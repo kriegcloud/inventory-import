@@ -7,6 +7,10 @@ tags: [alchemy-domain, read]
 
 # Query
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A query is a message a client sends to ask something no single key can answer: "this organization's items, sorted,
 filtered and searched, a page at a time". It declares its `input`, its `success` schema, whether it is `paged`, the
 reads it may wait on (`waitsFor`), its `middleware` and its `rejects`. Its Layer is one handler, built once, that

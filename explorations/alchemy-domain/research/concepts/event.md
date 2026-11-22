@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Event
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An event is a fact a command produced: `ImportConfirmed`, `ItemEdited`. It is a Schema class with a tag and fields,
 so it encodes the same way wherever it is stored or sent. An aggregate's history is its events and nothing else: its
 state comes from folding them with `evolve`, and every [view](./view.md), [policy](./policy.md) and
@@ -201,7 +205,8 @@ take-back). The import's `revision` today is the stream's `version`: every settl
 - `Import.predict(state, command, { id, now, version })` returns the events and one envelope per event with `seq`
   continuing from `version` (`Aggregate.ts` lines 470-534), a pure unit test for `seq` and `at`. On main `predict`
   takes no `id`: it reads it through `keyOf`.
-- `Domain.verify(model)` reports `DuplicateEventTag` when two event classes share a tag (`DefinitionError.ts` line 7).
+- `Domain.verify(model)` reports `DuplicateEventTag` when two event classes share a tag (`DefinitionError.ts` line 7);
+  at the pin `734c27a` `Domain.verify` is removed and building the model's Layer dies with it.
 - On main, `Verify.aggregate(X)` reports "decide for <command> returns something that is not an event" when an
   event is built with `.make` (`Prove/internal/Paths.ts` lines 238-242), and "constructs a class, which is not an
   event, a rejection or a command" when it is imported by package name; nothing is proved then. A report that proves

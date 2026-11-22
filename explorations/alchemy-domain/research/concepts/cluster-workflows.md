@@ -7,6 +7,10 @@ tags: [alchemy-domain, extra]
 
 # Workflows (Effect workflows and their engines)
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A workflow is a function whose steps survive the process that runs them. Each step is an **activity**: a named
 Effect whose result (success or typed failure) is written to a journal the first time it finishes. A run that stops,
 because its Worker was evicted or a deploy replaced it, is started again from the top, and every activity already in

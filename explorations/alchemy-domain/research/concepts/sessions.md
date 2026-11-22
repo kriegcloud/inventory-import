@@ -7,6 +7,10 @@ tags: [alchemy-domain, people-and-clients]
 
 # Sessions and request context
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A request context is an Effect service that travels with a request into the domain. Middleware on the Api provides
 it (for example "who is signed in"); the domain encodes it with its schema when a command is sent, and decodes it
 again wherever the aggregate runs, so an effectful `decide` (and a view's `validate`) can `yield*` it. The docs put

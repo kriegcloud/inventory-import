@@ -7,6 +7,10 @@ tags: [alchemy-domain, reaction]
 
 # Policy
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A policy is a "whenever this happens, do that" rule of the business, written as code. It names the aggregates or
 views it listens to (`from`) and the events it reacts to (`on`); its handler runs after the event has committed,
 decides whether to act, and acts by sending commands to aggregates or calling [external systems](./external-system.md).

@@ -7,6 +7,10 @@ tags: [alchemy-domain, layout]
 
 # Project layout
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Upstream lays out a project so a file's name says what it holds and the model never depends on how it is hosted. Each
 file holds one building block and is named after the block's noun and its kind (`Account.aggregate.ts`), folders are
 subdomains, and the work splits into three packages: a pure domain package, a server package that hosts it and
@@ -167,7 +171,7 @@ closest thing to upstream's pure domain package, and importable by `host` and `w
 | `.api` | `model` | `src/Catalog.api.ts`; its HTTP surface stays in `host/src/Catalog.http.ts` |
 | `.middleware` | each model's package (declaration, reached by a relative path); `access/host` (implementation) | `catalog/model/src/Session.middleware.ts`; `access/host/src/SessionIdentity.adapter.ts`. The kernel's `Identity.middleware.ts` stays for `/api/v1` |
 | `.context` | each model's package, reached by a relative path | `catalog/model/src/Actor.context.ts`, `access/model/src/Actor.context.ts`; the kernel's `Actor.context.ts` stays for `/api/v1` |
-| stories and the `verify` test | `model/test` | `test/Catalog.story.test.ts`, `test/Catalog.model.test.ts` |
+| stories and the declaration's test (its Layer built, at the pin) | `model/test` | `test/Catalog.story.test.ts`, `test/Catalog.model.test.ts` |
 | hosting (the Worker) | `host` + the app | `catalog/host/src/Host.ts`, `apps/inventory/src/server/App.ts`, `worker.ts` |
 
 ### Where the blocks may live: what the prover on main needs
@@ -210,8 +214,9 @@ The choices, none picked here (the owner decides):
 ## How to check it
 
 - `bun run boundaries:check` (the app's boundary law) refuses a `model` file that imports a `host` or a driver.
-- `Domain.verify(Catalog)` in `packages/catalog/model/test` proves the model package holds a complete model without a
-  host (see [model](./model.md)).
+- A test in `packages/catalog/model/test` that builds `Catalog`'s Layer on `InMemory` (at the pin `734c27a`;
+  `Domain.verify(Catalog)` at `dbfd0dd`) shows the model package holds a complete model without a host (see
+  [model](./model.md)).
 - A story test that runs on `Domain.InMemory` with no D1 proves the model package needs no infrastructure (see
   [story](./story.md)).
 - On main, `Verify.aggregate(X)` for each aggregate, one aggregate name per test file, proves the blocks are where the

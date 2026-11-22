@@ -7,6 +7,10 @@ tags: [alchemy-domain, extra]
 
 # Resend
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `@distilled.cloud/resend` is a generated Effect SDK for Resend's REST API: every Resend operation is a function that
 returns an `Effect` with a typed input, a typed output and the tagged errors that operation can answer. Sending a mail
 is one operation, `createEmail`; it needs an `HttpClient` and a `Credentials` service in context, both provided as

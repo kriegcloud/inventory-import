@@ -7,6 +7,10 @@ tags: [alchemy-domain, host]
 
 # Backfill
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A backfill is the work that gives a consumer added after its sources recorded events (a new view or
 [projection](./projection.md), or one whose `version` was bumped) the history it missed, in the order the events
 were recorded. Nobody runs a script: the deploy declares one run per consumer generation, the run walks a directory

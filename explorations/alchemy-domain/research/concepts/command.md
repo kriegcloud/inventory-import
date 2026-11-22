@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Command
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A command is a request someone makes of the model, named as an instruction (`ConfirmImport`, `EditItem`). It is also a
 contract: its declaration lists the data it carries, every event it may record, every refusal it may return, the
 middleware that guards it, and the reply its caller gets. The aggregate that handles it may only answer with what the
@@ -268,12 +272,13 @@ story(
 )
 ```
 
-`Domain.verify(model)` (`Model.ts` line 386) reports declaration problems such as `DuplicateEventTag` and, for an
-Api, `UnroutedCommand` (a served command no hosted aggregate handles) and `DuplicateCommand` (two calls of an Api
-would be the same CLI command) (`DefinitionError.ts` lines 7, 157-164, 305-315). In the trial on beta.87
-`Domain.verify(Inventory)` answered `[]`. A `decide` that returns an undeclared event or rejection is not caught by
-`verify`; it dies at run time with `UndeclaredDecision`. On main, [Verify](./verify.md) also proves the aggregate's
-[invariants and transitions](./invariants-and-transitions.md) for every command.
+`Domain.verify(model)` (`Model.ts` line 386; removed at the pin `734c27a`, where building the model's Layer finds these
+and dies with every one, so the check is a test that builds it, as [model](./model.md) shows) reports declaration
+problems such as `DuplicateEventTag` and, for an Api, `UnroutedCommand` (a served command no hosted aggregate handles)
+and `DuplicateCommand` (two calls of an Api would be the same CLI command) (`DefinitionError.ts` lines 7, 157-164,
+305-315). In the trial on beta.87 `Domain.verify(Inventory)` answered `[]`. A `decide` that returns an undeclared event
+or rejection is not caught by `verify`; it dies at run time with `UndeclaredDecision`. On main, [Verify](./verify.md)
+also proves the aggregate's [invariants and transitions](./invariants-and-transitions.md) for every command.
 
 ## What it needs
 

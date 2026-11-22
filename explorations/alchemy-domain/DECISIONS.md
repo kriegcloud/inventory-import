@@ -16,21 +16,26 @@ it.
 Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names the
 earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered on
 2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only one
-point his answers left is open: 21a, under decision 21, asked when move 6 opens (and one unnumbered point under decision
-14, below); 14a, 14b and 34a were answered later the same day and are under "Answered". 24 stands on his earlier infra
-answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not open. Decisions 42 to 56
-and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the others stay as the brief
-gives them.
+point his answers left is open: 21a, under decision 21, asked when move 6 opens (and three unnumbered points, below: a
+warning before a group's undo, under decision 8, accepted fixes after a keep, under decision 14, and the check of who
+may change a row or a group beside the lock); 14a, 14b and 34a
+were answered later the same day and are under "Answered". 24 stands on his earlier infra answer, I8 ("Close sign-up; I
+add accounts", 2026-11-19), and was not asked again: it is not open. Decisions 42 to 56 and 60 to 62 are asked each when
+its move opens, as he chose on 2026-11-22. The numbers of the others stay as the brief gives them.
 
-One point the brief leaves open, not numbered and not yet asked: when Ana undoes a group after Dana changed one of its
-rows, the screen says "Row 14 was changed by Dana and stays". A group's undo names no `seen`, so the undo can be taken
-from a screen that has not received Dana's act, and the sentence can only follow the undo. Whether the screen also warns
-before the undo, when it already holds a later decision on one of the group's rows, is his to decide.
+One point the brief leaves open, under decision 8, not numbered and not yet asked: when Ana undoes a group after Dana
+changed one of its rows, the screen says "Row 14 was changed by Dana and stays". A group's undo names no `seen`, so the
+undo can be taken from a screen that has not received Dana's act, and the sentence can only follow the undo. Whether the
+screen also warns before the undo, when it already holds a later decision on one of the group's rows, is his to decide.
 
-A second unnumbered point, under decision 14, not yet asked: a rival someone decides after the keep takes that decision
-(14a), and a clash is shown when that would import both rows with one SKU. Whether a decision after the keep that is
-only accepted fixes counts as such a decision, or leaves the rival out as one made before the keep does ("As today,
+A second unnumbered point, under decision 14, not yet asked: a decision someone makes on a rival after the keep wins
+over the keep (14a), and a clash is shown when that would import both rows with one SKU. Whether an accept made on a
+rival after the keep counts as such a decision, or leaves the rival out as one made before the keep does ("As today,
 never overwrite a choice"), is his to decide.
+
+A third unnumbered point, not yet asked: whether our check that each decision recording on a row or a group states the
+three rules on who may change it (`missingRules`) stands beside his answer "no hand-written assertions". It was removed
+with the hand-written lists and restored on the build's branch, by the build's own report, without asking him.
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
@@ -96,11 +101,11 @@ In the model (trial 13): the import numbers every change. The confirm names the 
 none before it missing, the change its plan was built at, and what its button said; the import takes it only when both
 numbers are its last, the plan does what was shown, and no group act is being sent (`AConfirmNamesEveryChange`,
 `APlanIsOfEveryChange`, `APlanDoesWhatWasShown`, `NothingEndsAReviewWhileAGroupIsSent`, proved). In the model he later
-chose (the sixth round, `review14`) a group is one act and is never "being sent": the first three rules are proved there
-too, and the fourth is not in it. The rule for the
-number a screen may name ran as a property, on a copy of the rule written in the test and not on the screen's code. That
-the screen sends Confirm only after its own acts came back, and that the handler builds the plan from rows written up to
-that change, are tests to write: not run. Reverse: a new decision by him.
+chose (the seventh round, `review15`) a group is one act and is never "being sent": the first three rules are proved
+there too, and the fourth is not in it. The rule for the number a screen may name ran as a property, on a copy of the
+rule written in the test and not on the screen's code. That the screen sends Confirm only after its own acts came back,
+and that the handler builds the plan from rows written up to that change, are tests to write: not run. Reverse: a new
+decision by him.
 
 ### 2026-11-20 — rows that wait unsaved when the page is reloaded
 
@@ -179,8 +184,9 @@ What each leaves unproved is in the brief under its number: for 2, that the queu
 3, that the screen says whose the row is, and, under decision 7's later answer (a group is one unit), that "No, it stays
 Dana's" and "Answer says 'no change'" hold only when the screen sends `covered: false` and leaves out of a group the
 rows that already hold what it gives: no rule checks `covered`, and with it set a repeat is recorded as the sender's
-(the brief, decisions 3 and 7; not run); for 6, what the two digests cover. That condition was not put to him with
-decision 7.
+unless the act also says it leaves the row reading as it reads (`asItReads`, under his later answer "No change, Ana's
+undo applies", below) (the brief, decisions 3 and 7; not run); for 6, what the two digests cover. That condition was not
+put to him with decision 7.
 
 ### 2026-11-22 — decisions 4, 13, 15 and 16 of the brief
 
@@ -286,6 +292,11 @@ Decision 28 was put to him as not run. With decision 32 he was told that his ans
 `CurrentActor` stands, and that the model's is a second declaration of the same name. With decision 39 he was told that
 a removed person's email stays in the events until their organization leaves.
 
+Decision 37's mechanism changed after he answered: the pin can import already-decided events into an aggregate
+without running a decision (a client's `import`, to which policies and sagas never react), so adopting at first touch
+needs no `Adopt…` command and no rewrite of `NothingIsWrittenBeforeConfirm` (the brief, decision 37; not run). He chose
+the outcome, not the command.
+
 ### 2026-11-22 — decision 35 of the brief, 57 to 59, and the rest at their move
 
 The last round of the same dialog. Of each: I chose; the agent recommended the same. Reverse each: a new decision by him.
@@ -351,9 +362,9 @@ new decision by him.
 The eight broken variants named in the question (of `review12`) each removed a refusal and were caught by the prover
 (`NotProved`): they show that the proofs break when a check is removed, which is the half of what must never happen. A
 variant that records nothing proved every rule and was caught only by a story. On the model he chose (the trial page's
-sixth round, `review14`) that each valid act is taken is held by its 43 stories, each of the eleven commands taken in a
-story with its events asserted; each of its 11 mutants whose act records nothing breaks no rule and fails at least one
-story.
+seventh round, `review15`) that each valid act is taken is held by its 45 stories, each of the eleven commands taken in
+a story with its events asserted; on `review14`, before the no-change answer, each of its 11 mutants whose act records
+nothing breaks no rule and fails at least one story.
 
 ### 2026-11-22 — an undo after a group, and an undo behind a group
 
@@ -381,12 +392,12 @@ again if they still mean it.
 Further answers by dialog on the same day. Reverse each: a new decision by him.
 
 - **The pin.** The library's `main` is pinned at `734c27a`, 67 commits past the `dbfd0dd` every trial on the trial page
-  ran on; no trial ran on `734c27a`. On it the model he chose is built on the branch
-  `claude/alchemy-review-model-f206c6` (135 rules proved, 7 searched, 11 reached, 45 stories, by its own report) and the
-  per-row model on `claude/alchemy-review-model-parked` (96 proved, 3 searched). His words: "All I know is I want the
-  latest version of alchemy. We will likely need to update effect & alchemy again before Wednesday comes." How often it
-  moves, under decision 1: "In the repo, re-pin only when needed"; one pin's builds are 38.7 MB in the repository,
-  measured. The options put with it, as the architecture's record gives them ([its
+  ran on; no trial ran on `734c27a`. On it the model he chose is built on the build's own branch, which is to merge into
+  main beside the brief (135 rules proved, 7 searched, 11 reached, 47 stories, by the build's own report), and the
+  per-row model on a branch kept privately as the fallback (96 proved, 3 searched, by the build's own report). His
+  words: "All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again
+  before Wednesday comes." How often it moves, under decision 1: "In the repo, re-pin only when needed"; one pin's
+  builds are 38.7 MB in the repository, measured. The options put with it, as the architecture's record gives them ([its
   DECISIONS.md](../ideal-architecture/DECISIONS.md), "Alchemy, where the pinned build is kept and how often it moves"):
   the files in the repository, moved only when needed; the files as release assets on GitHub; in the repository, moved
   often.
@@ -399,23 +410,26 @@ Further answers by dialog on the same day. Reverse each: a new decision by him.
   `RowUnit`, `GroupUnit`, `Review` and `ReviewApi` are these.
 - **A rule that each command can happen.** Question: the library now has `sometimes` rules, which the search answers
   "reached" or "unreached"; does each command get one, beside the stories? Answer: "Yes, one per command". On the
-  build's branch the eleven are reached, one for each command; not run on any trial model.
+  build's branch the eleven are reached, one for each command, by the build's own report; not run on any trial model.
+  The options he saw are not on record, nor is a recommendation. I chose.
 - **What holds the standing of each rule.** Answer: "The library's lock file": the library's `lock` option records each
   rule's standing, in place of a list written by hand, once it is shown to catch a rule that slipped. Not yet run.
+  Options: "The library's lock file"; "Both"; "Keep the hand-written list" (as the architecture's record gives them);
+  which was recommended is not on record. I chose.
   Corrected later the same day: at the pin the lock keeps each rule's text, not its standing; his answer then, "Lock
   plus the library's proved list", is under "the lock file corrected, a press that changes nothing, a keep after an
   earlier decision, a waiting undo" below.
 - **What is shown on Wednesday 2026-11-25.** Answer: "Chosen design, parked one as fallback": the model with a group as
   one unit is the one built for `main`; the per-row model stays on a branch as what is shown if the chosen one is not
   merged by Tuesday evening. As the architecture's record has it: if the chosen model is not checked and merged by the
-  evening of 2026-11-24, he shows Verify on the per-row model from a local branch on his own machine
-  (`claude/alchemy-review-model-parked`), and says plainly that it is the alternative he did not choose; that branch is
-  kept running on the pinned build and gets nothing else.
+  evening of 2026-11-24, he shows Verify on the per-row model from a local branch on his own machine, kept privately,
+  and says plainly that it is the alternative he did not choose; that branch is kept running on the pinned build and
+  gets nothing else. The options he saw are not on record, nor is a recommendation. I chose.
 - **Where decision 34's search runs in CI** (34a): answered later the same day, under "a keep and its rivals, a group
   taken back over a changed row, waiting acts, and where the search runs" below.
 
-For "Yes, one per command", "The library's lock file" and Wednesday the options put with each question and whether the
-recommendation was the same as his answer are not recorded here.
+For "Yes, one per command" and Wednesday the options he saw are not on record; for none of the three is a
+recommendation recorded.
 
 ### 2026-11-22 — a keep and its rivals, a group taken back over a changed row, waiting acts, and where the search runs
 
@@ -437,11 +451,14 @@ and its third option are recorded as he saw them; "as modelled" there is only ha
 row acts, and the leave-out of both rows was the brief's written rule for `review`, which no model contains and which
 did not run.
 
-So under decision 14 a keep never leaves a rival out against a decision someone made on that rival, and two keeps of
-one SKU are a clash, not two leave-outs. That changes the rule `review` applies to rivals; it is in no model and not
-run. His later answer, "As today, never overwrite a choice" (under "the lock file corrected, a press that changes
-nothing, a keep after an earlier decision, a waiting undo" below), narrows it: a rival whose decision is only accepted
-fixes, a person's or a group's, is still left out by the keep; only a rival someone kept or edited is not overwritten.
+So under decision 14 a decision someone makes on a rival after the keep wins over the keep, with a clash shown when it
+would import both rows with one SKU, and two keeps of one SKU are a clash, not two leave-outs. Whether an accept made
+on a rival after the keep counts as such a decision was not asked and is open ("Open", above). That
+changes the rule `review` applies to rivals; it is in no model and not run. His later answer, "As today, never
+overwrite a choice" (under "the lock file corrected, a press that changes nothing, a keep after an earlier decision, a
+waiting undo" below), is of the other order, a rival decided before the keep: one whose decision made before the keep
+is only accepted fixes, a person's or a group's, is left out by the keep; one kept or edited before it is not
+overwritten, and the clash is shown.
 
 **Group undo, changed row.** Question: Ana accepts a fix for 12 rows; Dana types a quantity on row 14 on top of it; Ana
 undoes her group; the model leaves row 14 with Dana's whole decision, the group's fix included, where today's app strips
@@ -481,7 +498,8 @@ of rule names. Options: "Lock plus the library's proved list" (Recommended); "Lo
 Answer: "Lock plus the library's proved list": the lock catches a rule removed or reworded; `require.proved` fails the
 build when a named rule is no longer proved; no hand-written assertions.
 
-What follows from it, as the library at the pin and the build's branch (`claude/alchemy-review-model-f206c6`) show it:
+What follows from it, as the library at the pin and the build's branch show it (the branch's figures by the build's own
+report):
 
 - The lock and `require` are options of Verify's reports only: `Verify.report` and `Verify.model` over a model, and
   `Verify.aggregate`. `Prove.report` (an aggregate) and `Prove.decisionReport` (a decision) take the source file, and
@@ -489,19 +507,20 @@ What follows from it, as the library at the pin and the build's branch (`claude/
 - In `bun run check` the `prove` task runs five tests: the import's own 37 rules for each of its seven commands under
   `Prove.report(Import)`, and each of `Deciding`, `Undoing`, `DecidingGroup` and `UndoingGroup` under
   `Prove.decisionReport`. Each fails on any rule its report does not give as proved, whatever its name, with what the
-  solver found. A decision's test also fails when it states no rule of an aggregate it reads or leaves out one of the
-  rules on who may change a row or a group (`missingRules`), and holds its count of paths, that every state it leaves
-  fits its aggregate's schema, that some state lets it record, and that the prover read every check. Which rules there
+  solver found. A decision's test holds its count of paths, that every state it leaves fits its aggregate's schema,
+  that some state lets it record, and that the prover read every check. Which rules there
   are is not checked there: in `bun run check` a rule that slips is caught by the report itself, and a rule taken out of
   a decision or renamed is not caught; the lock catches it, in `check:full`, CI's `proofs` job and the nightly run. The
-  lists of rule names written by hand (`packages/catalog/model/test/rules.ts`) are on the per-row model's branch
-  `claude/alchemy-review-model-parked` only.
+  lists of rule names written by hand (`packages/catalog/model/test/rules.ts`) are on the per-row model's branch only,
+  kept privately.
 - The lock acts in `check:full`, CI's `proofs` job and the nightly run, where `Catalog.verify.test.ts` runs
   `Verify.report` over `Catalog` with `lock: "./Catalog.lock.json"` and fails on a rule the lock holds differently or a
-  rule relocked. On the branch that test passes no `require`: it asserts each rule's standing from its kind (a model
-  invariant or an `eventually` rule checked, a `sometimes` rule reached, every other rule proved), and that every
-  decision states the rules on who may change what it records on. Under his answer the rules that must be proved are
-  named in its `require.proved`, in place of the assertion by kind. Not yet done.
+  rule relocked. On the build's branch as it stands, that test passes `require.proved`, with every rule the lock keeps
+  of the kinds a proof covers (135, by the build's own report), in place of the assertion by kind it had before.
+- The check that every decision recording on a row or a group states that aggregate's three rules on who may change
+  it: on the build's branch each of the four decision proofs calls `missingRules`, which fails, naming the decision,
+  when one leaves out the three rules, by the build's own report. It was removed with the hand-written lists and then
+  restored; his answer did not name it (under "Open").
 
 **Press that changed nothing.** Question: Ana's group leaves 12 rows out; Dana presses something on row 14 that changes
 nothing, because the row already reads that way through the group; Ana undoes her group; as written, row 14 stays left
@@ -510,17 +529,23 @@ Answer: "No change, Ana's undo applies": Dana's press is answered "no change" an
 has it; after Ana's undo row 14 is undecided like the other 11. "Row 14 stays whole" holds only for a press that changed
 the row. So a row's act carries what its sender says of the reading (`asItReads`: the act leaves the row reading as it
 reads now through its groups), as it carries `covered`, and such an act records nothing. The trial model `review15`
-makes that change; its results go on the trial page when its proofs have run. No rule checks what the sender says. The
-repository's model has the same exit to change: on the build's branch `Deciding.decision.ts` answers "no change" only
-when the row is not covered.
+makes that change, its results on the trial page's seventh round, and takes that exit only after the checks of the
+decision the sender saw on the row and of the matching, so a press from a screen that missed a later decision there or
+a new match is refused and held, as decision 2 has it, not answered "no change" (its story: "a press over a group from
+a screen that missed a later decision on the row is refused and held, not answered no change"). No rule sees that
+order: with the exit put back ahead of the check of what the sender saw, every rule is still proved and only that story
+fails. On `review15` the row's act has 284 paths and 135 rules are proved. No rule checks what the sender says.
+On the build's branch `Deciding.decision.ts` has the same exit, taken after the checks of the decision the sender saw
+and of the matching, by the build's own report.
 
 **Keep vs earlier** (decision 14a's other order, under decision 14). Question: row 10 already had a decision before Ana
 keeps row 4: does the keep leave it out? Options: "As today, never overwrite a choice" (Recommended); "Any earlier
 decision is a clash". Answer: "As today, never overwrite a choice": a rival whose decision was only accepted fixes, by a
 person or by a group, is left out by the keep, as today; a rival someone deliberately kept or edited is not overwritten:
-the clash is shown, naming both people, and neither row imports until it is settled. It narrows the record of 14a
-above, and changes the rule `review` applies to rivals (decision 14 of the brief has the three cases). In no model and
-not run.
+the clash is shown, naming both people, and neither row imports until it is settled. It is the other order from 14a
+above, a rival decided before the keep, and leaves 14a as it was for a decision made after the keep; whether an
+accept made on a rival after the keep counts there stays open ("Open", above). It changes the rule `review` applies
+to rivals (decision 14 of the brief has the three cases). In no model and not run.
 
 **Waiting undo.** Question: when a colleague's group lands, what happens to a waiting undo on a row the group does not
 touch? Options: "Sent again by itself" (Recommended); "Ask to press undo again". Answer: "Sent again by itself"; only an

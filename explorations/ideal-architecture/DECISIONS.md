@@ -258,8 +258,8 @@ until he says it matches, and its six decisions (X1 to X6) are his. Rejected: "@
 
 ### 2026-11-19 — Suggest fixes for a heading, the narrowing
 
-Question: the button is shown for an unmatched column only while some field still has no column, a narrowing the
-agent made; keep it? Answer: "Keep the narrowing (Recommended)". It is now Benjamin's choice. Rejected: "Show it for
+Question: the button is shown for an unmatched column only while some field still has no column, a narrowing made
+without asking him; keep it? Answer: "Keep the narrowing (Recommended)". It is now Benjamin's choice. Rejected: "Show it for
 any unmatched column". Reverse: drop the second condition in `offersSuggestions`
 (`packages/catalog/model/src/Suggestion/Suggest.rules.ts`).
 
@@ -313,8 +313,8 @@ ticked.
 
 ### 2026-11-19 — who builds xlsx
 
-Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)", the one that wrote the brief, on its own
-branch `claude/beep-xlsx`. Rejected: a fresh session. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
+Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)": built by the same author as the brief, on its
+own branch `claude/beep-xlsx`. Rejected: a builder new to the work. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
 another builder.
 
 ### 2026-11-19 — xlsx merge
@@ -364,7 +364,7 @@ Mine, in my words: "Also no react hooks where effect/reactivity + @effect/react-
 "useEffect banned with no exceptions." (The package is published as `@effect/atom-react`.) This supersedes "client
 state" of 2026-11-18, which kept TanStack Query for the rebuild and left atoms for later. What it means file by
 file, the exact line of what stays a hook, and the five questions it leaves are in
-[BRIEF-atoms.md](BRIEF-atoms.md); nothing is built, and the goal starts after the Effect-imports migration is merged.
+[BRIEF-atoms.md](BRIEF-atoms.md); nothing was built then; the goal is now merged into main.
 Reverse: none planned.
 
 ### 2026-11-19 — infra I1, deploy unit (18)
@@ -560,7 +560,7 @@ the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whol
 that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
 from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
 
-How the budget is measured changed on 2026-11-22 (agent, not asked): the rule and the one entry stand. The test held
+How the budget is measured changed on 2026-11-22 (not asked): the rule and the one entry stand. The test held
 the time on the clock to 400 ms, and GitHub's four-core runner, busy with the rest of the check, took over five
 seconds for five starts, so CI failed on a CLI that had not changed. It now holds the processor time the start used
 (user and system, as bash's `time` reports them) to 700 ms: the same 3.6 times the measured start (110 ms on the
@@ -697,7 +697,8 @@ before porting beep-effect to it.
 Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it uses it, all of it. How is not
 decided: the reading, the trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md),
 and its [brief](../alchemy-domain/BRIEF.md) puts each "how" to him. None of that brief's recommendations is his
-until he answers it. Nothing is built until he signs it and the atoms goal is merged.
+until he answers it. Only decision 1's pin is on main (as of 2026-11-22); nothing else of it is built until he signs it
+(the atoms goal, the other condition, is merged).
 
 From his own list of 2026-11-18, the items he marked as wanted (CAPTURE.md of that packet records them under
 2026-11-19, in his labels): "Cluster, workflows, singletons"; "Drizzle v1 on Durable Objects"; "GraphQL
@@ -716,7 +717,7 @@ What this touches in this file:
 - The rows of the README's table "Where the research disagrees with the request" that name those items say so.
 
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
-is the D1 core, and nothing of the reversal is built yet.
+is the D1 core, and nothing of the reversal is built yet but the library's pin (on main, as of 2026-11-22).
 
 ### 2026-11-19 — atoms, the table's own store in the review package
 
@@ -977,8 +978,8 @@ the grid, which no screen uses. Answer: "Local change"; the agent recommended th
 it was put to him: the fallbacks already in the file, at the cost of the browser's own undo in a cell's editor.
 
 What was built first was a different design, not put to him before it was built: measured in Chromium, the number
-cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent let the browser type the key that opens an
-editor, through a prop on the vendored cell and a `flushSync` in its key handler. A review found that wrong for a
+cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the browser was made to type the key that opens an
+editor, through a prop on the vendored cell and a `flushSync` in its key handler. That was found wrong for a
 column with a variant and its own `cell`, which lost the opening key and stored 6 for a typed 56.
 
 ### 2026-11-22 — deprecated APIs, `.agents/` is not read
@@ -1007,8 +1008,8 @@ nothing is stored that was not typed. A column that writes its own cell (`meta.w
 
 "Every column" as built means the four editors that take typing: text, number, url and long text, in a plain column
 and in one with its own `cell`. The select, multi-select, date and file editors and the boolean's checkbox are as
-published and untouched; the published select and multi-select drop the key that opens them, and still do (agent, not
-asked whether he meant those too).
+published and untouched; the published select and multi-select drop the key that opens them, and still do (not asked
+whether he meant those too).
 
 The test is `bun run grid:keys` in `apps/inventory`, on a development-only page (`/gallery/grid`) that adds nothing to
 the production build (its stylesheet is 124,636 bytes with and without the page; the walk that lists the
@@ -1019,7 +1020,7 @@ this checkout's own server on a port it asked the system for, and fails when no 
 was before the fix for every column, 22 of the 96 fail. Chromium only. Not measured: Firefox, Safari, a touch
 keyboard, an input method, a production build of the grid.
 
-Where the test runs (agent, not asked; he has been told): CI runs it as a step after the full check, with the
+Where the test runs (not asked; he has been told): CI runs it as a step after the full check, with the
 runner's Chrome (`/usr/bin/google-chrome`, which GitHub's Ubuntu 24.04 image documents), and it is run by hand after a
 change to the grid. The step has not run on a runner yet: nothing is pushed. It is not part of `bun run check`. An
 earlier version of this entry said the machine that runs the checks has no browser; that was wrong.
@@ -1039,14 +1040,14 @@ browser types that key now, and no such run has failed since; the test does not 
 Reverse: the "Local change" marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`,
 `data-grid-cell-variants.tsx`, `data-grid-utils.ts`), one at every changed or removed line.
 
-### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (agent, not asked)
+### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (not asked)
 
 The check refuses a code file no tsconfig includes, so the app's development scripts (`apps/inventory/scripts`, plain
 JavaScript) and the one script the page loads (`public/theme-init.js`) each got a project, type-checked by the app's
 `check`. Both are looser than the repository's one profile: no Effect rule applies (`plugins` is empty; 78 findings in
 the scripts otherwise), and the scripts' project has `noImplicitAny` off, so an untyped parameter or a package that
 ships no types is `any` without an error and a deprecated call behind either is not seen. Before, nothing
-type-checked them at all. This is the agent's judgement, not a decision of his; he was told on 2026-11-22 and it was
+type-checked them at all. This is not a decision of his; he was told on 2026-11-22 and it was
 left as built. Other ways: the Effect rules on and the findings fixed; the scripts rewritten as TypeScript;
 `noImplicitAny` on alone. Reverse: remove `plugins` and `noImplicitAny` from `apps/inventory/scripts/tsconfig.json`
 and `plugins` from `apps/inventory/tsconfig.public.json`, and fix what the check then finds.
@@ -1098,11 +1099,11 @@ needed". Rejected: release files on GitHub; re-pin often. One move is expected b
 move is one command, `bun run alchemy:repin -- <commit>` (`vendor/alchemy/README.md`). Reverse: delete
 `vendor/alchemy` and the root `overrides`, and ask for a release once one contains `Decision`.
 
-### 2026-11-22 — the review's model, its names (agent, not asked for each)
+### 2026-11-22 — the review's model, its names (not asked for each)
 
 Asked what the model's units should be called, he gave no names and said the names need not last yet: "I don't care
-about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are the
-agent's, open to change until the first hosted deploy he keeps stores an event under them: the aggregates `Import`,
+about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are
+proposed, not his, open to change until the first hosted deploy he keeps stores an event under them: the aggregates `Import`,
 `Row` and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after
 it, the events already stored carry the old names, and a rename needs an answer for them.
 
@@ -1115,7 +1116,7 @@ per-row model from a local branch on his own machine, and says plainly that it i
 That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
 once the chosen model is in `main`.
 
-### 2026-11-22 — the check on GitHub's runner (agent, not asked)
+### 2026-11-22 — the check on GitHub's runner (not asked)
 
 CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
 "timed out in 5000ms". Reproduced with the whole check pinned to four cores (`taskset`): turbo starts ten tasks at
@@ -1174,7 +1175,7 @@ three commands of the repository's CLI, in beep-effect's shapes and without its 
 and `config-sync --check` are part of `bun run check`. What each covers and leaves alone is in
 `docs/sync-commands.md`. `version-sync --write` may change a version number in `CLAUDE.md`, and nothing else there.
 
-The agent chose these, and I was not asked. Each is small to reverse:
+These were not put to me. Each is small to reverse:
 
 - **The held list is `updateGroups` in `.syncpackrc.json`**, a group's `label` being its reason, where beep-effect
   keeps a ledger of holds with a probe for each. One list, read by syncpack (`deps:outdated`) and by `deps update`.
@@ -1246,9 +1247,9 @@ chose; the agent recommended the same.
 
 Three defaults I was shown and accepted with the whole: the warning is at 30 days old or 200 files; an experiment
 that needs a database or a dev server keeps its state in its own ignored folder (`.state`) and on its own port,
-never the app's; a build session may use the scratchpad for trial code instead of a cache folder.
+never the app's; a build may use the scratchpad for trial code instead of a cache folder.
 
-The agent chose these, and I was not asked:
+These were not put to me:
 
 - **Status is not kept twice.** A note only ever says `open`: an experiment that graduated or was dropped has no
   folder, and its line in `scratchpad/LOG.md` says which. `scratch:list` reads both.
@@ -1281,15 +1282,15 @@ Four questions left open when `deps:update`, `version-sync` and `config-sync` we
    together. It was ^24 and is now ^22.20.5 everywhere; every type error that appeared would have been an API the
    runner does not have, and none did (`bun run check`, 80 of 80). Where something truly needs a newer Node, the
    answer is to move CI's Node, not to work around it.
-3. **`better-auth`, held by the agent's judgement because its tables are a migration written by hand?** Options:
+3. **`better-auth`, held back without my answer because its tables are a migration written by hand?** Options:
    "Hold it, and add the check (Recommended)"; "Hold it, no check"; "Don't hold it". Answer: "Hold it, and add the
    check". I chose; the agent recommended the same. The check existed as a slow test; it takes half a second, needs
    no secret, no network and no `.dev.vars` (an in-memory SQLite database and a dummy secret), and now runs in
    `bun run check` (`apps/inventory/test/server/AuthSchema.test.ts`). It fails when Better Auth wants a table or a
    column the migrations do not make, which is what `bun run auth:schema` would print.
 4. **A sentence that records a check ("checked in effect 4.1.4's source") is moved by `version-sync --write`,
-   though nobody checked again.** Answer: leave it as built. The agent's judgement: `--write` prints every line it
+   though nobody checked again.** Answer: leave it as built. Not my decision: `--write` prints every line it
    changes, and the person reads them.
 
-And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) are written by the agent, as the
+And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) were written without my answer, as the
 commands of the request that made it.

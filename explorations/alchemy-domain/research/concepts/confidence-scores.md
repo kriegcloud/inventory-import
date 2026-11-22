@@ -7,6 +7,10 @@ tags: [alchemy-domain, extra]
 
 # Confidence scores (TypeSafe through Effect's DecisionModel)
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 TypeSafe sells one API, System One, served by its model Jev. You send `state` (the content) and named typed
 questions, and get back typed answers. A **Choice** picks one option from a set and returns a probability for every
 option. A **Score** places the content on ordered levels. A **Noul** gives the probability that a yes-or-no
@@ -286,7 +290,8 @@ What changes, by part:
   as `packages/ai/typesafe/test/TypeSafeDecisionModel.test.ts` does.
 - A calibration run on labelled sample files (with options reordered) sets the thresholds; until then they are
   placeholders.
-- No `Domain.verify` rule or prover applies: this is not a domain declaration. App rule 8 ("a model proposes and
+- No declaration check of the library (`Domain.verify` at `dbfd0dd`, the Layer's build at the pin) and no prover
+  applies: this is not a domain declaration. App rule 8 ("a model proposes and
   never writes") still holds and is what the tests guard.
 
 ## What it needs

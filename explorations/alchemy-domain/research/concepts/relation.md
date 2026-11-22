@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Relation
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A relation is a rule a model states about a fixed few instances: one instance for each name in `over`, each given as
 its id and its state. Where a model's `invariants` are given every instance at once and can only be searched, a
 relation is small enough to prove: Verify shows that every command and every decision that records on one of its

@@ -7,6 +7,10 @@ tags: [alchemy-domain, host]
 
 # Observability
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A hosted model records its own work into whatever Effect tracer and metric exporters the runtime provides. Every
 command sent, every decide and commit, and every view, policy, projection, saga, external call, query and validate
 gets a span named after the building block, with structural attributes (`domain.*`) and never a payload value unless

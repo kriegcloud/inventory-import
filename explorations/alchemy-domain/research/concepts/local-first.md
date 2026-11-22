@@ -7,6 +7,10 @@ tags: [alchemy-domain, people-and-clients]
 
 # Optimistic updates, offline intents and predict
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 The server decides every command; the client only shows what it asked for before the answer arrives. Two of the
 four ways the docs describe work with a domain model: optimistic updates (show a pending line, confirm it when the
 event carrying the same `commandId` arrives on a live read) and offline intents (record what the person asked for,

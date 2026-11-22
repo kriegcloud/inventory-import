@@ -6,6 +6,9 @@ description: Every concept of @alchemy.run/domain and of what Benjamin asked to 
 
 # The map
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository builds
+on; what changed between that touches the verdicts is under "From `dbfd0dd` to the pin" below.
+
 One row per page of [concepts/](concepts/). The verdict is the page's own, in one of three forms; where the brief
 recommends otherwise, the row says so and names the decision:
 
@@ -21,7 +24,7 @@ A page that covers several arrangements has a row for each verdict it gives. Not
 
 | Concept | What it is | Today | Verdict |
 | --- | --- | --- | --- |
-| [Domain.Model](concepts/model.md) | One bounded context declared as a list of building blocks, checked by Domain.verify and hosted by Model.layer; inventory-import would declare one for the catalog and one for access. | no. | **Use.** declare `Catalog` and `Access` as two models on beta.87, test each with `Domain.verify` and stories on `Domain.InMemory`, and keep the handlers in one merged Layer per model. The brief's decisions 27 and 34 answer otherwise (2026-11-22): three models, `Catalog`, `Access` and `Usage`, checked with Verify. |
+| [Domain.Model](concepts/model.md) | One bounded context declared as a list of building blocks, checked by Domain.verify (by building its Layer at the pin) and hosted by Model.layer; inventory-import would declare one for the catalog and one for access. | no. | **Use.** declare `Catalog` and `Access` as two models on beta.87, test each with a test that builds its Layer on `Domain.InMemory` (`Domain.verify` at beta.87, removed at the pin) and stories on `Domain.InMemory`, and keep the handlers in one merged Layer per model. The brief's decisions 27 and 34 answer otherwise (2026-11-22): three models, `Catalog`, `Access` and `Usage`, checked with Verify. |
 | [Command](concepts/command.md) | A typed request to change one aggregate instance, with its input, the events it may record, the rejections it may return, its middleware and its reply; the app's confirm, take-back and item edit would each be one. | no. | **Use.** declare each import and item write as a command on beta.87 with `target`, built with `new`, pass the app's per-press request id as `commandId`, and keep middleware to one entry (or reverse the list) until the app takes main's list-order fix. The brief's decision 1 answers otherwise (2026-11-22): the app takes `main`, where a command has no `target`. |
 | [Event](concepts/event.md) | A fact the model recorded, named in the past tense and stored in an envelope; the app's import history (staged, rows settled, confirmed, taken back) and item edits would be events. | no. | **Use.** declare the import's and the item's history as events on beta.87, built with `new` inside domain blocks (with an exception to `newSchemaClass`), putting the counts and the actor in the event and reading time from the envelope. |
 | [Rejection](concepts/rejection.md) | A typed reason a command or read was refused, which records nothing and reaches the caller as declared; the app's stale review, closed import and changed item would be rejections. | yes, in its own form: `S.TaggedError` classes with `httpApiStatus`, for example `AlreadyImported`, `ImportKept`, `ImportNotFound` (`packages/catalog/contract/src/Import/Import.rejection.ts`) and `ItemChanged` (`packages/catalog/contract/src/Catalog.contract.ts` line 307). | **Use.** declare each refusal as a `Domain.Rejection` (or reuse the app's existing `S.TaggedError`s on beta.87) with `httpApiStatus`, build them with `new` inside domain blocks (with an exception to `newSchemaClass`), and handle them by tag at every sender. |
@@ -121,6 +124,33 @@ A page that covers several arrangements has a row for each verdict it gives. Not
 | [GitHub provider](concepts/github.md) | Alchemy's provider for github.com (repositories, rulesets, environments, Actions secrets and variables, webhooks, comments and runtime API bindings); this app uses it to declare the repository's deploy settings and its rule on main. | yes: `packages/infra/src/GitHub.stack.ts` (`Environment`, `Secret`, `Variable`, `Ruleset`), at `@alchemy.run/github` `2.0.0-beta.87` (`packages/infra/package.json`). | **Use.** keep declaring environments, secrets, variables and the ruleset in `GitHub.stack.ts` from the workstation, and add `Repository` (and, if wanted, a preview `Comment`) the same way. |
 | [GitHub provider](concepts/github.md) |  |  | **Cannot yet.** declare the workflow files. Nothing in the provider writes repository contents; it would take a new resource over GitHub's contents API (or a commit pushed by the deploy). Until then `ci.yml` and `deploy.yml` stay hand-written. |
 
+## From `dbfd0dd` to the pin
+
+The pages and this map were read at `main@dbfd0dd`; the repository pins `main@734c27a`, 67 commits later, read from
+the pin's own source. Five of those commits are marked breaking, and one of them touches what the pages recommend:
+
+- `60fea533` removes `Domain.verify`. Building a model's Layer checks the declaration and dies with every definition
+  problem at once, so the test that a model is well defined builds it on the in-memory host:
+  `Layer.build(Catalog.layer(handlers).pipe(Layer.provide(Domain.InMemory)))`, as the library's own example of a
+  model's unit test has it. Where a page says to test with `Domain.verify`, at the pin it means that.
+
+The other four (`4886524a`, Cloudflare containers; `784490fd`, Convex; `38042a75`, deploy environment values;
+`60d1eab6`, state encryption) are of packages outside the domain library, read from their titles only and not
+against each page. Not marked breaking, and changing what a page says:
+
+- `639ef3e5`: for each path through an aggregate's own command, Verify runs the real `decide` and `evolve` on inputs
+  the solver picks, and where they differ from what the prover read the rule is `Misread`, a seventh verdict (a match
+  over every `Prove.Verdict` needs a case for it). It adds `lock` (a file keeping each rule's text: a rule removed or
+  reworded fails, a drop in standing with the text unchanged does not), the model's `sometimes` rules ("reached" or
+  "unreached"), and suggested invariants (`suggest`, on by default; `relocked` and `suggested` in the report).
+- `93e5e720`: a schema with no JSON form in a state, command, event, reply or rejection, or an `initial` that does not
+  survive JSON, fails the model.
+- `6182c062`: a command's middleware list is typed in declaration order.
+- `36aef35d` and `7397367b`: a client's `import(target, events, { commandId, expectedVersion })` appends events
+  decided elsewhere without running `decide`; policies and sagas never react to them (decision 37 of the brief).
+- `907881e0`: a live read ends when its middleware's verdict runs out (`setExpiry`).
+- The package's exports close every `./*/internal` path.
+
 ## The reports
 
 | Report | What it holds |
@@ -131,4 +161,4 @@ A page that covers several arrangements has a row for each verdict it gives. Not
 | [04 The trial](04-trial.md) | What was run on the published release and on `main`, with the output and the source |
 | [05 Coverage ledger](05-coverage-ledger.md) | Every docs page and source file, each with how it was read |
 | [06 Export index](06-export-index.md) | Every exported name of the package, and the page that covers it |
-| [07 Saving review decisions, under Verify](07-review-decisions-trial.md) | Seven rounds of trials, with every source and every report of Verify: the shape under which the review's rules are proved, the largest value an object stores, and a decision, a relation, a model invariant and an `eventually` rule on this app; the row-by-row model of the fourth round, kept as the fallback; in the fifth, a group of rows decided as one unit; and, in the sixth, the model of his answers (`review14`) |
+| [07 Saving review decisions, under Verify](07-review-decisions-trial.md) | Seven rounds of trials, with every source and every report of Verify: the shape under which the review's rules are proved, the largest value an object stores, and a decision, a relation, a model invariant and an `eventually` rule on this app; the row-by-row model of the fourth round, kept as the fallback; in the fifth, a group of rows decided as one unit; in the sixth, `review14`; and, in the seventh, the model of his answers (`review15`) |

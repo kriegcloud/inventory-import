@@ -7,6 +7,10 @@ tags: [alchemy-domain, extras]
 
 # Alchemy Git
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `@alchemy.run/git` is a git host you deploy into your own Cloudflare account. It speaks git's smart HTTP protocol, so
 `git clone` and `git push` work against it unchanged; it serves a typed REST plane (`/api/v1`) with repositories,
 refs, objects, diffs and pull requests; and it answers a subset of GitHub's REST v3 API (`/api/v3`) for `gh api` and

@@ -7,6 +7,10 @@ tags: [alchemy-domain, people-and-clients]
 
 # Foldkit adapter and other clients
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Foldkit is an Elm-style front end on Effect: a Model changed only by Messages in `update`, Commands for side
 effects, Subscriptions for live data. The adapter derives, from one Domain [Api](./api.md), a Foldkit Command per
 Api command and per query, and a read namespace per View and Stream whose `watch` and `events` are ready-made

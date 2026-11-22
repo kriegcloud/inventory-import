@@ -7,6 +7,10 @@ tags: [alchemy-domain, read]
 
 # View
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A view is the read side of one key. It names the aggregates (or other views) it reads with `from`, says what one
 instance is about with `key`, and folds each event into a `state` with `evolve`, or turns events into events of its own
 with `emit`. The platform delivers each event to the view after the aggregate commits, at least once, in order per

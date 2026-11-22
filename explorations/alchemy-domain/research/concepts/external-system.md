@@ -7,6 +7,10 @@ tags: [alchemy-domain, reaction]
 
 # External System
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An external system is a service outside the model, declared in the model's own words: one entry per operation, each
 with its `args`, its `success` and the `error`s the model has an answer for. The declaration is an Effect service, so
 a [policy](./policy.md) or a [saga](./saga.md) resolves it with `yield*`, and a Layer built with `toLayer` supplies the

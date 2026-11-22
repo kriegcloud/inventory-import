@@ -7,6 +7,10 @@ tags: [alchemy-domain, surface]
 
 # Plain HTTP and OpenAPI (toHttpApi)
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An [Api](./api.md)'s typed client speaks Effect RPC. `toHttpApi` from `@alchemy.run/domain/Http` publishes the calls
 you list as plain HTTP and JSON instead: an Effect `HttpApiGroup` with one endpoint per call, an `HttpApi` holding only
 that group, the Layer of its handlers, and so an OpenAPI document. Every endpoint calls the Api in process with the

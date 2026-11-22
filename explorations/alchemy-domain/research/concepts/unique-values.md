@@ -7,6 +7,10 @@ tags: [alchemy-domain, pattern]
 
 # Unique values
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An [aggregate](./aggregate.md) instance sees only its own state, so no item can know whether another item already
 has its SKU. The pattern is to give the value itself an instance, keyed by the value: every attempt to take the value
 goes to that one instance, which handles one command at a time, so exactly one attempt wins. At beta.87 the claim is

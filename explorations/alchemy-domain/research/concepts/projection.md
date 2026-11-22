@@ -7,6 +7,10 @@ tags: [alchemy-domain, reaction]
 
 # Projection
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A projection reads events from aggregates or views and writes them into a store you run yourself: a D1 table, a
 search index, a warehouse, or a [stream](./stream.md) the model keeps. The platform routes each event to a key,
 appends it to that key's input log once, and hands the handler the key's inputs in order, in batches if the Layer asks
@@ -346,8 +350,9 @@ Until edits are events of an `Item` aggregate and part of `on`, never bump this 
   app, under redelivery.
 - A slow test on a real local D1 (`apps/inventory/test/*.slow.test.ts`) that confirms 50,000 staged rows through the
   projection's adapter and reads the three numbers.
-- `Domain.verify` and the model build report `NoEmitter`, `TwoWriters`, `WriterKeyMismatch`, `UnknownStream` and
-  `DuplicateDefinition` for a projection declared wrong (`packages/domain/src/DefinitionError.ts` 25, 101-144).
+- `Domain.verify` (removed at the pin `734c27a`) and the model build report `NoEmitter`, `TwoWriters`,
+  `WriterKeyMismatch`, `UnknownStream` and `DuplicateDefinition` for a projection declared wrong
+  (`packages/domain/src/DefinitionError.ts` 25, 101-144).
 - `Verify` on main does not check a projection's writes. In a trial on 2026-11-19, `Verify.model` on main listed among
   its assumptions that what a projection writes, and what a stream or a query gives, is not checked: only what a
   projection is given. The idempotency tests above are the check. No projection was run in either trial.

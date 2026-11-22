@@ -7,6 +7,10 @@ tags: [alchemy-domain, host]
 
 # Host on Cloudflare Durable Objects
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `DomainCloudflare.layerDurableObjects()` is the Layer that hosts a [model](./model.md) on Cloudflare. While the
 model's Layer is built inside an Alchemy `Cloudflare.Worker`, it declares one Durable Object class per
 [aggregate](./aggregate.md), [view](./view.md), [policy](./policy.md), [projection](./projection.md) and

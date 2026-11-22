@@ -7,6 +7,10 @@ tags: [alchemy-domain, people-and-clients]
 
 # Better Auth with Alchemy
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Two different things share this name, and they are kept apart on this page. The first is the package
 `@alchemy.run/better-auth`: one function, `BetterAuth(options)`, that builds a Better Auth server as an Effect
 value, takes its database from a Layer (`CloudflareD1` and others), mints a signing secret at deploy and applies

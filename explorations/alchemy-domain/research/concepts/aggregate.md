@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Aggregate
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An aggregate is a rule together with exactly the state that rule needs. Each instance (one import, one item) takes
 one [command](./command.md) at a time, checks it against its current state in `decide`, and answers with
 [events](./event.md) or a [rejection](./rejection.md). Its state is the fold of its events through `evolve`; a command's
@@ -199,6 +203,19 @@ All in `packages/domain/src/Aggregate.ts` on main unless noted.
   main (lines 769-796) has the two-argument `decide` and `keyOf`, but still names a client method `state`; the client
   has `get`.
 
+### What the pin adds: importing events already decided
+
+At the pin `734c27a` (not at `dbfd0dd`) an aggregate's client has `import(target, events, { commandId,
+expectedVersion })`. It appends events "decided elsewhere, such as history moved from another system, without running
+`decide`": `evolve` folds them, views and projections apply them like any other events, and policies and sagas never
+react to them. All of them commit at once under `commandId`, and a retry with the same id returns the first receipt.
+Each event is stamped with the platform's time, or with its own when passed as `{ event, at }`. It fails with
+`UnexpectedVersion` when the instance is not at `expectedVersion` (0 by default, so an instance with events refuses an
+import) and with `ImportOutOfOrder` when an event's time comes before the one ahead of it or after the platform's
+clock (`Aggregate.ts` at the pin, the client's `import`, `ImportOptions`, `Imported`). No command runs, so no rule of
+the aggregate is evaluated on the way in, and a state reached this way was reached by no command. In this app it is how
+the brief's decision 37 adopts rows already stored. Not run.
+
 ## Rules, and the mistakes to avoid
 
 - Find the rule first; the state is only what that rule needs. Keep lists, totals and counts for screens in views.
@@ -371,8 +388,10 @@ its own revision when the take-back's command reaches it (`RemoveIfUnchanged` in
 - A pure unit test with `Import.predict(state, command, { id, now, version, context })` (main: no `id`): the stale
   review gives `Rejected`, the current one `Accepted` with envelopes `seq` from `version + 1`.
 - `Domain.verify(model)` reports `InvalidInitial`, `DuplicateDefinition`, `DuplicateEventTag` among others
-  (`packages/domain/src/Model.ts` line 386, `Kernel.ts` lines 330-362). In the trial on beta.87 it answered `[]`. A
-  missing handler or an undeclared answer dies at run time with `UnhandledCommand` or `UndeclaredDecision`.
+  (`packages/domain/src/Model.ts` line 386, `Kernel.ts` lines 330-362; removed at the pin `734c27a`, where building the
+  model's Layer finds these and dies with every one, so the check is a test that builds it on `InMemory`, as
+  [model](./model.md) shows). In the trial on beta.87 it answered `[]`. A missing handler or an undeclared answer dies
+  at run time with `UnhandledCommand` or `UndeclaredDecision`.
 - On main, `Verify.aggregate(X)` proves the aggregate's invariants and transitions "for every state and every input,
   after any number of commands"; when one breaks it fails with `NotVerified` and names the rule, the command, the state
   before, the events, the state after and the shortest sequence that reaches it (the trial's broken `RowLeftOut`).

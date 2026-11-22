@@ -7,6 +7,10 @@ tags: [alchemy-domain, people-and-clients]
 
 # Sign in with Discord
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Discord sign-in is Better Auth's built-in `discord` social provider: the browser is sent to Discord, the person
 approves, Discord sends them back to `/api/auth/callback/discord` with a code, and Better Auth exchanges it, reads the
 person's Discord profile, creates or finds a `user`, stores an `account` row (`providerId` `discord`, `accountId` the

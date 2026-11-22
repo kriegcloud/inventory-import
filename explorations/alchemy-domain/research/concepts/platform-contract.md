@@ -7,6 +7,10 @@ tags: [alchemy-domain, host]
 
 # Platform contract
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `Platform` is the one Effect service a model needs in order to run. A model's Layer asks it for a `ModelHost`, then
 asks that host for one store per entity: an `AggregateStore` per aggregate, a `ViewStore` per view, a `PolicyStore`
 per policy, a `ProjectionStore` per projection, a `StreamStore` per stream and, on main only, a `DecisionStore` per

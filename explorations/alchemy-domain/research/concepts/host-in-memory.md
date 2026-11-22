@@ -7,6 +7,10 @@ tags: [alchemy-domain, host]
 
 # Host in memory
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `Domain.InMemory` is a Layer that provides a [`Platform`](./platform-contract.md), a `WorkflowEngine` for sagas, and
 `SecureRandom`, all held in plain JavaScript memory. Give it to a model's Layer and every aggregate, view, policy,
 projection and stream runs for real in the current process: commands decide and commit, policies react, views catch

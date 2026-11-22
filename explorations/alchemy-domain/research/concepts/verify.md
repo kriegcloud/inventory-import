@@ -7,6 +7,10 @@ tags: [alchemy-domain, checking]
 
 # Verify
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `Verify` checks rules, where a [story](./story.md) checks one example. It reads the TypeScript of a model's
 `decide`, `evolve` and rules, proves with the Z3 solver what can be proved for every state and every input, searches
 every sequence of a few commands (with events delivered twice and reactions reordered) for one that breaks the
@@ -70,6 +74,11 @@ Every export of `packages/domain/src/Verify.ts` on `main@dbfd0ddb`:
 | `VerifyError` | tag `VerifyError`: a file did not load, or the solver is missing | 106 |
 | `NotVerified` | tag `NotVerified`, `{ message, report }`; `message` is the rendered report | 109-112 |
 | `AggregateNotVerified` | also tag `NotVerified` (same tag string), with an `AggregateReport` | 507-510 |
+
+At the pin `734c27a` the same module also has: `lock?` on `Options` and `AggregateOptions` (the lock file's path);
+`relocked` on both reports; a rule's `kind` may be `sometimes` (a model rule answered "reached" or "unreached"); a
+rule may carry `suggested`, an invariant the prover proposes; and a verdict may be `Misread` (the real code differs
+from what the prover read). Read from the pin's `Verify.ts`; the line numbers above are of `dbfd0dd`.
 
 `Verify.model` options, with the defaults the source applies:
 
@@ -176,7 +185,9 @@ What the trial on 2026-11-19 printed, on a model of this app:
   not fit, so no proof of that aggregate counts (`Explore/internal/ModelSearch.ts:1097-1112`);
 - for a relation, any aggregate it touches has an invariant that is not proved (`ModelSearch.ts:1155-1182`).
 
-A drop is silent unless the rule is in `require.proved`. Pin the rules that must stay proved.
+A drop is silent unless the rule is in `require.proved`. Pin the rules that must stay proved. At the pin `734c27a`
+Verify also takes `lock`, a file that keeps each rule's text: a rule removed or reworded fails, and a drop in standing
+with the text unchanged still passes it, so `require.proved` is still what holds a rule proved.
 
 **Other rules:**
 
@@ -197,7 +208,8 @@ A drop is silent unless the rule is in `require.proved`. Pin the rules that must
 - Middleware is not run: a rule is checked against every actor the request context's schema allows.
 - Not checked at all: what a projection writes, what a stream or query returns, and how a platform commits a
   decision (assumed atomic) (`Verify.ts:222-228`, `:407`; `Prove.ts:160-161`).
-- Do not confuse with `Domain.verify(Model)`, which checks the declaration only (`model.mdx:332`).
+- Do not confuse with `Domain.verify(Model)`, which checks the declaration only (`model.mdx:332`), and is removed at
+  the pin `734c27a`, where building the model's Layer makes that check.
 
 ## In this app
 

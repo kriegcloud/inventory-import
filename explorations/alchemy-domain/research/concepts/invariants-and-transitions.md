@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Invariants and transitions
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An invariant is a named predicate over one aggregate's state; a transition is a named predicate over one step (the
 state before, the command, the events it recorded, the state after). A decision can carry transitions over all the
 instances it read, and a model can carry invariants over every instance, plus `eventually` rules that must hold
@@ -141,7 +145,8 @@ Verify reading `effect/Match` (`d123c318d`, #3503) widened what a rule may call.
   declarations and docstrings). No host, no story and no `Domain.verify` evaluates them: a commit that breaks an
   invariant is not refused, and declaring them costs nothing at run time. If a state must be refused, refuse it in
   `decide`. `Domain.verify(Model)` checks the declaration (a missing `keyOf`, two writers) and never reads these
-  rules (`website/src/content/docs/domain/model.mdx` line 332).
+  rules (`website/src/content/docs/domain/model.mdx` line 332); at the pin `734c27a` it is removed, and building the
+  model's Layer makes the same check, without reading these rules either.
 - **Write each rule inline, in the definition, under its own name.** Rules are read from the TypeScript source. An
   `invariants` object built elsewhere and passed by name is refused, not skipped: a `ProveError` or `ExploreError`
   saying each must be written in its definition, as a property, under a name of its own

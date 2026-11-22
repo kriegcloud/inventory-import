@@ -7,6 +7,10 @@ tags: [alchemy-domain, checking]
 
 # Prove
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `Prove` proves an aggregate's invariants and transitions, and a decision's rules, by induction. It takes any state
 the state's schema allows that satisfies every invariant it can read, any command input the command's schema allows,
 any time and any request context, runs `decide` and `evolve` symbolically, and asks the Z3 solver whether some choice

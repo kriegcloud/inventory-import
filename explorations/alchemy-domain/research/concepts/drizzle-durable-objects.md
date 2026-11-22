@@ -7,6 +7,10 @@ tags: [alchemy-domain, extra]
 
 # Drizzle on Durable Objects
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `Drizzle.DurableObject` (from `@alchemy.run/drizzle/Cloudflare`) opens a Drizzle database over the SQLite storage of
 the Durable Object it runs in. You declare tables with Drizzle's `sqliteTable`, commit SQL that `drizzle-kit
 generate` writes, capture that folder with `Cloudflare.SqlMigrations` when the Worker is built, and each object

@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Rejection
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A rejection is the typed answer "no" to a [command](./command.md) (or a read). It is `Schema.TaggedError` with its
 own type filled in, so it is a tagged class, an Effect error you can `yield*`, and a schema that crosses the wire. When
 `decide` returns one, nothing is recorded and the state stays as it was, so the caller can change its input and try

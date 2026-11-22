@@ -7,6 +7,10 @@ tags: [alchemy-domain, extra]
 
 # GraphQL (effect/graphql)
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `effect/graphql` is a typed GraphQL **client**. You declare each operation (a query, a mutation or a
 subscription) with a printed document, a Schema for its variables and a Schema for its result. You put the
 operations in a group, and `GraphQLClient.make` turns the group into an object with one method per operation. The
@@ -287,7 +291,8 @@ also says the figures are not billing figures, and a request that fails before S
   proves decoding and the error path, including a body with `errors` and `partial` left off.
 - Effect's own tests to read for behaviour: `packages/effect/test/graphql/` (`GraphQLClient.test.ts`,
   `GraphQLProtocol.test.ts`, `GraphQLResolver.test.ts` and six more).
-- No `Domain.verify` rule, story or prover applies: this is not a domain declaration.
+- No declaration check of the library (`Domain.verify` at `dbfd0dd`, the Layer's build at the pin), story or prover
+  applies: this is not a domain declaration.
 
 ## What it needs
 

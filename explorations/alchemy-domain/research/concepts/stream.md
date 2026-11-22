@@ -7,6 +7,10 @@ tags: [alchemy-domain, read]
 
 # Stream
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A stream is one ordered list of entries per key, kept for good and readable from any point. Exactly one
 [projection](./projection.md) writes it, by listing it in `writes` and calling `append` with the input it is handling;
 clients read it through an [Api](./api.md), guarded like a [view](./view.md). Its latest entry is its current value, so

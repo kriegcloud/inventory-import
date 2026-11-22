@@ -7,6 +7,10 @@ tags: [alchemy-domain, checking]
 
 # Test tooling
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Alchemy has three kinds of test tooling around a domain model. The first is `@alchemy.run/test` (folder
 `packages/alchemy-test`), a harness that deploys a real Alchemy stack once per test file, hands the tests its outputs
 (a URL, ids), and destroys it after; it also tests a provider's create / update / replace / delete on a scratch
@@ -307,7 +311,8 @@ is not verified, and this app signs in with a session cookie (`packages/access/h
 - Under `it.effect` the console is Effect's test console (`@effect/vitest` 4.1.4, the version the app installs,
   `src/internal/internal.ts:68`, `:490`), so a report a test prints with Effect's `Console` does not show in Vitest's
   output; `it.live`, which `@alchemy.run/test/Vitest` uses for every `test`, does not swap it (`:491`).
-- `Domain.verify(Catalog)` returning `[]` checks the declaration (`packages/domain/src/index.ts` 284-285). Run in the
+- `Domain.verify(Catalog)` returning `[]` checks the declaration (`packages/domain/src/index.ts` 284-285); at the pin
+  `734c27a` it is removed, and a test that builds the model's Layer on `InMemory` checks it instead. Run in the
   trial on beta.87: `Domain.verify(Inventory)` answered `[]` for a one-aggregate model.
 
 ## What it needs

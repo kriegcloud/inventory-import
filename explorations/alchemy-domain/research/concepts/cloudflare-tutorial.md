@@ -7,6 +7,10 @@ tags: [alchemy-domain, learning]
 
 # The Cloudflare tutorial, parts 3 to 5
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Alchemy's Cloudflare tutorial builds one small app in six parts: a Stack with an R2 Bucket (part 1), a Worker that
 reads and writes it (part 2), tests that deploy the Stack and call the Worker over HTTP (part 3), `alchemy dev` for
 local work (part 4), GitHub Actions with previews per pull request and credentials minted as code (part 5), and

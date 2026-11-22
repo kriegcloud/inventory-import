@@ -7,6 +7,10 @@ tags: [alchemy-domain, surface]
 
 # Api
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 An Api is the list of what one kind of client may reach in a [model](./model.md): the [commands](./command.md) it may
 send, the [views](./view.md) and [streams](./stream.md) it may read one key at a time, and the [queries](./query.md) it
 may ask across keys. It has no handlers of its own: aggregates decide commands and views answer reads, and the Api only

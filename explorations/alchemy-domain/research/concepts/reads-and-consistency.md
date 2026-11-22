@@ -7,6 +7,10 @@ tags: [alchemy-domain, read, consistency]
 
 # Reads and consistency
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Views, streams and projections are updated after a command commits, so a read can be a moment behind. A command's
 receipt, `{ stream, version }`, names the write; a read passed that receipt as `atLeast` waits until the read model has
 applied it, polling every 25 ms, and fails with `ConsistencyTimeout` after 10 seconds. On main a command can do the

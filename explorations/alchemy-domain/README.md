@@ -1,10 +1,10 @@
 ---
 type: Exploration
 title: Alchemy domain
-description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
+description: Everything @alchemy.run/domain and what plugs into it offers, read at its main@dbfd0dd, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on the branch claude/alchemy-review-model-f206c6, which goes into main beside the brief
+next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on the build's own branch, which is to merge into main beside the brief
 goals: []
 ---
 
@@ -30,11 +30,11 @@ under it:
    (singletons and crons) put to Benjamin as decision 28 of the brief, answered on 2026-11-22.
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
-   proved, and [the trial](research/04-trial.md) that ran them. Then
-   [the trial on saving review decisions](research/07-review-decisions-trial.md): seven rounds, with their sources
-   and Verify's reports. Read its sixth round's table first, for the model his answers describe (`review14`, with the seventh round's one change, `review15`); then the
-   fifth's, which decided a group as one unit before the last-group rule, and the fourth's, the row-by-row model kept as
-   the fallback.
+   proved, and [the trial](research/04-trial.md) that ran them. Then [the trial on saving review
+   decisions](research/07-review-decisions-trial.md): seven rounds, with their sources and Verify's reports. Read its
+   seventh round first, for the model his answers describe (`review15`: the sixth round's `review14` with one change and
+   an order for it), then the sixth round's table; then the fifth's, which decided a group as one unit before the
+   last-group rule, and the fourth's, the row-by-row model kept as the fallback.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
    does not.
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
@@ -77,15 +77,21 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   decided a group of rows as one unit (`review12`, and `review13` with only the import's last group act taken back): 123
   and 124 rules proved, six rules across every import, row and group checked 3 commands deep, the reading of a row
   through its groups equal to today's `act` over 50,000 generated sequences, and one group act in local workerd. The
-  sixth is the model he chose (`review14`): three aggregates, four decisions and eleven commands, with only the last
+  sixth is `review14`: three aggregates, four decisions and eleven commands, with only the last
   group still in force taken back, so undo walks back; 135 rules proved and seven rules across every import, row and
   group checked 3 commands deep, on `dbfd0dd`, not hosted; 43 stories and 148 mutants, each leaving a rule not proved
-  (32 of them only as unconfirmed) or failing a story, none passing both; the proofs cover what must never happen, and
-  the stories that each valid act is taken (his answer of 2026-11-22). The row-by-row model of the fourth round stays on
-  the branch `claude/alchemy-review-model-parked` as the fallback, where on the pinned `734c27a` it gives 96 rules
-  proved and 3 searched (its three rules on who may change a row stated on each of its two decisions). The model he
-  chose is built on `734c27a` on the branch `claude/alchemy-review-model-f206c6`, which goes into main beside the brief:
-  135 rules proved, 7 searched, 11 "can be taken" rules reached and 45 stories, by its own report. The `dbfd0dd` builds
+  or failing a story, none passing both (32 leave one not proved only as unconfirmed: the real code refuted the
+  solver's counterexample, so those 32 are held only by the stories they fail); the proofs cover what must never
+  happen, and the stories that each valid act is taken (his answer of 2026-11-22). The seventh is the model he chose
+  (`review15`): `review14` with his answer "No change, Ana's undo applies", a press over a group that leaves the row
+  reading as it reads recording nothing, and only after the checks of what the sender saw on the row and of the
+  matching; 135 rules proved, a row's act with 284 paths, seven rules across instances checked 3 commands deep and 45
+  stories, on `dbfd0dd`; the 148 mutants were not run on it, two of its change were. The
+  row-by-row model of the fourth round stays on a branch kept privately as the fallback, where on the pinned `734c27a`
+  it gives 96 rules proved and 3 searched (its three rules on who may change a row stated on each of its two
+  decisions), by the build's own report. The model he chose is built on `734c27a` on the build's own branch, which is
+  to merge into main beside the brief: 135 rules proved, 7 searched, 11 "can be taken" rules reached and 47 stories,
+  by the build's own report. Neither branch is on the public remote until the first merges. The `dbfd0dd` builds
   the trials installed are deleted by the library's registry a week after `main` moves past that commit; they were kept
   outside the repository, so the trials cannot be run again from the registry after that.
 - The second round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
@@ -212,7 +218,9 @@ or file of the upstream repository is copied here.
 
 ## Keeping it current
 
-The two refs are the tag `v2.0.0-beta.87` and `main` at `dbfd0ddb`. When a release is published, or `main` moves:
+The two refs are the tag `v2.0.0-beta.87` and `main` at `dbfd0ddb`; the repository pins `main@734c27a`, and what
+changed between that touches the pages is listed in [the map](research/00-map.md), "From `dbfd0dd` to the pin". When a
+release is published, or `main` moves:
 re-run the two commands at the foot of [02](research/02-merged-since-beta-87.md) for what merged, then re-read the
 pages whose "Where this was read" names a file that changed.
 
@@ -226,11 +234,11 @@ pages whose "Where this was read" names a file that changed.
   [07](research/07-review-decisions-trial.md); the brief written again on them, with sixty-two decisions, one decision
   each, and his answers on today's review saving under "Answered" with the options he rejected.
 - 2026-11-22: he answered decisions 1 to 40 by dialog, 7 and 8 after a fifth round of trials, which decided a group of
-  rows as one unit; then a sixth round (`review14`, the model he chose: 135 rules proved, 43 stories, 148 mutants) and
-  his further answers (an undo after and behind a group, the pin `734c27a`, the names, the lock file, what is shown on
-  2026-11-25, a keep and its rivals, a group taken back over a changed row, waiting acts, where the search runs in CI,
-  then the lock file corrected to "Lock plus the library's proved list", a press that changes nothing, a keep after an
-  earlier decision and a waiting undo);
-  9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their move. The brief written on his
-  answers. The pin is on main; the review's model is built on its branch, to go into main beside the brief; the rest
-  awaits "the brief matches".
+  rows as one unit; then a sixth round (`review14`: 135 rules proved, 43 stories, 148 mutants) and his further answers
+  (an undo after and behind a group, the pin `734c27a`, the names, the lock file, what is shown on 2026-11-25, a keep
+  and its rivals, a group taken back over a changed row, waiting acts, where the search runs in CI, then the lock file
+  corrected to "Lock plus the library's proved list", a press that changes nothing, a keep after an earlier decision and
+  a waiting undo), and a seventh round (`review15`, the model he chose, with his answer "No change, Ana's undo applies":
+  135 rules proved, 45 stories); 9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their
+  move. The brief written on his answers. The pin is on main; the review's model is built on its branch, to go into main
+  beside the brief; the rest awaits "the brief matches".

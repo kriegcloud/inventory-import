@@ -7,6 +7,10 @@ tags: [alchemy-domain, checking]
 
 # Explore
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `Explore` searches instead of proving. It runs every sequence of commands, up to a depth, on a new aggregate instance
 or on a whole model with nothing in it, and after each command lets the policies, sagas and views react. It does not
 pick values from a list: it reads `decide`, `evolve`, the policies and the rules with the same interpreter as

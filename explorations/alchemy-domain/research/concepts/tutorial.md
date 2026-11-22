@@ -7,6 +7,10 @@ tags: [alchemy-domain, learning]
 
 # The tutorial
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 The library's tutorial builds one bank in eight parts: an account aggregate checked by stories, two views,
 a second aggregate joined by a policy, an Api guarded by middleware, a Cloudflare deployment, a foldkit browser
 app, tracing into Axiom, and finally changing a view that already holds data. It opens with "Build a bank in eight

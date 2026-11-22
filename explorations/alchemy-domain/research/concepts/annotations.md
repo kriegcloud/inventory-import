@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Domain.Annotations
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Every building block takes an annotations object as its last argument and keeps it as the static `X.annotations`.
 The library itself reads two keys: `description`, which the surfaces built from an [Api](./api.md) show (AI and MCP
 tool descriptions, CLI help, OpenAPI), and `httpApiCacheControl`, which `toHttpApi` sends as `cache-control`. Every

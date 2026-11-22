@@ -7,6 +7,10 @@ tags: [alchemy-domain, checking]
 
 # Story
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A story is a test written as one example of a rule: the history that already happened (`given`), the command
 someone sends (`when`), and what the model records or refuses (`then`, `rejected`, `replied`). `Story.make` builds a
 runner from a [model](./model.md); the runner hosts the whole model on a fresh in-memory platform, so the

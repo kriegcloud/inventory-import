@@ -7,6 +7,10 @@ tags: [alchemy-domain, reaction]
 
 # Saga
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A saga is a process that takes several steps and may take hours or days. It is an Effect
 [workflow](./cluster-workflows.md): each step is an
 `Activity` whose result is stored, so a run that is cut short replays from the top and skips the steps already done; it

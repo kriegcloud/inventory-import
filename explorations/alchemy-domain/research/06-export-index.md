@@ -6,6 +6,9 @@ description: Every exported name of @alchemy.run/domain's source on main, file b
 
 # Export index
 
+Read at `main@dbfd0dd`, not at the pin `734c27a` the repository builds on: the names the pin adds or removes are not
+listed here, and what changed between that touches the pages is in [the map](00-map.md), "From `dbfd0dd` to the pin".
+
 Generated from `packages/domain/src` on `main@dbfd0ddb` and compared with the same file at `v2.0.0-beta.87`. A name is "covered" when a page of this packet mentions it; the pages named are where to read about it. "internal" means the source marks it `@internal` or it lives under an `internal/` folder: it is listed so that nothing is unlisted, and it is not part of what an app uses.
 
 893 exported declarations in 64 files; 887 are covered by a page, 6 are not.

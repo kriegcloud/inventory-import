@@ -1,19 +1,23 @@
 ---
 type: Reference
 title: Domain.Model
-description: One bounded context declared as a list of building blocks, checked by Domain.verify and hosted by Model.layer; inventory-import would declare one for the catalog and one for access.
+description: One bounded context declared as a list of building blocks, checked by Domain.verify (by building its Layer at the pin) and hosted by Model.layer; inventory-import would declare one for the catalog and one for access.
 tags: [alchemy-domain, declaration]
 ---
 
 # Domain.Model
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A `Domain.Model` is the list of building blocks that run together as one bounded context: its aggregates, views,
-policies, projections, streams, sagas and queries (and, on main only, decisions, relations, invariants and
-`eventually` rules). The declaration runs nothing. `Model.layer(handlers, options)` turns it into an Effect `Layer`
-that hosts every block on whatever `Domain.Platform` you provide, and `Domain.verify(Model)` checks the declaration
-without hosting it. The docs define it as "one bounded context running as a whole"
-[https://alchemy.run/domain/model]. Commands and events are not listed: they come with the aggregates that declare
-them.
+policies, projections, streams, sagas and queries (and, on main only, decisions, relations, invariants and `eventually`
+rules). The declaration runs nothing. `Model.layer(handlers, options)` turns it into an Effect `Layer` that hosts every
+block on whatever `Domain.Platform` you provide, and `Domain.verify(Model)` checks the declaration without hosting it
+(at beta.87 and `dbfd0dd`; at the pin it is removed, and building the Layer makes that check). The docs define it as
+"one bounded context running as a whole" [https://alchemy.run/domain/model]. Commands and events are not listed: they
+come with the aggregates that declare them.
 
 ## When to reach for it
 
@@ -208,6 +212,10 @@ All paths are `packages/domain/src/` on `main@dbfd0ddb`.
 
 ## Domain.verify
 
+Removed at the pin `734c27a` (commit `60fea533`): there, building the model's Layer checks for every problem below
+and dies with all of them at once, so a test that builds the Layer on `InMemory` takes its place (under "How it is
+declared" and "How to check it").
+
 `Domain.verify(Model)` returns every definition problem as a `ReadonlyArray<DefinitionError>`, in definition order,
 each once; an empty array means the declaration is sound. It builds the kernel and collects problems instead of dying
 on the first (`Kernel.ts:256-283` at beta.87). Each `DefinitionError` has a `reason`, a tagged error whose fields name
@@ -365,8 +373,9 @@ is still `2.0.0-beta.87`: main is not on npm.
 - One model per bounded context, each with its own name. Two models may list the same aggregate class and still get
   separate instances and events; two different models with the same name on one platform die with
   `ModelHostedTwice`.
-- Keep `Domain.verify(Model)` in a unit test. It is cheap and finds 15 kinds of mistake (17 on main) before any host
-  runs. It does not find the layer-only or run-time ones in the table above.
+- Keep the declaration's check in a unit test: `Domain.verify(Model)` at beta.87 and `dbfd0dd`, building the model's
+  Layer on `InMemory` at the pin. It is cheap and finds 15 kinds of mistake (17 on main) before any host runs. It does
+  not find the run-time ones in the table above.
 - At beta.87 a command listed by two aggregates is not refused: the later one takes it. Give each command exactly one
   aggregate.
 - Provide `handlers` once, as one Layer built with `Layer.mergeAll`. A view with middleware or rejections needs its
@@ -410,14 +419,18 @@ export const CatalogInMemory = Catalog.layer(Layer.empty, { lazy: ["ImportResult
 ```
 
 ```typescript
-// SKETCH: not compiled
-import * as Domain from "@alchemy.run/domain"
-import { expect, it } from "@effect/vitest"
+// SKETCH: not compiled. At the pin `734c27a`, where `Domain.verify` is removed: building the Layer checks the
+// declaration and dies with every problem it finds. At beta.87 and `dbfd0dd`:
+// expect(Domain.verify(Catalog)).toEqual([])
+import { InMemory } from "@alchemy.run/domain/InMemory"
+import { it } from "@effect/vitest"
+import * as Layer from "effect/Layer"
 import { Catalog } from "../src/Catalog.model.ts"
+import { CatalogHandlers } from "../src/Catalog.handlers.ts"
 
-it("the catalog model is well defined", () => {
-  expect(Domain.verify(Catalog)).toEqual([])
-})
+it.effect("the catalog model is well defined", () =>
+  Layer.build(Catalog.layer(CatalogHandlers).pipe(Layer.provide(InMemory)))
+)
 ```
 
 Access would be a second model (`Access`: people and roles, activity, the allowance). The catalog would not send to
@@ -433,14 +446,16 @@ this app (`ImportDraft`, `Item`, `Allowance`, `Organization`) with a model invar
   `packages/catalog/model/src/Catalog.handlers.ts` and `packages/access/model/src/Access.handlers.ts`, the ports in
   `Catalog.ports.ts` and `Access.ports.ts`, and the composition in `apps/inventory/src/server/App.ts`.
 - **Where it goes:** `packages/catalog/model/src/Catalog.model.ts` and `packages/access/model/src/Access.model.ts`,
-  with a `verify` test beside the existing `packages/catalog/model/test/Ports.test.ts`; hosted from
+  with a test of its declaration (its Layer built, at the pin) beside the existing
+  `packages/catalog/model/test/Ports.test.ts`; hosted from
   `packages/catalog/host/src/Host.ts` (see [project-layout](./project-layout.md)).
 - **What the person gets:** nothing they can see directly; the confirm, the take-back and the item edit would each
   commit in one decided step with a stored receipt, so a second press returns the first answer (rule 10).
 
 ## How to check it
 
-- `expect(Domain.verify(Catalog)).toEqual([])` in the model package's tests catches every "verify" row above.
+- `expect(Domain.verify(Catalog)).toEqual([])` in the model package's tests catches every "verify" row above at
+  beta.87 and `dbfd0dd`; at the pin `734c27a`, a test that builds the Layer, below, catches them.
 - Building `Catalog.layer(...)` on `Domain.InMemory` in one test catches the "layer" rows (`UnvalidatedRead`,
   `LazyViewNeedsOneSource`, `MissingWorkflowEngine`).
 - Stories ([story](./story.md)) catch the "run" rows: a `decide` that returns an undeclared event fails the story.
@@ -460,8 +475,9 @@ about 133 kB (43 kB gzip) to a minified browser bundle, and about 205 kB (67 kB 
 
 ## Verdict
 
-**Use:** declare `Catalog` and `Access` as two models on beta.87, test each with `Domain.verify` and stories on
-`Domain.InMemory`, and keep the handlers in one merged Layer per model. The model-level `decisions`, `relations`,
+**Use:** declare `Catalog` and `Access` as two models on beta.87, test each with a test that builds its Layer
+on `Domain.InMemory` (`Domain.verify` at beta.87, removed at the pin) and stories on `Domain.InMemory`, and keep the
+handlers in one merged Layer per model. The model-level `decisions`, `relations`,
 `invariants` and `eventually` exist only on `main@dbfd0ddb`; taking them is the same decision as taking main for the
 rest of the library.
 

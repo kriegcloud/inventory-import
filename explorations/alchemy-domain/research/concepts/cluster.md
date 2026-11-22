@@ -7,6 +7,10 @@ tags: [alchemy-domain, extra]
 
 # Effect Cluster
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 Effect Cluster is Effect's library for stateful programs spread over many processes. Its unit is the **entity**: a
 type with a set of RPC messages, and one **instance** per id that handles its messages one at a time, so it can keep
 state in memory without locks. Each id hashes to one of 300 **shards** per shard group, and each shard belongs to one

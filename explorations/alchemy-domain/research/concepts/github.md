@@ -7,6 +7,10 @@ tags: [alchemy-domain, extras]
 
 # GitHub provider
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `@alchemy.run/github` turns the settings around a GitHub repository into Stack resources. A deploy creates them and
 converges them to what the code declares; when one leaves the stack, its removal policy decides whether it is deleted,
 kept or closed on GitHub. It covers the repository and its rules, Actions environments, secrets and variables,

@@ -7,6 +7,10 @@ tags: [alchemy-domain, pattern]
 
 # Deadlines
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A deadline is a [command](./command.md) scheduled to reach one [aggregate](./aggregate.md) instance later. Because
 nobody is waiting for its answer when it fires, only a command that never rejects can be scheduled: it reports a fact
 ("the hour is up") and records nothing when the fact no longer applies. The race between the deadline and the thing

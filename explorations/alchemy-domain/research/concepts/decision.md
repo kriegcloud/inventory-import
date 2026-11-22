@@ -7,6 +7,10 @@ tags: [alchemy-domain, declaration]
 
 # Decision
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 A decision implements one [command](./command.md) whose rule needs more than one [aggregate](./aggregate.md)
 instance. It reads every instance the command names, runs one `decide` against all of their states together, and
 records each resulting event on one of those instances. Either every event commits or none does, and the caller gets
@@ -237,9 +241,9 @@ decision as one participant) are an idea, not code.
 
 - **Every command has one implementation.** A decision for a command an aggregate (or another decision) already
   implements is a type error on its entry in `decisions` and `ImplementedTwice` from `Domain.verify`
-  (`Kernel.ts` main 409-433).
+  (`Kernel.ts` main 409-433); at the pin `734c27a`, from building the model's Layer, `Domain.verify` being removed.
 - **Read only hosted aggregates.** A decision reading an aggregate the model leaves out is a type error and
-  `UnknownRead` from `Domain.verify` (`Kernel.ts` main 434-440).
+  `UnknownRead` from `Domain.verify` (`Kernel.ts` main 434-440); at the pin, from building the Layer.
 - **Record only with a read instance's `record`.** Returning a bare event, or one recorded on an instance not read,
   dies with `UnreadRecord`; an event the command does not declare dies with `UndeclaredDecision`; an event the
   receiving aggregate does not fold dies with `UndeclaredEvent` (`Kernel.ts` main 1435-1480).
@@ -362,9 +366,9 @@ locks the `Item` and `ImportDraft` types for the whole decision.
   `Story.then` on each instance; a second story where the claim is held ends in `Story.rejected(new AlreadyMember(...))`
   and `Story.then` with no events on both (nothing recorded). The same shape for a take-back over the import and its
   items.
-- `Domain.verify` reports `ImplementedTwice` and `UnknownRead`; `UnreadRecord`, `UndeclaredDecision` and
-  `UndeclaredEvent` die when the faulty `decide` runs; `DecisionsUnsupported` dies when the Layer is built on a host
-  without decisions.
+- `Domain.verify` reports `ImplementedTwice` and `UnknownRead` (at the pin, building the model's Layer does);
+  `UnreadRecord`, `UndeclaredDecision` and `UndeclaredEvent` die when the faulty `decide` runs; `DecisionsUnsupported`
+  dies when the Layer is built on a host without decisions.
 - A `transitions` rule such as `OnlyAFreeEmailIsClaimed`, proved by `Verify.model` or `Prove.decision`
   (`Prove.ts` main 556), together with each aggregate's own rules ([Verify](./verify.md), [Prove](./prove.md)).
 - **Not run:** the trial on 2026-11-19 ran stories and `Verify` on main for four aggregates, but no

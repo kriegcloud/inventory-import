@@ -13198,7 +13198,7 @@ check. The load average stands beside each time, and no timeout was raised.
 | 18 | 7 rules across every import, row and group | **Checked**, every sequence of up to 2 commands (9,401 sequences) and of up to 3 (16,629 sequences, 3,630 states) | 45.42 s, 27.67 30.97 38.79 to 35.73 32.23 38.82; 51.70 s, 35.73 32.23 38.82 to 30.31 31.63 38.29 |
 | 18 | The model under a strict type-check, with no cast | **No error**; none of the 49 parameters of its 31 Effect functions typed `any` (a probe; the pure rules not probed) | not timed |
 | 18 | Stories: each of the eleven commands accepted with its events, and each refusal it can give | **43 pass**, and 3 tests beside them: a property of the seal, a property of the screen's confirm number on a copy of its rule, and a count of the first property's runs | under 2 s |
-| 18 | 148 mutants: each check removed, each field of an event given a wrong value, each kind of act recording nothing | **111 leave a rule not proved, 32 of them only as `Unconfirmed` (a counterexample the solver found and did not replay), one of those (`undo-own`) on a state the prover could not read; the other 37 fail a story**; none passes both | the slowest 1,392 s; six at a time, load to 97 |
+| 18 | 148 mutants: each check removed, each field of an event given a wrong value, each kind of act recording nothing | **111 leave a rule not proved: 78 break one on the real code; 32 only as `Unconfirmed`, where the real code was run on the solver's counterexample and refuted it ("the real code rejects it with" a refusal, or keeps the rule), so those 32 are held only by the stories they fail, `undo-own` among them, on a state the prover could not read; and `takeback-imported`, every rule not proved because the prover could not read `TakeBackImport`, held by a story too. The other 37 fail a story only**; none passes both | the slowest 1,392 s; six at a time, load to 97 |
 | 19 | The reading of a row through its groups, against the `act` of today's code, for one person and for two | **Equal** where the reference has an answer; three orderings where it does not, below | 25,000 sequences a run |
 
 "Proved" here is of `review14`, printed below whole, on `main@dbfd0dd`, and of nothing else.
@@ -16154,12 +16154,17 @@ The proof run per mutant: `Prove.decisionReport` of the decision for the four de
 
 Tally (kind, held by): check by rule: 55, check by story: 5, field by rule: 56, field by story: 21, nothing by story: 11
 
+"By rule" here counts a mutant that leaves a rule not proved. Of those 111, 78 break a rule on the real code; 32 leave
+one not proved only as `Unconfirmed`, where the library's own words are "the solver found inputs, but the real code
+keeps the invariant on them", so the real code refuted the counterexample and only the stories they fail hold them;
+and `takeback-imported` is on code the prover could not read, held by a story too (below).
+
 #### Notes on the mutants
 - **Held by neither: none.** Writing stories during this step closed three gaps. `gundo-decided` (UndoGroup's "no group decided under this step") broke no rule, and no story had that refusal, so R35 was written. `group-groupdecided-madeOn` and `group-groupdecided-under` each broke a rule (DecideGroup.OnItsMatching, DecideGroup.AndKeepsWhichOneWasBeforeIt), but no story told them apart, so G8 was written.
 - **Checks no rule notices** (a story holds each): `match-same` (the same columns record nothing: R22), `suggestion-open` (R3: a suggestion on a removed import is no longer refused as NotOpen), `takeback-kept` (more kept than in force: R21; no rule bounds `kept`), `undo-history` (the let-go level: R34; Undoing stays PROVED without the check), `gundo-decided` (R35).
 - **Fields no rule notices** (stories hold each): the event's step, row and label, and ActCounted's madeOn, on DecideRow, UndoRowStep, DecideGroup and UndoGroup; RowDecided.label; GroupDecided's importId, organizationId, step and label; ImportStaged's organizationId, rows and columns; ImportRemoved.change (EveryChangeHasItsOwnNumber skips a step that ends Removed).
 - **Records nothing**: no rule breaks for any of the 11, as the prover's known limit says. The story that fails is named in the table. All 11 fail one or more stories. For the four decisions the prover's report does say `accepted false` and NotProved, with every rule Proved: it notices that nothing can be accepted, but no rule fails.
-- `undo-own` (NotYourStep removed): the prover could not translate the state schema check on the mutant (`schema NotTranslated`), yet still gave AnUndoTakesBackOnlyItsSendersOwnStep and NobodyClearsAnotherPersonsDecision as Unconfirmed. So it counts as held by a rule.
+- `undo-own` (NotYourStep removed): the prover could not translate the state schema check on the mutant (`schema NotTranslated`), yet still gave AnUndoTakesBackOnlyItsSendersOwnStep and NobodyClearsAnotherPersonsDecision as Unconfirmed. Unconfirmed means the real code refuted the solver's counterexample, so no rule shows this mutant wrong: it is held by the two stories it fails. `takeback-imported` is the second mutant held only by code the prover could not read: each of its rules is "not proved for TakeBackImport", and a story fails on it.
 - `row-nolonger` was first built as invalid code (removing `else if` took the closing brace). It was fixed (only the `else` branch removed), rebuilt and run again.
 - Times: a DecideRow mutant whose rule breaks took 86 s to 23 min in the prover (base 9 s): the time goes into confirming each counterexample. The other mutants took 0.2 to 30 s. 43 DecideRow/UndoRowStep mutants ran six at a time under `nice -n 10` (load up to 97 on the 64-core machine). The rest ran one at a time. No timeout was raised: the proof tests keep their own 1,500,000 ms and Verify.aggregate 600,000 ms, as given, and none was reached (the longest, `row-open`, took 1,391,862 ms, under the 1,500,000).
 
@@ -16437,20 +16442,37 @@ names, made in a copy of the model; the 148 take hours on a busy machine.
 Run on 2026-11-22 on the same builds, after he answered that a press over a group which leaves the row reading as it
 reads is "no change" and is recorded as nobody's ("No change, Ana's undo applies"). In `review14` such a press, sent as
 covered, skipped the no-change answer and was recorded as its sender's decision, the group's effect included, so it
-outlived the group's undo. `review15` is `review14` with one change: a row's act also says `asItReads`, that it leaves
-the row reading as it reads now through its groups; on a covered row that is what "changes nothing" means, as the row's
-own text is on any other row. No rule can check what the sender says of the reading, as for `covered`.
+outlived the group's undo. `review15` is `review14` with one change, and an order for it: a row's act also says
+`asItReads`, that it leaves the row reading as it reads now through its groups; on a covered row that is what "changes
+nothing" means, as the row's own text is on any other row. No rule can check what the sender says of the reading, as for
+`covered`.
+
+The order of the checks matters. A covered act's "no change" answer is taken only after the act passes its saw check
+and its matching check, so a press over a group from a screen that missed a later decision on the row is refused and
+held, as any act on an old screen is, and not answered "no change" (the story "a press over a group from a screen that
+missed a later decision on the row is refused and held, not answered no change"). An act on a row that is not covered
+and that already holds what it says is still "no change" before those checks, whoever decided it. No rule sees this
+ordering: with the covered exit put back ahead of the saw check every rule is still proved, and only that story fails.
+The brief names the ordering and its story in Proof 3 and Proof 6.
 
 | # | What | Result | Time, load before and after |
 | --- | --- | --- | --- |
-| 20 | `Verify.model(Review)` | **Verified. 135 rules proved** | 125.27 s, 51.71 38.43 32.00 to 39.86 36.98 32.18 |
-| 20 | `Prove.decision` of each decision | **Proved**: a row's act 176 paths (`review14`: 152), a row's undo 298, a group's act 42, a group's undo 84 | 8.47 s, 75.59 40.88 32.55 to 70.82 40.46 32.46 |
-| 20 | The seven rules across instances | **Checked**, every sequence of up to 3 commands (17,332 sequences, 4,199 states) | 58.49 s, 39.53 37.81 32.74 to 37.40 37.40 32.91 |
-| 20 | Stories | **All pass**: 35, and 9 of groups, one of them new; and the 3 properties of the seal | under 2 s |
-| 20 | The new check put back the old way | **Breaks** `AnActThatChangesNothingLeavesTheImport`, `AnActThatChangesNothingLeavesTheRow`, and the new story fails | 203.02 s, 37.40 37.40 32.91 to 81.37 58.17 41.93 |
+| 20 | `Verify.model(Review)` | **Verified. 135 rules proved** | 147.99 s, 42.65 45.24 34.65 to 44.86 45.33 36.26 |
+| 20 | `Prove.decision` of each decision | **Proved**: a row's act 284 paths (`review14`, before the no-change answer: 152), a row's undo 298, a group's act 42, a group's undo 84 | a row's act 24.78 s, 55.04 47.04 34.60 to 49.60 46.49 34.75; a row's undo 24.74 s, 49.60 46.49 34.75 to 42.65 45.24 34.65; a group's act 1.21 s, 53.66 46.48 34.28 to 53.66 46.48 34.28; a group's undo 4.94 s, 53.66 46.48 34.28 to 55.04 47.04 34.60 |
+| 20 | The seven rules across instances | **Checked**, every sequence of up to 2 commands (9,513 sequences, 685 states) and of up to 3 (20,957 sequences, 7,750 states) | 61.23 s, 44.86 45.33 36.26 to 38.17 43.23 36.14; 77.49 s, 38.17 43.23 36.14 to 34.26 40.56 35.73 |
+| 20 | Stories: each of the eleven commands accepted with its events, and each refusal it can give | **45 pass**: 35 on the review and 10 on groups, two of them new; and 3 tests beside them, as in the sixth round: a property of the seal, a property of the screen's confirm number on a copy of its rule, and a count of the first property's runs | under 2 s |
+| 20 | The new check removed, so a press over a group that leaves the reading as it is is recorded | `Deciding` **not proved**, 386 paths: `AnActThatChangesNothingLeavesTheImport` `Violated`, `AnActThatChangesNothingLeavesTheRow` only `Unconfirmed`; the story "a press over a group that leaves the row reading as it is changes nothing, and the group's undo reaches that row too" fails (1 of 10) | 199.81 s, 34.26 40.56 35.73 to 48.43 51.43 41.57 |
+| 20 | The covered exit put back ahead of the saw check | `Deciding` **proved**, 284 paths: no rule sees it; the story "a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change" fails (1 of 10) | 21.02 s, 48.43 51.43 41.57 to 48.75 51.36 41.76 |
 | 20 | A strict type-check of the model and its stories | No error | not timed |
 
-"Proved" here is of `review15` on `main@dbfd0dd`. The 148 mutants of the sixth round were not run again on it.
+"Proved" here is of `review15` on `main@dbfd0dd`. The 148 mutants of the sixth round were not run again on it; the
+two mutants above are of this round's change only.
+
+The margin is thin. The two exits of a row's act are each written as one choice (`cmd.covered ? ... : ...`). Written
+with "and" instead (`!cmd.covered && ...`, `cmd.covered && cmd.asItReads`), the same act has 290 paths, and then
+`Verify.model` proves 134 rules and only checks one, `Review.ARowBelongsToItsImportsOrganization`: `DecideRow` has more
+than 4,096 paths for it, and it is checked to 2 commands (9,434 sequences, 656 states). Nine other shapes of the same
+body that mean the same gave 284 to 524 paths.
 
 `Review.decision.ts`, against the sixth round's:
 ```diff
@@ -16482,28 +16504,28 @@ own text is on any other row. No rule can check what the sender says of the read
  export class Deciding extends Domain.Decision(DecideRow, {
    reads: { life: ImportLife, row: RowUnit },
    keyOf: (cmd) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
-@@ -123,8 +135,8 @@
+@@ -123,14 +135,18 @@
      }
      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
      if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})
 -    // The row says this already, whoever decided it and whether or not the sender has seen it.
 -    if (!cmd.covered && leavesAsItIs(row.state, cmd.flags)) return []
-+    // The row reads this already, whoever decided it and whether or not the sender has seen it.
-+    if (changesNothing(row.state, cmd)) return []
++    // The row holds this already, whoever decided it and whether or not the sender has seen it.
++    // (Written as one choice, not "and": the prover then reads 284 paths, few enough to prove the model's relations.)
++    if (cmd.covered ? false : leavesAsItIs(row.state, cmd.flags)) return []
      if (row.state._tag === "Decided") {
        if (cmd.saw !== row.state.change) return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
      } else if (cmd.saw !== 0) {
-@@ -170,43 +182,43 @@
-       before.life._tag === "Open" && command.sawGroup === before.life.lastGroup,
-     // A decision is replaced only by an act whose sender saw it, by the number of the change that recorded it.
-     ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) =>
--      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
-+      changesNothing(before.row, command) ||
-       (before.row._tag === "Decided" ? command.saw === before.row.change : command.saw === 0),
-     // Whatever it decides, an act is made on the import's matching now; one made on an older matching is not applied.
-     AnActIsMadeOnTheMatchingNow: ({ before, command }) =>
--      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
-+      changesNothing(before.row, command) ||
+       return yield* new NoLongerThere({})
+     }
+     if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
++    // Over a group, the sender says the act leaves the row reading as it reads: only once its screen has every
++    // decision on the row and the matching now, so a press from a screen that missed one is refused and held.
++    if (cmd.covered ? cmd.asItReads : false) return []
+     const change = life.state.changes + 1
+     return [
+       row.record(
+@@ -178,35 +194,35 @@
        (before.life._tag === "Open" && command.madeOn === before.life.matching),
      // An act that would leave the row's decision as it is records nothing: the row and the import are unchanged.
      AnActThatChangesNothingLeavesTheImport: ({ before, after, command }) =>
@@ -16548,7 +16570,7 @@ own text is on any other row. No rule can check what the sender says of the read
        after.life._tag !== "Open" ||
        after.row._tag !== "Decided" ||
        after.row.change === after.life.changes,
-@@ -225,28 +237,28 @@
+@@ -225,28 +241,28 @@
      // The decision an act replaces is kept under it.
      AnActKeepsWhichDecisionItReplaces: ({ before, after, command }) =>
        before.row._tag !== "Decided" ||
@@ -16588,7 +16610,24 @@ own text is on any other row. No rule can check what the sender says of the read
 ```diff
 --- review14/Group.story.test.ts
 +++ review15/Group.story.test.ts
-@@ -44,8 +44,8 @@
+@@ -21,7 +21,7 @@
+   ReopenImport,
+   ReviewMovedOn,
+ } from "./ImportLife.aggregate.ts"
+-import { DecideRow, DecidedBeforeTheConfirm, GroupedSince, NotYourStep } from "./Review.decision.ts"
++import { DecideRow, DecidedBeforeTheConfirm, DecidedSince, GroupedSince, NotYourStep } from "./Review.decision.ts"
+ import { Review } from "./Review.model.ts"
+ import { RowDecided, RowUnit } from "./RowUnit.aggregate.ts"
+ 
+@@ -32,6 +32,7 @@
+ const row12 = RowUnit.ref("imp_1/row-12")
+ const ana = { organizationId: "org_prairie", memberId: "ana", role: "editor" as const }
+ const dana = { organizationId: "org_prairie", memberId: "dana", role: "editor" as const }
++const carl = { organizationId: "org_prairie", memberId: "carl", role: "editor" as const }
+ const staged = new ImportStaged({ organizationId: "org_prairie", rows: 50_000, columns: "by heading", by: "ana" })
+ // 6,000 rows named in one text.
+ const rows = Array.from({ length: 6_000 }, (_, n) => `row-${n + 1}`).join(",")
+@@ -44,8 +45,8 @@
    new GroupDecided({ importId: id, organizationId: "org_prairie", change, by: "ana", step: "g1", patch, rows, count: 6_000, madeOn: 0, label: "6,000 fixes accepted", under: 0 })
  const groupCounted = (change: number, label = "6,000 fixes accepted", top = change) =>
    new GroupCounted({ change, step: "g1", rows: 6_000, label, by: "ana", top })
@@ -16599,7 +16638,7 @@ own text is on any other row. No rule can check what the sender says of the read
  const counts = { created: 155, updated: 0, already: 0, notImported: 49_845 }
  const confirm = (seen: number) => new ConfirmImport({ importId: id, shown: "155", plan: "155", seen, planAt: seen, ...counts })
  
-@@ -192,3 +192,20 @@
+@@ -192,3 +193,38 @@
      Story.then(life, new GroupCounted({ change: 5, step: "g3", rows: 6_000, label: "6,000 fixes accepted", by: "ana", top: 5 })),
    ),
  )
@@ -16620,20 +16659,39 @@ own text is on any other row. No rule can check what the sender says of the read
 +    Story.then(RowUnit.ref("imp_1/row-14")),
 +  ),
 +)
++it.effect("a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change", () =>
++  story(
++    Story.given(life, staged, groupCounted(1)),
++    Story.given(g1, groupDecided(1)),
++    // Ana's group leaves row 14 out; Dana, having seen it, types 8 on row 14.
++    Story.provide(CurrentActor, dana),
++    Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: '{"set":{"quantity":"8"}}' })),
++    Story.then(
++      RowUnit.ref("imp_1/row-14"),
++      new RowDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "dana", step: "d1", flags: '{"set":{"quantity":"8"}}', madeOn: 0, label: "Decide" }),
++    ),
++    Story.then(life, new ActCounted({ change: 2, step: "d1", row: "row-14", label: "Decide", holds: 2, by: "dana", actor: "dana", flags: '{"set":{"quantity":"8"}}', madeOn: 0 })),
++    // Carl's screen has the group but not Dana's 8: his "leave out" reads as the row read for him.
++    Story.provide(CurrentActor, carl),
++    Story.when(act({ row: "row-14", step: "c1", saw: 0, sawGroup: 1, covered: true, asItReads: true, flags: leftOut })),
++    Story.rejected(new DecidedSince({ by: "dana", change: 2 })),
++  ),
++)
 ```
 
 The stories:
 ```text
- ✓ review15/Group.story.test.ts > a group of 6,000 rows is one act and one change, and a confirm has to have received it 24ms
- ✓ review15/Group.story.test.ts > a group is taken only from a screen that has every change, and a step decides one group 5ms
- ✓ review15/Group.story.test.ts > a row's act names the last group act, and the same text over a group in force is a change 4ms
+ ✓ review15/Group.story.test.ts > a group of 6,000 rows is one act and one change, and a confirm has to have received it 26ms
+ ✓ review15/Group.story.test.ts > a group is taken only from a screen that has every change, and a step decides one group 8ms
+ ✓ review15/Group.story.test.ts > a row's act names the last group act, and the same text over a group in force is a change 6ms
  ✓ review15/Group.story.test.ts > only its maker takes a group back, in one act, once; a row another person decided since is not touched 4ms
  ✓ review15/Group.story.test.ts > a group made on an older matching is refused 3ms
- ✓ review15/Group.story.test.ts > a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen 4ms
- ✓ review15/Group.story.test.ts > only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers 4ms
+ ✓ review15/Group.story.test.ts > a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen 5ms
+ ✓ review15/Group.story.test.ts > only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers 3ms
  ✓ review15/Group.story.test.ts > a group decided after another was taken back goes over the one still in force, on the matching now 3ms
- ✓ review15/Group.story.test.ts > a press over a group that leaves the row reading as it is changes nothing, and the group's undo reaches that row too 3ms
-      Tests  9 passed (9)
+ ✓ review15/Group.story.test.ts > a press over a group that leaves the row reading as it is changes nothing, and the group's undo reaches that row too 4ms
+ ✓ review15/Group.story.test.ts > a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change 3ms
+      Tests  10 passed (10)
 ```
 ```text
       Tests  35 passed (35)
@@ -16642,7 +16700,7 @@ The stories:
 `Prove.decision(Deciding)` on the model with the check put back, the rules it reports:
 ```text
 NotProved
-schema Proved; accepted true; paths 350
+schema Proved; accepted true; paths 386
 Violated  decision  AnActThatChangesNothingLeavesTheImport
 Unconfirmed  decision  AnActThatChangesNothingLeavesTheRow
   - an event or rejection whose fields fail its schema crashes the command, and nothing is committed

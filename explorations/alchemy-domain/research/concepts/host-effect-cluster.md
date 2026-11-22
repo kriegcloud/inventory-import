@@ -7,6 +7,10 @@ tags: [alchemy-domain, host]
 
 # Host on Effect Cluster
 
+Read at the library's release `2.0.0-beta.87` and its `main@dbfd0dd`, not at the pin `734c27a` the repository
+builds on. What changed between that touches what this page recommends is listed once in [the map](../00-map.md),
+"From `dbfd0dd` to the pin".
+
 `DomainCluster.layerEntities` is a [platform](./platform-contract.md) Layer: provide it to the model's Layer and the
 model runs on [Effect Cluster](./cluster.md). Every object of the model (an aggregate instance, a view key, a policy,
 a projection key, a stream key) is an entity id of ONE entity type that you name, and sagas run on the pool's

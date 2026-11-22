@@ -233,6 +233,20 @@ typed there in any form stops the run, with the line's number and never its text
 file or says to commit it); his own token is checked when his file names one; and for `--staging` and
 `--production`, who may sign up in production is settled (below).
 
+**Before any tool at all, the run stops when a variable that would be used in place of what it checks is set
+outside it**, in his shell or in the root `.env`: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_API_KEY`, `CLOUDFLARE_EMAIL`, `CLOUDFLARE_ACCOUNT_EMAIL` for every size, and for `--staging` and
+`--production` also `OPENROUTER_API_KEY`, `PREVIEW_TEST_ACCOUNT_PASSWORD`, `PREVIEW_CLOUDFLARE_API_TOKEN`,
+`PREVIEW_CLOUDFLARE_ACCOUNT_ID`, `OP_SERVICE_ACCOUNT_TOKEN`, `GITHUB_ACCESS_TOKEN`, `GITHUB_TOKEN` and `GH_TOKEN`
+(`outranking` in `InfraSetup.rules.ts`). It names each one and where it is set, never its value, and a variable set
+and empty counts. The reason: Alchemy takes a provider's credentials from the process's environment and the root
+`.env` before it looks at any profile, for `plan`, `deploy` and `state bootstrap` alike (its
+`resolveProviderConfig`; `state bootstrap` imports the stack with the profile and reaches the same code), and a
+secret set there wins over the reference 1Password is asked for. Stopping was chosen over starting the children
+with those variables removed: removal cannot reach the root `.env`, which the stacks and Alchemy read themselves,
+and a stop leaves one thing true, that what the command tells him is what its children use because nothing else is
+there to use. `--dry-run` prints the names.
+
 What each step does, and with which tool:
 
 - **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if
@@ -255,10 +269,17 @@ What each step does, and with which tool:
   the profile's, whatever `cf` or a token says. After a profile is connected, or found connected, the command reads
   `alchemy profile show --profile <name>`, keeps the one line that names the account, and stops when it is not the
   account its questions name (for the token's account, the comparison is made inside the one process 1Password
-  fills the id for). In a run with `--staging` or `--production` it also stops when the two profiles deploy into the
-  same account (decision I4). The repair it names: `alchemy profile edit --profile <name> --reconfigure Cloudflare`.
+  fills the id for, trimmed and in lower case as Alchemy keeps one; a comparison 1Password did not answer is said
+  as that, not as a wrong account). By his token `cf` is never asked to log in to the previews' account, but when
+  `cf` is logged in it is asked which account holds the zone, and the profile's account is held against that one:
+  a test stage there is asked about, a run with `--staging` or `--production` stops, and with `cf` logged out the
+  command says nothing could tell. In a run with `--staging` or `--production` it also stops when the two profiles
+  deploy into the same account (decision I4), and when the other profile is connected and its account cannot be
+  read. Every question that makes something (the state store, each deploy) then names the account by the id read
+  from the profile. The repair it names: `alchemy profile edit --profile <name> --reconfigure Cloudflare`.
 - **Who may sign up in production** is `--sign-up` when given. When it is not, the command reads what GitHub's
-  `production` environment already holds (`gh variable get SIGN_UP --env production`) and keeps it, saying so; when
+  `production` environment already holds (`gh variable get SIGN_UP --env production --repo
+  kriegcloud/inventory-import`, the repository the stack writes to, never the one `gh` would pick) and keeps it, saying so; when
   GitHub holds none it stops before step 1. It never picks a list, so running `--staging` again cannot close
   production.
 - **Each deploy** is `plan` on his terminal, then "Deploy ... as that plan says?", then `deploy --yes` only after a
@@ -275,8 +296,9 @@ What each step does, and with which tool:
   process's environment or a file. In a workflow (`CI` set) the entry does nothing and 1Password is not contacted:
   a job's secrets come from its GitHub environment. For this, production's profile is also connected to 1Password
   (`alchemy profile edit --add 1Password`: the desktop app and his account), and in the 1Password app, Settings,
-  Developer, "Integrate with other apps" must be on. A variable already set in his shell still wins over the
-  provider, as Alchemy ranks the process's environment last.
+  Developer, "Integrate with other apps" must be on. A variable already set in his shell, even to nothing, still
+  wins over the provider, as Alchemy ranks the process's environment last and keeps an empty one; the entry does
+  not ask 1Password for it. That is for a stage he deploys by hand: `infra setup` stops on such a variable (above).
 
 **Still his, while it runs**: approving each login in the browser (Cloudflare for `cf`, then once for each Alchemy
 profile that logs in; in Alchemy's own question, picking the account the command names, `gh-cli` for GitHub and the
@@ -360,7 +382,11 @@ account-owned token. And for the checks added after the review: that `alchemy pr
 pipe, prints `accountId:` under the profile's Cloudflare line as its source does; that `gh variable get SIGN_UP
 --env production` answers the list and nothing else; and that a deploy of a test stage that changes nothing still
 prints its outputs, which is how he reads the password. `cf auth whoami` and `cf zones list` were run, to read the
-shape of their answers.
+shape of their answers. For the stop on variables set outside: Alchemy's order (environment and root `.env` before
+a profile, for `state bootstrap` too) was read in the pinned build's source and never run; the comparison script
+was run in `sh` on made-up ids (same in another case with spaces: 0; different: 3), never under `op run`. One gap
+is left for a stack deployed by hand, outside this command: `PREVIEW_CLOUDFLARE_ACCOUNT_ID` exported empty is read
+as an empty account id, with no stop.
 
 ### The same steps, by hand
 

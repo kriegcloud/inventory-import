@@ -1,7 +1,7 @@
 ---
 type: Brief
 title: "Brief: the app on @alchemy.run/domain"
-description: How inventory-import uses all of @alchemy.run/domain and the extras Benjamin asked for. The saving of review decisions is modelled first, in the shape he chose, an import, its rows and its groups as three aggregates with four decisions and eleven commands over the app's fifteen fields, and on the library's dbfd0dd Verify proves its 135 rules and checks seven more across instances, the proofs covering what must never happen and 46 stories that each valid act is taken; then one table of every concept with its worked instance, its move and a check that fails without it; then the decisions that are his, one decision each, most consequential first, with what one large import costs under his answers. The library pinned at 734c27a is on main; the review's model is built on it and merged into main (0c4c5e5: its lock keeps 135 rules of the kinds a proof covers, 7 across instances and 11 "can happen", with 47 stories and 154 mutants, counted here; proved, searched and reached by the build's own report); stored rows are not carried over (start empty); the rest of the build starts when he signs.
+description: How inventory-import uses all of @alchemy.run/domain and the extras Benjamin asked for. The saving of review decisions is modelled first, in the shape he chose, an import, its rows and its groups as three aggregates with four decisions and eleven commands over the app's fifteen fields, and on the library's dbfd0dd Verify proves its 135 rules and checks seven more across instances, the proofs covering what must never happen and 46 stories that each valid act is taken; then one table of every concept with its worked instance, its move and a check that fails without it; then the decisions that are his, one decision each, most consequential first, with what one large import costs under his answers. The library pinned at 734c27a is on main; the review's model is built on it and merged into main (0c4c5e5; at 0e8c6e3 its lock keeps 136 rules of the kinds a proof covers, 7 across instances and 11 "can happen", with 55 stories and 165 mutants, counted here; proved, searched and reached by the build's own report); stored rows are not carried over (start empty); the rest of the build starts when he signs.
 ---
 
 # Brief: the app on `@alchemy.run/domain`
@@ -28,11 +28,14 @@ Three rules shape every recommendation here:
 - **An option that goes against a dated answer of his says so**, with the answer and its date.
 
 Two parts of the build exist. Decision 1's pin is on main (commit `ea95cd0`: the library's `main@734c27a`, its 17
-packages kept as files). The review's model of move 1 is built on that pin and merged into main (`0c4c5e5`), in `packages/catalog/model`. Counted there: its lock (`test/Catalog.lock.json`) keeps 153 rules,
-135 of the kinds a proof covers (114 transitions, 19 invariants, 2 relations), 7 across instances and 11 "can happen";
-47 stories (34 in `test/Review.story.test.ts`, 13 in `test/Group.story.test.ts`); 154 mutants (`mutants/mutants.json`).
-What only a run of the prover gives (that the 135 are proved, the 7 searched, the 11 reached) is the build's own
-report. The per-row model, kept as the fallback, is on a branch of its own, not on main. **The
+packages kept as files). The review's model of move 1 is built on that pin and merged into main (`0c4c5e5`), in `packages/catalog/model`. Counted there at commit `0e8c6e3`: its lock (`test/Catalog.lock.json`)
+keeps 154 rules, 136 of the kinds a proof covers (115 transitions, 19 invariants, 2 relations), 7 across instances and
+11 "can happen"; 55 stories (36 in `test/Review.story.test.ts`, 19 in `test/Group.story.test.ts`); 165 mutants
+(`mutants/mutants.json`). The rule the lock gained over the earlier count of 153 is
+`UndoRowStep.ARowsUndoIsNotFromUnderALaterGroup`. What only a run of the prover gives (that the 136 are proved, the 7
+searched, the 11 reached) is the build's own report. The model keeps moving, and this brief's figures for it are as of
+`0e8c6e3`: the live numbers are in [docs/verify.md](../../docs/verify.md) and
+`packages/catalog/model/test/Catalog.lock.json`, with the two story files and `mutants/mutants.json`. The per-row model, kept as the fallback, is on a branch of its own, not on main. **The
 rest of the build starts after Benjamin says the brief matches.** The atoms goal, its other condition, is merged into
 main ([its plan](../../goals/atoms/PLAN.md)), and "today" in this brief is the code on main.
 
@@ -85,8 +88,8 @@ the repository; none ran on `734c27a`, and nothing was deployed. Those builds ar
 week after `main` moves past the commit (decision 1); the builds the trials installed were kept outside the repository
 and are not part of it, so once they are deleted no reader can install them from the registry and run the trials again.
 The repository pins `main@734c27a` (his answer of 2026-11-22). On that pin, with Effect 4.1.5, the model he chose is
-built and merged into main (`0c4c5e5`): 135 rules proved, 7 searched and 11 "can be
-taken" rules reached, by the build's own report, the same counts its lock keeps; 47 stories and 154 mutants, counted in
+built and merged into main (`0c4c5e5`). At `0e8c6e3`: 136 rules proved, 7 searched and 11 "can be
+taken" rules reached, by the build's own report, the same counts its lock keeps; 55 stories and 165 mutants, counted in
 `packages/catalog/model`. The per-row fallback is
 on a branch of its own, not on main: 96 rules proved and 3 searched on the same pin, by the build's own report,
 which is not checked from main.
@@ -134,7 +137,9 @@ which is not checked from main.
   written as chains of `&&`, and when the undo of a group was added (4,097 paths, nothing proved). With one comparison a
   rule, a group counted by a number instead of cleared by a branch, and no rule weaker, trial 13's `Deciding` had 332
   paths and `Undoing` 2,652; `review15`'s four decisions have 284, 298, 42 and 84 (a row's act 152 on `review14`, before
-  the no-change answer). The prover also cannot write a text's length into a text, nor read a loop, so it reads no hash.
+  the no-change answer). On `dbfd0dd` the prover also cannot write a text's length into a text, nor read a loop, so it
+  reads no hash. On this repository's pin the length half is patched (`02-text-length-in-a-template`,
+  [docs/patches.md](../../docs/patches.md)): a length-prefixed text is read and proved there. The loop half stands.
 - **The group as one unit, before the last-group rule** (trials 15 to 17, for decision 7, on `review12`): 123 rules
   proved, the four decisions with 42 to 292 paths; one act for 6,000 rows a median of 214 ms in local workerd, each time
   the first group act on a fresh import; and the reading of a row's decision through its groups equals today's `act` for
@@ -216,14 +221,22 @@ and the four decisions with `Effect.fn`, and its counts above are of that form o
 
 - **A row's act names the decision it saw on its row**, by the change that recorded it, the matching it was made on,
   whatever it decides, how many times the import had been confirmed (its opening), and the import's last group act as
-  its screen has it (`sawGroup`). Otherwise `DecidedSince { by, change }`, `NoLongerThere`, `MatchedSince`,
-  `ConfirmedSince` or `GroupedSince`. `GroupedSince` hands back no number: the screen learns the last group act only by
+  its screen has it (`sawGroup`). Otherwise `DecidedSince { by, change }`, `PutBackSince { by, change }`,
+  `NoLongerThere`, `MatchedSince`, `ConfirmedSince` or `GroupedSince`. `PutBackSince` says that the decision the sender
+  saw was taken back and an older one is there again, and whose it is: nobody decided the row since (the story "when
+  the decision its sender saw was taken back and an older one is there again, the refusal says so", in
+  `test/Review.story.test.ts`). `GroupedSince` hands back no number: the screen learns the last group act only by
   receiving it. The act also says whether a group in force on the row was decided after the row's own decision
   (`covered`): the row then reads otherwise than its own instance holds, and the same text is a change. The queue sends
   one act at a time and fills in a person's own earlier act from its receipt.
 - **An act that would leave the row as it is records nothing**; its receipt has no events, and the answer says "no
-  change": his answer of 2026-11-19. That holds only when the sender says the row is not covered by a group. No rule
-  checks `covered`: with it set, an act that repeats what the row holds is recorded as the sender's. A press over a
+  change": his answer of 2026-11-19. As it is means the same text made on the same matching (`onItsMatching` in
+  `Row.aggregate.ts`): at `0e8c6e3` the same text made on a newer matching than the row's is a change, recorded on the
+  matching now (the story "the same decision made again on a newer matching is a change, and made on the older one it
+  is refused"). That holds only when the sender says the row is not covered by a group. No rule checks `covered`:
+  with it set, an act that repeats what the row holds is recorded as the sender's, when `saw` matches. A covered press
+  sent twice (the same step, sender and text) is written once (the story "a covered press sent twice is written once
+  and answered the same"). A press over a
   group that leaves the row reading as it reads now changes nothing and is recorded as nobody's (the recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule (DECISIONS.md)): the act carries what its sender says of the reading (`asItReads`), as it
   carries `covered`, and with it set records nothing. That exit is taken only after the checks of the decision the
   sender saw on the row (`saw`) and of the matching (`madeOn`), so a press from a screen that missed a later decision on
@@ -234,18 +247,25 @@ and the four decisions with `Effect.fn`, and its counts above are of that form o
   shown by its own mutant, which the prover still proves: with the exit put back ahead of the check of `saw`, every rule
   is still proved and both stories fail; with it moved between the two checks, every rule is still proved and only the
   matching story fails. The trial model `review15` makes that change; `review14` does not have it. No rule checks what
-  the sender says. On main `Deciding.decision.ts` takes the `asItReads` exit only after the checks of `saw` and of the
-  matching, with the saw story (Carl's, in `test/Group.story.test.ts`) and the mutant `row-covered-early`, which puts
-  the exit ahead of the check of `saw`; it has neither the matching story nor a mutant that puts the exit between the
-  two checks, and both are still to add.
+  the sender says. In this repository, at `0e8c6e3`, `Deciding.decision.ts` takes the `asItReads` exit only after the
+  checks of `saw` and of the matching. Both halves have their story in `test/Group.story.test.ts` ("a press from a
+  screen that is behind is held, not lost as no change", Carl's; "a covered press made on an older matching is held
+  too") and their mutant: `row-covered-early` puts the exit ahead of the check of `saw`, `row-covered-before-matching`
+  puts it between the two checks.
 - **A stale press that matches what the row holds is held, not dropped** (the recommended "Hold it when
   behind", picked on 2026-11-22 and standing under his rule (DECISIONS.md)). Dana undoes her last decision on row 14, so the row holds her earlier fix F1 again, under Ana's group. Carl,
   whose screen has not received the undo, presses F1. On his screen no group covers the row, so he sends `covered:
   false`, and the text is what the row holds. The early "no change" is given only when the sender has seen the row's
   latest decision, or the row's own decision is newer than the last group; otherwise the press is refused and shown.
   This narrows his answer of 2026-11-19, as the model read it ("no change, whoever decided it and whether or not the
-  sender has seen it"), for this one case. Not built on main: there `Deciding` answers the uncovered "no change" before
-  the check of `saw`, so Carl's press is still dropped. Not in `review15`; no trial numbers.
+  sender has seen it"), for this one case. Built at `0e8c6e3`: from a screen that has not seen the row's decision,
+  `Deciding` gives the uncovered "no change" only when the row's own change is newer than the last group; otherwise it
+  refuses with `DecidedSince`, or with `PutBackSince` when what the sender saw was taken back. Carl's press is refused
+  `PutBackSince`, naming Dana's F1, and held. The story is "a press that matches what the row holds is held when its
+  screen is behind a group" (`test/Group.story.test.ts`), and the mutant `row-same-behind` gives that "no change"
+  whether or not a group was made since. On a row left with no decision the same press is refused `NoLongerThere` (the
+  story "the same on a row left with no decision", the mutant `row-same-untouched-behind`). Not in `review15`; no trial
+  numbers on `dbfd0dd`; that its proofs pass is by the build's own report.
 - **A match says every field's column after it**, the headings' own choices and "none, on purpose" included, because
   giving a column to one field can move what another reads. It names the last match its sender saw, and is refused on
   another. The same columns again, by heading or by hand, record nothing and take nothing back. The import's events hold
@@ -271,8 +291,8 @@ and the four decisions with `Effect.fn`, and its counts above are of that form o
   was written whole, with what the group gave it, so the row keeps the group's effect until that decision is undone
   (under "The reading of a row through its groups"). That is the recommended "Row 14 stays whole", picked on 2026-11-22 and standing under his rule (DECISIONS.md): the screen names
   the row ("Row 14 was changed by Dana and stays"). A press over the group that left the row reading as it read changed
-  nothing and is recorded as nobody's, so the group's undo leaves that row undecided like the group's other rows (his
-  answer of 2026-11-22, "No change, Ana's undo applies"). Today's `act` strips the group's part from such a row, and
+  nothing and is recorded as nobody's, so the group's undo leaves that row undecided like the group's other rows (the
+  recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule (DECISIONS.md)). Today's `act` strips the group's part from such a row, and
   changes at the move that puts the review on the model. A group's undo names no `seen` and no `sawGroup`: only a later
   group in force refuses it, not a row's act made since. So Ana's undo is taken from a screen that may not have received
   Dana's act on row 14, and the screen can say "Row 14 was changed by Dana and stays" only once the undo has landed and
@@ -284,9 +304,13 @@ and the four decisions with `Effect.fn`, and its counts above are of that form o
   confirms created, removed or kept, and the items they replaced, put back or kept.
 - **A row's undo names the change it takes back, the import's last group act (`sawGroup`), and brings what goes under
   the decision it puts back**; the row takes it only when it seals to exactly the text the row holds. It does not reach
-  past a confirm that stands. Otherwise `NotYourStep`, `NotWhatWasUnder`, `GroupedSince`, `ConfirmedSince`,
-  `DecidedBeforeTheConfirm` or, where a very long history was let go, `HistoryEnds`. It is checked against the row's own
-  instance only: it takes back the row's own decision, whatever a group in force does to the row.
+  past a confirm that stands. Otherwise `NotYourStep`, `GroupedAfter { last }`, `NotWhatWasUnder`, `GroupedSince`,
+  `ConfirmedSince`, `DecidedBeforeTheConfirm` or, where a very long history was let go, `HistoryEnds`. It also says
+  whether a group in force, decided after the decision it takes back, covers the row (`covered`, the sender's word,
+  from a screen that has every group act). At `0e8c6e3` such an undo is refused `GroupedAfter`, naming the group, as a
+  group's undo under a later group is; once that group is taken back the undo is taken
+  (`UndoRowStep.ARowsUndoIsNotFromUnderALaterGroup`; the story "a decision a later group covers is not taken back from
+  under it"; the mutant `undo-covered`). Otherwise it is checked against the row's own instance only.
 - **Every event of the import says whose it is**, and a row act's event who acted and whose decision the row's own
   instance then holds. A group act's rows and what it does are on the group's event, not the import's, so the history,
   the audit line and a notice are written from the import's events and the groups' events together.
@@ -334,9 +358,9 @@ sent to `Catalog` in memory, for one person and for two on live screens, with a 
 **Every rule, what it is proved of, and what holds the rest** (`Verify.model` of the trial's `Review` on `review15`, the
 model of his answers: 135 rules proved, in 148 s at loads of 35 to 55; on `review14`, before the no-change
 answer, 135 in 110 s at about 28, and in 128 s at about 31 in a first run; the seven rules across instances by
-`Verify.model` of its `ReviewInvariants`). The names are the build's, which its lock file on main keeps: the rules are
-the same on both, the lock holds the same 135 and 7 (counted here), and the build gives them proved and searched on
-`734c27a`, by its own report. Where
+`Verify.model` of its `ReviewInvariants`). The names are the build's, which its lock file keeps: at `0e8c6e3` the lock
+holds those 135 and one more, `UndoRowStep.ARowsUndoIsNotFromUnderALaterGroup` (136), and the 7 (counted here), and the
+build gives them proved and searched on `734c27a`, by its own report. Where
 a name starts with ".", it is of the block named before it in the same cell:
 
 | Rule, in words | Name | Standing | Proved of | What holds the rest |
@@ -351,10 +375,11 @@ a name starts with ".", it is of the block named before it in the same cell:
 | A row's act and a row's undo are made on a screen that has the import's last group act | `DecideRow.ARowsActSawTheLastGroupAct`; `UndoRowStep.ARowsUndoSawTheLastGroupAct` | proved | The number `sawGroup` states | That a refused act on a row the group does not name is sent again by itself: the queue's test, not run |
 | Nobody clears a decision they did not make; only its organization changes a row; a viewer changes none | `DecideRow.NobodyClearsAnotherPersonsDecision`, `.OnlyItsOwnOrganizationChangesTheRow`, `.AViewerChangesNoRow`; `UndoRowStep.NobodyClearsAnotherPersonsDecision`, `.OnlyItsOwnOrganizationChangesTheRow`, `.AViewerChangesNoRow` | proved | The row's maker and the actor | An act that puts a row back to nothing is recorded as its sender's, over what they saw |
 | An act, an undo, a group and a group's undo are of this opening; an act and a group are made on the matching now | `DecideRow.AnActIsMadeOnTheMatchingNow`, `.AnActIsOfThisOpening`; `UndoRowStep.AnUndoIsOfThisOpening`; `DecideGroup.AGroupIsMadeOnTheMatchingNow`, `.AGroupIsOfThisOpening`; `UndoGroup.AGroupsUndoIsOfThisOpening` | proved | The numbers the command states | Which part of a text is still in force: a reader over the columns at each match, and a test, not run. That a carried part keeps its number: a test of the client's merge, not run. What a match does to a group in force: not run |
-| An act that changes nothing records nothing | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow` | proved | The row's text, when the sender says the row is not covered | With `covered` set the same text is recorded as the sender's. Under his later answer ("No change, Ana's undo applies") an act whose sender says it leaves the row reading as it reads (`asItReads`) records nothing too: made in the trial model `review15`, not in `review14`, and taken only after the checks of `saw` and the matching, so a press from a screen that missed a later decision on the row, or made on an older matching, is refused and held (no rule holds that order: its saw half is held by one story and its matching half by another, each shown by a mutant the prover still proves); no rule checks what the sender says. That one encoder writes the text, so the same decision is the same text: a test, not run |
+| An act that changes nothing records nothing | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow` | proved | The row's text, when the sender says the row is not covered | With `covered` set and `asItReads` not, the same text is recorded as the sender's when `saw` matches; a covered press sent twice (same step, sender and text) is written once. Under the recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule (DECISIONS.md), an act whose sender says it leaves the row reading as it reads (`asItReads`) records nothing too: made in the trial model `review15`, not in `review14`, and taken only after the checks of `saw` and the matching, so a press from a screen that missed a later decision on the row, or made on an older matching, is refused and held (no rule holds that order: its saw half is held by one story and its matching half by another, each shown by a mutant the prover still proves); no rule checks what the sender says. That one encoder writes the text, so the same decision is the same text: a test, not run |
 | An act that is recorded is recorded as its sender said and as theirs; so is a group, whole, in force | `DecideRow.AnyOtherActIsRecorded`, `.WithItsText`, `.OnItsMatching`, `.UnderItsStep`, `.AsItsSenders`; `DecideGroup.AGroupIsRecorded`, `.WithEveryRowItNames`, `.WithWhatItDoes`, `.WithItsCount`, `.OnItsMatching`, `.InForce`, `.AsItsSenders` | proved | The row or the group after the act | That an act is taken at all: no rule holds it. The stories hold it |
 | What a row's act replaces is kept under it (its number, maker, text and matching), and what was below that stays below | `DecideRow.AnActKeepsWhichDecisionItReplaces`, `.AndWhose`, `.AndItsText`, `.AndItsMatching`, `.AndWhatWasBelowStaysBelow` | proved | The row and the sealed text | That the step and the label kept under it are the replaced decision's: no rule. What a group did to the row is not kept in the row |
 | A row's undo takes back only its sender's own decision, puts back the decision that was under it (its number, maker, text, matching and step), and leaves under that exactly what was recorded | `UndoRowStep.AnUndoTakesBackOnlyItsSendersOwnStep`, `.AnUndoLeavesADecisionWhenOneWasUnder`, `.AndNoneWhenNoneWas`, `.AnUndoPutsBackTheDecisionThatWasThere`, `.AsTheirsWhoMadeIt`, `.WithItsTextAsItWas`, `.OnItsMatchingAsItWas`, `.UnderItsStepAsItWas`, `.NothingIsBelowWhatWasTheLastKept`, `.WhatLiesUnderIsWhatWasRecorded`; `Row.TheSizeOfByIsTrue`, `.TheSizeOfStepIsTrue`, `.TheSizeOfFlagsIsTrue`, `.TheSizeOfLabelIsTrue` | proved, every depth, of the row's own levels | The seal of what is brought against the seal the row holds, and the sizes of its texts | That two levels never share a seal: `unseal` reads one back, a property over 2,000 random single levels, each sealed over a random text (trial 13, and again on `review14`). That the label put back is the one under it: the evolve copies it (`StepUndone`), and no rule checks it |
+| A row's decision is not taken back from under a later group in force that covers the row | `UndoRowStep.ARowsUndoIsNotFromUnderALaterGroup` | in the lock at `0e8c6e3`, proved by the build's own report; not in `review15` | The `covered` the undo states | That the screen sets `covered` truly: the screen, not run. The story "a decision a later group covers is not taken back from under it" |
 | Neither undo reaches past a confirm that stands | `UndoRowStep.AnUndoDoesNotReachPastAConfirm`; `UndoGroup.AGroupsUndoDoesNotReachPastAConfirm` | proved | The confirm's number | |
 | A row and a group are decided only on an open import | `DecideRow.ARowIsDecidedOnlyOnAnOpenImport`; `DecideGroup.AGroupIsDecidedOnlyOnAnOpenImport` | proved | The import | |
 | A group is taken only from a screen that has every change, and a step decides one group | `DecideGroup.AGroupIsMadeOnEveryChange`, `.AStepDecidesOneGroup` | proved | The number `seen` states and the group's instance | That the rows it names are the ones the fix fits: the screen, not run |
@@ -383,8 +408,8 @@ alone end `NotVerified`, because each folds events only a decision records, so t
   reader can read, or a row the file does not have: the command's schema bounds both; `DraftRows` and the handler name
   and skip what they cannot read (a test, not run).
 - `covered` and `asItReads`, which the sender states: with `covered` set and `asItReads` not, a repeat is recorded as
-  the sender's. So "no change" (his answer of 2026-11-19), "it stays Dana's" (decision 3) and "No change, Ana's undo
-  applies" (2026-11-22) hold only when the sender says them truly; a screen behind on the row or on the matching says
+  the sender's when `saw` matches. So "no change" (his answer of 2026-11-19), "it stays Dana's" (decision 3) and the
+  recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule (DECISIONS.md), hold only when the sender says them truly; a screen behind on the row or on the matching says
   them of a reading it no longer has, and is refused by `saw` or `madeOn` before the exit. That those two checks come
   before the exit is held by no rule: the saw half by one story and the matching half by another, each shown by its own
   mutant (the exit ahead of the check of `saw`; the exit between the two checks), which the prover still proves. That a
@@ -435,7 +460,7 @@ made at the press.** A resend with the same command id answers the first receipt
 | Act | Command | What it names |
 | --- | --- | --- |
 | A row's act | `DecideRow` | The row, the step, the decision it saw there (`saw`), the import's last group act as the screen has it (`sawGroup`), whether a group in force covers the row (`covered`), whether the act leaves the row reading as it reads now through its groups (`asItReads`, the recommended option picked on 2026-11-22 and standing under his rule; in the trial model `review15`), the opening, the matching, the decision's text and its label |
-| A row's undo | `UndoRowStep` | The row, the change it takes back, its step, `sawGroup`, the opening, and the level that goes under the decision it puts back, with the sealed text below that |
+| A row's undo | `UndoRowStep` | The row, the change it takes back, its step, `sawGroup`, whether a group in force decided after the decision it takes back covers the row (`covered`), the opening, and the level that goes under the decision it puts back, with the sealed text below that |
 | A group's act | `DecideGroup` | The step, the opening, every change the screen has received (`seen`), the matching, the rows and what the act does to them as two texts, and how many rows |
 | A group's undo | `UndoGroup` | The step and the change it takes back, and the opening |
 
@@ -444,8 +469,15 @@ A group act names every change, so it is sent once every earlier act in the pers
 **A rejection ends nothing by itself** (his answers of 2026-11-20 and 2026-11-21). What each one means for the queue of
 waiting acts:
 
-- `DecidedSince` or `NoLongerThere`, someone decided the row since: the act is held, with both decisions and whose is
-  whose, until the person picks one, and Confirm waits.
+- `DecidedSince`, someone decided the row since: the act is held, with both decisions and whose is whose, until the
+  person picks one, and Confirm waits.
+- `NoLongerThere`, the decision the screen showed was taken back and the row holds none: the act is held with what is
+  there, and Confirm waits.
+- `PutBackSince`, the decision the screen showed was taken back and an older one is there again: the act is held the
+  same way, with both, and the screen says the decision it showed was taken back and whose decision the row holds
+  again, not that someone decided since; Confirm waits. Nothing is dropped and nothing applied over the decision
+  there (by the rule "a press from a screen that is behind is never silently dropped or applied, it is held and shown";
+  DECISIONS.md, "Decided by the rule"). Not run.
 - `GroupedSince`, a group landed that the screen had not received (not run). When a colleague's group act lands, a
   waiting act on a row the group does not name is sent again by itself, naming the new last group act; one on a row the
   group names is held and shown with both, as his answers "Hold it, show both, ask" and "Keep them, say why"
@@ -467,7 +499,9 @@ waiting acts:
 - `ReviewMovedOn` on a group act, its screen one change behind: the screen draws the change, and the person presses
   again.
 - `GroupedAfter { last }` on a group's undo: a later group is still in force; the screen names it, and the undo stays in
-  the person's history until that group is taken back.
+  the person's history until that group is taken back. On a row's undo (`covered` set) it means a group in force,
+  decided after the decision, covers the row: the same, the screen names the group and the undo stays until that group
+  is taken back.
 - `MatchedSince`: the screen sends the act again without the parts whose field was matched since, shows those proposals
   as open again and says which accepts were taken back (his answer of 2026-11-20, "Server refuses, screen says so"); an
   act left with nothing is not sent again.
@@ -534,7 +568,7 @@ a property test over random orderings. It stays, smaller. The parts that hold hi
 | `ViewArrived { open }`, `closing`, `leftOver`, `LeftOverNamed` | "Name the rows, then drop them" | Stay: the stream says the import is confirmed; the queue sends nothing more; the Result step names the left-over acts |
 | `ConfirmPressed`, `ConfirmMoved`, `ConfirmStale` | "Refuse, show, confirm again" | Stay, on new causes: Confirm waits for the queue to empty; `ReviewMovedOn`, `PlanBehind` and `NotWhatWasShown` are `ConfirmMoved`, and the screen draws again from the stream |
 | `madeOn`, `notApplied`, `withoutStaleDecisions` (server), `MappingChoice.at` | "Server refuses, screen says so" | `madeOn` becomes the matching an act was made on; `MappingChoice.at` becomes the columns at each match, on the import's events; `notApplied` becomes the screen's reading of `MatchedSince` and of the parts the match put out of force |
-| A row's line above the review (`lines`, its sides with `overtaken` and `refused`, `Settled`) and `Side.seen` | "Hold it, show both, ask"; "Keep them, say why"; "Wait until she picks" | Stay, on new causes: `DecidedSince` and `NoLongerThere` hold the act with both decisions; any other rejection marks it not saved; Confirm waits for both |
+| A row's line above the review (`lines`, its sides with `overtaken` and `refused`, `Settled`) and `Side.seen` | "Hold it, show both, ask"; "Keep them, say why"; "Wait until she picks" | Stay, on new causes: `DecidedSince`, `PutBackSince` and `NoLongerThere` hold the act with both decisions; any other rejection marks it not saved; Confirm waits for both |
 | `changed` in `SaveAnswered` | "Answer says 'no change'" | A receipt with no events |
 | `Send { delta }`, `deltaOf`, `over` with a clear, `SaveAnswered`'s revision cases, `Put`, `Ask`, `matching`, `MatchStarted`, `MatchEnded` | The difference between two pictures | Go: an act is sent, and the stream brings the rest |
 | The test's own server (`packages/catalog/web/test/support/draftWorld.ts`) | | Goes: the test drives the real model on `Domain.InMemory` |
@@ -556,7 +590,8 @@ command whose text is the row's decision and whose label is stored, so `Action` 
   again if they still mean it (the recommended "Sent again by itself", picked on 2026-11-22 and standing under his rule (DECISIONS.md)). Not run.
 - **A group is taken back only while it is the last group still in force** (decision 8). An earlier one is refused with
   `GroupedAfter`, which names the later one; once that one is taken back, the earlier is the last again, so undo walks
-  back. A group its maker took back is out of force, and its patch is laid on no row (the recommended option, picked on 2026-11-22 and standing under his rule (DECISIONS.md)); a row
+  back. A row's undo of a decision that a later group in force covers is refused `GroupedAfter` the same way, and is
+  taken once that group is taken back (`UndoRowStep`'s `covered`, at `0e8c6e3`). A group its maker took back is out of force, and its patch is laid on no row (the recommended option, picked on 2026-11-22 and standing under his rule (DECISIONS.md)); a row
   someone changed over the group keeps that decision whole, with what the group had done to it when it was made, so the
   group's effect stays on that row until its decision is undone (the property under "The reading of a row through its
   groups"). That is the recommended "Row 14 stays whole", picked on 2026-11-22 and standing under his rule (DECISIONS.md), and the screen names the row ("Row 14 was changed by Dana
@@ -582,7 +617,7 @@ rejected are in [DECISIONS.md](DECISIONS.md).
 
 | Answer (date) | In the model | Proved | Tested |
 | --- | --- | --- | --- |
-| "Answer says 'no change'" (2026-11-19), rows somebody else had just decided the same way among its cases | A row's act that leaves the row as it is records nothing, whoever made what is there; its receipt has no events. From a screen that missed the row's latest decision, on a row whose own decision is not newer than the last group, it is refused and held instead (his answer of 2026-11-22, "Hold it when behind"; not built on main). Only when the sender says the row is not covered by a group (`covered`), or that the act leaves the row reading as it reads through its groups (`asItReads`, the recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule; in the trial model `review15`); no rule checks either; a group act is recorded whole. What that means for the second person is decision 3 | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow` | That the screen reads an empty receipt as "no change"; that it sets `covered` and `asItReads` truly and leaves out of a group the rows that already hold what it gives: not run |
+| "Answer says 'no change'" (2026-11-19), rows somebody else had just decided the same way among its cases | A row's act that leaves the row as it is (the same text, made on the same matching) records nothing, whoever made what is there; its receipt has no events. The same text made on a newer matching than the row's is a change (`onItsMatching`, at `0e8c6e3`). From a screen that missed the row's latest decision, on a row whose own decision is not newer than the last group, it is refused and held instead (the recommended "Hold it when behind", picked on 2026-11-22 and standing under his rule (DECISIONS.md); built at `0e8c6e3`). Only when the sender says the row is not covered by a group (`covered`), or that the act leaves the row reading as it reads through its groups (`asItReads`, the recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule; in the trial model `review15` and in this repository); no rule checks either; a group act is recorded whole. What that means for the second person is decision 3 | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow` | That the screen reads an empty receipt as "no change"; that it sets `covered` and `asItReads` truly and leaves out of a group the rows that already hold what it gives: not run |
 | "Refuse, show, confirm again" (2026-11-19): nothing is confirmed that was not on screen | The confirm names every change its screen received, the change its plan was built at, and what its button said. A group act is one numbered change, so no group is ever being sent and a confirm that has not received one is refused | `Import.AConfirmNamesEveryChange`, `.APlanIsOfEveryChange`, `.APlanDoesWhatWasShown` | The screen's and the handler's halves, a last change that is a group act included |
 | "Keep them and send them" (2026-11-20) | The queue of acts, with command ids, kept through a reload | | The fold's property test: every act is in the events or in the queue. Not run on this model |
 | "Name the rows, then drop them" (2026-11-20) | Nothing is decided on a closed import, nor after a reopen by an act, an undo, a group or a group's undo made before the confirm (decision 13) | `DecideRow.ARowIsDecidedOnlyOnAnOpenImport`, `.AnActIsOfThisOpening`; `UndoRowStep.AnUndoIsOfThisOpening`; `DecideGroup.AGroupIsDecidedOnlyOnAnOpenImport`, `.AGroupIsOfThisOpening`; `UndoGroup.AGroupsUndoIsOfThisOpening` | The Result step names the left-over acts |
@@ -590,7 +625,7 @@ rejected are in [DECISIONS.md](DECISIONS.md).
 | "SKU rematch", "Twin rematch", "Undone fix" (2026-11-20): server refuses, says so | A Replace, a Keep-stored, a keep of one of two and an undone fix are parts of the text with their own number; the reader puts them out of force as an accept | | The reader's test, each kind; not run |
 | "Other rematch" (2026-11-20): refuse if it changes the row | The reader compares the row with the stored item on the columns at the part's match and now, with `review` | | The same |
 | "Only when it changes" (2026-11-21); a field displaced by another's match counts as moved | The same columns again are no match (no rule: removing that check breaks none, and a story catches it); the columns are of every field, so a displaced one is moved | `Import.AMatchHoldsTheColumnsItSays`, of the columns a match holds | A story on `review15` (the same columns, by heading or by hand, are no match) |
-| "Hold it, show both, ask" (2026-11-20), for a row that waited | `DecidedSince` and `NoLongerThere` refuse the act; the queue holds it with both. An act made before a colleague's group reached the screen is refused with `GroupedSince`, held on a row the group names and sent again on one it does not. A row that did not wait is decision 2 | `DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt`, `.ARowsActSawTheLastGroupAct`; `UndoRowStep.ARowsUndoSawTheLastGroupAct` | That the queue holds it and Confirm waits; not run |
+| "Hold it, show both, ask" (2026-11-20), for a row that waited | `DecidedSince`, `PutBackSince` and `NoLongerThere` refuse the act; the queue holds it with both. An act made before a colleague's group reached the screen is refused with `GroupedSince`, held on a row the group names and sent again on one it does not. A row that did not wait is decision 2 | `DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt`, `.ARowsActSawTheLastGroupAct`; `UndoRowStep.ARowsUndoSawTheLastGroupAct` | That the queue holds it and Confirm waits; not run |
 | "Keep them, say why" (2026-11-20) | A refused act stays in the queue with its reason; signed out counts as waiting | | The queue's test |
 | "Each tab keeps its own" (2026-11-20); a discarded tab counts as gone and says so; "Keep both, she picks" for a refused row beside a closed tab's (2026-11-21) | One queue a tab, taken up only from a tab that is gone; a command id answers its first receipt whichever tab sends it | | The queue's test with two tabs |
 | "Wait until she picks", "Wait, like a held row" (2026-11-21) | Confirm is sent only when no act is held or marked not saved | | The screen's half of the confirm |
@@ -606,9 +641,9 @@ check ran in a trial named on the trial page.
 
 | Concept | Worked instance | Move | Fails when missing |
 | --- | --- | --- | --- |
-| Model | `Catalog`, `Access`, `Usage` | 1, 6, 2 | `Verify.report` of each, the library's lock file keeping every rule's text and `require.proved` naming every rule that must be proved (his answer of 2026-11-22, "Lock plus the library's proved list"). The trials ran `Review` (`review14`, then `review15`) and `Access`; main runs `Catalog` on `734c27a` with the lock and `require.proved` (`Catalog.verify.test.ts`; the lock keeps 135 of the kinds a proof covers, 7 across instances and 11 "can happen", counted here; proved, searched and reached by the build's own report); `Usage` not run |
+| Model | `Catalog`, `Access`, `Usage` | 1, 6, 2 | `Verify.report` of each, the library's lock file keeping every rule's text and `require.proved` naming every rule that must be proved (his answer of 2026-11-22, "Lock plus the library's proved list"). The trials ran `Review` (`review14`, then `review15`) and `Access`; main runs `Catalog` on `734c27a` with the lock and `require.proved` (`Catalog.verify.test.ts`; at `0e8c6e3` the lock keeps 136 of the kinds a proof covers, 7 across instances and 11 "can happen", counted here; proved, searched and reached by the build's own report); `Usage` not run |
 | Command, event, rejection | `DecideRow`, `RowDecided`, `GroupedSince`; `DecideGroup`, `GroupDecided`, `GroupedAfter`; `ConfirmImport`, `ImportConfirmed`, `ReviewMovedOn` | 1 | A story for each of the eleven commands accepted and for each refusal, each failing on a model whose `decide` records nothing for that command (on `review14` each mutant that records nothing fails stories); a "can happen" rule (`sometimes`) for each command, answered "reached": eleven on main (`Catalog.verify.test.ts`), each reached by the build's own report; not run on any trial model |
-| Aggregate | `Import`, `Row`, `Group`, `Item`, `Allowance`, `Organization`, `Member` | 1, 4, 2, 6 | Each one's Verify test, with a mutant beside each check that must break its rule or fail a story. The mutants ran on the review's model only (`review14`, 148, before the no-change answer; `review15`, the three of its change; main has 154 mutants, counted in `packages/catalog/model/mutants/mutants.json` (the trial's 148 and six for the new checks), a sample in `check:full` and all nightly, what each run finds by the build's own report); for `Item`, `Allowance`, `Organization` and `Member`: not run |
+| Aggregate | `Import`, `Row`, `Group`, `Item`, `Allowance`, `Organization`, `Member` | 1, 4, 2, 6 | Each one's Verify test, with a mutant beside each check that must break its rule or fail a story. The mutants ran on the review's model only (`review14`, 148, before the no-change answer; `review15`, the three of its change; this repository has 165 at `0e8c6e3`, counted in `packages/catalog/model/mutants/mutants.json` (the trial's 148, six for the covered checks, five for "Hold it when behind" and six for the cases settled by the rule), a sample in `check:full` and all nightly, what each run finds by the build's own report); for `Item`, `Allowance`, `Organization` and `Member`: not run |
 | Annotations | A description on every served command, view, stream and query, and on each Api | 1 on | A test that fails on a served declaration with none. Not run |
 | Decision | `Deciding`, `Undoing`, `DecidingGroup`, `UndoingGroup`; `FoundOrganization`, `AddMember`, `ChangeRole`, `RemoveMember` | 1; 6 | `Prove.decisionReport` of each in `bun run check`: every rule its report gives must be proved; which rules exist is the lock's, in `check:full`. On main each of the four decision proofs calls `missingRules`, which fails, naming the decision, when one leaves out the three rules: our check, kept and named as ours (his answer of 2026-11-22, "Keep it, named as ours"). The members' four with `MemberEmail` not run |
 | Relation | `ARowBelongsToItsImportsOrganization`, `AGroupBelongsToItsImportsOrganization` (proved on `review15`); `AMemberWhoIsInIsCounted` (checked, trial 10) | 1; 6 | Each kept by the lock, and each proved one named in `require.proved` |
@@ -641,7 +676,7 @@ check ran in a trial named on the trial page.
 | Host on Rivet | **Cannot yet**: no Rivet control plane or pool runs on Cloudflare (decision 57) | | Its question answered |
 | Backfill | `ImportHistory` added in move 5, built from the events the model itself recorded since move 3; nothing from before the model (decision 37, "Start empty") | 5 | An import confirmed on the model before that deploy is in the history after it, on the preview stage. Not run |
 | Observability | `Alchemy.Telemetry.layerOtlp` in the model's Worker | 2 | A test with an in-memory exporter sees a command's span and a `domain.*` metric. Not run |
-| Story | A story for each of the review's eleven commands and each refusal (46 written for `review15`; 47 on main, counted here: 34 in `Review.story.test.ts`, 13 in `Group.story.test.ts`), five on the item, six on the allowance, three on members | 1 on | A test that lists each model's commands and rejections and fails on one that no story names. Not run |
+| Story | A story for each of the review's eleven commands and each refusal (46 written for `review15`; 55 at `0e8c6e3`, counted here: 36 in `Review.story.test.ts`, 19 in `Group.story.test.ts`), five on the item, six on the allowance, three on members | 1 on | A test that lists each model's commands and rejections and fails on one that no story names. Not run |
 | Test tooling | Api tests in process; the library's harness with `dev: true` | 2 | The harness test fails without a model's binding. Not run |
 | Verify, Prove, Explore | `Prove.decisionReport` per decision in `bun run check`; for the import's own rules, `Prove.report(Import)` in the same task, which proves its 37 rules for each of its seven commands and leaves `ActCounted` and `GroupCounted` to the decisions (on `review14` the per-rule section of `Verify.aggregate` over the import, `ImportLife` there, gave the same 37 proved, the report itself `NotVerified` because the import folds events only a decision records); `Verify.report` per model in `check:full` and in CI, in its own job and nightly, with no new infrastructure (34a); a rule Verify breaks kept as a story | 1 | The Prove tests fail on any rule not proved; since `Prove` takes no lock and no `require`, which rules there are is held by the lock of `Verify.report`; `Verify.report` keeps every rule's text in the lock file and names the rules that must be proved in `require.proved` (decision 34, his answer "Lock plus the library's proved list"). On main both are written (the `prove` and `verify` tasks); what they report is the build's own report |
 | The tutorial | Move 1 follows its parts 1 to 3 on this app's nouns | 1 | A test named for each part, which fails while that part's block is absent. Not run |
@@ -666,7 +701,7 @@ check ran in a trial named on the trial page.
 | A row's decision when a group names it | There are no groups: a group act is saved as one decision a row | Read through its groups: the row's own decision with the patch of each group in force over it, laid on by `DraftRows` before it writes `importDecision`, and by the screen for the changes it receives. Not run |
 | "N of M rows need a decision" in the list of open imports | `review` over the saved decisions | The same, over the same rows |
 | Whether an accept, an undone fix, a keep or an answer about the stored item is in force | `withoutStaleDecisions` (`Rematch.rules.ts`) against `MappingChoice.at` and the import's column moves | A reader over the columns at each match, each part against the fields it rests on |
-| Which group may be taken back | Nothing: an undo is of the person's own step | The import's last group still in force (`topGroup`); `GroupedAfter` names the later one |
+| Which group may be taken back | Nothing: an undo is of the person's own step | The import's last group still in force (`topGroup`); `GroupedAfter` names the later one. A row's undo under a later group in force that covers the row is refused `GroupedAfter` too |
 | The numbers on the Result step | Read back in the confirm's own batch | `ImportResultCounts`, a query that waits for the projection |
 | The values an import wrote that differ from its file (the Activity page) | `GET /imports/changes`, from `importChange` | A query over the same rows, which the confirm's batch writes |
 | What a take-back would do now | D1 | D1: the handler reads which items changed, then sends `TakeBackImport` with how many of the created and of the replaced are kept |
@@ -712,7 +747,7 @@ The in-memory twins of what a model covers are retired for stories.
 | `importBatch`, `importOutcome`, `importChange` | Written by the confirm's and the take-back's batches, each with its marker | 3 |
 | `importReplaced`, `item` | Under decision 17's first option, written by `ItemRows` from each item's events, from move 3; under its second, by the confirm's batch | 3 |
 | `importUpload`, `importUploadChunk`, `importChunk` | Unchanged; `Upload` records what happened to them | 5 |
-| `importSuggestion` | Unchanged until move 8; then one import's suggestions in its own Drizzle object, which starts empty on a fresh database like every other move (decision 37, "Start empty") | 8 |
+| `importSuggestion` | Unchanged until move 8; then one import's suggestions in its own Drizzle object, which starts empty. An import left open across that deploy has no suggestions until they are made again; whether that matters rests on his open point on whether a staging deploy is one he keeps (DECISIONS.md, "Open"). "Start empty" (decision 37) is about rows stored before the model | 8 |
 | `member`, `organization` | Written by `MemberRows` under decision 20's first option; unchanged under its second | 6 |
 | `activity` | As decision 36 says | 3, 6 |
 | `modelCall` | Goes under decision 26's first option; its count is not carried over (decision 37, "Start empty") | 2 |
@@ -765,7 +800,8 @@ proves 134 rules and only checks one, `Catalog.ARowBelongsToItsImportsOrganizati
 paths (checked 2 commands deep, 9,434 sequences). Nine other shapes of the same body that mean the same gave 284 to 524
 paths. The margin is thin: how a check is written can cost a proved rule. Where the checks stand is not in the paths
 either: with the covered exit ahead of the check of `saw`, or between that check and the matching's, the act still has
-284 paths and every rule is still proved; only the two stories of the order see it.
+284 paths and every rule is still proved; only the two stories of the order see it. In this repository at `0e8c6e3`,
+as its prove tests write them, a row's act has 204 paths and a row's undo 300, a group's act 42 and a group's undo 84.
 
 ## Decisions for Benjamin
 
@@ -788,7 +824,7 @@ named beside it, as it ran.
 **Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"). The
 others are kept below as what was rejected. The pin is `main@734c27a`, re-pinned only when needed (his answers of
 2026-11-22), and is on main (`ea95cd0`). Every trial on the trial page ran on `dbfd0dd`. On `734c27a` the model he chose
-is built and merged into main (`0c4c5e5`; 135 proved, 7 searched, 11 reached, by the
+is built and merged into main (`0c4c5e5`; at `0e8c6e3` 136 proved, 7 searched, 11 reached, by the
 build's own report), and the per-row fallback on a branch of its own, not on main (96 proved, 3 searched, by the
 build's own report).
 
@@ -1006,8 +1042,8 @@ groups have up to 9 rows; a large file's can have thousands.
   act, each with its own rules and its own undo, and decision 41 sets the size. Nothing else of it was run.
 
 Beside the first option, not in it: the 123 rules and the six rules across instances are of `review12`; on `review15`,
-the model of his answers, 135 rules are proved and seven checked 3 commands deep, and on main at `734c27a`
-the lock keeps the same 135 and 7, proved and searched by the build's own report.
+the model of his answers, 135 rules are proved and seven checked 3 commands deep; in this repository, on `734c27a`, the
+lock at `0e8c6e3` keeps those 135 and one more (136), and the 7, proved and searched by the build's own report.
 
 The 214 ms and 95 ms were each the first group act on a fresh import, 20 runs a
 size, on `review12`, before the last-group rule, and were not run again on the model with it; for 6,000 rows the mean
@@ -1026,7 +1062,7 @@ for when the last change is a group act is not written. Not run. A row's undo, l
 group act and is refused when a group landed that the sender's screen had not received (the recommended option, picked on 2026-11-22 and standing under his rule;
 `UndoRowStep.ARowsUndoSawTheLastGroupAct`, proved on `review14`). A row's act answers "no change" only when its sender
 says no group in force covers the row (`covered`), or that the act leaves the row reading as it reads through its groups
-(`asItReads`, the recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule; in the trial model `review15`), neither of
+(`asItReads`, the recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule; in the trial model `review15` and in this repository at `0e8c6e3`, where from a screen behind a group the uncovered "no change" is held instead, "Hold it when behind"), neither of
 which a rule checks; a group act is recorded whole, so it answers "no change" for none of its rows; decision 3's answer
 and "Answer says 'no change'" then rest on the screen leaving out of a group the rows that already hold what it gives.
 Not run. Decision 11's example comes out otherwise under it: Ana's
@@ -1544,7 +1580,7 @@ take neither. So in `bun run check`, on main, the `prove` task's five tests (`Pr
 does not give as proved; which rules there are is the lock's: it acts in `check:full` and CI, where
 `Catalog.verify.test.ts` runs `Verify.report` with `lock: "./Catalog.lock.json"`, so a rule taken out or renamed is not
 caught in `bun run check`. That test now passes `require.proved`, with the rules the lock keeps of the kinds a proof
-covers (135, counted in the lock here), so a relock takes a rule out of both. On main each of the four decision proofs
+covers (136 at `0e8c6e3`, counted in the lock), so a relock takes a rule out of both. On main each of the four decision proofs
 calls `missingRules`, which fails, naming the decision, when one leaves out the three rules; it was removed with the
 hand-written lists, restored, and kept by his answer of 2026-11-22, "Keep it, named as ours". Which call
 asserts the import's own rules in `bun run check` the build settled as `Prove.report(Import)`, which proves its 37 rules
@@ -1627,9 +1663,10 @@ History, short: put to him first with the options "Adopt at first touch", "Adopt
 empty", he picked "Adopt at first touch"; asked then which mechanism adopts, he picked "The library's import
 (Recommended)" over "An Adopt command, proved" and "Try both in move 3, then ask". Neither is the plan.
 
-What a fresh start means in every move: the new model's migrations create its tables on an empty database; the seeds
-(the test accounts, the seeded organization's reference data) are written for the new model; local development data is
-reset with `bun run db:reset`; no carry-over code or test exists. No `Adopt…` command, no rule rewritten to except
+What a fresh start means in every move: no row the current app stored is carried in. A stage keeps its own events and
+the rows the model writes from move 3 on, and each move's migrations add its tables beside them; the seeds (the test
+accounts, the seeded organization's reference data) are written for the new model; local development starts fresh with
+`bun run db:reset`; no carry-over code or test exists. No `Adopt…` command, no rule rewritten to except
 adoption, no use of the library's `import` for it. That the pinned library can import events already decided is a fact
 about the library ([aggregate](research/concepts/aggregate.md)), not a plan here.
 
@@ -1768,9 +1805,13 @@ Auth's error page.
 | 9 | A Cloudflare API token that reads analytics; a 1Password service-account token for a deploy that writes secrets |
 | 10 | A deploy: the stack makes the bucket and the Worker |
 
-No move needs stored data carried over (decision 37, "Start empty"): each move that changes the tables starts on a
-fresh database, created by the new model's migrations and filled by its seeds, with local development data reset by
-`bun run db:reset`.
+No move needs stored data carried over (decision 37, "Start empty"). "Start empty" is about the rows the current app
+stored before the model: none is carried in. A stage's own events, and the rows the model writes from move 3 on, stay
+across the later moves' deploys on that stage; a move's migrations add its tables beside them. Local development
+starts fresh with `bun run db:reset`. One consequence, at move 8: suggestions move into an object of their own, which
+starts empty, so an import left open across that deploy has no suggestions until they are made again. Whether that
+matters depends on whether a staging deploy is one he keeps, his open point in [DECISIONS.md](DECISIONS.md), not
+decided.
 
 Under decision 30's answer, the browser pass runs on `alchemy dev`; the moves above that name a deploy also need it.
 A preview stage is deployed by CI for each pull request and a test stage by him from the workstation, as the infra goal
@@ -1796,8 +1837,9 @@ packages they name that it does not hold (decision 1): a re-pin, run when he ask
   failed a story, and none passed both. On `review15` three mutants of its change ran: the new exit removed leaves
   `Deciding` not proved and fails 2 of the 11 group stories; the exit put back ahead of the check of `saw` leaves every
   rule proved and fails the saw story and the matching story; the exit moved between the two checks leaves every rule
-  proved and fails the matching story only. Main has 154 mutants of its own, counted here: the 148 of `review14`'s kind
-  and six added since (`packages/catalog/model/mutants`: a sample in `check:full`, all of them nightly); what they find
+  proved and fails the matching story only. This repository has 165 mutants of its own at `0e8c6e3`, counted here: the
+  148 of `review14`'s kind, six for the covered checks, five for "Hold it when behind" and six for the cases settled by
+  the rule (`packages/catalog/model/mutants`: a sample in `check:full`, all of them nightly); what they find
   is the build's own report.
 - **The time of a group act.** A median of 95 to 214 ms in local workerd, each an import's first group act, on the model
   before the last-group rule (trial 17); a later group on the same import, the projection's write of its rows and
@@ -1848,8 +1890,9 @@ taken.
    where a rule taken out or renamed fails; on main `Catalog.verify.test.ts` passes the lock and `require.proved`. The review's model, `Catalog`, proved again on the pinned `734c27a`: on
    `dbfd0dd` its trial model of his answers, `review15`, has 135 rules proved, both relations among them, seven rules
    across instances checked 3 commands deep (20,957 sequences), each of its four decisions proved with its paths (284,
-   298, 42 and 84) and 46 stories; the model on main gives 135 proved, 7 searched and 11 "can be taken" rules reached
-   on `734c27a`, by the build's own report (its lock keeps those 135, 7 and 11, counted here), and the per-row
+   298, 42 and 84) and 46 stories; the model in this repository gives, at `0e8c6e3`, 136 proved, 7 searched and 11
+   "can be taken" rules reached on `734c27a`, by the build's own report (its lock keeps those 136, 7 and 11, counted
+   here; its row's act has 204 paths and its row's undo 300, as its prove tests write them), and the per-row
    fallback, on its own branch, 96 proved and 3 searched, by the build's own report (that branch is not in this
    repository). The item's 10 (trial 8's model), the allowance's 7 (trial 9's,
    whose one command is `TakeCall`; it starts empty, with no count carried over, decision 25) and
@@ -1857,8 +1900,8 @@ taken.
    `MemberEmail` not run) proved again on the pin with what their moves add; their relation and model
    invariant checked; `EveryUploadEnds` checked. Beside each check of a decision or an aggregate, a mutant that removes
    it and must break its rule or fail a story. A story for each of the review's eleven commands accepted and for each of
-   its refusals, each failing on a model whose `decide` records nothing for that command (47 stories on main,
-   counted here); a "can happen" rule (`sometimes`) for each command, answered "reached" (11 on main, reached by the
+   its refusals, each failing on a model whose `decide` records nothing for that command (55 stories at
+   `0e8c6e3`, counted here); a "can happen" rule (`sometimes`) for each command, answered "reached" (11 on main, reached by the
    build's own report). Every decision that records on a row or a group states that aggregate's three
    rules on who may change it, and a test fails, naming the decision, when one does not: on main each of the
    four decision proofs calls `missingRules`. It is our check, kept and named as ours (his answer of 2026-11-22, "Keep
@@ -1873,8 +1916,9 @@ taken.
    of `saw` and of the matching (the order of the trial model `review15`, which no rule holds: its saw half held by the
    story "a press over a group from a screen that missed a later decision on the row is refused and held, not answered
    no change", its matching half by the story "a press over a group made on an older matching is refused and held, not
-   answered no change", each shown by its own mutant, which the prover still proves; main has the saw story and its
-   mutant, and is to carry the matching story and its mutant); a stale press whose text matches what the row holds,
+   answered no change", each shown by its own mutant, which the prover still proves; this repository has both at
+   `0e8c6e3`, as "a press from a screen that is behind is held, not lost as no change" and "a covered press made on an
+   older matching is held too", with the mutants `row-covered-early` and `row-covered-before-matching`); a stale press whose text matches what the row holds,
    from a screen that missed the row's latest decision, on a row whose own decision is not newer than the last group,
    refused and held, not answered "no change" (the recommended "Hold it when behind", standing under his rule (DECISIONS.md)); a group taken back
    behind a later one; a group taken back over a row a colleague changed since, that row keeping her whole decision and
@@ -1910,7 +1954,8 @@ taken.
    6,000 rows; a confirm of 38,750 items to its end, before the Items page reads them.
 8. `bun run check:full`.
 9. Each of his answers of 2026-11-22 that the build must honour has a check that fails if it is built the other way.
-   Stories, rules and files named are on main, merged at `0c4c5e5` (stories by their title in
+   Stories, rules and files named are in this repository at `0e8c6e3`, the model having been merged into main at
+   `0c4c5e5` (stories by their title in
    `test/Review.story.test.ts` and `test/Group.story.test.ts`); "to write" where none exists there yet. The answers of
    that day about several people at once stand as consequences of his standing rule (DECISIONS.md).
 
@@ -1940,21 +1985,21 @@ taken.
 | 25, 26: the allowance per organization, back at 00:00 UTC | `Allowance`'s Verify test, with the `TestClock` across midnight UTC (move 2): to write |
 | 27, 28, 29, 30, 31: the hosts, two Workers, `alchemy dev`, the screens on the model's Api | Each move's rows of "Every single thing" (moves 2 and 7): to write, in that move |
 | 32, 33: blocks in each model package; `new` only in decide files | Built on main (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
-| 35, 36, 37, 38, 39: by rule; the activity table stays; start empty; mark removed, events stay; keep, delete when an org leaves | A stored event of an older shape read by its rule; each write of the model adding its `activity` line; each move's migrations and seeds run on an empty database, with no carry-over code in the repository; Remove leaving the import's events and deleting its D1 rows; an operator's command deleting an organization's objects (moves 2 to 6): to write, in the move that builds each |
+| 35, 36, 37, 38, 39: by rule; the activity table stays; start empty; mark removed, events stay; keep, delete when an org leaves | A stored event of an older shape read by its rule; each write of the model adding its `activity` line; no row the current app stored carried into the model, with no carry-over code in the repository; Remove leaving the import's events and deleting its D1 rows; an operator's command deleting an organization's objects (moves 2 to 6): to write, in the move that builds each |
 | 40: review in memory, then host | The order of moves itself |
 | "Undecided: Ana took it back" | The story "a group taken back gives no row anything again: Ana's group of twelve rows, Dana types on row 14, both are taken back, and row 14 holds nothing" |
 | "Yes, refuse and show" (an undo behind a group) | `UndoRowStep.ARowsUndoSawTheLastGroupAct`; the story "refuse and show: a row's undo or act sent before the last group act reached its screen is refused and records nothing, and is taken sent again with it" |
 | "Row 14 stays whole" | The story "a group's undo touches no row: a row another person decided since keeps its decision, and a row's act made before the undo reached its screen is refused"; the sentence on screen: to write (Proof 6) |
-| "No change, Ana's undo applies" | The story "a press that leaves a row reading as it reads is no change: Ana's group of twelve rows, Dana's press on row 14 changes nothing, Ana takes the group back, and row 14 holds nothing"; and, on main, the story "a press from a screen that is behind is held, not lost as no change" (the trial model `review15` has it as "a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change"); the story of a press over a group made on an older matching, held and not answered no change: to write (`review15` has it) |
+| "No change, Ana's undo applies" | The story "a press that leaves a row reading as it reads is no change: Ana's group of twelve rows, Dana's press on row 14 changes nothing, Ana takes the group back, and row 14 holds nothing"; and, at `0e8c6e3`, the stories "a press from a screen that is behind is held, not lost as no change" and "a covered press made on an older matching is held too" (the trial model `review15` has them as "a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change" and "a press over a group made on an older matching is refused and held, not answered no change"), with the mutants `row-covered-early` and `row-covered-before-matching` |
 | "Yes: resend untouched, hold touched"; "Sent again by itself" | To write: the queue's test (Proof 3) |
-| "Yes, tests hold it, said plainly" | The 47 stories; each of the 154 mutants on main, run in `check:full` by a sample and nightly in full (what they find by the build's own report) |
+| "Yes, tests hold it, said plainly" | The 55 stories; each of the 165 mutants (both at `0e8c6e3`), run in `check:full` by a sample and nightly in full (what they find by the build's own report) |
 | "Yes, one per command" | The 11 rules `Catalog.AnImportCanBeStaged` to `Catalog.AGroupCanBeUndone`, each answered "reached" in `Catalog.verify.test.ts` |
 | "Lock plus the library's proved list" | The lock in `Catalog.verify.test.ts` and its `require.proved` |
 | 34 and 34a: proofs in `bun run check`, search in `check:full`, its own CI job and nightly | The `prove` and `verify` turbo tasks; the `proofs` job in `.github/workflows/ci.yml` and `.github/workflows/proofs-nightly.yml` |
 | "Leave as made" | None in the model: nothing stored carries over (decision 37, "Start empty"); today's tests hold it in today's app |
-| "Start empty" | No carry-over code or test exists; the migrations and seeds of each move run on an empty database |
+| "Start empty" | No carry-over code or test exists; no row the current app stored is carried into the model; local development starts from `bun run db:reset` |
 | "Keep it, stop asking me": the standing rule | Each line of "Decided by the rule, for him to overrule" in DECISIONS.md with its own check, below or in the move named there |
-| "Hold it when behind" | To write in move 1's remaining work: `Deciding` gives the uncovered "no change" only when `saw` matches or the row's own decision is newer than the last group, and a story in which Dana's undo puts back F1 under Ana's group and Carl's press of F1, from a screen without the undo, is refused with Dana's decision. Not built on main |
+| "Hold it when behind" | Built at `0e8c6e3`: `Deciding` gives the uncovered "no change" only when `saw` matches or the row's own decision is newer than the last group; the story "a press that matches what the row holds is held when its screen is behind a group", in which Carl's press, from a screen without Dana's undo, is refused `PutBackSince` naming her F1; the mutants `row-same-behind` and `row-same-untouched-behind` |
 | "Say it after only" | To write at move 3: the Review step names the row after a group's undo lands and shows no warning before it (Proof 6) |
 | "No, row 10 stays out" | To write at move 3: `review`'s test for rivals, an accepted fix on a rival after the keep leaving it out (Proof 3) |
 | "Keep it, named as ours" | `missingRules` in `packages/catalog/model/test/proving.ts`, called by each of the four decision proofs |
@@ -1990,40 +2035,47 @@ proof. It is written for his answers; decision 40's answer is this order.
    each valid act is taken, the split he accepted. The row-by-row model stays on its branch as the fallback. Nothing the
    person sees; nothing stored. Built and merged into main at `0c4c5e5` (its counts under Proof 2); the `asItReads`
    exit after the checks of `saw` and of the matching, and the check that each decision states the rules on who may
-   change a row or a group (`missingRules`, kept as ours), are on main too. Still to add there: the story of a press
-   over a group made on an older matching, and the mutant that moves the exit between the two checks, as `review15` has
-   them; and the recommended "Hold it when behind", standing under his rule: the uncovered "no change" given only when `saw` matches or the row's own
-   decision is newer than the last group, with its story and mutant.
+   change a row or a group (`missingRules`, kept as ours), are on main too. Since then, at `0e8c6e3`, the model also
+   has the story of a covered press made on an older matching ("a covered press made on an older matching is held
+   too") and the mutant that moves the exit between the two checks (`row-covered-before-matching`), as `review15` has
+   them; and the recommended "Hold it when behind", standing under his rule: the uncovered "no change" from a screen
+   that has not seen the row's decision given only when the row's own decision is newer than the last group, with its
+   story ("a press that matches what the row holds is held when its screen is behind a group") and its mutant
+   (`row-same-behind`).
 2. **The host and the first slice.** The model's Worker, `bun run dev` as decision 30 says, the session, the two
    guards, the Api tests in process, the harness test, telemetry. The first slice is the allowance: its aggregate, its
-   view, and each model call's take going through it, starting empty: no count is carried over, the migrations create
-   the model's tables on an empty database, and local development data is reset with `bun run db:reset` (decision 37).
+   view, and each model call's take going through it, starting empty: no count the current app stored is carried over, the
+   migrations create the model's first tables, and local development data is reset with `bun run db:reset` (decision 37).
    The pin widened to `@alchemy.run/better-auth`
    and `@alchemy.run/test`. A preview stage deployed from the move's pull request.
    *Interim:* every import still runs on D1 as today.
 3. **The import's write side, in one move.** Stage, acts, group acts, match, suggestions recorded, confirm, take-back,
    reopen, remove; `DraftRows` and the batches with their markers; under decision 17's first answer, `Item`, its saga
    and `ItemRows` in the same move, so the confirm's items are written once in their final shape; a fresh start
-   (decision 37): the new model's migrations create its tables on an empty database, the seeds (the test accounts, the
-   seeded organization's reference data) are written for the new model, local development data is reset with
+   (decision 37): no row the current app stored is carried in, the new model's migrations add its tables beside the
+   allowance's from move 2, the seeds (the test accounts, the seeded organization's reference data) are written for the
+   new model, local development data is reset with
    `bun run db:reset`, and no carry-over code or test exists; the Review step's fold, queue and stream; the review region's change; a preview stage deployed from the move's pull
    request, and the group act and the confirm measured there. `PUT /imports/:id/decisions` and
    `SaveRequest` leave. *Interim:* the lists, the staged table and the suggestions' handler still read D1, which
    `DraftRows` keeps written.
-4. **The Items page** as queries; `EditItem` as a command; items only as the model creates them, from an empty
-   database, with nothing stored before move 3 carried over (decision 37).
+4. **The Items page** as queries; `EditItem` as a command; items only as the model creates them, with
+   nothing the current app stored carried over (decision 37).
 5. **The rest of the import**: `Upload` with its deadline, suggestions as a saga, the lists as queries,
    `ImportHistory` and its backfill from the model's own events since move 3.
 6. **People**: `Organization`, `Member`, `MemberEmail`, the four decisions (`FoundOrganization`, `AddMember`,
    `ChangeRole`, `RemoveMember`), `MemberRows`, `AdminApi` with `FoundOrganization`, by which the operator founds an
    organization (under 21a, open, asked when the move opens); the organizations and test accounts come from seeds
-   written for the new model on an empty database, with local development data reset with `bun run db:reset` and
-   nothing carried over (decision 37); the model proved again with the email claim and the founding before any count is
+   written for the new model, with local development data reset with `bun run db:reset` and no row the current app
+   stored carried over (decision 37); the model proved again with the email claim and the founding before any count is
    asserted; reads end on removal.
 7. **Cluster**: `Usage` moved to the pool on an empty store, as a fresh start only while no deploy he keeps holds
    counts; otherwise whether the day's count kept on Durable Objects since move 2 is carried across or starts again is
    his, asked when the move opens (decision 27). Its cron and singleton, the admin's live page. The pin widened to `@alchemy.run/effect-cluster`.
-8. **Mail, the channel, Discord sign-in, scores, the suggestions' object.**
+8. **Mail, the channel, Discord sign-in, scores, the suggestions' object.** The suggestions move into their own
+   object, which starts empty: an import left open across this move's deploy has no suggestions until they are made
+   again. Whether that matters depends on whether a staging deploy is one he keeps, his open point in DECISIONS.md, not
+   decided.
 9. **The operator's surface**: the command line, its HTTP document, the assistant's tools, the MCP server, the
    analytics driver and panel, the operator's scripts, secrets at a deploy, the repository resource.
 10. **The history and the mirror.**

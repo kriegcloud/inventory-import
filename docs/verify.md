@@ -38,9 +38,9 @@ Three kinds of rule, and one thing no rule says. Which rules there are is kept b
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
 schemas and the invariants allow and every input, not sampled by a test.
 
-**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 139. That an act is
+**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 143. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
-`test/Group.story.test.ts`, 56 of them, one at least for each of the eleven commands), and the property that drives
+`test/Group.story.test.ts`, 63 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
 "can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
 search three commands deep.
@@ -78,6 +78,12 @@ the story "a press that matches what the row holds is held when its screen is be
 What follows was settled by one rule and not asked (the decision log lists each, for Benjamin to overrule): a press
 from a screen that is behind is never dropped without a word and never applied; it is held and shown.
 
+One of them is a row's undo from under a later group: Dana's decision is under Ana's group in force, so Dana's undo
+is refused naming that group (`GroupedAfter`), nothing is recorded, and once the group is taken back the same undo is
+taken. Today's `act` differs there: it takes the step back at once and puts the row back to what it held before it,
+so the group's effect goes from that row while its other rows keep it. The fold's test "a row's undo under a later
+group is refused naming the group, and taken once the group is taken back" shows it.
+
 - The same text made again on a newer matching is a change, and is recorded on the matching now. Whatever it decides,
   a press made on an older matching is refused.
 - A row's decision is not taken back from under a later group in force that covers the row: `UndoRowStep` says
@@ -89,7 +95,22 @@ from a screen that is behind is never dropped without a word and never applied; 
   same text), and the second is answered with nothing new recorded.
 - An undo sent twice is written once too. A row keeps the last undo it took (the change taken back, the step it was
   pressed in, who pressed), whatever is decided there afterwards, and the same undo sent again is answered with
-  nothing new recorded, not `NotYourStep`. Three rules of `Undoing` say the row keeps each as the act said it.
+  nothing new recorded, not `NotYourStep`: also when an act on a group, or a confirm and a reopening, landed between
+  the two sendings, which the copy cannot have seen. Three rules of `Undoing` say the row keeps each as the act said
+  it. The limit: a row keeps its last undo only, so a copy that arrives after another undo on the same row is
+  refused `NotYourStep`, with nothing wrong stored. Keeping every undo is past what the prover reads: a text of them
+  looked into with `includes` leaves every rule "not read", and a list in the state is proved for short lists only.
+- A press drawn before an undo on the row is refused `UndoneSince`, naming who took the undo and of which change.
+  After an undo the row holds exactly what it held before the decision taken back, so a late copy of the very press
+  that was taken back, or a press from a screen that has the older decision and not the undo, names what the row
+  holds. `DecideRow` therefore says the last undo its screen has of the row (`sawUndone`), and a press that does not
+  have it records nothing.
+- The same press sent again after a match landed is answered as the first time on a row no group covers too: the row
+  holds that very act, and the copy is not told it was made on an older matching.
+- A row's undo is made on the matching now, as a row's act is: it puts another person's decision back on the row,
+  and from a screen that has not received a match it is refused `MatchedSince` and held.
+- `GroupedAfter` carries the import's last group in force, the one to take back first. For a row's undo that is the
+  group over the row or one made after it: the model keeps no reading of a group's rows and cannot say which.
 - `UndoGroup` names nothing its sender has seen, and is the one decision that takes a press from a screen that is
   behind: it takes back its sender's own act and replaces nothing of anyone else's. A row decided since keeps that
   person's whole decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer
@@ -125,7 +146,15 @@ bun run --cwd packages/catalog/model prove test/Import.prove.test.ts
 Two more tasks hold the model, both in `bun run check:full`:
 
 - `bun run --cwd packages/catalog/web fold`: the property that the model, fed the review region's presses, holds
-  what the region decides (`test/ReviewModelFold.fold.test.ts`), a minute and a half.
+  what the region decides (`test/ReviewModelFold.fold.test.ts`), two minutes. Each of its 25 runs presses 60 to 90
+  numbers on the messy sample, for one person or two. Three presses in ten send every row `act` wrote, the rest only
+  the rows a press changed. With two people, two numbers in five that press on one row press on a row the other
+  person's last press wrote, so presses meet on the same rows; and four in ten are first sent from a screen that has
+  not received the other person's last act, or any of their acts since its own: the model refuses them
+  (`GroupedSince`, `DecidedSince`, `PutBackSince`, `NoLongerThere`, `UndoneSince`, `ReviewMovedOn`) or answers "no
+  change", nothing is recorded, and the screen catches up and sends them again. A group's undo from such a screen is
+  taken, as `UndoGroup` names nothing seen. Its tallies say how often the seed reached each case, a covered row's "no
+  change" (`asItReads`) and a group taken back behind a later row act on its rows included.
 - `bun run --cwd packages/catalog/model mutants:sample`: a few of the model's mutants. A mutant is one change to a
   `decide` (a check removed, an event's field given a wrong value, an act made to record nothing), which a proof or a
   story must notice; `packages/catalog/model/mutants/README.md` has them all, what each class means and what they
@@ -290,7 +319,7 @@ stands. Shown on this model: with the line of `UndoingGroup` that refuses an und
 deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
 and the lock, whose text of the rule has not changed, is silent. So the test also gives Verify the library's list of
 rules that must stay proved (`require: { proved }`, Benjamin, 2026-11-22: "Lock plus the library's proved list"):
-the names the lock keeps of the kinds a proof covers, 139 of them. The same deletion then fails by name:
+the names the lock keeps of the kinds a proof covers, 143 of them (the Verify test states the number, so it cannot drift from this page unseen). The same deletion then fails by name:
 
 ```text
 Not done
@@ -307,10 +336,14 @@ and a rule taken out fails twice, once for each:
 Neither runs in a proof file: `Prove.report` and `Prove.decisionReport` take no lock and no `require`. So each proof
 test has a check of ours, that every rule its report names is proved. And each decision's proof has a second one the
 library has no counterpart for (`missingRules`, `test/proving.ts`): a decision that records on a row or a group states
-the three rules about who may change it. A row and a group have no command and so no middleware: without those rules
-nothing says whose act the decision records, and the lock and `require` would take a decision without them as it is
-written. Whoever adds one writes the three, as `CLAUDE.md` says, and calls `missingRules` in its
-proof as the four do: the check runs only where a proof calls it. It stays, named as ours (Benjamin, 2026-11-22: "Keep
+the rules about who may change it. They are asked by the event recorded, so that a rule is asked only where it can
+fail: an act on a row or a group states that only its own organization changes it and that a viewer changes none,
+and an undo states those two and that nobody takes back another person's ("nobody clears another person's decision"
+could not fail in a decision that always leaves one there, and is not stated in it). A row and a group have no
+command and so no middleware: without those rules nothing says whose act the decision records, and the lock and
+`require` would take a decision without them as it is written. Whoever adds one writes them, as `CLAUDE.md` says,
+and calls `missingRules` in its proof with the events its command records, as the four do: the check runs only where
+a proof calls it. It stays, named as ours (Benjamin, 2026-11-22: "Keep
 it, named as ours"): "no hand-written assertions" means no hand-written list of rule names or of how each stands.
 
 - Outside CI, a new rule is added to the file when `verify` runs: commit the file with the rule.

@@ -47,7 +47,9 @@ import {
   isLocalPath,
   lineAt,
   entriesOf,
+  membersOf,
   objectOf,
+  placed,
   renderArray,
   stringsIn,
   stringValues
@@ -234,20 +236,51 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
         })
       ]
     })
-    const policy = /"policy"\s*:\s*"catalog"/.exec(blankComments(text))
-    if (policy === null) return missing
-    const rest = Str.slice(policy.index)(text)
-    const closes = O.getOrElse(Str.indexOf("}")(blankComments(rest)), () => rest.length)
-    const block = O.filter(arrayOf("dependencies")(rest), (found) => found.start < closes)
-    if (O.isNone(block)) return missing
-    const span = { ...block.value, start: block.value.start + policy.index, end: block.value.end + policy.index }
+    // The group is the item of `versionGroups` that says `"policy": "catalog"` itself, whatever order its keys are
+    // in and whatever else it holds; its list is that item's own `dependencies`.
+    const blanked = blankComments(text)
+    const written = (member: { readonly start: number; readonly end: number }) =>
+      Str.slice(member.start, member.end)(blanked)
+    const group = O.flatMap(arrayOf("versionGroups")(text), (groups) =>
+      A.findFirst(
+        membersOf(groups)(text),
+        (item) =>
+          Str.startsWith("{")(written(item)) &&
+          A.some(membersOf(item)(text), (member) => /^"policy"\s*:\s*"catalog"$/.test(written(member)))
+      )
+    )
+    if (O.isNone(group)) return missing
+    const members = membersOf(group.value)(text)
+    const list = A.findFirst(members, (member) => /^"dependencies"\s*:\s*\[/.test(written(member)))
+    if (O.isNone(list)) return missing
+    const opens = list.value.start + O.getOrElse(Str.indexOf("[")(written(list.value)), () => 0)
+    const span = placed({ start: opens, end: list.value.end })(text)
     const found = A.map(stringsIn(span)(text), (entry) => entry.value)
     if (A.join(found, "\n") === A.join(expected, "\n")) return agreed
-    return blockDrift(config.value, span, {
+    const words = {
       what: "the catalog group's `dependencies`, from the `catalog` of package.json",
       found: listed(found),
-      expected: listed(expected),
-      text: renderArray(span)(A.map(expected, quoted))
+      expected: listed(expected)
+    }
+    const items = A.map(expected, quoted)
+    const array = renderArray(span)(items)
+    const onOneLine = !Str.includes("\n")(Str.slice(group.value.start, opens)(text))
+    if (!onOneLine || !Str.includes("\n")(array)) return blockDrift(config.value, span, { ...words, text: array })
+    // A group written on one line whose list no longer fits there: the formatter leaves such a group one key a line,
+    // so the whole group is written that way, not a list broken inside a line.
+    const key = '"dependencies": '
+    const inner = `${span.indent}  `
+    const body = A.map(members, (member) =>
+      member.start === list.value.start
+        ? `${key}${renderArray({ indent: inner, before: inner.length + key.length, after: 1 })(items)}`
+        : Str.slice(member.start, member.end)(text)
+    )
+    return blockDrift(config.value, group.value, {
+      ...words,
+      text: `{\n${A.join(
+        A.map(body, (member) => `${inner}${member}`),
+        ",\n"
+      )}\n${span.indent}}`
     })
   })
 

@@ -1,11 +1,15 @@
-// Two things every schema and every declaration of the review's model owes. A named schema generates only values it
-// accepts, so a property drawn from it never tests a value the model would refuse. And every command, event and
+// What every schema and every declaration of the review's model owes. A generator can be made from each named schema
+// and gives only values the schema accepts (docs/standards/schema-first.md, SF-7): that fails for a schema whose checks
+// no generator can meet, or whose own generator disagrees with it, and says nothing of what the bounds are, since the
+// generator is made from the same checks. So the bounds a rule or a comment leans on are stated once more as values
+// that must be refused. And every command, event and
 // rejection, each aggregate and decision, the model and its Api say in words what they are: an Api's tool list, its
 // command line and its OpenAPI document are written from those words.
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import { Actor } from "../src/Actor/Actor.context.ts"
 import { Catalog, CatalogApi } from "../src/Catalog.model.ts"
 import { GroupState } from "../src/Group/Group.aggregate.ts"
@@ -50,6 +54,37 @@ describe("generates only valid values", () => {
   })
   it.prop("ImportState", [Arbitrary.schema(ImportState)], ([value]) => {
     expect(S.is(ImportState)(value)).toBe(true)
+  })
+})
+
+describe("refuses what its bounds say", () => {
+  it("a step is never empty and at most 64 characters", () => {
+    expect(S.is(Step)("")).toBe(false)
+    expect(S.is(Step)(Str.repeat(64)("s"))).toBe(true)
+    expect(S.is(Step)(Str.repeat(65)("s"))).toBe(false)
+  })
+  it("a group names at least one row, in at most a million characters", () => {
+    expect(S.is(Rows)("")).toBe(false)
+    expect(S.is(Rows)(Str.repeat(1_000_000)("r"))).toBe(true)
+    expect(S.is(Rows)(Str.repeat(1_000_001)("r"))).toBe(false)
+  })
+  it("the ids of 50,000 items at their longest fit in one group", () => {
+    // "row-1234567.1234" is the longest id the contract's `RowId` allows: 16 characters.
+    const longest = `[${A.join(
+      A.makeBy(50_000, () => '"row-1234567.1234"'),
+      ","
+    )}]`
+    expect(longest.length).toBe(950_001)
+    expect(S.is(Rows)(longest)).toBe(true)
+  })
+  it("a decision's text, a patch, a label and a match's columns are bounded", () => {
+    expect(S.is(Flags)(Str.repeat(600_001)("f"))).toBe(false)
+    expect(S.is(Patch)(Str.repeat(10_001)("p"))).toBe(false)
+    expect(S.is(Label)(Str.repeat(201)("l"))).toBe(false)
+    expect(S.is(Columns)(Str.repeat(10_001)("c"))).toBe(false)
+  })
+  it("a change is a whole number", () => {
+    expect(S.is(Change)(1.5)).toBe(false)
   })
 })
 

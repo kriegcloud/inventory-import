@@ -16,7 +16,14 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import { bunFiles, noCheck, scratchCheck, scratchNew, scratchSentence } from "../src/commands/Scratch/Scratch.rules.ts"
+import {
+  bunFiles,
+  ignore,
+  noCheck,
+  scratchCheck,
+  scratchNew,
+  scratchSentence
+} from "../src/commands/Scratch/Scratch.rules.ts"
 import { diagnosticDirective } from "../src/commands/Scratch/Scratch.templates.ts"
 import { render } from "../src/Report.schema.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -77,6 +84,27 @@ describe("what scratch:check reads", () => {
             yield* repo.run("ln", ["-s", repo.join(repo.root, "elsewhere"), repo.join(shelf, "linked")])
             // JavaScript is not in the program (`allowJs` is off), so its header changes nothing.
             yield* repo.write(repo.join(shelf, "gen/api.js"), `// ${noCheck}\nexport const api = 1\n`)
+            // A screen whose two wrong lines each stand under a comment the compiler honours: after a tag that closes
+            // itself, and after JSX text with an apostrophe. The compiler passes the file, so it read both as
+            // directives; the scan has to find the same two.
+            yield* repo.write(
+              repo.join(shelf, "Hidden.tsx"),
+              A.join(
+                [
+                  "export const Row = (props: { readonly item: string }) => <b>{props.item}</b>",
+                  'const item = "shelf"',
+                  `export const row = <Row item={item} /> // ${ignore}`,
+                  'export const one: number = "one"',
+                  `export const text = <p>Don't</p> // ${ignore}`,
+                  'export const two: number = "two"',
+                  ""
+                ],
+                "\n"
+              )
+            )
+            const compiled = yield* repo.run(repo.join(here, "node_modules/.bin/tsrs"), ["-p", "tsconfig.json"], {
+              cwd: repo.join(repo.root, "scratchpad")
+            })
             // The list is asked for as `scratch:check` asks: `bun run types --listFilesOnly` in the scratchpad.
             const types = Effect.succeed({ code: 0, output: "" })
             const errors = (found: Effect.Success<ReturnType<typeof scratchCheck>>) =>
@@ -89,14 +117,20 @@ describe("what scratch:check reads", () => {
             // error is the type-check's to report.
             yield* repo.write(repo.join(shelf, "Broken.ts"), "export const broken = {\n")
             const broken = yield* scratchCheck(types, bunFiles)
-            return { whole: errors(whole), broken: errors(broken) }
+            return {
+              compiled: { code: compiled.code, said: `${compiled.stdout}${compiled.stderr}` },
+              whole: errors(whole),
+              broken: errors(broken)
+            }
           })
         )
         const refused = [
           "err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: turns",
+          "err:   scratchpad/experiments/shelf/Hidden.tsx:3: names",
+          "err:   scratchpad/experiments/shelf/Hidden.tsx:5: names",
           "err:   scratchpad/experiments/shelf/linked/Linked.ts:1: names"
         ]
-        expect(result).toEqual({ whole: refused, broken: refused })
+        expect(result).toEqual({ compiled: { code: 0, said: "" }, whole: refused, broken: refused })
       }),
     slowLimits.testTimeout
   )

@@ -17,7 +17,7 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
   active, no date); a model's name shows its source, "Why?" and Reject, and a weak guess waits for a typed name; the
   vendors form opens with what a cut-off cell holds and the question names vendors, not JSON; every view and every
   reason in full on a phone; every confirmed import, a clean file's too, listed on Upload and under Activity, each
-  linking to its result; a .txt letter refused with a message; quantities with their unit and default ("0 EA,
+  linking to its result; a .txt of plain text refused with a message (a letter whose every line holds exactly one comma is read as two columns and opens Match); quantities with their unit and default ("0 EA,
   default"); Activity and People on the data table; "Why flagged?"; Items filtered by Active and Lot tracked; a
   take-back restores the items it replaced. Every screen measured at 1440, 820 and 375 px: nothing past the edge. On
   the last version Confirm stored 155, the result said 155 imported and 45 not, Items showed 155.
@@ -112,7 +112,7 @@ means I chose and the agent recommended the same.
 | Into the last version | A past import found again; the drop indication | Mine, in my words: "Find a past import again, Drop indication on Upload" | both seen on it |
 | A model's name guess the guard rates low | Typed by the person, the guess offered beside the box; one press | the agent's default after the hour | "the app never invents a value" |
 | What "Why flagged?" asks about | The rows on screen (view, kind, search); rows ticked one by one | the agent's default after the hour: it needs no new control | the standard's "the answer names them" |
-| A .txt file | A table only when most rows have as many cells as the heading; any text with commas | the agent's default after the hour | a letter read as two columns |
+| A .txt file | A table only when most rows have as many cells as the heading; any text with commas | the agent's default after the hour; kept by me on 2026-11-22 for a letter with one comma on every line ("Keep reading it": I chose; the agent recommended the same) | of six files tried, the letters with uneven or no commas are refused; a letter with one comma on every line opens Match as two columns |
 | A save failed, rows wait unsaved, and the person reloads | Keep them and send them; warn before leaving only; drop them and say which | same, 2026-11-20 | row 130 left out with the network down: the browser asked before the reload, the row came back "not saved yet", and was sent when the network returned |
 | Rows wait unsaved and someone else confirms the import | Name the rows, then drop them; drop them without a word | same, 2026-11-20 | rows 55 and 191 left out and waiting, the import confirmed in another browser: the result says "Row 55: you left out", "Row 191: you left out" |
 | An accept waits while its field's column is matched again | Server refuses, screen says so; screen drops it only; as today | same, 2026-11-20 | Unit cost matched again from another screen, then rows 55 and 191 accepted: "2 accepts were taken back", both rows still open |

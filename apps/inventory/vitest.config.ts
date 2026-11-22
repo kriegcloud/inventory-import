@@ -16,6 +16,9 @@ export default defineConfig({
     environment: "node",
     // The fast project tries tests that wait in real time again (`realTime`); this names each one that needed it.
     ...saidAloud,
+    // Where vitest keeps what it knows of the lockfile, which no project sets: the app's own folder, not the
+    // repository's (../../vitest.shared.ts says why).
+    fsModuleCachePath: "node_modules/.vitest-cache",
     projects: [
       {
         extends: true,

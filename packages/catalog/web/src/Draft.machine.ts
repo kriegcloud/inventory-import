@@ -1221,12 +1221,53 @@ const answeringStray = (draft: Draft, event: Answer): Stepped =>
           onNone: () => side,
           onSome: (one) => ({ ...side, seen: eachDecision([...side.seen, one]) })
         })
-      const next: Draft = {
+      const moved: Draft = {
         ...withoutStray(draft, event.id),
         flight: O.map(draft.flight, (flight) => ({ ...flight, rows: R.map(flight.rows, also) })),
         unsent: R.map(draft.unsent, also),
         lines: R.map(draft.lines, (line, rowId) => ({ ...line, sides: A.map(line.sides, (side) => also(side, rowId)) }))
       }
+      // A row it sent that somebody decided since was not written: hers is still with her, never dropped because the
+      // draft it went out from is gone. Where the draft has ended it is named; otherwise, unless she has decided the
+      // row again here (that one goes, over what it names), it is a line with theirs.
+      const since = A.filter(event.decidedSince, ({ rowId, theirs }) =>
+        O.exists(R.get(rows, rowId), (sent) => !sameDecision(sent, theirs))
+      )
+      const sent = (rowId: string): O.Option<RowDecision> => O.flatten(R.get(rows, rowId))
+      const next: Draft = !A.isReadonlyArrayNonEmpty(since)
+        ? moved
+        : moved.ended
+          ? {
+              ...moved,
+              leftOver: leaving(
+                moved,
+                againstImport(
+                  naming(
+                    A.map(since, ({ rowId }): OfRow => [rowId, sent(rowId)]),
+                    R.fromEntries(A.map(since, ({ rowId, theirs }) => [rowId, theirs] as const))
+                  ),
+                  moved.endedOn
+                )
+              )
+            }
+          : editing(moved, (book) => {
+              for (const { rowId, theirs } of since) {
+                if (O.isSome(latest(book, rowId)) || R.has(flying(moved), rowId)) continue
+                const side: Side = {
+                  decision: sent(rowId),
+                  madeOn: event.revision,
+                  dates: {},
+                  // Not written, so it put nothing there; and what somebody decided since is not seen until the line
+                  // shows it to her.
+                  seen: [],
+                  live: false,
+                  here: true,
+                  overtaken: false,
+                  refused: O.none()
+                }
+                book.lines[rowId] = { sides: withSides([side], sidesOf(book, rowId)), theirs: O.some(theirs) }
+              }
+            })
       return O.isNone(next.held) || event.revision <= heldAt(next)
         ? only(next)
         : { draft: landing(next, stored, event.revision), effects: [DraftEffect.Ask()] }

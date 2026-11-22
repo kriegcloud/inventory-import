@@ -3,7 +3,7 @@
 // pressed them or not at all. Anybody else: the page is left, their rows stay kept in this browser for them alone, and
 // the page loaded after it has nothing of theirs. And an import not found asks who is signed in once at most, never in a
 // loop, and is never drawn again from what was read before.
-import { describe, expect, it } from "@effect/vitest"
+import { beforeEach, describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -51,7 +51,13 @@ const browser = vi.hoisted(() => {
       sessionStorage: storage(tab)
     })
   })
-  return { kept }
+  return { kept, tab }
+})
+
+// Each test is a new browser: a test run again (a retry) never finds what an earlier run of it left kept.
+beforeEach(() => {
+  for (const key of R.keys(browser.kept)) delete browser.kept[key]
+  for (const key of R.keys(browser.tab)) delete browser.tab[key]
 })
 vi.mock("sonner", () => ({
   toast: Object.assign(() => 0, { dismiss: () => undefined, success: () => 0, loading: () => 0, error: () => 0 })
@@ -164,10 +170,11 @@ const page = (id: ImportId, who = dana) => {
 /** A page whose save of row 2 was refused for nobody signed in, so who is signed in is being asked again. */
 const askedAgain = Effect.fnUntraced(function* (id: ImportId) {
   const t = page(id)
-  yield* settle
+  // The review is drawn once its read has landed; a decision made before that is not the case here.
+  yield* until(t.onScreen)
   t.server.signedOut = true
   t.decide("row-2")
-  yield* settle
+  yield* until(() => t.session.times() > 0)
   expect([t.sent(), t.session.times(), t.registry.get(t.session.asked)]).toEqual([[["row-2"]], 1, true])
   t.server.signedOut = false
   return t
@@ -181,7 +188,7 @@ describe("the review while who is signed in is asked again", () => {
       yield* settle
       expect([t.onScreen(), t.drew, A.length(t.saves)]).toEqual([true, ["skeleton", "review"], 1])
       yield* t.session.answer(dana)
-      yield* settle
+      yield* until(() => A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7"))
       // The row decided meanwhile goes; the one refused goes once the import's picture has checked it.
       expect([t.onScreen(), t.drew, A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7")]).toEqual([
         true,
@@ -200,7 +207,7 @@ describe("the review while who is signed in is asked again", () => {
       t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
       yield* settle
       yield* t.session.answer(marcus)
-      yield* settle
+      yield* until(() => t.session.left.times > 0)
       expect([t.session.left.times, t.registry.get(memberKey), A.length(t.saves), t.commits]).toEqual([
         1,
         "mem_dana/org_prairie",
@@ -210,7 +217,7 @@ describe("the review while who is signed in is asked again", () => {
       expect([A.length(keptOf(id, "mem_dana")), keptOf(id, "mem_marcus")]).toEqual([1, []])
       // Marcus's own page, in the same browser and tab.
       const his = page(id, marcus)
-      yield* settle
+      yield* until(() => O.isSome(his.registry.get(shownDecisions(id))))
       expect([his.registry.get(shownDecisions(id)), his.saves, A.length(keptOf(id, "mem_dana"))]).toEqual([
         O.some({}),
         [],
@@ -232,10 +239,12 @@ describe("the review while who is signed in is asked again", () => {
       yield* t.session.fail()
       yield* settle
       expect([t.onScreen(), A.length(t.saves)]).toEqual([true, 1])
+      // Asked again: answered once that question is out, not one already failed.
+      const asked = t.session.times()
       t.registry.refresh(t.session.signedIn)
-      yield* settle
+      yield* until(() => t.session.times() > asked)
       yield* t.session.answer(dana)
-      yield* settle
+      yield* until(() => A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7"))
       expect(A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7")).toBe(true)
     })
   )
@@ -244,14 +253,14 @@ describe("the review while who is signed in is asked again", () => {
     Effect.gen(function* () {
       const id = importNo(94)
       const t = page(id)
-      yield* settle
+      yield* until(t.onScreen)
       t.registry.refresh(t.session.signedIn)
-      yield* settle
+      yield* until(() => t.session.times() > 0)
       t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
       yield* settle
       expect([t.registry.get(t.session.asked), t.commits]).toEqual([true, []])
       yield* t.session.answer(dana)
-      yield* settle
+      yield* until(() => A.length(t.commits) > 0)
       expect(A.length(t.commits)).toBe(1)
     })
   )
@@ -262,19 +271,19 @@ describe("the review while who is signed in is asked again", () => {
       Effect.gen(function* () {
         const id = importNo(95)
         const t = page(id)
-        yield* settle
+        yield* until(t.onScreen)
         t.decide("row-2")
-        yield* settle
+        yield* until(() => A.length(t.saves) > 0)
         yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         t.session.choose("org_northline")
         t.registry.refresh(t.session.signedIn)
-        yield* settle
+        yield* until(() => t.session.times() > 0)
         t.server.notFoundIn = "org_northline"
         yield* t.session.answer(
           memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
         )
-        yield* settle
+        yield* until(() => t.drew[t.drew.length - 1] === "gone")
         expect([t.session.left.times, t.drew[t.drew.length - 1], A.length(t.saves)]).toEqual([0, "gone", 1])
         expect(A.length(keptOf(id, "mem_dana"))).toBe(1)
       })

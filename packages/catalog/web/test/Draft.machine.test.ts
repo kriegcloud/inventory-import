@@ -21,6 +21,7 @@ import {
   waiting
 } from "../src/Draft.machine.ts"
 import {
+  broken,
   Choices,
   Command,
   dispatch,
@@ -759,26 +760,99 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
   })
 })
 
-describe("a closed tab's refused decision beside this tab's own", () => {
-  it("does not stop this tab's decision that a match trims to the same value: hers goes, the refused one stays named", () => {
-    const world = opened()
-    for (const command of [
-      Command.cases.Decide.make({ row: "a", to: "accepted" }),
-      Command.cases.Match.make({}),
-      Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
-      Command.cases.TakeUp.make({ row: "a", to: "out", beside: "refused", as: "refused" })
-    ]) {
-      run(world, command)
-      holds(world)
-    }
-    quiet(world)
-    for (const command of [
-      Command.cases.ReturnToTab.make({}),
-      Command.cases.ServerTakesRead.make({}),
-      Command.cases.ReadArrives.make({})
-    ]) {
-      run(world, command)
-      holds(world)
-    }
+describe("orderings the properties met, pinned", () => {
+  // Each is played as the properties play an ordering, and every rule they check after it is checked here too.
+  it("a closed tab's refused decision, beside the one this tab took up and sent, is settled when she decides the row again: nothing of it is owed", () => {
+    expect(
+      broken([
+        Command.cases.TakeUp.make({ row: "a", to: "out", beside: "no", as: "waiting" }),
+        Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
+        Command.cases.TakeUp.make({ row: "a", to: "acceptedOut", beside: "refused", as: "waiting" }),
+        Command.cases.Decide.make({ row: "a", to: "accepted" }),
+        Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
+        Command.cases.Reload.make({})
+      ])
+    ).toEqual(O.none())
   })
+
+  it("her own decision trimmed by a match to what a closed tab was refused is still hers, and goes", () => {
+    expect(
+      broken([
+        Command.cases.Decide.make({ row: "a", to: "accepted" }),
+        Command.cases.Match.make({}),
+        Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
+        Command.cases.TakeUp.make({ row: "a", to: "out", beside: "refused", as: "refused" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("a row decided again behind a failed save, beside somebody else's answer, does not wait for nothing after a confirm", () => {
+    expect(
+      broken([
+        Command.cases.Decide.make({ row: "a", to: "out" }),
+        Command.cases.ServerTakesSave.make({}),
+        Command.cases.SomeoneElse.make({ row: "c", to: "out" }),
+        Command.cases.Decide.make({ row: "c", to: "kept" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.SaveFails.make({}),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.Decide.make({ row: "a", to: "nothing" }),
+        Command.cases.PressConfirm.make({})
+      ])
+    ).toEqual(O.none())
+  })
+  it("a pick sent behind a confirm whose answer ends the draft, refused as decided since, comes back as a line: never dropped with the draft it went out from", () => {
+    expect(
+      broken([
+        Command.cases.SomeoneElse.make({ row: "b", to: "acceptedOut" }),
+        Command.cases.Match.make({}),
+        Command.cases.SomeoneConfirms.make({}),
+        Command.cases.PressConfirm.make({}),
+        Command.cases.TakeUp.make({ row: "b", to: "accepted", beside: "another", as: "landed" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.SomeoneReopens.make({}),
+        Command.cases.SomeoneElse.make({ row: "b", to: "accepted" }),
+        Command.cases.SettleAll.make({ which: "theirs" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("that line does not count her as having seen what was decided since: a colleague's later decision is not written over unasked", () => {
+    expect(
+      broken([
+        Command.cases.SomeoneConfirms.make({}),
+        Command.cases.PressConfirm.make({}),
+        Command.cases.TakeUp.make({ row: "b", to: "accepted", beside: "another", as: "landed" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.SomeoneReopens.make({}),
+        Command.cases.SomeoneElse.make({ row: "b", to: "kept" })
+      ])
+    ).toEqual(O.none())
+  })
+})
+
+describe("seeds the properties were falsified by, played again", () => {
+  const seeds = [
+    {
+      name: "with the person confirming",
+      seed: 369148268449177,
+      may: { confirms: true, elsewhere: false, tabs: false }
+    },
+    {
+      name: "with the person confirming",
+      seed: -2416120108841983,
+      may: { confirms: true, elsewhere: false, tabs: false }
+    },
+    {
+      name: "with somebody else confirming, reopening or removing the import",
+      seed: 5903557278919753,
+      may: { confirms: true, elsewhere: true, tabs: true }
+    }
+  ] as const
+  for (const { may, name, seed } of seeds) {
+    it.prop(`${name}, seed ${seed}`, { choices: Choices }, ({ choices }) => play(choices, may), {
+      timeout: 300_000,
+      arbitrary: { runs, size: 60, seed }
+    })
+  }
 })

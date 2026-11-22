@@ -8,6 +8,8 @@ export default defineConfig({
     include: ["experiments/**/*.test.{ts,tsx}"],
     passWithNoTests: true,
     testTimeout: 30_000,
-    hookTimeout: 60_000
+    hookTimeout: 60_000,
+    // Its own cache of transformed modules, as every package keeps.
+    fsModuleCachePath: "node_modules/.vitest-cache"
   }
 })

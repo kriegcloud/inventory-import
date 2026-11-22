@@ -1143,7 +1143,10 @@ Two things this does not end, both found while measuring:
   server makes writes what its screen showed, and nothing is sent beside it" is falsified by seed 369148268449177
   after 651 runs ("after everything landed, a row of the person's still waits"), every time, on an idle machine too.
   A second seed, -2416120108841983, falsified it after 762 runs in an unpinned run of the full check. Seeds are drawn
-  at random and it was met twice in about twenty runs here, so CI will meet it.
+  at random and it was met twice in about twenty runs here, so CI will meet it. Since: on the draft machine of one
+  model (`518babd`) neither seed falsifies it; the first seed's shortest ordering and both seeds are named tests in
+  `packages/catalog/web/test/Draft.machine.test.ts`, with a third seed of another property, which the property world
+  had wrongly failed.
 
 ### 2026-11-22 — dependencies, versions and derived configuration kept in step
 

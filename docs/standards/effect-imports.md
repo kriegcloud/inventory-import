@@ -12,7 +12,7 @@ which module it is without scrolling to the imports, and a search for `effect/Op
 These are beep-effect's rules, taken as written: `standards/effect-laws-v1.md` laws 1 and 2,
 `standards/effect-first-development.md` section EF-4, `.patterns/effect-module-paths.md`, and law 2 of its
 `effect-first-development` skill. Where its code and its rules disagree, the rule is followed; the disagreements are
-listed at the end. Every path below exists in the installed `effect` 4.1.4, and the check reads the installed
+listed at the end. Every path below exists in the installed `effect` 4.1.5, and the check reads the installed
 package, never a list.
 
 ## EI-1. A module comes from its own path, whole

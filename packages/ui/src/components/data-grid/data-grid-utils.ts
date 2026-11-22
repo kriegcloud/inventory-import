@@ -1,3 +1,4 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
 import type {
   CellSelectionBounds,
   CellSelectionState,
@@ -6,7 +7,7 @@ import type {
   RowData,
   Table
 } from "@tanstack/react-table"
-import type * as React from "react"
+import type { ComponentType, CSSProperties, MouseEvent as ReactMouseEvent, RefObject, SVGProps } from "react"
 
 import {
   BaselineIcon,
@@ -445,7 +446,7 @@ export function getColumnVariantOptions<TData extends RowData, TVariant extends 
 }
 
 export function getColumnVariantLabel(meta?: DataGridColumnMeta): {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  icon: ComponentType<SVGProps<SVGSVGElement>>
   label: string
 } | null {
   if (meta?.variant === undefined) return null
@@ -545,9 +546,7 @@ export function getWindowedColumns<T>(items: T[], columnWindow: ColumnWindow | n
   return entries
 }
 
-export function getColumnPinningStyle<TData extends RowData>(
-  column: Column<DataGridFeatures, TData>
-): React.CSSProperties {
+export function getColumnPinningStyle<TData extends RowData>(column: Column<DataGridFeatures, TData>): CSSProperties {
   const isPinned = column.getIsPinned()
 
   return {
@@ -577,7 +576,7 @@ export function getCellLayoutStyle({
   width: number
   pinned: ColumnPinningPosition
   pinnedOffset: number
-}): React.CSSProperties {
+}): CSSProperties {
   return {
     insetInlineStart: pinned === "start" ? `${pinnedOffset}px` : undefined,
     insetInlineEnd: pinned === "end" ? `${pinnedOffset}px` : undefined,
@@ -793,7 +792,7 @@ export function getLineCount(rowHeight: RowHeightValue): number {
 export function scrollCellIntoView<TData extends RowData>(params: {
   container: HTMLDivElement
   targetCell: HTMLDivElement
-  tableRef: React.RefObject<Table<DataGridFeatures, TData> | null>
+  tableRef: RefObject<Table<DataGridFeatures, TData> | null>
   viewportOffset: number
   direction?: "left" | "right" | "home" | "end"
   isRtl: boolean
@@ -907,7 +906,7 @@ export function getIsPointOnScrollbar(container: HTMLElement | null, clientX: nu
   return false
 }
 
-export function getIsEventOnScrollbar(event: React.MouseEvent<HTMLElement>): boolean {
+export function getIsEventOnScrollbar(event: ReactMouseEvent<HTMLElement>): boolean {
   return getIsPointOnScrollbar(
     event.currentTarget.closest<HTMLElement>('[data-slot="data-grid"]'),
     event.clientX,
@@ -988,7 +987,7 @@ export function formatFileSize(bytes: number): string {
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`
 }
 
-export function getFileIcon(type: string): React.ComponentType<React.SVGProps<SVGSVGElement>> {
+export function getFileIcon(type: string): ComponentType<SVGProps<SVGSVGElement>> {
   if (type.startsWith("image/")) return FileImage
   if (type.startsWith("video/")) return FileVideo
   if (type.startsWith("audio/")) return FileAudio

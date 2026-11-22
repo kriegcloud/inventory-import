@@ -1035,6 +1035,172 @@ itself, so that the handlers it gives the table are the store's is held by none.
 line of the code changed (the page kept on a sort, a 200 ms pause, no write of the waiting filter, the page kept on a
 filter, no finalizer on the timer, a repeated sort written).
 
+### Batch 2, the data grid (2026-11-22)
+
+Counted by name (React's `useState`, `useReducer`, `useMemo`, `useCallback`, `useContext`, `useEffect`,
+`useLayoutEffect`, `useInsertionEffect`, `useSyncExternalStore`, `useImperativeHandle`, `useRef`, `useId`,
+`useDeferredValue`, `useTransition`, `use`, `useOptimistic`, `useActionState`, each followed by `(` or `<`) over the 12
+grid files in the table below and `hooks/use-debounced-callback.ts`: 216 calls before (and two of the radix
+`useComposedRefs`, not React's), 26 after: `useId` 12, `useRef` 13, each holding a DOM node, and `useDeferredValue` 1,
+which the atoms rule allows. `hooks/use-value-as-ref.ts` did not move and is not in the count: it keeps its
+`useLayoutEffect` 1 and a `useRef` that holds a value (below).
+
+How the grid holds what it held in hooks. Each grid on screen has atoms of its own, made for its `useId`
+(`use-data-grid.ts`): `gridController`, made once, holds every handler as one function for the grid's whole life, adds
+its window and document listeners and removes them in its finalizer (which also writes what was waiting and lets the
+files' object URLs go, upstream's unmount effect); the grid element's ref callback, which stays the same, puts the
+element's own listeners on and follows the table's atoms (focus, editing, search, paste dialog, drag, autoscroll) while
+the element is on the page. What a handler needs from the last draw (the props, the data, the direction) is the atom
+`gridDrawn`, written in the draw as TanStack's `useTable` writes the table's options in the draw, where upstream's value
+refs were written in a layout effect after it. The table's own state (focus, selection, editing, search, context menu,
+paste dialog, row height) was already TanStack's, in its atoms (`data-grid-features.ts`), and stays there; each row
+still reads it through TanStack's `Subscribe`, so moving the focus still draws two cells. A cell is drawn again when its
+value changes through `cellChanges`, an atom per cell of the table that holds the table's own cell listener while it is
+read. Memo answers the virtualizer and the table compare by identity (the table's options, the column sizes, the range
+functions, the row key, the column window, the rows' shared object) are kept in slots their owner holds (`kept`),
+while what they were made from is the same.
+
+Post-draw work, without an effect: a cell takes the focus through one of two ref callbacks that each stay the same
+(one focuses, one does not), so React calls the focusing one exactly when the cell turns focused; the text cell's
+element likewise has an editing and a showing callback; the number editor's input focuses itself when it is put on the
+page; the search box asks for the focus a frame after it mounts and takes it only when its grid is the one the Ctrl+F was
+pressed in (`searchFocusClaim`, below), and listens for Escape while it is on the page. What such a
+callback needs from the draw is on the element (`data-typed-over`, `data-cell-text`). A frame after each draw of the
+grid's owner the grid tries the cell waiting for focus again, and focuses the first cell for `autoFocus`.
+
+| File | Before | After |
+| --- | --- | --- |
+| `use-data-grid.ts` | useCallback 32, useEffect 12, useLayoutEffect 1, useMemo 10, useRef 8, useState 1, useSyncExternalStore 1 | useId 1 |
+| `data-grid.tsx` | useCallback 6, useLayoutEffect 5 (radix), useMemo 3, useRef 2, useState 1 | none (`useDeferredValue` 1, as before) |
+| `data-grid-cell-variants.tsx` | useCallback 55, useEffect 4, useId 2, useLayoutEffect 1, useMemo 6, useRef 20, useState 3 | useId 9, useRef 12 |
+| `data-grid-cell.tsx` | useCallback 2, useLayoutEffect 1, useRef 1, useSyncExternalStore 1, `useComposedRefs` | none |
+| `data-grid-data-cell.tsx` | useEffect 1, useLayoutEffect 1, useReducer 1, useRef 1, useState 2 | none |
+| `data-grid-row.tsx` | useCallback 2, `use` 1 (a context), `useComposedRefs` | none |
+| `data-grid-column-header.tsx` | useCallback 4 | none |
+| `data-grid-select-column.tsx` | useCallback 4, useId 1 | useId 1 |
+| `data-grid-search.tsx` | useEffect 2, useRef 2, useState 2 | none |
+| `data-grid-context-menu.tsx` | useCallback 6, useMemo 1 | none |
+| `data-grid-paste-dialog.tsx` | useCallback 3, useRef 1 | useRef 1 |
+| `use-badge-overflow.ts` | useMemo 1 | none (`useBadgeOverflow` is gone; the cells call `getBadgeOverflow`) |
+| `hooks/use-value-as-ref.ts` | useLayoutEffect 1, useRef 1 | unchanged |
+| `hooks/use-debounced-callback.ts` (batch 1) | useId 1 | useId 1 |
+
+`packages/ui/.oxlintrc.kit.json` reads the whole grid folder under "Batch 2, the data grid"
+(`!src/components/data-grid/**`, beside the 12 files' own lines), so a file added to it is read from its first line;
+`use-debounced-callback.ts` was already on its list. Three files of the folder only imported React as a namespace,
+which the rule refuses, and import it by name now, each saying so on its first line: `data-grid-cell-preview.tsx`,
+`data-grid-types.ts`, `data-grid-utils.ts` (in `docs/kit.md`'s list too). Put back, a `useState` in
+`data-grid-paste-dialog.tsx` failed it ("'useState' import from 'react' is restricted"), and taken out it passed; a new
+file in the folder calling `useState` failed it, where `!src/components/data-grid/` alone did not read that file.
+
+The hooks left, each with its reason:
+
+- `useId` (12): allowed, and the key each per-instance atom is made for (and the file cell's two labels, the select
+  column's checkbox label).
+- `useRef` (13), each a DOM node: the editors' textarea, input, command list, dropzone and file input, the cells'
+  element (`containerRef`, handed to the cell so its popover can tell a click inside it), the paste dialog's radio
+  button.
+- The libraries' own hooks stay: TanStack's `useTable` and `Subscribe`, TanStack Virtual's `useVirtualizer`, Radix's
+  `useDirection`, and React's `useDeferredValue`, which the atoms rule allows.
+- The kit's own hooks are built on these and on `@effect/atom-react`'s: `useDebouncedCallback`, `useCellValue`,
+  `useEditableText`, `useCellDraft`, `useFileDropTarget`.
+
+**Questions for Benjamin, none of them blocking:**
+
+- `hooks/use-value-as-ref.ts` keeps its `useRef` and layout effect: the grid no longer uses it, but the four batch 4
+  files (`tour.tsx`, `stepper.tsx`, `file-upload.tsx`, `action-bar.tsx`) do, and a ref that follows a value cannot be
+  an atom without changing them. It moves, or goes, with batch 4.
+- The grid's two imports of `useDebouncedCallback` (`data-grid-search.tsx`, `data-grid-cell-variants.tsx`) each pass
+  the atoms rule by one `oxlint-disable-next-line no-restricted-imports` with the reason: the rule keeps the kit's
+  debounce out of our own code, and these are the kit. So does the new test's import of its atoms.
+- Values a draw hands to its handlers are written in the draw, to atoms nothing draws from: `gridDrawn` (the grid's
+  props), the viewport's scroll and its middle columns, the debounced callback's latest callback, the virtualizers
+  handed over the first time they are drawn. Upstream wrote the same values in layout effects after the draw; a draw
+  React throws away (not one this grid has been seen to make) would leave its values there until the next.
+
+`hooks/use-debounced-callback.ts`, the two things batch 1 left: the function it returns is the same from draw to draw
+while the delay is (`debouncedFor`, made again only for another delay), and when it fires it runs the callback of the
+latest draw, handed over in the draw to `latestCallback`.
+
+Also changed beside the move, with nothing on screen different (each read the same on the walk-through below): rows no
+longer register their elements in a map; the grid reads the drawn rows from the page when it needs the first one in
+view. A cell drawn while the grid scrolls is its preview unless its last draw was in full (`drawnInFull`, a WeakSet of
+the table's cells), where upstream kept per-cell state: a cell drawn in full that is drawn again during a scroll for
+another reason (it lost the focus, its selection changed) stays in full, as upstream's did. An earlier version drew it
+as its preview and in full again when the scroll ended, which cost the arrow keys a frame of layout each time the rows
+moved (below). One difference is left: a cell drawn in full, scrolled out of view and back during one scroll, is drawn
+in full again, where upstream drew its preview. A text
+cell's element holds the text it opened with while it is edited, where upstream emptied it and filled it again, so a
+value changed by someone else during an edit no longer replaces what is being typed; one whose edit ended without a
+value stored shows the value again when the editing ends, as upstream did on every draw. The pending focus is tried a
+frame after the owner's draw instead of in the same commit; `autoFocus` is tried when the data or columns change, a
+frame later as before. Upstream's unmount work ran in React's development double mount too (and let go of the file
+cells' object URLs while the grid stayed); here it runs once the grid has really left. The viewport's insets are
+measured when the grid, its header or its footer changes size (a ResizeObserver), where upstream also measured when the
+row count changed. A draft (a text cell's, a long-text cell's) lives only while its editor is open, where upstream's
+could show again at the next edit when an edit ended without clearing it.
+
+Two grids with search on one page: one Ctrl+F opens the search of every grid (as upstream), and each open box asks
+for the focus a frame later, so the last box drawn took it and the query went to the other grid. The grid the key was
+pressed in (in a cell, or in its own search box) now claims the press (`searchFocusClaim` in `use-data-grid.ts`, set
+by each grid's Ctrl+F listener through `claimSearchFocus`); a box, and a grid's own element for a press made outside
+it, take the focus only when their grid holds the claim; a press outside every grid goes to the first grid, as
+upstream's passive effects had it; the claim is let go two frames after the press. On `/gallery/grid` with a second
+grid (a change made for the check and taken out): click `r1.text` of the first, Ctrl+F, type "ab": the first box has
+the focus and reads "1 of 24", the second "Type to search"; click `s1.text` of the second, the same: the second box
+has it and reads "1 of 24" (upstream gave this one to the first grid); focus on the page, Ctrl+F, "ab": the first
+grid's box, with one grid or two. Three runs each, no console warning.
+
+The tests: `apps/inventory/test/web/gridAtoms.test.ts`, under Vitest's fake timers, on a registry made as the app's is
+(`defaultIdleTTL: 400`, so an atom nobody reads stays 400 ms, as on screen): a pause runs the latest draw's callback
+through one function while the delay is the same, and not at 299 ms; a pause waiting when the component leaves never
+runs (the callback is still in the registry then, so only the cleared timer stops it); the hook itself, drawn twice by
+`react-dom/static`'s `prerender` on one registry, runs the second draw's callback; a cell's value is followed while it
+is read and its table listener is taken off when it is not; what the virtualizer is given stays the same object while
+its row height does; with two grids, the box of the grid Ctrl+F was pressed in takes the focus, whichever box is drawn
+last and with each ref called twice as StrictMode does. Each was seen to fail with the code changed: a new function on
+every draw, a plain timeout in place of the component's timer (the first two cases), the hook keeping its first draw's
+callback (the third), no finalizer on the cell's listener, `kept` never keeping, the box focusing without the claim.
+
+Measured on `/gallery/grid` with 50,000 rows (`?rows=50000`, a change to `GridGallery.tsx` made for the measurement
+and taken out), the dev server, headless Chromium 149: 50 ArrowDown from `r1.text` until the focus is on row 51, the
+main thread's own work read from CDP `Performance.getMetrics`. A first count found the arrow keys a tenth to a sixth
+slower than upstream's files. The CPU profiles (CDP `Profiler`, self time by function) of the two were alike within
+4%, the atom libraries' share about 10 ms of 390; the difference was in frames: a timeline trace showed 14 to 15
+layouts per 50 presses that no script asked for, each after a commit that swapped a cell back from its preview (a
+`MutationObserver` read 20 more row children replaced, 7 fewer cell attributes changed). That was the preview change
+above, now undone (`drawnInFull`); the viewport also reads its per-grid atoms once (`ViewportLayout.atoms`) and writes
+its scroll and middle columns only when they change, and a cell finds its value atom by the cell object
+(`cellChangesOf`). Afterwards, 16 runs of each build alternating, the order swapped each pair, load between 36 and 19
+(no quieter time came), medians with the quartiles:
+
+| 50 ArrowDown | Upstream's files | Now | Change |
+| --- | --- | --- | --- |
+| Main-thread time | 411.5 ms (394 to 451) | 401 ms (383 to 417) | -2.6% |
+| Script time | 286.5 ms (275 to 305) | 276.5 ms (266 to 289) | -3.5% |
+| Wall time to the focus on row 51 | 463 ms (443 to 502) | 451.5 ms (437 to 463) | -2.5% |
+| Layouts | 52.5 (49 to 54) | 49.5 (49 to 53) | |
+
+Each run paired with its neighbour of the other build: main-thread time -2.8% at the median (quartiles -7.7% to
++2.7%). Counted over 50 presses in two runs each (StrictMode's second draw included), the rows' contents were drawn
+as often (354 and 362 times, upstream's 360 and 352) and the data cells less often (1,065 and 1,129, upstream's 1,578
+and 1,516).
+
+`grid:keys` (`CHROME_PATH` set to Playwright's Chromium 149; the system Chromium does not start here): 96 cases OK
+before and after, the same lines.
+
+Walked through on `/gallery/grid` with search, paste and row deletion turned on for the walk (the same change, taken
+out), by a script that pressed and read each step, run on the old files and on the new: every reading the same. Click
+`r1.text`, ArrowDown, ArrowRight: focus on `r2.number`. Type 9, Enter: stored `number "9"`, focus `r3.number`. Type 4,
+Escape: stored `number "12"`, focus `r3.number`. Tab: focus leaves the grid. `r1.text` Ctrl+C ("1 cell copied"),
+`r4.url` Ctrl+V: `r4.url` keeps `"https://a.example"` ("1 cell skipped pasting for invalid data"). `r5.text`
+Shift+ArrowRight, Shift+ArrowDown: 4 cells selected; Delete: `r5.text` and `r6.text` `""`, the two numbers null.
+Right-click `r1.text`: Copy, Cut, Clear, Delete rows; Escape: focus back on `r1.text`. Ctrl+F: the box has the focus;
+"ab": "1 of 22", Enter "2 of 22", Enter "3 of 22", focus on `r1.textShown`; Escape in the box leaves it open, as
+upstream. Close, Ctrl+Z: "4 actions undone", `r5.text` `"ab"` and `r6.number` 12 again; Ctrl+Y: cleared again. No
+warning or error in the console. The import's Review step ("Use items_messy.csv": Needs a decision 24, Cannot import 21,
+Ready 155, All 200) draws no data grid: no screen uses the grid but the gallery.
+
 ## Hand-written discriminators in the web packages
 
 A6's standing preference: a hand-written `type` or `kind` discriminator is a tagged enum (in memory) or a schema tagged

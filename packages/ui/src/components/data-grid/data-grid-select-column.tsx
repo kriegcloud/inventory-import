@@ -1,4 +1,7 @@
 "use client"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// The checkboxes' handlers are plain functions of the draw (upstream kept them in `useCallback`s); `useId` stays, the
+// label's link to its checkbox.
 
 import {
   type CellContext,
@@ -9,7 +12,7 @@ import {
   type TableState
 } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import { type ComponentProps, type MouseEvent, type ReactNode, useId } from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 
@@ -77,7 +80,9 @@ function DataGridSelectHeader<TData extends RowData>({
   readOnly,
   debug
 }: DataGridSelectHeaderProps<TData>) {
-  const onCheckedChange = React.useCallback((value: boolean) => table.toggleAllPageRowsSelected(value), [table])
+  function onCheckedChange(value: boolean) {
+    table.toggleAllPageRowsSelected(value)
+  }
 
   if (readOnly) {
     return <div className="flex translate-y-0.5 items-center ps-1 text-sm text-muted-foreground">#</div>
@@ -108,7 +113,7 @@ function selectSelectAllState(state: TableState<DataGridFeatures>) {
   }
 }
 
-interface DataGridSelectCheckboxProps extends Omit<React.ComponentProps<typeof Checkbox>, "id"> {
+interface DataGridSelectCheckboxProps extends Omit<ComponentProps<typeof Checkbox>, "id"> {
   rowNumber?: number | undefined
   hitboxSize?: HitboxSize | undefined
   debug?: boolean | undefined
@@ -122,7 +127,7 @@ function DataGridSelectCheckbox({
   className,
   ...props
 }: DataGridSelectCheckboxProps) {
-  const id = React.useId()
+  const id = useId()
 
   if (rowNumber !== undefined) {
     return (
@@ -168,7 +173,7 @@ interface DataGridSelectHitboxProps {
   htmlFor: string
   size?: HitboxSize | undefined
   debug?: boolean | undefined
-  children: React.ReactNode
+  children: ReactNode
 }
 
 function DataGridSelectHitbox({ htmlFor, size, debug, children }: DataGridSelectHitboxProps) {
@@ -217,24 +222,20 @@ function DataGridSelectCell<TData extends RowData>({
   readOnly,
   debug
 }: DataGridSelectCellProps<TData>) {
-  const onToggle = React.useCallback(
-    (checked: boolean, shiftKey: boolean) => {
-      table.setFocusedCell(row.id, column.id)
-      row.getToggleSelectedHandler()({ target: { checked }, shiftKey })
-    },
-    [table, row, column]
-  )
+  function onToggle(checked: boolean, shiftKey: boolean) {
+    table.setFocusedCell(row.id, column.id)
+    row.getToggleSelectedHandler()({ target: { checked }, shiftKey })
+  }
 
-  const onCheckedChange = React.useCallback((value: boolean) => onToggle(value, false), [onToggle])
+  function onCheckedChange(value: boolean) {
+    onToggle(value, false)
+  }
 
-  const onClick = React.useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (!event.shiftKey) return
-      event.preventDefault()
-      onToggle(!row.getIsSelected(), true)
-    },
-    [row, onToggle]
-  )
+  function onClick(event: MouseEvent<HTMLButtonElement>) {
+    if (!event.shiftKey) return
+    event.preventDefault()
+    onToggle(!row.getIsSelected(), true)
+  }
 
   // `row` is stable, so selection and numbering come from a subscription.
   return (

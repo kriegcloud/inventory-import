@@ -1,17 +1,27 @@
 "use client"
-
-import { type Cell, flexRender, type RowData } from "@tanstack/react-table"
-import * as React from "react"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// A cell drawn while the grid scrolls is its preview, unless its last draw was in full (`drawnInFull`): a cell drawn in
+// full before the scroll stays in full when it is drawn again during it (it lost the focus, its selection changed), as
+// upstream's state kept it, and is not swapped for its preview and back when the scroll ends. A written cell writes
+// itself through a ref callback kept per cell of the table, which writes again when the table says the value changed; a
+// custom cell is drawn again on each change through `cellChanges`. Upstream had state, a layout effect and an effect
+// for these.
+import { useAtomValue } from "@effect/atom-react"
+import { type Cell, flexRender, type RowData, type Table } from "@tanstack/react-table"
+import * as Atom from "effect/reactivity/Atom"
+import { type ComponentType, memo, type RefCallback } from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { DataGridCellProps } from "@inventory/ui/components/data-grid/data-grid-types"
 
 import {
   ColumnVariants,
+  getCellKey,
   getHasCustomCell,
-  getHasCustomDisplay
+  getHasCustomDisplay,
+  parseCellKey
 } from "@inventory/ui/components/data-grid/data-grid-utils"
-import { DataGridCell } from "@inventory/ui/components/data-grid/data-grid-cell"
+import { cellChangesOf, DataGridCell } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { DataGridCellPreview } from "@inventory/ui/components/data-grid/data-grid-cell-preview"
 import {
   BooleanCell,
@@ -29,7 +39,10 @@ interface DataGridDataCellProps<TData extends RowData> extends DataGridCellProps
   isScrolling: boolean
 }
 
-export const DataGridDataCell = React.memo(DataGridDataCellImpl, (prev, next) => {
+// The cells (one row's cell of one column, the same object while the row is) whose last draw was in full.
+const drawnInFull = new WeakSet<object>()
+
+export const DataGridDataCell = memo(DataGridDataCellImpl, (prev, next) => {
   // Only the end of a scroll matters, when previews switch to full cells.
   if (prev.isScrolling && !next.isScrolling) return false
   if (prev.columnIndex !== next.columnIndex) return false
@@ -71,19 +84,16 @@ function DataGridDataCellImpl<TData extends RowData>({ isScrolling, ...props }: 
   const hasCustomDisplay = getHasCustomDisplay(cell.column)
 
   const rowId = cell.row.id
-  const [isPreview, setIsPreview] = React.useState(isScrolling)
-  const [prevRowId, setPrevRowId] = React.useState(rowId)
-  if (rowId !== prevRowId) {
-    setPrevRowId(rowId)
-    if (isScrolling && !isPreview) setIsPreview(true)
-  }
-  if (isPreview && !isScrolling) setIsPreview(false)
+  // Drawn during a scroll: a new row or a cell that just came into view, or one whose last draw was a preview (the memo
+  // skips the others while their props stay the same).
+  const isPreview = isScrolling && !drawnInFull.has(cell)
 
   if (writeCell) {
     return <DataGridWrittenCell key={rowId} {...props} writeCell={writeCell} />
   }
 
   if (isPreview && !props.isFocused && !props.isEditing && !hasCustomCell && !hasCustomDisplay) {
+    drawnInFull.delete(cell)
     return (
       <DataGridCellPreview
         cell={cell}
@@ -103,6 +113,8 @@ function DataGridDataCellImpl<TData extends RowData>({ isScrolling, ...props }: 
     )
   }
 
+  drawnInFull.add(cell)
+
   if (hasCustomCell || (hasCustomDisplay && !props.isEditing)) {
     return (
       <DataGridCell key={rowId} {...props}>
@@ -113,7 +125,7 @@ function DataGridDataCellImpl<TData extends RowData>({ isScrolling, ...props }: 
 
   const variant = cell.column.columnDef.meta?.variant ?? "text"
 
-  type CellComponent = React.ComponentType<DataGridCellProps<TData>>
+  type CellComponent = ComponentType<DataGridCellProps<TData>>
 
   const Comp = ColumnVariants.match(variant, {
     text: (): CellComponent => ShortTextCell,
@@ -134,22 +146,41 @@ interface DataGridWrittenCellProps<TData extends RowData> extends DataGridCellPr
   writeCell: (element: HTMLElement, value: unknown) => void
 }
 
-function DataGridWrittenCell<TData extends RowData>({ writeCell, ...props }: DataGridWrittenCellProps<TData>) {
-  const { table } = props.cell
-  const rowId = props.cell.row.id
-  const columnId = props.cell.column.id
-  const ref = React.useRef<HTMLDivElement>(null)
+// One family of written cells' ref callbacks per table, kept while the table is.
+const writtenCellFamilies = new WeakMap<object, (cellKey: string) => Atom.Atom<RefCallback<HTMLDivElement>>>()
 
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element) return
-    const write = () => {
-      const row = table.getRowModel().rowsById[rowId]
-      writeCell(element, row?.getValue(columnId))
-    }
-    write()
-    return table.subscribeCell(rowId, columnId, write)
-  }, [table, rowId, columnId, writeCell])
+/**
+ * The ref callback of one written cell: it writes the value into the element when the element is put on the page,
+ * writes again each time the table says the value changed, and stops when the element goes.
+ */
+function writtenCellRef<TData extends RowData>(table: Table<DataGridFeatures, TData>, rowId: string, columnId: string) {
+  let family = writtenCellFamilies.get(table)
+  if (family === undefined) {
+    family = Atom.family((cellKey: string) =>
+      Atom.readable((): RefCallback<HTMLDivElement> => {
+        const cell = parseCellKey(cellKey)
+        return (element) => {
+          if (!element) return
+          const write = () => {
+            const writeCell = table.getAllFlatColumnsById()[cell.columnId]?.columnDef.meta?.writeCell
+            const row = table.getRowModel().rowsById[cell.rowId]
+            writeCell?.(element, row?.getValue(cell.columnId))
+          }
+          write()
+          return table.subscribeCell(cell.rowId, cell.columnId, write)
+        }
+      }).pipe(Atom.setIdleTTL(0))
+    )
+    writtenCellFamilies.set(table, family)
+  }
+  return family(getCellKey(rowId, columnId))
+}
+
+function DataGridWrittenCell<TData extends RowData>({
+  writeCell: _writeCell,
+  ...props
+}: DataGridWrittenCellProps<TData>) {
+  const ref = useAtomValue(writtenCellRef(props.cell.table, props.cell.row.id, props.cell.column.id))
 
   return <DataGridCell {...props} ref={ref} />
 }
@@ -158,7 +189,7 @@ interface DataGridCustomCellContentProps<TData extends RowData> {
   cell: Cell<DataGridFeatures, TData>
 }
 
-const DataGridCustomCellContent = React.memo(DataGridCustomCellContentImpl) as typeof DataGridCustomCellContentImpl
+const DataGridCustomCellContent = memo(DataGridCustomCellContentImpl) as typeof DataGridCustomCellContentImpl
 
 function DataGridCustomCellContentImpl<TData extends RowData>({
   cell: cellProp
@@ -176,9 +207,7 @@ function useUpdatedCell<TData extends RowData>(cell: Cell<DataGridFeatures, TDat
   const { table } = cell
   const rowId = cell.row.id
   const columnId = cell.column.id
-  const [updateCount, onCellUpdate] = React.useReducer((count: number) => count + 1, 0)
-
-  React.useEffect(() => table.subscribeCell(rowId, columnId, onCellUpdate), [table, rowId, columnId])
+  const updateCount = useAtomValue(cellChangesOf(cell))
 
   if (updateCount === 0) return cell
 

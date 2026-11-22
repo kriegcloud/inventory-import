@@ -1,5 +1,7 @@
-import * as React from "react"
-
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// `useBadgeOverflow` is gone: it kept `getBadgeOverflow`'s answer in a memo, and the answer is only drawn (for the
+// multi-select cell its items were a new array on each draw, so it kept nothing). The cells call `getBadgeOverflow` as
+// they draw; each badge's width is still measured once and cached below.
 import { getRootFontScale } from "@inventory/ui/components/data-grid/data-grid-utils"
 
 const MAX_CACHED_BADGE_WIDTHS = 1000
@@ -110,47 +112,6 @@ export function getBadgeOverflow<T>({
     hiddenCount: Math.max(0, items.length - visible.length),
     containerWidth
   }
-}
-
-export function useBadgeOverflow<T>({
-  items,
-  getLabel,
-  containerWidth,
-  lineCount,
-  cacheKeyPrefix,
-  containerPadding,
-  badgeGap,
-  overflowBadgeWidth,
-  iconSize,
-  maxWidth
-}: UseBadgeOverflowProps<T>): UseBadgeOverflowReturn<T> {
-  return React.useMemo(
-    () =>
-      getBadgeOverflow({
-        items,
-        getLabel,
-        containerWidth,
-        lineCount,
-        cacheKeyPrefix,
-        containerPadding,
-        badgeGap,
-        overflowBadgeWidth,
-        iconSize,
-        maxWidth
-      }),
-    [
-      items,
-      getLabel,
-      containerWidth,
-      lineCount,
-      cacheKeyPrefix,
-      containerPadding,
-      badgeGap,
-      overflowBadgeWidth,
-      iconSize,
-      maxWidth
-    ]
-  )
 }
 
 export function clearBadgeWidthCache(): void {

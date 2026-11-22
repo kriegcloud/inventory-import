@@ -1,5 +1,11 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
 import type { Cell, ColumnPinningPosition, RowData } from "@tanstack/react-table"
-import type * as React from "react"
+import type {
+  ComponentProps,
+  ComponentType,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent
+} from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 
@@ -29,7 +35,7 @@ export interface ColumnSelectOption {
   label: string
   value: string
   count?: number
-  icon?: React.ComponentType<React.ComponentProps<"svg">>
+  icon?: ComponentType<ComponentProps<"svg">>
 }
 
 export type PlainColumnVariant = "text" | "long-text" | "url" | "date"
@@ -70,7 +76,7 @@ export type ColumnVariantMeta =
 
 export type DataGridColumnMeta = {
   label?: string
-  icon?: React.ComponentType<React.ComponentProps<"svg">>
+  icon?: ComponentType<ComponentProps<"svg">>
   writeCell?: (element: HTMLElement, value: unknown) => void
 } & ColumnVariantMeta
 
@@ -145,7 +151,7 @@ export interface AddRowsOptions {
 export type CreateRowDetails =
   | {
       reason: "add-row-press"
-      event?: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement> | undefined
+      event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement> | undefined
     }
   | { reason: "insert-below"; event: KeyboardEvent; afterRowId: string }
   | { reason: "paste"; event?: undefined }

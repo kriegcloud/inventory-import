@@ -1,4 +1,9 @@
 "use client"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// What every row of one grid shares (whether columns stretch, the Firefox layout, the columns nobody may edit) comes in
+// the `shared` prop, kept as one object by the grid while it says the same, where upstream handed it down in a React
+// context. Rows no longer register their elements: the grid reads the drawn rows from the page when it needs the first
+// one in view. A row is still drawn again only when its row, place or columns change, or `shared` does.
 
 import type { VirtualItem } from "@tanstack/react-virtual"
 
@@ -15,8 +20,7 @@ import {
   type TableState
 } from "@tanstack/react-table"
 import { cn } from "cn"
-import { useComposedRefs } from "radix-ui/internal"
-import * as React from "react"
+import { type ComponentProps, memo } from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { CellPresence, ColumnWindow, RowHeightValue } from "@inventory/ui/components/data-grid/data-grid-types"
@@ -35,24 +39,23 @@ import { DataGridDataCell } from "@inventory/ui/components/data-grid/data-grid-d
 
 const EMPTY_CELL_SELECTION_BOUNDS: CellSelectionBounds[] = []
 
-interface DataGridRowContextValue {
+/** What every row of one grid is drawn with, the same object while none of it changes. */
+export interface DataGridRowShared {
   stretchColumns: boolean
   adjustLayout: boolean
   readOnlyColumnIds: Set<string>
-  rowMapRef: React.RefObject<Map<number, HTMLDivElement>>
 }
 
-export const DataGridRowContext = React.createContext<DataGridRowContextValue | null>(null)
-
-interface DataGridRowProps<TData extends RowData> extends React.ComponentProps<"div"> {
+interface DataGridRowProps<TData extends RowData> extends ComponentProps<"div"> {
   row: Row<DataGridFeatures, TData>
   leafColumns: Column<DataGridFeatures, TData>[]
   virtualItem: VirtualItem
   columnWindow: ColumnWindow | null
   isScrolling: boolean
+  shared: DataGridRowShared
 }
 
-export const DataGridRow = React.memo(
+export const DataGridRow = memo(
   DataGridRowImpl,
   (prev, next) =>
     prev.row.id === next.row.id &&
@@ -61,7 +64,8 @@ export const DataGridRow = React.memo(
     prev.virtualItem.index === next.virtualItem.index &&
     prev.virtualItem.start === next.virtualItem.start &&
     prev.columnWindow === next.columnWindow &&
-    prev.isScrolling === next.isScrolling
+    prev.isScrolling === next.isScrolling &&
+    prev.shared === next.shared
 ) as typeof DataGridRowImpl
 
 function DataGridRowImpl<TData extends RowData>({
@@ -138,16 +142,16 @@ interface DataGridRowContentProps<TData extends RowData> extends Omit<DataGridRo
 }
 
 function DataGridRowContent<TData extends RowData>({
-  ref,
   virtualItem,
   columnWindow,
   rowState,
   isScrolling,
+  shared,
   className,
   style,
   ...props
 }: DataGridRowContentProps<TData>) {
-  const { stretchColumns, adjustLayout, readOnlyColumnIds, rowMapRef } = useDataGridRowContext()
+  const { stretchColumns, adjustLayout, readOnlyColumnIds } = shared
   const virtualRowIndex = virtualItem.index
   const {
     visibleCells,
@@ -161,19 +165,6 @@ function DataGridRowContent<TData extends RowData>({
     isRowSelected
   } = rowState
 
-  const onRowChange = React.useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node) {
-        rowMapRef.current.set(virtualRowIndex, node)
-      } else {
-        rowMapRef.current.delete(virtualRowIndex)
-      }
-    },
-    [virtualRowIndex, rowMapRef]
-  )
-
-  const rowRef = useComposedRefs(ref, onRowChange)
-
   return (
     <div
       role="row"
@@ -183,7 +174,6 @@ function DataGridRowContent<TData extends RowData>({
       data-slot="data-grid-row"
       tabIndex={-1}
       {...props}
-      ref={rowRef}
       className={cn("absolute flex w-full border-b", className)}
       style={{
         height: `${getRowHeightValue(rowHeight)}px`,
@@ -264,14 +254,6 @@ function DataGridRowContent<TData extends RowData>({
   )
 }
 
-function useDataGridRowContext() {
-  const context = React.use(DataGridRowContext)
-  if (!context) {
-    throw new Error("`DataGridRow` must be rendered within `DataGrid`")
-  }
-  return context
-}
-
 interface DataGridUtilityCellProps<TData extends RowData> {
   cell: Cell<DataGridFeatures, TData>
   columnIndex: number
@@ -285,7 +267,7 @@ interface DataGridUtilityCellProps<TData extends RowData> {
   showEndBorder: boolean
 }
 
-const DataGridUtilityCell = React.memo(DataGridUtilityCellImpl) as typeof DataGridUtilityCellImpl
+const DataGridUtilityCell = memo(DataGridUtilityCellImpl) as typeof DataGridUtilityCellImpl
 
 function DataGridUtilityCellImpl<TData extends RowData>({
   cell,
@@ -301,7 +283,7 @@ function DataGridUtilityCellImpl<TData extends RowData>({
 }: DataGridUtilityCellProps<TData>) {
   // Utility renderers read row state, like selection, through the stable `cell`.
   "use no memo"
-  const onFocus = React.useCallback(() => {
+  function onFocus() {
     const { table, row, column } = cell
     const ranges = table.atoms.cellSelection.get()
     const focusedCell = getFocusedCellPosition(ranges)
@@ -323,7 +305,7 @@ function DataGridUtilityCellImpl<TData extends RowData>({
     }
 
     table.setFocusedCell(row.id, column.id)
-  }, [cell])
+  }
 
   return (
     <div

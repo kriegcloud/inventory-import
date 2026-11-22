@@ -1,5 +1,15 @@
-import type { Virtualizer, VirtualizerOptions } from "@tanstack/react-virtual"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// Each grid on screen has atoms of its own, made for its `useId` (`gridController` and the values below it), where
+// upstream kept refs, `useCallback`s and effects. The controller is made once per grid: its handlers are the same
+// functions for the grid's whole life, its window and document listeners go with its finalizer, and the listeners on the
+// grid's element and its subscriptions to the table come and go with that element (the viewport's ref callback). What a
+// handler needs from the last draw (the props, the data, the direction) is the `gridDrawn` atom, written in the draw as
+// TanStack's `useTable` writes the table's options in the draw; upstream's value refs were written after it. The rule
+// this file protects: a handler reads the table, the props and the grid's element as they are now, so every key, every
+// press and where focus lands afterwards are what they were with the hooks.
+import type { Virtualizer } from "@tanstack/react-virtual"
 
+import { useAtomValue } from "@effect/atom-react"
 import {
   type CellSelectionState,
   type ColumnDef,
@@ -15,9 +25,20 @@ import {
   useTable
 } from "@tanstack/react-table"
 import * as Match from "effect/Match"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 // Local change: `Result`, for the `try` statement upstream has here (none in this repository).
 import * as Result from "effect/Result"
-import * as React from "react"
+import {
+  type ComponentProps,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+  type SyntheticEvent,
+  useId
+} from "react"
 import { toast } from "sonner"
 
 import type {
@@ -25,10 +46,10 @@ import type {
   ClipboardNotice,
   CreateRowDetails,
   DataChangeDetails,
+  Direction,
   NavigationDirection
 } from "@inventory/ui/components/data-grid/data-grid-types"
 
-import { useValueAsRef } from "@inventory/ui/hooks/use-value-as-ref"
 import { type DataGridFeatures, dataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import {
   getCellElement,
@@ -48,6 +69,7 @@ import {
   // Local change: `settle`, for the `try` statement upstream has here.
   settle
 } from "@inventory/ui/components/data-grid/data-grid-utils"
+import { atomRegistry } from "@inventory/ui/components/data-table/data-table-state"
 import { useDirection } from "@inventory/ui/components/direction"
 
 const OVERSCAN = 6
@@ -69,232 +91,339 @@ interface UseDataGridProps<TData extends RowData> extends Omit<TableOptions<Data
   onEscapeKeyDown?: (event: KeyboardEvent) => void
 }
 
-function useDataGrid<TData extends RowData>({
-  data: dataProp,
-  columns,
-  overscan = OVERSCAN,
-  dir: dirProp,
-  onEscapeKeyDown,
-  ...props
-}: UseDataGridProps<TData>) {
-  const [pendingEdit, setPendingEdit] = React.useState({
-    from: dataProp,
-    to: dataProp
-  })
-  const dataPropRef = useValueAsRef(dataProp)
-  const data = pendingEdit.from === dataProp ? pendingEdit.to : dataProp
-  const contextDir = useDirection()
-  const dir = dirProp ?? contextDir
-  const dataGridRef = React.useRef<HTMLDivElement>(null)
-  const tableRef = React.useRef<Table<DataGridFeatures, TData>>(null)
-  const rowVirtualizerRef = React.useRef<Virtualizer<HTMLDivElement, Element>>(null)
-  const columnVirtualizerRef = React.useRef<Virtualizer<HTMLDivElement, Element>>(null)
-  const headerRef = React.useRef<HTMLDivElement>(null)
-  const rowMapRef = React.useRef<Map<number, HTMLDivElement>>(new Map())
-  const footerRef = React.useRef<HTMLDivElement>(null)
-  const pendingFocusRef = React.useRef<{
-    cell: CellPosition
-    shouldScroll: boolean
-  } | null>(null)
-  const onEscapeKeyDownRef = useValueAsRef(onEscapeKeyDown)
-  const propsRef = useValueAsRef(props)
-  const stableProps = useStableProps(props, propsRef)
+type GridProps<TData extends RowData> = Omit<UseDataGridProps<TData>, "data" | "columns" | "overscan" | "dir">
 
-  const onDataChange = React.useCallback(
-    (nextData: TData[], details: DataChangeDetails<TData>) => {
-      setPendingEdit({ from: dataPropRef.current, to: nextData })
-      propsRef.current.onDataChange?.(nextData, details)
+/** What one grid was last drawn with: what upstream's value refs held, for the handlers made once. */
+interface GridDrawn<TData extends RowData> {
+  readonly props: GridProps<TData>
+  readonly data: readonly TData[]
+  readonly columns: readonly unknown[]
+  readonly dir: Direction
+}
+
+/** A value kept from one draw to the next while what it was made from is the same: a memo's answer, held by its owner. */
+export interface Kept<V> {
+  deps: readonly unknown[] | undefined
+  value: V | undefined
+}
+
+export function emptyKept<V>(): Kept<V> {
+  return { deps: undefined, value: undefined }
+}
+
+/** The value `slot` holds when `deps` are the same as the last time (each compared with `Object.is`), or a new one. */
+export function kept<V>(slot: Kept<V>, deps: readonly unknown[], make: () => V): V {
+  const last = slot.deps
+  if (last !== undefined && last.length === deps.length && last.every((dep, index) => Object.is(dep, deps[index]))) {
+    return slot.value as V
+  }
+  const value = make()
+  slot.deps = deps
+  slot.value = value
+  return value
+}
+
+/** A ref's shape over an atom, for code written against `ref.current`: it reads and writes the atom now. */
+function atomRef<A>(registry: AtomRegistry.AtomRegistry, atom: Atom.Writable<A>): RefObject<A> {
+  return {
+    get current() {
+      return registry.get(atom)
     },
-    [dataPropRef, propsRef]
-  )
+    set current(value) {
+      registry.set(atom, value)
+    }
+  }
+}
 
-  const getRowIdAtDisplayIndex = React.useCallback(
-    (displayIndex: number) => tableRef.current?.getRowModel().rows[displayIndex]?.id,
-    []
-  )
+/** The props, data and direction of the last draw of one grid. */
+const gridDrawn = Atom.family((_grid: string) => Atom.make<unknown>(null))
 
-  const getCellSelection = React.useCallback(
-    (): CellSelectionState => tableRef.current?.atoms.cellSelection.get() ?? [],
-    []
-  )
+/** The first table one grid was drawn with (upstream's `tableRef`): its methods act on the table as it is now. */
+export const gridTableOf = Atom.family((_grid: string) => Atom.make<unknown>(null))
 
-  const getFocusedCell = React.useCallback(() => getFocusedCellPosition(getCellSelection()), [getCellSelection])
+/** The data an edit made, until the caller draws the grid with data of its own (upstream's `pendingEdit` state). */
+const pendingEdits = Atom.family((_grid: string) =>
+  Atom.make<{ readonly from: unknown; readonly to: any[] } | null>(null)
+)
 
-  const revealCell = React.useCallback(
-    (cell: CellPosition, { shouldFocus, shouldScroll }: { shouldFocus: boolean; shouldScroll: boolean }) => {
-      const currentTable = tableRef.current
-      const container = dataGridRef.current
-      if (!currentTable || !container) return false
+/** A cell to focus once it is drawn. */
+const pendingFocus = Atom.family((_grid: string) =>
+  Atom.make<{ readonly cell: CellPosition; readonly shouldScroll: boolean } | null>(null)
+)
 
-      const rowIndex = getRowDisplayIndex(currentTable, cell.rowId)
-      if (rowIndex === -1) return false
+/** The grid whose search box takes the focus after one Ctrl+F, with the press it came from. */
+export interface SearchFocusClaim {
+  readonly press: object
+  readonly grid: string
+}
 
-      if (shouldScroll) {
-        rowVirtualizerRef.current?.scrollToIndex(rowIndex, { align: "auto" })
-      }
+/**
+ * Which grid's search box takes the focus when the boxes open. One Ctrl+F opens the search of every grid on the page,
+ * and each open box asks for the focus a frame later: the box of the grid the key was pressed in (in a cell, or in its
+ * own search box) takes it, whichever box is drawn last and under StrictMode's second call of each ref; for a press
+ * outside every grid, the first grid's, as upstream's passive effects had it. None once the press's frame is over.
+ */
+export const searchFocusClaim = Atom.keepAlive(Atom.make<O.Option<SearchFocusClaim>>(O.none()))
 
-      const cellElement = getCellElement(container, cell.rowId, cell.columnId)
-      if (!cellElement) {
-        const centerIndex = currentTable
-          .getCenterVisibleLeafColumns()
-          .findIndex((column) => column.id === cell.columnId)
-        if (shouldScroll && centerIndex !== -1) {
-          columnVirtualizerRef.current?.scrollToIndex(centerIndex, {
-            align: "auto"
-          })
-        }
-        return false
-      }
+/**
+ * The claim after one grid's Ctrl+F listener has seen `press`: this grid's when the key was pressed in it; the claim
+ * another grid made for this same press otherwise; and this grid's when it is the first to see a press made outside
+ * every grid (the listeners run in the order the grids were put on the page).
+ *
+ * @example
+ * claimSearchFocus(O.none(), press, "first", false) // O.some({ press, grid: "first" })
+ * claimSearchFocus(O.some({ press, grid: "first" }), press, "second", true) // O.some({ press, grid: "second" })
+ * claimSearchFocus(O.some({ press, grid: "second" }), press, "first", false) // still "second"
+ */
+export function claimSearchFocus(
+  claim: O.Option<SearchFocusClaim>,
+  press: object,
+  grid: string,
+  isPressedHere: boolean
+): O.Option<SearchFocusClaim> {
+  if (!isPressedHere && O.isSome(claim) && claim.value.press === press) return claim
+  return O.some({ press, grid })
+}
 
-      if (shouldScroll) {
-        scrollCellIntoView({
-          container,
-          targetCell: cellElement,
-          tableRef,
-          viewportOffset: VIEWPORT_OFFSET,
-          isRtl: dir === "rtl"
+/** Whether one grid's newly opened search box takes the focus: when its grid holds the claim, or nobody does. */
+export function takesSearchFocus(claim: O.Option<SearchFocusClaim>, grid: string): boolean {
+  return O.isNone(claim) || claim.value.grid === grid
+}
+
+/** The rows' and the columns' virtualizers of one grid, handed over by its viewport when TanStack Virtual makes them. */
+export const rowVirtualizerOf = Atom.family((_grid: string) =>
+  Atom.make<Virtualizer<HTMLDivElement, Element> | null>(null)
+)
+export const columnVirtualizerOf = Atom.family((_grid: string) =>
+  Atom.make<Virtualizer<HTMLDivElement, Element> | null>(null)
+)
+
+/** What one grid on screen is: its elements, its handlers and its listeners, made once for its `useId`. */
+export interface GridController<TData extends RowData> {
+  readonly dataGridRef: RefObject<HTMLDivElement | null>
+  readonly headerRef: RefObject<HTMLDivElement | null>
+  readonly footerRef: RefObject<HTMLDivElement | null>
+  /** Puts the grid's element on screen: its listeners and the table's subscriptions, undone by what it returns. */
+  readonly attachGrid: (element: HTMLDivElement) => () => void
+  readonly bodyHandlers: ComponentProps<"div">
+  readonly revealCell: (cell: CellPosition, options: { shouldFocus: boolean; shouldScroll: boolean }) => boolean
+  readonly focusCellElement: (cell: CellPosition, shouldScroll?: boolean) => void
+  readonly onDataChange: (nextData: TData[], details: DataChangeDetails<TData>) => void
+  readonly onRowSelectionChange: (updater: Updater<RowSelectionState>) => void
+  readonly onColumnVisibilityChange: (updater: Updater<ColumnVisibilityState>) => void
+  readonly onClipboardNotice: (notice: ClipboardNotice) => void
+  readonly onRowAdd: (
+    event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement>
+  ) => Promise<void> | undefined
+  /** Memo slots of the draw: the stable props, the table's options, the column sizes. */
+  readonly kept: {
+    readonly props: { key: string | undefined; value: object | undefined }
+    readonly options: Kept<TableOptions<DataGridFeatures, TData>>
+    readonly sizes: Kept<Record<string, number>>
+  }
+}
+
+/** One grid's controller, made for its `useId` and let go the moment the grid leaves the screen. */
+export const gridController = Atom.family((grid: string) =>
+  Atom.readable((get): GridController<any> => makeGridController(grid, get)).pipe(Atom.setIdleTTL(0))
+)
+
+function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomContext): GridController<TData> {
+  const registry = get.registry
+  // The values the handlers read stay while the grid is on screen.
+  get.mount(gridDrawn(grid))
+  get.mount(gridTableOf(grid))
+  get.mount(pendingFocus(grid))
+  get.mount(rowVirtualizerOf(grid))
+  get.mount(columnVirtualizerOf(grid))
+
+  const drawn = () => registry.get(gridDrawn(grid)) as GridDrawn<TData> | null
+  const tableRef = atomRef(registry, gridTableOf(grid)) as unknown as RefObject<Table<DataGridFeatures, TData> | null>
+  const rowVirtualizerRef = atomRef(registry, rowVirtualizerOf(grid))
+  const columnVirtualizerRef = atomRef(registry, columnVirtualizerOf(grid))
+  const pendingFocusRef = atomRef(registry, pendingFocus(grid))
+  const propsRef = {
+    get current(): GridProps<TData> {
+      return drawn()?.props ?? {}
+    }
+  }
+  const getDir = (): Direction => drawn()?.dir ?? "ltr"
+  // DOM nodes: the grid's element and its header and footer, set by their ref callbacks.
+  const dataGridRef: RefObject<HTMLDivElement | null> = { current: null }
+  const headerRef: RefObject<HTMLDivElement | null> = { current: null }
+  const footerRef: RefObject<HTMLDivElement | null> = { current: null }
+
+  function onDataChange(nextData: TData[], details: DataChangeDetails<TData>) {
+    registry.set(pendingEdits(grid), { from: drawn()?.data, to: nextData })
+    propsRef.current.onDataChange?.(nextData, details)
+  }
+
+  function getRowIdAtDisplayIndex(displayIndex: number) {
+    return tableRef.current?.getRowModel().rows[displayIndex]?.id
+  }
+
+  function getCellSelection(): CellSelectionState {
+    return tableRef.current?.atoms.cellSelection.get() ?? []
+  }
+
+  function getFocusedCell() {
+    return getFocusedCellPosition(getCellSelection())
+  }
+
+  function revealCell(
+    cell: CellPosition,
+    { shouldFocus, shouldScroll }: { shouldFocus: boolean; shouldScroll: boolean }
+  ) {
+    const currentTable = tableRef.current
+    const container = dataGridRef.current
+    if (!currentTable || !container) return false
+
+    const rowIndex = getRowDisplayIndex(currentTable, cell.rowId)
+    if (rowIndex === -1) return false
+
+    if (shouldScroll) {
+      rowVirtualizerRef.current?.scrollToIndex(rowIndex, { align: "auto" })
+    }
+
+    const cellElement = getCellElement(container, cell.rowId, cell.columnId)
+    if (!cellElement) {
+      const centerIndex = currentTable.getCenterVisibleLeafColumns().findIndex((column) => column.id === cell.columnId)
+      if (shouldScroll && centerIndex !== -1) {
+        columnVirtualizerRef.current?.scrollToIndex(centerIndex, {
+          align: "auto"
         })
       }
-      if (shouldFocus) {
-        getCellFocusTarget(cellElement).focus({ preventScroll: true })
-      }
-      return true
-    },
-    [dir]
-  )
+      return false
+    }
 
-  const focusCellElement = React.useCallback(
-    (cell: CellPosition, shouldScroll = true) => {
-      if (tableRef.current?.getSearchOpen()) return
+    if (shouldScroll) {
+      scrollCellIntoView({
+        container,
+        targetCell: cellElement,
+        tableRef,
+        viewportOffset: VIEWPORT_OFFSET,
+        isRtl: getDir() === "rtl"
+      })
+    }
+    if (shouldFocus) {
+      getCellFocusTarget(cellElement).focus({ preventScroll: true })
+    }
+    return true
+  }
 
-      if (revealCell(cell, { shouldFocus: true, shouldScroll })) {
-        pendingFocusRef.current = null
-        return
-      }
+  function focusCellElement(cell: CellPosition, shouldScroll = true) {
+    if (tableRef.current?.getSearchOpen()) return
 
-      pendingFocusRef.current = { cell, shouldScroll }
-      const container = dataGridRef.current
-      if (container && document.activeElement !== container) {
-        container.focus({ preventScroll: true })
-      }
-    },
-    [revealCell]
-  )
+    if (revealCell(cell, { shouldFocus: true, shouldScroll })) {
+      pendingFocusRef.current = null
+      return
+    }
 
-  const focusCell = React.useCallback(
-    (rowId: string, columnId: string) => {
-      tableRef.current?.setFocusedCell(rowId, columnId)
-      tableRef.current?.setEditingCell(null)
-      focusCellElement({ rowId, columnId })
-    },
-    [focusCellElement]
-  )
+    pendingFocusRef.current = { cell, shouldScroll }
+    const container = dataGridRef.current
+    if (container && document.activeElement !== container) {
+      container.focus({ preventScroll: true })
+    }
+  }
 
-  const getColumnIds = React.useCallback(
-    () => tableRef.current?.getVisibleLeafColumns().map((column) => column.id) ?? [],
-    []
-  )
+  function focusCell(rowId: string, columnId: string) {
+    tableRef.current?.setFocusedCell(rowId, columnId)
+    tableRef.current?.setEditingCell(null)
+    focusCellElement({ rowId, columnId })
+  }
 
-  const getIsDataColumnId = React.useCallback(
-    (columnId: string) => getIsDataColumn(tableRef.current?.getAllFlatColumnsById()[columnId]),
-    []
-  )
+  function getColumnIds() {
+    return tableRef.current?.getVisibleLeafColumns().map((column) => column.id) ?? []
+  }
 
-  const getNavigableColumnIds = React.useCallback(
-    () => getColumnIds().filter(getIsDataColumnId),
-    [getColumnIds, getIsDataColumnId]
-  )
+  function getIsDataColumnId(columnId: string) {
+    return getIsDataColumn(tableRef.current?.getAllFlatColumnsById()[columnId])
+  }
 
-  const selectRange = React.useCallback((start: CellPosition, end: CellPosition) => {
+  function getNavigableColumnIds() {
+    return getColumnIds().filter(getIsDataColumnId)
+  }
+
+  function selectRange(start: CellPosition, end: CellPosition) {
     tableRef.current?.selectCellRange({
       anchorRowId: start.rowId,
       anchorColumnId: start.columnId,
       focusRowId: end.rowId,
       focusColumnId: end.columnId
     })
-  }, [])
+  }
 
-  const onRowsDelete = React.useCallback((rowIds: string[]) => {
+  function onRowsDelete(rowIds: string[]) {
     tableRef.current?.deleteRows(rowIds)
     tableRef.current?.endCellDrag()
-  }, [])
+  }
 
-  const startEditing = React.useCallback((rowId: string, columnId: string) => {
+  function startEditing(rowId: string, columnId: string) {
     const cellsByColumnId = tableRef.current?.getCoreRowModel().rowsById[rowId]?.getAllCellsByColumnId()
     cellsByColumnId?.[columnId]?.startEditing()
-  }, [])
+  }
 
-  const blurCell = React.useCallback(() => {
+  function blurCell() {
     if (tableRef.current?.getEditingCell() && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur()
     }
 
     tableRef.current?.resetCellSelection(true)
     tableRef.current?.setEditingCell(null)
-  }, [])
+  }
 
-  const onCellClick = React.useCallback(
-    (rowId: string, columnId: string, event?: React.MouseEvent) => {
-      if (event?.button === 2) return
+  function onCellClick(rowId: string, columnId: string, event?: ReactMouseEvent) {
+    if (event?.button === 2) return
 
-      const currentTable = tableRef.current
-      if (!currentTable) return
+    const currentTable = tableRef.current
+    if (!currentTable) return
 
-      const ranges = currentTable.atoms.cellSelection.get()
-      const currentFocused = getFocusedCellPosition(ranges)
+    const ranges = currentTable.atoms.cellSelection.get()
+    const currentFocused = getFocusedCellPosition(ranges)
 
-      if (event) {
-        if (event.ctrlKey || event.metaKey) {
-          event.preventDefault()
-          currentTable.selectCellRange(
-            {
-              anchorRowId: rowId,
-              anchorColumnId: columnId,
-              focusRowId: rowId,
-              focusColumnId: columnId
-            },
-            {
-              mode: currentTable.getIsCellSelected(rowId, columnId) ? "exclude" : "include"
-            }
-          )
-          currentTable.setEditingCell(null)
-          focusCellElement({ rowId, columnId })
-          return
-        }
-
-        if (event.shiftKey && currentFocused) {
-          event.preventDefault()
-          currentTable.extendCellSelectionTo({ rowId, columnId })
-          focusCellElement(currentFocused, false)
-          return
-        }
+    if (event) {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault()
+        currentTable.selectCellRange(
+          {
+            anchorRowId: rowId,
+            anchorColumnId: columnId,
+            focusRowId: rowId,
+            focusColumnId: columnId
+          },
+          {
+            mode: currentTable.getIsCellSelected(rowId, columnId) ? "exclude" : "include"
+          }
+        )
+        currentTable.setEditingCell(null)
+        focusCellElement({ rowId, columnId })
+        return
       }
 
-      if (columnId !== "select") currentTable.clearRowSelection()
-
-      if (
-        !getHasCellRangeSelection(ranges) &&
-        currentFocused?.rowId === rowId &&
-        currentFocused?.columnId === columnId
-      ) {
-        startEditing(rowId, columnId)
-      } else {
-        focusCell(rowId, columnId)
+      if (event.shiftKey && currentFocused) {
+        event.preventDefault()
+        currentTable.extendCellSelectionTo({ rowId, columnId })
+        focusCellElement(currentFocused, false)
+        return
       }
-    },
-    [focusCell, focusCellElement, startEditing]
-  )
+    }
 
-  const onCellDoubleClick = React.useCallback(
-    (rowId: string, columnId: string, event?: React.MouseEvent) => {
-      if (event?.defaultPrevented) return
+    if (columnId !== "select") currentTable.clearRowSelection()
 
+    if (!getHasCellRangeSelection(ranges) && currentFocused?.rowId === rowId && currentFocused?.columnId === columnId) {
       startEditing(rowId, columnId)
-    },
-    [startEditing]
-  )
+    } else {
+      focusCell(rowId, columnId)
+    }
+  }
 
-  const onCellMouseDown = React.useCallback((rowId: string, columnId: string, event: React.MouseEvent) => {
+  function onCellDoubleClick(rowId: string, columnId: string, event?: ReactMouseEvent) {
+    if (event?.defaultPrevented) return
+
+    startEditing(rowId, columnId)
+  }
+
+  function onCellMouseDown(rowId: string, columnId: string, event: ReactMouseEvent) {
     if (event.button === 2) return
 
     event.preventDefault()
@@ -302,29 +431,26 @@ function useDataGrid<TData extends RowData>({
     if (!event.ctrlKey && !event.metaKey && !event.shiftKey) {
       tableRef.current?.startCellDrag({ rowId, columnId })
     }
-  }, [])
+  }
 
-  const onCellMouseEnter = React.useCallback(
-    (rowId: string, columnId: string) => {
-      const dragStartCell = tableRef.current?.getCellDragAnchor()
-      if (!dragStartCell) return
+  function onCellMouseEnter(rowId: string, columnId: string) {
+    const dragStartCell = tableRef.current?.getCellDragAnchor()
+    if (!dragStartCell) return
 
-      const currentFocused = getFocusedCell()
-      if (currentFocused?.rowId !== dragStartCell.rowId || currentFocused?.columnId !== dragStartCell.columnId) {
-        tableRef.current?.setEditingCell(null)
-        focusCellElement(dragStartCell, false)
-      }
+    const currentFocused = getFocusedCell()
+    if (currentFocused?.rowId !== dragStartCell.rowId || currentFocused?.columnId !== dragStartCell.columnId) {
+      tableRef.current?.setEditingCell(null)
+      focusCellElement(dragStartCell, false)
+    }
 
-      selectRange(dragStartCell, { rowId, columnId })
-    },
-    [selectRange, getFocusedCell, focusCellElement]
-  )
+    selectRange(dragStartCell, { rowId, columnId })
+  }
 
-  const onCellMouseUp = React.useCallback(() => {
+  function onCellMouseUp() {
     tableRef.current?.endCellDrag()
-  }, [])
+  }
 
-  const onCellContextMenu = React.useCallback((rowId: string, columnId: string, event: React.MouseEvent) => {
+  function onCellContextMenu(rowId: string, columnId: string, event: ReactMouseEvent) {
     event.preventDefault()
     event.stopPropagation()
 
@@ -334,257 +460,139 @@ function useDataGrid<TData extends RowData>({
       currentTable.setFocusedCell(rowId, columnId)
     }
     currentTable.openContextMenu({ x: event.clientX, y: event.clientY })
-  }, [])
-
-  const onColumnVisibilityChange = React.useCallback(
-    (updater: Updater<ColumnVisibilityState>) => {
-      const currentTable = tableRef.current
-      if (!currentTable) return
-      makeStateUpdater("columnVisibility", currentTable)(updater)
-
-      const focusedColumnId = getFocusedCell()?.columnId
-      if (focusedColumnId && currentTable.atoms.columnVisibility.get()[focusedColumnId] === false) {
-        currentTable.resetCellSelection(true)
-        currentTable.setEditingCell(null)
-      }
-
-      propsRef.current.onColumnVisibilityChange?.(updater)
-    },
-    [propsRef, getFocusedCell]
-  )
-
-  const onRowSelectionChange = React.useCallback(
-    (updater: Updater<RowSelectionState>) => {
-      const currentTable = tableRef.current
-      if (!currentTable) return
-      const newRowSelection = functionalUpdate(updater, currentTable.atoms.rowSelection.get())
-
-      const firstColumnId = getNavigableColumnIds()[0]
-      const lastColumnId = getNavigableColumnIds().at(-1)
-      const rows = currentTable.getRowModel().rows
-      const ranges: CellSelectionState = []
-
-      if (firstColumnId && lastColumnId) {
-        let runStartRowId: string | null = null
-        for (let rowIndex = 0; rowIndex <= rows.length; rowIndex++) {
-          const row = rows[rowIndex]
-          const isSelected = row ? !!newRowSelection[row.id] : false
-
-          if (isSelected && row && runStartRowId === null) {
-            runStartRowId = row.id
-          } else if (!isSelected && runStartRowId !== null) {
-            const runEndRowId = rows[rowIndex - 1]?.id ?? runStartRowId
-            ranges.push({
-              anchorRowId: runStartRowId,
-              anchorColumnId: firstColumnId,
-              focusRowId: runEndRowId,
-              focusColumnId: lastColumnId
-            })
-            runStartRowId = null
-          }
-        }
-      }
-
-      const focusedCell = getFocusedCell()
-      const isUtilityCellFocused = focusedCell !== null && !getIsDataColumnId(focusedCell.columnId)
-      // The focused cell stays the active range so selecting rows elsewhere doesn't move focus and scroll to them.
-      if (focusedCell) {
-        ranges.push({
-          anchorRowId: focusedCell.rowId,
-          anchorColumnId: focusedCell.columnId,
-          focusRowId: focusedCell.rowId,
-          focusColumnId: focusedCell.columnId
-        })
-      }
-
-      makeStateUpdater("rowSelection", currentTable)(newRowSelection)
-      currentTable.setCellSelection(ranges)
-      if (!isUtilityCellFocused) {
-        currentTable.setEditingCell(null)
-      }
-
-      propsRef.current.onRowSelectionChange?.(updater)
-    },
-    [getNavigableColumnIds, getIsDataColumnId, propsRef, getFocusedCell]
-  )
-
-  const defaultColumn: Partial<ColumnDef<DataGridFeatures, TData>> = React.useMemo(
-    () => ({
-      minSize: MIN_COLUMN_SIZE,
-      maxSize: MAX_COLUMN_SIZE,
-      cell: renderDefaultCell
-    }),
-    []
-  )
-
-  const dataGridBodyEventHandlers = React.useMemo<React.ComponentProps<"div">>(() => {
-    let hoveredCellKey: string | null = null
-
-    function getEventCell(event: React.SyntheticEvent) {
-      const container = dataGridRef.current
-      const target = event.target
-      if (!container || !(target instanceof Element)) return null
-      if (!container.contains(target)) return null
-
-      // Utility cells manage their own pointer and focus events.
-      const cellElement = target.closest<HTMLElement>('[data-slot="data-grid-cell"]:not([data-utility])')
-      if (!cellElement) return null
-
-      const { rowId, columnId } = cellElement.dataset
-      if (!rowId || !columnId) return null
-
-      const editingCell = tableRef.current?.getEditingCell()
-      if (editingCell?.rowId === rowId && editingCell.columnId === columnId) {
-        return null
-      }
-      return { rowId, columnId }
-    }
-
-    function getPressedCell(event: React.MouseEvent<HTMLElement>) {
-      if (getIsEventOnScrollbar(event)) return null
-      return getEventCell(event)
-    }
-
-    return {
-      onClick: (event) => {
-        const cell = getPressedCell(event)
-        if (!cell) return
-        event.preventDefault()
-        onCellClick(cell.rowId, cell.columnId, event)
-      },
-      onDoubleClick: (event) => {
-        const cell = getPressedCell(event)
-        if (!cell) return
-        event.preventDefault()
-        onCellDoubleClick(cell.rowId, cell.columnId)
-      },
-      onMouseDown: (event) => {
-        const cell = getPressedCell(event)
-        if (cell) onCellMouseDown(cell.rowId, cell.columnId, event)
-      },
-      onMouseOver: (event) => {
-        const cell = getEventCell(event)
-        const cellKey = cell ? getCellKey(cell.rowId, cell.columnId) : null
-        if (cellKey === hoveredCellKey) return
-        hoveredCellKey = cellKey
-        if (cell) onCellMouseEnter(cell.rowId, cell.columnId)
-      },
-      onMouseLeave: () => {
-        hoveredCellKey = null
-      },
-      onMouseUp: (event) => {
-        if (getEventCell(event)) onCellMouseUp()
-      },
-      onContextMenu: (event) => {
-        const cell = getEventCell(event)
-        if (cell) onCellContextMenu(cell.rowId, cell.columnId, event)
-      }
-    }
-  }, [onCellClick, onCellDoubleClick, onCellMouseDown, onCellMouseEnter, onCellMouseUp, onCellContextMenu])
-
-  const tableColumns = React.useMemo(
-    () =>
-      columns.map((column) =>
-        column.id && UTILITY_COLUMN_IDS.has(column.id)
-          ? {
-              ...column,
-              enableCellSelection: column.enableCellSelection ?? false,
-              enableOrdering: column.enableOrdering ?? false
-            }
-          : column
-      ),
-    [columns]
-  )
-
-  const enableCellEditing = !props.readOnly && props.enableCellEditing !== false
-  const hasRowAdd = !!props.createRow
-
-  const tableOptions = React.useMemo<TableOptions<DataGridFeatures, TData>>(() => {
-    return {
-      ...stableProps,
-      onCellScroll: (cell) => revealCell(cell, { shouldFocus: false, shouldScroll: true }),
-      onCellFocus: (cell) => focusCellElement(cell),
-      onClipboardNotice: (notice) => (propsRef.current.onClipboardNotice ?? toastClipboardNotice)(notice),
-      features: dataGridFeatures,
-      data,
-      onDataChange,
-      columns: tableColumns,
-      defaultColumn,
-      autoResetCellSelection: false,
-      enableCellEditing,
-      onRowSelectionChange,
-      onColumnVisibilityChange,
-      columnResizeMode: "onChange",
-      columnResizeDirection: dir,
-      dir
-    }
-  }, [
-    stableProps,
-    propsRef,
-    revealCell,
-    focusCellElement,
-    data,
-    onDataChange,
-    tableColumns,
-    defaultColumn,
-    enableCellEditing,
-    onRowSelectionChange,
-    onColumnVisibilityChange,
-    dir
-  ])
-
-  const table = useTable(tableOptions, selectTableState)
-
-  React.useEffect(
-    () => () => {
-      const currentTable = tableRef.current
-      if (!currentTable) return
-      currentTable.commitCellUpdates()
-      revokeFileObjectUrls(currentTable, dataPropRef.current)
-    },
-    [dataPropRef]
-  )
-
-  if (tableRef.current === null) {
-    tableRef.current = table
   }
 
-  const rowSize = table.getRowSize()
+  function onColumnVisibilityChange(updater: Updater<ColumnVisibilityState>) {
+    const currentTable = tableRef.current
+    if (!currentTable) return
+    makeStateUpdater("columnVisibility", currentTable)(updater)
 
-  const dragDepsRef = useValueAsRef({
-    selectRange,
-    dir,
-    rowSize
-  })
-
-  const columnSizeVars = React.useMemo(() => {
-    const headers = table.getFlatHeaders()
-    const colSizes: { [key: string]: number } = {}
-    for (const header of headers) {
-      colSizes[`--header-${header.id}-size`] = header.getSize()
-      colSizes[`--col-${header.column.id}-size`] = header.column.getSize()
+    const focusedColumnId = getFocusedCell()?.columnId
+    if (focusedColumnId && currentTable.atoms.columnVisibility.get()[focusedColumnId] === false) {
+      currentTable.resetCellSelection(true)
+      currentTable.setEditingCell(null)
     }
-    return colSizes
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the table is stable, so its columns and sizing state invalidate the sizes
-  }, [tableColumns, table.state.columnResizing, table.state.columnSizing])
 
-  const isFirefox = React.useSyncExternalStore(
-    React.useCallback(() => () => {}, []),
-    React.useCallback(() => navigator.userAgent.includes("Firefox"), []),
-    React.useCallback(() => false, [])
-  )
+    propsRef.current.onColumnVisibilityChange?.(updater)
+  }
 
-  const adjustLayout = React.useMemo(() => {
-    const columnPinning = table.state.columnPinning
-    return isFirefox && ((columnPinning.start?.length ?? 0) > 0 || (columnPinning.end?.length ?? 0) > 0)
-  }, [isFirefox, table.state.columnPinning])
+  function onRowSelectionChange(updater: Updater<RowSelectionState>) {
+    const currentTable = tableRef.current
+    if (!currentTable) return
+    const newRowSelection = functionalUpdate(updater, currentTable.atoms.rowSelection.get())
 
-  const rowVirtualizerOptions = React.useMemo<Pick<VirtualizerOptions<HTMLDivElement, Element>, "overscan">>(
-    () => ({ overscan }),
-    [overscan]
-  )
+    const firstColumnId = getNavigableColumnIds()[0]
+    const lastColumnId = getNavigableColumnIds().at(-1)
+    const rows = currentTable.getRowModel().rows
+    const ranges: CellSelectionState = []
 
-  const skipDataGridTabStop = React.useCallback(() => {
+    if (firstColumnId && lastColumnId) {
+      let runStartRowId: string | null = null
+      for (let rowIndex = 0; rowIndex <= rows.length; rowIndex++) {
+        const row = rows[rowIndex]
+        const isSelected = row ? !!newRowSelection[row.id] : false
+
+        if (isSelected && row && runStartRowId === null) {
+          runStartRowId = row.id
+        } else if (!isSelected && runStartRowId !== null) {
+          const runEndRowId = rows[rowIndex - 1]?.id ?? runStartRowId
+          ranges.push({
+            anchorRowId: runStartRowId,
+            anchorColumnId: firstColumnId,
+            focusRowId: runEndRowId,
+            focusColumnId: lastColumnId
+          })
+          runStartRowId = null
+        }
+      }
+    }
+
+    const focusedCell = getFocusedCell()
+    const isUtilityCellFocused = focusedCell !== null && !getIsDataColumnId(focusedCell.columnId)
+    // The focused cell stays the active range so selecting rows elsewhere doesn't move focus and scroll to them.
+    if (focusedCell) {
+      ranges.push({
+        anchorRowId: focusedCell.rowId,
+        anchorColumnId: focusedCell.columnId,
+        focusRowId: focusedCell.rowId,
+        focusColumnId: focusedCell.columnId
+      })
+    }
+
+    makeStateUpdater("rowSelection", currentTable)(newRowSelection)
+    currentTable.setCellSelection(ranges)
+    if (!isUtilityCellFocused) {
+      currentTable.setEditingCell(null)
+    }
+
+    propsRef.current.onRowSelectionChange?.(updater)
+  }
+
+  // The body's mouse handlers, the same object for the grid's life: the cell under the pointer is read from the event.
+  let hoveredCellKey: string | null = null
+
+  function getEventCell(event: SyntheticEvent) {
+    const container = dataGridRef.current
+    const target = event.target
+    if (!container || !(target instanceof Element)) return null
+    if (!container.contains(target)) return null
+
+    // Utility cells manage their own pointer and focus events.
+    const cellElement = target.closest<HTMLElement>('[data-slot="data-grid-cell"]:not([data-utility])')
+    if (!cellElement) return null
+
+    const { rowId, columnId } = cellElement.dataset
+    if (!rowId || !columnId) return null
+
+    const editingCell = tableRef.current?.getEditingCell()
+    if (editingCell?.rowId === rowId && editingCell.columnId === columnId) {
+      return null
+    }
+    return { rowId, columnId }
+  }
+
+  function getPressedCell(event: ReactMouseEvent<HTMLElement>) {
+    if (getIsEventOnScrollbar(event)) return null
+    return getEventCell(event)
+  }
+
+  const bodyHandlers: ComponentProps<"div"> = {
+    onClick: (event) => {
+      const cell = getPressedCell(event)
+      if (!cell) return
+      event.preventDefault()
+      onCellClick(cell.rowId, cell.columnId, event)
+    },
+    onDoubleClick: (event) => {
+      const cell = getPressedCell(event)
+      if (!cell) return
+      event.preventDefault()
+      onCellDoubleClick(cell.rowId, cell.columnId)
+    },
+    onMouseDown: (event) => {
+      const cell = getPressedCell(event)
+      if (cell) onCellMouseDown(cell.rowId, cell.columnId, event)
+    },
+    onMouseOver: (event) => {
+      const cell = getEventCell(event)
+      const cellKey = cell ? getCellKey(cell.rowId, cell.columnId) : null
+      if (cellKey === hoveredCellKey) return
+      hoveredCellKey = cellKey
+      if (cell) onCellMouseEnter(cell.rowId, cell.columnId)
+    },
+    onMouseLeave: () => {
+      hoveredCellKey = null
+    },
+    onMouseUp: (event) => {
+      if (getEventCell(event)) onCellMouseUp()
+    },
+    onContextMenu: (event) => {
+      const cell = getEventCell(event)
+      if (cell) onCellContextMenu(cell.rowId, cell.columnId, event)
+    }
+  }
+
+  function skipDataGridTabStop() {
     const container = dataGridRef.current
     if (!container) return
 
@@ -592,539 +600,590 @@ function useDataGrid<TData extends RowData>({
     requestAnimationFrame(() => {
       container.tabIndex = 0
     })
-  }, [])
+  }
 
-  const addRow = React.useCallback(
-    async (trigger: CreateRowDetails, columnId: string | undefined) => {
-      const { readOnly, createRow } = propsRef.current
-      if (readOnly || !createRow) return
+  async function addRow(trigger: CreateRowDetails, columnId: string | undefined) {
+    const { readOnly, createRow } = propsRef.current
+    if (readOnly || !createRow) return
 
-      // Local change: `settle` where upstream has a `try` statement; a refused new row says why, as upstream's did.
-      const created = await settle(
-        () => createRow(trigger),
-        (error) => (error instanceof Error ? error.message : "Failed to add row")
-      )
-      if (Result.isFailure(created)) {
-        toast.error(created.failure)
-        return
-      }
-      const row: TData | null = created.success
-      const currentTable = tableRef.current
-      if (!row || !currentTable) return
+    // Local change: `settle` where upstream has a `try` statement; a refused new row says why, as upstream's did.
+    const created = await settle(
+      () => createRow(trigger),
+      (error) => (error instanceof Error ? error.message : "Failed to add row")
+    )
+    if (Result.isFailure(created)) {
+      toast.error(created.failure)
+      return
+    }
+    const row: TData | null = created.success
+    const currentTable = tableRef.current
+    if (!row || !currentTable) return
 
-      const [rowId] = currentTable.addRows(
-        [row],
-        trigger.reason === "insert-below" ? { afterRowId: trigger.afterRowId } : undefined
-      )
-      if (!rowId || !columnId) return
+    const [rowId] = currentTable.addRows(
+      [row],
+      trigger.reason === "insert-below" ? { afterRowId: trigger.afterRowId } : undefined
+    )
+    if (!rowId || !columnId) return
 
-      currentTable.clearSelection()
-      focusCell(rowId, columnId)
-    },
-    [propsRef, focusCell]
-  )
+    currentTable.clearSelection()
+    focusCell(rowId, columnId)
+  }
 
-  const onRowAdd = React.useCallback(
-    (event?: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) =>
-      addRow({ reason: "add-row-press", event }, getNavigableColumnIds().find(getIsDataColumnId)),
-    [addRow, getNavigableColumnIds, getIsDataColumnId]
-  )
+  function onRowAdd(event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement>) {
+    return addRow({ reason: "add-row-press", event }, getNavigableColumnIds().find(getIsDataColumnId))
+  }
 
-  const getColumnHeaderTrigger = React.useCallback((columnId: string) => {
+  function getColumnHeaderTrigger(columnId: string) {
     return (
       headerRef.current?.querySelector<HTMLElement>(
         `[data-slot="data-grid-header-cell"][data-column-id="${CSS.escape(columnId)}"] :is(button, [role="checkbox"])`
       ) ?? null
     )
-  }, [])
+  }
 
-  const focusColumnHeader = React.useCallback(
-    (columnId: string) => {
-      const trigger = getColumnHeaderTrigger(columnId)
-      if (!trigger) return false
+  function focusColumnHeader(columnId: string) {
+    const trigger = getColumnHeaderTrigger(columnId)
+    if (!trigger) return false
 
-      tableRef.current?.resetCellSelection(true)
-      tableRef.current?.clearRowSelection()
-      tableRef.current?.setEditingCell(null)
-      trigger.focus()
-      return true
-    },
-    [getColumnHeaderTrigger]
-  )
+    tableRef.current?.resetCellSelection(true)
+    tableRef.current?.clearRowSelection()
+    tableRef.current?.setEditingCell(null)
+    trigger.focus()
+    return true
+  }
 
-  const onColumnHeaderKeyDown = React.useCallback(
-    (event: KeyboardEvent, columnId: string) => {
-      const { key, shiftKey, ctrlKey, metaKey, altKey } = event
-      const isHorizontalArrow = key === "ArrowLeft" || key === "ArrowRight"
-      if (ctrlKey || metaKey || (altKey && (shiftKey || !isHorizontalArrow))) {
-        return false
-      }
+  function onColumnHeaderKeyDown(event: KeyboardEvent, columnId: string) {
+    const { key, shiftKey, ctrlKey, metaKey, altKey } = event
+    const isHorizontalArrow = key === "ArrowLeft" || key === "ArrowRight"
+    if (ctrlKey || metaKey || (altKey && (shiftKey || !isHorizontalArrow))) {
+      return false
+    }
 
-      const headerColumnIds = getColumnIds().filter((id) => getColumnHeaderTrigger(id))
-      const headerIndex = headerColumnIds.indexOf(columnId)
-      if (headerIndex === -1) return false
+    const headerColumnIds = getColumnIds().filter((id) => getColumnHeaderTrigger(id))
+    const headerIndex = headerColumnIds.indexOf(columnId)
+    if (headerIndex === -1) return false
 
-      const isRtl = dir === "rtl"
+    const isRtl = getDir() === "rtl"
 
-      function focusColumnHeaderAt(index: number) {
-        const targetColumnId = headerColumnIds[index]
-        if (targetColumnId) focusColumnHeader(targetColumnId)
-      }
+    function focusColumnHeaderAt(index: number) {
+      const targetColumnId = headerColumnIds[index]
+      if (targetColumnId) focusColumnHeader(targetColumnId)
+    }
 
-      function resizeColumnBy(delta: number) {
-        const currentTable = tableRef.current
-        const column = currentTable?.getColumn(columnId)
-        if (!currentTable || !column?.getCanResize()) return
-
-        const defaultColumnDef = currentTable.getDefaultColumnDef()
-        const minSize = column.columnDef.minSize ?? defaultColumnDef.minSize ?? 0
-        const maxSize = column.columnDef.maxSize ?? defaultColumnDef.maxSize ?? Number.POSITIVE_INFINITY
-        const size = Math.min(Math.max(column.getSize() + delta, minSize), maxSize)
-        currentTable.setColumnSizing((prev) => ({ ...prev, [columnId]: size }))
-      }
-
-      // Local change: the key is read with `effect/Match` instead of a `switch`. Each key answers what the handler
-      // does with the event: "prevent" (handled, and the browser's own action is stopped), "keep" (handled, the
-      // browser's action stands) or "ignore" (not a key the header takes).
-      type Handled = "prevent" | "keep" | "ignore"
-      const handled = Match.value(key).pipe(
-        Match.when(Match.is("ArrowLeft", "ArrowRight"), (arrow): Handled => {
-          const step = (arrow === "ArrowRight") !== isRtl ? 1 : -1
-          if (altKey) {
-            resizeColumnBy(step * COLUMN_RESIZE_STEP)
-          } else if (shiftKey) {
-            const column = tableRef.current?.getColumn(columnId)
-            column?.move(step)
-          } else {
-            focusColumnHeaderAt(headerIndex + step)
-          }
-          return "prevent"
-        }),
-        Match.when("Home", (): Handled => {
-          focusColumnHeaderAt(0)
-          return "prevent"
-        }),
-        Match.when("End", (): Handled => {
-          focusColumnHeaderAt(headerColumnIds.length - 1)
-          return "prevent"
-        }),
-        Match.when("ArrowUp", (): Handled => "prevent"),
-        Match.when("ArrowDown", (): Handled => {
-          // Stops the menu trigger from opening its menu.
-          event.stopPropagation()
-          const firstRowId = getRowIdAtDisplayIndex(0)
-          if (!firstRowId) return "prevent"
-          tableRef.current?.clearRowSelection()
-          focusCell(firstRowId, columnId)
-          return "prevent"
-        }),
-        Match.when("Escape", (): Handled => {
-          dataGridRef.current?.focus()
-          return "prevent"
-        }),
-        Match.when("Tab", (): Handled => {
-          if (shiftKey) {
-            if (headerIndex === 0) {
-              skipDataGridTabStop()
-              return "keep"
-            }
-            focusColumnHeaderAt(headerIndex - 1)
-          } else if (headerIndex < headerColumnIds.length - 1) {
-            focusColumnHeaderAt(headerIndex + 1)
-          } else {
-            const firstRowId = getRowIdAtDisplayIndex(0)
-            const firstColumnId = getNavigableColumnIds()[0]
-            if (!firstRowId || !firstColumnId) return "keep"
-            tableRef.current?.clearRowSelection()
-            focusCell(firstRowId, firstColumnId)
-          }
-          return "prevent"
-        }),
-        Match.orElse((): Handled => "ignore")
-      )
-      if (handled === "ignore") return false
-      if (handled === "keep") return true
-
-      event.preventDefault()
-      return true
-    },
-    [
-      dir,
-      getColumnIds,
-      getNavigableColumnIds,
-      getColumnHeaderTrigger,
-      focusColumnHeader,
-      skipDataGridTabStop,
-      focusCell,
-      getRowIdAtDisplayIndex
-    ]
-  )
-
-  const onDataGridKeyDown = React.useCallback(
-    (event: KeyboardEvent) => {
+    function resizeColumnBy(delta: number) {
       const currentTable = tableRef.current
-      if (!currentTable) return
+      const column = currentTable?.getColumn(columnId)
+      if (!currentTable || !column?.getCanResize()) return
 
-      const cellSelection = currentTable.atoms.cellSelection.get()
-      const focusedCell = getFocusedCellPosition(cellSelection)
-      const hasCellRangeSelection = getHasCellRangeSelection(cellSelection)
-      const { key, ctrlKey, metaKey, shiftKey, altKey } = event
-      const isCtrlPressed = ctrlKey || metaKey
+      const defaultColumnDef = currentTable.getDefaultColumnDef()
+      const minSize = column.columnDef.minSize ?? defaultColumnDef.minSize ?? 0
+      const maxSize = column.columnDef.maxSize ?? defaultColumnDef.maxSize ?? Number.POSITIVE_INFINITY
+      const size = Math.min(Math.max(column.getSize() + delta, minSize), maxSize)
+      currentTable.setColumnSizing((prev) => ({ ...prev, [columnId]: size }))
+    }
 
-      if (currentTable.options.enableSearch && isCtrlPressed && !shiftKey && key === SEARCH_SHORTCUT_KEY) {
-        event.preventDefault()
-        currentTable.openSearch()
-        return
-      }
-
-      if (currentTable.getSearchOpen() && !currentTable.getEditingCell()) {
-        if (key === "Enter") {
-          event.preventDefault()
-          if (shiftKey) {
-            currentTable.goToPrevSearchMatch()
-          } else {
-            currentTable.goToNextSearchMatch()
-          }
-          return
+    // Local change: the key is read with `effect/Match` instead of a `switch`. Each key answers what the handler
+    // does with the event: "prevent" (handled, and the browser's own action is stopped), "keep" (handled, the
+    // browser's action stands) or "ignore" (not a key the header takes).
+    type Handled = "prevent" | "keep" | "ignore"
+    const handled = Match.value(key).pipe(
+      Match.when(Match.is("ArrowLeft", "ArrowRight"), (arrow): Handled => {
+        const step = (arrow === "ArrowRight") !== isRtl ? 1 : -1
+        if (altKey) {
+          resizeColumnBy(step * COLUMN_RESIZE_STEP)
+        } else if (shiftKey) {
+          const column = tableRef.current?.getColumn(columnId)
+          column?.move(step)
+        } else {
+          focusColumnHeaderAt(headerIndex + step)
         }
-        if (key === "Escape") {
-          event.preventDefault()
-          currentTable.closeSearch()
-          return
+        return "prevent"
+      }),
+      Match.when("Home", (): Handled => {
+        focusColumnHeaderAt(0)
+        return "prevent"
+      }),
+      Match.when("End", (): Handled => {
+        focusColumnHeaderAt(headerColumnIds.length - 1)
+        return "prevent"
+      }),
+      Match.when("ArrowUp", (): Handled => "prevent"),
+      Match.when("ArrowDown", (): Handled => {
+        // Stops the menu trigger from opening its menu.
+        event.stopPropagation()
+        const firstRowId = getRowIdAtDisplayIndex(0)
+        if (!firstRowId) return "prevent"
+        tableRef.current?.clearRowSelection()
+        focusCell(firstRowId, columnId)
+        return "prevent"
+      }),
+      Match.when("Escape", (): Handled => {
+        dataGridRef.current?.focus()
+        return "prevent"
+      }),
+      Match.when("Tab", (): Handled => {
+        if (shiftKey) {
+          if (headerIndex === 0) {
+            skipDataGridTabStop()
+            return "keep"
+          }
+          focusColumnHeaderAt(headerIndex - 1)
+        } else if (headerIndex < headerColumnIds.length - 1) {
+          focusColumnHeaderAt(headerIndex + 1)
+        } else {
+          const firstRowId = getRowIdAtDisplayIndex(0)
+          const firstColumnId = getNavigableColumnIds()[0]
+          if (!firstRowId || !firstColumnId) return "keep"
+          tableRef.current?.clearRowSelection()
+          focusCell(firstRowId, firstColumnId)
         }
-        return
-      }
+        return "prevent"
+      }),
+      Match.orElse((): Handled => "ignore")
+    )
+    if (handled === "ignore") return false
+    if (handled === "keep") return true
 
-      if (currentTable.getEditingCell()) return
+    event.preventDefault()
+    return true
+  }
 
-      const headerCell =
-        event.target instanceof Element
-          ? event.target.closest<HTMLElement>('[data-slot="data-grid-header-cell"]')
-          : null
-      const headerColumnId = headerCell?.dataset.columnId
-      if (headerColumnId && onColumnHeaderKeyDown(event, headerColumnId)) {
-        return
-      }
+  function onDataGridKeyDown(event: KeyboardEvent) {
+    const currentTable = tableRef.current
+    if (!currentTable) return
 
-      if (
-        isCtrlPressed &&
-        (key === "Backspace" || key === "Delete") &&
-        !propsRef.current.readOnly &&
-        propsRef.current.enableRowDeletion
-      ) {
-        const rowIds = new Set<string>()
+    const cellSelection = currentTable.atoms.cellSelection.get()
+    const focusedCell = getFocusedCellPosition(cellSelection)
+    const hasCellRangeSelection = getHasCellRangeSelection(cellSelection)
+    const { key, ctrlKey, metaKey, shiftKey, altKey } = event
+    const isCtrlPressed = ctrlKey || metaKey
 
-        if (currentTable.getHasRowSelection()) {
-          const rowSelection = currentTable.atoms.rowSelection.get()
-          for (const row of currentTable.getRowModel().rows) {
-            if (rowSelection[row.id]) rowIds.add(row.id)
-          }
-        } else if (hasCellRangeSelection) {
-          for (const { rowId } of currentTable.getSelectedCells()) {
-            rowIds.add(rowId)
-          }
-        } else if (focusedCell) {
-          rowIds.add(focusedCell.rowId)
-        }
-
-        if (rowIds.size > 0) {
-          event.preventDefault()
-          onRowsDelete(Array.from(rowIds))
-        }
-        return
-      }
-
-      if (!focusedCell) return
-
-      if (!headerColumnId && (key === "ContextMenu" || (shiftKey && key === "F10"))) {
-        event.preventDefault()
-        const container = dataGridRef.current
-        const cellElement = container && getCellElement(container, focusedCell.rowId, focusedCell.columnId)
-        if (!cellElement) return
-        const rect = cellElement.getBoundingClientRect()
-        currentTable.openContextMenu({
-          x: dir === "rtl" ? rect.right : rect.left,
-          y: rect.bottom
-        })
-        return
-      }
-
-      let direction: NavigationDirection | null = null
-
-      const isUtilityCellFocused = !getIsDataColumnId(focusedCell.columnId)
-
-      if (
-        isUtilityCellFocused &&
-        shiftKey &&
-        (key.startsWith("Arrow") || key === "Home" || key === "End" || key === "PageUp" || key === "PageDown")
-      ) {
-        event.preventDefault()
-        return
-      }
-
-      const canCopyCells = !isUtilityCellFocused || currentTable.getHasRowSelection()
-
-      if (isCtrlPressed && !shiftKey && key === "a") {
-        event.preventDefault()
-        currentTable.selectAllDataCells()
-        return
-      }
-
-      if (isCtrlPressed && !shiftKey && key === "c" && canCopyCells) {
-        event.preventDefault()
-        void currentTable.copySelectedCells()
-        return
-      }
-
-      if (isCtrlPressed && !shiftKey && key === "x" && canCopyCells && !propsRef.current.readOnly) {
-        event.preventDefault()
-        void currentTable.cutSelectedCells()
-        return
-      }
-
-      if (
-        propsRef.current.enablePaste &&
-        isCtrlPressed &&
-        !shiftKey &&
-        key === "v" &&
-        !isUtilityCellFocused &&
-        !propsRef.current.readOnly
-      ) {
-        event.preventDefault()
-        void currentTable.pasteCells()
-        return
-      }
-
-      if (
-        (key === "Delete" || key === "Backspace") &&
-        !isCtrlPressed &&
-        !isUtilityCellFocused &&
-        !propsRef.current.readOnly
-      ) {
-        const cellsToClear = currentTable.getSelectedCells()
-
-        if (cellsToClear.length > 0) {
-          event.preventDefault()
-
-          currentTable.clearCells(cellsToClear)
-
-          if (hasCellRangeSelection) {
-            currentTable.clearSelection()
-          }
-
-          if (currentTable.getCutCellGrid().length) {
-            currentTable.resetCutCellGrid(true)
-          }
-        }
-        return
-      }
-
-      if (key === "Enter" && shiftKey && !propsRef.current.readOnly && propsRef.current.createRow) {
-        event.preventDefault()
-        const currentColumnId = isUtilityCellFocused ? getNavigableColumnIds()[0] : focusedCell.columnId
-
-        void addRow({ reason: "insert-below", event, afterRowId: focusedCell.rowId }, currentColumnId)
-        return
-      }
-
-      const isRtl = dir === "rtl"
-
-      // Local change: the key is read with `effect/Match` instead of a `switch`. Each key answers the direction to
-      // move in, or null when it moves nowhere (the key was handled another way, or is not one the grid takes).
-      type Move = NavigationDirection | null
-      direction = Match.value(key).pipe(
-        Match.when("ArrowUp", (): Move => {
-          if (altKey && !isCtrlPressed && !shiftKey) return "pageup"
-          if (isCtrlPressed) return "ctrl+up"
-          if (
-            !shiftKey &&
-            getRowDisplayIndex(currentTable, focusedCell.rowId) === 0 &&
-            focusColumnHeader(focusedCell.columnId)
-          ) {
-            event.preventDefault()
-            return null
-          }
-          return "up"
-        }),
-        Match.when("ArrowDown", (): Move => {
-          if (altKey && !isCtrlPressed && !shiftKey) return "pagedown"
-          return isCtrlPressed ? "ctrl+down" : "down"
-        }),
-        Match.when("ArrowLeft", (): Move => {
-          if (isCtrlPressed) return isRtl ? "end" : "home"
-          return "left"
-        }),
-        Match.when("ArrowRight", (): Move => {
-          if (isCtrlPressed) return isRtl ? "home" : "end"
-          return "right"
-        }),
-        Match.when("Home", (): Move => (isCtrlPressed ? "ctrl+home" : "home")),
-        Match.when("End", (): Move => (isCtrlPressed ? "ctrl+end" : "end")),
-        Match.when("PageUp", (): Move => (altKey ? "pageleft" : "pageup")),
-        Match.when("PageDown", (): Move => (altKey ? "pageright" : "pagedown")),
-        Match.when("Escape", (): Move => {
-          if (event.defaultPrevented) return null
-          event.preventDefault()
-          if (hasCellRangeSelection || currentTable.getHasRowSelection()) {
-            currentTable.clearSelection()
-          } else {
-            blurCell()
-            dataGridRef.current?.focus()
-          }
-          return null
-        }),
-        Match.when("Tab", (): Move => {
-          // Local patch: Tab leaves the grid, as the ARIA grid pattern expects; arrow keys move between cells.
-          // Upstream moves cell by cell, so the action bar (portalled after the grid) was out of keyboard reach.
-          if (shiftKey) skipDataGridTabStop()
-          return null
-        }),
-        Match.orElse((): Move => null)
-      )
-
-      if (!direction) return
+    if (currentTable.options.enableSearch && isCtrlPressed && !shiftKey && key === SEARCH_SHORTCUT_KEY) {
       event.preventDefault()
+      currentTable.openSearch()
+      return
+    }
 
-      const extend = shiftKey && key !== "Tab"
-      const pageSize = rowVirtualizerRef.current?.getVirtualItems().length
+    if (currentTable.getSearchOpen() && !currentTable.getEditingCell()) {
+      if (key === "Enter") {
+        event.preventDefault()
+        if (shiftKey) {
+          currentTable.goToPrevSearchMatch()
+        } else {
+          currentTable.goToNextSearchMatch()
+        }
+        return
+      }
+      if (key === "Escape") {
+        event.preventDefault()
+        currentTable.closeSearch()
+        return
+      }
+      return
+    }
 
-      if (!extend && hasCellRangeSelection) currentTable.clearSelection()
-      currentTable.navigate(direction, { extend, pageSize })
-    },
-    [
-      dir,
-      propsRef,
-      blurCell,
-      getNavigableColumnIds,
-      getIsDataColumnId,
-      onRowsDelete,
-      addRow,
-      focusColumnHeader,
-      onColumnHeaderKeyDown,
-      skipDataGridTabStop
-    ]
-  )
+    if (currentTable.getEditingCell()) return
 
-  React.useEffect(() => {
+    const headerCell =
+      event.target instanceof Element ? event.target.closest<HTMLElement>('[data-slot="data-grid-header-cell"]') : null
+    const headerColumnId = headerCell?.dataset.columnId
+    if (headerColumnId && onColumnHeaderKeyDown(event, headerColumnId)) {
+      return
+    }
+
+    if (
+      isCtrlPressed &&
+      (key === "Backspace" || key === "Delete") &&
+      !propsRef.current.readOnly &&
+      propsRef.current.enableRowDeletion
+    ) {
+      const rowIds = new Set<string>()
+
+      if (currentTable.getHasRowSelection()) {
+        const rowSelection = currentTable.atoms.rowSelection.get()
+        for (const row of currentTable.getRowModel().rows) {
+          if (rowSelection[row.id]) rowIds.add(row.id)
+        }
+      } else if (hasCellRangeSelection) {
+        for (const { rowId } of currentTable.getSelectedCells()) {
+          rowIds.add(rowId)
+        }
+      } else if (focusedCell) {
+        rowIds.add(focusedCell.rowId)
+      }
+
+      if (rowIds.size > 0) {
+        event.preventDefault()
+        onRowsDelete(Array.from(rowIds))
+      }
+      return
+    }
+
+    if (!focusedCell) return
+
+    if (!headerColumnId && (key === "ContextMenu" || (shiftKey && key === "F10"))) {
+      event.preventDefault()
+      const container = dataGridRef.current
+      const cellElement = container && getCellElement(container, focusedCell.rowId, focusedCell.columnId)
+      if (!cellElement) return
+      const rect = cellElement.getBoundingClientRect()
+      currentTable.openContextMenu({
+        x: getDir() === "rtl" ? rect.right : rect.left,
+        y: rect.bottom
+      })
+      return
+    }
+
+    let direction: NavigationDirection | null = null
+
+    const isUtilityCellFocused = !getIsDataColumnId(focusedCell.columnId)
+
+    if (
+      isUtilityCellFocused &&
+      shiftKey &&
+      (key.startsWith("Arrow") || key === "Home" || key === "End" || key === "PageUp" || key === "PageDown")
+    ) {
+      event.preventDefault()
+      return
+    }
+
+    const canCopyCells = !isUtilityCellFocused || currentTable.getHasRowSelection()
+
+    if (isCtrlPressed && !shiftKey && key === "a") {
+      event.preventDefault()
+      currentTable.selectAllDataCells()
+      return
+    }
+
+    if (isCtrlPressed && !shiftKey && key === "c" && canCopyCells) {
+      event.preventDefault()
+      void currentTable.copySelectedCells()
+      return
+    }
+
+    if (isCtrlPressed && !shiftKey && key === "x" && canCopyCells && !propsRef.current.readOnly) {
+      event.preventDefault()
+      void currentTable.cutSelectedCells()
+      return
+    }
+
+    if (
+      propsRef.current.enablePaste &&
+      isCtrlPressed &&
+      !shiftKey &&
+      key === "v" &&
+      !isUtilityCellFocused &&
+      !propsRef.current.readOnly
+    ) {
+      event.preventDefault()
+      void currentTable.pasteCells()
+      return
+    }
+
+    if (
+      (key === "Delete" || key === "Backspace") &&
+      !isCtrlPressed &&
+      !isUtilityCellFocused &&
+      !propsRef.current.readOnly
+    ) {
+      const cellsToClear = currentTable.getSelectedCells()
+
+      if (cellsToClear.length > 0) {
+        event.preventDefault()
+
+        currentTable.clearCells(cellsToClear)
+
+        if (hasCellRangeSelection) {
+          currentTable.clearSelection()
+        }
+
+        if (currentTable.getCutCellGrid().length) {
+          currentTable.resetCutCellGrid(true)
+        }
+      }
+      return
+    }
+
+    if (key === "Enter" && shiftKey && !propsRef.current.readOnly && propsRef.current.createRow) {
+      event.preventDefault()
+      const currentColumnId = isUtilityCellFocused ? getNavigableColumnIds()[0] : focusedCell.columnId
+
+      void addRow({ reason: "insert-below", event, afterRowId: focusedCell.rowId }, currentColumnId)
+      return
+    }
+
+    const isRtl = getDir() === "rtl"
+
+    // Local change: the key is read with `effect/Match` instead of a `switch`. Each key answers the direction to
+    // move in, or null when it moves nowhere (the key was handled another way, or is not one the grid takes).
+    type Move = NavigationDirection | null
+    direction = Match.value(key).pipe(
+      Match.when("ArrowUp", (): Move => {
+        if (altKey && !isCtrlPressed && !shiftKey) return "pageup"
+        if (isCtrlPressed) return "ctrl+up"
+        if (
+          !shiftKey &&
+          getRowDisplayIndex(currentTable, focusedCell.rowId) === 0 &&
+          focusColumnHeader(focusedCell.columnId)
+        ) {
+          event.preventDefault()
+          return null
+        }
+        return "up"
+      }),
+      Match.when("ArrowDown", (): Move => {
+        if (altKey && !isCtrlPressed && !shiftKey) return "pagedown"
+        return isCtrlPressed ? "ctrl+down" : "down"
+      }),
+      Match.when("ArrowLeft", (): Move => {
+        if (isCtrlPressed) return isRtl ? "end" : "home"
+        return "left"
+      }),
+      Match.when("ArrowRight", (): Move => {
+        if (isCtrlPressed) return isRtl ? "home" : "end"
+        return "right"
+      }),
+      Match.when("Home", (): Move => (isCtrlPressed ? "ctrl+home" : "home")),
+      Match.when("End", (): Move => (isCtrlPressed ? "ctrl+end" : "end")),
+      Match.when("PageUp", (): Move => (altKey ? "pageleft" : "pageup")),
+      Match.when("PageDown", (): Move => (altKey ? "pageright" : "pagedown")),
+      Match.when("Escape", (): Move => {
+        if (event.defaultPrevented) return null
+        event.preventDefault()
+        if (hasCellRangeSelection || currentTable.getHasRowSelection()) {
+          currentTable.clearSelection()
+        } else {
+          blurCell()
+          dataGridRef.current?.focus()
+        }
+        return null
+      }),
+      Match.when("Tab", (): Move => {
+        // Local patch: Tab leaves the grid, as the ARIA grid pattern expects; arrow keys move between cells.
+        // Upstream moves cell by cell, so the action bar (portalled after the grid) was out of keyboard reach.
+        if (shiftKey) skipDataGridTabStop()
+        return null
+      }),
+      Match.orElse((): Move => null)
+    )
+
+    if (!direction) return
+    event.preventDefault()
+
+    const extend = shiftKey && key !== "Tab"
+    const pageSize = rowVirtualizerRef.current?.getVirtualItems().length
+
+    if (!extend && hasCellRangeSelection) currentTable.clearSelection()
+    currentTable.navigate(direction, { extend, pageSize })
+  }
+
+  // Window and document listeners, for the grid's whole life (upstream's effects with no dependencies that change).
+  function onGlobalKeyDown(event: KeyboardEvent) {
     const dataGridElement = dataGridRef.current
     if (!dataGridElement) return
 
-    dataGridElement.addEventListener("keydown", onDataGridKeyDown)
-    return () => {
-      dataGridElement.removeEventListener("keydown", onDataGridKeyDown)
-    }
-  }, [onDataGridKeyDown])
+    const target = event.target
+    if (!(target instanceof HTMLElement)) return
 
-  React.useEffect(() => {
-    function onGlobalKeyDown(event: KeyboardEvent) {
-      const dataGridElement = dataGridRef.current
-      if (!dataGridElement) return
+    const { key, ctrlKey, metaKey, shiftKey } = event
+    const isCommandPressed = ctrlKey || metaKey
 
-      const target = event.target
-      if (!(target instanceof HTMLElement)) return
-
-      const { key, ctrlKey, metaKey, shiftKey } = event
-      const isCommandPressed = ctrlKey || metaKey
-
-      const currentTable = tableRef.current
-      if (currentTable?.options.enableSearch && isCommandPressed && !shiftKey && key === SEARCH_SHORTCUT_KEY) {
-        const isInInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA"
-        const isInDataGrid = dataGridElement.contains(target)
-        const isInSearchInput = target.closest('[role="search"]') !== null
-
-        if (isInDataGrid || isInSearchInput || !isInInput) {
-          event.preventDefault()
-          event.stopPropagation()
-
-          const nextSearchOpen = !currentTable.getSearchOpen()
-          if (nextSearchOpen) currentTable.openSearch()
-          else currentTable.closeSearch()
-
-          if (nextSearchOpen && !isInDataGrid && !isInSearchInput) {
-            requestAnimationFrame(() => {
-              dataGridElement.focus()
-            })
-          }
-          return
-        }
-      }
-
+    const currentTable = tableRef.current
+    if (currentTable?.options.enableSearch && isCommandPressed && !shiftKey && key === SEARCH_SHORTCUT_KEY) {
+      const isInInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA"
       const isInDataGrid = dataGridElement.contains(target)
+      const isInSearchInput = target.closest('[role="search"]') !== null
 
-      // Works from anywhere but text fields, editors and another grid, like an app's undo.
-      const undoRedoKey = key.toLowerCase()
-      if (
-        currentTable &&
-        isCommandPressed &&
-        (undoRedoKey === "z" || undoRedoKey === "y") &&
-        (currentTable.options.enableUndoRedo ?? !currentTable.options.readOnly) &&
-        !getIsEditableTarget(target) &&
-        !(getIsInPopover(target) && !target.closest('[role="toolbar"]')) &&
-        (isInDataGrid || !target.closest('[role="grid"]'))
-      ) {
+      if (isInDataGrid || isInSearchInput || !isInInput) {
         event.preventDefault()
-        const isRedo = undoRedoKey === "y" || shiftKey
-        const count = isRedo ? currentTable.redo() : currentTable.undo()
-        if (count === 0) {
-          toast.info(isRedo ? "No actions to redo" : "No actions to undo")
-        } else {
-          toast.success(`${count} action${count === 1 ? "" : "s"} ${isRedo ? "redone" : "undone"}`)
+        event.stopPropagation()
+
+        // The search box beside this grid's element (both are in the grid's wrapper) is its own.
+        const isInOwnSearchInput = target.closest('[role="search"]')?.parentElement?.contains(dataGridElement) === true
+        registry.set(
+          searchFocusClaim,
+          claimSearchFocus(registry.get(searchFocusClaim), event, grid, isInDataGrid || isInOwnSearchInput)
+        )
+        // Every box asks in the frame after the press; after that frame the claim is let go, so a search opened later
+        // by other means focuses its own box.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const claim = registry.get(searchFocusClaim)
+            if (O.isSome(claim) && claim.value.press === event) registry.set(searchFocusClaim, O.none())
+          })
+        })
+
+        const nextSearchOpen = !currentTable.getSearchOpen()
+        // Asked for before the search opens, so the box's own request (made as it is drawn, which can be within
+        // `openSearch`) comes after it in the frame, as upstream's passive effect did; and only when no other grid
+        // claimed the press, so the grid the person was in keeps the focus.
+        if (nextSearchOpen && !isInDataGrid && !isInSearchInput) {
+          requestAnimationFrame(() => {
+            if (takesSearchFocus(registry.get(searchFocusClaim), grid)) dataGridElement.focus()
+          })
+        }
+
+        if (nextSearchOpen) currentTable.openSearch()
+        else currentTable.closeSearch()
+        return
+      }
+    }
+
+    const isInDataGrid = dataGridElement.contains(target)
+
+    // Works from anywhere but text fields, editors and another grid, like an app's undo.
+    const undoRedoKey = key.toLowerCase()
+    if (
+      currentTable &&
+      isCommandPressed &&
+      (undoRedoKey === "z" || undoRedoKey === "y") &&
+      (currentTable.options.enableUndoRedo ?? !currentTable.options.readOnly) &&
+      !getIsEditableTarget(target) &&
+      !(getIsInPopover(target) && !target.closest('[role="toolbar"]')) &&
+      (isInDataGrid || !target.closest('[role="grid"]'))
+    ) {
+      event.preventDefault()
+      const isRedo = undoRedoKey === "y" || shiftKey
+      const count = isRedo ? currentTable.redo() : currentTable.undo()
+      if (count === 0) {
+        toast.info(isRedo ? "No actions to redo" : "No actions to undo")
+      } else {
+        toast.success(`${count} action${count === 1 ? "" : "s"} ${isRedo ? "redone" : "undone"}`)
+      }
+      return
+    }
+
+    if (!isInDataGrid) return
+
+    if (key === "Escape") {
+      const hasSelections = tableRef.current?.getHasCellRangeSelection() || tableRef.current?.getHasRowSelection()
+
+      if (hasSelections) {
+        propsRef.current.onEscapeKeyDown?.(event)
+        if (event.defaultPrevented) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        tableRef.current?.clearSelection()
+      }
+    }
+  }
+
+  function onFocusIn(event: FocusEvent) {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (!dataGridRef.current?.contains(target)) return
+
+    const columnId = target.closest<HTMLElement>('[data-slot="data-grid-header-cell"]')?.dataset.columnId ?? null
+    if (tableRef.current?.getFocusedHeaderColumnId() === columnId) return
+    tableRef.current?.setFocusedHeaderColumnId(columnId)
+  }
+
+  function onOutsideClick(event: MouseEvent) {
+    if (event.button === 2) {
+      return
+    }
+
+    if (dataGridRef.current && !dataGridRef.current.contains(event.target as Node)) {
+      const elements = document.elementsFromPoint(event.clientX, event.clientY)
+
+      const isInsidePopover = elements.some((element) => getIsInPopover(element))
+
+      if (!isInsidePopover) {
+        const hasSelections = tableRef.current?.getHasCellRangeSelection() || tableRef.current?.getHasRowSelection()
+        blurCell()
+        if (hasSelections) tableRef.current?.clearSelection()
+      }
+    }
+  }
+
+  window.addEventListener("keydown", onGlobalKeyDown, true)
+  document.addEventListener("focusin", onFocusIn)
+  document.addEventListener("mousedown", onOutsideClick)
+  get.addFinalizer(() => {
+    window.removeEventListener("keydown", onGlobalKeyDown, true)
+    document.removeEventListener("focusin", onFocusIn)
+    document.removeEventListener("mousedown", onOutsideClick)
+    // When the grid leaves the screen (upstream's unmount effect): what is waiting to be written is written, and the
+    // files' object URLs are let go.
+    const currentTable = tableRef.current
+    if (!currentTable) return
+    currentTable.commitCellUpdates()
+    revokeFileObjectUrls(currentTable, drawn()?.data)
+  })
+
+  // After a draw of the grid's owner, a frame later: the cell waiting for focus, and the first cell for `autoFocus`
+  // (upstream's layout effect after every draw, and its effect on the data and columns).
+  let afterDrawFrame = 0
+  let autoFocusFrame = 0
+  let autoFocusDrawn: { readonly data: unknown; readonly columns: unknown } | null = null
+
+  function retryPendingFocus() {
+    const pending = pendingFocusRef.current
+    if (!pending) return
+
+    const focusedCell = getFocusedCell()
+    const isStale =
+      !focusedCell ||
+      focusedCell.rowId !== pending.cell.rowId ||
+      focusedCell.columnId !== pending.cell.columnId ||
+      !!tableRef.current?.getEditingCell() ||
+      !dataGridRef.current?.contains(document.activeElement)
+
+    if (
+      isStale ||
+      revealCell(pending.cell, {
+        shouldFocus: true,
+        shouldScroll: pending.shouldScroll
+      })
+    ) {
+      pendingFocusRef.current = null
+    }
+  }
+
+  function autoFocusFirstCell() {
+    const current = drawn()
+    const autoFocus = current?.props.autoFocus
+    if (!current || !autoFocus || current.data.length === 0 || current.columns.length === 0 || getFocusedCell()) return
+    if (getNavigableColumnIds().length === 0) return
+
+    cancelAnimationFrame(autoFocusFrame)
+    autoFocusFrame = requestAnimationFrame(() => {
+      const firstRowId = tableRef.current?.getRowModel().rows[0]?.id
+
+      if (typeof autoFocus === "object") {
+        const rowId = autoFocus.rowId ?? firstRowId
+        if (rowId && autoFocus.columnId) {
+          focusCell(rowId, autoFocus.columnId)
         }
         return
       }
 
-      if (!isInDataGrid) return
-
-      if (key === "Escape") {
-        const hasSelections = tableRef.current?.getHasCellRangeSelection() || tableRef.current?.getHasRowSelection()
-
-        if (hasSelections) {
-          onEscapeKeyDownRef.current?.(event)
-          if (event.defaultPrevented) return
-
-          event.preventDefault()
-          event.stopPropagation()
-          tableRef.current?.clearSelection()
-        }
+      const firstColumnId = getNavigableColumnIds()[0]
+      if (firstRowId && firstColumnId) {
+        focusCell(firstRowId, firstColumnId)
       }
+    })
+  }
+
+  function onDrawn(current: GridDrawn<TData> | null) {
+    if (!dataGridRef.current || !current) return
+    if (pendingFocusRef.current) {
+      cancelAnimationFrame(afterDrawFrame)
+      afterDrawFrame = requestAnimationFrame(retryPendingFocus)
     }
-
-    window.addEventListener("keydown", onGlobalKeyDown, true)
-    return () => {
-      window.removeEventListener("keydown", onGlobalKeyDown, true)
+    if (autoFocusDrawn === null || autoFocusDrawn.data !== current.data || autoFocusDrawn.columns !== current.columns) {
+      autoFocusDrawn = { data: current.data, columns: current.columns }
+      autoFocusFirstCell()
     }
-  }, [onEscapeKeyDownRef])
+  }
 
-  React.useEffect(() => {
-    const autoFocus = propsRef.current.autoFocus
-
-    if (autoFocus && data.length > 0 && columns.length > 0 && !getFocusedCell()) {
-      if (getNavigableColumnIds().length > 0) {
-        const rafId = requestAnimationFrame(() => {
-          const firstRowId = tableRef.current?.getRowModel().rows[0]?.id
-
-          if (typeof autoFocus === "object") {
-            const rowId = autoFocus.rowId ?? firstRowId
-            if (rowId && autoFocus.columnId) {
-              focusCell(rowId, autoFocus.columnId)
-            }
-            return
-          }
-
-          const firstColumnId = getNavigableColumnIds()[0]
-          if (firstRowId && firstColumnId) {
-            focusCell(firstRowId, firstColumnId)
-          }
-        })
-        return () => cancelAnimationFrame(rafId)
-      }
-    }
-    return undefined
-  }, [propsRef, data, columns, getFocusedCell, getNavigableColumnIds, focusCell])
-
-  React.useEffect(() => {
-    const container = dataGridRef.current
-    if (!container) return
+  // The grid's element on screen: its own listeners, and what follows the table's state (upstream's effects that
+  // depended on the element or the table).
+  function attachGrid(container: HTMLDivElement) {
+    dataGridRef.current = container
+    const table = tableRef.current
+    container.addEventListener("keydown", onDataGridKeyDown)
 
     let isPointerFocus = false
 
@@ -1143,8 +1202,10 @@ function useDataGrid<TData extends RowData>({
       const viewportTop =
         currentContainer.getBoundingClientRect().top + (headerRef.current?.getBoundingClientRect().height ?? 0)
 
+      // Local change: the drawn rows are read from the page (upstream kept a map the rows' refs filled).
       let firstRowIndex: number | null = null
-      for (const [rowIndex, rowElement] of rowMapRef.current) {
+      for (const rowElement of currentContainer.querySelectorAll<HTMLElement>('[data-slot="data-grid-row"]')) {
+        const rowIndex = Number(rowElement.dataset.index)
         if (
           rowElement.getBoundingClientRect().top >= viewportTop - 1 &&
           (firstRowIndex === null || rowIndex < firstRowIndex)
@@ -1181,45 +1242,13 @@ function useDataGrid<TData extends RowData>({
       focusCell(firstVisibleRowId, firstColumnId)
     }
 
-    container.addEventListener("pointerdown", onPointerDown)
-    container.addEventListener("pointerup", onPointerUp)
-    container.addEventListener("focus", onFocus)
-
-    return () => {
-      container.removeEventListener("pointerdown", onPointerDown)
-      container.removeEventListener("pointerup", onPointerUp)
-      container.removeEventListener("focus", onFocus)
-    }
-  }, [getNavigableColumnIds, focusCell, focusCellElement, getFocusedCell])
-
-  React.useEffect(() => {
-    function onFocusIn(event: FocusEvent) {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (!dataGridRef.current?.contains(target)) return
-
-      const columnId = target.closest<HTMLElement>('[data-slot="data-grid-header-cell"]')?.dataset.columnId ?? null
-      if (tableRef.current?.getFocusedHeaderColumnId() === columnId) return
-      tableRef.current?.setFocusedHeaderColumnId(columnId)
-    }
-
-    document.addEventListener("focusin", onFocusIn)
-    return () => {
-      document.removeEventListener("focusin", onFocusIn)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    const container = dataGridRef.current
-    if (!container) return
-
-    let rafId = 0
+    let focusOutFrame = 0
 
     function onFocusOut(event: FocusEvent) {
       if (event.relatedTarget || tableRef.current?.getEditingCell()) return
 
-      cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => {
+      cancelAnimationFrame(focusOutFrame)
+      focusOutFrame = requestAnimationFrame(() => {
         const focusedCell = getFocusedCell()
         if (!focusedCell || !document.hasFocus()) return
         if (document.activeElement && document.activeElement !== document.body) return
@@ -1228,15 +1257,33 @@ function useDataGrid<TData extends RowData>({
       })
     }
 
+    container.addEventListener("pointerdown", onPointerDown)
+    container.addEventListener("pointerup", onPointerUp)
+    container.addEventListener("focus", onFocus)
     container.addEventListener("focusout", onFocusOut)
 
-    return () => {
-      cancelAnimationFrame(rafId)
-      container.removeEventListener("focusout", onFocusOut)
-    }
-  }, [getFocusedCell, focusCellElement])
+    const unsubscribes: Array<() => void> = []
+    if (table) unsubscribes.push(followTable(table))
+    unsubscribes.push(registry.subscribe(gridDrawn(grid), (current) => onDrawn(current as GridDrawn<TData> | null)))
+    onDrawn(drawn())
 
-  React.useEffect(() => {
+    return () => {
+      container.removeEventListener("keydown", onDataGridKeyDown)
+      container.removeEventListener("pointerdown", onPointerDown)
+      container.removeEventListener("pointerup", onPointerUp)
+      container.removeEventListener("focus", onFocus)
+      container.removeEventListener("focusout", onFocusOut)
+      cancelAnimationFrame(focusOutFrame)
+      cancelAnimationFrame(afterDrawFrame)
+      cancelAnimationFrame(autoFocusFrame)
+      autoFocusDrawn = null
+      for (const unsubscribe of unsubscribes) unsubscribe()
+      if (dataGridRef.current === container) dataGridRef.current = null
+    }
+  }
+
+  /** What follows the table's own atoms while the grid is on screen; the function it returns stops it. */
+  function followTable(table: Table<DataGridFeatures, TData>) {
     let prevFocusKey: string | null = null
     let prevEdgeKey: string | null = null
 
@@ -1288,87 +1335,39 @@ function useDataGrid<TData extends RowData>({
       else dataGridRef.current?.focus()
     })
 
-    return () => {
-      subscription.unsubscribe()
-      editingSubscription.unsubscribe()
-      searchOpenSubscription.unsubscribe()
-    }
-  }, [table, revealCell, focusCellElement])
-
-  const { pasteDialog: pasteDialogAtom, cellSelection: cellSelectionAtom } = table.atoms
-
-  React.useEffect(() => {
+    const { pasteDialog: pasteDialogAtom, cellSelection: cellSelectionAtom } = table.atoms
     let prevPasteDialogOpen = pasteDialogAtom.get().open
-    let rafId = 0
+    let pasteFrame = 0
 
-    const subscription = pasteDialogAtom.subscribe(() => {
+    const pasteSubscription = pasteDialogAtom.subscribe(() => {
       const isPasteDialogOpen = pasteDialogAtom.get().open
       const wasPasteDialogOpen = prevPasteDialogOpen
       prevPasteDialogOpen = isPasteDialogOpen
       if (!wasPasteDialogOpen || isPasteDialogOpen) return
 
-      cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => {
+      cancelAnimationFrame(pasteFrame)
+      pasteFrame = requestAnimationFrame(() => {
         const focusedCell = getFocusedCellPosition(cellSelectionAtom.get())
         if (focusedCell) focusCellElement(focusedCell)
       })
     })
 
+    const stopDrag = followCellDrag(table)
+    const stopAutoScroll = followAutoScroll(table)
+
     return () => {
-      cancelAnimationFrame(rafId)
       subscription.unsubscribe()
+      editingSubscription.unsubscribe()
+      searchOpenSubscription.unsubscribe()
+      cancelAnimationFrame(pasteFrame)
+      pasteSubscription.unsubscribe()
+      stopDrag()
+      stopAutoScroll()
     }
-  }, [pasteDialogAtom, cellSelectionAtom, focusCellElement])
+  }
 
-  React.useLayoutEffect(() => {
-    const pending = pendingFocusRef.current
-    if (!pending) return
-
-    const focusedCell = getFocusedCell()
-    const isStale =
-      !focusedCell ||
-      focusedCell.rowId !== pending.cell.rowId ||
-      focusedCell.columnId !== pending.cell.columnId ||
-      !!tableRef.current?.getEditingCell() ||
-      !dataGridRef.current?.contains(document.activeElement)
-
-    if (
-      isStale ||
-      revealCell(pending.cell, {
-        shouldFocus: true,
-        shouldScroll: pending.shouldScroll
-      })
-    ) {
-      pendingFocusRef.current = null
-    }
-  })
-
-  React.useEffect(() => {
-    function onOutsideClick(event: MouseEvent) {
-      if (event.button === 2) {
-        return
-      }
-
-      if (dataGridRef.current && !dataGridRef.current.contains(event.target as Node)) {
-        const elements = document.elementsFromPoint(event.clientX, event.clientY)
-
-        const isInsidePopover = elements.some((element) => getIsInPopover(element))
-
-        if (!isInsidePopover) {
-          const hasSelections = tableRef.current?.getHasCellRangeSelection() || tableRef.current?.getHasRowSelection()
-          blurCell()
-          if (hasSelections) tableRef.current?.clearSelection()
-        }
-      }
-    }
-
-    document.addEventListener("mousedown", onOutsideClick)
-    return () => {
-      document.removeEventListener("mousedown", onOutsideClick)
-    }
-  }, [blurCell])
-
-  React.useEffect(() => {
+  /** While cells are dragged over, the page's own selection and context menu are kept out. */
+  function followCellDrag(table: Table<DataGridFeatures, TData>) {
     function onSelectStart(event: Event) {
       event.preventDefault()
     }
@@ -1397,9 +1396,10 @@ function useDataGrid<TData extends RowData>({
       onCleanup()
       subscription.unsubscribe()
     }
-  }, [table])
+  }
 
-  React.useEffect(() => {
+  /** While cells are dragged past an edge of the grid, it scrolls and the selection follows the pointer. */
+  function followAutoScroll(table: Table<DataGridFeatures, TData>) {
     let rafId: number | null = null
     let mouseX = 0
     let mouseY = 0
@@ -1446,7 +1446,7 @@ function useDataGrid<TData extends RowData>({
       }
 
       const rect = cachedRect
-      const { dir } = dragDepsRef.current
+      const dir = getDir()
       const hasNegativeScroll = container.scrollLeft < 0
       const isActuallyRtl = dir === "rtl" || hasNegativeScroll
 
@@ -1479,7 +1479,7 @@ function useDataGrid<TData extends RowData>({
         return
       }
 
-      const { rowSize: rh } = dragDepsRef.current
+      const rh = tbl.getRowSize()
       const columnIds = getColumnIds()
       if (columnIds.length === 0) {
         rafId = requestAnimationFrame(tick)
@@ -1562,7 +1562,7 @@ function useDataGrid<TData extends RowData>({
       }
 
       if (dragStartCell && (rowId !== selectionEdge?.rowId || columnId !== selectionEdge?.columnId)) {
-        dragDepsRef.current.selectRange(dragStartCell, { rowId, columnId })
+        selectRange(dragStartCell, { rowId, columnId })
         lastSelectionTime = now
       }
 
@@ -1630,42 +1630,165 @@ function useDataGrid<TData extends RowData>({
       onAutoScrollStop()
       subscription.unsubscribe()
     }
-  }, [table, dragDepsRef, getColumnIds])
+  }
 
-  const dataGridBodyProps = React.useMemo(
-    () => ({
-      ...dataGridBodyEventHandlers,
-      style: {
-        contain: adjustLayout ? "layout paint" : "strict"
-      } satisfies React.CSSProperties
-    }),
-    [dataGridBodyEventHandlers, adjustLayout]
+  return {
+    dataGridRef,
+    headerRef,
+    footerRef,
+    attachGrid,
+    bodyHandlers,
+    revealCell,
+    focusCellElement,
+    onDataChange,
+    onRowSelectionChange,
+    onColumnVisibilityChange,
+    onClipboardNotice: (notice) => (propsRef.current.onClipboardNotice ?? toastClipboardNotice)(notice),
+    onRowAdd,
+    kept: {
+      props: { key: undefined, value: undefined },
+      options: emptyKept(),
+      sizes: emptyKept()
+    }
+  }
+}
+
+const defaultColumn: Partial<ColumnDef<DataGridFeatures, any>> = {
+  minSize: MIN_COLUMN_SIZE,
+  maxSize: MAX_COLUMN_SIZE,
+  cell: renderDefaultCell
+}
+
+// Firefox needs its own layout for pinned columns; the page has a browser, never a server render.
+const isFirefox = typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox")
+
+// The columns with the utility columns' defaults, kept by the columns they were made from.
+const tableColumnsKept = new WeakMap<object, ColumnDef<DataGridFeatures, any>[]>()
+
+function getTableColumns<TData extends RowData>(
+  columns: readonly ColumnDef<DataGridFeatures, TData>[]
+): ColumnDef<DataGridFeatures, TData>[] {
+  const known = tableColumnsKept.get(columns)
+  if (known !== undefined) return known as ColumnDef<DataGridFeatures, TData>[]
+  const made = columns.map((column) =>
+    column.id && UTILITY_COLUMN_IDS.has(column.id)
+      ? {
+          ...column,
+          enableCellSelection: column.enableCellSelection ?? false,
+          enableOrdering: column.enableOrdering ?? false
+        }
+      : column
+  )
+  tableColumnsKept.set(columns, made)
+  return made
+}
+
+function useDataGrid<TData extends RowData>({
+  data: dataProp,
+  columns,
+  overscan = OVERSCAN,
+  dir: dirProp,
+  ...props
+}: UseDataGridProps<TData>) {
+  const grid = useId()
+  const registry = useAtomValue(atomRegistry)
+  const controller = useAtomValue(gridController(grid)) as GridController<TData>
+  const pendingEdit = useAtomValue(pendingEdits(grid))
+  const data = pendingEdit !== null && pendingEdit.from === dataProp ? (pendingEdit.to as TData[]) : dataProp
+  const contextDir = useDirection()
+  const dir = dirProp ?? contextDir
+  // What the handlers read of this draw: written in the draw, as `useTable` below writes the table's options.
+  registry.set(gridDrawn(grid), { props, data: dataProp, columns, dir })
+  const stableProps = getStableProps(
+    controller.kept.props,
+    props,
+    () => (registry.get(gridDrawn(grid)) as GridDrawn<TData> | null)?.props ?? {}
   )
 
-  return React.useMemo(
-    () => ({
-      table,
-      dataGridRef,
-      headerRef,
-      footerRef,
-      rowMapRef,
-      rowVirtualizerRef,
-      columnVirtualizerRef,
-      rowVirtualizerOptions,
-      dataGridBodyProps,
-      columnSizeVars,
-      dir,
-      adjustLayout,
-      onRowAdd: hasRowAdd ? onRowAdd : undefined
-    }),
-    [table, rowVirtualizerOptions, dataGridBodyProps, columnSizeVars, dir, adjustLayout, hasRowAdd, onRowAdd]
+  const tableColumns = getTableColumns(columns)
+
+  const enableCellEditing = !props.readOnly && props.enableCellEditing !== false
+  const hasRowAdd = !!props.createRow
+
+  const tableOptions = kept(
+    controller.kept.options,
+    [stableProps, data, tableColumns, enableCellEditing, dir],
+    (): TableOptions<DataGridFeatures, TData> => ({
+      ...stableProps,
+      onCellScroll: (cell) => controller.revealCell(cell, { shouldFocus: false, shouldScroll: true }),
+      onCellFocus: (cell) => controller.focusCellElement(cell),
+      onClipboardNotice: controller.onClipboardNotice,
+      features: dataGridFeatures,
+      data,
+      onDataChange: controller.onDataChange,
+      columns: tableColumns,
+      defaultColumn,
+      autoResetCellSelection: false,
+      enableCellEditing,
+      onRowSelectionChange: controller.onRowSelectionChange,
+      onColumnVisibilityChange: controller.onColumnVisibilityChange,
+      columnResizeMode: "onChange",
+      columnResizeDirection: dir,
+      dir
+    })
   )
+
+  const table = useTable(tableOptions, selectTableState)
+
+  if (registry.get(gridTableOf(grid)) === null) {
+    registry.set(gridTableOf(grid), table)
+  }
+
+  const columnSizeVars = kept(
+    controller.kept.sizes,
+    [tableColumns, table.state.columnResizing, table.state.columnSizing],
+    () => {
+      const headers = table.getFlatHeaders()
+      const colSizes: { [key: string]: number } = {}
+      for (const header of headers) {
+        colSizes[`--header-${header.id}-size`] = header.getSize()
+        colSizes[`--col-${header.column.id}-size`] = header.column.getSize()
+      }
+      return colSizes
+    }
+  )
+
+  const columnPinning = table.state.columnPinning
+  const adjustLayout = isFirefox && ((columnPinning.start?.length ?? 0) > 0 || (columnPinning.end?.length ?? 0) > 0)
+
+  const dataGridBodyProps = {
+    ...controller.bodyHandlers,
+    style: {
+      contain: adjustLayout ? "layout paint" : "strict"
+    } satisfies CSSProperties
+  }
+
+  return {
+    table,
+    gridId: grid,
+    dataGridRef: controller.dataGridRef,
+    headerRef: controller.headerRef,
+    rowVirtualizerOptions: { overscan },
+    dataGridBodyProps,
+    columnSizeVars,
+    dir,
+    adjustLayout,
+    onRowAdd: hasRowAdd ? controller.onRowAdd : undefined
+  }
 }
 
 let nextObjectId = 0
 const objectIds = new WeakMap<object, number>()
 
-function useStableProps<TProps extends object>(props: TProps, propsRef: React.RefObject<TProps>): TProps {
+/**
+ * The props with each function in a wrapper that calls the prop of the last draw, made again only when a prop that is
+ * not a function changes (upstream's `useStableProps`, its memo held by the grid's controller).
+ */
+function getStableProps<TProps extends object>(
+  slot: { key: string | undefined; value: object | undefined },
+  props: TProps,
+  latest: () => object
+): TProps {
   let propsKey = ""
   for (const [name, value] of Object.entries(props)) {
     let valueKey = `${typeof value}${String(value)}`
@@ -1682,18 +1805,19 @@ function useStableProps<TProps extends object>(props: TProps, propsRef: React.Re
     propsKey += `${name}:${valueKey}\u0000`
   }
 
-  return React.useMemo(() => {
-    const stableProps = { ...props }
-    for (const [key, value] of Object.entries(props)) {
-      if (typeof value !== "function") continue
-      Reflect.set(stableProps, key, (...args: unknown[]) => {
-        const callback: unknown = Reflect.get(propsRef.current, key)
-        if (typeof callback === "function") return callback(...args)
-      })
-    }
-    return stableProps
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- callbacks read `propsRef`, so only non-function prop changes rebuild
-  }, [propsKey])
+  if (slot.key === propsKey && slot.value !== undefined) return slot.value as TProps
+
+  const stableProps = { ...props }
+  for (const [key, value] of Object.entries(props)) {
+    if (typeof value !== "function") continue
+    Reflect.set(stableProps, key, (...args: unknown[]) => {
+      const callback: unknown = Reflect.get(latest(), key)
+      if (typeof callback === "function") return callback(...args)
+    })
+  }
+  slot.key = propsKey
+  slot.value = stableProps
+  return stableProps
 }
 
 function selectTableState(state: TableState<DataGridFeatures>) {

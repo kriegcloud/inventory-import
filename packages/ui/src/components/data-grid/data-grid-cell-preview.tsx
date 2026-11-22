@@ -1,7 +1,8 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
 import type { Cell, ColumnPinningPosition, RowData } from "@tanstack/react-table"
 
 import { cn } from "cn"
-import * as React from "react"
+import type { ReactNode } from "react"
 
 import * as Match from "effect/Match"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
@@ -115,7 +116,7 @@ export function DataGridCellPreview<TData extends RowData>({
 
 type CellPreview = {
   className?: string
-  content: React.ReactNode
+  content: ReactNode
 }
 
 function getPreviewContent<TData extends RowData>({

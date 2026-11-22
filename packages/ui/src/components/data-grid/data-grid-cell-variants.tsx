@@ -1,10 +1,32 @@
 "use client"
-
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// What an editor keeps while it is open (a draft, the value it opened with, whether Escape was pressed, a file drag)
+// is an atom of the cell on screen, made for its `useId`, where upstream had state and refs; its handlers are plain
+// functions of the draw. What upstream did in effects when editing began or ended is done by ref callbacks that stay
+// the same: a number's input focuses itself when it is put on the page, and the text cell's element is given one of
+// two callbacks, one for editing and one for showing, so React calls the right one exactly when editing begins or ends.
+// What such a callback needs from the draw is on the element (`data-typed-over`, the key that opened the editor is to
+// replace the value; `data-cell-text`, the value shown). The rule this file protects: the key that opens an editor is
+// typed into it, and what is stored is what was typed (`bun run grid:keys`).
 import type { RowData } from "@tanstack/react-table"
 import type { ExternalToast } from "sonner"
 
+import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react"
 import { cn } from "cn"
-import * as React from "react"
+import * as Atom from "effect/reactivity/Atom"
+import {
+  type ChangeEvent,
+  type ComponentProps,
+  type FocusEvent,
+  type DragEvent as ReactDragEvent,
+  type InputEvent as ReactInputEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type RefCallback,
+  type RefObject,
+  useId,
+  useRef
+} from "react"
 import { toast } from "sonner"
 
 import type {
@@ -15,7 +37,10 @@ import type {
   StopEditingOptions
 } from "@inventory/ui/components/data-grid/data-grid-types"
 
-import { useBadgeOverflow } from "@inventory/ui/components/data-grid/use-badge-overflow"
+import { getBadgeOverflow } from "@inventory/ui/components/data-grid/use-badge-overflow"
+import { atomRegistry, oneTimer } from "@inventory/ui/components/data-table/data-table-state"
+// The kit's own debounce, on atoms since batch 1 (`oneTimer`): the rule keeps it out of our code, and this is the kit.
+// oxlint-disable-next-line no-restricted-imports
 import { useDebouncedCallback } from "@inventory/ui/hooks/use-debounced-callback"
 import {
   createFileObjectUrl,
@@ -48,7 +73,7 @@ import {
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 // Local change: `Result`, for the same.
 import * as Result from "effect/Result"
-import { DataGridCell, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"
+import { DataGridCell, setRef, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { Badge } from "@inventory/ui/components/badge"
 import { Button } from "@inventory/ui/components/button"
 import { Calendar } from "@inventory/ui/components/calendar"
@@ -83,28 +108,27 @@ export function ShortTextCell<TData extends RowData>(props: DataGridCellProps<TD
   )
 }
 
+/** What one long-text cell on screen keeps while its editor is open: the value it opened with, and whether Escape was pressed. */
+const longTextEdit = Atom.family((_instance: string) =>
+  Atom.make<{ readonly startValue: string | null; readonly isCanceling: boolean }>({
+    startValue: null,
+    isCanceling: false
+  })
+)
+
 export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TData>) {
   const { cell, rowHeight, isEditing, readOnly } = props
+  const instance = useId()
+  const registry = useAtomValue(atomRegistry)
+  useAtomMount<unknown>(isEditing ? longTextEdit(instance) : nothingKept)
   const initialValue = getTextCellValue(useCellValue(cell))
   const { value, setDraftValue, clearDraft } = useCellDraft({
     key: initialValue,
     fallback: initialValue,
     enabled: isEditing
   })
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
-  const containerRef = React.useRef<HTMLDivElement>(null)
-
-  const editStartValueRef = React.useRef(initialValue)
-  const isCancelingRef = React.useRef(false)
-  const wasEditingRef = React.useRef(false)
-
-  React.useEffect(() => {
-    if (isEditing && !wasEditingRef.current) {
-      editStartValueRef.current = initialValue
-      isCancelingRef.current = false
-    }
-    wasEditingRef.current = isEditing
-  }, [isEditing, initialValue])
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const debouncedSave = useDebouncedCallback((newValue: string) => {
     if (!readOnly) {
@@ -112,45 +136,43 @@ export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TDa
     }
   }, 300)
 
-  const onSave = React.useCallback(
-    (options?: StopEditingOptions) => {
-      debouncedSave.cancel()
-      if (isCancelingRef.current) {
-        cell.table.stopEditing(options)
-        return
-      }
-      if (!readOnly && value !== initialValue) {
-        cell.setValue(value)
-      }
-      clearDraft()
-      cell.table.stopEditing(options)
-    },
-    [cell, value, initialValue, readOnly, debouncedSave, clearDraft]
-  )
-
-  const onCancel = React.useCallback(() => {
+  function onSave(options?: StopEditingOptions) {
     debouncedSave.cancel()
-    isCancelingRef.current = true
+    if (registry.get(longTextEdit(instance)).isCanceling) {
+      cell.table.stopEditing(options)
+      return
+    }
+    if (!readOnly && value !== initialValue) {
+      cell.setValue(value)
+    }
     clearDraft()
-    const editStartValue = editStartValueRef.current
+    cell.table.stopEditing(options)
+  }
+
+  function onCancel() {
+    debouncedSave.cancel()
+    const { startValue } = registry.get(longTextEdit(instance))
+    registry.set(longTextEdit(instance), { startValue, isCanceling: true })
+    clearDraft()
+    // The value the editor opened with (upstream's first value when it never opened).
+    const editStartValue = startValue ?? initialValue
     if (!readOnly && getTextCellValue(cell.getValue()) !== editStartValue) {
       cell.setValue(editStartValue)
     }
     cell.table.stopEditing()
-  }, [cell, readOnly, debouncedSave, clearDraft])
+  }
 
-  const onOpenChange = React.useCallback(
-    (open: boolean) => {
-      if (open && !readOnly) {
-        cell.startEditing()
-      } else {
-        onSave()
-      }
-    },
-    [cell, readOnly, onSave]
-  )
+  function onOpenChange(open: boolean) {
+    if (open && !readOnly) {
+      cell.startEditing()
+    } else {
+      onSave()
+    }
+  }
 
-  const onOpenFocus = React.useCallback(() => {
+  function onOpenFocus() {
+    // The editor has just opened: what it opened with is kept for Escape (upstream's effect on `isEditing`).
+    registry.set(longTextEdit(instance), { startValue: initialValue, isCanceling: false })
     const textarea = textareaRef.current
     if (!textarea) return
 
@@ -161,18 +183,17 @@ export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TDa
     // Local change: the browser types the key that opened the editor, after the text (see `typesInPlace` in
     // data-grid-cell.tsx). Upstream typed it here on the next frame, and lost it when a second key came first.
     textarea.scrollTop = textarea.scrollHeight
-  }, [cell])
+  }
 
-  const onBlur = React.useCallback(() => onSave(), [onSave])
+  function onBlur() {
+    onSave()
+  }
 
-  const onChange = React.useCallback(
-    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newValue = event.target.value
-      setDraftValue(newValue)
-      debouncedSave(newValue)
-    },
-    [debouncedSave, setDraftValue]
-  )
+  function onChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    const newValue = event.target.value
+    setDraftValue(newValue)
+    debouncedSave(newValue)
+  }
 
   return (
     <DataGridCell<TData> {...props} ref={containerRef} onCommit={onSave} onCancel={onCancel}>
@@ -205,17 +226,42 @@ export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TDa
   )
 }
 
+/** Whether Escape was pressed in one number cell's editor, read by the blur that follows it. */
+const numberCanceling = Atom.family((_instance: string) => Atom.make(false))
+
+const numberInputRefs = new WeakMap<object, RefCallback<HTMLInputElement>>()
+
+/**
+ * The number editor's ref callback for its input ref, the same function while that ref is: the input is put on the page
+ * when editing begins, so it takes the focus then, with its value selected when a typed key is to replace it.
+ */
+function getNumberInputRef(inputRef: RefObject<HTMLInputElement | null>) {
+  const known = numberInputRefs.get(inputRef)
+  if (known !== undefined) return known
+  const ref: RefCallback<HTMLInputElement> = (input) => {
+    if (!input) return
+    const undo = setRef(inputRef, input)
+    input.focus()
+    // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
+    if (input.hasAttribute("data-typed-over")) input.select()
+    return undo
+  }
+  numberInputRefs.set(inputRef, ref)
+  return ref
+}
+
 export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData>) {
   const { cell, isEditing, readOnly } = props
+  const instance = useId()
+  const registry = useAtomValue(atomRegistry)
+  useAtomMount<unknown>(isEditing ? numberCanceling(instance) : nothingKept)
   const initialValue = getNumberCellValue(useCellValue(cell))
   const { value, setDraftValue, clearDraft } = useCellDraft({
     key: initialValue,
     fallback: String(initialValue ?? ""),
     enabled: isEditing
   })
-  const inputRef = React.useRef<HTMLInputElement>(null)
-  const isCancelingRef = React.useRef(false)
-  const prevIsEditingRef = React.useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const numberMeta = getColumnVariantOptions(cell.column, "number")
   const min = numberMeta?.min
@@ -230,54 +276,39 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
         : "decimal"
       : undefined
 
-  const onSave = React.useCallback(
-    (options?: StopEditingOptions) => {
-      const numValue = value === "" ? null : Number(value)
-      if (!readOnly && numValue !== initialValue) {
-        cell.setValue(numValue)
-      }
-      clearDraft()
-      cell.table.stopEditing(options)
-    },
-    [cell, initialValue, value, readOnly, clearDraft]
-  )
+  function onSave(options?: StopEditingOptions) {
+    const numValue = value === "" ? null : Number(value)
+    if (!readOnly && numValue !== initialValue) {
+      cell.setValue(numValue)
+    }
+    clearDraft()
+    cell.table.stopEditing(options)
+  }
 
-  const onBlur = React.useCallback(() => {
+  function onBlur() {
     // Escape blurs too, and the typed value hasn't been cleared by then.
-    if (isCancelingRef.current) {
-      isCancelingRef.current = false
+    if (registry.get(numberCanceling(instance))) {
+      registry.set(numberCanceling(instance), false)
       cell.table.stopEditing()
       return
     }
     onSave()
-  }, [cell, onSave])
+  }
 
-  const onChange = React.useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setDraftValue(event.target.value)
-    },
-    [setDraftValue]
-  )
+  function onFocus() {
+    // The editor has just opened and taken the focus (upstream reset this when editing began).
+    registry.set(numberCanceling(instance), false)
+  }
 
-  const onCancel = React.useCallback(() => {
+  function onChange(event: ChangeEvent<HTMLInputElement>) {
+    setDraftValue(event.target.value)
+  }
+
+  function onCancel() {
     clearDraft()
-    isCancelingRef.current = true
+    registry.set(numberCanceling(instance), true)
     inputRef.current?.blur()
-  }, [clearDraft])
-
-  React.useEffect(() => {
-    const wasEditing = prevIsEditingRef.current
-    prevIsEditingRef.current = isEditing
-
-    if (isEditing && !wasEditing && inputRef.current) {
-      isCancelingRef.current = false
-      inputRef.current.focus()
-
-      // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
-      if (getPendingChar(cell)) inputRef.current.select()
-    }
-    // Local change: upstream's list also held `setDraftValue`, which its fallback called.
-  }, [cell, isEditing])
+  }
 
   return (
     <DataGridCell<TData> {...props} className="text-end" onCommit={onSave} onCancel={onCancel} commitOnEnter>
@@ -286,7 +317,9 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
           aria-label={getColumnLabel(cell.column)}
           type="number"
           inputMode={inputMode}
-          ref={inputRef}
+          ref={getNumberInputRef(inputRef)}
+          data-typed-over={getPendingChar(cell) ? "" : undefined}
+          onFocus={onFocus}
           min={min}
           max={max}
           step={step}
@@ -311,40 +344,34 @@ export function UrlCell<TData extends RowData>(props: DataGridCellProps<TData>) 
     parse: parseUrlText
   })
 
-  const onWrapperKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!isEditing && isFocused && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault()
-        if (!value) return
-        const href = getUrlHref(value)
-        if (href) {
-          window.open(href, "_blank", "noopener,noreferrer")
-        } else {
-          toastDangerousUrl()
-        }
-      }
-    },
-    [isEditing, isFocused, value]
-  )
-
-  const onLinkClick = React.useCallback(
-    (event: React.MouseEvent<HTMLAnchorElement>) => {
-      if (isEditing) {
-        event.preventDefault()
-        return
-      }
-
+  function onWrapperKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!isEditing && isFocused && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault()
+      if (!value) return
       const href = getUrlHref(value)
-      if (!href) {
-        event.preventDefault()
+      if (href) {
+        window.open(href, "_blank", "noopener,noreferrer")
+      } else {
         toastDangerousUrl()
-        return
       }
+    }
+  }
 
-      event.stopPropagation()
-    },
-    [isEditing, value]
-  )
+  function onLinkClick(event: ReactMouseEvent<HTMLAnchorElement>) {
+    if (isEditing) {
+      event.preventDefault()
+      return
+    }
+
+    const href = getUrlHref(value)
+    if (!href) {
+      event.preventDefault()
+      toastDangerousUrl()
+      return
+    }
+
+    event.stopPropagation()
+  }
 
   const displayValue = isEditing ? "" : value
   const urlHref = displayValue ? getUrlHref(displayValue) : ""
@@ -378,55 +405,43 @@ export function BooleanCell<TData extends RowData>(props: Omit<DataGridCellProps
   const { cell, isFocused, readOnly } = props
   const value = getBooleanCellValue(useCellValue(cell))
   const control = getColumnVariantOptions(cell.column, "boolean")?.control ?? "checkbox"
-  const containerRef = React.useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const onCheckedChange = React.useCallback(
-    (checked: boolean) => {
-      if (readOnly) return
-      cell.setValue(checked)
-    },
-    [cell, readOnly]
-  )
+  function onCheckedChange(checked: boolean) {
+    if (readOnly) return
+    cell.setValue(checked)
+  }
 
-  const onWrapperKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (isFocused && !readOnly && (event.key === " " || event.key === "Enter")) {
-        event.preventDefault()
-        event.stopPropagation()
-        onCheckedChange(!value)
-      }
-    },
-    [isFocused, value, onCheckedChange, readOnly]
-  )
-
-  const onWrapperClick = React.useCallback(
-    (event: React.MouseEvent) => {
-      if (isFocused && !readOnly) {
-        event.preventDefault()
-        event.stopPropagation()
-        onCheckedChange(!value)
-      }
-    },
-    [isFocused, value, onCheckedChange, readOnly]
-  )
-
-  const onControlClick = React.useCallback((event: React.MouseEvent) => {
-    event.stopPropagation()
-  }, [])
-
-  const onControlMouseDown = React.useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
+  function onWrapperKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (isFocused && !readOnly && (event.key === " " || event.key === "Enter")) {
       event.preventDefault()
-      cell.table.setFocusedCell(cell.row.id, cell.column.id)
-      containerRef.current?.focus()
-    },
-    [cell]
-  )
+      event.stopPropagation()
+      onCheckedChange(!value)
+    }
+  }
 
-  const onControlDoubleClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+  function onWrapperClick(event: ReactMouseEvent) {
+    if (isFocused && !readOnly) {
+      event.preventDefault()
+      event.stopPropagation()
+      onCheckedChange(!value)
+    }
+  }
+
+  function onControlClick(event: ReactMouseEvent) {
     event.stopPropagation()
-  }, [])
+  }
+
+  function onControlMouseDown(event: ReactMouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    event.preventDefault()
+    cell.table.setFocusedCell(cell.row.id, cell.column.id)
+    containerRef.current?.focus()
+  }
+
+  function onControlDoubleClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+  }
 
   return (
     <DataGridCell<TData>
@@ -467,26 +482,45 @@ export function BooleanCell<TData extends RowData>(props: Omit<DataGridCellProps
 }
 
 const NO_OPTIONS: ColumnSelectOption[] = []
+const NO_VALUES: never[] = []
+
+// A cell's list worked out from its value, kept while the value is the same array: a draft compares its key with it.
+const cellValuesKept = new WeakMap<object, unknown[]>()
+
+/** `read(value)`, the same array as last time for the same array value, and one empty array for any other value. */
+function getKeptCellValue<T>(value: unknown, read: (value: unknown) => T[]): T[] {
+  if (!Array.isArray(value)) return NO_VALUES
+  const known = cellValuesKept.get(value)
+  if (known !== undefined) return known as T[]
+  const made = read(value)
+  cellValuesKept.set(value, made)
+  return made
+}
+
+/** The files one file cell on screen is deleting. */
+const fileCellDeleting = Atom.family((_instance: string) =>
+  Atom.make<{ readonly ids: ReadonlySet<string> }>({ ids: new Set<string>() })
+)
+
+/** Whether files are dragged over one drop target on screen. */
+const fileDragActive = Atom.family((_instance: string) => Atom.make(false))
 
 export function SelectCell<TData extends RowData>(props: DataGridCellProps<TData>) {
   const { cell, rowHeight, isEditing, readOnly } = props
   const value = getOptionCellValue(useCellValue(cell))
-  const containerRef = React.useRef<HTMLDivElement>(null)
-  const commandRef = React.useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const commandRef = useRef<HTMLDivElement>(null)
   const options = getColumnVariantOptions(cell.column, "select")?.options ?? NO_OPTIONS
 
-  const onValueChange = React.useCallback(
-    (newValue: string) => {
-      if (readOnly) return
-      cell.setValue(newValue)
-      cell.table.stopEditing()
-    },
-    [cell, readOnly]
-  )
+  function onValueChange(newValue: string) {
+    if (readOnly) return
+    cell.setValue(newValue)
+    cell.table.stopEditing()
+  }
 
-  const onOpenFocus = React.useCallback(() => {
+  function onOpenFocus() {
     commandRef.current?.focus()
-  }, [])
+  }
 
   const displayLabel = value ? getOptionLabel(options, value) : null
 
@@ -544,7 +578,7 @@ export function MultiSelectCell<TData extends RowData>(props: DataGridCellProps<
   const rowId = cell.row.id
   const columnId = cell.column.id
   const rawValue = useCellValue(cell)
-  const cellValue = React.useMemo(() => getOptionsCellValue(rawValue), [rawValue])
+  const cellValue = getKeptCellValue(rawValue, getOptionsCellValue)
 
   const cellKey = getCellKey(rowId, columnId)
 
@@ -558,100 +592,82 @@ export function MultiSelectCell<TData extends RowData>(props: DataGridCellProps<
     setDraftValue: onSearchValueChange,
     clearDraft: clearSearch
   } = useCellDraft({ key: cellKey, fallback: "" })
-  const containerRef = React.useRef<HTMLDivElement>(null)
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const options = getColumnVariantOptions(cell.column, "multi-select")?.options ?? NO_OPTIONS
 
-  const commitValues = React.useCallback(
-    (newValues: string[]) => {
-      setDraftValues(newValues)
-      queueMicrotask(() => {
-        cell.setValue(newValues)
-        clearDraft()
-        inputRef.current?.focus()
-      })
-    },
-    [cell, setDraftValues, clearDraft]
-  )
+  function commitValues(newValues: string[]) {
+    setDraftValues(newValues)
+    queueMicrotask(() => {
+      cell.setValue(newValues)
+      clearDraft()
+      inputRef.current?.focus()
+    })
+  }
 
-  const onValueChange = React.useCallback(
-    (value: string) => {
-      if (readOnly) return
-      commitValues(
-        selectedValues.includes(value) ? selectedValues.filter((v) => v !== value) : [...selectedValues, value]
-      )
-      clearSearch()
-    },
-    [readOnly, commitValues, selectedValues, clearSearch]
-  )
+  function onValueChange(value: string) {
+    if (readOnly) return
+    commitValues(
+      selectedValues.includes(value) ? selectedValues.filter((v) => v !== value) : [...selectedValues, value]
+    )
+    clearSearch()
+  }
 
-  const removeValue = React.useCallback(
-    (valueToRemove: string, event?: React.MouseEvent) => {
-      if (readOnly) return
-      event?.stopPropagation()
-      event?.preventDefault()
-      commitValues(selectedValues.filter((v) => v !== valueToRemove))
-    },
-    [readOnly, commitValues, selectedValues]
-  )
+  function removeValue(valueToRemove: string, event?: ReactMouseEvent) {
+    if (readOnly) return
+    event?.stopPropagation()
+    event?.preventDefault()
+    commitValues(selectedValues.filter((v) => v !== valueToRemove))
+  }
 
-  const clearAll = React.useCallback(() => {
+  function clearAll() {
     if (readOnly) return
     clearDraft()
     cell.setValue([])
     queueMicrotask(() => inputRef.current?.focus())
-  }, [cell, readOnly, clearDraft])
+  }
 
-  const onOpenChange = React.useCallback(
-    (open: boolean) => {
-      if (!open) clearSearch()
-      setCellEditing(cell, open, readOnly)
-    },
-    [cell, readOnly, clearSearch]
-  )
+  function onOpenChange(open: boolean) {
+    if (!open) clearSearch()
+    setCellEditing(cell, open, readOnly)
+  }
 
-  const onOpenFocus = React.useCallback(() => {
+  function onOpenFocus() {
     inputRef.current?.focus()
-  }, [])
+  }
 
-  const onCommit = React.useCallback(
-    (options?: StopEditingOptions) => {
-      clearSearch()
-      cell.table.stopEditing(options)
-    },
-    [cell, clearSearch]
-  )
+  function onCommit(options?: StopEditingOptions) {
+    clearSearch()
+    cell.table.stopEditing(options)
+  }
 
-  const onCancel = React.useCallback(() => {
+  function onCancel() {
     clearDraft()
     clearSearch()
     cell.table.stopEditing()
-  }, [cell, clearDraft, clearSearch])
+  }
 
-  const onInputKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Backspace" && searchValue === "") {
-        event.preventDefault()
-        if (selectedValues.length > 0) {
-          commitValues(selectedValues.slice(0, -1))
-        } else {
-          queueMicrotask(() => inputRef.current?.focus())
-        }
+  function onInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace" && searchValue === "") {
+      event.preventDefault()
+      if (selectedValues.length > 0) {
+        commitValues(selectedValues.slice(0, -1))
+      } else {
+        queueMicrotask(() => inputRef.current?.focus())
       }
-      if (event.key === "Escape") {
-        event.stopPropagation()
-      }
-    },
-    [searchValue, selectedValues, commitValues]
-  )
+    }
+    if (event.key === "Escape") {
+      event.stopPropagation()
+    }
+  }
 
   const displayLabels = selectedValues.map((value) => getOptionLabel(options, value)).filter(Boolean)
 
-  const selectedValuesSet = React.useMemo(() => new Set(selectedValues), [selectedValues])
+  const selectedValuesSet = new Set(selectedValues)
 
   const lineCount = getLineCount(rowHeight)
 
-  const { visibleItems: visibleLabels, hiddenCount: hiddenBadgeCount } = useBadgeOverflow({
+  const { visibleItems: visibleLabels, hiddenCount: hiddenBadgeCount } = getBadgeOverflow({
     items: displayLabels,
     getLabel: (label) => label,
     containerWidth: width,
@@ -763,20 +779,17 @@ export function MultiSelectCell<TData extends RowData>(props: DataGridCellProps<
 export function DateCell<TData extends RowData>(props: DataGridCellProps<TData>) {
   const { cell, rowHeight, isEditing, readOnly } = props
   const value = getDateCellValue(useCellValue(cell))
-  const containerRef = React.useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const isInvalidDate = value !== "" && !parseLocalDate(value)
 
   const selectedDate = value ? (parseLocalDate(value) ?? undefined) : undefined
 
-  const onDateSelect = React.useCallback(
-    (date: Date | undefined) => {
-      if (!date || readOnly) return
+  function onDateSelect(date: Date | undefined) {
+    if (!date || readOnly) return
 
-      cell.setValue(formatDateToString(date))
-      cell.table.stopEditing()
-    },
-    [cell, readOnly]
-  )
+    cell.setValue(formatDateToString(date))
+    cell.table.stopEditing()
+  }
 
   return (
     <DataGridCell<TData> {...props} ref={containerRef} onMouseDown={isEditing ? onEditingCellMouseDown : undefined}>
@@ -812,14 +825,14 @@ export function DateCell<TData extends RowData>(props: DataGridCellProps<TData>)
 export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>) {
   const { cell, width, rowHeight, isEditing, readOnly } = props
 
-  const labelId = React.useId()
-  const descriptionId = React.useId()
+  const labelId = useId()
+  const descriptionId = useId()
 
   const rowId = cell.row.id
   const columnId = cell.column.id
   const cellKey = getCellKey(rowId, columnId)
   const rawValue = useCellValue(cell)
-  const cellValue = React.useMemo(() => getFilesCellValue(rawValue), [rawValue])
+  const cellValue = getKeptCellValue(rawValue, getFilesCellValue)
 
   const fileMeta = getColumnVariantOptions(cell.column, "file")
   const maxFileSize = fileMeta?.maxFileSize ?? 10 * 1024 * 1024
@@ -832,246 +845,210 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
     setDraftValue: setUploadingFiles,
     clearDraft: clearUploadingFiles
   } = useCellDraft<FileCellData[] | null>({ key: cellKey, fallback: null })
-  const [deletingIds, setDeletingIds] = React.useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useAtom(fileCellDeleting(useId()))
+  const deletingIds = deleting.ids
+  const setDeletingIds = (ids: ReadonlySet<string>) => setDeleting({ ids })
   const {
     value: error,
     setDraftValue: setError,
     clearDraft: clearError
   } = useCellDraft<string | null>({ key: cellValue, fallback: null })
-  const errorTimeoutRef = React.useRef<number | undefined>(undefined)
+  // The error's two seconds on screen, cleared when the cell leaves (upstream's timeout ref and unmount effect).
+  const errorTimer = useAtomValue(oneTimer(useId()))
 
-  const files = React.useMemo(
-    () => (uploadingFiles ? [...cellValue, ...uploadingFiles] : cellValue),
-    [cellValue, uploadingFiles]
-  )
-  const uploadingIds = React.useMemo(() => new Set(uploadingFiles?.map((file) => file.id)), [uploadingFiles])
+  const files = uploadingFiles ? [...cellValue, ...uploadingFiles] : cellValue
+  const uploadingIds = new Set(uploadingFiles?.map((file) => file.id))
   const isPending = uploadingFiles !== null || deletingIds.size > 0
 
-  const acceptedTypes = React.useMemo(() => (accept ? accept.split(",").map((t) => t.trim()) : null), [accept])
+  const acceptedTypes = accept ? accept.split(",").map((t) => t.trim()) : null
 
-  React.useEffect(() => () => window.clearTimeout(errorTimeoutRef.current), [])
+  function flashError(message: string, toastOptions?: ExternalToast) {
+    setError(message)
+    toast(message, toastOptions)
+    errorTimer.start(clearError, 2000)
+  }
 
-  const flashError = React.useCallback(
-    (message: string, toastOptions?: ExternalToast) => {
-      setError(message)
-      toast(message, toastOptions)
-      window.clearTimeout(errorTimeoutRef.current)
-      errorTimeoutRef.current = window.setTimeout(clearError, 2000)
-    },
-    [setError, clearError]
-  )
+  async function addFiles(newFiles: File[]) {
+    if (readOnly || isPending || newFiles.length === 0) return
+    clearError()
 
-  const addFiles = React.useCallback(
-    async (newFiles: File[]) => {
-      if (readOnly || isPending || newFiles.length === 0) return
-      clearError()
+    if (maxFiles && cellValue.length + newFiles.length > maxFiles) {
+      flashError(`Maximum ${maxFiles} files allowed`)
+      return
+    }
 
-      if (maxFiles && cellValue.length + newFiles.length > maxFiles) {
-        flashError(`Maximum ${maxFiles} files allowed`)
+    const accepted: { file: File; data: FileCellData }[] = []
+    const rejected: { name: string; reason: string }[] = []
+
+    for (const file of newFiles) {
+      const reason = validateFile(file, maxFileSize, acceptedTypes)
+      if (reason) {
+        rejected.push({ name: file.name, reason })
+        continue
+      }
+      accepted.push({
+        file,
+        data: {
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: undefined
+        }
+      })
+    }
+
+    const firstRejected = rejected[0]
+    if (firstRejected) {
+      const truncatedName =
+        firstRejected.name.length > 20 ? `${firstRejected.name.slice(0, 20)}...` : firstRejected.name
+
+      flashError(firstRejected.reason, {
+        description:
+          rejected.length === 1
+            ? `"${truncatedName}" has been rejected`
+            : `"${truncatedName}" and ${rejected.length - 1} more rejected`
+      })
+    }
+
+    if (accepted.length === 0) return
+
+    setUploadingFiles(accepted.map(({ data }) => data))
+
+    let uploadedFiles: FileCellData[]
+
+    const options = cell.table.options
+    const uploadFiles = options.uploadFiles
+    if (uploadFiles) {
+      // Local change: `settle` where upstream has a `try` statement; a refused upload says why, as upstream's did.
+      // Called on the options, as upstream called it.
+      const uploaded = await settle(
+        () =>
+          uploadFiles.call(options, {
+            files: accepted.map(({ file }) => file),
+            rowId,
+            columnId
+          }),
+        (error) =>
+          error instanceof Error
+            ? error.message
+            : `Failed to upload ${accepted.length} file${accepted.length !== 1 ? "s" : ""}`
+      )
+      if (Result.isFailure(uploaded)) {
+        toast.error(uploaded.failure)
+        clearUploadingFiles()
         return
       }
+      uploadedFiles = uploaded.success
+    } else {
+      uploadedFiles = accepted.map(({ file, data }) => ({
+        ...data,
+        url: createFileObjectUrl(cell.table, file)
+      }))
+    }
 
-      const accepted: { file: File; data: FileCellData }[] = []
-      const rejected: { name: string; reason: string }[] = []
+    cell.setValue([...getFilesCellValue(cell.getValue()), ...uploadedFiles.filter((file) => file.url !== undefined)])
+    clearUploadingFiles()
+  }
 
-      for (const file of newFiles) {
-        const reason = validateFile(file, maxFileSize, acceptedTypes)
-        if (reason) {
-          rejected.push({ name: file.name, reason })
-          continue
-        }
-        accepted.push({
-          file,
-          data: {
-            id: crypto.randomUUID(),
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            url: undefined
-          }
-        })
+  async function deleteFiles(fileIds: string[]) {
+    if (readOnly || isPending) return
+    clearError()
+
+    const filesToDelete = cellValue.filter((file) => fileIds.includes(file.id))
+    if (filesToDelete.length === 0) return
+
+    const idsToDelete = new Set(filesToDelete.map((file) => file.id))
+    setDeletingIds(idsToDelete)
+
+    const options = cell.table.options
+    const deleteFiles = options.deleteFiles
+    if (deleteFiles) {
+      // Local change: `settle` where upstream has a `try` statement; a refused delete says why, as upstream's did.
+      // Called on the options, as upstream called it.
+      const deleted = await settle(
+        () =>
+          deleteFiles.call(options, {
+            fileIds: [...idsToDelete],
+            rowId,
+            columnId
+          }),
+        (error) =>
+          error instanceof Error
+            ? error.message
+            : filesToDelete.length === 1
+              ? `Failed to delete ${filesToDelete[0]?.name}`
+              : "Failed to delete files"
+      )
+      if (Result.isFailure(deleted)) {
+        toast.error(deleted.failure)
+        setDeletingIds(new Set())
+        return
       }
+    }
 
-      const firstRejected = rejected[0]
-      if (firstRejected) {
-        const truncatedName =
-          firstRejected.name.length > 20 ? `${firstRejected.name.slice(0, 20)}...` : firstRejected.name
+    cell.setValue(getFilesCellValue(cell.getValue()).filter((file) => !idsToDelete.has(file.id)))
+    setDeletingIds(new Set())
+  }
 
-        flashError(firstRejected.reason, {
-          description:
-            rejected.length === 1
-              ? `"${truncatedName}" has been rejected`
-              : `"${truncatedName}" and ${rejected.length - 1} more rejected`
-        })
-      }
+  const containerRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dropzoneRef = useRef<HTMLDivElement>(null)
 
-      if (accepted.length === 0) return
-
-      setUploadingFiles(accepted.map(({ data }) => data))
-
-      let uploadedFiles: FileCellData[]
-
-      const options = cell.table.options
-      const uploadFiles = options.uploadFiles
-      if (uploadFiles) {
-        // Local change: `settle` where upstream has a `try` statement; a refused upload says why, as upstream's did.
-        // Called on the options, as upstream called it.
-        const uploaded = await settle(
-          () =>
-            uploadFiles.call(options, {
-              files: accepted.map(({ file }) => file),
-              rowId,
-              columnId
-            }),
-          (error) =>
-            error instanceof Error
-              ? error.message
-              : `Failed to upload ${accepted.length} file${accepted.length !== 1 ? "s" : ""}`
-        )
-        if (Result.isFailure(uploaded)) {
-          toast.error(uploaded.failure)
-          clearUploadingFiles()
-          return
-        }
-        uploadedFiles = uploaded.success
-      } else {
-        uploadedFiles = accepted.map(({ file, data }) => ({
-          ...data,
-          url: createFileObjectUrl(cell.table, file)
-        }))
-      }
-
-      cell.setValue([...getFilesCellValue(cell.getValue()), ...uploadedFiles.filter((file) => file.url !== undefined)])
-      clearUploadingFiles()
-    },
-    [
-      cell,
-      cellValue,
-      maxFiles,
-      maxFileSize,
-      acceptedTypes,
-      flashError,
-      rowId,
-      columnId,
-      readOnly,
-      isPending,
-      clearError,
-      setUploadingFiles,
-      clearUploadingFiles
-    ]
-  )
-
-  const deleteFiles = React.useCallback(
-    async (fileIds: string[]) => {
-      if (readOnly || isPending) return
-      clearError()
-
-      const filesToDelete = cellValue.filter((file) => fileIds.includes(file.id))
-      if (filesToDelete.length === 0) return
-
-      const idsToDelete = new Set(filesToDelete.map((file) => file.id))
-      setDeletingIds(idsToDelete)
-
-      const options = cell.table.options
-      const deleteFiles = options.deleteFiles
-      if (deleteFiles) {
-        // Local change: `settle` where upstream has a `try` statement; a refused delete says why, as upstream's did.
-        // Called on the options, as upstream called it.
-        const deleted = await settle(
-          () =>
-            deleteFiles.call(options, {
-              fileIds: [...idsToDelete],
-              rowId,
-              columnId
-            }),
-          (error) =>
-            error instanceof Error
-              ? error.message
-              : filesToDelete.length === 1
-                ? `Failed to delete ${filesToDelete[0]?.name}`
-                : "Failed to delete files"
-        )
-        if (Result.isFailure(deleted)) {
-          toast.error(deleted.failure)
-          setDeletingIds(new Set())
-          return
-        }
-      }
-
-      cell.setValue(getFilesCellValue(cell.getValue()).filter((file) => !idsToDelete.has(file.id)))
-      setDeletingIds(new Set())
-    },
-    [cell, cellValue, rowId, columnId, readOnly, isPending, clearError]
-  )
-
-  const containerRef = React.useRef<HTMLDivElement>(null)
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
-  const dropzoneRef = React.useRef<HTMLDivElement>(null)
-
-  const onDropFiles = React.useCallback((droppedFiles: File[]) => void addFiles(droppedFiles), [addFiles])
+  function onDropFiles(droppedFiles: File[]) {
+    void addFiles(droppedFiles)
+  }
 
   const { isDragActive: isDraggingOver, dropTargetProps: cellDropProps } = useFileDropTarget(onDropFiles)
   const { isDragActive: isDragging, dropTargetProps: dropzoneDropProps } = useFileDropTarget(onDropFiles)
 
-  const onDropzoneClick = React.useCallback(() => {
+  function onDropzoneClick() {
     fileInputRef.current?.click()
-  }, [])
+  }
 
-  const onDropzoneKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault()
-        onDropzoneClick()
-      }
-    },
-    [onDropzoneClick]
-  )
+  function onDropzoneKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      onDropzoneClick()
+    }
+  }
 
-  const onFileInputChange = React.useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFiles = Array.from(event.target.files ?? [])
-      void addFiles(selectedFiles)
-      event.target.value = ""
-    },
-    [addFiles]
-  )
+  function onFileInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? [])
+    void addFiles(selectedFiles)
+    event.target.value = ""
+  }
 
-  const onOpenChange = React.useCallback(
-    (open: boolean) => {
-      clearError()
-      setCellEditing(cell, open, readOnly)
-    },
-    [cell, readOnly, clearError]
-  )
+  function onOpenChange(open: boolean) {
+    clearError()
+    setCellEditing(cell, open, readOnly)
+  }
 
-  const onEscapeKeyDown = React.useCallback((event: Event) => {
+  function onEscapeKeyDown(event: Event) {
     event.stopPropagation()
-  }, [])
+  }
 
-  const onOpenFocus = React.useCallback(() => {
+  function onOpenFocus() {
     queueMicrotask(() => {
       dropzoneRef.current?.focus()
     })
-  }, [])
+  }
 
-  const onCancel = React.useCallback(() => {
+  function onCancel() {
     clearError()
     cell.table.stopEditing()
-  }, [cell, clearError])
+  }
 
-  const onWrapperKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (isEditing && event.key === " ") {
-        event.preventDefault()
-        onDropzoneClick()
-      }
-    },
-    [isEditing, onDropzoneClick]
-  )
+  function onWrapperKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (isEditing && event.key === " ") {
+      event.preventDefault()
+      onDropzoneClick()
+    }
+  }
 
   const lineCount = getLineCount(rowHeight)
 
-  const { visibleItems: visibleFiles, hiddenCount: hiddenFileCount } = useBadgeOverflow({
+  const { visibleItems: visibleFiles, hiddenCount: hiddenFileCount } = getBadgeOverflow({
     items: files,
     getLabel: (file) => file.name,
     containerWidth: width,
@@ -1261,14 +1238,14 @@ function OverflowBadge({ count }: OverflowBadgeProps) {
 }
 
 interface CellEditorPopoverProps<TData extends RowData> extends Omit<
-  React.ComponentProps<typeof PopoverContent>,
+  ComponentProps<typeof PopoverContent>,
   "align" | "alignOffset" | "sideOffset"
 > {
   cell: DataGridCellProps<TData>["cell"]
   open: boolean
   readOnly: boolean
   rowHeight: RowHeightValue
-  containerRef: React.RefObject<HTMLDivElement | null>
+  containerRef: RefObject<HTMLDivElement | null>
   onOpenChange?: (open: boolean) => void
   onOpenFocus?: () => void
   overlap?: boolean
@@ -1286,26 +1263,20 @@ function CellEditorPopover<TData extends RowData>({
   className,
   ...props
 }: CellEditorPopoverProps<TData>) {
-  const onEditorOpenChange = React.useCallback(
-    (nextOpen: boolean) => {
-      if (onOpenChange) {
-        onOpenChange(nextOpen)
-      } else {
-        setCellEditing(cell, nextOpen, readOnly)
-      }
-    },
-    [cell, readOnly, onOpenChange]
-  )
+  function onEditorOpenChange(nextOpen: boolean) {
+    if (onOpenChange) {
+      onOpenChange(nextOpen)
+    } else {
+      setCellEditing(cell, nextOpen, readOnly)
+    }
+  }
 
-  const { onPointerDownOutside, onCloseAutoFocus } = useCellEditorDismiss(containerRef)
+  const { onPointerDownOutside, onCloseAutoFocus } = getCellEditorDismiss(containerRef)
 
-  const onOpenAutoFocus = React.useCallback(
-    (event: Event) => {
-      event.preventDefault()
-      onOpenFocus?.()
-    },
-    [onOpenFocus]
-  )
+  function onOpenAutoFocus(event: Event) {
+    event.preventDefault()
+    onOpenFocus?.()
+  }
 
   return (
     <Popover open={open} onOpenChange={onEditorOpenChange}>
@@ -1331,91 +1302,119 @@ interface UseEditableTextOptions<TData extends RowData> extends DataGridCellProp
   parse?: (text: string) => string | null
 }
 
+/** What a text cell's editor holds while it is open: its element, and the text it opened with. */
+interface TextEditor {
+  /** The element's ref callback while it is edited: it takes the focus and selects what a typed key replaces. */
+  readonly ref: RefCallback<HTMLDivElement>
+  readonly element: () => HTMLDivElement | null
+  readonly startText: () => string | null
+}
+
+/**
+ * One text cell's editor, made when its editing begins and let go when it ends (the cell reads it only while it is
+ * edited): the element is given `ref` while it is edited and `showTextRef` while it is not, so React calls one of the
+ * two exactly when editing begins or ends (upstream's effect and layout effect on `isEditing`).
+ */
+const textEditors = Atom.family((_instance: string) =>
+  Atom.readable((): TextEditor => {
+    let element: HTMLDivElement | null = null
+    let startText: string | null = null
+    return {
+      ref: (node) => {
+        if (!node) return
+        element = node
+        node.focus()
+        // The text it opened with is drawn while it is edited, so no draw writes over what is being typed.
+        startText = node.textContent ?? ""
+
+        // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
+        if (node.hasAttribute("data-typed-over")) {
+          selectEditableText(node)
+        } else if (node.textContent) {
+          moveCaretToEnd(node)
+        }
+        return () => {
+          if (element === node) element = null
+          // Marks the element for `showTextRef`, which then undoes what was typed and not stored.
+          node.dataset.edited = ""
+        }
+      },
+      element: () => element,
+      startText: () => startText
+    }
+  }).pipe(Atom.setIdleTTL(0))
+)
+
+/** What a text cell that is not being edited reads in place of an editor. */
+const noTextEditor = Atom.readable((): TextEditor => ({ ref: showTextRef, element: () => null, startText: () => null }))
+
+/**
+ * A text cell's element while it is not edited. Once its editing has ended, what was typed and not stored leaves
+ * with it, and the text scrolls back to its start; an element that was never edited is left as it was drawn.
+ */
+function showTextRef(element: HTMLDivElement | null) {
+  if (!element || element.dataset.edited === undefined) return
+  delete element.dataset.edited
+  const shown = element.dataset.cellText ?? ""
+  if (element.textContent !== shown) element.textContent = shown
+  element.scrollLeft = 0
+}
+
 function useEditableText<TData extends RowData>({
   cell,
   isEditing,
   readOnly,
   parse = parsePlainText
 }: UseEditableTextOptions<TData>) {
+  const instance = useId()
+  const editor = useAtomValue(isEditing ? textEditors(instance) : noTextEditor)
   const initialValue = getTextCellValue(useCellValue(cell))
   const { value, setDraftValue, clearDraft } = useCellDraft({
     key: initialValue,
     fallback: initialValue,
     enabled: isEditing
   })
-  const textRef = React.useRef<HTMLDivElement>(null)
-  const prevIsEditingRef = React.useRef(false)
 
-  React.useLayoutEffect(() => {
-    const element = textRef.current
-    if (!isEditing && element && element.textContent !== initialValue) {
-      element.textContent = initialValue
+  function onSave(options?: StopEditingOptions, element = editor.element()) {
+    const value = parse(element?.textContent ?? "")
+    if (!readOnly && value !== parse(initialValue)) {
+      cell.setValue(value)
     }
-  }, [initialValue, isEditing])
-
-  React.useEffect(() => {
-    const wasEditing = prevIsEditingRef.current
-    prevIsEditingRef.current = isEditing
-    const element = textRef.current
-    if (!element) return
-
-    if (isEditing && !wasEditing) {
-      element.focus()
-
-      if (!element.textContent && value) {
-        element.textContent = value
-      }
-
-      // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
-      if (getPendingChar(cell)) {
-        selectEditableText(element)
-      } else if (element.textContent) {
-        moveCaretToEnd(element)
-      }
-    } else if (!isEditing && wasEditing) {
-      element.scrollLeft = 0
-    }
-  }, [cell, isEditing, value])
-
-  const onSave = React.useCallback(
-    (options?: StopEditingOptions) => {
-      const value = parse(textRef.current?.textContent ?? "")
-      if (!readOnly && value !== parse(initialValue)) {
-        cell.setValue(value)
-      }
-      clearDraft()
-      cell.table.stopEditing(options)
-    },
-    [cell, parse, initialValue, readOnly, clearDraft]
-  )
-
-  const onBlur = React.useCallback(() => onSave(), [onSave])
-
-  const onInput = React.useCallback(
-    (event: React.InputEvent<HTMLDivElement>) => {
-      setDraftValue(event.currentTarget.textContent ?? "")
-    },
-    [setDraftValue]
-  )
-
-  const onCancel = React.useCallback(() => {
     clearDraft()
-    const element = textRef.current
+    cell.table.stopEditing(options)
+  }
+
+  function onCommit(options?: StopEditingOptions) {
+    onSave(options)
+  }
+
+  function onBlur(event: FocusEvent<HTMLDivElement>) {
+    onSave(undefined, event.currentTarget)
+  }
+
+  function onInput(event: ReactInputEvent<HTMLDivElement>) {
+    setDraftValue(event.currentTarget.textContent ?? "")
+  }
+
+  function onCancel() {
+    clearDraft()
+    const element = editor.element()
     if (!element) return
     // Blurring saves the DOM text, so the typed text is undone first.
     element.textContent = initialValue
     element.blur()
-  }, [initialValue, clearDraft])
+  }
 
   return {
     value,
-    onCommit: onSave,
+    onCommit,
     onCancel,
     textProps: {
-      ref: textRef,
+      ref: isEditing ? editor.ref : showTextRef,
       isEditing,
       label: getColumnLabel(cell.column),
-      value,
+      text: isEditing ? (editor.startText() ?? initialValue) : initialValue,
+      isTypedOver: isEditing && getPendingChar(cell) !== null,
       onBlur,
       onInput
     }
@@ -1430,18 +1429,23 @@ function parseUrlText(text: string) {
   return text.trim() || null
 }
 
-interface EditableTextProps extends React.ComponentProps<"div"> {
+interface EditableTextProps extends ComponentProps<"div"> {
   isEditing: boolean
   label: string
-  value: string
+  /** What the element holds: the value shown, or while it is edited, the text it opened with. */
+  text: string
+  /** The key that opened the editor is to replace the text. */
+  isTypedOver: boolean
 }
 
-function EditableText({ isEditing, label, value, className, ...props }: EditableTextProps) {
+function EditableText({ isEditing, label, text, isTypedOver, className, ...props }: EditableTextProps) {
   return (
     <div
       role={isEditing ? "textbox" : undefined}
       aria-label={isEditing ? label : undefined}
       data-slot="data-grid-cell-content"
+      data-cell-text={isEditing ? undefined : text}
+      data-typed-over={isTypedOver ? "" : undefined}
       dir="auto"
       contentEditable={isEditing}
       tabIndex={-1}
@@ -1455,7 +1459,7 @@ function EditableText({ isEditing, label, value, className, ...props }: Editable
         className
       )}
     >
-      {isEditing ? "" : value}
+      {text}
     </div>
   )
 }
@@ -1466,41 +1470,52 @@ interface UseCellDraftOptions<TValue> {
   enabled?: boolean
 }
 
+/**
+ * One draft of one cell on screen (each `useCellDraft` its own, made for its `useId`), kept while the draft is in use:
+ * a draft that is not (a text cell that is not being edited) reads `noDraft`, so a cell drawn while scrolling makes
+ * no atom of its own until it is edited.
+ */
+const cellDrafts = Atom.family((_instance: string) =>
+  Atom.make<{ readonly key: unknown; readonly value: unknown } | null>(null)
+)
+const noDraft = Atom.keepAlive(Atom.make<{ readonly key: unknown; readonly value: unknown } | null>(null))
+
+/** What an editor that is not open mounts in place of what it keeps while it is. */
+const nothingKept = Atom.keepAlive(Atom.make(false))
+
 function useCellDraft<TValue>({ key, fallback, enabled = true }: UseCellDraftOptions<TValue>) {
-  const [draft, setDraft] = React.useState<{
-    key: unknown
-    value: TValue
-  } | null>(null)
-  const value = enabled && draft !== null && draft.key === key ? draft.value : fallback
+  const instance = useId()
+  const [draft, setDraft] = useAtom(enabled ? cellDrafts(instance) : noDraft)
+  const value = enabled && draft !== null && draft.key === key ? (draft.value as TValue) : fallback
 
-  const setDraftValue = React.useCallback((newValue: TValue) => setDraft({ key, value: newValue }), [key])
+  function setDraftValue(newValue: TValue) {
+    if (!enabled) return
+    setDraft({ key, value: newValue })
+  }
 
-  const clearDraft = React.useCallback(() => setDraft(null), [])
+  function clearDraft() {
+    setDraft(null)
+  }
 
   return { value, setDraftValue, clearDraft }
 }
 
-function useCellEditorDismiss(containerRef: React.RefObject<HTMLDivElement | null>) {
-  const onPointerDownOutside = React.useCallback(
-    (event: Event) => {
-      const container = containerRef.current
-      if (event.target instanceof Node && container?.contains(event.target)) {
-        event.preventDefault()
-      }
-    },
-    [containerRef]
-  )
-
-  const onCloseAutoFocus = React.useCallback(
-    (event: Event) => {
+/** A cell editor's two dismiss handlers, for the cell's element. */
+function getCellEditorDismiss(containerRef: RefObject<HTMLDivElement | null>) {
+  function onPointerDownOutside(event: Event) {
+    const container = containerRef.current
+    if (event.target instanceof Node && container?.contains(event.target)) {
       event.preventDefault()
-      const container = containerRef.current
-      if (!container?.closest('[role="grid"]')?.contains(document.activeElement)) {
-        container?.focus()
-      }
-    },
-    [containerRef]
-  )
+    }
+  }
+
+  function onCloseAutoFocus(event: Event) {
+    event.preventDefault()
+    const container = containerRef.current
+    if (!container?.closest('[role="grid"]')?.contains(document.activeElement)) {
+      container?.focus()
+    }
+  }
 
   return { onPointerDownOutside, onCloseAutoFocus }
 }
@@ -1525,7 +1540,7 @@ function getPendingChar<TData extends RowData>(cell: DataGridCellProps<TData>["c
   return cell.table.getEditingCell()?.pendingChar ?? null
 }
 
-function onEditingCellMouseDown(event: React.MouseEvent) {
+function onEditingCellMouseDown(event: ReactMouseEvent) {
   event.preventDefault()
 }
 
@@ -1557,35 +1572,32 @@ function validateFile(file: File, maxFileSize: number, acceptedTypes: string[] |
 }
 
 function useFileDropTarget(onDropFiles: (files: File[]) => void) {
-  const [isDragActive, setIsDragActive] = React.useState(false)
+  const [isDragActive, setIsDragActive] = useAtom(fileDragActive(useId()))
 
-  const onDragEnter = React.useCallback((event: React.DragEvent) => {
+  function onDragEnter(event: ReactDragEvent) {
     event.preventDefault()
     event.stopPropagation()
     if (event.dataTransfer.types.includes("Files")) {
       setIsDragActive(true)
     }
-  }, [])
+  }
 
-  const onDragLeave = React.useCallback((event: React.DragEvent) => {
+  function onDragLeave(event: ReactDragEvent) {
     event.preventDefault()
     event.stopPropagation()
     if (getIsDragLeaving(event)) setIsDragActive(false)
-  }, [])
+  }
 
-  const onDrop = React.useCallback(
-    (event: React.DragEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      setIsDragActive(false)
+  function onDrop(event: ReactDragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragActive(false)
 
-      const droppedFiles = Array.from(event.dataTransfer.files)
-      if (droppedFiles.length > 0) {
-        onDropFiles(droppedFiles)
-      }
-    },
-    [onDropFiles]
-  )
+    const droppedFiles = Array.from(event.dataTransfer.files)
+    if (droppedFiles.length > 0) {
+      onDropFiles(droppedFiles)
+    }
+  }
 
   return {
     isDragActive,
@@ -1598,14 +1610,14 @@ function useFileDropTarget(onDropFiles: (files: File[]) => void) {
   }
 }
 
-function getIsDragLeaving(event: React.DragEvent) {
+function getIsDragLeaving(event: ReactDragEvent) {
   const rect = event.currentTarget.getBoundingClientRect()
   const x = event.clientX
   const y = event.clientY
   return x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom
 }
 
-function onFileDragOver(event: React.DragEvent) {
+function onFileDragOver(event: ReactDragEvent) {
   event.preventDefault()
   event.stopPropagation()
 }

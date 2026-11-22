@@ -1,8 +1,11 @@
 "use client"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// The dialog's handlers are plain functions of the draw (upstream kept them in `useCallback`s); the radio button's ref
+// is a DOM node, read when the person presses Continue.
 
 import { type ReactTable, type RowData, Subscribe } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import { type ComponentProps, memo, useRef } from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { PasteDialogState } from "@inventory/ui/components/data-grid/data-grid-types"
@@ -33,7 +36,7 @@ interface PasteDialogProps<TData extends RowData> extends DataGridPasteDialogPro
   pasteDialog: PasteDialogState
 }
 
-const PasteDialog = React.memo(PasteDialogImpl, (prev, next) => {
+const PasteDialog = memo(PasteDialogImpl, (prev, next) => {
   if (prev.table !== next.table) return false
   if (prev.pasteDialog.open !== next.pasteDialog.open) return false
   if (!next.pasteDialog.open) return true
@@ -41,24 +44,21 @@ const PasteDialog = React.memo(PasteDialogImpl, (prev, next) => {
 }) as typeof PasteDialogImpl
 
 function PasteDialogImpl<TData extends RowData>({ table, pasteDialog }: PasteDialogProps<TData>) {
-  const expandRadioRef = React.useRef<HTMLInputElement | null>(null)
+  const expandRadioRef = useRef<HTMLInputElement | null>(null)
 
-  const onOpenChange = React.useCallback(
-    (open: boolean) => {
-      if (!open) table.resetPasteDialog(true)
-    },
-    [table]
-  )
+  function onOpenChange(open: boolean) {
+    if (!open) table.resetPasteDialog(true)
+  }
 
-  const onCancel = React.useCallback(() => {
+  function onCancel() {
     table.resetPasteDialog(true)
-  }, [table])
+  }
 
-  const onContinue = React.useCallback(() => {
+  function onContinue() {
     void table.pasteCells({
       expandRows: expandRadioRef.current?.checked ?? false
     })
-  }, [table])
+  }
 
   return (
     <Dialog open={pasteDialog.open} onOpenChange={onOpenChange}>
@@ -100,7 +100,7 @@ function PasteDialogImpl<TData extends RowData>({ table, pasteDialog }: PasteDia
   )
 }
 
-function RadioItem({ className, ...props }: React.ComponentProps<"input">) {
+function RadioItem({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       type="radio"

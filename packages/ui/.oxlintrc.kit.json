@@ -20,6 +20,8 @@
     "!src/components/sortable.tsx",
     "!src/components/direction.tsx",
     "!src/components/calendar.tsx",
-    "!src/components/slider.tsx"
+    "!src/components/slider.tsx",
+    // Batch 2, the data grid: the folder whole, so a file added to it is read from its first line.
+    "!src/components/data-grid/**"
   ]
 }

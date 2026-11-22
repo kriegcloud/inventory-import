@@ -1,16 +1,48 @@
 "use client"
-
-import { type Column, flexRender, type HeaderGroup, type RowData, type TableState } from "@tanstack/react-table"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// The viewport's own values are atoms of its grid (made for the grid's `useId`): the measured insets, the scroll the
+// last draw was made at, and `viewportLayout`, which holds the ref callbacks of the grid's element and its footer
+// (they put the grid's listeners on, measure it with a ResizeObserver and have the virtualizers measure again when the
+// columns, filters or sort change) and the range functions TanStack Virtual is given, kept while the row height is the
+// same. Upstream did this in layout effects and kept its values in refs. The rows share one object (`shared`), kept
+// while it says the same, where upstream had a context. The rule this file protects: the virtualizer is given the same
+// functions from draw to draw, so 50,000 rows scroll as fast as they did.
+import { useAtomValue } from "@effect/atom-react"
+import {
+  type Column,
+  flexRender,
+  type HeaderGroup,
+  type RowData,
+  type Table,
+  type TableState
+} from "@tanstack/react-table"
 import { defaultRangeExtractor, type Range, useVirtualizer, type Virtualizer } from "@tanstack/react-virtual"
 import { cn } from "cn"
-import { useLayoutEffect } from "radix-ui/internal"
-import * as React from "react"
+import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import {
+  type ComponentProps,
+  type KeyboardEvent as ReactKeyboardEvent,
+  memo,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type RefCallback,
+  useDeferredValue
+} from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { ColumnWindow } from "@inventory/ui/components/data-grid/data-grid-types"
-import type { useDataGrid } from "@inventory/ui/components/data-grid/use-data-grid"
 
-import { useValueAsRef } from "@inventory/ui/hooks/use-value-as-ref"
+import {
+  columnVirtualizerOf,
+  emptyKept,
+  gridController,
+  gridTableOf,
+  type Kept,
+  kept,
+  rowVirtualizerOf,
+  type useDataGrid
+} from "@inventory/ui/components/data-grid/use-data-grid"
 import {
   getColumnBorderVisibility,
   getColumnPinningStyle,
@@ -20,7 +52,7 @@ import {
 import { DataGridColumnHeader } from "@inventory/ui/components/data-grid/data-grid-column-header"
 import { DataGridContextMenu } from "@inventory/ui/components/data-grid/data-grid-context-menu"
 import { DataGridPasteDialog } from "@inventory/ui/components/data-grid/data-grid-paste-dialog"
-import { DataGridRow, DataGridRowContext } from "@inventory/ui/components/data-grid/data-grid-row"
+import { DataGridRow, type DataGridRowShared } from "@inventory/ui/components/data-grid/data-grid-row"
 import { DataGridSearch } from "@inventory/ui/components/data-grid/data-grid-search"
 import { Plus } from "lucide-react"
 
@@ -29,20 +61,17 @@ const COLUMN_OVERSCAN = 2
 const SCROLL_JUMP_EXIT_ROWS_PER_COMMIT = 2
 
 interface DataGridProps<TData extends RowData>
-  extends ReturnType<typeof useDataGrid<TData>>, Omit<React.ComponentProps<"div">, "dir"> {
+  extends ReturnType<typeof useDataGrid<TData>>, Omit<ComponentProps<"div">, "dir"> {
   height?: number
   stretchColumns?: boolean
-  actionBar?: React.ReactNode
+  actionBar?: ReactNode
 }
 
 export function DataGrid<TData extends RowData>({
   table,
+  gridId,
   dataGridRef,
   headerRef,
-  footerRef,
-  rowMapRef,
-  rowVirtualizerRef,
-  columnVirtualizerRef,
   rowVirtualizerOptions,
   dataGridBodyProps,
   columnSizeVars,
@@ -57,17 +86,13 @@ export function DataGrid<TData extends RowData>({
 }: DataGridProps<TData>) {
   return (
     <div data-slot="data-grid-wrapper" dir={dir} {...props} className={cn("relative flex w-full flex-col", className)}>
-      {table.options.enableSearch && <DataGridSearch table={table} />}
+      {table.options.enableSearch && <DataGridSearch table={table} gridId={gridId} />}
       <DataGridContextMenu table={table} dataGridRef={dataGridRef} />
       <DataGridPasteDialog table={table} />
       <DataGridViewport
         table={table}
-        dataGridRef={dataGridRef}
+        gridId={gridId}
         headerRef={headerRef}
-        footerRef={footerRef}
-        rowMapRef={rowMapRef}
-        rowVirtualizerRef={rowVirtualizerRef}
-        columnVirtualizerRef={columnVirtualizerRef}
         rowVirtualizerOptions={rowVirtualizerOptions}
         dataGridBodyProps={dataGridBodyProps}
         columnSizeVars={columnSizeVars}
@@ -94,15 +119,178 @@ const EMPTY_VIEWPORT_INSETS: ViewportInsets = {
   headerHeight: 0
 }
 
+/** The insets one grid's viewport measured: the header above the rows and the footer below them. */
+const viewportInsets = Atom.family((_grid: string) => Atom.make<ViewportInsets>(EMPTY_VIEWPORT_INSETS))
+
+/** The scroll the last draw of one grid's viewport was made at, and whether it was jumping. */
+const scrollCommitted = Atom.family((_grid: string) =>
+  Atom.make<{ readonly offset: number; readonly isJumping: boolean } | null>(null)
+)
+
+/** The columns between the pinned ones, as one grid's viewport draws them, for its column range. */
+const centerColumnsOf = Atom.family((_grid: string) => Atom.make<ReadonlyArray<{ readonly id: string }>>([]))
+
+/**
+ * What one grid's viewport keeps for its whole life: its ref callbacks, its range functions, its memo slots, and the
+ * registry and per-grid atoms its draw reads, looked up once rather than on every draw (an arrow key draws it again).
+ */
+interface ViewportLayout {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly atoms: {
+    readonly insets: Atom.Writable<ViewportInsets>
+    readonly scrollCommitted: Atom.Writable<{ readonly offset: number; readonly isJumping: boolean } | null>
+    readonly centerColumns: Atom.Writable<ReadonlyArray<{ readonly id: string }>>
+    readonly rowVirtualizer: Atom.Writable<Virtualizer<HTMLDivElement, Element> | null>
+    readonly columnVirtualizer: Atom.Writable<Virtualizer<HTMLDivElement, Element> | null>
+  }
+  /** The grid's element, which both virtualizers scroll. */
+  readonly scrollElement: () => HTMLDivElement | null
+  readonly gridRef: RefCallback<HTMLDivElement>
+  readonly footerRef: RefCallback<HTMLDivElement>
+  readonly columnRangeExtractor: (range: Range) => number[]
+  readonly kept: {
+    readonly rowRange: Kept<(range: Range) => number[]>
+    readonly rowKey: Kept<(index: number) => string>
+    readonly columnWindow: Kept<ColumnWindow | null>
+    readonly readOnlyColumnIds: Kept<Set<string>>
+    readonly shared: Kept<DataGridRowShared>
+  }
+}
+
+const viewportLayout = Atom.family((grid: string) =>
+  Atom.readable((get): ViewportLayout => {
+    const registry = get.registry
+    const controller = get(gridController(grid))
+    get.mount(viewportInsets(grid))
+    get.mount(scrollCommitted(grid))
+    get.mount(centerColumnsOf(grid))
+
+    function measure() {
+      const dataGrid = controller.dataGridRef.current
+      if (!dataGrid) return
+      const header = controller.headerRef.current
+      const footer = controller.footerRef.current
+      const gridRect = dataGrid.getBoundingClientRect()
+      const next: ViewportInsets = {
+        start: (header?.getBoundingClientRect().bottom ?? gridRect.top) - gridRect.top,
+        end: gridRect.bottom - (footer?.getBoundingClientRect().top ?? gridRect.bottom),
+        headerHeight: header?.offsetHeight ?? 0
+      }
+      const prev = registry.get(viewportInsets(grid))
+      if (prev.start !== next.start || prev.end !== next.end || prev.headerHeight !== next.headerHeight) {
+        registry.set(viewportInsets(grid), next)
+      }
+    }
+
+    const observer = new ResizeObserver(measure)
+    get.addFinalizer(() => observer.disconnect())
+
+    // The virtualizers measure their items again a frame after the columns, filters or sort change.
+    let measureFrame = 0
+    function measureVirtualizers() {
+      cancelAnimationFrame(measureFrame)
+      measureFrame = requestAnimationFrame(() => {
+        registry.get(rowVirtualizerOf(grid))?.measure()
+        registry.get(columnVirtualizerOf(grid))?.measure()
+      })
+    }
+
+    const gridRef: RefCallback<HTMLDivElement> = (dataGrid) => {
+      if (!dataGrid) return
+      const detach = controller.attachGrid(dataGrid)
+      measure()
+      observer.observe(dataGrid)
+      const header = controller.headerRef.current
+      if (header) observer.observe(header)
+
+      const unsubscribes: Array<() => void> = []
+      const table = getGridTable(registry, grid)
+      if (table) {
+        const { columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, sorting } = table.atoms
+        const followed: ReadonlyArray<{ subscribe: (listener: () => void) => { unsubscribe: () => void } }> = [
+          columnFilters,
+          columnOrder,
+          columnPinning,
+          columnSizing,
+          columnVisibility,
+          sorting
+        ]
+        for (const atom of followed) {
+          const subscription = atom.subscribe(measureVirtualizers)
+          unsubscribes.push(() => subscription.unsubscribe())
+        }
+      }
+      measureVirtualizers()
+
+      return () => {
+        for (const unsubscribe of unsubscribes) unsubscribe()
+        cancelAnimationFrame(measureFrame)
+        observer.unobserve(dataGrid)
+        if (header) observer.unobserve(header)
+        detach()
+      }
+    }
+
+    const footerRef: RefCallback<HTMLDivElement> = (footer) => {
+      if (!footer) return
+      controller.footerRef.current = footer
+      observer.observe(footer)
+      measure()
+      return () => {
+        observer.unobserve(footer)
+        if (controller.footerRef.current === footer) controller.footerRef.current = null
+        // Measured again once the footer has left the page.
+        queueMicrotask(measure)
+      }
+    }
+
+    function columnRangeExtractor(range: Range) {
+      const indexes = defaultRangeExtractor(range)
+      const table = getGridTable(registry, grid)
+      const activeColumnIds = [table?.getFocusedCell()?.column.id, table?.atoms.editingCell.get()?.columnId]
+      const centerColumns = registry.get(centerColumnsOf(grid))
+      for (const columnId of activeColumnIds) {
+        if (!columnId) continue
+        const index = centerColumns.findIndex((column) => column.id === columnId)
+        if (index !== -1 && !indexes.includes(index)) indexes.push(index)
+      }
+      return indexes.sort((a, b) => a - b)
+    }
+
+    return {
+      registry,
+      atoms: {
+        insets: viewportInsets(grid),
+        scrollCommitted: scrollCommitted(grid),
+        centerColumns: centerColumnsOf(grid),
+        rowVirtualizer: rowVirtualizerOf(grid),
+        columnVirtualizer: columnVirtualizerOf(grid)
+      },
+      scrollElement: () => controller.dataGridRef.current,
+      gridRef,
+      footerRef,
+      columnRangeExtractor,
+      kept: {
+        rowRange: emptyKept(),
+        rowKey: emptyKept(),
+        columnWindow: emptyKept(),
+        readOnlyColumnIds: emptyKept(),
+        shared: emptyKept()
+      }
+    }
+  }).pipe(Atom.setIdleTTL(0))
+)
+
+/** The table one grid was first drawn with: its methods and atoms act on the table as it is now. */
+function getGridTable(registry: AtomRegistry.AtomRegistry, grid: string) {
+  return registry.get(gridTableOf(grid)) as Table<DataGridFeatures, RowData> | null
+}
+
 type DataGridViewportProps<TData extends RowData> = Pick<
   DataGridProps<TData>,
   | "table"
-  | "dataGridRef"
+  | "gridId"
   | "headerRef"
-  | "footerRef"
-  | "rowMapRef"
-  | "rowVirtualizerRef"
-  | "columnVirtualizerRef"
   | "rowVirtualizerOptions"
   | "dataGridBodyProps"
   | "columnSizeVars"
@@ -114,12 +302,8 @@ type DataGridViewportProps<TData extends RowData> = Pick<
 
 function DataGridViewport<TData extends RowData>({
   table,
-  dataGridRef,
+  gridId,
   headerRef,
-  footerRef,
-  rowMapRef,
-  rowVirtualizerRef,
-  columnVirtualizerRef,
   rowVirtualizerOptions,
   dataGridBodyProps,
   columnSizeVars,
@@ -129,6 +313,9 @@ function DataGridViewport<TData extends RowData>({
   stretchColumns,
   onRowAdd: onRowAddProp
 }: DataGridViewportProps<TData>) {
+  const layout = useAtomValue(viewportLayout(gridId))
+  const { registry, atoms } = layout
+  const insets = useAtomValue(atoms.insets)
   const rows = table.getRowModel().rows
   const rowSize = table.getRowSize()
   const readOnly = table.getIsReadOnly()
@@ -140,129 +327,81 @@ function DataGridViewport<TData extends RowData>({
   const startWidth = getColumnsWidth(startColumns)
   const centerWidth = getColumnsWidth(centerColumns)
   const endWidth = getColumnsWidth(table.getEndVisibleLeafColumns())
-  const [insets, setInsets] = React.useState(EMPTY_VIEWPORT_INSETS)
+  if (registry.get(atoms.centerColumns) !== centerColumns) registry.set(atoms.centerColumns, centerColumns)
 
   const isColumnVirtualizationEnabled = !stretchColumns && headerGroups.length === 1
   const enableCellEditing = table.options.enableCellEditing
   const hasFooter = !readOnly && !!onRowAddProp
-  const insetsKey = rows.length * rowSize > height ? `overflow:${hasFooter}` : `${rows.length}:${rowSize}:${hasFooter}`
 
-  useLayoutEffect(() => {
-    const dataGrid = dataGridRef.current
-    if (!dataGrid) return
-    const header = headerRef.current
-    const footer = footerRef.current
-
-    const measure = () => {
-      const gridRect = dataGrid.getBoundingClientRect()
-      const next: ViewportInsets = {
-        start: (header?.getBoundingClientRect().bottom ?? gridRect.top) - gridRect.top,
-        end: gridRect.bottom - (footer?.getBoundingClientRect().top ?? gridRect.bottom),
-        headerHeight: header?.offsetHeight ?? 0
+  const rowRangeExtractor = kept(
+    layout.kept.rowRange,
+    [rowSize],
+    () =>
+      ({ startIndex, endIndex, overscan: overscanProp, count }: Range) => {
+        const overscan = registry.get(atoms.scrollCommitted)?.isJumping === true ? 0 : overscanProp
+        const rowVirtualizer = registry.get(atoms.rowVirtualizer)
+        const direction = rowVirtualizer?.scrollDirection ?? null
+        const before =
+          direction === "forward"
+            ? Math.ceil(overscan / 3)
+            : direction === "backward"
+              ? overscan * 2 - Math.ceil(overscan / 3)
+              : overscan
+        const viewportHeight = rowVirtualizer?.scrollRect?.height ?? 0
+        const visibleCount = viewportHeight > 0 ? Math.ceil(viewportHeight / rowSize) + 1 : endIndex - startIndex + 1
+        const total = Math.min(count, visibleCount + overscan * 2)
+        const start = Math.max(0, Math.min(startIndex - before, count - total))
+        const indexes: number[] = []
+        for (let index = start; index < start + total; index++) {
+          indexes.push(index)
+        }
+        return indexes
       }
-      setInsets((prev) =>
-        prev.start === next.start && prev.end === next.end && prev.headerHeight === next.headerHeight ? prev : next
-      )
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    for (const element of [dataGrid, header, footer]) {
-      if (element) observer.observe(element)
-    }
-    return () => observer.disconnect()
-  }, [dataGridRef, headerRef, footerRef, insetsKey])
-
-  const isScrollJumpingRef = React.useRef(false)
-
-  const rowRangeExtractor = React.useCallback(
-    ({ startIndex, endIndex, overscan: overscanProp, count }: Range) => {
-      const overscan = isScrollJumpingRef.current ? 0 : overscanProp
-      const direction = rowVirtualizerRef.current?.scrollDirection ?? null
-      const before =
-        direction === "forward"
-          ? Math.ceil(overscan / 3)
-          : direction === "backward"
-            ? overscan * 2 - Math.ceil(overscan / 3)
-            : overscan
-      const viewportHeight = rowVirtualizerRef.current?.scrollRect?.height ?? 0
-      const visibleCount = viewportHeight > 0 ? Math.ceil(viewportHeight / rowSize) + 1 : endIndex - startIndex + 1
-      const total = Math.min(count, visibleCount + overscan * 2)
-      const start = Math.max(0, Math.min(startIndex - before, count - total))
-      const indexes: number[] = []
-      for (let index = start; index < start + total; index++) {
-        indexes.push(index)
-      }
-      return indexes
-    },
-    [rowVirtualizerRef, rowSize]
   )
 
-  const getRowKey = React.useCallback((index: number) => `${index}:${rowSize}`, [rowSize])
+  const getRowKey = kept(layout.kept.rowKey, [rowSize], () => (index: number) => `${index}:${rowSize}`)
 
   const rowVirtualizer = useVirtualizer({
     ...rowVirtualizerOptions,
     rangeExtractor: rowRangeExtractor,
     count: rows.length,
-    getScrollElement: () => dataGridRef.current,
+    getScrollElement: layout.scrollElement,
     getItemKey: getRowKey,
     estimateSize: () => rowSize,
     scrollPaddingStart: VIEWPORT_OFFSET,
     scrollPaddingEnd: insets.start + insets.end + VIEWPORT_OFFSET
   })
 
-  const centerColumnsRef = useValueAsRef(centerColumns)
-
-  const columnRangeExtractor = React.useCallback(
-    (range: Range) => {
-      const indexes = defaultRangeExtractor(range)
-      const activeColumnIds = [table.getFocusedCell()?.column.id, table.atoms.editingCell.get()?.columnId]
-      for (const columnId of activeColumnIds) {
-        if (!columnId) continue
-        const index = centerColumnsRef.current.findIndex((column) => column.id === columnId)
-        if (index !== -1 && !indexes.includes(index)) indexes.push(index)
-      }
-      return indexes.sort((a, b) => a - b)
-    },
-    [table, centerColumnsRef]
-  )
-
   const columnVirtualizer = useVirtualizer({
     horizontal: true,
     enabled: isColumnVirtualizationEnabled,
     isRtl: dir === "rtl",
     count: centerColumns.length,
-    getScrollElement: () => dataGridRef.current,
+    getScrollElement: layout.scrollElement,
     estimateSize: (index) => centerColumns[index]?.getSize() ?? 0,
     getItemKey: (index) => centerColumns[index]?.id ?? index,
     overscan: COLUMN_OVERSCAN,
     paddingStart: startWidth,
     scrollPaddingStart: startWidth + VIEWPORT_OFFSET,
     scrollPaddingEnd: endWidth + VIEWPORT_OFFSET,
-    rangeExtractor: columnRangeExtractor
+    rangeExtractor: layout.columnRangeExtractor
   })
 
+  // TanStack Virtual keeps one virtualizer per viewport: it is handed to the grid's handlers the first time it is drawn.
+  if (registry.get(atoms.rowVirtualizer) !== rowVirtualizer) registry.set(atoms.rowVirtualizer, rowVirtualizer)
+  if (registry.get(atoms.columnVirtualizer) !== columnVirtualizer) {
+    registry.set(atoms.columnVirtualizer, columnVirtualizer)
+  }
+
   const scrollOffset = rowVirtualizer.scrollOffset ?? 0
-  const committedScrollRef = React.useRef({
-    offset: scrollOffset,
-    isJumping: false
-  })
-  const scrollDelta = Math.abs(scrollOffset - committedScrollRef.current.offset)
+  const committedScroll = registry.get(atoms.scrollCommitted) ?? { offset: scrollOffset, isJumping: false }
+  const scrollDelta = Math.abs(scrollOffset - committedScroll.offset)
   const isScrolling = rowVirtualizer.isScrolling || columnVirtualizer.isScrolling
   const isScrollJumping =
     rowVirtualizer.isScrolling &&
     scrollDelta >
-      rowSize *
-        (committedScrollRef.current.isJumping ? SCROLL_JUMP_EXIT_ROWS_PER_COMMIT : rowVirtualizer.options.overscan * 2)
-  const deferredIsScrolling = React.useDeferredValue(isScrolling)
-
-  useLayoutEffect(() => {
-    committedScrollRef.current = {
-      offset: scrollOffset,
-      isJumping: isScrollJumping
-    }
-    isScrollJumpingRef.current = isScrollJumping
-  })
+      rowSize * (committedScroll.isJumping ? SCROLL_JUMP_EXIT_ROWS_PER_COMMIT : rowVirtualizer.options.overscan * 2)
+  const deferredIsScrolling = useDeferredValue(isScrolling)
 
   const columnWindowKey = isColumnVirtualizationEnabled
     ? getColumnWindowKey({
@@ -274,85 +413,35 @@ function DataGridViewport<TData extends RowData>({
       })
     : ""
 
-  const columnWindow = React.useMemo(() => parseColumnWindowKey(columnWindowKey), [columnWindowKey])
+  const columnWindow = kept(layout.kept.columnWindow, [columnWindowKey], () => parseColumnWindowKey(columnWindowKey))
 
-  useLayoutEffect(() => {
-    columnVirtualizerRef.current = columnVirtualizer
-    return () => {
-      if (columnVirtualizerRef.current === columnVirtualizer) {
-        columnVirtualizerRef.current = null
-      }
+  const readOnlyColumnIds = kept(
+    layout.kept.readOnlyColumnIds,
+    // `getCanEdit` reads these table options, so they make the set again.
+    [leafColumns, readOnly, enableCellEditing],
+    () => new Set(leafColumns.filter((column) => !column.getCanEdit()).map((column) => column.id))
+  )
+
+  const shared = kept(layout.kept.shared, [stretchColumns, adjustLayout, readOnlyColumnIds], () => ({
+    stretchColumns,
+    adjustLayout,
+    readOnlyColumnIds
+  }))
+
+  function onRowAdd(event: ReactMouseEvent<HTMLDivElement>) {
+    void onRowAddProp?.(event)
+  }
+
+  function onFooterCellKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!onRowAddProp) return
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      void onRowAddProp(event)
     }
-  }, [columnVirtualizerRef, columnVirtualizer])
+  }
 
-  useLayoutEffect(() => {
-    rowVirtualizerRef.current = rowVirtualizer
-    return () => {
-      if (rowVirtualizerRef.current === rowVirtualizer) {
-        rowVirtualizerRef.current = null
-      }
-    }
-  }, [rowVirtualizerRef, rowVirtualizer])
-
-  useLayoutEffect(() => {
-    const rafId = requestAnimationFrame(() => {
-      rowVirtualizer.measure()
-      columnVirtualizer.measure()
-    })
-    return () => cancelAnimationFrame(rafId)
-  }, [
-    rowVirtualizer,
-    columnVirtualizer,
-    table.state.columnFilters,
-    table.state.columnOrder,
-    table.state.columnPinning,
-    table.state.columnSizing,
-    table.state.columnVisibility,
-    table.state.sorting
-  ])
-
-  const readOnlyColumnIds = React.useMemo(
-    () => new Set(leafColumns.filter((column) => !column.getCanEdit()).map((column) => column.id)),
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `getCanEdit` reads these table options, so they invalidate the set
-    [leafColumns, readOnly, enableCellEditing]
-  )
-
-  const rowContext = React.useMemo(
-    () => ({
-      stretchColumns,
-      adjustLayout,
-      readOnlyColumnIds,
-      rowMapRef
-    }),
-    [stretchColumns, adjustLayout, readOnlyColumnIds, rowMapRef]
-  )
-
-  const onRowAddRef = useValueAsRef(onRowAddProp)
-
-  const onRowAdd = React.useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      void onRowAddRef.current?.(event)
-    },
-    [onRowAddRef]
-  )
-
-  const onDataGridContextMenu = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault()
-  }, [])
-
-  const onFooterCellKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!onRowAddRef.current) return
-
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault()
-        void onRowAddRef.current(event)
-      }
-    },
-    [onRowAddRef]
-  )
-
-  return (
+  const drawn = (
     <div
       role="grid"
       aria-label="Data grid"
@@ -361,7 +450,7 @@ function DataGridViewport<TData extends RowData>({
       aria-multiselectable="true"
       data-slot="data-grid"
       tabIndex={0}
-      ref={dataGridRef}
+      ref={layout.gridRef}
       className="relative isolate grid overflow-auto overscroll-x-contain rounded-md border tabular-nums select-none focus:outline-none"
       style={{
         ...columnSizeVars,
@@ -399,30 +488,29 @@ function DataGridViewport<TData extends RowData>({
               : undefined
           }
         >
-          <DataGridRowContext value={rowContext}>
-            {rowVirtualizer.getVirtualItems().map((virtualItem, _, items) => {
-              const row = rows[virtualItem.index]
-              if (!row) return null
+          {rowVirtualizer.getVirtualItems().map((virtualItem, _, items) => {
+            const row = rows[virtualItem.index]
+            if (!row) return null
 
-              return (
-                <DataGridRow
-                  key={virtualItem.index % items.length}
-                  row={row}
-                  leafColumns={leafColumns}
-                  virtualItem={virtualItem}
-                  columnWindow={columnWindow}
-                  isScrolling={isScrolling || deferredIsScrolling}
-                />
-              )
-            })}
-          </DataGridRowContext>
+            return (
+              <DataGridRow
+                key={virtualItem.index % items.length}
+                row={row}
+                leafColumns={leafColumns}
+                virtualItem={virtualItem}
+                columnWindow={columnWindow}
+                isScrolling={isScrolling || deferredIsScrolling}
+                shared={shared}
+              />
+            )
+          })}
         </div>
       </div>
       {hasFooter && (
         <div
           role="rowgroup"
           data-slot="data-grid-footer"
-          ref={footerRef}
+          ref={layout.footerRef}
           className="sticky bottom-0 z-30 grid border-t bg-background"
         >
           <div
@@ -453,6 +541,19 @@ function DataGridViewport<TData extends RowData>({
       )}
     </div>
   )
+
+  // What the next draw and the range functions compare with: this draw's scroll, once the rows above have been drawn
+  // with the last one's (upstream wrote it in a layout effect after the draw).
+  const committed = registry.get(atoms.scrollCommitted)
+  if (committed?.offset !== scrollOffset || committed.isJumping !== isScrollJumping) {
+    registry.set(atoms.scrollCommitted, { offset: scrollOffset, isJumping: isScrollJumping })
+  }
+
+  return drawn
+}
+
+function onDataGridContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+  event.preventDefault()
 }
 
 function getColumnsWidth<TData extends RowData>(columns: Column<DataGridFeatures, TData>[]) {
@@ -497,7 +598,7 @@ function parseColumnWindowKey(key: string): ColumnWindow | null {
 }
 
 interface DataGridActionBarProps<TData extends RowData> extends Pick<DataGridProps<TData>, "table"> {
-  actionBar: React.ReactNode
+  actionBar: ReactNode
 }
 
 function DataGridActionBar<TData extends RowData>({ table, actionBar }: DataGridActionBarProps<TData>) {
@@ -514,7 +615,7 @@ interface DataGridHeaderProps<TData extends RowData>
   columnWindow: ColumnWindow | null
 }
 
-const DataGridHeader = React.memo(
+const DataGridHeader = memo(
   DataGridHeaderImpl,
   (prev, next) =>
     prev.table.atoms === next.table.atoms &&
@@ -627,7 +728,7 @@ function selectHeaderState(state: TableState<DataGridFeatures>) {
   }
 }
 
-function onHeaderCellMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+function onHeaderCellMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
   if (!event.currentTarget.querySelector("button, input, a[href]")) {
     event.preventDefault()
   }

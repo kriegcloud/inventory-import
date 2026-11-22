@@ -429,17 +429,21 @@ bun run check
   in atoms, not React's hooks, and each says so on its first line. `shadcn add` over one of them is a merge by hand,
   never `--overwrite`: take upstream's change into the file as it is here, and keep it on atoms
   (`packages/ui/.oxlintrc.kit.json` reads these files and refuses an effect hook or a state hook; it reads the
-  whole `components/data-table/` folder, a file added to it too). Moved so far (batch 1, the data table), all under
-  `packages/ui/src/`:
+  whole `components/data-table/` and `components/data-grid/` folders, a file added to either too). Moved so far
+  (batch 1, the data table; batch 2, the data grid), all under `packages/ui/src/`:
   - `hooks/use-data-table.ts`, `hooks/use-debounced-callback.ts`
   - `components/data-table/`: `data-table-state.ts`, `data-table-records.tsx`, `data-table-toolbar.tsx`,
     `data-table-view-options.tsx`, `data-table-sort-menu.tsx`, `data-table-filter-menu.tsx`,
     `data-table-slider-filter.tsx`, `data-table-range-filter.tsx`, `data-table-date-filter.tsx`
   - `components/faceted.tsx`, `components/sortable.tsx`, `components/calendar.tsx`, `components/slider.tsx`
-  - changed only in how React is imported (by name, so the lint can read them): `components/direction.tsx` and, in
+  - `components/data-grid/`: `use-data-grid.ts`, `data-grid.tsx`, `data-grid-cell-variants.tsx`, `data-grid-cell.tsx`,
+    `data-grid-data-cell.tsx`, `data-grid-row.tsx`, `data-grid-column-header.tsx`, `data-grid-select-column.tsx`,
+    `data-grid-search.tsx`, `data-grid-context-menu.tsx`, `data-grid-paste-dialog.tsx`, `use-badge-overflow.ts`
+  - changed only in how React is imported (by name, so the lint can read them): `components/direction.tsx`; in
     `components/data-table/`, `data-table.tsx`, `data-table-pagination.tsx`, `data-table-faceted-filter.tsx`,
     `data-table-column-header.tsx`, `data-table-cards.tsx`, `data-table-skeleton.tsx`, `data-table-types.ts`,
-    `data-table-utils.ts`
+    `data-table-utils.ts`; in `components/data-grid/`, `data-grid-cell-preview.tsx`, `data-grid-types.ts`,
+    `data-grid-utils.ts`
 - **`bunx`, not `npx`, for `add`.** Under `npx` the CLI's own `npm install` stopped with `EALLOWSCRIPTS` (npm 11
   refuses an `allow-scripts` setting handed down as an environment variable). `bunx` without `--bun` still runs the
   CLI on Node. The CLI installs with npm here, so

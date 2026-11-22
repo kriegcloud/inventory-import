@@ -236,7 +236,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared by hand in the packages with screens (`tags:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
@@ -329,7 +329,7 @@ explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
-                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared by hand in the packages with screens; exports; keys; effect-imports: every Effect import from its own path
+                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; effect-imports: every Effect import from its own path
                         under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout). Nothing imports it.
 turbo.json              The task graph: seven package tasks and the root tasks (the repository's own rules, one each).
@@ -392,8 +392,8 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 - Literal unions are `Schema.Literals([...])`. Classes are `Schema.Class`, `Model.Class`, `Schema.TaggedError`.
 - A tagged value's case is told by what its type gives: `O.isSome` and `O.match`, `AsyncResult.isFailure`, a
   `Data.taggedEnum`'s `$is` and `$match`, a `Schema.TaggedUnion`'s `guards`, `isAnyOf` and `match`, `Match.valueTags`
-  for plain data, `Schema.is` of one error class. Never `x._tag === "A"` or `switch (x._tag)`: in the packages with
-  screens `bun run check` refuses both (`tags:check`).
+  for plain data, `Schema.is` of one error class. Never `x._tag === "A"` or `switch (x._tag)`:
+  `bun run check` refuses both, in every src and test folder (`tags:check`).
 - `bun run typecheck` catches wiring mistakes (a missing Layer shows as a type error in `worker.ts`). Run it early.
 - A route beside the HttpApi (a frame document, a stream) has its own shape: pattern 6 in `docs/patterns.md`.
 

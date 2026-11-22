@@ -1,5 +1,6 @@
 {
   "commit": "734c27a",
+  "pinnedOn": "2026-11-22",
   "packages": [
     {
       "package": "@alchemy.run/acme",

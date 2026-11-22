@@ -32,6 +32,8 @@
     "docs:check": "bun packages/tooling/tool/cli/src/bin.ts docs check",
     "deps:lint": "syncpack lint",
     "deps:outdated": "syncpack update --check",
+    "alchemy:repin": "python3 vendor/alchemy/repin.py",
+    "alchemy:check": "python3 vendor/alchemy/repin.py --check",
     "prepare": "effect-tsgo patch --typescript --oxlint --tsrs",
     "keys:check": "bun packages/tooling/tool/cli/src/bin.ts laws keys",
     "vendor:check": "bun packages/tooling/tool/cli/src/bin.ts vendor check",

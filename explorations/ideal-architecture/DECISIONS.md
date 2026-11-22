@@ -1109,11 +1109,11 @@ Measured, cold, pinned (`taskset`), the whole check each time, 80 tasks:
 The last two rows are what CI runs. Every red run after the first row was a test that waits in real time, never a
 limit. One test worker costs about a minute on four cores.
 
-Measured again on the tree with everything merged (main at 7d91233 with the loud retries and the sized limits, 83
+Measured again on the tree with everything merged (main at 46eed3e with the loud retries and the sized limits, 85
 tasks; the table above had 80 and lacked the atoms and sync branches), cold, as CI runs it: four pinned cores, green
-three times in a row in 262, 223 and 255 s; two pinned cores, green twice in 285 and 269 s. No test needed a second
-try in any of the five. The slowest, under 5 minutes, leaves about 10 of the job's 15 for the install, the browser
-step and a runner slower than two pinned cores here. The runner itself has not run this yet: nothing is pushed.
+three times in a row in 235, 208 and 276 s; two pinned cores, green in 298 s. No test needed a second try in any of
+them. The slowest, five minutes, leaves about ten of the job's 15 for the install, the browser step and a runner
+slower than two pinned cores here. The runner itself has not run this yet: nothing is pushed.
 
 The concurrency, workers and limits were the agent's, not asked; the second try was put to him. Question, by dialog:
 the tests that wait in real time fail now and then under load and are tried again with no word, which can hide an

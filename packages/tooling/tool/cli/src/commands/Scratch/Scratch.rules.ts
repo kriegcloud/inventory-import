@@ -381,6 +381,33 @@ export const noCheck = "@ts-nocheck"
 export const uncheckedLines = (text: string): ReadonlyArray<number> =>
   A.flatMap(Str.split("\n")(text), (line, index) => (/@ts-nocheck/i.test(line) ? [index + 1] : []))
 
+/**
+ * The comment that hides whatever type error the next line has, and goes on hiding it once the code is right. The
+ * scratchpad refuses it (Benjamin's decision of 2026-11-22: "Refuse ignore, allow expect-error").
+ *
+ * @category rules
+ */
+export const ignore = "@ts-ignore"
+
+/**
+ * The comment an experiment may write instead of {@link ignore}: it says the next line must not compile, and is an
+ * error itself as soon as that line does.
+ *
+ * @category rules
+ */
+export const expectError = "@ts-expect-error"
+
+/**
+ * The lines of a file that name {@link ignore}, numbered from 1, in any mix of capitals, as for {@link noCheck}.
+ *
+ * @example
+ * ignoredLines("const count = 1\n// @ts-ignore\ncount()\n") // [2]
+ *
+ * @category rules
+ */
+export const ignoredLines = (text: string): ReadonlyArray<number> =>
+  A.flatMap(Str.split("\n")(text), (line, index) => (/@ts-ignore/i.test(line) ? [index + 1] : []))
+
 /** The files the type-check reads, each absolute. A test gives its own. */
 export type Listing = Effect.Effect<ReadonlyArray<string>, RepoError, Repo>
 
@@ -706,7 +733,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     code,
     (path) =>
       Effect.map(repo.text(repo.join(repo.root, path)), (text) =>
-        A.appendAll(
+        A.flatten([
           A.map(diagnosticLines(path)(text), (line) =>
             problem(
               `${path}:${line}`,
@@ -718,8 +745,14 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
               `${path}:${line}`,
               `names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`
             )
+          ),
+          A.map(ignoredLines(text), (line) =>
+            problem(
+              `${path}:${line}`,
+              `names \`${ignore}\`, which hides a type error on the next line and keeps hiding it after the code is fixed. Fix the error, or, where the experiment shows that a wrong call does not compile, write \`${expectError}\`, which fails by itself once the error is gone`
+            )
           )
-        )
+        ])
       ),
     { concurrency: 1 }
   )

@@ -56,7 +56,9 @@ the test's name says it was not run, and it was checked by hand.
   turned off). What it says of an experiment is what it would say of a package. A file may turn one diagnostic off
   only as decision 33 of the Alchemy brief allows: `// @effect-diagnostics newSchemaClass:off` as the first line of a
   `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses any other `@effect-diagnostics` line, and any
-  `@ts-nocheck` (in any mix of capitals, as the compiler reads it), with its file and line. It reads the files the
+  `@ts-nocheck` or `@ts-ignore` (in any mix of capitals), with its file and line. `@ts-expect-error` is allowed: it
+  is how an experiment shows that a wrong call does not compile, and it fails by itself once the error is gone, where
+  `@ts-ignore` would go on hiding it. It reads the files the
   compiler itself lists for the scratchpad's type-check (`tsrs -p tsconfig.json --listFilesOnly`): the experiments
   and the scratchpad's configuration, a file loose beside them or in a `dist` folder, a folder linked in, and every
   file one of those reaches by an import, whatever its folder is called and whether or not it is in the scratchpad.

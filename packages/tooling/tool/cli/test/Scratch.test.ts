@@ -8,6 +8,9 @@ import * as Str from "effect/String"
 import * as TestClock from "effect/testing/TestClock"
 import {
   diagnosticLines,
+  expectError,
+  ignore,
+  ignoredLines,
   noCheck,
   programFiles,
   type Install,
@@ -466,6 +469,33 @@ describe("scratch", () => {
         "err: scratch:check FAIL  2 problems",
         `err:   scratchpad/experiments/shelf/Shelf.aggregate.ts:2: ${refused}`,
         `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it("the comment that hides the next line's error is found in any capitals; the one that expects it is not", () => {
+    expect(ignoredLines(`const count = 1\n// ${ignore}\ncount()\n`)).toEqual([2])
+    expect(ignoredLines("// @TS-Ignore\r\n/* @ts-IGNORE */\r\n")).toEqual([1, 2])
+    expect(ignoredLines(`// ${expectError}\ncount()\n`)).toEqual([])
+  })
+
+  it.effect("check refuses a line that hides a type error, and lets one that expects it stand", () =>
+    Effect.gen(function* () {
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "probe", ""),
+          "scratchpad/experiments/shelf/Shelf.ts": `export const count = 1\n// ${ignore}\ncount()\n`,
+          "scratchpad/experiments/shelf/Shelf.test.ts": `// @TS-Ignore\nexport const size = 1\n`,
+          "scratchpad/experiments/shelf/Wrong.ts": `// ${expectError}\nexport const wrong: number = "one"\n`
+        }),
+        scratchCheck(types, included).pipe(said)
+      )
+      const refused = `names \`${ignore}\`, which hides a type error on the next line and keeps hiding it after the code is fixed. Fix the error, or, where the experiment shows that a wrong call does not compile, write \`${expectError}\`, which fails by itself once the error is gone`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  2 problems",
+        `err:   scratchpad/experiments/shelf/Shelf.test.ts:1: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.ts:2: ${refused}`,
         "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])
     })

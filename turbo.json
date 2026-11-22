@@ -137,6 +137,9 @@
     // source. The installed @effect/tsgo it compares a `$schema` with is hashed through bun.lock.
     "//#version-sync": {
       "inputs": [
+        "packages/foundation/modeling/identity/src/**",
+        "packages/foundation/modeling/schema/src/**",
+        "packages/foundation/modeling/utils/src/**",
         "package.json",
         "apps/**/package.json",
         "packages/**/package.json",
@@ -165,6 +168,9 @@
     // bun.lock.
     "//#config-sync:check": {
       "inputs": [
+        "packages/foundation/modeling/identity/src/**",
+        "packages/foundation/modeling/schema/src/**",
+        "packages/foundation/modeling/utils/src/**",
         "*.{json,jsonc}",
         "scratchpad/package.json",
         "scratchpad/tsconfig*.json",

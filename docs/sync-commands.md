@@ -113,14 +113,19 @@ depends on where it is and what it holds is written from that.
 | sources | `source` in `.syncpackrc.json` | the root's `workspaces` patterns |
 | coverage | every package fits a `workspaces` pattern, and every pattern names a package (a problem, not repaired) | the folders with a `package.json` under `apps` and `packages` |
 | paths | a `$schema`, an `extends` and a path in a script that names nothing where it is, and would from the root | the depth of the folder it is in |
-| references | a solution file (`"files": []`) references every project beside it, the root's also each package's projects other than its `tsconfig.json`; a reference that names nothing is removed; a project that has `references` lists the workspace packages its `package.json` declares | the `tsconfig*.json` files on disk, and each package's dependencies |
+| references | a solution file (`"files": []`) references every project beside it, the root's also each package's projects other than its `tsconfig.json`; a reference that names nothing is removed, one a person added is kept. A package's own projects are type-checked from source and have no references; none is derived | the `tsconfig*.json` files on disk |
 | scripts | `check` type-checks each of the package's projects and counts against its ceiling file; `test` exists beside a `vitest.config.ts`; `lint` exists unless the package is vendored | what the package holds |
 | tasks | `check` and `check:full` run every root task `turbo.json` defines and no other; each has a root script (a problem when it has none) | the `//#name` tasks of `turbo.json` |
-| vendored | the formatter's `ignorePatterns` name every vendored package | the packages with a `vendor.json` |
-| scratchpad | the scratchpad's `dependencies` name every package, as `workspace:*` ([the scratchpad](scratchpad.md)); syncpack's sources leave the scratchpad out | the packages under `packages/` |
+| vendored | the formatter's `ignorePatterns` name every vendored package, and no package of the repository's own | the packages with a `vendor.json` |
+| scratchpad | the scratchpad's `dependencies` name every package under `packages/`, as `workspace:*` ([the scratchpad](scratchpad.md)); a link an experiment added to another workspace stays as written; syncpack's sources leave the scratchpad out | the packages under `packages/` |
 
-A reference a person added by hand to a solution file is kept while it names something. No package has project
-references today (each is type-checked from source by `tsrs -p`); the rule for them is there for the day one does.
+A reference a person added by hand to a solution file is kept while it names something. A list or object that holds
+a comment is never rewritten whole: the command names what differs and leaves the change to a person, so the comment
+stays. A `./` path that names nothing beside its file is a problem, never a repoint at the root's file of that name.
+
+Every rule reads the root and each package's own folder, not the folders below it: a project or a configuration file
+in a package's subfolder (`apps/inventory/scripts/tsconfig.json`) is not checked, and a solution file keeps the
+reference a person gave it.
 
 The rest of what repeats the workspaces is held elsewhere: the two stylesheet lists by `bun run beep laws screens`,
 which package may import which by `bun run beep laws boundaries`.

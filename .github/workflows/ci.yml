@@ -30,8 +30,11 @@ jobs:
       - name: Check, test and build
         run: bun run check:full -- --summarize
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
-      # Chrome at this path (CHROME_BIN in actions/runner-images, Ubuntu 24.04); with no browser there the step fails.
+      # Chrome at this path (CHROME_BIN in actions/runner-images, Ubuntu 24.04). The browser says its version first,
+      # so a path that is wrong fails on that line with the path in it.
       - name: Type on the data grid
-        run: bun run --cwd apps/inventory grid:keys
+        run: |
+          "$CHROME_PATH" --version
+          bun run --cwd apps/inventory grid:keys
         env:
           CHROME_PATH: /usr/bin/google-chrome

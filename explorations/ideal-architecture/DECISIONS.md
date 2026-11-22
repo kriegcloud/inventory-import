@@ -556,6 +556,15 @@ the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whol
 that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
 from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
 
+How the budget is measured changed on 2026-11-22 (agent, not asked): the rule and the one entry stand. The test held
+the time on the clock to 400 ms, and GitHub's four-core runner, busy with the rest of the check, took over five
+seconds for five starts, so CI failed on a CLI that had not changed. It now holds the processor time the start used
+(user and system, as bash's `time` reports them) to 700 ms: the same 3.6 times the measured start (110 ms on the
+clock, about 185 ms of processor time, since bun runs several threads). Shown both ways: with the CLI held to 8% of a
+core the old test timed out and the new one passes; with four heavy packages imported by the entry the new one fails
+(1,073 ms). What loading everything costs today: 121 ms on the clock for `--version`, of which bun alone is 18 ms and
+Effect's CLI with no command of ours 95 ms, so a fast path would save about 26 ms. Not built.
+
 ### 2026-11-19 — tooling CLI: what the tests stand on (T8)
 
 Question: what do the rules' tests stand on? Answer: "@effect/vitest and a real temp folder (Recommended)".

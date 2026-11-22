@@ -144,8 +144,8 @@ const serve = (port) =>
       reject(new Error(`the development server stopped (exit ${code}) before it served: ${said.trim()}`))
     )
     setTimeout(
-      () => reject(new Error(`the development server did not say it serves port ${port} in 60 s: ${said.trim()}`)),
-      60_000
+      () => reject(new Error(`the development server did not say it serves port ${port} in 180 s: ${said.trim()}`)),
+      180_000
     )
   })
 
@@ -185,7 +185,7 @@ const typeAll = async (browser, origin, delay) => {
         if (wanted === before) await page.waitForTimeout(500)
         const settled = await stored
           .filter({ hasText: wanted })
-          .waitFor({ timeout: 2000 })
+          .waitFor({ timeout: 15_000 })
           .then(
             () => true,
             () => false

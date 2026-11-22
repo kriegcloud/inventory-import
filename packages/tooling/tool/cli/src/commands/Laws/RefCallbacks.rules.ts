@@ -28,6 +28,10 @@
  * to a ref, at any depth (`ref={props.measure}`, `ref={props.on.measure}`), is the caller's to keep steady: every
  * attribute of that name, in every screen, is judged the same way, and so is a list a prop hands in.
  *
+ * A file whose names lead into each other past the steps its length allows, one nested too deep, one too large, or
+ * one the parser reads with errors (`internal/budget.ts`) is refused as a whole, once, at the line being read, in
+ * words that say which: never read without end, never passed in silence.
+ *
  * What it does not see: a ref among spread props (`{...first}`); a steady callback on an element whose `key` changes
  * (React makes the element anew, and calls the callback, whenever the key does: an effect on the key); a hook that
  * hands back a new function on each draw; and a prop's name shared by two unrelated components, which is judged as
@@ -41,12 +45,14 @@ import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as HashSet from "effect/HashSet"
+import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
+import { unreadSentence } from "./internal/budget.ts"
 import { type Handed, readScreen } from "./internal/refCallbacksCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/RefCallbacks.rules")
@@ -150,6 +156,12 @@ export const refCallbacks = Effect.fn("RefCallbacks.refCallbacks")(function* () 
   )
   const at = (file: string, handed: Handed, why: string): RefCallbacksFinding =>
     RefCallbacksFinding.cases.At.make({ place: `${file}:${handed.line}`, why })
+  // A screen the law did not read is refused once, where it stopped, in words that say why.
+  const unread = A.flatMap(read, (screen) =>
+    A.map(O.toArray(screen.unread), ({ line, unread }) =>
+      RefCallbacksFinding.cases.At.make({ place: `${screen.file}:${line}`, why: unreadSentence(unread) })
+    )
+  )
   const direct = A.flatMap(read, (screen) =>
     A.flatMap(screen.refs, (handed) =>
       handed.verdict.kind === "refused" ? [at(screen.file, handed, `${handed.as}: ${handed.verdict.why}`)] : []
@@ -181,7 +193,7 @@ export const refCallbacks = Effect.fn("RefCallbacks.refCallbacks")(function* () 
         : []
     )
   )
-  const found = A.appendAll(direct, through)
+  const found = A.appendAll(A.appendAll(unread, direct), through)
   return A.isArrayNonEmpty(found)
     ? A.prepend<RefCallbacksFinding, RefCallbacksFinding>(found, RefCallbacksFinding.cases.Refused.make({}))
     : A.of<RefCallbacksFinding>(RefCallbacksFinding.cases.Clean.make({}))

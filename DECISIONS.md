@@ -62,12 +62,12 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       saying the column was matched again after the accept. Accepting again works.
     - The take-back line says a field "was matched again" and "to decide again" also when its column was cleared or
       went to another field, after the rows were decided again, and to people who cannot decide.
-  - **For whoever changes the code.** `tags:check` takes 38 s on a chain of 20 calls, and `refs:check` does not
-    return on seven module variables assigned to each other; no file here is of either shape. `WordMatch`, `Read`
-    and the kept form of a held row are tagged unions whose cases are still built by hand. The property test of the
-    draft generates no take-back, empty decision, settled line, taken-up row or sign-out. Nothing fails when the
-    held-confirm line is removed, and three tests of a save while the session is asked again keep a person signed
-    in, which the app does not.
+  - **For whoever changes the code.** `tags:check` and `refs:check` read a file within a budget and refuse one past
+    it in words; a file built to kill the parser behind text their scan misreads still kills the check, which then
+    fails (`goals/atoms/PLAN.md` names the shapes). The kept form of a held row is a tagged union whose cases are
+    still built by hand. The property test of the draft generates no take-back, empty decision, settled line,
+    taken-up row or sign-out. Nothing fails when the held-confirm line is removed, and three tests of a save while
+    the session is asked again keep a person signed in, which the app does not.
 - **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
   a restore after several confirms of one import replaced the same item in turn.
 - **Where my agent was wrong:** its profile missed rows 92 and 103 ("2024-13-01"), caught by the rules on the real

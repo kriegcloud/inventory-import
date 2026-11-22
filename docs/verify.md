@@ -38,9 +38,9 @@ Three kinds of rule, and one thing no rule says. Which rules there are is kept b
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
 schemas and the invariants allow and every input, not sampled by a test.
 
-**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 136. That an act is
+**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 139. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
-`test/Group.story.test.ts`, 55 of them, one at least for each of the eleven commands), and the property that drives
+`test/Group.story.test.ts`, 56 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
 "can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
 search three commands deep.
@@ -87,6 +87,9 @@ from a screen that is behind is never dropped without a word and never applied; 
   saw was taken back and an older decision is there again, `NoLongerThere` when nothing is.
 - A covered press sent twice is written once: the row holds that very act (the sender's, under the same step, with the
   same text), and the second is answered with nothing new recorded.
+- An undo sent twice is written once too. A row keeps the last undo it took (the change taken back, the step it was
+  pressed in, who pressed), whatever is decided there afterwards, and the same undo sent again is answered with
+  nothing new recorded, not `NotYourStep`. Three rules of `Undoing` say the row keeps each as the act said it.
 - `UndoGroup` names nothing its sender has seen, and is the one decision that takes a press from a screen that is
   behind: it takes back its sender's own act and replaces nothing of anyone else's. A row decided since keeps that
   person's whole decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer
@@ -128,10 +131,14 @@ Two more tasks hold the model, both in `bun run check:full`:
   story must notice; `packages/catalog/model/mutants/README.md` has them all, what each class means and what they
   cost. All of them run every night (`mutants`).
 
-In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`, `bun run proofs`), which restores
-turbo's results from the last run on `main` and so runs nothing unless one of those changed, and they run again every
-night with nothing replayed and every mutant (`bun run proofs:nightly`, `.github/workflows/proofs-nightly.yml`).
-`bun run check:ci` is `check:full` without them, for CI's main job.
+In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`, which runs the tasks of
+`bun run proofs` through turbo itself), which restores turbo's results from the last run on `main` and so runs
+nothing unless one of those changed. They run again every night with nothing replayed and every mutant
+(`.github/workflows/proofs-nightly.yml`, which also calls turbo itself; `bun run proofs:nightly` is the same four
+tasks by hand, with `--force`, so it replays nothing either). `bun run check:ci` is `check:full` without them, for
+CI's main job. The rule on `main` names both jobs as required (`packages/infra/src/GitHub.stack.ts`); it holds once
+the repository's stack is deployed again (`goals/infra/PLAN.md`, step 14), and until then a red proofs job stops no
+merge.
 
 ## Three rules to break
 
@@ -283,7 +290,7 @@ stands. Shown on this model: with the line of `UndoingGroup` that refuses an und
 deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
 and the lock, whose text of the rule has not changed, is silent. So the test also gives Verify the library's list of
 rules that must stay proved (`require: { proved }`, Benjamin, 2026-11-22: "Lock plus the library's proved list"):
-the names the lock keeps of the kinds a proof covers, 136 of them. The same deletion then fails by name:
+the names the lock keeps of the kinds a proof covers, 139 of them. The same deletion then fails by name:
 
 ```text
 Not done

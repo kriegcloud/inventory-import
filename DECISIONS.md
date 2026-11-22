@@ -48,9 +48,12 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
     - A decision of hers that a confirm wrote, whose own save is refused after the import was opened again because
       somebody changed the row since, comes back to her to pick only if her screen had already read the reopened
       import when the refusal arrived. If the refusal arrives first, it is dropped without a word.
-  - **For whoever changes the code.** `tags:check` and `refs:check` read a file within a budget and refuse one past
-    it in words; a file built to kill the parser behind text their scan misreads still kills the check, which then
-    fails (`goals/atoms/PLAN.md` names the shapes). The kept form of a held row is a tagged union whose cases are
+  - **For whoever changes the code.** `tags:check`, `refs:check` and `try:check` read a file within a budget and
+    refuse one past it in words; a file built to kill the parser behind text their scan misreads still kills the
+    check, which then fails (`goals/atoms/PLAN.md` and `docs/standards/no-try.md` name the shapes). `try:check`
+    misses a `try` in a few doc-comment examples that are not modules by themselves (`docs/standards/no-try.md`
+    lists them). No test fails when the guard on browser storage is taken out of the review's kept store or of
+    the five places that write who was signed in. The kept form of a held row is a tagged union whose cases are
     still built by hand. Nothing fails when the held-confirm line is removed.
 - **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
   a restore after several confirms of one import replaced the same item in turn.

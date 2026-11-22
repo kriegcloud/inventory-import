@@ -78,9 +78,13 @@ import {
   parsePastedCellValue,
   parseTsv,
   serializeCellValue,
+  // Local change: `settle`, for the `try` statements upstream has here (none in this repository).
+  settle,
   stringifyUnknown,
   swapItems
 } from "@inventory/ui/components/data-grid/data-grid-utils"
+// Local change: `Result`, for the same.
+import * as Result from "effect/Result"
 
 type DataGridInstance = Table<DataGridFeatures, RowData>
 type DataGridColumnInstance = Column<DataGridFeatures, RowData>
@@ -863,11 +867,11 @@ function runWithReason<T>(table: DataGridInstance, reason: DataChangeReason, fn:
   if (store.reason) return fn()
   commitCellUpdates(table, store)
   store.reason = reason
-  try {
-    return fn()
-  } finally {
-    store.reason = null
-  }
+  // Local change: `Result.try` where upstream has `try` and `finally`. The reason is cleared whether `fn` returns or
+  // throws, and what it threw is thrown on unchanged, as upstream's `finally` did.
+  const outcome = Result.try({ try: fn, catch: (thrown) => ({ thrown }) })
+  store.reason = null
+  return Result.getOrThrowWith(outcome, ({ thrown }) => thrown)
 }
 
 function commitCellUpdates(table: DataGridInstance, store: CellUpdateStore) {
@@ -1610,20 +1614,20 @@ async function writeSelectedCells(table: DataGridInstance, isCut: boolean) {
   const serialized = serializeSelectedCells(table, isCut)
   if (!serialized) return
 
-  try {
-    await navigator.clipboard.writeText(serialized.text)
-    if (isCut) table.setCutCellGrid(serialized.cellGrid)
-    else if (table.atoms.cutCellGrid.get().length > 0) table.resetCutCellGrid(true)
-    notify?.({
-      variant: "success",
-      message: `${pluralizeCells(serialized.cellCount)} ${isCut ? "cut" : "copied"}`
-    })
-  } catch (error) {
-    notify?.({
-      variant: "error",
-      message: error instanceof Error ? error.message : `Failed to ${isCut ? "cut" : "copy"} to clipboard`
-    })
-  }
+  // Local change: `settle` where upstream has a `try` statement; a refused copy says why, as upstream's did.
+  const outcome = await settle(
+    async () => {
+      await navigator.clipboard.writeText(serialized.text)
+      if (isCut) table.setCutCellGrid(serialized.cellGrid)
+      else if (table.atoms.cutCellGrid.get().length > 0) table.resetCutCellGrid(true)
+      notify?.({
+        variant: "success",
+        message: `${pluralizeCells(serialized.cellCount)} ${isCut ? "cut" : "copied"}`
+      })
+    },
+    (error) => (error instanceof Error ? error.message : `Failed to ${isCut ? "cut" : "copy"} to clipboard`)
+  )
+  if (Result.isFailure(outcome)) notify?.({ variant: "error", message: outcome.failure })
 }
 
 function serializeSelectedCells(table: DataGridInstance, includeCellGrid: boolean) {
@@ -1755,118 +1759,119 @@ async function pasteCells(table: DataGridInstance, { expandRows = false }: Paste
   const pasteDialog = table.atoms.pasteDialog.get()
   const dataColumnIds = getDataColumnIds(table)
 
-  try {
-    const clipboardText = pasteDialog.clipboardText || (await navigator.clipboard.readText())
-    if (!clipboardText) return
+  // Local change: `settle` where upstream has a `try` statement around the whole paste; a refused paste says why, as
+  // upstream's did.
+  const outcome = await settle(
+    async () => {
+      const clipboardText = pasteDialog.clipboardText || (await navigator.clipboard.readText())
+      if (!clipboardText) return
 
-    const target = getPasteTarget(
-      table,
-      { rowId: focusedCell.row.id, columnId: focusedCell.column.id },
-      parseTsv(clipboardText, dataColumnIds.length),
-      dataColumnIds
-    )
-    if (target.rowIndex === -1 || target.columnIndex === -1) return
+      const target = getPasteTarget(
+        table,
+        { rowId: focusedCell.row.id, columnId: focusedCell.column.id },
+        parseTsv(clipboardText, dataColumnIds.length),
+        dataColumnIds
+      )
+      if (target.rowIndex === -1 || target.columnIndex === -1) return
 
-    const rowCount = table.getRowModel().rows.length
-    const rowsNeeded = target.rowIndex + target.values.length - rowCount
+      const rowCount = table.getRowModel().rows.length
+      const rowsNeeded = target.rowIndex + target.values.length - rowCount
 
-    if (rowsNeeded > 0 && createRow) {
-      if (!expandRows && !pasteDialog.clipboardText) {
-        table.setPasteDialog({ open: true, rowsNeeded, clipboardText })
-        return
-      }
-      if (expandRows) {
-        const newRows: RowData[] = []
-        for (let i = 0; i < rowsNeeded; i++) {
-          const row = await createRow({ reason: "paste" })
-          if (row) newRows.push(row)
+      if (rowsNeeded > 0 && createRow) {
+        if (!expandRows && !pasteDialog.clipboardText) {
+          table.setPasteDialog({ open: true, rowsNeeded, clipboardText })
+          return
         }
-        runWithReason(table, "paste", () => table.addRows(newRows))
-        await waitForRowCount(table, rowCount + newRows.length)
+        if (expandRows) {
+          const newRows: RowData[] = []
+          for (let i = 0; i < rowsNeeded; i++) {
+            const row = await createRow({ reason: "paste" })
+            if (row) newRows.push(row)
+          }
+          runWithReason(table, "paste", () => table.addRows(newRows))
+          await waitForRowCount(table, rowCount + newRows.length)
+        }
       }
-    }
 
-    const rows = table.getRowModel().rows
-    const cutCellGrid = table.atoms.cutCellGrid.get()
-    const updates: CellUpdate[] = []
-    const writtenCellKeys = new Set<string>()
-    const movedSourceCells: CellPosition[] = []
-    let skippedCount = 0
-    let endRowIndex = target.rowIndex
-    let endColumnIndex = target.columnIndex
+      const rows = table.getRowModel().rows
+      const cutCellGrid = table.atoms.cutCellGrid.get()
+      const updates: CellUpdate[] = []
+      const writtenCellKeys = new Set<string>()
+      const movedSourceCells: CellPosition[] = []
+      let skippedCount = 0
+      let endRowIndex = target.rowIndex
+      let endColumnIndex = target.columnIndex
 
-    for (const [pasteRowIndex, pasteRow] of target.values.entries()) {
-      const rowIndex = target.rowIndex + pasteRowIndex
-      const rowId = rows[rowIndex]?.id
-      if (!rowId) break
+      for (const [pasteRowIndex, pasteRow] of target.values.entries()) {
+        const rowIndex = target.rowIndex + pasteRowIndex
+        const rowId = rows[rowIndex]?.id
+        if (!rowId) break
 
-      for (const [pasteColumnIndex, text] of pasteRow.entries()) {
-        const columnIndex = target.columnIndex + pasteColumnIndex
-        const columnId = dataColumnIds[columnIndex]
-        if (!columnId) break
+        for (const [pasteColumnIndex, text] of pasteRow.entries()) {
+          const columnIndex = target.columnIndex + pasteColumnIndex
+          const columnId = dataColumnIds[columnIndex]
+          if (!columnId) break
 
-        endRowIndex = Math.max(endRowIndex, rowIndex)
-        endColumnIndex = Math.max(endColumnIndex, columnIndex)
+          endRowIndex = Math.max(endRowIndex, rowIndex)
+          endColumnIndex = Math.max(endColumnIndex, columnIndex)
 
-        const column = table.getAllFlatColumnsById()[columnId]
-        const parsed = column?.getCanEdit() ? parsePastedCellValue(text, column.columnDef.meta) : null
-        if (!parsed) {
-          skippedCount++
-          continue
+          const column = table.getAllFlatColumnsById()[columnId]
+          const parsed = column?.getCanEdit() ? parsePastedCellValue(text, column.columnDef.meta) : null
+          if (!parsed) {
+            skippedCount++
+            continue
+          }
+
+          updates.push({ rowId, columnId, value: parsed.value })
+          writtenCellKeys.add(getCellKey(rowId, columnId))
+
+          const sourceCell = target.isFill ? cutCellGrid[0]?.[0] : cutCellGrid[pasteRowIndex]?.[pasteColumnIndex]
+          if (sourceCell) movedSourceCells.push(sourceCell)
+        }
+      }
+
+      if (updates.length > 0) {
+        const clearedSourceUpdates = movedSourceCells
+          .filter((cell) => !writtenCellKeys.has(getCellKey(cell.rowId, cell.columnId)))
+          .map((cell) => ({
+            ...cell,
+            value: getEmptyValueForColumn(table, cell.columnId)
+          }))
+        table.resetCutCellGrid(true)
+        runWithReason(table, "paste", () => updateEditableCells(table, [...updates, ...clearedSourceUpdates]))
+
+        const startRowId = rows[target.rowIndex]?.id
+        const startColumnId = dataColumnIds[target.columnIndex]
+        const endRowId = rows[endRowIndex]?.id
+        const endColumnId = dataColumnIds[endColumnIndex]
+        if (startRowId && startColumnId && endRowId && endColumnId) {
+          table.selectCellRange({
+            anchorRowId: startRowId,
+            anchorColumnId: startColumnId,
+            focusRowId: endRowId,
+            focusColumnId: endColumnId
+          })
         }
 
-        updates.push({ rowId, columnId, value: parsed.value })
-        writtenCellKeys.add(getCellKey(rowId, columnId))
-
-        const sourceCell = target.isFill ? cutCellGrid[0]?.[0] : cutCellGrid[pasteRowIndex]?.[pasteColumnIndex]
-        if (sourceCell) movedSourceCells.push(sourceCell)
-      }
-    }
-
-    if (updates.length > 0) {
-      const clearedSourceUpdates = movedSourceCells
-        .filter((cell) => !writtenCellKeys.has(getCellKey(cell.rowId, cell.columnId)))
-        .map((cell) => ({
-          ...cell,
-          value: getEmptyValueForColumn(table, cell.columnId)
-        }))
-      table.resetCutCellGrid(true)
-      runWithReason(table, "paste", () => updateEditableCells(table, [...updates, ...clearedSourceUpdates]))
-
-      const startRowId = rows[target.rowIndex]?.id
-      const startColumnId = dataColumnIds[target.columnIndex]
-      const endRowId = rows[endRowIndex]?.id
-      const endColumnId = dataColumnIds[endColumnIndex]
-      if (startRowId && startColumnId && endRowId && endColumnId) {
-        table.selectCellRange({
-          anchorRowId: startRowId,
-          anchorColumnId: startColumnId,
-          focusRowId: endRowId,
-          focusColumnId: endColumnId
+        notify?.({
+          variant: "success",
+          message:
+            skippedCount > 0
+              ? `${pluralizeCells(updates.length)} pasted, ${skippedCount} skipped`
+              : `${pluralizeCells(updates.length)} pasted`
+        })
+      } else if (skippedCount > 0) {
+        notify?.({
+          variant: "error",
+          message: `${pluralizeCells(skippedCount)} skipped pasting for invalid data`
         })
       }
 
-      notify?.({
-        variant: "success",
-        message:
-          skippedCount > 0
-            ? `${pluralizeCells(updates.length)} pasted, ${skippedCount} skipped`
-            : `${pluralizeCells(updates.length)} pasted`
-      })
-    } else if (skippedCount > 0) {
-      notify?.({
-        variant: "error",
-        message: `${pluralizeCells(skippedCount)} skipped pasting for invalid data`
-      })
-    }
-
-    if (pasteDialog.open) table.resetPasteDialog(true)
-  } catch (error) {
-    notify?.({
-      variant: "error",
-      message: error instanceof Error ? error.message : "Failed to paste. Please try again."
-    })
-  }
+      if (pasteDialog.open) table.resetPasteDialog(true)
+    },
+    (error) => (error instanceof Error ? error.message : "Failed to paste. Please try again.")
+  )
+  if (Result.isFailure(outcome)) notify?.({ variant: "error", message: outcome.failure })
 }
 
 function getPasteTarget(

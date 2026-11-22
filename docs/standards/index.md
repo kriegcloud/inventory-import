@@ -22,6 +22,7 @@
 * [Schema first](schema-first.md) - Data is an Effect Schema that decodes into canonical Effect values, normalises and defaults at the boundary, models every finite variant as a tagged union, annotates keys as keys, and generates only valid values.
 * [Effect imports](effect-imports.md) - Every Effect module is imported whole from its own path under one fixed name, never through the "effect" barrel or a folder of modules, and a check holds it.
 * [Deprecated APIs](deprecated-apis.md) - No API marked deprecated is used, whether a library's or one of our own packages', and a check that reads every file's types holds it; with what that check cannot see.
+* [No try statement](no-try.md) - Code that can fail is an Effect, or a Result or an Option outside one, never a try statement, in every code file and in the examples of doc comments; a check that reads every file's syntax tree holds it, with the three paths it does not read and why.
 * [Engineering targets](engineering.md) - How the code is designed, tested, documented and measured, the server's rules for data, and how close development stays to production.
 * [Settings, logs and traces](config-and-logs.md) - Settings and secrets come through Effect Config on the server, a missing setting turns its feature off, and logs, failures and spans are useful without leaking anything.
 * [Security and tenancy](security.md) - Production headers on every response, secrets kept on the server, every write checked for its role and origin, and one organization never sees another's rows.

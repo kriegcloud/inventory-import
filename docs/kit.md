@@ -161,6 +161,12 @@ return <DataGrid {...grid} table={table} height={560} actionBar={<ReviewActions 
   number, url or long-text column, with its own `cell` or without; upstream typed it with the deprecated
   `document.execCommand`, and its fallbacks stored 6 for a typed 56. The select, multi-select, date and file editors
   are as published: the select and multi-select drop the key that opens them.
+- **Local patch:** no `try` statement, as everywhere in this repository (Benjamin, 2026-11-22). Where upstream has
+  one, a callback's promise is read as a `Result` through `settle` in `data-grid-utils.ts` (an upload or a delete of
+  files, a new row, a copy, a paste: a failure says the same words as before), the reason of a change is cleared with
+  `Result.try` (`runWithReason` in `data-grid-features.ts`), and pasted JSON, a URL or a value JSON cannot write is
+  read with `Option.liftThrowable`. The same in `data-table/format.ts` (`formatDate`), `file-upload.tsx` (an upload)
+  and `stepper.tsx` (a step's check). Each is marked "Local change" where it is made; nothing on screen changed.
 - **The grid's browser check:** `bun run --cwd apps/inventory grid:keys` types on those four editors, in both kinds
   of column, on the development page `/gallery/grid`, and reads what the grid stored: 56, -5, a space, a key then
   Escape, a key then undo, F2 then a key, each with no pause between keys and with 40 ms (96 cases). It fails on an

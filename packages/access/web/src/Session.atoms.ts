@@ -20,6 +20,7 @@ import {
   settledBeforeOwnSwitch
 } from "@inventory/client/MemberAtoms"
 import { leaveApp, navigate } from "@inventory/ui/Route"
+import { sharedStorage, tabStorage } from "@inventory/client/Storage"
 import {
   actorOfSession,
   type OrganizationChoice,
@@ -76,42 +77,24 @@ const signedOutKey = "signed-out-here"
  * Whether this browser was signed in when it last asked. It decides only what is drawn before the session answer
  * comes (the sign-in page at once, or a placeholder for the app); it grants nothing, and the answer always wins.
  */
-export const wasSignedIn = (): boolean => {
-  try {
-    return window.localStorage.getItem(signedInKey) === "yes"
-  } catch {
-    return false
-  }
-}
+export const wasSignedIn = (): boolean => O.contains(sharedStorage.read(signedInKey), "yes")
 
 const rememberSignedIn = (signedIn: boolean) => {
-  try {
-    if (signedIn) window.localStorage.setItem(signedInKey, "yes")
-    else window.localStorage.removeItem(signedInKey)
-  } catch {
-    // Private windows can refuse storage: the placeholder is then drawn until the answer comes.
-  }
+  // Private windows can refuse storage: the placeholder is then drawn until the answer comes.
+  if (signedIn) sharedStorage.write(signedInKey, "yes")
+  else sharedStorage.remove(signedInKey)
 }
 
 /**
  * Whether the person signed out in this tab. Development signs a visitor in as the first test account on its own
  * (the app's sign-in gate); after a sign-out it does not, so the sign-in page can be seen and another account chosen there.
  */
-export const signedOutHere = (): boolean => {
-  try {
-    return window.sessionStorage.getItem(signedOutKey) === "yes"
-  } catch {
-    return false
-  }
-}
+export const signedOutHere = (): boolean => O.contains(tabStorage.read(signedOutKey), "yes")
 
 const rememberSignedOut = (signedOut: boolean) => {
-  try {
-    if (signedOut) window.sessionStorage.setItem(signedOutKey, "yes")
-    else window.sessionStorage.removeItem(signedOutKey)
-  } catch {
-    // Without storage a sign-out in development is followed by the first test account again: nothing is lost.
-  }
+  // Without storage a sign-out in development is followed by the first test account again: nothing is lost.
+  if (signedOut) tabStorage.write(signedOutKey, "yes")
+  else tabStorage.remove(signedOutKey)
 }
 
 /**
@@ -123,11 +106,8 @@ export const changedKey = "inventory:signed-in-changed"
 
 /** Tells the other tabs of this browser that who is signed in may have changed. */
 const sayChanged = (): void => {
-  try {
-    window.localStorage.setItem(changedKey, SecureRandom.uuidV4Unsafe())
-  } catch {
-    // Storage refused: the other tabs ask again when they are next shown.
-  }
+  // Storage refused: the other tabs ask again when they are next shown.
+  sharedStorage.write(changedKey, SecureRandom.uuidV4Unsafe())
 }
 
 const endedKey = "session-ended"
@@ -138,34 +118,26 @@ const endedKey = "session-ended"
  */
 const rememberEnded = (who: O.Option<Member>) => {
   sayChanged()
-  try {
-    const { pathname, search } = window.location
-    window.sessionStorage.setItem(endedKey, `${keyOfMember(who)}\n${pathname}${search}`)
-  } catch {
-    // Without storage the sign-in page says nothing, and signing in again lands on the first screen.
-  }
+  // Without storage the sign-in page says nothing, and signing in again lands on the first screen. Where the page has
+  // no address to read (no window), nothing is kept either.
+  const at = O.liftThrowable(() => `${window.location.pathname}${window.location.search}`)()
+  if (O.isSome(at)) tabStorage.write(endedKey, `${keyOfMember(who)}\n${at.value}`)
 }
 
 /** Whether this tab's last page was left because its member's session had ended. */
-export const sessionEnded = (): boolean => {
-  try {
-    return window.sessionStorage.getItem(endedKey) !== null
-  } catch {
-    return false
-  }
-}
+export const sessionEnded = (): boolean => O.isSome(tabStorage.read(endedKey))
 
 /** Where `who` was when their session ended in this tab, taken once; none for anybody else, who lands on the first screen. */
 const takeEnded = (who: O.Option<Member>): O.Option<string> => {
-  try {
-    const kept = window.sessionStorage.getItem(endedKey)
-    window.sessionStorage.removeItem(endedKey)
-    const [of = "", at = ""] = Str.split(kept ?? "", "\n")
-    const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
-    return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
-  } catch {
-    return O.none()
-  }
+  const kept = tabStorage.read(endedKey)
+  // Where the browser refuses to forget it, it is not taken: nothing is said, and the first screen is the landing.
+  if (O.isNone(tabStorage.remove(endedKey))) return O.none()
+  const [of = "", at = ""] = Str.split(
+    O.getOrElse(kept, () => ""),
+    "\n"
+  )
+  const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
+  return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
 }
 
 /**

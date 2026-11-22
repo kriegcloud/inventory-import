@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/TaggedError.equivalence.test.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/TaggedError.equivalence.test.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 import { it } from "@effect/vitest";
 import * as FileSystem from "@beep/utils/FileSystem";
 import * as NodeUrl from "@beep/utils/NodeUrl";
@@ -59,7 +59,7 @@ describe("@beep/utils tagged-error declared equivalence", () => {
         value: () => undefined,
       });
 
-      try {
+      yield* Effect.gen(function* () {
         const fileSystemFirst = yield* captureEffectDefect(FileSystem.existsSync("missing"));
         const fileSystemSecond = yield* captureEffectDefect(FileSystem.existsSync("missing"));
         const pathFirst = capture(() => Path.join("one", "two"));
@@ -70,11 +70,15 @@ describe("@beep/utils tagged-error declared equivalence", () => {
         expectPrivateEquivalence(fileSystemFirst, fileSystemSecond, pathFirst);
         expectPrivateEquivalence(pathFirst, pathSecond, urlFirst);
         expectPrivateEquivalence(urlFirst, urlSecond, fileSystemFirst);
-      } finally {
-        if (P.isNotUndefined(descriptor)) {
-          Reflect.defineProperty(globalThis.process, "getBuiltinModule", descriptor);
-        }
-      }
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (P.isNotUndefined(descriptor)) {
+              Reflect.defineProperty(globalThis.process, "getBuiltinModule", descriptor);
+            }
+          })
+        )
+      );
     })
   );
 });

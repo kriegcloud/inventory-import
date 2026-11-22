@@ -1,15 +1,11 @@
 // What a dimensions or vendors cell of the file holds, as the fields of the form that fixes it: read from whole JSON,
 // or found piece by piece in a cell that was cut off, so the form opens with what the file says and never empty.
 // The one thing not to break: nothing here decides a value; the domain's readers check what the form saves.
+import * as O from "effect/Option"
 import { parse } from "@inventory/ui/Json"
 
-const parsed = (text: string): unknown => {
-  try {
-    return parse(text)
-  } catch {
-    return undefined
-  }
-}
+/** The cell's JSON, or nothing where it is not JSON (a cell cut off): then it is read piece by piece. */
+const parsed = (text: string): unknown => O.getOrUndefined(O.liftThrowable(parse)(text))
 
 const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

@@ -1031,7 +1031,9 @@ same. The telemetry script is converted; `theme-init.js` is the one file the law
 beside it. `.agents/` is left out by name, as for the deprecated-API check.
 
 When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
-batch". I chose; the agent recommended the same. Not built yet.
+batch". I chose; the agent recommended the same. Built: every `try` is converted but theme-init's, and
+`bun run check` refuses one in any code file git would commit, its doc comments' examples included, outside `.agents/`
+and the scratchpad (`try:check`, `docs/standards/no-try.md`).
 
 ### 2026-11-22 — Alchemy, which build, and the state store it upgrades
 

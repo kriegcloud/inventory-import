@@ -8,36 +8,19 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import { tabStorage } from "@inventory/client/Storage"
 
 /** Where a tab keeps its id: in the tab's own storage, which a reload of the tab keeps and a new tab does not. */
 const tabSlot = "inventory:tab"
 
-/** The tab's own storage, or none where reading it is refused (some private windows) or there is no window. */
-const tabStorage = (): Storage | undefined => {
-  try {
-    return typeof window === "undefined" ? undefined : window.sessionStorage
-  } catch {
-    return undefined
-  }
-}
-
-/** The id this tab had before a reload, if its storage kept one. */
-const keptId = (): O.Option<string> => {
-  try {
-    return O.fromNullishOr(tabStorage()?.getItem(tabSlot))
-  } catch {
-    return O.none()
-  }
-}
+/** The id this tab had before a reload, if its storage kept one (none where reading it is refused, or no window). */
+const keptId = (): O.Option<string> => tabStorage.read(tabSlot)
 
 /** A new id for this tab, kept for a reload of it (where the tab's storage refuses, a reload is another tab). */
 const newId = (): string => {
   const id = SecureRandom.uuidV4Unsafe()
-  try {
-    tabStorage()?.setItem(tabSlot, id)
-  } catch {
-    // Storage refused: the id lasts as long as the page.
-  }
+  // Storage refused: the id lasts as long as the page.
+  tabStorage.write(tabSlot, id)
   return id
 }
 

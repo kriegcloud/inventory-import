@@ -5,9 +5,9 @@
  *
  * The subset is computed, not hand-listed: the import closure of the entries in `VendorSubset.data.ts`, plus the
  * tests named there. Source files are copied byte for byte under a one-line provenance header. Test files get the
- * import rewrites listed there, recorded per file. A source file is patched only by a listed patch, each with its
- * reason, recorded in `vendor.json` and named in the file's provenance line. Run it again, pointed at a newer
- * commit, to refresh.
+ * import rewrites listed there, recorded per file. A source or test file is patched only by a listed patch, each with
+ * its reason, recorded in `vendor.json` and named in the file's provenance line (a test's patches apply after its
+ * rewrites). Run it again, pointed at a newer commit, to refresh.
  *
  * The words written into the kit (the provenance line, each README, the comment in `vendor.json`) name this command
  * and `vendor check`. A run at the recorded commit changes no file.
@@ -321,8 +321,9 @@ here under the same name and the same export subpaths, and is replaced by the pu
   copy starts with one provenance line, which the hash leaves out). \`bun run vendor:check\` fails when they differ.
 - Copied tests have their imports of beep-effect's test runner and run-count helper rewritten (each rewrite is listed
   in \`vendor.json\`); \`test/support/fcRuns.ts\`, when present, stands in for the run-count helper.
-- A source file differs from upstream only by a patch \`bun run beep vendor sync\` applies (\`sourcePatches\`),
-  recorded with its reason under \`patches\` in \`vendor.json\` and named in the file's first line.
+- A source file, or a copied test beyond its rewrites, differs from upstream only by a patch
+  \`bun run beep vendor sync\` applies (\`sourcePatches\`), recorded with its reason under \`patches\` in
+  \`vendor.json\` and named in the file's first line.
 - Licensed under MIT, as the package's own LICENSE file in beep-effect says (\`LICENSE\`, copied unchanged).
 `
     )
@@ -395,10 +396,26 @@ here under the same name and the same export subpaths, and is replaced by the pu
         if (O.isSome(beyond)) {
           return yield* stop(`${pkg.name} ${file} imports ${beyond.value[0]}, which is outside the vendored subset`)
         }
-        yield* repo.write(repo.join(target, file), header(pkg.dir, file, false) + rewritten.body)
+        // A test's patches apply to the text its rewrites left, in order, as a source file's do.
+        const patches = A.filter(sourcePatches, (patch) => patch.pkg === pkg.name && patch.file === file)
+        const gone = A.findFirst(patches, (patch) => !Str.includes(patch.from)(rewritten.body))
+        if (O.isSome(gone)) {
+          return yield* stop(
+            `${pkg.name} ${file}: the text a patch replaces is gone upstream; remove or update the patch`
+          )
+        }
+        const body = A.reduce(patches, rewritten.body, (so, patch) => Str.replace(patch.from, patch.to)(so))
+        yield* repo.write(repo.join(target, file), header(pkg.dir, file, A.isReadonlyArrayNonEmpty(patches)) + body)
         const sourceSha256 = yield* repo.sha256(source)
-        const sha256 = yield* repo.sha256(encoder.encode(rewritten.body))
-        return { path: file, sourceSha256, sha256, rewrites: rewritten.rewrites }
+        const sha256 = yield* repo.sha256(encoder.encode(body))
+        const applied = A.map(patches, (patch) => ({ change: `${patch.from} -> ${patch.to}`, reason: patch.reason }))
+        return {
+          path: file,
+          sourceSha256,
+          sha256,
+          rewrites: rewritten.rewrites,
+          ...(A.isReadonlyArrayNonEmpty(applied) ? { patches: applied } : {})
+        }
       }),
       { concurrency: 1 }
     )

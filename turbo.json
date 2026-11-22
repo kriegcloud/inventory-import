@@ -239,6 +239,26 @@
       ],
       "outputs": []
     },
+    // No `try` statement is written (`beep laws try`), in the code or in a doc comment's example, read from each file's
+    // own syntax tree: every code file git would commit is an input, in a folder nobody listed too (`.claude` and
+    // `.codex` among them), with `.gitignore`, `bun.lock` (the parser's version) and the law's own source. Left out
+    // by name: what the law does not read (`.agents`, the scratchpad and theme-init.js), what is installed or built,
+    // and `.claude/worktrees`, which git ignores and which in the main checkout holds every other checkout.
+    "//#try:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "!apps/inventory/public/theme-init.js",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // The root's own .ts files and each package's vitest.config.ts type-check (tsconfig.config.json). Only the linter
     // above reads that project otherwise, and an import that does not resolve there would hide a deprecated call.
     "//#configs:check": {

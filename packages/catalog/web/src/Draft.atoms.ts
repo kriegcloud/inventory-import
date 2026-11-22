@@ -21,6 +21,7 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { perKey } from "@inventory/client/Api"
 import { member } from "@inventory/client/MemberAtoms"
+import { sharedStorage } from "@inventory/client/Storage"
 import { browserLocks, lockOf, takingOf, thisTab } from "@inventory/client/TabAtoms"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
@@ -127,15 +128,6 @@ const waitingAt = Atom.family((key: string) =>
   kept({ key, schema: StoredWaiting, defaultValue: (): StoredWaiting => O.none() })
 )
 
-/** The browser's storage shared by every tab, or none where reading it is itself refused (some private windows). */
-const sharedStorage = (): Storage | undefined => {
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
-}
-
 /** The scope one import's waiting rows are kept under for one member, in one organization: every tab's begins so. */
 const scopeOf = (actor: Owner, id: ImportId) => ({
   organizationId: actor.organizationId,
@@ -152,21 +144,17 @@ const keyOf = (actor: Owner, id: ImportId, tab: string): string =>
  * page kept for every tab (no tab in its key) counts as a tab that is gone.
  */
 const otherTabs = (actor: Owner, id: ImportId, tab: string): ReadonlyArray<Entry> => {
-  const storage = sharedStorage()
-  if (storage === undefined) return []
+  // Where the browser refuses to list its storage (some private windows), no other tab kept anything.
+  const keys = sharedStorage.keys()
+  if (O.isNone(keys)) return []
   const legacy = progressKey(scopeOf(actor, id))
   const prefix = progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:` })
   const own = keyOf(actor, id, tab)
   const found: Array<Entry> = []
-  try {
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index)
-      if (key === null || key === own) continue
-      if (key === legacy) found.push({ key, tab: O.none() })
-      else if (Str.startsWith(prefix)(key)) found.push({ key, tab: O.some(Str.slice(Str.length(prefix))(key)) })
-    }
-  } catch {
-    return []
+  for (const key of keys.value) {
+    if (key === own) continue
+    if (key === legacy) found.push({ key, tab: O.none() })
+    else if (Str.startsWith(prefix)(key)) found.push({ key, tab: O.some(Str.slice(Str.length(prefix))(key)) })
   }
   return found
 }
@@ -185,16 +173,15 @@ const claimOf = (entry: Entry): string => `inventory-kept:${entry.key}`
  * claim, so another tab that claims it next finds it gone (the atom's own write could land after the claim ends).
  */
 const takeEntry = (registry: AtomRegistry.AtomRegistry, key: string, take: (stored: StoredWaiting) => void): void => {
-  const storage = sharedStorage()
-  let text: string | null = null
-  try {
-    text = storage?.getItem(key) ?? null
-    storage?.removeItem(key)
-  } catch {
-    return
-  }
+  // Read and erased as one: where the browser refuses either, it is not taken.
+  const text = sharedStorage.attempt((storage) => {
+    const found = storage.getItem(key)
+    storage.removeItem(key)
+    return found
+  })
+  if (O.isNone(text)) return
   registry.set(waitingAt(key), O.none())
-  take(storedFromText(text))
+  take(storedFromText(text.value))
 }
 
 /**
@@ -508,8 +495,9 @@ const entriesOfThisTab = (input: {
   readonly actor: Owner
   readonly tab: string
 }): ReadonlyArray<{ readonly key: string; readonly id: ImportId; readonly sends: boolean; readonly own: boolean }> => {
-  const storage = sharedStorage()
-  if (storage === undefined) return []
+  // Where the browser refuses to list its storage (some private windows), this tab kept nothing there.
+  const keys = sharedStorage.keys()
+  if (O.isNone(keys)) return []
   const { actor, registry, tab } = input
   const own = progressKey({ organizationId: actor.organizationId, memberId: actor.id, screen: "" })
   // The escaped start and end of the last part of every key this tab writes, whatever the member and the import.
@@ -518,24 +506,19 @@ const entriesOfThisTab = (input: {
   const start = escaped("import:")
   const end = escaped(`:waiting:${tab}`)
   const found: Array<{ key: string; id: ImportId; sends: boolean; own: boolean }> = []
-  try {
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index)
-      if (key === null || !Str.endsWith(end)(key)) continue
-      const screen = O.getOrElse(A.last(Str.split(":")(key)), () => "")
-      if (!Str.startsWith(start)(screen)) continue
-      const id = pipe(
-        screen,
-        Str.slice(Str.length(start), Str.length(screen) - Str.length(end)),
-        Str.replaceAll("%3A", ":"),
-        Str.replaceAll("%25", "%")
-      )
-      if (!S.is(ImportId)(id)) continue
-      const waits = O.exists(toWaiting(registry.get(waitingAt(key))), sends)
-      found.push({ key, id, sends: waits, own: Str.startsWith(own)(key) })
-    }
-  } catch {
-    return []
+  for (const key of keys.value) {
+    if (!Str.endsWith(end)(key)) continue
+    const screen = O.getOrElse(A.last(Str.split(":")(key)), () => "")
+    if (!Str.startsWith(start)(screen)) continue
+    const id = pipe(
+      screen,
+      Str.slice(Str.length(start), Str.length(screen) - Str.length(end)),
+      Str.replaceAll("%3A", ":"),
+      Str.replaceAll("%25", "%")
+    )
+    if (!S.is(ImportId)(id)) continue
+    const waits = O.exists(toWaiting(registry.get(waitingAt(key))), sends)
+    found.push({ key, id, sends: waits, own: Str.startsWith(own)(key) })
   }
   return found
 }

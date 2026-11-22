@@ -4,6 +4,8 @@ import { cn } from "cn"
 import { Direction as DirectionPrimitive, Slot as SlotPrimitive } from "radix-ui"
 import { useComposedRefs, useLayoutEffect } from "radix-ui/internal"
 import * as React from "react"
+// Local change: `Result`, for the `try` statement upstream has here (none in this repository).
+import * as Result from "effect/Result"
 
 import { useRefWithInit } from "@inventory/ui/hooks/use-ref-with-init"
 import { useValueAsRef } from "@inventory/ui/hooks/use-value-as-ref"
@@ -255,15 +257,23 @@ function Stepper(props: StepperProps) {
           return true
         }
 
-        try {
-          const isValid = await propsRef.current.onValidate(value, direction)
+        // Local change: a promise read as a `Result` where upstream has a `try` statement; a check that throws, or
+        // whose promise is rejected, or a step that cannot be set, refuses the step, as upstream's did. The check is
+        // called at once, inside the event, as upstream's was: an async function runs up to its first `await` when it
+        // is called, and what it throws is its promise's rejection.
+        const props = propsRef.current
+        const step = async () => {
+          const isValid = (await props.onValidate?.(value, direction)) ?? true
           if (isValid) {
             store.setState("value", value)
           }
           return isValid
-        } catch {
-          return false
         }
+        const checked = await step().then(
+          (isValid) => Result.succeed(isValid),
+          () => Result.fail("refused" as const)
+        )
+        return Result.getOrElse(checked, () => false)
       },
       hasValidation: () => !!propsRef.current.onValidate,
       addStep: (value, completed, disabled) => {

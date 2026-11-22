@@ -1077,3 +1077,65 @@ model is built for `main`. If it is not checked and merged by the evening of 202
 per-row model from a local branch on his own machine, and says plainly that it is the alternative he did not choose.
 That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
 once the chosen model is in `main`.
+
+### 2026-11-22 — the review's model, a rule that each command can happen
+
+The model's rules say what never happens; a change that made the model refuse every command would keep them all.
+Question: should Verify itself hold that each command can be taken, beside the stories? Options: "Yes, one per
+command"; "Stories only". Answer: "Yes, one per command". Rejected: "Stories only". It was put to him as a search,
+not a proof, and as not yet tried on this model. Each command gets a `sometimes` rule on the model (a row can be
+decided, an import can be confirmed, an act can be undone), so a command nothing reaches shows as "never reached" in
+Verify's own report. The stories stay as tests.
+
+What it is, tried on the pinned build with the per-row model, not yet with the model he chose: the rule is given the
+whole model (every instance, with the events it recorded) and is searched from a model with nothing in it. "Reached"
+means one sequence of commands was found that gets there, printed and run on the real code; it says nothing of any
+other sequence. "Never reached" fails the verification, and can also mean only that the search was too short. Verify
+searches two commands deep unless told otherwise: there, with eleven of the twelve commands and no longer walks, four
+were not reached (a take-back, a reopening, a group's row skipped and a group stopped each take three commands), and
+with its 200 longer walks three, since a walk happened on the take-back. At three deep all were reached, and all
+twelve on the whole model, so the search is set to three. One way it does not fail: a search that stops at its
+budget with `allow: { truncated: true }` says nothing of the rules it did not reach, so that option is never set.
+Verify also says, with no rule written, when no state the invariants allow lets a command record an event; the rule
+adds that some sequence from nothing gets there. Reverse: delete the `sometimes` block of the model.
+
+### 2026-11-22 — the review's model, what keeps a rule from being taken out or weakened
+
+Question: what holds the rules, so that none is taken out or made to say less without it showing: the list of rule
+names written by hand in the tests, or the file the library's Verify keeps? Options: "The library's lock file";
+"Both"; "Keep the hand-written list". Answer: "The library's lock file". Rejected: "Both"; "Keep the hand-written
+list". The hand-written list was to go once the lock had been shown to refuse a rule that slipped.
+
+The answer came with the lock described as a file that keeps how each rule stands. It does not: on the pinned build
+(`lock: "./<Model>.lock.json"` on `Verify.report`) it is one file beside the test that keeps each rule's kind and
+its text. If that description is what he chose from, his answer rests on something that was wrong on that point; so
+the hand-written list, which does say how each rule stands, stays until he has answered what holds that.
+
+What the lock does, shown on the per-row model: an invariant made to say less ("says less than the rule locked",
+with the state that now passes), a rule taken out, a rule renamed, and a transition and a decision's rule whose text
+changed are each refused by name. It compares a rule's own text: only an aggregate's invariant is compared for what
+it says, any other rule whose text changed is refused whatever the change, and a rule made to allow more through a
+helper or a constant it calls passes, as does an invariant whose difference another invariant still covers. Under
+`CI` the file is never written, a rule it does not list fails, and `UPDATE_VERIFY_LOCK=1` is ignored; everything is
+proved and searched again first, the lock skips nothing. Outside CI a new rule is added to the file without a word,
+and `UPDATE_VERIFY_LOCK=1` locks every rule as it is written and passes, so that variable is never set to make a
+test pass.
+
+Not held by the lock, and not yet answered: whether a rule is still proved or has slipped to only searched. Verify's
+`require: { proved: [...] }`, one assertion that every rule but the few named as searched is proved, or the
+hand-written list as it is, each holds that. Reverse: delete the `lock` option and the file.
+
+### 2026-11-22 — the review's model, where its proofs run in CI
+
+Locally the proofs are part of `bun run check` and the search of the whole model part of `bun run check:full`.
+Question: where do they run in CI? Options: "Own job + nightly, no new infrastructure"; "Also replay from your
+remote cache"; "Full copy of beep-effect's tiers". Answer: "Own job + nightly, no new infrastructure". Rejected: the
+other two. The proofs and the search are each their own turbo task, whose inputs name what a result depends on: the
+model's files and the kernel files they import, the pinned library, the versions `bun.lock` resolves for the
+package (Effect, the solver, the parser), the file Verify locks the rules in, and the two variables Verify reads.
+CI's main job stops running them; a second job runs them, restoring turbo's results from the last run on `main`
+through GitHub's own cache and saving them only on `main`, so it proves nothing unless one of those changed. A
+nightly workflow runs everything with nothing replayed and opens or comments on one labelled issue when it fails;
+GitHub turns a schedule off after 60 days without a commit on a public repository, and turning it on again is done
+by hand. No secret, no remote cache. Not built yet: it goes in with the model. Reverse: put `prove` and the search
+back in the main job's command and delete the second job and the nightly workflow.

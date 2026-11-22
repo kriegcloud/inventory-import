@@ -159,7 +159,9 @@ describe("the plan of a stage", () => {
           "not set, so no pull request could get a preview and main could not reach staging. Write the references " +
           'PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>" and ' +
           'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local (git ' +
-          "ignores it) and deploy the stack again; it asks 1Password for both."
+          "ignores it) and deploy the stack again; it asks 1Password for both. If they are written there already, " +
+          "PREVIEW_CLOUDFLARE_API_TOKEN is exported empty in your shell or the root .env, and an empty one wins over " +
+          "1Password's answer: unset it."
       )
     })
   })

@@ -251,6 +251,8 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
 | `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
 | `bun run telemetry` | Optional, Benjamin's to start (needs Docker): Grafana's LGTM stack, then `OTEL_EXPORTER_OTLP_ENDPOINT` in `apps/inventory/.dev.vars` sends the Worker's and the browser's traces, metrics and logs to it. Never part of `bun run dev`; `telemetry:down` stops it |
+| `bun run release <major\|minor\|patch>` | Benjamin asks for it. Cuts a release: `major` or `minor` makes `release/<major>.<minor>` from `main`, `patch` tags the next patch on the release branch it is run on; it sets the app's version, writes the notes, runs `check:full`, commits and makes an annotated tag. It pushes nothing and prints the one push that sends branch and tag together (`docs/releasing.md`). `bun run beep release verify <tag>` says whether a tag may deploy |
+| `bun run beep infra setup --test-stage` | Benjamin's to run at his own terminal, never an agent's: what a first deploy needs (the Cloudflare account, an Alchemy profile, the state store), then a plan he reads and a deploy on his yes. `--staging` sets up what GitHub must hold, `--production` deploys production. An agent may run it only with `--dry-run`, which prints the steps and starts nothing (`goals/infra/PLAN.md`) |
 | `bun run alchemy:repin -- <commit>` | Moves the Alchemy packages kept as files in `vendor/alchemy` to another commit of the library's `main`: the files, the root `overrides`, the lockfile's hashes, the repository's patches to them carried to the new files (it stops on one that no longer applies, or is no longer needed), an install that is refused the library's registry, then `check:full` with nothing replayed from the cache (`vendor/alchemy/README.md`). Benjamin asks for it; it commits nothing. `bun run alchemy:check` checks the pin as it stands. Needs python3 |
 
 | App command (`apps/inventory`) | What it does |
@@ -265,8 +267,10 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `auth:schema` | After a change to Better Auth's options, prints the migration it still needs |
 | `grid:keys` | Types on every data grid editor in Chromium and reads what is stored (needs `CHROME_PATH`); by hand, after a change to the grid |
 
-Hosting is not a script: `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
-only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
+Hosting is Benjamin's alone. `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
+`bun run beep infra setup` does what comes before a first deploy and then deploys on his yes. No agent runs either,
+whatever it was asked to get done, and none runs `bun run release` unless he asks for a release in that message
+(`goals/infra/PLAN.md`, "What Benjamin does by hand"; `docs/releasing.md`).
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
 (`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile of the workspaces, and `bunfig.toml` keeps one
@@ -330,7 +334,8 @@ packages/infra/          @beep/infra: what is deployed, per stage. The stage pla
                         (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:
                         the deploy environments, their secrets, the rule on main). Nothing in the app imports it.
 alchemy.run.ts          The app's stack, re-exported for `bunx alchemy deploy --stage <name>`. A deploy is Benjamin's:
-                        no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state` (goals/infra/PLAN.md).
+                        no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state`, nor
+                        `bun run beep infra setup`, which runs them for him (goals/infra/PLAN.md).
 vendor/alchemy/         The Alchemy packages as files, one commit of the library's main, with every sibling address
                         inside them rewritten so an install needs the library's registry for nothing. Its README says
                         why, and how the pin moves. Never edit a file there: `bun run alchemy:check`, part of `bun run check`, fails on a change.

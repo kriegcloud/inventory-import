@@ -19,6 +19,7 @@ import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import * as Path from "effect/Path"
 import * as R from "effect/Record"
 import { opEnvFile, ownEnvFile, referencesIn } from "./OpReferences.rules.ts"
@@ -35,20 +36,22 @@ export class OpEnvReferences extends Data.TaggedClass("@beep/infra/SecretProvide
  */
 const ofProcess = (name: string) =>
   Config.String(name)
-    .pipe(Config.withDefault(""))
-    .parse(ConfigProvider.fromEnv())
-    .pipe(Effect.orElseSucceed(() => ""))
+    .pipe(Config.option)
+    .parse(ConfigProvider.fromEnv({ preserveEmptyStrings: true }))
+    .pipe(Effect.orElseSucceed(() => O.none<string>()))
 
 /**
  * The references to ask 1Password for: none in a workflow, none for a variable the process already holds, none when
  * neither file is there, else the ones `op.env` and the owner's own `op.env.local` give for these names.
  */
 export const referencesWanted = Effect.fn("OpReferences.referencesWanted")(function* (names: ReadonlyArray<string>) {
-  const ci = yield* ofProcess("CI")
+  const workflow = yield* ofProcess("CI")
+  const ci = O.getOrElse(workflow, () => "")
   if (ci !== "" && ci !== "false" && ci !== "0") return R.empty<string, string>()
   // A variable set in the shell wins over this entry anyway, so 1Password is not asked for it: a stage run by hand
-  // with its secret exported needs no 1Password in its profile.
-  const unset = yield* Effect.filter(names, (name) => Effect.map(ofProcess(name), (value) => value === ""), {
+  // with its secret exported needs no 1Password in its profile. Set and empty counts as set: Alchemy keeps an empty
+  // variable of the process and ranks it over what 1Password answers, so asking would only be thrown away.
+  const unset = yield* Effect.filter(names, (name) => Effect.map(ofProcess(name), O.isNone), {
     concurrency: 1
   })
   const fs = yield* FileSystem.FileSystem

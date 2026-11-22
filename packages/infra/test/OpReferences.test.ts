@@ -114,6 +114,13 @@ layer(Path.layer)("the references a stack asks 1Password for, read from the file
     })
   )
 
+  it.effect("a variable exported empty is held too: Alchemy would rank the empty one over 1Password's answer", () =>
+    Effect.gen(function* () {
+      const empty = yield* inProcess({ OPENROUTER_API_KEY: "" }, wanted(text))
+      expect(empty).toEqual({ PREVIEW_TEST_ACCOUNT_PASSWORD: "op://vault/preview/password" })
+    })
+  )
+
   it.effect("his own file is read too, after the committed one: a name in both takes his", () =>
     Effect.gen(function* () {
       const withOwn = yield* inProcess(

@@ -1824,7 +1824,7 @@ called by an agent. Rejected: keeping `op run`. Reverse: remove `secrets` from t
 ### 2026-11-22 — infra: previews and staging deploy with my own Cloudflare token
 
 Question: the repository's stack made a deploy token in each Cloudflare account with the one login it is deployed
-with. My second account, for previews, test stages and staging, is under another login, so the stack could not make
+with. That login does not reach the account for previews, test stages and staging, so the stack could not make
 its token there. How does that account get its deploy key?
 Answer: "Use my own token". I chose; the agent recommended the same. The stack no longer makes a token in the
 previews' account: it asks 1Password for the account-owned token I made there and for the account's id, by the two

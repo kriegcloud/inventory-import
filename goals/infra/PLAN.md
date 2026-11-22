@@ -210,20 +210,32 @@ Nothing below was started. Every command names its stage.
 
 ### One command for steps 2 to 6, 8, 9 and the first part of 12
 
-`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run: with no terminal,
-or with `CI` set, it stops before its first tool, so no agent and no CI job runs it. `--dry-run` prints every step
-and every command a run would start, and starts nothing. It can be run again: a step whose work is there says so and
-does nothing. It comes in three sizes, smallest first, and several can be given at once:
+`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run, and no agent
+runs it. What enforces that is narrow: with no terminal, or with `CI` set, it stops before its first tool, which
+keeps a workflow and a plain agent shell out. A program that is given a terminal passes that test, so the rule for
+agents is a rule, and the command is built for the case where it is broken: it shows nothing secret itself, and
+everything it makes waits for a yes. `--dry-run` starts no tool and writes nothing; it prints the steps and the
+commands of a run, with the token's commands when his own file names one, and says when a run as things are would
+stop before step 1. What a run finds on the way (an item already there, a profile already connected) only a run
+shows. Run again, it leaves alone what it can see is done: a reference already written, an item already there, a
+profile already connected to the right account. The state store is the exception: nothing reads whether it exists,
+so every run asks and, on a yes, runs `state bootstrap` again, which adopts the store that is there. It comes in
+three sizes, smallest first, and several can be given at once:
 
 | Flag | Steps below | What it does |
 | --- | --- | --- |
-| `--test-stage` | 2, 3, 4 | Finds the Cloudflare account with `cf`, makes and connects the Alchemy profile `inventory-preview`, makes sure of the state store, then plans, asks and deploys `test_<user>`: a live address on workers.dev. Needs one account and nothing from 1Password |
-| `--staging` | 5, 6, 8, 12 | Checks his own token for the previews' account, makes the previews' password in 1Password and writes its reference, connects both profiles (production's `inventory-production` to Cloudflare, GitHub and 1Password), then plans, asks and deploys the repository's stack, which writes that token to GitHub for previews and staging. Staging itself then deploys on the next push to `main` that passes CI |
-| `--production` | 9 | Plans, asks and deploys production from the workstation; needs `--sign-up` |
+| `--test-stage` | 2, 3, 4 | Finds the previews' account (his own token for it, or `cf`), makes and connects the Alchemy profile `inventory-preview`, checks which account that profile deploys into, makes sure of the state store, then plans, asks and deploys `test_<user>`: a live address on workers.dev. Needs one account; from 1Password only the token, when his file names one |
+| `--staging` | 2, 3, 5, 6, 8, 12 | Checks his own token for the previews' account; makes the previews' password in 1Password and writes its reference; connects both profiles (the previews' to Cloudflare and 1Password, production's to Cloudflare, GitHub and 1Password) and checks each one's account; makes sure of the state store in both accounts; then plans, asks and deploys the repository's stack, which writes that token to GitHub for previews and staging. Staging itself then deploys on the next push to `main` that passes CI |
+| `--production` | 5, 9 | Finds production's account with `cf`, makes and connects `inventory-production` (Cloudflare and 1Password) and checks its account, makes sure of the state store there, then plans, asks and deploys production from the workstation |
+
+Before step 1 of any run: every line of `packages/infra/env/op.env` must be a comment or `NAME=op://…` (a value
+typed there in any form stops the run, with the line's number and never its text, before the command writes to that
+file or says to commit it); his own token is checked when his file names one; and for `--staging` and
+`--production`, who may sign up in production is settled (below).
 
 What each step does, and with which tool:
 
-- **1Password**, through `op-human` (the plain CLI; `op` on this machine is the agents' shim): if
+- **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if
   `packages/infra/env/op.env` names no `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
   PREVIEW_TEST_ACCOUNT_PASSWORD" in the vault (`--vault`, or asked when there are several), has 1Password make it with
   a generated password when it is not there, and writes `op://<vault id>/<item id>/password` to that file. The
@@ -233,12 +245,22 @@ What each step does, and with which tool:
   and the command says so before the plan.
 - **Cloudflare**, through `cf`: `cf auth whoami` names the accounts, so no id is typed; when `cf` is not logged in
   it starts `cf auth login` and waits. One account is used for a test stage only after he says yes; with several he
-  picks (`--preview-account`, `--production-account`, by name or id, skip the question). The two ids go to the
-  repository's stack as `PRODUCTION_CLOUDFLARE_ACCOUNT_ID` and `PREVIEW_CLOUDFLARE_ACCOUNT_ID`.
+  picks (`--preview-account`, `--production-account`, by name or id, skip the question). Production's id goes to
+  the repository's stack as `PRODUCTION_CLOUDFLARE_ACCOUNT_ID`; the previews' the stack asks 1Password for.
 - **Alchemy profiles and state**: `bunx alchemy profile create`, `profile edit --profile <name> --add Cloudflare`
   (and `--add GitHub` for production's), then, after a yes, `bunx alchemy state bootstrap --profile <name>`.
 - **GitHub**, through `gh`: his login is the production approver (`--approver` names another); `gh auth login` is
   started when `gh` is not logged in.
+- **The profile's own account.** Every state store and deploy runs with `--profile`, so the account deployed into is
+  the profile's, whatever `cf` or a token says. After a profile is connected, or found connected, the command reads
+  `alchemy profile show --profile <name>`, keeps the one line that names the account, and stops when it is not the
+  account its questions name (for the token's account, the comparison is made inside the one process 1Password
+  fills the id for). In a run with `--staging` or `--production` it also stops when the two profiles deploy into the
+  same account (decision I4). The repair it names: `alchemy profile edit --profile <name> --reconfigure Cloudflare`.
+- **Who may sign up in production** is `--sign-up` when given. When it is not, the command reads what GitHub's
+  `production` environment already holds (`gh variable get SIGN_UP --env production`) and keeps it, saying so; when
+  GitHub holds none it stops before step 1. It never picks a list, so running `--staging` again cannot close
+  production.
 - **Each deploy** is `plan` on his terminal, then "Deploy ... as that plan says?", then `deploy --yes` only after a
   yes. A plan that fails, or a no, deploys nothing. No deploy is wrapped in `op run`: the stacks
   ask 1Password for their secrets themselves (below), so the 1Password app asks him to authorize once for the plan
@@ -257,17 +279,19 @@ What each step does, and with which tool:
   provider, as Alchemy ranks the process's environment last.
 
 **Still his, while it runs**: approving each login in the browser (Cloudflare for `cf`, then once for each Alchemy
-profile; in Alchemy's own question, picking the account the command names and `gh-cli` for GitHub), unlocking
-1Password when it asks, reading each plan, and answering each question. A test stage's address and its
-`testAccountPassword` are printed by Alchemy to his terminal only; the command reads neither. Removing a test stage
-is his too: `bunx alchemy destroy --stage test_<user> --profile inventory-preview`. Steps 1, 7, 10 and 11 below are
-not in the command (accounts and Workers Paid, who may sign up, the zone's HTTPS setting, the push), and approving a
-production deploy on GitHub stays as `docs/releasing.md` says.
+profile that logs in; in Alchemy's own question, picking the account the command names, `gh-cli` for GitHub and the
+desktop app for 1Password), unlocking 1Password when it asks, reading each plan, and answering each question. A test
+stage's address is printed by Alchemy to his terminal. Its `testAccountPassword` is not: the command asks its own
+deploy to leave it out, because a terminal is not proof of a person, and tells him the step that shows it,
+`bunx alchemy deploy --stage test_<user> --profile inventory-preview` run by him, which should change nothing and
+prints the password in its output (not tried). Removing a test stage is his too: `bunx alchemy destroy --stage
+test_<user> --profile inventory-preview`. Steps 1, 7, 10 and 11 below are not in the command (accounts and Workers
+Paid, deciding who may sign up, the zone's HTTPS setting, the push), and approving a production deploy on GitHub
+stays as `docs/releasing.md` says. A stop after the first step says which steps of that run are done and stay.
 
-**Two accounts, two logins.** Seen 2026-11-22: `cf`'s login sees one account, the one holding the zone
-`beep-effect.com`, which makes it production's; the second account, for previews, test stages and staging, is under
-another login. So each account is reached its own way: production's by the browser login of its Alchemy profile,
-the previews' by a token Benjamin made there.
+**Two accounts, each reached its own way.** Production's account is the one that holds the zone `beep-effect.com`;
+it is reached by the browser login of its Alchemy profile. The previews' account, for previews, test stages and
+staging, need not be reachable by that login: it is reached by a token Benjamin made in it.
 
 **The previews' account by his own token** (Benjamin, 2026-11-22: "Use my own token"; the other way was adding
 production's login as a member of the second account). He made an account-owned API token in the second account and
@@ -315,11 +339,11 @@ fail.
 
 **When one login does see two accounts** (not his case today): the command works the roles out from what `cf` can
 read. The account that holds the zone is production's and the other is the previews'; it says both and asks before
-anything is made, and when `cf` cannot tell, or there are more than two, he picks. A test stage put into the account
-that holds the zone is told so in the question. A run that would give both roles to one account stops (decision I4).
-
-The other references he keeps in that item (a global API key, and three for R2's S3 API) are used by nothing here;
-no stack makes anything in R2.
+anything is made, and when `cf` cannot tell, or there are more than two, he picks. However the previews' account was
+come by (the only one, picked, or named by a flag), one that holds the zone is used only after a yes to a question
+that says it is production's. An account named for production that does not hold the zone stops the run, and two
+accounts named by flags are still asked about together. A run that would give both roles to one account stops
+(decision I4).
 
 **Never run for real.** The command was tested with stand-ins for every tool (`test/InfraSetup.test.ts` in
 `packages/tooling/tool/cli`: what is started, in which order, with which arguments, and that each guard stops it)
@@ -332,7 +356,11 @@ first reads a root `.env` as it did before. The provider itself was never called
 that would be handed to it. Likewise not tried, for the second account's token: that `op run` fills a quoted reference whose item name has a
 space; that `cf` uses `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the environment over its own login;
 that `cf accounts tokens verify` and `get` answer the fields read here; and that `--method stored` takes an
-account-owned token. `cf auth whoami` and `cf zones list` were run, to read the shape of their answers.
+account-owned token. And for the checks added after the review: that `alchemy profile show`, read through a
+pipe, prints `accountId:` under the profile's Cloudflare line as its source does; that `gh variable get SIGN_UP
+--env production` answers the list and nothing else; and that a deploy of a test stage that changes nothing still
+prints its outputs, which is how he reads the password. `cf auth whoami` and `cf zones list` were run, to read the
+shape of their answers.
 
 ### The same steps, by hand
 

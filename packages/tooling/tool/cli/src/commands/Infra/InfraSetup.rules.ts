@@ -14,8 +14,15 @@
  *   that file is never printed. The model key's line is the owner's to fill; this command only looks whether it is
  *   a reference.
  * - Every deploy is `plan`, shown on his terminal, then his yes, then `deploy`. A no deploys nothing.
- * - Nothing here is run by an agent or by CI: with no terminal, or with `CI` set, the command stops before its
- *   first step. Only `--dry-run` runs without one, and it starts no tool at all.
+ * - With no terminal, or with `CI` set, the command stops before its first step; only `--dry-run` runs without
+ *   one, and it starts no tool at all. That keeps a workflow and a plain agent shell out. It does not prove a
+ *   person: a program given a terminal passes it. So the rule that no agent runs this is a rule for agents, the
+ *   command shows nothing secret itself (a test stage's minted password is left out of its deploy), and everything
+ *   it makes waits for a yes.
+ * - The account a yes is about is the account deployed into: each profile's own account is read and compared with
+ *   the one named before anything is made with it.
+ * - A run again changes nothing it was not asked to: production's sign-up list is the flag's or the one GitHub
+ *   already holds, never a default.
  * - Decision I4 holds until the owner says otherwise: production and the previews are two Cloudflare accounts, and
  *   a run that would give both roles to one account stops.
  *
@@ -128,6 +135,12 @@ export const Step = S.TaggedUnion({
     role: Role.pipe(S.annotateKey({ description: "The account the Alchemy profile is for" })),
     github: S.Boolean.pipe(
       S.annotateKey({ description: "Whether the profile must also reach GitHub: the repository's stack does" })
+    ),
+    onePassword: S.Boolean.pipe(
+      S.annotateKey({
+        description:
+          "Whether the profile must also reach 1Password: a stage whose plan reads a secret asks it through the profile"
+      })
     )
   },
   StateStore: { role: Role.pipe(S.annotateKey({ description: "The account whose state store is made sure of" })) },
@@ -192,12 +205,16 @@ export const stepsFor = (sizes: ReadonlyArray<SetupSize>): ReadonlyArray<Step> =
     ...(staging ? [Step.cases.PreviewPassword.make({})] : []),
     ...(A.isReadonlyArrayNonEmpty(roles) ? [Step.cases.Cloudflare.make({ roles })] : []),
     ...(preview
-      ? [Step.cases.Profile.make({ role: "preview", github: false }), Step.cases.StateStore.make({ role: "preview" })]
+      ? [
+          // A preview or staging stage run by hand from this profile asks 1Password for the previews' password.
+          Step.cases.Profile.make({ role: "preview", github: false, onePassword: staging }),
+          Step.cases.StateStore.make({ role: "preview" })
+        ]
       : []),
     ...(test ? [Step.cases.Deploy.make({ target: "test-stage" })] : []),
     ...(prod
       ? [
-          Step.cases.Profile.make({ role: "production", github: staging }),
+          Step.cases.Profile.make({ role: "production", github: staging, onePassword: true }),
           Step.cases.StateStore.make({ role: "production" })
         ]
       : []),
@@ -348,9 +365,17 @@ export interface Found {
   readonly approver: O.Option<string>
   /** Whether `op.env.local` names a token and an id for the previews' account: no login to it is then needed. */
   readonly previewByToken: boolean
+  /** Who may open an account in production, settled before the first step: the flag, or what GitHub already holds. */
+  readonly signUp: O.Option<string>
 }
 
-const nothingFound: Found = { preview: O.none(), production: O.none(), approver: O.none(), previewByToken: false }
+const nothingFound: Found = {
+  preview: O.none(),
+  production: O.none(),
+  approver: O.none(),
+  previewByToken: false,
+  signUp: O.none()
+}
 
 const accountOf = (found: Found, role: Role) =>
   Role.match(role, { preview: () => found.preview, production: () => found.production })
@@ -362,10 +387,12 @@ export const givenFor = (input: {
   readonly options: SetupOptions
   readonly modelKey: ReferenceState
 }): Given => {
-  const signUp = O.getOrElse(input.options.signUp, () => "closed")
+  // Settled before the first step (`signUpFor`): never a default here, so a run again cannot close production.
+  const signUp: Given = O.match(input.found.signUp, { onNone: () => ({}), onSome: (value) => ({ SIGN_UP: value }) })
   const withoutKey: Given = input.modelKey === "reference" ? {} : { DEPLOY_WITHOUT_MODEL_KEY: "true" }
   return Target.match(input.target, {
-    "test-stage": (): Given => ({}),
+    // A terminal is not proof of a person, so this command's deploy asks the stack to leave the minted password out.
+    "test-stage": (): Given => ({ HIDE_TEST_ACCOUNT_PASSWORD: "true" }),
     repository: (): Given => ({
       ...O.match(input.found.production, {
         onNone: () => ({}),
@@ -376,10 +403,10 @@ export const givenFor = (input: {
         onSome: (account) => ({ PREVIEW_CLOUDFLARE_ACCOUNT_ID: account.id })
       }),
       ...O.match(input.found.approver, { onNone: () => ({}), onSome: (login) => ({ PRODUCTION_APPROVER: login }) }),
-      SIGN_UP: signUp,
+      ...signUp,
       ...withoutKey
     }),
-    production: (): Given => ({ SIGN_UP: signUp, ...withoutKey })
+    production: (): Given => ({ ...signUp, ...withoutKey })
   })
 }
 
@@ -412,10 +439,11 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     Profile: (step) => {
       const name = profileOf(options, step.role)
       return [
-        `Alchemy profile "${name}" (${step.role} account), connected to Cloudflare${step.github ? ", GitHub" : ""}${step.role === "production" ? " and 1Password" : ""}. One that is there and connected is left alone.`,
+        `Alchemy profile "${name}" (${step.role} account), connected to Cloudflare${step.github ? ", GitHub" : ""}${step.onePassword ? " and 1Password" : ""}. One that is there and connected is left alone.`,
         "  bunx alchemy profile list",
+        `  bunx alchemy profile show --profile ${name}   (which account it deploys into, compared with the one named before anything is made)`,
         `  bunx alchemy profile create ${name}   (only when there is none)`,
-        `  bunx alchemy profile edit --profile ${name} --add Cloudflare${step.github ? " --add GitHub" : ""}${step.role === "production" ? " --add 1Password" : ""}   (only what is not connected; the browser login and the account are yours to pick)`
+        `  bunx alchemy profile edit --profile ${name} --add Cloudflare${step.github ? " --add GitHub" : ""}${step.onePassword ? " --add 1Password" : ""}   (only what is not connected; the browser login and the account are yours to pick)`
       ]
     },
     StateStore: (step) => [
@@ -453,15 +481,80 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
   })
 
 /** What `--dry-run` prints: every step in order, and that nothing was started. */
-export const dryRun = (options: SetupOptions): ReadonlyArray<string> => [
-  "Dry run: nothing is started and nothing is written. A run would do these steps, in this order:",
-  ...A.flatMap(stepsFor(options.sizes), (step, index) => {
-    const [first, ...rest] = described(options)(step)
-    return [`${index + 1}. ${first ?? ""}`, ...rest]
-  })
-]
+export const dryRun = (input: {
+  readonly options: SetupOptions
+  /** Whether his own file names the previews' token: a run then asks cf nothing about that account. */
+  readonly previewByToken: boolean
+}): ReadonlyArray<string> => {
+  const { options, previewByToken } = input
+  return [
+    "Dry run: nothing is started and nothing is written. A run would do these steps, in this order:",
+    ...(has(options.sizes, "staging") && !previewByToken
+      ? [
+          `As things are, a run stops before step 1: ${localEnvFile} does not name ${previewTokenName} and ${previewAccountIdName}, which the repository's stack needs.`
+        ]
+      : []),
+    ...(previewByToken
+      ? [
+          `Before step 1, the previews' token (${localEnvFile}) is checked, and the previews' account is asked of cf in no step:`,
+          `  op-human run --env-file ${localEnvFile} -- sh -c 'CLOUDFLARE_API_TOKEN="$${previewTokenName}" CLOUDFLARE_ACCOUNT_ID="$${previewAccountIdName}" cf accounts tokens verify'`,
+          `  op-human run --env-file ${localEnvFile} -- sh -c '… cf accounts tokens get <token id>'`,
+          `  and the previews' profile is connected with: op-human run --env-file ${localEnvFile} -- bunx alchemy profile edit --profile ${options.previewProfile} --add Cloudflare --method stored --set apiToken=env:${previewTokenName} --set accountId=env:${previewAccountIdName}`
+        ]
+      : []),
+    ...(has(options.sizes, "staging") || has(options.sizes, "production")
+      ? ["Before step 1 too, when `--sign-up` is not given: gh variable get SIGN_UP --env production"]
+      : []),
+    ...A.flatMap(stepsFor(options.sizes), (step, index) => {
+      const [first, ...rest] = described(options)(step)
+      return [`${index + 1}. ${first ?? ""}`, ...rest]
+    })
+  ]
+}
 
-/** Stops unless a person is at a terminal: no agent and no CI job runs the setup. */
+/**
+ * The numbers of the lines of a references file that are neither blank, nor a comment, nor `NAME=op://…`. Such a
+ * line is where a value typed by mistake would sit, whatever its form (`export NAME=…`, `NAME = …`, another name).
+ *
+ * @example
+ * strayLines("# a comment\nA=op://v/i/f\nexport B=hunter2\n") // [3]
+ */
+export const strayLines = (text: string): ReadonlyArray<number> =>
+  A.flatMap(linesOf(text), (line, index) => {
+    if (line === "" || Str.startsWith("#")(line)) return []
+    const reference = O.exists(Str.match(/^[A-Z][A-Z0-9_]*=(.*)$/)(line), (found) => isReference(`${found[1]}`))
+    return reference ? [] : [index + 1]
+  })
+
+/**
+ * Who may open an account in production, settled before the first step: the flag, else what GitHub's production
+ * environment already holds, else a stop. Never a default: a run again without the flag must not close production.
+ */
+const signUpFor = Effect.fn("InfraSetup.signUpFor")(function* (options: SetupOptions) {
+  const workstation = yield* Workstation
+  if (!has(options.sizes, "staging") && !has(options.sizes, "production")) return O.none<string>()
+  if (O.isSome(options.signUp)) {
+    yield* workstation.say(`Sign-up in production: ${options.signUp.value} (\`--sign-up\`).`)
+    return options.signUp
+  }
+  const held = yield* workstation.ask("gh", ["variable", "get", "SIGN_UP", "--env", "production"])
+  const value = Str.trim(held.stdout)
+  if (held.code !== 0 || value === "") {
+    return yield* stop(
+      "Say who may open an account in production with `--sign-up`: emails separated by commas (yours first), or `closed`. GitHub holds no list yet (or gh could not read it), and this command never picks one. Nothing was started."
+    )
+  }
+  yield* workstation.say(
+    `Sign-up in production: ${value}, as GitHub's production environment already holds it (no \`--sign-up\`). It is kept.`
+  )
+  return O.some(value)
+})
+
+/**
+ * Stops unless the command is at a terminal with `CI` unset. This keeps a workflow and a plain agent shell out. It
+ * is not proof of a person: a program given a terminal passes it, so nothing secret is shown through this command
+ * (a test stage's minted password is left out of its deploy), and every thing made waits for a yes.
+ */
 const ownerOnly = Effect.gen(function* () {
   const workstation = yield* Workstation
   const terminal = yield* workstation.hand("sh", ["-c", 'test -t 0 && test -t 1 && test -z "${CI:-}"'])
@@ -481,7 +574,10 @@ const named = (accounts: ReadonlyArray<Account>) =>
     ", "
   )
 
-/** The account for one role: the one the flag names, the only one after a yes, or the one he picks. */
+/**
+ * The account for one role: the one the flag names, the only one after a yes, or the one he picks. However it was
+ * come by, an account that holds production's zone is used for previews only after a yes to a question that says so.
+ */
 const pick = Effect.fn("InfraSetup.pick")(function* (input: {
   readonly role: Role
   readonly wanted: O.Option<string>
@@ -491,37 +587,49 @@ const pick = Effect.fn("InfraSetup.pick")(function* (input: {
 }) {
   const workstation = yield* Workstation
   const { role, wanted, accounts } = input
-  if (O.isSome(wanted)) {
-    const match = A.findFirst(accounts, (account) => account.id === wanted.value || account.name === wanted.value)
-    if (O.isNone(match)) {
-      return yield* stop(
-        `No Cloudflare account named "${wanted.value}" for ${role}: cf sees ${named(accounts)}. Nothing was changed.`
-      )
-    }
-    return match.value
-  }
   const holds = (account: Account) => O.exists(input.holder, (holder) => holder.id === account.id)
+  const shared = (account: Account) => role === "preview" && holds(account)
+  const note = ` It holds the zone ${productionZone}, so it is production's account: a test stage here shares it.`
   const [only, ...others] = accounts
-  if (!A.isReadonlyArrayNonEmpty(others)) {
-    const note =
-      role === "preview" && holds(only)
-        ? ` It holds the zone ${productionZone}, so it is production's account: a test stage here shares it.`
-        : ""
-    const yes = yield* workstation.confirm(`Use the Cloudflare account "${only.name}" for ${role}?${note}`)
-    if (!yes) return yield* stop(`Stopped: no Cloudflare account for ${role}. Nothing was changed.`)
+  if (O.isNone(wanted) && !A.isReadonlyArrayNonEmpty(others)) {
+    const yes = yield* workstation.confirm(
+      `Use the Cloudflare account "${only.name}" for ${role}?${shared(only) ? note : ""}`
+    )
+    if (!yes) return yield* stop(`Stopped: no Cloudflare account for ${role}.`)
     return only
   }
-  const id = yield* workstation.choose(
-    `Which Cloudflare account is for ${role}?`,
-    A.map(accounts, (account) => ({
-      title: holds(account) ? `${account.name} (holds ${productionZone})` : account.name,
-      value: account.id
-    }))
-  )
-  return O.getOrElse(
-    A.findFirst(accounts, (account) => account.id === id),
-    () => only
-  )
+  const chosen = yield* O.match(wanted, {
+    onSome: (name) =>
+      O.match(
+        A.findFirst(accounts, (account) => account.id === name || account.name === name),
+        {
+          onNone: () => stop(`No Cloudflare account named "${name}" for ${role}: cf sees ${named(accounts)}.`),
+          onSome: (account) => Effect.succeed(account)
+        }
+      ),
+    onNone: () =>
+      workstation
+        .choose(
+          `Which Cloudflare account is for ${role}?`,
+          A.map(accounts, (account) => ({
+            title: holds(account) ? `${account.name} (holds ${productionZone})` : account.name,
+            value: account.id
+          }))
+        )
+        .pipe(
+          Effect.map((id) =>
+            O.getOrElse(
+              A.findFirst(accounts, (account) => account.id === id),
+              () => only
+            )
+          )
+        )
+  })
+  if (shared(chosen)) {
+    const yes = yield* workstation.confirm(`Use the Cloudflare account "${chosen.name}" for ${role}?${note}`)
+    if (!yes) return yield* stop(`Stopped: no Cloudflare account for ${role}.`)
+  }
+  return chosen
 })
 
 const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
@@ -543,16 +651,16 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   if (O.isNone(first)) {
     yield* workstation.say("Cloudflare: cf is not logged in. Starting `cf auth login`: approve it in the browser.")
     const code = yield* workstation.hand("cf", ["auth", "login"])
-    if (code !== 0) return yield* stop("`cf auth login` did not finish. Nothing was changed; run this again.")
+    if (code !== 0) return yield* stop("`cf auth login` did not finish. Run this again.")
   }
   const again = O.isSome(first) ? first : yield* whoAmI
   const who = loggedIn(again)
   if (O.isNone(who)) {
-    return yield* stop("cf is still not logged in (`cf auth whoami`). Nothing was changed; run this again.")
+    return yield* stop("cf is still not logged in (`cf auth whoami`). Run this again.")
   }
   const accounts = who.value.accounts
   if (!A.isReadonlyArrayNonEmpty(accounts)) {
-    return yield* stop("cf is logged in and sees no Cloudflare account. Nothing was changed.")
+    return yield* stop("cf is logged in and sees no Cloudflare account.")
   }
   yield* workstation.say(
     `Cloudflare: cf is logged in and sees ${accounts.length === 1 ? "one account" : `${accounts.length} accounts`}: ${named(accounts)}.`
@@ -572,7 +680,7 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   )
   const both = A.contains(roles, "preview") && A.contains(roles, "production")
   const sameAccount =
-    "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account, so in one account every pull request's run could change or remove production. Nothing was changed."
+    "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account, so in one account every pull request's run could change or remove production."
   if (both && accounts.length === 1) {
     return yield* stop(
       `cf sees one account. ${sameAccount} Name the second account's token and id in ${localEnvFile}: previews and test stages then go there with no login.`
@@ -594,7 +702,7 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
     )
     if (!yes) {
       return yield* stop(
-        "Stopped: the accounts were not confirmed. Name them with `--production-account` and `--preview-account`. Nothing was changed."
+        "Stopped: the accounts were not confirmed. Name them with `--production-account` and `--preview-account`."
       )
     }
     return { ...found, preview: O.some(previews), production: holder }
@@ -607,6 +715,18 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
     : found.production
   if (both && O.isSome(preview) && O.isSome(production) && preview.value.id === production.value.id) {
     return yield* stop(`Both roles were given the account "${preview.value.name}". ${sameAccount}`)
+  }
+  // Production's address is on the zone, so an account named for production that does not hold it is a mistake.
+  if (O.isSome(production) && O.isSome(holder) && production.value.id !== holder.value.id) {
+    return yield* stop(
+      `"${production.value.name}" was named for production, but "${holder.value.name}" holds the zone ${productionZone}. Production's account is the one that holds it: name that one, or leave the flag out.`
+    )
+  }
+  if (both && O.isSome(preview) && O.isSome(production)) {
+    const yes = yield* workstation.confirm(
+      `Use "${production.value.name}" for production and "${preview.value.name}" for previews, test stages and staging?`
+    )
+    if (!yes) return yield* stop("Stopped: the accounts were not confirmed.")
   }
   return { ...found, preview, production }
 })
@@ -681,20 +801,19 @@ const tokenChecked = Effect.gen(function* () {
   if (!yes) return yield* stop("Stopped at the previews' token. Nothing was changed.")
 })
 
-const profile = Effect.fn("InfraSetup.profile")(function* (
-  role: Role,
-  github: boolean,
+const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
+  step: { readonly role: Role; readonly github: boolean; readonly onePassword: boolean },
   options: SetupOptions,
   found: Found
 ) {
+  const { role, github } = step
   const workstation = yield* Workstation
   const name = profileOf(options, role)
-  // Production's stacks ask 1Password for their secrets through the profile, so its profile is connected to it too.
-  const wanted = ["Cloudflare", ...(github ? ["GitHub"] : []), ...(role === "production" ? ["1Password"] : [])]
+  const wanted = ["Cloudflare", ...(github ? ["GitHub"] : []), ...(step.onePassword ? ["1Password"] : [])]
   const listed = Effect.gen(function* () {
     const answer = yield* workstation.ask("bunx", ["alchemy", "profile", "list"])
     if (answer.code !== 0) {
-      return yield* stop(`\`bunx alchemy profile list\` failed: ${Str.trim(answer.stderr)}. Nothing was changed.`)
+      return yield* stop(`\`bunx alchemy profile list\` failed: ${Str.trim(answer.stderr)}.`)
     }
     return A.findFirst(profilesOf(answer.stdout), (one) => one.name === name)
   })
@@ -714,7 +833,8 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
     )
     return found
   }
-  if (role === "preview" && found.previewByToken) {
+  const byToken = role === "preview" && found.previewByToken
+  if (byToken && A.contains(toConnect, "Cloudflare")) {
     yield* workstation.say(
       `Alchemy: connecting profile "${name}" to the previews' account with the token and id ${localEnvFile} names. 1Password fills them for that one command; Alchemy then keeps the token in its profile store on this machine.`
     )
@@ -743,16 +863,18 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
     if (!O.exists(now, (one) => connected(one.providers, "Cloudflare"))) {
       return yield* stop(`Profile "${name}" is still not connected to Cloudflare. Run this again.`)
     }
-    return found
   }
+  // By his token the profile needs no login to Cloudflare; whatever else it must reach is connected the usual way.
+  const remaining = byToken ? A.filter(toConnect, (provider) => provider !== "Cloudflare") : toConnect
+  if (!A.isReadonlyArrayNonEmpty(remaining)) return found
   const account = O.match(accountOf(found, role), { onNone: () => "", onSome: (one) => ` "${one.name}"` })
   yield* workstation.say(
-    `Alchemy: connecting profile "${name}" to ${A.join(toConnect, " and ")}. Yours to do: approve the login in the browser${
-      A.contains(toConnect, "Cloudflare")
+    `Alchemy: connecting profile "${name}" to ${A.join(remaining, " and ")}. Yours to do: approve the login in the browser${
+      A.contains(remaining, "Cloudflare")
         ? `, and if Alchemy asks which account, pick${account} (the ${role} account)`
         : ""
-    }${A.contains(toConnect, "GitHub") ? "; for GitHub pick gh-cli" : ""}${
-      A.contains(toConnect, "1Password")
+    }${A.contains(remaining, "GitHub") ? "; for GitHub pick gh-cli" : ""}${
+      A.contains(remaining, "1Password")
         ? '; for 1Password pick the desktop app and your account (in the app, Settings, Developer, "Integrate with other apps" must be on)'
         : ""
     }.`
@@ -763,7 +885,7 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
     "edit",
     "--profile",
     name,
-    ...A.flatMap(toConnect, (provider) => ["--add", provider])
+    ...A.flatMap(remaining, (provider) => ["--add", provider])
   ])
   if (code !== 0) return yield* stop(`Connecting profile "${name}" did not finish. Run this again.`)
   const after = yield* listed
@@ -771,6 +893,91 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
   if (A.isReadonlyArrayNonEmpty(still)) {
     return yield* stop(`Profile "${name}" is still not connected to ${A.join(still, " and ")}. Run this again.`)
   }
+  return found
+})
+
+/**
+ * The Cloudflare account id `alchemy profile show` gives for a profile. Only that one line is kept: the rest of what
+ * the tool prints there (part of a token among it) is dropped unread.
+ *
+ * @example
+ * accountIn("- p\n  Cloudflare (oauth) — ok\n    accountId: 0123456789abcdef0123456789abcdef") // the id
+ */
+export const accountIn = (shown: string): O.Option<string> => {
+  const lines = Str.split("\n")(shown)
+  return A.findFirstIndex(lines, (line) => /^ {2}Cloudflare \(/.test(line)).pipe(
+    O.map((at) => A.takeWhile(A.drop(lines, at + 1), (line) => /^ {4}/.test(line))),
+    O.flatMap(A.findFirst((line) => /^ {4}accountId: \S+\s*$/.test(line))),
+    O.map((line) => Str.trim(Str.slice(15)(line)))
+  )
+}
+
+/**
+ * Stops unless the profile deploys into the account the questions name. Every bootstrap and deploy runs with
+ * `--profile`, so it is the profile's own account that is deployed into, whatever `cf` or a token says; a profile
+ * connected to another account would have him say yes to one account and deploy into the other. With `strict`, the
+ * two roles' profiles must also be two accounts (decision I4).
+ */
+const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(function* (
+  role: Role,
+  options: SetupOptions,
+  found: Found
+) {
+  const workstation = yield* Workstation
+  const name = profileOf(options, role)
+  const heldBy = Effect.fn("InfraSetup.heldBy")(function* (profileName: string) {
+    const answer = yield* workstation.ask("bunx", ["alchemy", "profile", "show", "--profile", profileName])
+    return answer.code === 0 ? accountIn(answer.stdout) : O.none<string>()
+  })
+  const reconnect = `Connect it to the right one with \`bunx alchemy profile edit --profile ${name} --reconfigure Cloudflare\`, then run this again.`
+  const held = yield* heldBy(name)
+  if (O.isNone(held)) {
+    return yield* stop(
+      `Could not read which Cloudflare account profile "${name}" deploys into (\`bunx alchemy profile show --profile ${name}\`), so nothing is made with it.`
+    )
+  }
+  if (role === "preview" && found.previewByToken) {
+    // The id is compared inside the one process 1Password fills it for: this command never holds it.
+    const same = yield* workstation.ask("op-human", [
+      "run",
+      "--env-file",
+      localEnvFile,
+      "--",
+      "sh",
+      "-c",
+      `test "$${previewAccountIdName}" = "$1"`,
+      "sh",
+      held.value
+    ])
+    if (same.code !== 0) {
+      return yield* stop(
+        `Profile "${name}" deploys into another Cloudflare account than the one ${localEnvFile} names for the previews. ${reconnect}`
+      )
+    }
+  }
+  const namedAccount = found.previewByToken && role === "preview" ? O.none<Account>() : accountOf(found, role)
+  if (O.isSome(namedAccount) && namedAccount.value.id !== held.value) {
+    return yield* stop(
+      `Profile "${name}" deploys into another Cloudflare account than "${namedAccount.value.name}", the one named for ${role}: a yes to the questions would be about one account and the deploy would go into the other. ${reconnect}`
+    )
+  }
+  yield* workstation.say(`Alchemy: profile "${name}" deploys into the account named for ${role}. Checked.`)
+  const strict = has(options.sizes, "staging") || has(options.sizes, "production")
+  const other = yield* heldBy(profileOf(options, role === "preview" ? "production" : "preview"))
+  if (strict && O.exists(other, (id) => id === held.value)) {
+    return yield* stop(
+      `Profiles "${options.previewProfile}" and "${options.productionProfile}" deploy into the same Cloudflare account. Production and the previews are two accounts (decision I4): a preview's deploy token covers its whole account. Connect the previews' profile to the second account (its token and id in ${localEnvFile}), then run this again.`
+    )
+  }
+})
+
+const profile = Effect.fn("InfraSetup.profile")(function* (
+  step: { readonly role: Role; readonly github: boolean; readonly onePassword: boolean },
+  options: SetupOptions,
+  found: Found
+) {
+  yield* profileConnected(step, options, found)
+  yield* profileAccountChecked(step.role, options, found)
   return found
 })
 
@@ -903,7 +1110,7 @@ const gitHubLogin = Effect.fn("InfraSetup.gitHubLogin")(function* (options: Setu
       "GitHub: gh is not logged in. Starting `gh auth login`: it needs rights over the repository's settings."
     )
     const code = yield* workstation.hand("gh", ["auth", "login"])
-    if (code !== 0) return yield* stop("`gh auth login` did not finish. Nothing was changed; run this again.")
+    if (code !== 0) return yield* stop("`gh auth login` did not finish. Run this again.")
   }
   const who = O.isSome(first) ? first : yield* login
   if (O.isNone(who)) return yield* stop("gh is still not logged in (`gh api user`). Run this again.")
@@ -921,31 +1128,14 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
   const text = target === "test-stage" ? "" : yield* repo.text(repo.join(repo.root, opEnvFile))
   const modelKey = referenceState({ text, name: modelKeyName })
   if (target !== "test-stage") {
-    if (modelKey === "not-a-reference") {
-      return yield* stop(
-        `${opEnvFile} has a line for ${modelKeyName} that is not an op:// reference. Fill in its vault path, or put the "# " back, and run this again. The line was not printed.`
-      )
-    }
     yield* workstation.say(
       modelKey === "reference"
         ? `Model key: ${opEnvFile} names a reference for ${modelKeyName}. The stack asks 1Password for it at the deploy, and the app asks you to authorize; this command never reads it.`
         : `Model key: ${opEnvFile} names none, so this deploys with DEPLOY_WITHOUT_MODEL_KEY=true: production runs without a model and its rules answer. To use a model, fill in that line and run this again.`
     )
     if (target === "repository" && referenceState({ text, name: previewPasswordName }) !== "reference") {
-      return yield* stop(`${opEnvFile} names no reference for ${previewPasswordName}. Nothing was deployed.`)
+      return yield* stop(`${opEnvFile} names no reference for ${previewPasswordName}.`)
     }
-    yield* workstation.say(
-      O.match(options.signUp, {
-        onSome: (signUp) => `Sign-up in production: ${signUp}.`,
-        onNone: () =>
-          "Sign-up in production: closed (no `--sign-up`), so nobody can open an account there, you included, until this runs with `--sign-up <your email>`."
-      })
-    )
-  }
-  if (target === "production" && O.isNone(options.signUp)) {
-    return yield* stop(
-      "Production needs `--sign-up`: the emails that may open an account (yours first), or `closed`. Nothing was deployed."
-    )
   }
   const given = givenFor({ target, found, options, modelKey })
   const what = Target.match(target, {
@@ -966,10 +1156,13 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
   yield* workstation.say(
     Target.match(target, {
       "test-stage": () =>
-        `Deployed ${stage}. Its address and testAccountPassword are in Alchemy's output above, shown to you only. Sign in as dana@example-works.test with that password. To remove the stage: \`bunx alchemy destroy --stage ${stage} --profile ${options.previewProfile}\`, yours to run.`,
+        `Deployed ${stage}. Its address is in Alchemy's output above. Its password was left out of this run on purpose. To read it, run \`bunx alchemy deploy --stage ${stage} --profile ${options.previewProfile}\` yourself: it should change nothing, and its output shows testAccountPassword. Sign in as dana@example-works.test with it. To remove the stage: \`bunx alchemy destroy --stage ${stage} --profile ${options.previewProfile}\`, yours to run too.`,
       repository: () =>
         "Deployed the repository's stack. The next push to main that passes CI deploys staging; a pull request gets a preview. Both deploy with your own token: to rotate it, make a new one in the previews' account, put it in your 1Password item, and run this again.",
-      production: () => "Deployed production. Open its address and sign up with your email."
+      production: () =>
+        O.exists(found.signUp, (value) => Str.trim(value) === "closed")
+          ? "Deployed production. Sign-up is closed there: nobody can open an account, you included, until this runs with `--sign-up <your email>`."
+          : "Deployed production. Open its address: an email on the sign-up list can open an account there."
     })
   )
   return found
@@ -982,7 +1175,7 @@ const perform = (
   Step.match({
     PreviewPassword: () => previewPassword(options, found),
     Cloudflare: (step) => cloudflare(step.roles, options, found),
-    Profile: (step) => profile(step.role, step.github, options, found),
+    Profile: (step) => profile(step, options, found),
     StateStore: (step) => stateStore(step.role, options, found),
     GitHubLogin: () => gitHubLogin(options, found),
     Deploy: (step) => deploy(step.target, options, found)
@@ -999,20 +1192,33 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
       "Say how much to set up: `--test-stage` (a test stage and its address), `--staging` (the repository's stack) or `--production`. `--dry-run` prints the steps and starts nothing."
     )
   }
-  if (!/^[a-z0-9][-_a-z0-9]*$/.test(options.user)) {
+  if (has(options.sizes, "test-stage") && !/^[a-z0-9][-_a-z0-9]*$/.test(options.user)) {
     return yield* stop(
       `"test_${options.user}" is not a stage name (lower-case letters, digits, - and _). Pass \`--user <name>\`.`
     )
   }
-  if (options.dryRun) {
-    return yield* Effect.forEach(dryRun(options), workstation.say, { concurrency: 1, discard: true })
-  }
-  yield* ownerOnly
   const repo = yield* Repo
   const local = repo.join(repo.root, localEnvFile)
   const own = (yield* repo.exists(local)) ? yield* repo.text(local) : ""
   const token = referenceState({ text: own, name: previewTokenName })
   const accountId = referenceState({ text: own, name: previewAccountIdName })
+  const previewByToken = token === "reference" && accountId === "reference"
+  if (options.dryRun) {
+    return yield* Effect.forEach(dryRun({ options, previewByToken }), workstation.say, {
+      concurrency: 1,
+      discard: true
+    })
+  }
+  yield* ownerOnly
+  // The tracked file holds comments and references and nothing else: a value typed there in any form would be
+  // committed with the reference this command writes, so any other line stops the run before it writes or says so.
+  const committed = yield* repo.text(repo.join(repo.root, opEnvFile))
+  const stray = strayLines(committed)
+  if (A.isReadonlyArrayNonEmpty(stray)) {
+    return yield* stop(
+      `${opEnvFile} is tracked by git and holds only comments and lines NAME=op://vault/item/field. Line ${A.join(A.map(stray, String), ", ")} is neither. If a value was typed there, take it out (and change it wherever it came from if the file was ever committed), then run this again. Nothing was started; no line was printed.`
+    )
+  }
   if (
     (token === "missing") !== (accountId === "missing") ||
     token === "not-a-reference" ||
@@ -1022,20 +1228,30 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
       `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither. Nothing was started; no line was printed.`
     )
   }
-  const previewByToken = token === "reference"
   if (!previewByToken && has(options.sizes, "staging")) {
     return yield* stop(
       `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
     )
   }
+  const signUp = yield* signUpFor(options)
   // Before the first step, so a token that will not do is said before anything is made with it or beside it.
   if (previewByToken) yield* tokenChecked
   const steps = stepsFor(options.sizes)
   yield* Effect.reduce(
     steps,
-    (): Found => ({ ...nothingFound, previewByToken }),
+    (): Found => ({ ...nothingFound, previewByToken, signUp }),
     (found, step, index) =>
-      workstation.say(`\nStep ${index + 1} of ${steps.length}.`).pipe(Effect.andThen(perform(options, found)(step)))
+      workstation.say(`\nStep ${index + 1} of ${steps.length}.`).pipe(
+        Effect.andThen(perform(options, found)(step)),
+        // A stop inside a step says what stopped it; what the steps before it made is still there.
+        Effect.catchTag("SetupStopped", (stopped) =>
+          stop(
+            index === 0
+              ? stopped.message
+              : `${stopped.message} Steps 1 to ${index} of this run are done and stay as they are; a run again goes on from them.`
+          )
+        )
+      )
   )
   yield* workstation.say("\nDone. Nothing else was started.")
 })

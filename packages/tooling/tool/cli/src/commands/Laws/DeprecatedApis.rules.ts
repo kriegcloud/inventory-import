@@ -32,6 +32,7 @@ import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
+import { silencings } from "./internal/directives.ts"
 
 const $I = $RepoCliId.create("commands/Laws/DeprecatedApis.rules")
 
@@ -70,24 +71,9 @@ const Profile = S.Struct({
 const readProfile = S.decodeEffect(S.fromJsonString(Profile), { onExcessProperty: "error", errors: "all" })
 
 /**
- * A comment that turns rules off: `oxlint-disable` or `eslint-disable`, for a line, the next one or the file, at the
- * start of a `//` comment (read to the line's end) or of a block comment (read to its end, over as many lines as it
- * has). Groups 1 and 2 are a line comment's directive and what follows it; 3 and 4 a block comment's.
- *
- * The text is matched, not parsed, so the same words inside a string or after `//` in a sentence of a doc comment are
- * refused too, though oxlint ignores them there (measured on 1.93.0). That errs on the side of the rule: write the
- * words another way there, as this law's own test does.
+ * Whether a directive (`internal/directives.ts`) turns this rule off: it names it, under any plugin's spelling, or
+ * names no rule at all.
  */
-const directive =
-  /\/\/[ \t]*((?:oxlint|eslint)-disable(?:-next-line|-line)?)(?![\w-])([^\r\n]*)|\/\*\s*((?:oxlint|eslint)-disable(?:-next-line|-line)?)(?![\w-])([\s\S]*?)\*\//g
-
-/**
- * The rules a directive names: what follows it up to its reason, which begins at the first `--`, with or without
- * spaces around it, as oxlint reads it (measured: `typescript/no-deprecated--legacy` turns the rule off).
- */
-const namedRules = (rest: string) => A.filter(Str.split(/[\s,]+/)(`${Str.split("--")(rest)[0]}`), Str.isNonEmpty)
-
-/** Whether a directive turns this rule off: it names it, under any plugin's spelling, or names no rule at all. */
 const silences = (rules: ReadonlyArray<string>) =>
   A.isReadonlyArrayEmpty(rules) || A.some(rules, (name) => Str.match(/(?:^|\/)no-deprecated$/)(name).pipe(O.isSome))
 
@@ -276,15 +262,8 @@ export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(functio
       files,
       (file) =>
         Effect.map(repo.text(repo.join(repo.root, file)), (text) =>
-          A.flatMap(A.fromIterable(Str.matchAll(directive)(text)), (found) =>
-            silences(namedRules(`${found[2] ?? found[4]}`))
-              ? A.of<DeprecatedApisFinding>(
-                  DeprecatedApisFinding.cases.Silenced.make({
-                    place: `${file}:${A.length(Str.split("\n")(Str.slice(0, found.index)(text)))}`,
-                    directive: `${found[1] ?? found[3]}`
-                  })
-                )
-              : A.empty<DeprecatedApisFinding>()
+          A.map(silencings({ text, silences }), ({ directive, line }) =>
+            DeprecatedApisFinding.cases.Silenced.make({ place: `${file}:${line}`, directive })
           )
         ),
       { concurrency: 16 }

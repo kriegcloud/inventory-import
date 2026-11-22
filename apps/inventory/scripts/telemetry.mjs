@@ -5,6 +5,7 @@
 // `bun run dev` never starts it, and the app runs the same without it.
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import * as Effect from "effect/Effect"
 
 const compose = ["compose", "-f", fileURLToPath(new URL("../telemetry/compose.yaml", import.meta.url))]
 const grafana = Number(process.env.GRAFANA_PORT ?? 3000)
@@ -28,13 +29,14 @@ if (command === "down") {
 
 docker(["up", "-d"])
 // The image starts Grafana and the collector inside one container; both take a little while.
-const answers = async (url, init) => {
-  try {
-    return (await fetch(url, init)).ok
-  } catch {
-    return false
-  }
-}
+// A request nobody answers yet (the port not open, the connection reset) is not an error here: not ready, ask again.
+const answers = (url, init) =>
+  Effect.runPromise(
+    Effect.tryPromise({ try: () => fetch(url, init), catch: () => "unanswered" }).pipe(
+      Effect.map((response) => response.ok),
+      Effect.orElseSucceed(() => false)
+    )
+  )
 const deadline = Date.now() + 120_000
 let ready = false
 while (!ready && Date.now() < deadline) {

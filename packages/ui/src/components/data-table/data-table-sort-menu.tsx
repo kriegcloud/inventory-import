@@ -1,5 +1,7 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
+import { useAtom, useAtomMount, useAtomSet } from "@effect/atom-react"
 import {
   type ColumnSort,
   type ReactTable,
@@ -9,7 +11,8 @@ import {
   Subscribe
 } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import * as Atom from "effect/reactivity/Atom"
+import { type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, useId } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -49,7 +52,52 @@ import { ArrowDownUp, ChevronsUpDown, GripVertical, Trash2 } from "lucide-react"
 const SORT_SHORTCUT_KEY = "s"
 const REMOVE_SORT_SHORTCUTS = ["backspace", "delete"]
 
-interface DataTableSortMenuProps<TData extends RowData> extends React.ComponentProps<typeof PopoverContent> {
+/** Whether one sort menu on screen is open, made for each menu (its `useId`). */
+const menuOpen = Atom.family((_instance: string) => Atom.make(false))
+
+/** One sort menu's trigger button, set by the button's ref. */
+const menuTrigger = Atom.family((_instance: string) => Atom.make<HTMLButtonElement | null>(null))
+
+/**
+ * Ctrl+Shift+S opens and closes one sort menu, from anywhere in its table (or the page, when its table is the first):
+ * the listener is on the window while the menu is on screen, and goes with the atom. A disabled trigger takes no
+ * shortcut, as upstream's `disabled` prop.
+ */
+const menuShortcut = Atom.family((instance: string) =>
+  Atom.readable((get) => {
+    const registry = get.registry
+    function onKeyDown(event: KeyboardEvent) {
+      const trigger = registry.get(menuTrigger(instance))
+      if (trigger?.disabled === true) return
+      const open = registry.get(menuOpen(instance))
+      if (!open && !getIsTableShortcutTarget(trigger, event.target)) {
+        return
+      }
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        (event.target instanceof HTMLElement && event.target.contentEditable === "true")
+      ) {
+        return
+      }
+
+      if (event.key.toLowerCase() === SORT_SHORTCUT_KEY && (event.ctrlKey || event.metaKey) && event.shiftKey) {
+        event.preventDefault()
+        registry.set(menuOpen(instance), !open)
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    get.addFinalizer(() => window.removeEventListener("keydown", onKeyDown))
+  })
+)
+
+/** Which of one sort row's two lists is open, made for each row (its `useId`). */
+const itemSelectors = Atom.family((_instance: string) =>
+  Atom.make<{ readonly field: boolean; readonly direction: boolean }>({ field: false, direction: false })
+)
+
+interface DataTableSortMenuProps<TData extends RowData> extends ComponentProps<typeof PopoverContent> {
   table: ReactTable<DataTableFeatures, TData, unknown>
   disabled?: boolean
 }
@@ -72,101 +120,62 @@ function DataTableSortMenuContent<TData extends RowData>({
   sorting: SortingState
 }) {
   const dir = useDirection()
-  const id = React.useId()
-  const labelId = React.useId()
-  const descriptionId = React.useId()
-  const [open, setOpen] = React.useState(false)
-  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const id = useId()
+  const labelId = useId()
+  const descriptionId = useId()
+  const [open, setOpen] = useAtom(menuOpen(id))
+  const setTrigger = useAtomSet(menuTrigger(id))
+  useAtomMount(menuShortcut(id))
 
   const onSortingChange = table.setSorting
 
-  const { columnLabels, columns } = React.useMemo(() => {
-    const labels = new Map<string, string>()
-    const sortingIds = new Set(sorting.map((s) => s.id))
-    const availableColumns: { id: string; label: string }[] = []
+  // Worked out in each draw: `sorting` and the table handed in are new in each draw that changes them.
+  const columnLabels = new Map<string, string>()
+  const sortingIds = new Set(sorting.map((s) => s.id))
+  const columns: { id: string; label: string }[] = []
 
-    for (const column of table.getAllLeafColumns()) {
-      if (!column.getCanSort()) continue
+  for (const column of table.getAllLeafColumns()) {
+    if (!column.getCanSort()) continue
 
-      const label = column.columnDef.meta?.label ?? column.id
-      labels.set(column.id, label)
+    const label = column.columnDef.meta?.label ?? column.id
+    columnLabels.set(column.id, label)
 
-      if (!sortingIds.has(column.id)) {
-        availableColumns.push({ id: column.id, label })
-      }
+    if (!sortingIds.has(column.id)) {
+      columns.push({ id: column.id, label })
     }
+  }
 
-    return {
-      columnLabels: labels,
-      columns: availableColumns
-    }
-  }, [sorting, table])
-
-  const onSortAdd = React.useCallback(() => {
+  function onSortAdd() {
     const firstColumn = columns[0]
     if (!firstColumn) return
 
     onSortingChange((prevSorting) => [...prevSorting, { id: firstColumn.id, desc: false }])
-  }, [columns, onSortingChange])
+  }
 
-  const onSortUpdate = React.useCallback(
-    (sortId: string, updates: Partial<ColumnSort>) => {
-      onSortingChange((prevSorting) => prevSorting.map((sort) => (sort.id === sortId ? { ...sort, ...updates } : sort)))
-    },
-    [onSortingChange]
-  )
+  function onSortUpdate(sortId: string, updates: Partial<ColumnSort>) {
+    onSortingChange((prevSorting) => prevSorting.map((sort) => (sort.id === sortId ? { ...sort, ...updates } : sort)))
+  }
 
-  const onSortRemove = React.useCallback(
-    (sortId: string) => {
-      onSortingChange((prevSorting) => prevSorting.filter((item) => item.id !== sortId))
-    },
-    [onSortingChange]
-  )
+  function onSortRemove(sortId: string) {
+    onSortingChange((prevSorting) => prevSorting.filter((item) => item.id !== sortId))
+  }
 
-  const onSortingReset = React.useCallback(
-    () => onSortingChange(table.initialState.sorting),
-    [onSortingChange, table.initialState.sorting]
-  )
+  function onSortingReset() {
+    onSortingChange(table.initialState.sorting)
+  }
 
-  React.useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (disabled) return
-      if (!open && !getIsTableShortcutTarget(triggerRef.current, event.target)) {
-        return
-      }
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        (event.target instanceof HTMLElement && event.target.contentEditable === "true")
-      ) {
-        return
-      }
-
-      if (event.key.toLowerCase() === SORT_SHORTCUT_KEY && (event.ctrlKey || event.metaKey) && event.shiftKey) {
-        event.preventDefault()
-        setOpen((prev) => !prev)
-      }
+  function onTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (REMOVE_SORT_SHORTCUTS.includes(event.key.toLowerCase()) && sorting.length > 0) {
+      event.preventDefault()
+      onSortingReset()
     }
-
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [disabled, open])
-
-  const onTriggerKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (REMOVE_SORT_SHORTCUTS.includes(event.key.toLowerCase()) && sorting.length > 0) {
-        event.preventDefault()
-        onSortingReset()
-      }
-    },
-    [sorting.length, onSortingReset]
-  )
+  }
 
   return (
     <Sortable value={sorting} onValueChange={onSortingChange} getItemValue={(item) => item.id}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" ref={triggerRef} onKeyDown={onTriggerKeyDown} disabled={disabled}>
+          <Button variant="outline" ref={setTrigger} onKeyDown={onTriggerKeyDown} disabled={disabled}>
             <ArrowDownUp className="text-muted-foreground" />
             Sort
             {sorting.length > 0 && (
@@ -258,26 +267,24 @@ function DataTableSortItem({
   const directionListboxId = `${sortItemId}-direction-listbox`
   const label = columnLabels.get(sort.id) ?? sort.id
 
-  const [showFieldSelector, setShowFieldSelector] = React.useState(false)
-  const [showDirectionSelector, setShowDirectionSelector] = React.useState(false)
+  const [{ field: showFieldSelector, direction: showDirectionSelector }, setSelectors] = useAtom(itemSelectors(useId()))
+  const setShowFieldSelector = (open: boolean) => setSelectors((previous) => ({ ...previous, field: open }))
+  const setShowDirectionSelector = (open: boolean) => setSelectors((previous) => ({ ...previous, direction: open }))
 
-  const onItemKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return
-      }
+  function onItemKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      return
+    }
 
-      if (showFieldSelector || showDirectionSelector) {
-        return
-      }
+    if (showFieldSelector || showDirectionSelector) {
+      return
+    }
 
-      if (REMOVE_SORT_SHORTCUTS.includes(event.key.toLowerCase())) {
-        event.preventDefault()
-        onSortRemove(sort.id)
-      }
-    },
-    [sort.id, showFieldSelector, showDirectionSelector, onSortRemove]
-  )
+    if (REMOVE_SORT_SHORTCUTS.includes(event.key.toLowerCase())) {
+      event.preventDefault()
+      onSortRemove(sort.id)
+    }
+  }
 
   return (
     <SortableItem id={sortItemId} value={sort.id} asChild>

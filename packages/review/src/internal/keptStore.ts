@@ -9,14 +9,11 @@ import * as O from "effect/Option"
 import * as KeyValueStore from "effect/persistence/KeyValueStore"
 import * as Atom from "effect/reactivity/Atom"
 
-/** The browser's storage, or none where reading `localStorage` is itself refused (some private windows). */
-const lookup = (): Storage | undefined => {
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
-}
+/**
+ * The browser's storage, or none where reading `localStorage` is itself refused (some private windows). Not
+ * `@inventory/client/Storage`, which this package may not use: every call after this one is an `Effect.try` below.
+ */
+const lookup = (): Storage | undefined => O.getOrUndefined(O.liftThrowable(() => window.localStorage)())
 
 const refusal = (method: string, key: string, cause: unknown) =>
   new KeyValueStore.KeyValueStoreError({ key, method, message: `The browser would not ${method} ${key}`, cause })

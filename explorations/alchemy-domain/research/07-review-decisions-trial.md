@@ -7445,7 +7445,7 @@ them, runs stories of everything else a person would call wrong against what clo
 | 13 | "No row is decided on a removed import", which an earlier draft named as a model invariant | **Broken**, as it should be: Remove leaves the rows as they are (run on `review9`) | 188.51 s, 31.24 39.37 36.26 to 38.66 39.87 37.07 |
 | 13 | Sixteen mutants, each with one check removed | **Each breaks the rule named for that check**, below | fourteen in a run that was cut off before it printed its time; the two left in 371.65 s, load 106.80 66.00 52.67 to 49.94 65.56 57.41 |
 | 13 | Twenty-five stories, a property that a seal is read back (2,000 runs) and one of the number a screen may name | **All pass** | under 1 s |
-| 13 | The seal as a hash; with lengths written into the text; the undo sent by the server alone | Not read; a `ProveError`; the sender proved and the content refuted | below |
+| 13 | The seal as a hash; with lengths written into the text; the undo sent by the server alone | Not read; a `ProveError`; the sender proved and the content refuted | below; on this repository's pin the `ProveError` is patched ([Patching a dependency](../../../docs/patches.md)) |
 | 14 | The final model on the domain's Durable Object host in local workerd | 600 acts one after another in each of two runs: 131 and 151 ms an act on the mean (the second run printed below), each timed act the first on a row of its own; counting the Worker's call, 4 requests to objects an act (3 of them between objects), 5 on a row's first, 3 for a refused act, 1 for what touches one object. Each refusal the stories show is shown; three races on one row took one, three on two rows took both | first run 31.80 32.66 38.22 to 29.19 34.14 38.24; second 29.97 34.14 38.18 to 45.85 37.06 38.43 |
 
 "Proved" here is of `review11`, printed below whole, and of nothing else.
@@ -9917,6 +9917,9 @@ elapsed 1961 ms
 ```
 
   The sizes are therefore numbers beside each level, compared with the texts' lengths when a level is brought back.
+  That was `dbfd0dd`, as run. On this repository's pin the library is patched for it: a text's length written into a
+  template is read, so a rule that holds is proved and a broken one comes back with the text that breaks it
+  ([Patching a dependency](../../../docs/patches.md), `02-text-length-in-a-template`).
 - **A hash of it** (FNV-1a, in a loop) is not read:
 
 ```text

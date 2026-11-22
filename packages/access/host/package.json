@@ -31,17 +31,17 @@
     "@beep/better-auth": "workspace:*",
     "@beep/d1": "workspace:*",
     "@beep/identity": "workspace:*",
-    "@cloudflare/workers-types": "^5.20261113.1",
+    "@cloudflare/workers-types": "catalog:",
     "@inventory/access-contract": "workspace:*",
     "@inventory/access-model": "workspace:*",
     "@inventory/kernel": "workspace:*",
-    "better-auth": "1.7.22",
-    "effect": "4.1.5"
+    "better-auth": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "4.1.5",
-    "@types/node": "^22.20.5",
-    "vitest": "^5.1.0"
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
   },
   "beep": {
     "family": "context",

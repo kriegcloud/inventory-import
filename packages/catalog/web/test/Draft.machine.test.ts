@@ -9,6 +9,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import {
+  type Draft,
   DraftEffect,
   DraftEvent,
   emptyDraft,
@@ -831,6 +832,112 @@ describe("orderings the properties met, pinned", () => {
       ])
     ).toEqual(O.none())
   })
+
+  it("a pick let go because a late closed picture holds the same value is named when the import, opened again, holds another", () => {
+    expect(
+      broken([
+        Command.cases.SomeoneElse.make({ row: "b", to: "acceptedOut" }),
+        Command.cases.Match.make({}),
+        Command.cases.SomeoneConfirms.make({}),
+        Command.cases.PressConfirm.make({}),
+        Command.cases.ConfirmFails.make({}),
+        Command.cases.TakeUp.make({ row: "b", to: "accepted", beside: "another", as: "landed" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.SomeoneReopens.make({}),
+        Command.cases.SomeoneElse.make({ row: "b", to: "accepted" }),
+        Command.cases.SettleAll.make({ which: "theirs" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("a closed tab's decision picked beside hers whose answer was lost, refused as decided since, is not said as someone else's before a picture says what a match took back", () => {
+    expect(
+      broken([
+        Command.cases.Match.make({}),
+        Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
+        Command.cases.ServerTakesSave.make({ which: "last" }),
+        Command.cases.SaveFails.make({ which: "last" }),
+        Command.cases.TakeUp.make({ row: "a", to: "kept", beside: "no", as: "waiting" }),
+        Command.cases.Settle.make({ row: "a", which: "theirs" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("her decision the screen reads as saved leaves its line remembering the save of hers whose answer was lost: what that save wrote is not said as someone else's", () => {
+    expect(
+      broken([
+        Command.cases.SomeoneElse.make({ row: "c", to: "acceptedOut" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.Decide.make({ row: "c", to: "empty" }),
+        Command.cases.Match.make({}),
+        Command.cases.Decide.make({ row: "c", to: "out" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.ServerTakesSave.make({ which: "last" }),
+        Command.cases.SaveFails.make({ which: "last" }),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.Decide.make({ row: "c", to: "acceptedOut" }),
+        Command.cases.SaveFails.make({ which: "last" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("what an answer said of a row is known as of that answer, not a later one: her own saved decision, matched since, is never said as decided by someone else", () => {
+    expect(
+      broken([
+        Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
+        Command.cases.Decide.make({ row: "c", to: "acceptedOut" }),
+        Command.cases.ServerTakesSave.make({ which: "last" }),
+        Command.cases.SaveAnswers.make({ which: "last" }),
+        Command.cases.Match.make({}),
+        Command.cases.Match.make({}),
+        Command.cases.TakeUp.make({ row: "a", to: "acceptedOut", beside: "another", as: "waiting" }),
+        Command.cases.Settle.make({ row: "a", which: "theirs" }),
+        Command.cases.TakeUp.make({ row: "c", to: "nothing", beside: "another", as: "refused" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("on that ordering, her pick of the closed tab's decision goes at once: what an answer said of the row before the matches does not hold it on a line", () => {
+    const world = opened()
+    for (const command of [
+      Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
+      Command.cases.Decide.make({ row: "c", to: "acceptedOut" }),
+      Command.cases.ServerTakesSave.make({}),
+      Command.cases.SaveAnswers.make({}),
+      Command.cases.Match.make({}),
+      Command.cases.Match.make({}),
+      Command.cases.TakeUp.make({ row: "a", to: "acceptedOut", beside: "another", as: "waiting" }),
+      Command.cases.Settle.make({ row: "a", which: "theirs" }),
+      Command.cases.TakeUp.make({ row: "c", to: "nothing", beside: "another", as: "refused" }),
+      // She picks the other tab's leave-out of row c; the save of row a out before it is answered.
+      Command.cases.SettleAll.make({ which: "first" }),
+      Command.cases.ServerTakesSave.make({}),
+      Command.cases.SaveAnswers.make({})
+    ])
+      run(world, command)
+    expect([R.keys(world.draft.lines), O.map(world.draft.flight, (flight) => R.keys(flight.rows))]).toEqual([
+      [],
+      O.some(["c"])
+    ])
+  })
+
+  it("a decision the server refused is not sent again unasked because a closed tab taken up afterwards had the same one", () => {
+    expect(
+      broken([
+        Command.cases.TakeUp.make({ row: "a", to: "accepted", beside: "another", as: "landed" }),
+        Command.cases.Leave.make({}),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.Settle.make({ row: "a", which: "first" }),
+        Command.cases.ComeBack.make({}),
+        Command.cases.SomeoneElse.make({ row: "a", to: "kept" }),
+        Command.cases.TakeUp.make({ row: "a", to: "accepted", beside: "no", as: "waiting" }),
+        Command.cases.SaveRefused.make({ which: "last" })
+      ])
+    ).toEqual(O.none())
+  })
 })
 
 describe("a save's answer that comes after its draft closed", () => {
@@ -953,6 +1060,45 @@ describe("a save's answer that comes after its draft closed", () => {
     expect([late.draft.lines, late.draft.unsent]).toEqual([{}, {}])
   })
 
+  it("brings her refused pick back beside a closed tab's decision of the row taken up and sent since", () => {
+    // Left out here and held as sent by the closed picture; in the import opened again her closed tab's "keep" (made
+    // over "left out") is taken up and sent. A colleague accepts the row, and the first save's answer says so while
+    // the second is out: "left out" is a side of the row's line, never dropped because another decision of the row
+    // is on its way. The second, refused the same way, is the other side.
+    const events = [
+      DraftEvent.Opened({ kept: O.none() }),
+      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.Decided({ changes: { a: O.some(out) } }),
+      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.TakenUp({
+        kept: {
+          rows: {
+            a: {
+              decision: O.some(kept),
+              madeOn: 7,
+              dates: {},
+              seen: [O.some(out)],
+              live: false,
+              here: false,
+              overtaken: false,
+              refused: O.none()
+            }
+          },
+          lines: {},
+          confirms: O.some(1),
+          leftOver: O.none()
+        }
+      }),
+      answer(1, 9, [{ rowId: "a", theirs: O.some(accepted) }])
+    ]
+    const late = played(events)
+    const sides = (draft: Draft) => A.map(draft.lines.a?.sides ?? [], (side) => side.decision)
+    expect([A.map(sends(late.effects), (send) => send.id), sides(late.draft)]).toEqual([[1, 2], [O.some(out)]])
+    const both = played([...events, answer(2, 9, [{ rowId: "a", theirs: O.some(accepted) }])])
+    expect([sides(both.draft), both.draft.unsent]).toEqual([[O.some(kept), O.some(out)], {}])
+  })
+
   it("names once a row whose later decision of hers waited behind the save when its draft closed", () => {
     // Left out, sent, then kept while that save was out: the closed picture holds the first, and the second was named
     // closing. The late answer of the first adds neither a line nor a row to send.
@@ -985,6 +1131,21 @@ describe("seeds the properties were falsified by, played again", () => {
       name: "with somebody else confirming, reopening or removing the import",
       seed: 5903557278919753,
       may: { confirms: true, elsewhere: true, tabs: true }
+    },
+    {
+      name: "with somebody else confirming, reopening or removing the import",
+      seed: -7675454253259129,
+      may: { confirms: true, elsewhere: true, tabs: true }
+    },
+    {
+      name: "with reloads, sign-outs and closed tabs taken up",
+      seed: 7065129212828743,
+      may: { confirms: false, elsewhere: false, tabs: true }
+    },
+    {
+      name: "with reloads, sign-outs and closed tabs taken up",
+      seed: -5469710740912195,
+      may: { confirms: false, elsewhere: false, tabs: true }
     }
   ] as const
   for (const { may, name, seed } of seeds) {

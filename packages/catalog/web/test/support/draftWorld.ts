@@ -10,6 +10,7 @@ import * as Formatter from "effect/Formatter"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
@@ -1403,7 +1404,7 @@ export const broken = (commands: ReadonlyArray<Command>): O.Option<string> => {
     runIn(world, command)
     holds(world)
   }
-  try {
+  const played = (): O.Option<string> => {
     for (const command of commands) one(command)
     // Everything on its way lands.
     quiet(world)
@@ -1427,9 +1428,12 @@ export const broken = (commands: ReadonlyArray<Command>): O.Option<string> => {
       ).toEqual(plain(world.server.decisions))
     }
     return O.none()
-  } catch (error) {
-    return O.some(error instanceof Error ? error.message : String(error))
   }
+  // What did not hold is thrown (an `expect`, or the draft refusing a step): its words are the answer.
+  return Result.match(
+    Result.try({ try: played, catch: (error) => (error instanceof Error ? error.message : String(error)) }),
+    { onSuccess: (held) => held, onFailure: O.some }
+  )
 }
 
 /** The ordering with every command left out that it still fails without: what a failure prints. */
@@ -1459,11 +1463,7 @@ const playIn = (choices: typeof Choices.Type, may: Play): void => {
     if (command === undefined) break
     commands.push(command)
     // The world moves on so the next draw is from what is enabled then; what must hold is checked by `broken`.
-    try {
-      runIn(world, command)
-    } catch {
-      break
-    }
+    if (O.isNone(O.liftThrowable(runIn)(world, command))) break
   }
   if (O.isNone(broken(commands))) return
   const ordering = shortest(commands)

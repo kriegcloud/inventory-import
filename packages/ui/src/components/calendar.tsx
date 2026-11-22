@@ -1,4 +1,5 @@
-import * as React from "react"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
+import type { ComponentProps } from "react"
 import { cn } from "cn"
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { DayPicker, getDefaultClassNames, type DayButton } from "react-day-picker"
@@ -14,8 +15,8 @@ function Calendar({
   formatters,
   components,
   ...props
-}: React.ComponentProps<typeof DayPicker> & {
-  buttonVariant?: React.ComponentProps<typeof Button>["variant"]
+}: ComponentProps<typeof DayPicker> & {
+  buttonVariant?: ComponentProps<typeof Button>["variant"]
 }) {
   const defaultClassNames = getDefaultClassNames()
 
@@ -126,17 +127,16 @@ function Calendar({
   )
 }
 
-function CalendarDayButton({ className, day, modifiers, ...props }: React.ComponentProps<typeof DayButton>) {
-  const defaultClassNames = getDefaultClassNames()
+// The focused day takes the focus: the ref changes from none to `focusDay` when a day becomes the focused one, and
+// React calls a new ref with the button, as upstream's effect on `modifiers.focused` did.
+const focusDay = (node: HTMLButtonElement | null) => node?.focus()
 
-  const ref = React.useRef<HTMLButtonElement>(null)
-  React.useEffect(() => {
-    if (modifiers.focused) ref.current?.focus()
-  }, [modifiers.focused])
+function CalendarDayButton({ className, day, modifiers, ...props }: ComponentProps<typeof DayButton>) {
+  const defaultClassNames = getDefaultClassNames()
 
   return (
     <Button
-      ref={ref}
+      ref={modifiers.focused ? focusDay : undefined}
       variant="ghost"
       size="icon"
       data-day={day.date.toLocaleDateString()}

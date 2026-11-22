@@ -1,9 +1,12 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
+import { useAtom, useAtomMount, useAtomSet } from "@effect/atom-react"
 import type { Column, ReactTable, RowData } from "@tanstack/react-table"
 
 import { cn } from "cn"
-import * as React from "react"
+import * as Atom from "effect/reactivity/Atom"
+import { type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, useId, useRef } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import type {
@@ -70,7 +73,45 @@ const REMOVE_FILTER_SHORTCUTS = ["backspace", "delete"]
 type FilterUpdate = Partial<Omit<ColumnFilterItem, "filterId">>
 type FilterSelector = "field" | "operator" | "value"
 
-interface DataTableFilterMenuProps<TData extends RowData> extends React.ComponentProps<typeof PopoverContent> {
+/** Whether one filter menu on screen is open, made for each menu (its `useId`). */
+const menuOpen = Atom.family((_instance: string) => Atom.make(false))
+
+/** One filter menu's trigger button, set by the button's ref. */
+const menuTrigger = Atom.family((_instance: string) => Atom.make<HTMLButtonElement | null>(null))
+
+/**
+ * Ctrl+Shift+F opens and closes one filter menu, from anywhere in its table (or the page, when its table is the
+ * first): the listener is on the window while the menu is on screen, and goes with the atom. A disabled trigger takes
+ * no shortcut, as upstream's `disabled` prop.
+ */
+const menuShortcut = Atom.family((instance: string) =>
+  Atom.readable((get) => {
+    const registry = get.registry
+    function onKeyDown(event: KeyboardEvent) {
+      const trigger = registry.get(menuTrigger(instance))
+      if (trigger?.disabled === true) return
+      const open = registry.get(menuOpen(instance))
+      if (!open && !getIsTableShortcutTarget(trigger, event.target)) {
+        return
+      }
+      if (getIsEditableTarget(event.target)) return
+      if (event.key.toLowerCase() !== FILTER_SHORTCUT_KEY || !(event.ctrlKey || event.metaKey) || !event.shiftKey) {
+        return
+      }
+
+      event.preventDefault()
+      registry.set(menuOpen(instance), !open)
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    get.addFinalizer(() => window.removeEventListener("keydown", onKeyDown))
+  })
+)
+
+/** Which of one filter row's lists is open, made for each row (its `useId`). */
+const activeSelectorOf = Atom.family((_instance: string) => Atom.make<FilterSelector | null>(null))
+
+interface DataTableFilterMenuProps<TData extends RowData> extends ComponentProps<typeof PopoverContent> {
   table: ReactTable<DataTableFeatures, TData, unknown>
   disabled?: boolean
 }
@@ -103,33 +144,17 @@ function DataTableFilterMenuContent<TData extends RowData>({
   ...props
 }: DataTableFilterMenuContentProps<TData>) {
   const dir = useDirection()
-  const id = React.useId()
-  const labelId = React.useId()
-  const descriptionId = React.useId()
-  const [open, setOpen] = React.useState(false)
-  const triggerRef = React.useRef<HTMLButtonElement>(null)
-  const addButtonRef = React.useRef<HTMLButtonElement>(null)
+  const id = useId()
+  const labelId = useId()
+  const descriptionId = useId()
+  const [open, setOpen] = useAtom(menuOpen(id))
+  const setTrigger = useAtomSet(menuTrigger(id))
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  useAtomMount(menuShortcut(id))
 
-  React.useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (disabled) return
-      if (!open && !getIsTableShortcutTarget(triggerRef.current, event.target)) {
-        return
-      }
-      if (getIsEditableTarget(event.target)) return
-      if (event.key.toLowerCase() !== FILTER_SHORTCUT_KEY || !(event.ctrlKey || event.metaKey) || !event.shiftKey) {
-        return
-      }
-
-      event.preventDefault()
-      setOpen((open) => !open)
-    }
-
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [disabled, open])
-
-  const columns = React.useMemo(() => table.getAllLeafColumns().filter((column) => column.getCanFilter()), [table])
+  // Worked out in each draw: the table handed in is a new object in each draw of its owner, so upstream's memo on it
+  // never kept anything.
+  const columns = table.getAllLeafColumns().filter((column) => column.getCanFilter())
 
   const hasFilters = filters.length > 0
 
@@ -157,7 +182,7 @@ function DataTableFilterMenuContent<TData extends RowData>({
     table.resetJoinOperator()
   }
 
-  function onTriggerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+  function onTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
     const lastFilter = filters.at(-1)
     if (!lastFilter || !getIsRemoveKey(event)) return
 
@@ -173,7 +198,7 @@ function DataTableFilterMenuContent<TData extends RowData>({
     >
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" ref={triggerRef} onKeyDown={onTriggerKeyDown} disabled={disabled}>
+          <Button variant="outline" ref={setTrigger} onKeyDown={onTriggerKeyDown} disabled={disabled}>
             <ListFilter className="text-muted-foreground" />
             Filter
             {hasFilters && (
@@ -249,7 +274,7 @@ function DataTableFilterMenuContent<TData extends RowData>({
   )
 }
 
-function getIsRemoveKey(event: React.KeyboardEvent) {
+function getIsRemoveKey(event: ReactKeyboardEvent) {
   return REMOVE_FILTER_SHORTCUTS.includes(event.key.toLowerCase())
 }
 
@@ -274,7 +299,7 @@ function DataTableFilterItem<TData extends RowData>({
   onFilterUpdate,
   onFilterRemove
 }: DataTableFilterItemProps<TData>) {
-  const [activeSelector, setActiveSelector] = React.useState<FilterSelector | null>(null)
+  const [activeSelector, setActiveSelector] = useAtom(activeSelectorOf(useId()))
 
   const column = columns.find((column) => column.id === filter.id)
   if (!column) return null
@@ -288,7 +313,7 @@ function DataTableFilterItem<TData extends RowData>({
     }
   }
 
-  function onItemKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+  function onItemKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (activeSelector || getIsEditableTarget(event.target)) return
     if (!getIsRemoveKey(event)) return
 

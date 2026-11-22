@@ -68,6 +68,52 @@ describe("config-sync", () => {
     })
   )
 
+  it.effect("writes syncpack's catalog group from the root's catalog, and asks for the group when there is none", () =>
+    Effect.gen(function* () {
+      const root = json({
+        name: "root",
+        workspaces: ["packages/*"],
+        catalog: { vitest: "^5.1.0", effect: "4.1.5" }
+      })
+      const packages = {
+        "packages/kernel/package.json": json({ name: "@x/kernel", scripts, dependencies: { effect: "catalog:" } }),
+        "packages/kernel/tsconfig.json": "{}"
+      }
+      const config = (dependencies: string) =>
+        lines([
+          "{",
+          '  "source": ["package.json", "packages/*/package.json"],',
+          '  "versionGroups": [',
+          '    { "label": "kept files", "dependencies": ["alchemy"], "isIgnored": true },',
+          `    { "label": "the catalog", "policy": "catalog", "dependencies": ${dependencies} },`,
+          '    { "label": "after", "dependencies": ["react"], "isIgnored": true }',
+          "  ]",
+          "}"
+        ])
+      const result = yield* run({ "package.json": root, ".syncpackrc.json": config('["effect"]'), ...packages }, [
+        ".syncpackrc.json"
+      ])
+      expect(result.before).toEqual([
+        "err: config-sync FAIL  1 place differs from what it is derived from (`bun run config-sync` writes it)",
+        "err:   .syncpackrc.json:5  the catalog group's `dependencies`, from the `catalog` of package.json: found effect, expected effect, vitest"
+      ])
+      expect(result.files[".syncpackrc.json"]).toBe(config('["effect", "vitest"]'))
+      expect(result.again.length).toBe(1)
+      const none = yield* run(
+        {
+          "package.json": root,
+          ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"]),
+          ...packages
+        },
+        [".syncpackrc.json"]
+      )
+      expect(none.before).toEqual([
+        "err: config-sync FAIL  1 problem needs a person, and no command repairs it",
+        'err:   .syncpackrc.json: has no version group that holds the catalog: add { "label": "...", "policy": "catalog", "dependencies": [], "dependencyTypes": ["prod", "dev", "peer"] } to "versionGroups" and run `bun run config-sync`, or a dependency of the root\'s catalog can be written as a version in one package.json'
+      ])
+    })
+  )
+
   it.effect("a list too long for one line is written one item a line, as the formatter leaves it", () =>
     Effect.gen(function* () {
       const patterns = ["apps/*", "packages/*", "packages/catalog/*", "packages/access/*", "packages/foundation/*/*"]

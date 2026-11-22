@@ -1,7 +1,11 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 // Local changes: five places pass an optional prop only when it has a value, which this repo's exact optional
 // property types require (`prop={undefined}` is not the same as leaving the prop out). Behaviour is unchanged.
+// The item being dragged is an atom of each `Sortable` on screen; what a draw of `Sortable` and of an item hands to
+// their parts (the items, dnd-kit's listeners for this draw) stays in React context, read with `useContext`, the one
+// hook left here (goals/atoms PLAN, "The kit on atoms").
 
 import {
   type Announcements,
@@ -35,11 +39,24 @@ import {
   verticalListSortingStrategy
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { useAtom } from "@effect/atom-react"
 import { cn } from "cn"
+import * as Atom from "effect/reactivity/Atom"
 import { Slot as SlotPrimitive } from "radix-ui"
-import { useComposedRefs } from "radix-ui/internal"
-import * as React from "react"
-import * as ReactDOM from "react-dom"
+import {
+  type ComponentProps,
+  createContext,
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+  type RefCallback,
+  // A draw of `Sortable` or of an item hands its parts what it was drawn with (the items, dnd-kit's listeners and
+  // attributes for this draw); an atom would need them written during the draw or after it, in an effect.
+  // oxlint-disable-next-line no-restricted-imports
+  useContext,
+  useId
+} from "react"
+import { createPortal } from "react-dom"
 
 const orientationConfig = {
   vertical: {
@@ -76,10 +93,50 @@ interface SortableRootContextValue<T> {
   flatCursor: boolean
 }
 
-const SortableRootContext = React.createContext<SortableRootContextValue<unknown> | null>(null)
+/** The item one `Sortable` on screen is dragging, made for each (its `useId`). */
+const activeIdOf = Atom.family((_instance: string) => Atom.make<UniqueIdentifier | null>(null))
+
+/** One ref callback that hands the node to each ref, and cleans up after each when the node goes. */
+function composeRefs<T>(...refs: ReadonlyArray<Ref<T> | undefined>): RefCallback<T> {
+  return (node) => {
+    const cleanups = refs.map((ref) => {
+      if (typeof ref === "function") return ref(node)
+      if (ref !== null && ref !== undefined) ref.current = node
+      return undefined
+    })
+    return () => {
+      cleanups.forEach((cleanup, index) => {
+        const ref = refs[index]
+        if (typeof cleanup === "function") cleanup()
+        else if (typeof ref === "function") ref(null)
+        else if (ref !== null && ref !== undefined) ref.current = null
+      })
+    }
+  }
+}
+
+// One item's ref callback, made again only when what it closes over changes, as upstream's `useComposedRefs` over a
+// `useCallback`: React hands a new ref callback null and then the node, which dnd-kit reads as the node leaving and
+// coming back. Kept per dnd-kit's own setter, which is the same for the item's whole life.
+const keptRefs = new WeakMap<
+  object,
+  { readonly deps: ReadonlyArray<unknown>; readonly ref: RefCallback<HTMLElement> }
+>()
+
+function keptRef(owner: object, deps: ReadonlyArray<unknown>, make: () => RefCallback<HTMLElement>) {
+  const kept = keptRefs.get(owner)
+  if (kept !== undefined && kept.deps.length === deps.length && kept.deps.every((dep, i) => Object.is(dep, deps[i]))) {
+    return kept.ref
+  }
+  const ref = make()
+  keptRefs.set(owner, { deps, ref })
+  return ref
+}
+
+const SortableRootContext = createContext<SortableRootContextValue<unknown> | null>(null)
 
 function useSortableContext(consumerName: string) {
-  const context = React.useContext(SortableRootContext)
+  const context = useContext(SortableRootContext)
   if (!context) {
     throw new Error(`\`${consumerName}\` must be used within \`${ROOT_NAME}\``)
   }
@@ -104,6 +161,72 @@ type SortableProps<T> = DndContextProps &
     flatCursor?: boolean
   }
 
+// What a screen reader hears while an item is dragged: one set per list of values, kept while the list is the same.
+const announcementsKept = new WeakMap<ReadonlyArray<unknown>, Announcements>()
+
+function announcementsFor(value: ReadonlyArray<unknown>): Announcements {
+  const kept = announcementsKept.get(value)
+  if (kept !== undefined) return kept
+  const made: Announcements = {
+    onDragStart({ active }) {
+      const activeValue = active.id.toString()
+      return `Grabbed sortable item "${activeValue}". Current position is ${active.data.current?.sortable.index + 1} of ${value.length}. Use arrow keys to move, space to drop.`
+    },
+    onDragOver({ active, over }) {
+      if (over) {
+        const overIndex = over.data.current?.sortable.index ?? 0
+        const activeIndex = active.data.current?.sortable.index ?? 0
+        const moveDirection = overIndex > activeIndex ? "down" : "up"
+        const activeValue = active.id.toString()
+        return `Sortable item "${activeValue}" moved ${moveDirection} to position ${overIndex + 1} of ${value.length}.`
+      }
+      return "Sortable item is no longer over a droppable area. Press escape to cancel."
+    },
+    onDragEnd({ active, over }) {
+      const activeValue = active.id.toString()
+      if (over) {
+        const overIndex = over.data.current?.sortable.index ?? 0
+        return `Sortable item "${activeValue}" dropped at position ${overIndex + 1} of ${value.length}.`
+      }
+      return `Sortable item "${activeValue}" dropped. No changes were made.`
+    },
+    onDragCancel({ active }) {
+      const activeIndex = active.data.current?.sortable.index ?? 0
+      const activeValue = active.id.toString()
+      return `Sorting cancelled. Sortable item "${activeValue}" returned to position ${activeIndex + 1} of ${value.length}.`
+    },
+    onDragMove({ active, over }) {
+      if (over) {
+        const overIndex = over.data.current?.sortable.index ?? 0
+        const activeIndex = active.data.current?.sortable.index ?? 0
+        const moveDirection = overIndex > activeIndex ? "down" : "up"
+        const activeValue = active.id.toString()
+        return `Sortable item "${activeValue}" is moving ${moveDirection} to position ${overIndex + 1} of ${value.length}.`
+      }
+      return "Sortable item is no longer over a droppable area. Press escape to cancel."
+    }
+  }
+  announcementsKept.set(value, made)
+  return made
+}
+
+function instructionsOf(orientation: "vertical" | "horizontal" | "mixed"): ScreenReaderInstructions {
+  return {
+    draggable: `
+        To pick up a sortable item, press space or enter.
+        While dragging, use the ${orientation === "vertical" ? "up and down" : orientation === "horizontal" ? "left and right" : "arrow"} keys to move the item.
+        Press space or enter again to drop the item in its new position, or press escape to cancel.
+      `
+  }
+}
+
+// One set of instructions for each orientation, made once.
+const instructionsFor = {
+  vertical: instructionsOf("vertical"),
+  horizontal: instructionsOf("horizontal"),
+  mixed: instructionsOf("mixed")
+}
+
 function Sortable<T>(props: SortableProps<T>) {
   const {
     value,
@@ -122,8 +245,8 @@ function Sortable<T>(props: SortableProps<T>) {
     ...sortableProps
   } = props
 
-  const id = React.useId()
-  const [activeId, setActiveId] = React.useState<UniqueIdentifier | null>(null)
+  const id = useId()
+  const [activeId, setActiveId] = useAtom(activeIdOf(id))
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -132,133 +255,67 @@ function Sortable<T>(props: SortableProps<T>) {
       coordinateGetter: sortableKeyboardCoordinates
     })
   )
-  const config = React.useMemo(() => orientationConfig[orientation], [orientation])
+  const config = orientationConfig[orientation]
 
-  const getItemValue = React.useCallback(
-    (item: T): UniqueIdentifier => {
-      if (typeof item === "object" && !getItemValueProp) {
-        throw new Error("`getItemValue` is required when using array of objects")
+  // Worked out in each draw: callers hand `getItemValue` as a new function in each draw, so upstream's memos on it,
+  // and on the items and context worked out from it, never kept anything.
+  const getItemValue = (item: T): UniqueIdentifier => {
+    if (typeof item === "object" && !getItemValueProp) {
+      throw new Error("`getItemValue` is required when using array of objects")
+    }
+    return getItemValueProp ? getItemValueProp(item) : (item as UniqueIdentifier)
+  }
+
+  const items = value.map((item) => getItemValue(item))
+
+  function onDragStart(event: DragStartEvent) {
+    onDragStartProp?.(event)
+
+    if (event.activatorEvent.defaultPrevented) return
+
+    setActiveId(event.active.id)
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    onDragEndProp?.(event)
+
+    if (event.activatorEvent.defaultPrevented) return
+
+    const { active, over } = event
+    if (over && active.id !== over?.id) {
+      const activeIndex = value.findIndex((item) => getItemValue(item) === active.id)
+      const overIndex = value.findIndex((item) => getItemValue(item) === over.id)
+
+      if (onMove) {
+        onMove({ ...event, activeIndex, overIndex })
+      } else {
+        onValueChange?.(arrayMove(value, activeIndex, overIndex))
       }
-      return getItemValueProp ? getItemValueProp(item) : (item as UniqueIdentifier)
-    },
-    [getItemValueProp]
-  )
+    }
+    setActiveId(null)
+  }
 
-  const items = React.useMemo(() => {
-    return value.map((item) => getItemValue(item))
-  }, [value, getItemValue])
+  function onDragCancel(event: DragEndEvent) {
+    onDragCancelProp?.(event)
 
-  const onDragStart = React.useCallback(
-    (event: DragStartEvent) => {
-      onDragStartProp?.(event)
+    if (event.activatorEvent.defaultPrevented) return
 
-      if (event.activatorEvent.defaultPrevented) return
+    setActiveId(null)
+  }
 
-      setActiveId(event.active.id)
-    },
-    [onDragStartProp]
-  )
+  const announcements = announcementsFor(value)
+  const screenReaderInstructions = instructionsFor[orientation]
 
-  const onDragEnd = React.useCallback(
-    (event: DragEndEvent) => {
-      onDragEndProp?.(event)
-
-      if (event.activatorEvent.defaultPrevented) return
-
-      const { active, over } = event
-      if (over && active.id !== over?.id) {
-        const activeIndex = value.findIndex((item) => getItemValue(item) === active.id)
-        const overIndex = value.findIndex((item) => getItemValue(item) === over.id)
-
-        if (onMove) {
-          onMove({ ...event, activeIndex, overIndex })
-        } else {
-          onValueChange?.(arrayMove(value, activeIndex, overIndex))
-        }
-      }
-      setActiveId(null)
-    },
-    [value, onValueChange, onMove, getItemValue, onDragEndProp]
-  )
-
-  const onDragCancel = React.useCallback(
-    (event: DragEndEvent) => {
-      onDragCancelProp?.(event)
-
-      if (event.activatorEvent.defaultPrevented) return
-
-      setActiveId(null)
-    },
-    [onDragCancelProp]
-  )
-
-  const announcements: Announcements = React.useMemo(
-    () => ({
-      onDragStart({ active }) {
-        const activeValue = active.id.toString()
-        return `Grabbed sortable item "${activeValue}". Current position is ${active.data.current?.sortable.index + 1} of ${value.length}. Use arrow keys to move, space to drop.`
-      },
-      onDragOver({ active, over }) {
-        if (over) {
-          const overIndex = over.data.current?.sortable.index ?? 0
-          const activeIndex = active.data.current?.sortable.index ?? 0
-          const moveDirection = overIndex > activeIndex ? "down" : "up"
-          const activeValue = active.id.toString()
-          return `Sortable item "${activeValue}" moved ${moveDirection} to position ${overIndex + 1} of ${value.length}.`
-        }
-        return "Sortable item is no longer over a droppable area. Press escape to cancel."
-      },
-      onDragEnd({ active, over }) {
-        const activeValue = active.id.toString()
-        if (over) {
-          const overIndex = over.data.current?.sortable.index ?? 0
-          return `Sortable item "${activeValue}" dropped at position ${overIndex + 1} of ${value.length}.`
-        }
-        return `Sortable item "${activeValue}" dropped. No changes were made.`
-      },
-      onDragCancel({ active }) {
-        const activeIndex = active.data.current?.sortable.index ?? 0
-        const activeValue = active.id.toString()
-        return `Sorting cancelled. Sortable item "${activeValue}" returned to position ${activeIndex + 1} of ${value.length}.`
-      },
-      onDragMove({ active, over }) {
-        if (over) {
-          const overIndex = over.data.current?.sortable.index ?? 0
-          const activeIndex = active.data.current?.sortable.index ?? 0
-          const moveDirection = overIndex > activeIndex ? "down" : "up"
-          const activeValue = active.id.toString()
-          return `Sortable item "${activeValue}" is moving ${moveDirection} to position ${overIndex + 1} of ${value.length}.`
-        }
-        return "Sortable item is no longer over a droppable area. Press escape to cancel."
-      }
-    }),
-    [value]
-  )
-
-  const screenReaderInstructions: ScreenReaderInstructions = React.useMemo(
-    () => ({
-      draggable: `
-        To pick up a sortable item, press space or enter.
-        While dragging, use the ${orientation === "vertical" ? "up and down" : orientation === "horizontal" ? "left and right" : "arrow"} keys to move the item.
-        Press space or enter again to drop the item in its new position, or press escape to cancel.
-      `
-    }),
-    [orientation]
-  )
-
-  const contextValue = React.useMemo(
-    () => ({
-      id,
-      items,
-      modifiers: modifiers ?? config.modifiers,
-      strategy: strategy ?? config.strategy,
-      activeId,
-      setActiveId,
-      getItemValue,
-      flatCursor
-    }),
-    [id, items, modifiers, strategy, config.modifiers, config.strategy, activeId, getItemValue, flatCursor]
-  )
+  const contextValue = {
+    id,
+    items,
+    modifiers: modifiers ?? config.modifiers,
+    strategy: strategy ?? config.strategy,
+    activeId,
+    setActiveId,
+    getItemValue,
+    flatCursor
+  }
 
   return (
     <SortableRootContext.Provider value={contextValue as SortableRootContextValue<unknown>}>
@@ -281,11 +338,11 @@ function Sortable<T>(props: SortableProps<T>) {
   )
 }
 
-const SortableContentContext = React.createContext<boolean>(false)
+const SortableContentContext = createContext<boolean>(false)
 
-interface SortableContentProps extends React.ComponentProps<"div"> {
+interface SortableContentProps extends ComponentProps<"div"> {
   strategy?: SortableContextProps["strategy"]
-  children: React.ReactNode
+  children: ReactNode
   asChild?: boolean
   withoutSlot?: boolean
 }
@@ -322,17 +379,17 @@ interface SortableItemContextValue {
   disabled?: boolean
 }
 
-const SortableItemContext = React.createContext<SortableItemContextValue | null>(null)
+const SortableItemContext = createContext<SortableItemContextValue | null>(null)
 
 function useSortableItemContext(consumerName: string) {
-  const context = React.useContext(SortableItemContext)
+  const context = useContext(SortableItemContext)
   if (!context) {
     throw new Error(`\`${consumerName}\` must be used within \`${ITEM_NAME}\``)
   }
   return context
 }
 
-interface SortableItemProps extends React.ComponentProps<"div"> {
+interface SortableItemProps extends ComponentProps<"div"> {
   value: UniqueIdentifier
   asHandle?: boolean
   asChild?: boolean
@@ -342,8 +399,8 @@ interface SortableItemProps extends React.ComponentProps<"div"> {
 function SortableItem(props: SortableItemProps) {
   const { value, style, asHandle, asChild, disabled, className, ref, id: idProp, ...itemProps } = props
 
-  const inSortableContent = React.useContext(SortableContentContext)
-  const inSortableOverlay = React.useContext(SortableOverlayContext)
+  const inSortableContent = useContext(SortableContentContext)
+  const inSortableOverlay = useContext(SortableOverlayContext)
 
   if (!inSortableContent && !inSortableOverlay) {
     throw new Error(`\`${ITEM_NAME}\` must be used within \`${CONTENT_NAME}\` or \`${OVERLAY_NAME}\``)
@@ -354,43 +411,36 @@ function SortableItem(props: SortableItemProps) {
   }
 
   const context = useSortableContext(ITEM_NAME)
-  const instanceId = React.useId()
+  const instanceId = useId()
   const id = idProp ?? instanceId
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: value,
     ...(disabled === undefined ? {} : { disabled })
   })
 
-  const onNodeRefChange = React.useCallback(
-    (node: HTMLElement | null) => {
+  const composedRef = keptRef(setNodeRef, [disabled, asHandle, ref], () =>
+    composeRefs(ref, (node: HTMLElement | null) => {
       if (disabled) return
       setNodeRef(node)
       if (asHandle) setActivatorNodeRef(node)
-    },
-    [disabled, asHandle, setNodeRef, setActivatorNodeRef]
+    })
   )
 
-  const composedRef = useComposedRefs(ref, onNodeRefChange)
+  // Worked out in each draw: React compares a style by its properties, and the item's parts are drawn with it.
+  const composedStyle: CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    ...style
+  }
 
-  const composedStyle = React.useMemo<React.CSSProperties>(() => {
-    return {
-      transform: CSS.Translate.toString(transform),
-      transition,
-      ...style
-    }
-  }, [transform, transition, style])
-
-  const itemContext = React.useMemo<SortableItemContextValue>(
-    () => ({
-      id,
-      attributes,
-      listeners,
-      setActivatorNodeRef,
-      isDragging,
-      ...(disabled === undefined ? {} : { disabled })
-    }),
-    [id, attributes, listeners, setActivatorNodeRef, isDragging, disabled]
-  )
+  const itemContext: SortableItemContextValue = {
+    id,
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    isDragging,
+    ...(disabled === undefined ? {} : { disabled })
+  }
 
   const ItemPrimitive = asChild ? SlotPrimitive.Slot : "div"
 
@@ -423,7 +473,7 @@ function SortableItem(props: SortableItemProps) {
   )
 }
 
-interface SortableItemHandleProps extends React.ComponentProps<"button"> {
+interface SortableItemHandleProps extends ComponentProps<"button"> {
   asChild?: boolean
 }
 
@@ -437,15 +487,12 @@ function SortableItemHandle(props: SortableItemHandleProps) {
 
   const { setActivatorNodeRef } = itemContext
 
-  const onActivatorNodeRef = React.useCallback(
-    (node: HTMLElement | null) => {
+  const composedRef = keptRef(setActivatorNodeRef, [isDisabled, ref], () =>
+    composeRefs(ref, (node: HTMLElement | null) => {
       if (isDisabled) return
       setActivatorNodeRef(node)
-    },
-    [isDisabled, setActivatorNodeRef]
+    })
   )
-
-  const composedRef = useComposedRefs(ref, onActivatorNodeRef)
 
   const HandlePrimitive = asChild ? SlotPrimitive.Slot : "button"
 
@@ -470,7 +517,7 @@ function SortableItemHandle(props: SortableItemHandleProps) {
   )
 }
 
-const SortableOverlayContext = React.createContext(false)
+const SortableOverlayContext = createContext(false)
 
 const dropAnimation: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
@@ -482,13 +529,9 @@ const dropAnimation: DropAnimation = {
   })
 }
 
-function subscribe() {
-  return () => {}
-}
-
-interface SortableOverlayProps extends Omit<React.ComponentProps<typeof DragOverlay>, "children"> {
+interface SortableOverlayProps extends Omit<ComponentProps<typeof DragOverlay>, "children"> {
   container?: Element | DocumentFragment | null
-  children?: ((params: { value: UniqueIdentifier }) => React.ReactNode) | React.ReactNode
+  children?: ((params: { value: UniqueIdentifier }) => ReactNode) | ReactNode
 }
 
 function SortableOverlay(props: SortableOverlayProps) {
@@ -496,17 +539,13 @@ function SortableOverlay(props: SortableOverlayProps) {
 
   const context = useSortableContext(OVERLAY_NAME)
 
-  const mounted = React.useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false
-  )
-
-  const container = containerProp ?? (mounted ? globalThis.document?.body : null)
+  // Upstream asked `useSyncExternalStore` whether it was drawn on a server, where there is no page to portal into.
+  // This app is drawn only in the browser, so the page's body is there from the first draw.
+  const container = containerProp ?? globalThis.document?.body ?? null
 
   if (!container) return null
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <DragOverlay
       {...(dropAnimation === undefined ? {} : { dropAnimation })}
       {...(context.modifiers === undefined ? {} : { modifiers: context.modifiers })}

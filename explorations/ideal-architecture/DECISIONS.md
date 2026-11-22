@@ -697,7 +697,7 @@ Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it 
 decided: the reading, the trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md),
 and its [brief](../alchemy-domain/BRIEF.md) puts each "how" to him. None of that brief's recommendations is his
 until he answers it. Decision 1's pin is on main (as of 2026-11-22), and the review's model of its move 1 is built on
-that pin and merged into main (`0c4c5e5`, not yet on the public remote); the rest of it is built after he signs it
+that pin and merged into main (`0c4c5e5`); the rest of it is built after he signs it
 (the atoms goal, the other condition, is merged).
 
 From his own list of 2026-11-18, the items he marked as wanted (CAPTURE.md of that packet records them under
@@ -718,7 +718,7 @@ What this touches in this file:
 
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
 is the D1 core, and nothing of the reversal is on main yet but the library's pin and the review's model of move 1
-(as of 2026-11-22; `0c4c5e5`, not yet on the public remote).
+(as of 2026-11-22; `0c4c5e5`).
 
 ### 2026-11-19 — atoms, the table's own store in the review package
 
@@ -1070,7 +1070,9 @@ same. The telemetry script is converted; `theme-init.js` is the one file the law
 beside it. `.agents/` is left out by name, as for the deprecated-API check.
 
 When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
-batch". I chose; the agent recommended the same. Not built yet.
+batch". I chose; the agent recommended the same. Built: every `try` is converted but theme-init's, and
+`bun run check` refuses one in any code file git would commit, its doc comments' examples included, outside `.agents/`
+and the scratchpad (`try:check`, `docs/standards/no-try.md`).
 
 ### 2026-11-22 — Alchemy, which build, and the state store it upgrades
 

@@ -18,6 +18,7 @@ import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
 import { tags, tagsSentence } from "./Tags.rules.ts"
+import { tryStatements, trySentence } from "./Try.rules.ts"
 
 /** `laws exports`: the package in the current folder has exact exports, one per component and hook. */
 export const exportsCommand = Command.make("exports", {}, () =>
@@ -61,6 +62,13 @@ export const tagsCommand = Command.make("tags", {}, () => Effect.flatMap(tags(),
   )
 )
 
+/** `laws try`: no `try` statement in any code file git would commit, its doc comments' examples included. */
+export const tryCommand = Command.make("try", {}, () => Effect.flatMap(tryStatements(), emit(trySentence))).pipe(
+  Command.withDescription(
+    "No try statement is written, in any code file git would commit or its doc comments' examples"
+  )
+)
+
 const write = Flag.Boolean("write").pipe(
   Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
   Flag.withDefault(false)
@@ -91,6 +99,7 @@ export const lawsCommand = Command.make("laws").pipe(
     privatePathsCommand,
     refCallbacksCommand,
     screensCommand,
-    tagsCommand
+    tagsCommand,
+    tryCommand
   ])
 )

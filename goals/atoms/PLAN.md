@@ -957,6 +957,79 @@ take a hook back. After batch 4 the list is the two folders, and `refs:check` re
 How a changed file is marked. Its first line says it was changed here and no longer matches its registry, and
 `docs/kit.md` lists the changed files, so `shadcn add` over one is a merge by hand and never `--overwrite`.
 
+### Batch 1, the data table (2026-11-22)
+
+Counted by name with `\b(useState|useEffect|…|useSyncExternalStore)\b\s*[<(]` over the 19 files: 100 calls before
+(the table's 80 counted fewer of the menus' `useId`s and refs), 23 after. The table's state is atoms of each table on
+screen (`localTableState`, the draft of a typed filter, `oneTimer` for the 300 ms pause, all made per `useId` in
+`data-table-state.ts` and `use-data-table.ts`), and each change reads it through the registry as it is now; the
+address is the app's `location` atom, written as before. Popovers' open state, a menu's shortcut (a window listener
+in an atom, cleaned up by its finalizer), the range boxes' drafts and their red ring's delay are per-instance atoms; a
+day's focus in the calendar is a ref that changes when the day becomes the focused one. `packages/ui/.oxlintrc.kit.json`
+reads the 15 files that changed; `data-table.tsx`, `data-table-pagination.tsx` (one `useId`),
+`data-table-faceted-filter.tsx` and `direction.tsx` had no hook to move and are unchanged, so it does not read them.
+
+| File | Before | After |
+| --- | --- | --- |
+| `hooks/use-data-table.ts` | useEffect 1, useMemo 6, useRef 2, useState 2 | useId 1 |
+| `hooks/use-debounced-callback.ts` | useEffect 1, useLayoutEffect 1, useMemo 1, useRef 2 | useId 1 |
+| `data-table-state.ts` | useCallback 1, useMemo 3, useRef 1, useState 1 | useId 1 |
+| `data-table-records.tsx` | useMemo 2 | none |
+| `data-table-toolbar.tsx` | useMemo 1 | none |
+| `data-table-pagination.tsx` | useId 1 | useId 1 (unchanged) |
+| `data-table-view-options.tsx` | useMemo 1 | none |
+| `data-table-sort-menu.tsx` | useCallback 6, useEffect 1, useId 3, useMemo 1, useRef 1, useState 3 | useId 4 |
+| `data-table-filter-menu.tsx` | useEffect 1, useId 3, useMemo 1, useRef 2, useState 2 | useId 4, useRef 1 |
+| `data-table-slider-filter.tsx` | useCallback 2, useEffect 2, useId 1, useRef 1, useState 3 | useId 1 |
+| `data-table-range-filter.tsx` | useEffect 1, useRef 1, useState 2 | useId 1 |
+| `data-table-date-filter.tsx` | useCallback 2, useMemo 1 | none |
+| `faceted.tsx` | useContext 1, useEffect 1, useLayoutEffect 2, useRef 2, useState 2, useSyncExternalStore 1 | useContext 1, useId 1 |
+| `sortable.tsx` | useCallback 6, useContext 4, useId 2, useMemo 7, useState 1, useSyncExternalStore 1 | useContext 4, useId 2 |
+| `calendar.tsx` | useEffect 1, useRef 1 | none |
+| `slider.tsx` | useMemo 1 | none |
+| `data-table.tsx`, `data-table-faceted-filter.tsx`, `direction.tsx` | none | none (unchanged) |
+
+The hooks left, each with its reason:
+
+- `useId` (17 calls, every file above that has one): allowed, and the key each per-instance atom is made for.
+- `useRef`, `data-table-filter-menu.tsx`: `addButtonRef`, the "Add filter" button, focused when a filter is removed:
+  a DOM node.
+- The libraries' own hooks stay: TanStack's `useTable` (`use-data-table.ts`), dnd-kit's `useSensor`, `useSensors`
+  and `useSortable` (`sortable.tsx`), Radix's `useDirection` (`direction.tsx` and its readers).
+
+**Five `useContext` calls stay** (2026-11-22; kept under the rule's own words, "no hooks where an atom can do the job", since here one cannot. Benjamin was told and has not chosen: it is his to overrule), neither a DOM ref, `useId` nor a library's own hook, each read
+past the lint by one `oxlint-disable-next-line` on its import with the reason:
+
+- `faceted.tsx`, 1 (`useFacetedState`, read by `FacetedValue`, `FacetedItem` and `FacetedClear`): what `Faceted` was
+  drawn with (the value the caller holds, its items, what choosing does).
+- `sortable.tsx`, 4 (`useSortableContext`; `useSortableItemContext`; the two "is this item inside a list or an
+  overlay" checks in `SortableItem`): what `Sortable` and each item were drawn with, dnd-kit's listeners and
+  attributes for that draw among them.
+
+Each carries a value of the draw itself down to the parts drawn in it. An atom can hold it only if it is written during
+the draw (React refuses an update to another component while one draws) or after it (an effect, which is banned); a
+`ScopedAtom` takes its input once. The other way is for the callers to hand atoms instead of values, which changes
+every caller of these two components. Unless Benjamin overrules, React context stays here and the lint is told so on
+those two lines.
+
+Also changed beside the move, with nothing on screen different: upstream's memos that keyed on the table or on
+`getItemValue` (new objects in each draw of their owner, so they never kept anything) are plain values; a value whose
+identity the table compares (the page, a parsed sort, the configured columns, a config built from its columns) is kept
+in a `WeakMap` by what it was worked out from; the item's ref callback in `sortable.tsx` is kept per dnd-kit's own
+setter so dnd-kit does not see the node leave and come back in each draw. Two development-only warnings
+(`useDataTable`'s config check, the slider's missing bounds) are said once per column set or column instead of on
+each mount. `useDebouncedCallback` runs the callback of the draw the call was made in, not the latest one (its only
+callers are batch 2's data grid, a typed cell and the grid's search). The slider filter reads its range as it is
+drawn until it first opens, where upstream read it once when first drawn.
+
+The tests: `packages/catalog/web/test/ItemsTableAddress.test.ts` drives the Items table's store on the Items page's
+config, under Vitest's fake timers: the address after a sort (`?sort=unitCost.desc`, page one), after a page and a
+page size, after a search, after a filter chosen from a list; a typed filter written after 300 ms and not at 299; a
+change of page writing a waiting filter first (`?name=wash&page=2`); a waiting filter never written once the table
+has left; two changes in one tick both landing in the table's own atoms. Each but the last was seen to fail with one
+line of the code changed (the page kept on a sort, a 200 ms pause, no write of the waiting filter, the page kept on a
+filter, no finalizer on the timer, a repeated sort written).
+
 ## Hand-written discriminators in the web packages
 
 A6's standing preference: a hand-written `type` or `kind` discriminator is a tagged enum (in memory) or a schema tagged

@@ -156,6 +156,18 @@ export interface Flight {
 }
 
 /**
+ * A save nobody waits for any more: the rows it carried as they were sent (each on the revision it was made on), and
+ * the rows of it nothing else accounts for. The draft that closed with it out named every row of it but those the
+ * closed picture held as sent (`owed`, with that picture's revision `closedAt`); a row she decides again since is
+ * accounted for by that decision. Its answer accounts for an owed row only: a decision is named or on a line once.
+ */
+export interface Stray {
+  readonly rows: Sides
+  readonly owed: ReadonlyArray<string>
+  readonly closedAt: number
+}
+
+/**
  * Why the last confirm was not made, as the screen says it: nothing was imported, and the newer picture is being
  * read (`read` false: the button waits for it) or has been read, with how many rows it decides otherwise (`apart`; a
  * match changes no row) and the accepts the server took back because their column was matched again.
@@ -184,7 +196,7 @@ export interface Draft {
   /** The id of the last save or confirm sent: never used twice in a page, whatever ended or was let go since. */
   readonly lastId: number
   /** The saves sent and no longer waited for (the import was closed, or the draft let go): what each carried, by id. */
-  readonly strays: Readonly<Record<string, RowChanges>>
+  readonly strays: Readonly<Record<string, Stray>>
   readonly unsent: Sides
   /** The lines above the review: a row is never in `unsent` while its line has a decision that can be sent. */
   readonly lines: Lines
@@ -848,11 +860,24 @@ export const startAgain = (draft: Draft): Draft => ({
   lastId: draft.lastId,
   // What this tab sent of a row and may be on the server is still so on the next visit.
   sentBefore: draft.sentBefore,
+  // Whoever lets a draft go with a save out accounts for its rows (kept, or named); `closing` says which it did not.
   strays: O.match(draft.flight, {
     onNone: () => draft.strays,
-    onSome: (flight) => ({ ...draft.strays, [flight.id]: changesOf(flight.rows) })
+    onSome: (flight) => ({ ...draft.strays, [flight.id]: { rows: flight.rows, owed: [], closedAt: 0 } })
   })
 })
+
+/** She decided these rows again: a stray's answer owes nothing of them any more, whatever became of that decision. */
+const decidedAgain = (draft: Draft, rows: ReadonlyArray<string>): Draft =>
+  R.isEmptyReadonlyRecord(draft.strays)
+    ? draft
+    : {
+        ...draft,
+        strays: R.map(draft.strays, (stray) => ({
+          ...stray,
+          owed: A.filter(stray.owed, (rowId) => !A.contains(rows, rowId))
+        }))
+      }
 
 // -- The lines -------------------------------------------------------------------------------------------------------
 
@@ -1214,7 +1239,8 @@ type Answer = Data.TaggedEnum.Value<DraftEvent, "SaveAnswered">
 const answeringStray = (draft: Draft, event: Answer): Stepped =>
   O.match(R.get(draft.strays, `${event.id}`), {
     onNone: () => only(draft),
-    onSome: (rows) => {
+    onSome: (stray) => {
+      const rows = changesOf(stray.rows)
       const stored = storedOf(rows, event)
       const also = (side: Side, rowId: string): Side =>
         O.match(R.get(stored, rowId), {
@@ -1228,12 +1254,24 @@ const answeringStray = (draft: Draft, event: Answer): Stepped =>
         lines: R.map(draft.lines, (line, rowId) => ({ ...line, sides: A.map(line.sides, (side) => also(side, rowId)) }))
       }
       // A row it sent that somebody decided since was not written: hers is still with her, never dropped because the
-      // draft it went out from is gone. Where the draft has ended it is named; otherwise, unless she has decided the
-      // row again here (that one goes, over what it names), it is a line with theirs.
-      const since = A.filter(event.decidedSince, ({ rowId, theirs }) =>
-        O.exists(R.get(rows, rowId), (sent) => !sameDecision(sent, theirs))
+      // draft it went out from is gone. Only a row nothing has accounted for (`Stray.owed`): the closed picture held it
+      // as sent, the answer was judged after that picture (in the import opened again), and she has not decided it
+      // since. Where the draft has ended it is named; otherwise it is a line with theirs.
+      const since = A.filter(
+        event.decidedSince,
+        ({ rowId, theirs }) =>
+          event.revision > stray.closedAt &&
+          A.contains(stray.owed, rowId) &&
+          O.exists(R.get(rows, rowId), (sent) => !sameDecision(sent, theirs))
       )
       const sent = (rowId: string): O.Option<RowDecision> => O.flatten(R.get(rows, rowId))
+      // What the server holds of each row it names as decided since, at the answer's revision.
+      const decided: RowChanges = R.fromEntries(
+        A.map(
+          A.filter(event.decidedSince, ({ rowId }) => R.has(rows, rowId)),
+          ({ rowId, theirs }) => [rowId, theirs] as const
+        )
+      )
       const next: Draft = !A.isReadonlyArrayNonEmpty(since)
         ? moved
         : moved.ended
@@ -1253,24 +1291,19 @@ const answeringStray = (draft: Draft, event: Answer): Stepped =>
           : editing(moved, (book) => {
               for (const { rowId, theirs } of since) {
                 if (O.isSome(latest(book, rowId)) || R.has(flying(moved), rowId)) continue
-                const side: Side = {
-                  decision: sent(rowId),
-                  madeOn: event.revision,
-                  dates: {},
-                  // Not written, so it put nothing there; and what somebody decided since is not seen until the line
-                  // shows it to her.
-                  seen: [],
-                  live: false,
-                  here: true,
-                  overtaken: false,
-                  refused: O.none()
-                }
-                book.lines[rowId] = { sides: withSides([side], sidesOf(book, rowId)), theirs: O.some(theirs) }
+                O.map(R.get(stray.rows, rowId), (one) => {
+                  // As it was sent, on the revisions it was made on (a side is never re-dated). Not written, so it put
+                  // nothing there; and what somebody decided since is not seen until the line shows it to her.
+                  const side: Side = { ...one, seen: [], live: false, here: true, overtaken: false, refused: O.none() }
+                  book.lines[rowId] = { sides: withSides([side], sidesOf(book, rowId)), theirs: O.some(theirs) }
+                })
               }
             })
+      // What it says the server holds is kept over an older picture until the newer one is read: of the rows it wrote,
+      // and of those somebody decided since, so a line it draws still stands over what is known until then.
       return O.isNone(next.held) || event.revision <= heldAt(next)
         ? only(next)
-        : { draft: landing(next, stored, event.revision), effects: [DraftEffect.Ask()] }
+        : { draft: landing(next, { ...stored, ...decided }, event.revision), effects: [DraftEffect.Ask()] }
     }
   })
 
@@ -1518,9 +1551,29 @@ const restarting = (input: { readonly before: Draft; readonly after: Draft; read
  */
 const closing = (draft: Draft, picture: Picture): Stepped => {
   const alive = O.map(waiting({ ...draft, ended: false }), decisionsIn)
+  const ended = startAgain(draft)
+  // The save that is out becomes a stray. Each of its rows is named here, or stands under a later decision of hers that
+  // is, but one the picture holds as sent: that one is owed its answer.
+  const strays = O.match(draft.flight, {
+    onNone: () => ended.strays,
+    onSome: (flight): Draft["strays"] => ({
+      ...ended.strays,
+      [flight.id]: {
+        rows: flight.rows,
+        owed: A.filter(
+          R.keys(flight.rows),
+          (rowId) =>
+            O.isNone(latest(draft, rowId)) &&
+            O.exists(R.get(flight.rows, rowId), (sent) => sameDecision(R.get(picture.decisions, rowId), sent.decision))
+        ),
+        closedAt: picture.revision
+      }
+    })
+  })
   return {
     draft: {
-      ...startAgain(draft),
+      ...ended,
+      strays,
       onScreen: draft.onScreen,
       leftOver: leaving(
         draft,
@@ -1879,7 +1932,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
     // The person's rows, the latest over the earliest; sent at once unless a save is out, with whatever waits.
     Decided: ({ changes }) =>
       sending(
-        editing({ ...draft, leftOver: O.none() }, (book) => {
+        editing(decidedAgain({ ...draft, leftOver: O.none() }, R.keys(changes)), (book) => {
           for (const [rowId, decision] of R.toEntries(changes)) deciding(draft, book, rowId, decision)
         })
       ),
@@ -1889,9 +1942,15 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       O.isNone(draft.held)
         ? only(draft)
         : sending(
-            editing(draft, (book) => {
-              for (const pick of picks) picking(draft, book, pick)
-            })
+            editing(
+              decidedAgain(
+                draft,
+                A.map(picks, (pick) => pick.rowId)
+              ),
+              (book) => {
+                for (const pick of picks) picking(draft, book, pick)
+              }
+            )
           ),
     SaveAgain: () => sending(draft),
     SaveFailed: ({ id }) => failing(draft, id, Said.NotSaved()),

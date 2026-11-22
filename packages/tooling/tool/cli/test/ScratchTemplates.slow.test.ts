@@ -16,14 +16,7 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import {
-  type Listing,
-  noCheck,
-  programFiles,
-  scratchCheck,
-  scratchNew,
-  scratchSentence
-} from "../src/commands/Scratch/Scratch.rules.ts"
+import { bunFiles, noCheck, scratchCheck, scratchNew, scratchSentence } from "../src/commands/Scratch/Scratch.rules.ts"
 import { diagnosticDirective } from "../src/commands/Scratch/Scratch.templates.ts"
 import { render } from "../src/Report.schema.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -47,17 +40,6 @@ const templates = proverInstalled
   : (["probe", "service", "screen"] as const)
 
 const copied = ["tsconfig.base.json"]
-
-// The compiler's own answer to "which files do you read", as `scratch:check` asks it.
-const compilerFiles: Listing = Effect.gen(function* () {
-  const repo = yield* Repo
-  const answer = yield* repo.run(
-    repo.join(here, "node_modules/.bin/tsrs"),
-    ["-p", "tsconfig.json", "--listFilesOnly"],
-    { cwd: repo.join(repo.root, "scratchpad") }
-  )
-  return programFiles(answer.stdout)
-})
 
 describe("what scratch:check reads", () => {
   it.effect(
@@ -95,14 +77,26 @@ describe("what scratch:check reads", () => {
             yield* repo.run("ln", ["-s", repo.join(repo.root, "elsewhere"), repo.join(shelf, "linked")])
             // JavaScript is not in the program (`allowJs` is off), so its header changes nothing.
             yield* repo.write(repo.join(shelf, "gen/api.js"), `// ${noCheck}\nexport const api = 1\n`)
-            const found = yield* scratchCheck(Effect.succeed({ code: 0, output: "" }), compilerFiles)
-            return A.filter(printed(render(scratchSentence)(found)), (line) => /^err: {3}/.test(line))
+            // The list is asked for as `scratch:check` asks: `bun run types --listFilesOnly` in the scratchpad.
+            const types = Effect.succeed({ code: 0, output: "" })
+            const errors = (found: Effect.Success<ReturnType<typeof scratchCheck>>) =>
+              A.map(
+                A.filter(printed(render(scratchSentence)(found)), (line) => /^err: {3}/.test(line)),
+                (line) => Str.replace(/: (turns|names) .*$/, ": $1")(line)
+              )
+            const whole = yield* scratchCheck(types, bunFiles)
+            // With a syntax error the compiler ends in failure and still prints its list: the scan goes on, and the
+            // error is the type-check's to report.
+            yield* repo.write(repo.join(shelf, "Broken.ts"), "export const broken = {\n")
+            const broken = yield* scratchCheck(types, bunFiles)
+            return { whole: errors(whole), broken: errors(broken) }
           })
         )
-        expect(A.map(result, (line) => Str.replace(/: (turns|names) .*$/, ": $1")(line))).toEqual([
+        const refused = [
           "err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: turns",
           "err:   scratchpad/experiments/shelf/linked/Linked.ts:1: names"
-        ])
+        ]
+        expect(result).toEqual({ whole: refused, broken: refused })
       }),
     slowLimits.testTimeout
   )

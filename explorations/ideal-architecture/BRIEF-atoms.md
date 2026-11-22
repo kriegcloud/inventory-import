@@ -1,7 +1,7 @@
 ---
 type: Brief
 title: "Brief: atoms"
-description: The goal atoms. The front end's state moves from React hooks and TanStack Query onto effect/reactivity and @effect/atom-react, and useEffect leaves our code with no exception. Written only; nothing is built, and it starts after the Effect-imports migration is merged and Benjamin says "the brief matches".
+description: The goal atoms. The front end's state moves from React hooks and TanStack Query onto effect/reactivity and @effect/atom-react, and useEffect leaves our code with no exception. Written 2026-11-19, before it was built, to start after the Effect-imports migration is merged and Benjamin says "the brief matches"; the goal is built and merged into main (goals/atoms/PLAN.md).
 ---
 
 # Brief: `atoms`
@@ -31,7 +31,7 @@ the table's columns and remounted it).
 
 ## The inventory
 
-Counted in the worktree at `4bf0939` with one pattern per hook (a call, with or without `React.`). A hook's own
+Counted in this repository at `4bf0939` with one pattern per hook (a call, with or without `React.`). A hook's own
 definition counts as one. "ui (own)" is `packages/ui/src` without `components/` and `hooks/`, which are the vendored
 kit.
 

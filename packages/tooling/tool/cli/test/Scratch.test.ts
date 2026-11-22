@@ -7,10 +7,13 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as TestClock from "effect/testing/TestClock"
 import {
+  commentsOf,
   diagnosticLines,
   expectError,
   ignore,
   ignoredLines,
+  leakingComments,
+  leakingLines,
   noCheck,
   programFiles,
   type Install,
@@ -54,11 +57,14 @@ const included: Listing = Effect.gen(function* () {
   )
 })
 // A list the test states itself, each path from the repository's root.
-const lists = (...paths: ReadonlyArray<string>): Listing =>
+const only = (...paths: ReadonlyArray<string>): Listing =>
   Effect.gen(function* () {
     const repo = yield* Repo
     return A.map(paths, (path) => repo.join(repo.root, path))
   })
+// The same with the scratchpad's own two configuration files, which the compiler always lists.
+const lists = (...paths: ReadonlyArray<string>): Listing =>
+  only("scratchpad/vite.config.ts", "scratchpad/vitest.config.ts", ...paths)
 
 const at = (iso: string) => DateTime.makeUnsafe(iso).pipe(DateTime.toEpochMillis, TestClock.setTime)
 const note = (started: string, template = "probe", libraries = "") =>
@@ -403,10 +409,19 @@ describe("scratch", () => {
             // Never loaded by the compiler, so what they say changes nothing.
             "scratchpad/experiments/shelf/.state/cache.ts": off,
             "scratchpad/experiments/shelf/gen/api.js": `// ${noCheck}\n`,
-            "scratchpad/node_modules/left-pad/index.ts": off
+            // A library an install put there, and a file somebody wrote in a folder of the same name.
+            "scratchpad/node_modules/left-pad/package.json": "{}",
+            "scratchpad/node_modules/left-pad/index.ts": off,
+            "scratchpad/node_modules/@scope/pad/package.json": "{}",
+            "scratchpad/node_modules/@scope/pad/src/index.ts": off,
+            "scratchpad/lib/node_modules/Written.ts": off,
+            "scratchpad/node_modules/mine/Written.ts": off
           }),
-          // Reached by a relative import that leaves the scratchpad: the experiment's own.
+          // Reached by a relative import that leaves the scratchpad: the experiment's own, and no less so beside a
+          // package.json somebody wrote, which makes no workspace of the folder.
           "notes/Outside.ts": off,
+          "notes/own/package.json": "{}",
+          "notes/own/Beside.ts": off,
           // A package's file is that package's, held by its own check.
           "packages/kernel/package.json": json({ name: "@x/kernel" }),
           "packages/kernel/src/Role.ts": off
@@ -421,21 +436,28 @@ describe("scratch", () => {
             "scratchpad/experiments/shelf/linked/Reached.ts",
             "scratchpad/extra.config.ts",
             "scratchpad/node_modules/left-pad/index.ts",
+            "scratchpad/node_modules/@scope/pad/src/index.ts",
+            "scratchpad/lib/node_modules/Written.ts",
+            "scratchpad/node_modules/mine/Written.ts",
             "notes/Outside.ts",
+            "notes/own/Beside.ts",
             "packages/kernel/src/Role.ts"
           )
         ).pipe(said)
       )
       const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
       expect(result).toEqual([
-        "err: scratch:check FAIL  7 problems",
+        "err: scratch:check FAIL  10 problems",
         `err:   notes/Outside.ts:1: ${refused}`,
+        `err:   notes/own/Beside.ts:1: ${refused}`,
         `err:   scratchpad/experiments/Loose.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/.state/Imported.ts:1: names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`,
         `err:   scratchpad/experiments/shelf/dist/Shelf.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/linked/Reached.ts:1: ${refused}`,
         `err:   scratchpad/extra.config.ts:1: ${refused}`,
+        `err:   scratchpad/lib/node_modules/Written.ts:1: ${refused}`,
+        `err:   scratchpad/node_modules/mine/Written.ts:1: ${refused}`,
         "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])
     })
@@ -446,6 +468,97 @@ describe("scratch", () => {
       programFiles("$ tsrs -p tsconfig.json --listFilesOnly\n/repo/scratchpad/vite.config.ts\r\n/repo/a/B.tsx\n\n")
     ).toEqual(["/repo/scratchpad/vite.config.ts", "/repo/a/B.tsx"])
   })
+
+  it.effect("check says so when the compiler's list is not whole, and passes nothing on an empty one", () =>
+    Effect.gen(function* () {
+      const tree = repository({
+        "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "probe", ""),
+        "scratchpad/experiments/shelf/Shelf.ts": `// ${noCheck}\nexport const count = 1\n`
+      })
+      const lacks = (names: string) =>
+        `err:   scratchpad/tsconfig.json: the type-checker's list of the files it reads lacks ${names}, which it always reads. So the list is not whole, and a line that turns a check off may stand in a file nobody read: run \`bun run types --listFilesOnly\` in scratchpad and see what it prints (its \`types\` script is \`tsrs -p tsconfig.json\`)`
+      const empty = yield* inTree(tree, scratchCheck(types, only()).pipe(said))
+      expect(A.take(empty, 2)).toEqual([
+        "err: scratch:check FAIL  1 problem",
+        lacks("scratchpad/vite.config.ts and scratchpad/vitest.config.ts")
+      ])
+      const partial = yield* inTree(
+        tree,
+        scratchCheck(types, only("scratchpad/vite.config.ts", "scratchpad/experiments/shelf/Shelf.ts")).pipe(said)
+      )
+      expect(A.map(A.take(partial, 3), (line) => Str.replace(/: names .*$/, ": names")(line))).toEqual([
+        "err: scratch:check FAIL  2 problems",
+        lacks("scratchpad/vitest.config.ts"),
+        "err:   scratchpad/experiments/shelf/Shelf.ts:1: names"
+      ])
+    })
+  )
+
+  it("a comment is what the compiler would read as one: not a string, a template or a regular expression", () => {
+    expect(
+      commentsOf(
+        A.join(
+          [
+            'const quoted = "// no" // one',
+            "const single = '/* no */'",
+            "const lines = `",
+            "// no ${[1].map((n) => `${n} // no`) /* two */}",
+            "// no`",
+            'const pattern = /[/]\\/"/ // three',
+            "const half = 4 / 2 /* four",
+            "still four */"
+          ],
+          "\n"
+        )
+      )
+    ).toEqual([
+      { line: 1, text: "// one" },
+      { line: 4, text: "/* two */" },
+      { line: 6, text: "// three" },
+      { line: 7, text: "/* four\nstill four */" }
+    ])
+  })
+
+  it("a directive is one where a comment starts with it; a string or a sentence that names it is none", () => {
+    const quoted = A.join(
+      [
+        `const sample = "// ${ignore}\\nfoo()"`,
+        `const other = \`\n// ${noCheck}\n// ${ignore}\n\``,
+        `/** Replaces ${ignore} with ${expectError}, and never writes ${noCheck}. */`,
+        `// see ${ignore} and ${noCheck}`
+      ],
+      "\n"
+    )
+    expect(ignoredLines(quoted)).toEqual([])
+    expect(uncheckedLines(quoted)).toEqual([])
+    expect(ignoredLines(`const count = 1 // ${ignore}\n/*\n * ${ignore} */\n/// ${ignore}: why\n`)).toEqual([1, 3, 4])
+  })
+
+  it("the comments that silence a leaking requirement are found in any capitals, wherever they stand", () => {
+    expect(leakingComments).toEqual(["@effect-leakable-service", "@effect-expect-leaking"])
+    expect(
+      leakingLines("/** @effect-leakable-service */\nclass Database {}\n// @Effect-Expect-Leaking Database\n")
+    ).toEqual([1, 3])
+    expect(leakingLines("// @effect-diagnostics floatingEffect:off\n")).toEqual([])
+  })
+
+  it.effect("check refuses a comment that silences a leaking requirement, and lets a quoted directive stand", () =>
+    Effect.gen(function* () {
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "service", ""),
+          "scratchpad/experiments/shelf/Shelf.ts": "/** @effect-leakable-service */\nexport class Database {}\n",
+          "scratchpad/experiments/shelf/Strip.test.ts": `const sample = "// ${ignore}\\nfoo()"\n/** Replaces ${ignore}. */\n`
+        }),
+        scratchCheck(types, included).pipe(said)
+      )
+      expect(result).toEqual([
+        "err: scratch:check FAIL  1 problem",
+        "err:   scratchpad/experiments/shelf/Shelf.ts:1: names a comment that silences the `leakingRequirements` diagnostic (`@effect-leakable-service` or `@effect-expect-leaking`). No file of the scratchpad may: give the service what it needs in its Layer, so no method requires it",
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
 
   it("the comment that turns a whole file's checks off is found on any line", () => {
     expect(uncheckedLines(`// ${noCheck}\nexport const count = 1\n`)).toEqual([1])

@@ -48,6 +48,9 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
     - When somebody else confirms the import and opens it again while this screen is behind, a decision she picks
       on a line can be let go without a word, if an older answer then says the import is closed and that confirm
       wrote the same value; a colleague's decision made after the reopening stands.
+    - A decision of hers that a confirm wrote, whose own save is refused after the import was opened again because
+      somebody changed the row since, comes back to her to pick only if her screen had already read the reopened
+      import when the refusal arrived. If the refusal arrives first, it is dropped without a word.
     - A row taken up from a closed tab, beside a save of hers whose answer was lost, can be said as "decided since by
       someone else or another tab" when only she decided it.
   - **For whoever changes the code.** `tags:check` and `refs:check` read a file within a budget and refuse one past

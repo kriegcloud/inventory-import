@@ -15,9 +15,9 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 | # | Question | Recommendation | Source |
 | --- | --- | --- | --- |
-| 13 | A second vendor for confidence scores? | Not until a labelled calibration run shows a gain | 03 §7.3 |
+| 13 | A second vendor for confidence scores? | Not until a labelled calibration run shows a gain (at odds with "ai-typesafe confidence" on his list of wanted items; see "core, reversed"; asked again as decisions 45 to 47 of the alchemy-domain brief) | 03 §7.3 |
 | 15 | Do model-preselected values count as Ready? | No | 03 §7.8 |
-| 16 | MCP for agents? | Own tools: reads plus proposal-only writes that need approval | 01 §3 |
+| 16 | MCP for agents? | Own tools: reads plus proposal-only writes that need approval (asked again as decisions 50 and 51 of the alchemy-domain brief) | 01 §3 |
 
 ### Round four: shipping (answered 2026-11-19, entries "infra I1" to "infra I9" below)
 
@@ -33,7 +33,7 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 ## Answered
 
-### 2026-11-18 — core
+### 2026-11-18 — core (reversed 2026-11-19 by "core, reversed")
 
 Question: what is the core of the rebuilt app? Answer: the model-first package shape over D1 state tables behind
 ports. Rationale: Confirm and take-back stay one atomic write, and nothing rests on a beta engine; rejected were an
@@ -258,8 +258,8 @@ until he says it matches, and its six decisions (X1 to X6) are his. Rejected: "@
 
 ### 2026-11-19 — Suggest fixes for a heading, the narrowing
 
-Question: the button is shown for an unmatched column only while some field still has no column, a narrowing the
-agent made; keep it? Answer: "Keep the narrowing (Recommended)". It is now Benjamin's choice. Rejected: "Show it for
+Question: the button is shown for an unmatched column only while some field still has no column, a narrowing made
+without asking him; keep it? Answer: "Keep the narrowing (Recommended)". It is now Benjamin's choice. Rejected: "Show it for
 any unmatched column". Reverse: drop the second condition in `offersSuggestions`
 (`packages/catalog/model/src/Suggestion/Suggest.rules.ts`).
 
@@ -313,13 +313,13 @@ ticked.
 
 ### 2026-11-19 — who builds xlsx
 
-Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)", the one that wrote the brief, on its own
-branch `claude/beep-xlsx`. Rejected: a fresh session. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
+Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)", the one that wrote the brief, on a branch
+of its own. Rejected: a fresh session. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
 another builder.
 
 ### 2026-11-19 — xlsx merge
 
-Question: how does `claude/beep-xlsx` reach main? Answer: "Merge locally, I push (Recommended)"; merged into local
+Question: how does the xlsx work reach main? Answer: "Merge locally, I push (Recommended)"; merged into local
 main at `3253f2f`. Reverse: none planned.
 
 ### 2026-11-19 — where the new workbook reader differs from the old
@@ -364,7 +364,7 @@ Mine, in my words: "Also no react hooks where effect/reactivity + @effect/react-
 "useEffect banned with no exceptions." (The package is published as `@effect/atom-react`.) This supersedes "client
 state" of 2026-11-18, which kept TanStack Query for the rebuild and left atoms for later. What it means file by
 file, the exact line of what stays a hook, and the five questions it leaves are in
-[BRIEF-atoms.md](BRIEF-atoms.md); nothing is built, and the goal starts after the Effect-imports migration is merged.
+[BRIEF-atoms.md](BRIEF-atoms.md); nothing was built then; the goal is now merged into main.
 Reverse: none planned.
 
 ### 2026-11-19 — infra I1, deploy unit (18)
@@ -399,7 +399,10 @@ The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY`: "Not deploye
 reserved for a later confidence-score goal; no stage gets it, and it is not in `env/op.env`. Rejected: declare it,
 unused. It is never resolved by an agent.
 
-### 2026-11-19 — infra I6, email (23)
+At odds with "ai-typesafe confidence" on his list of wanted items (see "core, reversed"). Whether the key is used
+is decision 46 of the alchemy-domain brief; this entry stands until he answers it.
+
+### 2026-11-19 — infra I6, email (23) (at odds with "Resend email" on his list of wanted items; see "core, reversed")
 
 Question: does the app send email now? Answer: "Not now (Recommended)". Rejected: Resend for reset only; Resend for
 reset, verification and invitations. Reverse: a later goal adds the sending domain and its key.
@@ -556,7 +559,7 @@ the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whol
 that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
 from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
 
-How the budget is measured changed on 2026-11-22 (agent, not asked): the rule and the one entry stand. The test held
+How the budget is measured changed on 2026-11-22 (not asked): the rule and the one entry stand. The test held
 the time on the clock to 400 ms, and GitHub's four-core runner, busy with the rest of the check, took over five
 seconds for five starts, so CI failed on a CLI that had not changed. It now holds the processor time the start used
 (user and system, as bash's `time` reports them) to 700 ms: the same 3.6 times the measured start (110 ms on the
@@ -578,7 +581,7 @@ beside infra (Recommended)". Rejected: build after infra; not yet. The goal is
 
 ### 2026-11-19 — merging the tooling CLI
 
-Question: how does `claude/tooling-cli` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local
+Question: how does the tooling CLI reach main? Answer: "Merge locally, I push (Recommended)". Merged into local
 main at its last commit of that day.
 
 ### 2026-11-19 — tooling CLI: what a rule returns
@@ -643,7 +646,7 @@ is his to fill. Reverse: let a preview mint its own again (`testPasswordOf`) and
 
 ### 2026-11-19 — merging infra
 
-Question: how does `claude/infra` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local main
+Question: how does the infra work reach main? Answer: "Merge locally, I push (Recommended)". Merged into local main
 at 8007ab5; the push, and with it `deploy.yml` on `main`, is his.
 
 ### 2026-11-19 — atoms, merging the goal
@@ -680,6 +683,42 @@ organization they left for the five minutes. Rejected: keyed reads as built (row
 registry, as the brief said. Built in `@inventory/client/Api` (`forgetReads`, called when the session answers that
 nobody is signed in, and by sign-out and sign-in-as before their reload), with a test. Reverse: `forgetReads` and its
 three callers.
+
+### 2026-11-19 — core, reversed
+
+Benjamin reversed the 2026-11-18 decision "core" (the model-first shape over D1 state tables, with Alchemy's domain
+ideas borrowed and the import lifecycle moved onto an aggregate "later"). His words: "not seeing a lot of
+@alchemy.run/domain"; "If I made that decision I clearly wasn't paying attention. @alchemy.run/domain was one of the
+primary reasons I wanted to embark on this build out in the first place"; "Not borrow use."; and "if possible find a
+way to make use of ever single thing". The app is where he explores the library in full and settles its designs
+before porting beep-effect to it.
+
+Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it uses it, all of it. How is not
+decided: the reading, the trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md),
+and its [brief](../alchemy-domain/BRIEF.md) puts each "how" to him. None of that brief's recommendations is his
+until he answers it. Decision 1's pin is on main (as of 2026-11-22), and the review's model of its move 1 is built on
+that pin and merged into main (`0c4c5e5`, not yet on the public remote); the rest of it is built after he signs it
+(the atoms goal, the other condition, is merged).
+
+From his own list of 2026-11-18, the items he marked as wanted (CAPTURE.md of that packet records them under
+2026-11-19, in his labels): "Cluster, workflows, singletons"; "Drizzle v1 on Durable Objects"; "GraphQL
+(effect/graphql)"; "ai-typesafe confidence"; "Resend email"; "Discord sign-in, distilled clients"; "Alchemy Git". He
+did not mark R2 presigned uploads, which stay out.
+
+What this touches in this file:
+
+- "core" (2026-11-18): reversed, in his words above.
+- "infra I6, email (23)" (his "Not now" of 2026-11-19), open question 13, and the second paragraph of "infra I5"
+  (the key reserved for confidence scores): not reversed in any words of his. Each is at odds with an item he marked
+  as wanted. That they are reversed is inferred from his list and from "make use of ever single thing"; the
+  alchemy-domain brief asks him (its decisions 45 to 49), and these entries stand until he answers.
+- "infra I7, repository rules (24)" was answered "Yes, with an admin bypass" and is built; it stands. The
+  alchemy-domain brief proposes Alchemy Git beside it (its decision 55), not in place of the ruleset or of CI.
+- The rows of the README's table "Where the research disagrees with the request" that name those items say so.
+
+Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
+is the D1 core, and nothing of the reversal is on main yet but the library's pin and the review's model of move 1
+(as of 2026-11-22; `0c4c5e5`, not yet on the public remote).
 
 ### 2026-11-19 — atoms, the table's own store in the review package
 
@@ -940,8 +979,8 @@ the grid, which no screen uses. Answer: "Local change"; the agent recommended th
 it was put to him: the fallbacks already in the file, at the cost of the browser's own undo in a cell's editor.
 
 What was built first was a different design, not put to him before it was built: measured in Chromium, the number
-cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent let the browser type the key that opens an
-editor, through a prop on the vendored cell and a `flushSync` in its key handler. A review found that wrong for a
+cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the browser was made to type the key that opens an
+editor, through a prop on the vendored cell and a `flushSync` in its key handler. That was found wrong for a
 column with a variant and its own `cell`, which lost the opening key and stored 6 for a typed 56.
 
 ### 2026-11-22 — deprecated APIs, `.agents/` is not read
@@ -970,8 +1009,8 @@ nothing is stored that was not typed. A column that writes its own cell (`meta.w
 
 "Every column" as built means the four editors that take typing: text, number, url and long text, in a plain column
 and in one with its own `cell`. The select, multi-select, date and file editors and the boolean's checkbox are as
-published and untouched; the published select and multi-select drop the key that opens them, and still do (agent, not
-asked whether he meant those too).
+published and untouched; the published select and multi-select drop the key that opens them, and still do (not asked
+whether he meant those too).
 
 The test is `bun run grid:keys` in `apps/inventory`, on a development-only page (`/gallery/grid`) that adds nothing to
 the production build (its stylesheet is 124,636 bytes with and without the page; the walk that lists the
@@ -982,7 +1021,7 @@ this checkout's own server on a port it asked the system for, and fails when no 
 was before the fix for every column, 22 of the 96 fail. Chromium only. Not measured: Firefox, Safari, a touch
 keyboard, an input method, a production build of the grid.
 
-Where the test runs (agent, not asked; he has been told): CI runs it as a step after the full check, with the
+Where the test runs (not asked; he has been told): CI runs it as a step after the full check, with the
 runner's Chrome (`/usr/bin/google-chrome`, which GitHub's Ubuntu 24.04 image documents), and it is run by hand after a
 change to the grid. The step has not run on a runner yet: nothing is pushed. It is not part of `bun run check`. An
 earlier version of this entry said the machine that runs the checks has no browser; that was wrong.
@@ -1002,14 +1041,14 @@ browser types that key now, and no such run has failed since; the test does not 
 Reverse: the "Local change" marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`,
 `data-grid-cell-variants.tsx`, `data-grid-utils.ts`), one at every changed or removed line.
 
-### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (agent, not asked)
+### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (not asked)
 
 The check refuses a code file no tsconfig includes, so the app's development scripts (`apps/inventory/scripts`, plain
 JavaScript) and the one script the page loads (`public/theme-init.js`) each got a project, type-checked by the app's
 `check`. Both are looser than the repository's one profile: no Effect rule applies (`plugins` is empty; 78 findings in
 the scripts otherwise), and the scripts' project has `noImplicitAny` off, so an untyped parameter or a package that
 ships no types is `any` without an error and a deprecated call behind either is not seen. Before, nothing
-type-checked them at all. This is the agent's judgement, not a decision of his; he was told on 2026-11-22 and it was
+type-checked them at all. This is not a decision of his; he was told on 2026-11-22 and it was
 left as built. Other ways: the Effect rules on and the findings fixed; the scripts rewritten as TypeScript;
 `noImplicitAny` on alone. Reverse: remove `plugins` and `noImplicitAny` from `apps/inventory/scripts/tsconfig.json`
 and `plugins` from `apps/inventory/tsconfig.public.json`, and fix what the check then finds.
@@ -1061,13 +1100,13 @@ needed". Rejected: release files on GitHub; re-pin often. One move is expected b
 move is one command, `bun run alchemy:repin -- <commit>` (`vendor/alchemy/README.md`). Reverse: delete
 `vendor/alchemy` and the root `overrides`, and ask for a release once one contains `Decision`.
 
-### 2026-11-22 — the review's model, its names (agent, not asked for each)
+### 2026-11-22 — the review's model, its names (not asked for each)
 
 Asked what the model's units should be called, he gave no names and said the names need not last yet: "I don't care
 about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are
-the agent's, open to change until the first hosted deploy stores an event under them: the aggregates `Import`, `Row`
-and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after it,
-the events already stored carry the old names, and a rename needs an answer for them.
+proposed, not his, open to change until the first hosted deploy he keeps stores an event under them: the aggregates `Import`,
+`Row` and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after
+it, the events already stored carry the old names, and a rename needs an answer for them.
 
 ### 2026-11-22 — the review's model, what is shown on Wednesday
 
@@ -1177,7 +1216,7 @@ three times in a row in 235, 208 and 276 s; two pinned cores, green in 298 s. No
 them. The slowest, five minutes, leaves about ten of the job's 15 for the install, the browser step and a runner
 slower than two pinned cores here. The runner itself has not run this yet: nothing is pushed.
 
-The concurrency, workers and limits were the agent's, not asked; the second try was put to him. Question, by dialog:
+The concurrency, workers and limits were not put to me; the second try was. Question, by dialog:
 the tests that wait in real time fail now and then under load and are tried again with no word, which can hide an
 intermittent fault in the review's save and confirm, and it is not a cure; what should happen to the retry? Options:
 "Retry for now, said aloud; remove after TestClock" (Recommended), "Remove it now", "Keep it as is". Answer: "Retry
@@ -1221,7 +1260,7 @@ three commands of the repository's CLI, in beep-effect's shapes and without its 
 and `config-sync --check` are part of `bun run check`. What each covers and leaves alone is in
 `docs/sync-commands.md`. `version-sync --write` may change a version number in `CLAUDE.md`, and nothing else there.
 
-The agent chose these, and I was not asked. Each is small to reverse:
+These were not put to me. Each is small to reverse:
 
 - **The held list is `updateGroups` in `.syncpackrc.json`**, a group's `label` being its reason, where beep-effect
   keeps a ledger of holds with a probe for each. One list, read by syncpack (`deps:outdated`) and by `deps update`.
@@ -1295,7 +1334,7 @@ Three defaults I was shown and accepted with the whole: the warning is at 30 day
 that needs a database or a dev server keeps its state in its own ignored folder (`.state`) and on its own port,
 never the app's; trial code written while building something goes in the scratchpad, not a cache folder.
 
-The agent chose these, and I was not asked:
+These were not put to me:
 
 - **Status is not kept twice.** A note only ever says `open`: an experiment that graduated or was dropped has no
   folder, and its line in `scratchpad/LOG.md` says which. `scratch:list` reads both.
@@ -1339,17 +1378,17 @@ Four questions left open when `deps:update`, `version-sync` and `config-sync` we
    together. It was ^24 and is now ^22.20.5 everywhere; every type error that appeared would have been an API the
    runner does not have, and none did (`bun run check`, 80 of 80). Where something truly needs a newer Node, the
    answer is to move CI's Node, not to work around it.
-3. **`better-auth`, held by the agent's judgement because its tables are a migration written by hand?** Options:
+3. **`better-auth`, held back without my answer because its tables are a migration written by hand?** Options:
    "Hold it, and add the check (Recommended)"; "Hold it, no check"; "Don't hold it". Answer: "Hold it, and add the
    check". I chose; the agent recommended the same. The check existed as a slow test; it takes half a second, needs
    no secret, no network and no `.dev.vars` (an in-memory SQLite database and a dummy secret), and now runs in
    `bun run check` (`apps/inventory/test/server/AuthSchema.test.ts`). It fails when Better Auth wants a table or a
    column the migrations do not make, which is what `bun run auth:schema` would print.
 4. **A sentence that records a check ("checked in effect 4.1.4's source") is moved by `version-sync --write`,
-   though nobody checked again.** Answer: leave it as built. The agent's judgement: `--write` prints every line it
+   though nobody checked again.** Answer: leave it as built. Not my decision: `--write` prints every line it
    changes, and the person reads them.
 
-And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) are written by the agent, as the
+And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) were written without my answer, as the
 commands of the request that made it.
 
 ### 2026-11-22 — the review's model, a row decided after a group that is taken back
@@ -1501,9 +1540,9 @@ ours"; the agent recommended the same. The documents say it is ours and why, and
 hand-written list of rule names or of how each stands. Reverse: drop `missingRules` from `test/proving.ts` and the
 four proofs.
 
-### 2026-11-22 — the review's model, several people on one import, and what is stored already
+### 2026-11-22 — the review's model, several people on one import
 
-Two answers, after the cases above were explained to me (Ana, Dana and Carl are invented names for people reviewing
+An answer, after the cases above were explained to me (Ana, Dana and Carl are invented names for people reviewing
 one import at once).
 
 Question: the review by several people at once, as built and proved: keep it, and how are its remaining edge cases
@@ -1513,10 +1552,7 @@ without a word and never applied; it is held and shown. Each case settled by tha
 reported, so I can overrule it. A case where the rule itself cannot be kept (the prover's path limit) still comes to
 me.
 
-Question: what happens to rows stored before the model? I chose "Start empty"; the agent recommended the same. No
-carry-over of stored rows is built: a fresh database starts on the new model. Nothing in the model or its documents
-plans for taking existing rows in, and the library's `import` is not used for it. Reverse: write a decision that
-records a stored row as the model's own, with the three rules about who may change it.
+What is stored already is the entry "rows already stored: start empty" below.
 
 ### 2026-11-22 — the review's model, decided by the rule, for me to overrule
 
@@ -1562,6 +1598,15 @@ matching's number and the text as one text, `onItsMatching`) it is one, and the 
 `UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
 group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
 
+### 2026-11-22 — the review's model, rows already stored: start empty
+
+Nothing the app has stored today (imports, items, organizations) is carried into the model. His answer: "Start empty
+(Recommended)"; I chose; the agent recommended the same. It replaces the alchemy-domain brief's decision 37 answer
+"Adopt at first touch", and the mechanism he then picked for it, the same day. Each move's migrations create the
+model's tables on an empty database, its seeds are written for the new model, and local development data is reset
+with `bun run db:reset`; no carry-over code or test exists. Recorded in full in the alchemy-domain packet's
+DECISIONS.md. Reverse: a new decision by him, before the first deploy he keeps holds data.
+
 ### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
 
 For the screen, not the model. His answers: "a waiting undo on a row a landing group doesn't
@@ -1593,7 +1638,7 @@ untouched.
    recommended the same. bun writes `scratchpad/bun.lock` with the first library; `scratch:check` asks for it once
    the scratchpad lists one.
 
-The agent chose, and I was not asked: the Verify template takes the prover from the root's install (a library of the
+This was not put to me: the Verify template takes the prover from the root's install (a library of the
 scratchpad would be a second Effect), so it works once a package asks for `@alchemy.run/domain`, and until then
 `scratch:new` says so.
 
@@ -1623,7 +1668,7 @@ staging after CI passes on `main`, and production only from a `v*` tag whose com
 behind the `production` environment; the previews are unchanged. Reverse: production on a push to `main` again in
 `deploy.yml`, and the `staging` stage out of the stage plan.
 
-The agent chose these, and I was not asked:
+These were not put to me:
 
 - The approval stays as code. The `production` environment and its reviewer are already made by the repository's
   stack (`packages/infra/src/GitHub.stack.ts`, decision I7), so nothing is clicked in GitHub's settings: the stack
@@ -1671,6 +1716,20 @@ After that review I was asked three questions by dialog, on 2026-11-22:
    recommended the same. A commit whose change differs from main's counts when its `git cherry-pick -x` line names
    a commit that is on `origin/main`; the release's output, its notes and its tag message list it under "Picked
    with changes". No flag. Rejected: always refusing it; accepting it only behind a flag.
+
+The agent chose these while closing the second review of that build, and I was not asked. Each can be reversed in
+`Release.rules.ts` or `deploy.yml`:
+
+- The pick's line counts only alone on a line, as `-x` writes it. Nothing compares the edited change with main's;
+  the documents and the "Picked with changes" lines say so, and that the approval screen shows none of it.
+- A release commit made by hand passes only when the app's file and `bun.lock` are their parent's with the version
+  moved. The text of `CHANGELOG.md` is not compared.
+- A patch is refused, by the command and by the deploy guard, when a release of its line under it is one the guard
+  refuses, or was never pushed. A bad tag stops its line until an admin deletes or replaces it.
+- Production asks the remote again after my approval: the commit must still be its release branch's head and carry
+  the tag, or the job fails. Nothing orders the releases of two lines.
+- The failed "Deploy" run after each green push to `main`, until I deploy the repository's stack with the `staging`
+  environment, is left failing and written down, not skipped.
 
 ### 2026-11-22 — atoms A1, the kit too
 

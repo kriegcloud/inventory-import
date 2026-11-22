@@ -1163,7 +1163,40 @@ it.effect(
       Story.rejected(MatchedSince.make({ matching: 1 })),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      Story.rejected(MatchedSince.make({ matching: 1 })),
+      // And so is her own step with another text: that is not the press the row holds.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: leftOut })),
       Story.rejected(MatchedSince.make({ matching: 1 }))
+    )
+)
+it.effect(
+  "a press sent twice is answered as the first time when the import was confirmed and opened again between: Dana's keep on row 12, sent again from the first opening",
+  () =>
+    story(
+      Story.given(
+        life,
+        staged,
+        counted({ change: 1, step: "d1", row: "row-12", by: "dana", flags: kept }),
+        confirmed(2),
+        ImportTakenBack.make({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+        ImportReopened.make({ change: 4, by: "dana" })
+      ),
+      Story.given(row12, decided({ change: 1, by: "dana", step: "d1", flags: kept })),
+      // The row holds this very keep, recorded in the first opening: its copy records nothing, and is not refused.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept, opening: 0 })),
+      Story.then(row12),
+      Story.then(life),
+      // Any other press made in the first opening is refused: under a new step, with another text, or from
+      // someone else.
+      Story.when(act({ row: "row-12", step: "d2", saw: 0, flags: kept, opening: 0 })),
+      Story.rejected(ConfirmedSince.make({})),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: leftOut, opening: 0 })),
+      Story.rejected(ConfirmedSince.make({})),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept, opening: 0 })),
+      Story.rejected(ConfirmedSince.make({}))
     )
 )
 it.effect(

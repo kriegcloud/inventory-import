@@ -25,7 +25,7 @@ layer(NodeServices.layer)("UndoingGroup", (it) => {
       expect(notProved(standings(report)), said).toEqual([])
       // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
       // are there, and the ones about who may change a row or a group it states itself.
-      expect(missingRules({ report, records: ["GroupUndone", "GroupCounted"] }), said).toEqual([])
+      expect(missingRules({ report, decision: UndoingGroup }), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.

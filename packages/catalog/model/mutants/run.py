@@ -4,6 +4,7 @@
     python3 -I mutants/run.py --sample              nine fast mutants, chosen below (about a minute)
     python3 -I mutants/run.py --all --jobs 4        all of them (an hour or more on a busy machine)
     python3 -I mutants/run.py --only key1,key2      the ones named
+    python3 -I mutants/run.py --all --except key1   all but the ones named (a slow one, run apart)
     python3 -I mutants/run.py --list                the mutants, one a line, and nothing run
 
 Run from anywhere; paths are taken from this file. Each mutant named in `mutants.json` (next to this file) is one
@@ -333,6 +334,7 @@ def main():
     pick.add_argument("--sample", action="store_true", help="the fixed fast sample")
     pick.add_argument("--only", help="keys, comma-separated")
     pick.add_argument("--list", action="store_true", help="list the mutants and run nothing")
+    parser.add_argument("--except", dest="left_out", default="", help="keys to leave out, comma-separated")
     parser.add_argument("--jobs", type=int, default=2, help="mutants run at once (default 2)")
     parser.add_argument("--keep", action="store_true", help="keep each copy after it is classified")
     parser.add_argument("--no-baseline", action="store_true", help="skip the run of the unchanged copy")
@@ -355,19 +357,32 @@ def main():
             print("unknown keys: " + ", ".join(unknown), file=sys.stderr)
             return 1
         chosen = [by_key[k] for k in keys]
+    left_out = [k.strip() for k in opts.left_out.split(",") if k.strip()]
+    unknown = [k for k in left_out if k not in by_key]
+    if unknown:
+        print("unknown keys to leave out: " + ", ".join(unknown), file=sys.stderr)
+        return 1
+    if left_out:
+        chosen = [m for m in chosen if m["key"] not in left_out]
+        print("left out, to be run apart: " + ", ".join(left_out), flush=True)
     if not os.path.exists(VITEST):
         print(f"vitest not found at {VITEST}: run bun install first", file=sys.stderr)
         return 1
 
-    # Every chosen mutant must apply to the package's own text before anything runs.
+    # Every chosen mutant must apply to the package's own text before anything runs, and one kept as held by a rule
+    # must record each of its rules as violated: any other standing is the prover giving up, which holds nothing.
     problems = []
     for m in chosen:
         with open(os.path.join(PKG, m["file"])) as f:
             _, reason = apply(f.read(), m)
+        if not reason and m["expect"] == "rule":
+            other = [t for t in m["trialRules"] if STANDING.match(t) and not t.startswith("Violated ")]
+            if other:
+                reason = "kept as held by a rule on a standing that is not a rule violated: " + "; ".join(other)
         if reason:
             problems.append((m, reason))
     for m, reason in problems:
-        print(f"DOES NOT APPLY {m['key']}: {reason}")
+        print(f"NOT RUN {m['key']}: {reason}")
     ready = [m for m in chosen if all(m is not p[0] for p in problems)]
 
     os.makedirs(WORK, exist_ok=True)

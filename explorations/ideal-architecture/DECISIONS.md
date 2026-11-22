@@ -1593,19 +1593,6 @@ answered before, and not asked. I can overrule any of them.
    she is not told `NotYourStep`. It is known whatever was decided on the row since, and only as hers, in that step,
    of that change. Before, the second sending was refused as an undo of a decision the row no longer holds. Reverse:
    remove `undone` from the row's state and the check in `Undoing`.
-
-With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
-excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
-group covers the matching is checked first, so a press behind on both is refused with the matching.
-
-The prover's limit decided how 1 is written. As two comparisons (the text, then the matching) the relation of a row to
-its import's organization was no longer proved across `DecideRow`, in three forms: 232, 226 and 220 paths in the
-decision's own proof, each past 4,096 for the relation. What counts there is how many ways through the `decide` reach
-the record, and "the text differs, or the text is the same and the matching differs" is two. As one comparison (the
-matching's number and the text as one text, `onItsMatching`) it is one, and the relation is proved: 204 paths, and
-`UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
-group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
-
 8. **A press drawn before an undo on the row is held** (2026-11-22, a second review). After an undo the row holds
    exactly what it held before the decision taken back, so the number of the row's decision cannot tell a press made
    after the undo from one drawn before it. Dana types 8 on row 14 and takes it back; the first sending of her 8,
@@ -1633,6 +1620,25 @@ group); the lock written again on purpose for the two rules above. 55 stories, 1
     to keep every undo it took. Tried: a text of them looked into with `includes`, which the prover does not read
     (every rule of the undo comes back "not read"); not tried, read from the library: a list in the state, whose
     rules are then proved for short lists only and not proved. For me to settle if it matters.
+14. **A press's copy is answered as the first time when a group act, or a confirm and a reopening, landed between
+    the two sendings** (a fourth review, the same day; 12 said it of an undo only). Before, the copy was refused
+    `GroupedSince` or `ConfirmedSince` though the row held that very press: this step, from this person, with this
+    text on the matching it was made on.
+
+With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
+excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
+group covers the matching is checked first, so a press behind on both is refused with the matching.
+
+The prover's limit decided how 1 is written. As two comparisons (the text, then the matching) the relation of a row to
+its import's organization was no longer proved across `DecideRow`, in three forms: 232, 226 and 220 paths in the
+decision's own proof, each past 4,096 for the relation. What counts there is how many ways through the `decide` reach
+the record, and "the text differs, or the text is the same and the matching differs" is two. As one comparison (the
+matching's number and the text as one text, `onItsMatching`) it is one, and the relation is proved: 204 paths, and
+`UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
+group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
+
+With 7: `UndoRowStep` at 324 paths, 139 rules proved under `CI=true` (three new, each one comparison: the row keeps
+which change was taken back, the step it was pressed in, and who pressed), 56 stories, 169 mutants.
 
 With 8 to 11: `DecideRow` at 222 paths and `UndoRowStep` at 326, the relation of a row to its import's organization
 still proved across both (the first form tried); 61 stories, 179 mutants. With 12: `UndoRowStep` at 362 (the test
@@ -1655,10 +1661,8 @@ Rules that said less than their names, each either made to say it or renamed (th
 - Said as they are, in words only: `replaced` on an import counts replacements as the confirms said them, not
   items; a group's rows are bounded at a million characters, which takes 50,000 ids at their longest.
 
-143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these.
-
-With 7: `UndoRowStep` at 324 paths, 139 rules proved under `CI=true` (three new, each one comparison: the row keeps
-which change was taken back, the step it was pressed in, and who pressed), 56 stories, 169 mutants.
+143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these. With 14:
+`DecideRow` at 234 paths, the relation still proved across it, no rule changed; 65 stories, 190 mutants.
 
 ### 2026-11-22 — the review's model, rows already stored: start empty
 

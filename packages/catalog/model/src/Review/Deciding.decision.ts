@@ -23,6 +23,7 @@ import {
   ActCounted,
   ConfirmedSince,
   Import,
+  type ImportState,
   isOpen,
   MatchedSince,
   NotOpen,
@@ -114,8 +115,8 @@ const changesNothing = (act: {
 }): boolean => (act.command.covered ? act.command.asItReads : leavesAsItIs({ row: act.row, flags: act.command.flags }))
 
 /**
- * The act would leave the row as its own instance holds it, and no group in force covers the row since: no change,
- * whatever the sender has seen. A covered act that changes nothing is no change only once its sender is shown to have
+ * The act would leave the row as its own instance holds it, and no group in force covers the row since, by its
+ * sender's word. Whether that is answered "no change" is `sameAndNotHeld`'s to say. A covered act that changes nothing is no change only once its sender is shown to have
  * seen the row's decision and the matching now (2026-11-22: "Same: hold, show both"): otherwise a press from a screen
  * that is behind, which reads the row through a group as it read before, would be lost as "no change".
  */
@@ -123,6 +124,28 @@ const sameAsItsOwn = (act: {
   readonly row: RowState
   readonly command: { readonly flags: string; readonly covered: boolean }
 }): boolean => !act.command.covered && leavesAsItIs({ row: act.row, flags: act.command.flags })
+
+/** The act's sender has seen what the row holds: its decision, by the number of the change, or that it has none. */
+const sawIt = (act: { readonly row: RowState; readonly command: { readonly saw: number } }): boolean =>
+  isDecided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
+
+/**
+ * No group was made since the row's own decision (or, on a row with none, at all), so the row cannot read through a
+ * group its sender has not seen it under.
+ */
+const noGroupSince = (act: { readonly life: ImportState; readonly row: RowState }): boolean =>
+  isOpen(act.life) && (isDecided(act.row) ? act.row.change > act.life.lastGroup : act.life.lastGroup === 0)
+
+/**
+ * The act is answered "no change" unseen: what the row's own instance holds, on an uncovered row, from a sender who
+ * has seen it or with no group made since. From a screen that is behind after a group it is refused and held
+ * (2026-11-22: "Hold it when behind"), so it is not exempt from the rules on what an act saw.
+ */
+const sameAndNotHeld = (act: {
+  readonly life: ImportState
+  readonly row: RowState
+  readonly command: { readonly flags: string; readonly covered: boolean; readonly saw: number }
+}): boolean => sameAsItsOwn(act) && (sawIt(act) || noGroupSince(act))
 
 /** One act of the review: read from the import and the row, recorded on both or on neither. */
 export class Deciding extends Domain.Decision(
@@ -162,16 +185,23 @@ export class Deciding extends Domain.Decision(
         if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
         if (cmd.asItReads) return []
       } else {
-        // No group covers the row: what its own instance says already is no change, whoever decided it and whether
-        // or not the sender has seen it. Any other act is from a screen that has seen what is there.
+        // No group covers the row, by its sender's word: what the row's own instance says already is no change,
+        // whoever decided it. From a screen that has not seen what is there, that holds only while no group was made
+        // since: after one, the row may read through the group again (its later decision undone), and the press
+        // would put the row's own decision over the group. That one is refused and held (2026-11-22: "Hold it when
+        // behind"). `saw` is asked once in each case, for the prover's paths.
         if (isDecided(row.state)) {
-          if (row.state.flags === cmd.flags) return []
           if (cmd.saw !== row.state.change) {
+            if (row.state.flags === cmd.flags && row.state.change > life.state.lastGroup) return []
             return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
           }
+          if (row.state.flags === cmd.flags) return []
         } else {
+          if (cmd.saw !== 0) {
+            if (cmd.flags === NO_DECISION && life.state.lastGroup === 0) return []
+            return yield* new NoLongerThere({})
+          }
           if (cmd.flags === NO_DECISION) return []
-          if (cmd.saw !== 0) return yield* new NoLongerThere({})
         }
         if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
       }
@@ -213,12 +243,12 @@ export class Deciding extends Domain.Decision(
         isOpen(before.life) && command.sawGroup === before.life.lastGroup,
       // A decision is replaced only by an act whose sender saw it, by the number of the change that recorded it.
       ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) =>
-        sameAsItsOwn({ row: before.row, command }) ||
-        (isDecided(before.row) ? command.saw === before.row.change : command.saw === 0),
+        sameAndNotHeld({ life: before.life, row: before.row, command }) || sawIt({ row: before.row, command }),
       // Whatever it decides, an act is made on the import's matching now; one made on an older matching is not
       // applied.
       AnActIsMadeOnTheMatchingNow: ({ before, command }) =>
-        sameAsItsOwn({ row: before.row, command }) || (isOpen(before.life) && command.madeOn === before.life.matching),
+        sameAndNotHeld({ life: before.life, row: before.row, command }) ||
+        (isOpen(before.life) && command.madeOn === before.life.matching),
       // An act that would leave the row's decision as it is records nothing: the row and the import are unchanged.
       AnActThatChangesNothingLeavesTheImport: ({ before, after, command }) =>
         !changesNothing({ row: before.row, command }) ||

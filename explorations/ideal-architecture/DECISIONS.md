@@ -1443,14 +1443,68 @@ for the person; each of those checks has its own mutant (154 in all). `DecideRow
 176; the lock was written again on purpose for the two rules' new text. Reverse: answer the covered "no change" with
 the other one, before `saw`, and accept that such a press is lost.
 
+### 2026-11-22 — the review's model, a press that matches what the row holds, from a screen behind a group
+
+Found on review of the entry above, and older than it: the uncovered "no change" also trusted the sender's word
+(`covered: false`) before the check of what the sender saw. Dana accepts the fix on row 14 (change 1). Ana's group
+covers row 14 (change 2). Dana types 8 on it (change 3), and Carl's screen has all of that. Dana takes the 8 back: the
+row holds her accept of change 1 again, and the group, made after it, covers the row again. Carl, who has not
+received the undo, presses accept on what he sees as an uncovered row holding the 8. The model answered "no change",
+since the accept is what the row's own instance holds, and dropped the press; recorded, it would have put the accept
+over Ana's group. Question: should a stale press that happens to match what the row holds be dropped or held?
+Options: "Hold it when behind (Recommended)", "Keep 'no change' as decided". I chose "Hold it when behind"; the agent
+recommended the same. It narrows my answer of 2026-11-19 ("no change, whoever decided it and whether or not the sender
+has seen it") for this one case.
+
+Built so: on an uncovered row the early "no change" is answered when the sender has seen what the row holds, or when
+no group was made since the row's own decision (on a row with none: no group at all). Otherwise the press goes to the
+check of what the sender saw and is refused with what is there (`DecidedSince`, or `NoLongerThere` on a row left with
+no decision), so the screen holds it and shows both. With no group since, a press that matches is still no change,
+seen or not, as before. The two rules that excused every such press (a decision is replaced only by an act that saw
+it; an act is made on the matching now) excuse only the one answered "no change"; the lock was written again on
+purpose for those two. Three stories hold it (the six steps above, refused with Dana's change 1; the same on a row
+left with no decision; and the earlier "seen or not" one, with a press from a screen that still shows a decision taken
+back), and four mutants, each held by its story: no rule can, since a press answered "no change" or refused records
+nothing (the proof notices them only by its count of paths).
+
+The same review found the matching half of the covered order held by nothing. It has a story now (Ana's group, Dana
+matches a column, and Carl's covered press on the matching before is refused with the matching now, then is no change
+once his screen has the match) and a mutant that answers the covered "no change" before the check of the matching.
+
+`saw` is asked once in each case of the row, for the prover's paths: `DecideRow` at 368 paths in its own proof, from
+284, and the relation of a row to its import's organization still proved across it; 135 rules proved under `CI=true`.
+159 mutants. Reverse: answer the uncovered "no change" first again, as the entry of 2026-11-19 says, and accept that
+such a press is dropped.
+
 ### 2026-11-22 — the review's model, whose act a decision records, held by a check of ours again
 
 The check that every decision recording on a row or a group states the three rules about who may change it
 (`missingRules`, in each decision's proof) is back. "No hand-written assertions" was about asserting how each rule
 stands, which the lock and `require.proved` do; this check guards what the library does not. A row and a group have no
-command and so no middleware of their own: a decision that records on one, adoption's when it comes included, says
+command and so no middleware of their own: a decision that records on one says
 whose act it records only by stating those rules, and without them it would lock and prove and let anyone change the
-row. Reverse: drop `missingRules` from `test/proving.ts` and the four proofs.
+row. It came back without my being asked, so it was put to me. Question: one check of ours remains; each decision
+that records on a row or a group must state the three who-may-change rules; does it stay? I chose "Keep it, named as
+ours"; the agent recommended the same. The documents say it is ours and why, and "no hand-written assertions" means no
+hand-written list of rule names or of how each stands. Reverse: drop `missingRules` from `test/proving.ts` and the
+four proofs.
+
+### 2026-11-22 — the review's model, several people on one import, and what is stored already
+
+Two answers, after the cases above were explained to me (Ana, Dana and Carl are invented names for people reviewing
+one import at once).
+
+Question: the review by several people at once, as built and proved: keep it, and how are its remaining edge cases
+settled? I chose "Keep it, stop asking me"; the agent recommended the same. What is built and proved stays. For an edge
+case that remains, one rule is applied without asking me: a press from a screen that is behind is never dropped
+without a word and never applied; it is held and shown. Each case settled by that rule is listed where the work is
+reported, so I can overrule it. A case where the rule itself cannot be kept (the prover's path limit) still comes to
+me.
+
+Question: what happens to rows stored before the model? I chose "Start empty"; the agent recommended the same. No
+carry-over of stored rows is built: a fresh database starts on the new model. Nothing in the model or its documents
+plans for taking existing rows in, and the library's `import` is not used for it. Reverse: write a decision that
+records a stored row as the model's own, with the three rules about who may change it.
 
 ### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
 

@@ -224,11 +224,11 @@
       },
       "DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt": {
         "kind": "transition",
-        "source": "({ before, command }) =>\n        sameAsItsOwn({ row: before.row, command }) ||\n        (isDecided(before.row) ? command.saw === before.row.change : command.saw === 0)"
+        "source": "({ before, command }) =>\n        sameAndNotHeld({ life: before.life, row: before.row, command }) || sawIt({ row: before.row, command })"
       },
       "DecideRow.AnActIsMadeOnTheMatchingNow": {
         "kind": "transition",
-        "source": "({ before, command }) =>\n        sameAsItsOwn({ row: before.row, command }) ||\n        (isOpen(before.life) && command.madeOn === before.life.matching)"
+        "source": "({ before, command }) =>\n        sameAndNotHeld({ life: before.life, row: before.row, command }) ||\n        (isOpen(before.life) && command.madeOn === before.life.matching)"
       },
       "DecideRow.AnActThatChangesNothingLeavesTheImport": {
         "kind": "transition",

@@ -1214,6 +1214,70 @@
       "trialStories": []
     },
     {
+      "key": "row-same-unseen",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "            if (row.state.flags === cmd.flags && row.state.change > life.state.lastGroup) return []\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a save that leaves the row as it is records nothing, seen or not: the answer says no change"
+      ]
+    },
+    {
+      "key": "row-same-behind",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "            if (row.state.flags === cmd.flags && row.state.change > life.state.lastGroup) return []\n",
+      "new": "            if (row.state.flags === cmd.flags) return []\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a press that matches what the row holds is held when its screen is behind a group: Dana accepts row 14, Ana's group covers it, Dana types 8 and takes that back, and Carl, who has not received the undo, presses accept there"
+      ]
+    },
+    {
+      "key": "row-same-untouched-unseen",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "            if (cmd.flags === NO_DECISION && life.state.lastGroup === 0) return []\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a save that leaves the row as it is records nothing, seen or not: the answer says no change"
+      ]
+    },
+    {
+      "key": "row-same-untouched-behind",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "            if (cmd.flags === NO_DECISION && life.state.lastGroup === 0) return []\n",
+      "new": "            if (cmd.flags === NO_DECISION) return []\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: the same on a row left with no decision: Dana accepts row 14, Ana's group covers it, Dana takes her accept back, and Carl, who has not received the undo, clears the row"
+      ]
+    },
+    {
       "key": "row-covered",
       "target": "DecideRow",
       "kind": "check",
@@ -1247,13 +1311,29 @@
       ]
     },
     {
+      "key": "row-covered-before-matching",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // A group in force covers the row"],
+      "until": "      } else {\n        // No group covers the row",
+      "old": "        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n        if (cmd.asItReads) return []\n",
+      "new": "        if (cmd.asItReads) return []\n        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a covered press made on an older matching is held too: Ana's group leaves row 14 out, Dana matches a column, and Carl, who has not received the match, presses leave out there"
+      ]
+    },
+    {
       "key": "row-saw",
       "target": "DecideRow",
       "kind": "check",
       "file": "src/Review/Deciding.decision.ts",
       "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
       "until": "      const change = life.state.changes + 1",
-      "old": "          if (cmd.saw !== row.state.change) {\n            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })\n          }\n",
+      "old": "            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })\n",
       "new": "",
       "proof": "test/Deciding.prove.test.ts",
       "expect": "rule",
@@ -1283,7 +1363,7 @@
       "file": "src/Review/Deciding.decision.ts",
       "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
       "until": "      const change = life.state.changes + 1",
-      "old": "          if (cmd.saw !== 0) return yield* new NoLongerThere({})\n",
+      "old": "            return yield* new NoLongerThere({})\n",
       "new": "",
       "proof": "test/Deciding.prove.test.ts",
       "expect": "rule",

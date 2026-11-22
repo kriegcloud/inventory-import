@@ -830,6 +830,10 @@ it.effect("a save that leaves the row as it is records nothing, seen or not: the
     Story.when(act({ row: "row-3", step: "a3", saw: 0, flags: "{}" })),
     Story.then(row3),
     Story.then(life),
+    // Nor one from a screen that still shows a decision there that was taken back since.
+    Story.when(act({ row: "row-3", step: "a4", saw: 1, flags: "{}" })),
+    Story.then(row3),
+    Story.then(life),
     // Somebody else had just decided it the same way, and the screen had not received that.
     Story.provide(CurrentActor, dana),
     Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),

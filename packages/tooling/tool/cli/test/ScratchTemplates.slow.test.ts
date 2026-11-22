@@ -29,7 +29,10 @@ const copied = [
   "tsconfig.base.json",
   "scratchpad/package.json",
   "scratchpad/tsconfig.json",
-  "scratchpad/vitest.config.ts"
+  "scratchpad/vitest.config.ts",
+  // The scratchpad's vitest configuration takes the repository's test limits from these two.
+  "vitest.shared.ts",
+  "vitest.retries.ts"
 ]
 
 describe("the scratchpad's templates", () => {

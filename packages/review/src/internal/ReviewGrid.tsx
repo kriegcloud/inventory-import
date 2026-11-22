@@ -534,7 +534,8 @@ const Row = memo(function Row(props: {
     )
   }
 
-  const value = (column: ReviewColumn): ReactNode => {
+  // `whole`: the value is read in full on as many lines as it takes (the problem under the name), never cut.
+  const value = (column: ReviewColumn, whole = false): ReactNode => {
     if (column.id === reasonColumn.id) {
       const reason = reasonOf({ view, kinds: props.kinds, words: props.words })
       // The whole reason, on as many lines as it takes: it is the sentence the person acts on.
@@ -553,10 +554,14 @@ const Row = memo(function Row(props: {
         )}
       >
         {(out || view.marks[column.id] === undefined) && (view.cells[column.id] ?? "") !== "" ? (
-          // A plain value that does not fit ends in an ellipsis; its whole text is one hover, focus or tap away.
-          <CutText text={shownWith(column, view.cells[column.id] ?? "", view.cells)} className="min-w-0" />
+          whole ? (
+            <span className="min-w-0 wrap-anywhere">{shownWith(column, view.cells[column.id] ?? "", view.cells)}</span>
+          ) : (
+            // A plain value that does not fit ends in an ellipsis; its whole text is one hover, focus or tap away.
+            <CutText text={shownWith(column, view.cells[column.id] ?? "", view.cells)} className="min-w-0" />
+          )
         ) : (
-          <span className="min-w-0 truncate">
+          <span className={whole ? "min-w-0 wrap-anywhere" : "min-w-0 truncate"}>
             <CellValue
               value={view.cells[column.id] ?? ""}
               display={(text) => shownWith(column, text, view.cells)}
@@ -837,7 +842,8 @@ const Row = memo(function Row(props: {
               {props.under.length === 0 && hiddenSubject === undefined ? null : (
                 <span
                   className={cn(
-                    "flex gap-2 truncate font-normal text-muted-foreground",
+                    // It wraps rather than cuts: a problem shown here may be the only place the row says it.
+                    "flex min-w-0 flex-wrap gap-x-2 font-normal whitespace-normal text-muted-foreground",
                     // In a 36px row the line is tighter than in a 44px one.
                     props.dense ? "text-xs leading-3.5" : "items-center text-xs leading-4"
                   )}
@@ -851,8 +857,8 @@ const Row = memo(function Row(props: {
                   {/* The row's problem is in a column this width has no room for: its change is shown here, so
                       every row under a heading still says what it was and what it becomes. */}
                   {hiddenSubject === undefined ? null : (
-                    <span className="min-w-0 flex-none">
-                      {hiddenSubject.label} {value(hiddenSubject)}
+                    <span className="min-w-0">
+                      {hiddenSubject.label} {value(hiddenSubject, true)}
                     </span>
                   )}
                 </span>
@@ -1096,6 +1102,18 @@ function KindRow(props: {
   )
 }
 
+declare module "react" {
+  interface CSSProperties {
+    /** The width a group heading's words may take, left of the pinned answers (`max-w-(--band-room)`). */
+    readonly "--band-room"?: string
+  }
+}
+
+// A band's own padding on the left (36 px at most, on the page) and a little air before the pinned answers.
+const bandInset = 48
+// However short of room, a band's words get at least this much width: they wrap, never down to one word a line.
+const bandLeast = 240
+
 /**
  * A group of identical fixes as one decision, directly above the rows it would change, and the only place it is
  * offered. Two lines lined up with the columns below: the change (the file's spellings, an arrow, the proposed value,
@@ -1119,6 +1137,8 @@ function GroupRow(props: {
   indent: boolean
   /** The actions column's width, to tell whether the quiet answers fit beside each other. */
   actionsWidth: number
+  /** The grid's room on screen: the band's words keep to it, left of the pinned answers. */
+  room: number
   measure: (element: Element | null) => void
   /** How the group's column shows a value (`ReviewColumn.display`). */
   display?: ((value: string) => string) | undefined
@@ -1151,10 +1171,22 @@ function GroupRow(props: {
     <span className="flex flex-col items-end gap-1">
       {choices !== undefined ? (
         // A guess: the person picks, so no choice is the filled button.
-        // Three long answers side by side would run over the question beside them: they stack instead.
+        // Answers side by side that are wider than their column would run over the question beside them: three
+        // always, two when their words are long. They stack instead.
         <ButtonGroup
           aria-label={`Choose for the ${n} ticked rows`}
-          orientation={choices.length > 2 ? "vertical" : "horizontal"}
+          orientation={
+            choices.length > 2 ||
+            A.reduce(
+              choices,
+              0,
+              (total, choice) => total + xsButton(`Use ${valueWords(group, choice)} for ${n}`, true)
+            ) +
+              actionsChrome >
+              props.actionsWidth
+              ? "vertical"
+              : "horizontal"
+          }
         >
           {choices.map((choice) => (
             <Button
@@ -1237,9 +1269,17 @@ function GroupRow(props: {
       aria-rowindex={props.index + 2}
       end={answers}
     >
-      {/* Lined up with the names of the rows below: past their expand button and their row number. */}
-      <div className={cn("flex min-w-0 flex-col gap-0.5", props.indent ? "pl-16" : "pl-10")}>
-        <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+      {/* Lined up with the names of the rows below: past their expand button and their row number. When the table
+          scrolls sideways the band runs on under the pinned answers: its words are held to the part in view, and
+          wrap there, so the question is read whole and no answer covers it. */}
+      <div
+        className={cn(
+          "sticky left-0 flex max-w-(--band-room) min-w-0 flex-col gap-0.5",
+          props.indent ? "pl-16" : "pl-10"
+        )}
+        style={{ "--band-room": `${Math.max(bandLeast, props.room - props.actionsWidth - bandInset)}px` }}
+      >
+        <span className="flex min-w-0 items-start gap-2 text-sm font-semibold">
           {choices === undefined ? null : (
             // A question, marked as the caller says who asks it: the sparkle only for a model.
             <StatusPill
@@ -1249,7 +1289,7 @@ function GroupRow(props: {
               Guess
             </StatusPill>
           )}
-          <GroupChange group={group} applied={props.applied} oneLine display={props.display} />
+          <GroupChange group={group} applied={props.applied} display={props.display} />
           <Badge variant="secondary" className="flex-none">
             {rowsWord(group.rowIds.length)}
           </Badge>
@@ -1772,6 +1812,7 @@ export function ReviewGrid(props: GridProps) {
   const showStatus = useAtomValue(grid.showStatus)
   const statusWidth = useAtomValue(grid.statusWidth)
   const actionsWidth = useAtomValue(grid.actionsWidth)
+  const room = useAtomValue(region.gridRoom)
   const plan = useAtomValue(grid.plan)
   const { columns, under, folded } = useAtomValue(grid.parts)
   const expanded = useAtomValue(grid.expanded)
@@ -1934,6 +1975,7 @@ export function ReviewGrid(props: GridProps) {
                       readOnly={readOnly}
                       indent={folded.length > 0}
                       actionsWidth={actionsWidth}
+                      room={room}
                       measure={grid.measureLine}
                     />
                   ),

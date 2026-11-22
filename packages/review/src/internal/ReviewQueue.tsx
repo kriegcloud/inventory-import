@@ -217,13 +217,17 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
       <ItemFooter className="min-w-0">
         <div className="flex w-full min-w-0 flex-col gap-2">
           {choices !== undefined ? (
-            <ButtonGroup aria-label={`Choose for ${n === 1 ? "the row" : `all ${n} rows`}`} className="w-full">
+            // Stacked: two answers side by side on a phone run past the card's edge once their words are long.
+            <ButtonGroup
+              aria-label={`Choose for ${n === 1 ? "the row" : `all ${n} rows`}`}
+              orientation="vertical"
+              className="w-full"
+            >
               {choices.map((choice, at) => (
                 <Button
                   key={choice}
                   variant="outline"
                   size="touch"
-                  className="flex-1"
                   {...(at === 0 ? first : {})}
                   onClick={() => groupActions.choose(group.id, choice)}
                 >
@@ -270,7 +274,8 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
                         {contextOf(view, props.columns, group.column)}
                       </span>
                     </span>
-                    <span className="flex-none font-normal text-muted-foreground">
+                    {/* At most half the line: the row's name beside it is how the person knows which row it is. */}
+                    <span className="max-w-1/2 min-w-0 truncate font-normal text-muted-foreground">
                       <ColumnText column={columnOf(group.column)}>{view.row.cells[group.column]}</ColumnText> →{" "}
                       {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
                       {choices === undefined ? (view.problem?.fix?.to ?? group.to) : "?"}

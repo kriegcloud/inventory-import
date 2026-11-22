@@ -33,7 +33,7 @@ import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { decodeJsonc, entriesOf, objectOf, renderObject } from "../../Sync.rules.ts"
 import { scratchpadFiles } from "./Scratch.config.ts"
-import { filesOf, Template, templates } from "./Scratch.templates.ts"
+import { decideFileLine, diagnosticDirective, filesOf, Template, templates } from "./Scratch.templates.ts"
 
 const $I = $RepoCliId.create("commands/Scratch/Scratch.rules")
 
@@ -336,6 +336,29 @@ export const bunTypes: Install = Effect.gen(function* () {
   return { code: answer.code, output: Str.trim(`${answer.stdout}\n${answer.stderr}`) }
 })
 
+/**
+ * Where a file turns an Effect diagnostic off, and whether it may (decision 33 of the Alchemy brief, 2026-11-22: "`new`
+ * only in decide files"). The prover knows an event or a rejection only by `new`, so a decide file (`*.aggregate.ts`,
+ * `*.decision.ts`) may turn `newSchemaClass` off on its first line, and on no other; no other file may turn anything
+ * off. Each line is a refusal, with its line number from 1.
+ *
+ * @example
+ * diagnosticLines("Shelf.aggregate.ts")(decideFileLine) // []
+ * diagnosticLines("Shelf.ts")(decideFileLine) // [1]
+ *
+ * @category rules
+ */
+export const diagnosticLines =
+  (file: string) =>
+  (text: string): ReadonlyArray<number> => {
+    const decideFile = /\.(aggregate|decision)\.ts$/.test(file)
+    return A.flatMap(Str.split("\n")(Str.replace(/\r/g, "")(text)), (line, index) =>
+      Str.includes(diagnosticDirective)(line) && !(decideFile && index === 0 && Str.trim(line) === decideFileLine)
+        ? [index + 1]
+        : []
+    )
+  }
+
 /** The test runner over the scratchpad, given the folder to run: every experiment's, or one's. */
 export type RunTests = (
   folder: string
@@ -595,6 +618,27 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
   const state = yield* reading()
   const problem = (where: string, message: string): ScratchFinding =>
     ScratchFinding.cases.Problem.make({ where, message })
+  // A diagnostic turned off: only `newSchemaClass`, only on the first line of a decide file.
+  const turnedOff = yield* Effect.forEach(
+    state.experiments,
+    Effect.fnUntraced(function* (experiment) {
+      const code = A.filter(experiment.paths, (path) => !ownState(path) && /\.[cm]?[jt]sx?$/.test(path))
+      return yield* Effect.forEach(
+        code,
+        (path) =>
+          Effect.map(repo.text(repo.join(experiment.folder, path)), (text) =>
+            A.map(diagnosticLines(path)(text), (line) =>
+              problem(
+                `${scratchpad}/experiments/${experiment.slug}/${path}:${line}`,
+                `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+              )
+            )
+          ),
+        { concurrency: 1 }
+      )
+    }),
+    { concurrency: 1 }
+  )
   const perExperiment = A.flatMap(state.experiments, (experiment) => {
     const where = `${scratchpad}/experiments/${experiment.slug}`
     const nested = A.filter(experiment.paths, (path) => {
@@ -704,7 +748,15 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
         `names the library \`${one.library}\`, which is not in the scratchpad's package.json: add it there (\`bun add --cwd ${scratchpad} ${one.library}\`), or take it out of the note`
       )
   )
-  const problems = A.flatten([perExperiment, sharedProblems, unaccounted, undeclared, unlocked, A.flatten(configs)])
+  const problems = A.flatten([
+    perExperiment,
+    A.flatten(A.flatten(turnedOff)),
+    sharedProblems,
+    unaccounted,
+    undeclared,
+    unlocked,
+    A.flatten(configs)
+  ])
   const structure = A.isArrayNonEmpty(problems)
     ? A.prepend<ScratchFinding, ScratchFinding>(
         problems,

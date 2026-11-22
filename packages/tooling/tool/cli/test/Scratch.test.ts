@@ -7,6 +7,7 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as TestClock from "effect/testing/TestClock"
 import {
+  diagnosticLines,
   type Install,
   logLine,
   readLogLine,
@@ -19,7 +20,7 @@ import {
   scratchTest
 } from "../src/commands/Scratch/Scratch.rules.ts"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import { typeName } from "../src/commands/Scratch/Scratch.templates.ts"
+import { decideFileLine, diagnosticDirective, typeName } from "../src/commands/Scratch/Scratch.templates.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { lines } from "./support/sync.ts"
@@ -321,6 +322,43 @@ describe("scratch", () => {
         "err:   scratchpad/package.json: `left-pad` is a library no experiment's NOTE.md names (`libraries:`): name the experiment that needs it, or remove it",
         "err:   scratchpad/experiments/own-install/NOTE.md: names the library `date-fns`, which is not in the scratchpad's package.json: add it there (`bun add --cwd scratchpad date-fns`), or take it out of the note",
         "err: scratch:check FAIL  the type-checker, with the Effect diagnostics, over the experiments:\nexperiments/no-note/Idea.ts(1,1): error TS1: wrong"
+      ])
+    })
+  )
+
+  it("a diagnostic may be turned off only by the one line, first in a decide file", () => {
+    const line = decideFileLine
+    expect(diagnosticLines("Shelf.aggregate.ts")(`${line}\nexport const x = 1\n`)).toEqual([])
+    expect(diagnosticLines("Count.decision.ts")(`${line}\r\n`)).toEqual([])
+    expect(diagnosticLines("Shelf.ts")(`${line}\n`)).toEqual([1])
+    expect(diagnosticLines("Shelf.test.ts")(`${line}\n`)).toEqual([1])
+    expect(diagnosticLines("Shelf.aggregate.ts")(`// a comment\n${line}\n`)).toEqual([2])
+    expect(diagnosticLines("Shelf.aggregate.ts")(`// ${diagnosticDirective} strictEffectProvide:off\n`)).toEqual([1])
+    expect(
+      diagnosticLines("Shelf.aggregate.ts")(`${line}\n// ${diagnosticDirective}-next-line floatingEffect:off\n`)
+    ).toEqual([2])
+  })
+
+  it.effect("check refuses a diagnostic turned off anywhere but the first line of a decide file", () =>
+    Effect.gen(function* () {
+      const line = decideFileLine
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "verify", ""),
+          "scratchpad/experiments/shelf/Shelf.aggregate.ts": `${line}\nexport const decide = 1\n`,
+          "scratchpad/experiments/shelf/Shelf.decision.ts": `// first\n${line}\n`,
+          "scratchpad/experiments/shelf/Shelf.ts": `${line}\n`,
+          "scratchpad/experiments/shelf/Shelf.test.ts": `// ${diagnosticDirective} floatingEffect:off\n`
+        }),
+        scratchCheck(types).pipe(said)
+      )
+      const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  3 problems",
+        `err:   scratchpad/experiments/shelf/Shelf.decision.ts:2: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.test.ts:1: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])
     })
   )

@@ -1518,6 +1518,50 @@ carry-over of stored rows is built: a fresh database starts on the new model. No
 plans for taking existing rows in, and the library's `import` is not used for it. Reverse: write a decision that
 records a stored row as the model's own, with the three rules about who may change it.
 
+### 2026-11-22 — the review's model, decided by the rule, for me to overrule
+
+A review of the model on main found cases nobody had put to me. Each is settled here by the rule above (a press from
+a screen that is behind is never dropped without a word and never applied; it is held and shown), or by what I
+answered before, and not asked. I can overrule any of them.
+
+1. **The same decision made again on a newer matching is a change.** "No change" needs the same text and the same
+   matching. Ana keeps row 12; Dana matches a column; Ana, with the match on her screen, keeps the row again: it is
+   recorded, on the matching now. Before, it was answered "no change" and the row kept the old matching for good.
+   Whatever it decides, a press made on an older matching is refused with the matching now, a press that matches
+   what the row holds included. Reverse: compare the text only, in `leavesAsItIs`.
+2. **A row's decision is not taken back from under a later group.** Dana types 8 on row 14; Ana's group, drawn on a
+   screen that had the 8, covers the row; Dana's undo of the 8 is refused naming the group (`GroupedAfter`), as a
+   group's undo under a later group is, and is taken once the group is taken back. Before, it was taken, and the group
+   then read over a row its maker never saw. `UndoRowStep` gains `covered`, the sender's word from a screen that has
+   every group act. Reverse: remove `covered` from `UndoRowStep` and its check.
+3. **A refusal says what happened.** When the decision the sender saw was taken back and an older one is there again,
+   the refusal is `PutBackSince` with whose older decision it is, not `DecidedSince`: nobody decided the row since.
+   The six steps of the entry "a press that matches what the row holds" are refused this way.
+4. **A covered press sent twice is written once and answered the same.** The resend is known by the row holding this
+   very act: the sender's, under the same step, with the same text. It is answered with nothing new recorded, not
+   refused with the sender's own decision. The library gives a decision no number of the command to know a resend by.
+5. **A group's undo is taken from a screen that is behind on the rows.** This stands by my answer "Row 14 stays
+   whole": the undo takes back its sender's own act and touches no row, so a row decided since keeps that person's
+   whole decision, and the screen then names it. It is the one decision that takes a press from a screen that is
+   behind, because it replaces nothing of anyone else's. The answer is the group's undo and its number; which rows
+   were decided since and stay is read from the rows, not carried in the answer: the model keeps no reading of a
+   group's rows.
+6. From the entry above: a row left with no decision is guarded as a decided one is (a "clear" from a screen that
+   still shows a decision there, after a group, is refused `NoLongerThere`); and with no group made since the row's
+   own decision, a press that matches what the row holds from a screen that is behind is still "no change".
+
+With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
+excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
+group covers the matching is checked first, so a press behind on both is refused with the matching.
+
+The prover's limit decided how 1 is written. As two comparisons (the text, then the matching) the relation of a row to
+its import's organization was no longer proved across `DecideRow`, in three forms: 232, 226 and 220 paths in the
+decision's own proof, each past 4,096 for the relation. What counts there is how many ways through the `decide` reach
+the record, and "the text differs, or the text is the same and the matching differs" is two. As one comparison (the
+matching's number and the text as one text, `onItsMatching`) it is one, and the relation is proved: 204 paths, and
+`UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
+group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
+
 ### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
 
 For the screen, not the model. His answers: "a waiting undo on a row a landing group doesn't

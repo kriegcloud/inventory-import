@@ -59,7 +59,7 @@ import {
   SuggestionRecorded,
   TakeBackImport
 } from "../src/Import/Import.aggregate.ts"
-import { DecidedSince, DecideRow, NoLongerThere } from "../src/Review/Deciding.decision.ts"
+import { DecidedSince, DecideRow, NoLongerThere, PutBackSince } from "../src/Review/Deciding.decision.ts"
 import { DecideGroup } from "../src/Review/DecidingGroup.decision.ts"
 import {
   DecidedBeforeTheConfirm,
@@ -123,6 +123,7 @@ const undo = (input: {
   readonly step: string
   readonly opening?: number
   readonly sawGroup?: number
+  readonly covered?: boolean
   readonly next?: Level
   readonly below?: string
 }) =>
@@ -132,6 +133,7 @@ const undo = (input: {
     undo: input.undo,
     step: input.step,
     sawGroup: input.sawGroup ?? 0,
+    covered: input.covered ?? false,
     opening: input.opening ?? 0,
     next: input.next ?? noLevel,
     below: input.below ?? ""
@@ -738,8 +740,45 @@ it.effect("an act made on an older matching is refused, whatever it decides", ()
     Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: '{"stored":"replace"}', madeOn: 0 })),
     Story.rejected(MatchedSince.make({ matching: 1 })),
     Story.when(act({ row: "row-12", step: "a2", saw: 0, flags: '{"stored":"replace"}', madeOn: 1 })),
-    ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a2", flags: '{"stored":"replace"}', madeOn: 1 })
+    ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a2", flags: '{"stored":"replace"}', madeOn: 1 }),
+    // Nor is one that decides nothing on a row that holds nothing.
+    Story.when(act({ row: "row-3", step: "a3", saw: 0, flags: "{}", madeOn: 0 })),
+    Story.rejected(MatchedSince.make({ matching: 1 }))
   )
+)
+it.effect(
+  "the same decision made again on a newer matching is a change, and made on the older one it is refused: Ana keeps row 12, Dana matches a column, and Ana keeps it again",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: kept, madeOn: 0 })),
+      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: kept }),
+      Story.provide(CurrentActor, dana),
+      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "tags: none", by: "dana" })),
+      // A screen that has neither the match nor Ana's keep sends the same keep on the matching before: refused with
+      // the matching now, not "no change". So is one that has the keep.
+      Story.provide(CurrentActor, admin),
+      Story.when(act({ row: "row-12", step: "x1", saw: 0, flags: kept, madeOn: 0 })),
+      Story.rejected(MatchedSince.make({ matching: 1 })),
+      Story.when(act({ row: "row-12", step: "x2", saw: 1, flags: kept, madeOn: 0 })),
+      Story.rejected(MatchedSince.make({ matching: 1 })),
+      // Dana has the match and not Ana's keep. Her keep on the matching now would replace a decision she has not
+      // seen: refused with it.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept, madeOn: 1 })),
+      Story.rejected(DecidedSince.make({ by: "ana", change: 1 })),
+      // Ana has the match. Her keep was made before it, so she keeps the row again: the same text, on the matching
+      // now. It is recorded, and the row's decision is on that matching.
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a2", saw: 1, flags: kept, madeOn: 1 })),
+      ...recorded(row12, "row-12", { change: 3, by: "ana", step: "a2", flags: kept, madeOn: 1 }),
+      // And once more, on the same matching: no change.
+      Story.when(act({ row: "row-12", step: "a3", saw: 3, flags: kept, madeOn: 1 })),
+      Story.then(row12),
+      Story.then(life)
+    )
 )
 it.effect("an act made before a confirm is not taken after the import is opened again", () =>
   story(
@@ -801,6 +840,42 @@ it.effect("when someone else decided the row first, the act is refused with whos
     Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
     Story.rejected(DecidedSince.make({ by: "dana", change: 1 }))
   )
+)
+it.effect(
+  "when the decision its sender saw was taken back and an older one is there again, the refusal says so: Ana leaves row 12 out, Dana keeps it and takes that back, and the admin, who has not received the undo, types a name",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
+      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
+      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(
+        life,
+        ActCounted.make({
+          change: 3,
+          step: "u1",
+          row: "row-12",
+          label: "undo",
+          holds: 1,
+          by: "ana",
+          actor: "dana",
+          flags: leftOut,
+          madeOn: 0
+        })
+      ),
+      // The admin's screen has Dana's keep and not its undo. Ana decided nothing since: the refusal does not say she
+      // did. It says what the admin saw was taken back, and whose older decision is there again.
+      Story.provide(CurrentActor, admin),
+      Story.when(act({ row: "row-12", step: "x1", saw: 2, flags: typed })),
+      Story.rejected(PutBackSince.make({ by: "ana", change: 1 })),
+      Story.then(row12),
+      Story.then(life)
+    )
 )
 it.effect("a decision its sender saw that was taken back since is no longer there, and the act is refused", () =>
   story(

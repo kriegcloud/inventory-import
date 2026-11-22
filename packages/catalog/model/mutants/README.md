@@ -3,7 +3,7 @@
 What the proofs and the stories of the review are worth is measured by breaking the model on purpose and seeing
 whether anything notices. A **mutant** is one change to the model's source, made in a copy of the package:
 
-- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 71 of them;
+- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 77 of them;
 - **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 77;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 
@@ -37,6 +37,12 @@ holds, removed (`row-same-unseen`, and `row-same-untouched-unseen` on a row with
 not a group was made since (`row-same-behind`, `row-same-untouched-behind`), and the covered "no change" answered
 before the check of the matching (`row-covered-before-matching`).
 
+Six more came with the cases settled by that rule: the same text on a newer matching answered "no change"
+(`row-same-matching`, and `row-same-unseen-matching` from a screen that has not seen the row's decision), the refusal
+that says what the sender saw was taken back, removed (`row-putback`, `row-putback-covered`), the covered press sent
+twice no longer known (`row-resend-covered`), and a row's undo taken from under a later group (`undo-covered`). A rule
+holds the first and the last; the others are kept as held by their stories.
+
 ## Where they run
 
 The sample is the turbo task `mutants:sample` (`bun run --cwd packages/catalog/model mutants:sample`), part of
@@ -50,7 +56,7 @@ From `packages/catalog/model` (the runner finds its paths from its own place, so
 
 ```sh
 python3 -I mutants/run.py --sample              # nine fast mutants, about 25 s
-python3 -I mutants/run.py --all --jobs 4        # all 159
+python3 -I mutants/run.py --all --jobs 4        # all 165
 python3 -I mutants/run.py --only confirm-sum,group-madeon
 python3 -I mutants/run.py --list                # every mutant, and nothing run
 ```

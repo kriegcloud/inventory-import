@@ -13,7 +13,7 @@ import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/De
 import { ImportId, RowId } from "@inventory/catalog-contract/Ids"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { type Actor, CurrentActor } from "@inventory/catalog-model/Actor"
-import { DecideRow } from "@inventory/catalog-model/Deciding"
+import { DecideRow, GroupedAfter } from "@inventory/catalog-model/Deciding"
 import { DecideGroup } from "@inventory/catalog-model/DecidingGroup"
 import {
   Group,
@@ -37,7 +37,7 @@ import {
   StepUndone
 } from "@inventory/catalog-model/RowAggregate"
 import { NotYourStep, UndoRowStep } from "@inventory/catalog-model/Undoing"
-import { GroupedAfter, UndoGroup } from "@inventory/catalog-model/UndoingGroup"
+import { UndoGroup } from "@inventory/catalog-model/UndoingGroup"
 import {
   storedChoice,
   toRegionDecisions,
@@ -533,12 +533,15 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     const kept = stack.length >= 3
     const next = kept ? O.getOrElse(A.get(stack, stack.length - 3), () => ({ level: noLevel })).level : noLevel
     const below = kept ? sealed(A.map(A.take(stack, stack.length - 3), (held) => held.level)) : ""
+    // A group in force decided after the row's decision covers it: the screen says so, as it does for a row's act.
+    const covered = coveredIn(known(), row)
     const command = UndoRowStep.make({
       importId,
       row: RowId.make(row),
       undo,
       step,
       sawGroup: lastGroup,
+      covered,
       opening: 0,
       next,
       below
@@ -547,6 +550,11 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     if (!mine) {
       steps.push(Story.when(command), Story.rejected(NotYourStep.make({})))
       return "NotYourStep"
+    }
+    // The decision lies under a later group in force: it is not taken back from under it.
+    if (covered) {
+      steps.push(Story.when(command), Story.rejected(GroupedAfter.make({ last: topGroup })))
+      return "GroupedAfter"
     }
     changes += 1
     if (kept) sealedUndos += 1

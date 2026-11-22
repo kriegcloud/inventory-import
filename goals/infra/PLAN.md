@@ -234,12 +234,17 @@ file or says to commit it); his own token is checked when his file names one; an
 `--production`, who may sign up in production is settled (below).
 
 **Before any tool at all, the run stops when a variable that would be used in place of what it checks is set
-outside it**, in his shell or in the root `.env`: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`,
+outside it**, in his shell or in a root env file: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`,
 `CLOUDFLARE_API_KEY`, `CLOUDFLARE_EMAIL`, `CLOUDFLARE_ACCOUNT_EMAIL` for every size, and for `--staging` and
 `--production` also `OPENROUTER_API_KEY`, `PREVIEW_TEST_ACCOUNT_PASSWORD`, `PREVIEW_CLOUDFLARE_API_TOKEN`,
-`PREVIEW_CLOUDFLARE_ACCOUNT_ID`, `OP_SERVICE_ACCOUNT_TOKEN`, `GITHUB_ACCESS_TOKEN`, `GITHUB_TOKEN` and `GH_TOKEN`
-(`outranking` in `InfraSetup.rules.ts`). It names each one and where it is set, never its value, and a variable set
-and empty counts. The reason: Alchemy takes a provider's credentials from the process's environment and the root
+`PREVIEW_CLOUDFLARE_ACCOUNT_ID`, `OP_SERVICE_ACCOUNT_TOKEN`, `GITHUB_ACCESS_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, and
+the GitHub host names `GH_HOST`, `GITHUB_BASE_URL`, `GITHUB_API_URL`, `GH_ENTERPRISE_TOKEN` and
+`GITHUB_ENTERPRISE_TOKEN` (with a host set, `gh --repo` and Alchemy's GitHub provider go to that server, with its
+token, while the questions say GitHub) (`outranking` in `InfraSetup.rules.ts`). It names each one and where it is
+set, never its value, and a variable set and empty counts. The root env files are the ones `bun run` loads into the
+command before it starts: `.env`, `.env.<NODE_ENV>` (`.env.development` when it is unset) and `.env.local` (not
+under test), as Bun 1.4.4 was seen to do in an empty folder; a name one of them sets is said to be that file's, since
+`env -u` cannot clear it (Bun loads the file again), and a name in no file is said to be his shell's. The reason: Alchemy takes a provider's credentials from the process's environment and the root
 `.env` before it looks at any profile, for `plan`, `deploy` and `state bootstrap` alike (its
 `resolveProviderConfig`; `state bootstrap` imports the stack with the profile and reaches the same code), and a
 secret set there wins over the reference 1Password is asked for. Stopping was chosen over starting the children
@@ -249,8 +254,12 @@ there to use. `--dry-run` prints the names.
 
 What each step does, and with which tool:
 
-- **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if
-  `packages/infra/env/op.env` names no `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
+- **Which file a reference is read from.** The stacks read `op.env`, then his own `op.env.local`, and the last line
+  of a name wins, so a name his own file has is that file's. The command reads the model key's and the previews'
+  password's references the same way (`referenceGiven`), and says which file it read: what it says, and the
+  `DEPLOY_WITHOUT_MODEL_KEY` it gives, come from the file the stack will take the reference from.
+- **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if neither
+  `packages/infra/env/op.env` nor `op.env.local` names a `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
   PREVIEW_TEST_ACCOUNT_PASSWORD" in the vault (`--vault`, or asked when there are several), has 1Password make it with
   a generated password when it is not there, and writes `op://<vault id>/<item id>/password` to that file. The
   command never sees the password: the output of the one call that makes it is thrown away unread, the item is found
@@ -271,12 +280,18 @@ What each step does, and with which tool:
   account its questions name (for the token's account, the comparison is made inside the one process 1Password
   fills the id for, trimmed and in lower case as Alchemy keeps one; a comparison 1Password did not answer is said
   as that, not as a wrong account). By his token `cf` is never asked to log in to the previews' account, but when
-  `cf` is logged in it is asked which account holds the zone, and the profile's account is held against that one:
-  a test stage there is asked about, a run with `--staging` or `--production` stops, and with `cf` logged out the
-  command says nothing could tell. In a run with `--staging` or `--production` it also stops when the two profiles
-  deploy into the same account (decision I4), and when the other profile is connected and its account cannot be
-  read. Every question that makes something (the state store, each deploy) then names the account by the id read
-  from the profile. The repair it names: `alchemy profile edit --profile <name> --reconfigure Cloudflare`.
+  `cf` is logged in it is asked which account holds the zone (`cf zones list --name beep-effect.com --status
+  active`: one active zone, so a pending copy in another account does not count), and a test stage there is asked
+  about; with `cf` logged out the command says nothing could tell. **A run with `--staging` or `--production` stops
+  when `cf` cannot name the account that holds the zone** (logged in to another account, or no active zone it sees):
+  production's account is that one, and nothing else here can tell it from the previews'. Its previews' profile is
+  then held against production's account, and stops when it deploys into it. In such a run it also stops when the two
+  profiles deploy into the same account (decision I4), when the other profile is connected and its account cannot be
+  read, and when `alchemy profile list` fails. With no previews' profile connected, production's profile is held
+  against the id his `op.env.local` names, inside 1Password's process as above; with no such file either, it says
+  that production's account was held against no previews' account. Every question that makes something (the state store, each deploy) then names the account by the id read
+  from the profile; the repository's names both, production's for the token it makes and the previews' that previews
+  and staging deploy into. The repair it names: `alchemy profile edit --profile <name> --reconfigure Cloudflare`.
 - **Who may sign up in production** is `--sign-up` when given. When it is not, the command reads what GitHub's
   `production` environment already holds (`gh variable get SIGN_UP --env production --repo
   kriegcloud/inventory-import`, the repository the stack writes to, never the one `gh` would pick) and keeps it, saying so; when
@@ -361,7 +376,8 @@ fail.
 
 **When one login does see two accounts** (not his case today): the command works the roles out from what `cf` can
 read. The account that holds the zone is production's and the other is the previews'; it says both and asks before
-anything is made, and when `cf` cannot tell, or there are more than two, he picks. However the previews' account was
+anything is made, and when there are more than two he picks among the others. When `cf` cannot tell which holds the
+zone, a test stage alone has him pick, and a run with `--staging` or `--production` stops (above). However the previews' account was
 come by (the only one, picked, or named by a flag), one that holds the zone is used only after a yes to a question
 that says it is production's. An account named for production that does not hold the zone stops the run, and two
 accounts named by flags are still asked about together. A run that would give both roles to one account stops
@@ -384,9 +400,16 @@ pipe, prints `accountId:` under the profile's Cloudflare line as its source does
 prints its outputs, which is how he reads the password. `cf auth whoami` and `cf zones list` were run, to read the
 shape of their answers. For the stop on variables set outside: Alchemy's order (environment and root `.env` before
 a profile, for `state bootstrap` too) was read in the pinned build's source and never run; the comparison script
-was run in `sh` on made-up ids (same in another case with spaces: 0; different: 3), never under `op run`. One gap
-is left for a stack deployed by hand, outside this command: `PREVIEW_CLOUDFLARE_ACCOUNT_ID` exported empty is read
-as an empty account id, with no stop.
+was run in `sh` on made-up ids (same in another case with spaces: 0; different: 3), never under `op run`. What
+`cf zones list` answers was read, not run, in cf 1.0.0-beta.20's source and Cloudflare's published schema as
+`@distilled.cloud/cloudflare` 1.0.0-rc.20 types it: piped, it prints the response's `result` array as JSON (coloured
+only on a terminal or with `FORCE_COLOR` set, which would make the answer unreadable and stop a strict run); a
+zone's `account` has an optional `id` and an optional, nullable `name`, so an account with no name is called by its
+id and one with no id names no account; `--status active` is one of the command's own filters. That it leaves out a
+pending copy of the zone in a second account is read from that filter, not tried. One gap is left for a stack
+deployed by hand, outside this command: `PREVIEW_CLOUDFLARE_ACCOUNT_ID` exported empty is read as an empty account
+id, with no stop. A hand deploy with `CI` set asks 1Password for nothing; its stop on a missing token names that
+cause among three.
 
 ### The same steps, by hand
 

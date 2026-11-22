@@ -9,12 +9,18 @@ description: Every key of reports 04 to 12 after reconciliation, with its owner,
 Reports 04 to 12 were written in parallel by designers who did not see each other's work. On 2026-11-22 they were
 read together and reconciled: where one key was defined twice, where two keys named one thing, where a key was used
 and defined nowhere, the owning report was edited with the smallest change, and every choice that was Benjamin's
-became a numbered open decision in [DECISIONS.md](../DECISIONS.md) (8 to 87). This report is the result: one index of
+became a numbered open decision in [DECISIONS.md](../DECISIONS.md) (8 to 91: 8 to 87 that day, and 88 to 91 added after the sceptic review the same day). This report is the result: one index of
 every key, the counts, and the list of what was changed. It is generated from the reports' own tables, so a report is
 the home of each row and this index is a view of them.
 
-Nothing here is built. No term is ratified: no `rat-` record exists, so every row is a proposal for the foundational
-auditor and Benjamin.
+Benjamin answered nineteen decisions the same day: 8 to 11, 13 to 16, 20, 21, 23, 25, 32, 34, 39, 40, 41 and 43, and a
+new one, 93. He then answered seven more: 22, 26, 38 and 46, and three new ones the carried-through reports raised, 94
+to 96. This index is revised to those answers (section "The thin thread and the slices"). 63 stay open: 12, 17 to
+19, 24, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92. By his ruling each is put to him when the slice that needs it
+is specified, its recommendation is the agent's until then, and nothing is built on it.
+
+Nothing here is built. No term is ratified: decision 32 makes the name of a `rat-` record the mark of a ratified term,
+and no `rat-` record exists, so every row is a proposal for the foundational auditor and Benjamin.
 
 ## How the index was made
 
@@ -23,10 +29,17 @@ Tag, gist parent, Identity, Source, Status) and the property-table header (Key, 
 Source) in reports 04 and 06 to 12, after the edits. It found 169 term rows and 270 property rows, no key
 defined twice, and no key used both as a term and as a property. After a sceptic's review the same day (section
 "Changes after the sceptic review"), a second throwaway script read the reports' tables again and found 164 term rows
-and 269 property rows, each equal to a row below in key, owner and tag. Report 05's metamodel entries are listed apart
+and 269 property rows, each equal to a row below in key, owner and tag. A later review of the packet removed two of
+those property rows by hand, `decidedAt` and `recordedAt` (section "Collisions resolved"), which left 267. Decisions 39
+and 43 then changed the tables by hand: one term row came in, `ContactAssignment`, and three property rows,
+`contactPerson`, `contactAccount` and `assignmentPoint`, and the property row `isContactOf` went out. The tables below
+have 165 term rows and 269 property rows.
+The property table includes `termCategory`, which decision 19 (a) does not mint, so the minted count under that answer is 268. Report 05's metamodel entries are listed apart
 (they mint no IRI under decision 19's recommended answer). "Entry" says whether a row is an OWL class, a concept
-scheme or a concept; "gist parent" is shortened to the class, or to the local parent for a subclass, and says
-"(pending)" when its row does; "Owner" is the report that holds the row.
+scheme or a concept; "gist parent" is shortened to the class, or to the local parent for a subclass; "Owner" is the
+report that holds the row. A gist parent says "(pending)" for one of two reasons: its gist name is not yet admitted,
+since decision 13 admits a name only when a term in the slice being built needs it, or the placement waits on an open
+decision. A parent with no mark is in `gist-categories.md` already or is admitted with the thin thread.
 
 ## Terms
 
@@ -50,6 +63,7 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | BusinessStepScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | later |
 | ColumnMatching | class | event | `gist:Event` | 09 | import | in the repository today |
 | CommitmentLine | class | kind | `gist:Commitment` | 09 | commitments | Sutton only |
+| ContactAssignment | class | relator | `gist:Assignment` | 06 | party and access | Sutton only (slice 1; decisions 39 and 43) |
 | ContactPoint | class | information | `gist:ElectronicAddress` | 06 | party and access | Sutton only |
 | ContactPointKindScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | ContactPurposeScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | later |
@@ -57,7 +71,7 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | CostBasisScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | later |
 | CostFinalityScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | CostObservation | class | information | `gist:Content` | 07 | catalog | in the repository today |
-| Currency | class | kind | `gist:UnitOfMeasure` (pending) | 07 | catalog | in the repository today |
+| Currency | class | kind | `gist:UnitOfMeasure` (pending) | 07 | catalog | in the repository today (a documented USD; no currency field is stored, and projecting it is decision 88) |
 | DecisionUndo | class | event | `gist:Event` | 09 | import | in the repository today |
 | DisaggregationEvent | class | event | `gist:PhysicalEvent` (pending) | 09 | execution | Sutton only |
 | EventLine | class | event | `gist:Event` | 09 | execution | Sutton only |
@@ -66,8 +80,8 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | FileRow | class | information | `gist:Content` | 09 | import | in the repository today |
 | FileUpload | class | event | `gist:Event` | 09 | import | in the repository today |
 | FulfilmentProgressScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
-| Grant | class | relator | `gist:Assignment` (pending) | 06 | party and access | in the repository today; Sutton only; later |
-| GrantScopeKindScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
+| Grant | class | relator | `gist:Assignment` (decision 13) | 06 | party and access | in the repository today (the thin thread: the record's role field read as one grant at organization scope, stated by `grantScope`, decisions 40 and 96); Sutton only (site scope); later (field scope) |
+| GrantScopeKindScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today (the organization scope, implied by every record; no other scope is stored; the thin thread ships the scheme with that one concept, decision 96) |
 | GroupDecision | class | event | `gist:Event` | 09 | import | in the repository today |
 | HoldPlacement | class | event | `gist:Event` | 09 | execution | Sutton only |
 | HoldReasonScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
@@ -98,7 +112,7 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | Invoice | class | information | `gist:Content` | 09 | accounting | Sutton only |
 | InvoicingProgressScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | ItemCategoryScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
-| ItemEdit | class | event | `gist:Event` | 09 | import | in the repository today |
+| ItemEdit | class | event | `gist:Event` | 09 | import | later |
 | ItemIdentifier | class | information | `gist:ID` | 07 | catalog | in the repository today |
 | ItemImport | class | event | `gist:Event` | 09 | import | in the repository today |
 | ItemLifecycleScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
@@ -116,23 +130,23 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | ManufacturingOrderLine | class | subkind | `CommitmentLine` | 09 | commitments | Sutton only |
 | MaterialLot | class | kind | `gist:PhysicalSubstance` (pending) | 08 | warehouse and stock | Sutton only |
 | MeasurementDimensionScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | later |
-| Member | class | relator | `gist:TemporalRelation` (pending) | 06 | party and access | in the repository today |
+| Member | class | relator | `gist:TemporalRelation` (decision 13) | 06 | party and access | in the repository today |
 | MemberRoleScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
-| MembershipStatusScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
-| ModelCall | class | event | `gist:Event` | 06 | party and access | in the repository today |
+| MembershipStatusScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | not proposed (the `member` table stores `removedAt` and no status: active is `removedAt` being null, removed is its being set; invited and suspended are not stored) |
+| ModelCall | class | event | `gist:Event` | 06 | party and access | later |
 | ModelCallPurposeScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
 | MoneyAmount | class | value | `gist:Magnitude` | 07 | catalog | in the repository today |
 | ObjectObservation | class | event | `gist:PhysicalEvent` (pending) | 09 | execution | Sutton only |
 | OperationDefinition | class | kind | `gist:TaskTemplate` (pending) | 07 | catalog | Sutton only |
 | OperationExecution | class | event | `gist:Task` (pending) | 09 | execution | Sutton only |
 | OrderLifecycleScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
-| Organization | class | kind | `gist:Organization` | 06 | party and access | in the repository today; Sutton only |
+| Organization | class | kind | `gist:Organization` | 06 | party and access | Sutton only |
 | PackagingUnit | class | subkind | `UnitOfMeasure` (pending) | 07 | catalog | in the repository today |
 | Party | class | category | none (pending) | 06 | party and access | later |
 | PartyIdentifier | class | information | `gist:ID` | 06 | party and access | later |
 | PaymentProgressScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | Permission | class | information | `gist:Permission` (pending) | 06 | party and access | Sutton only |
-| Person | class | kind | `gist:Person` | 06 | party and access | in the repository today; Sutton only |
+| Person | class | kind | `gist:Person` | 06 | party and access | Sutton only (contacts, whose evidence is external or a fixture); the human a membership refers to has no distinct stored Person record today, and the thin thread takes the class with one link from `Member` and no name or email paths (decision 94) |
 | Pick | class | subkind | `StockMovement` (pending) | 09 | execution | Sutton only |
 | PortalAccess | class | information | `gist:Permission` (pending) | 06 | party and access | Sutton only |
 | PortalModuleScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
@@ -159,17 +173,17 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | ReceivingRejection | class | event | `gist:Event` | 09 | execution | Sutton only |
 | ReceivingRejectReasonScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | ReviewOutcomeScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
-| Role | class | information | `gist:Permission` (pending) | 06 | party and access | in the repository today; Sutton only |
+| Role | class | information | none in the thin thread; `gist:Permission` waits for slice 1 (decisions 13 and 41) | 06 | party and access | in the repository today (the thin thread: viewer, editor and admin, each a concept of `MemberRoleScheme` and under the same IRI an individual of `Role`, decision 41); Sutton only (custom roles) |
 | Routing | class | kind | `gist:TaskTemplate` (pending) | 07 | catalog | Sutton only |
 | RoutingRevision | class | kind | `gist:TaskTemplate` (pending) | 07 | catalog | Sutton only |
 | RowDecision | class | event | `gist:Event` | 09 | import | in the repository today |
-| RowOutcome | class | information | `gist:Content` | 09 | import | in the repository today |
+| RowOutcome | class | information | `gist:Content` | 09 | import | in the repository today (the latest outcome of a row only; an identity for each confirmation waits on decision 53) |
 | SalesOrder | class | kind | `gist:Agreement` (pending) | 09 | commitments | Sutton only |
 | SalesOrderLine | class | subkind | `CommitmentLine` | 09 | commitments | Sutton only |
 | SerialUnit | class | kind | `gist:PhysicalIdentifiableItem` | 08 | warehouse and stock | Sutton only |
 | ServiceItemSpecification | class | subkind | `ItemSpecification` (pending) | 07 | catalog | Sutton only |
 | Shipment | class | event | `gist:Transaction` | 09 | execution | Sutton only |
-| SignInAccount | class | information | `gist:Content` | 06 | party and access | in the repository today |
+| SignInAccount | class | information | `gist:Content` | 06 | party and access | later |
 | Site | class | subkind | `gist:GeoLocation` through `Location` (pending) | 08 | warehouse and stock | Sutton only |
 | SourceRecord | class | information | `gist:Content` | 04 | import | later |
 | StagedFile | class | information | `gist:FormattedContent` (pending) | 09 | import | in the repository today |
@@ -179,7 +193,7 @@ scheme or a concept; "gist parent" is shortened to the class, or to the local pa
 | StockPosition | class | information | `gist:Content` | 08 | warehouse and stock | Sutton only |
 | SupplierBill | class | information | `gist:Content` | 09 | accounting | Sutton only |
 | SuspectedDuplicate | class | information | `gist:Content` | 06 | party and access | later |
-| Tenant | class | role | `Organization` (pending) | 06 | party and access | in the repository today |
+| Tenant | class | role | `Organization` (decision 38) | 06 | party and access | in the repository today |
 | TrackingCode | class | information | `gist:ID` | 08 | warehouse and stock | Sutton only |
 | TrackingMethodScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
 | TransferOrder | class | kind | `gist:Commitment` (pending) | 09 | commitments | Sutton only |
@@ -203,7 +217,7 @@ By context (the owner's area; report 09 split by its sections):
 
 | Context | Classes | Schemes | Concepts | All |
 | --- | --- | --- | --- | --- |
-| party and access | 19 | 0 | 0 | 19 |
+| party and access | 20 | 0 | 0 | 20 |
 | catalog | 25 | 0 | 0 | 25 |
 | warehouse and stock | 19 | 0 | 10 | 29 |
 | commitments | 14 | 0 | 0 | 14 |
@@ -211,12 +225,12 @@ By context (the owner's area; report 09 split by its sections):
 | accounting | 3 | 0 | 0 | 3 |
 | import | 18 | 0 | 0 | 18 |
 | taxonomy | 0 | 40 | 0 | 40 |
-| All | 114 | 40 | 10 | 164 |
+| All | 115 | 40 | 10 | 165 |
 
 The ten concepts are 08's inventory measure kinds and position bases, which 08 lists as terms because it holds their
 definitions and arithmetic; every other concept is in report 10's scheme tables and is counted there, not here.
 
-By tag, classes only (114; a scheme or a concept carries no kind tag in 05's model, though 08 and 10 wrote one
+By tag, classes only (115; a scheme or a concept carries no kind tag in 05's model, though 08 and 10 wrote one
 in their Tag column):
 
 | Tag | Classes |
@@ -225,20 +239,24 @@ in their Tag column):
 | subkind | 15 |
 | role | 1 |
 | phase | 0 |
-| relator | 5 |
+| relator | 6 |
 | event | 31 |
 | information | 30 |
 | category | 1 |
 | value | 2 |
 
 Every class's tag is one 05's rule V25 admits for the gist class it reaches (checked by a script over the table
-above). The five relators are `Member` and `Grant` (gist's temporal relation and assignment), `InventoryReservation`
-(a commitment) and `VendorItem` and `PriceListEntry` (offers, which gist makes contingent commitments).
+above, before Benjamin's answers). Two rows changed since, by hand: `ContactAssignment` is a relator under
+`gist:Assignment`, as `Grant` is, and `Role` reaches no gist class in the thin thread, so V25 has nothing to test on it
+until `gist:Permission` is admitted. The six relators are `Member` (gist's temporal relation), `Grant` and
+`ContactAssignment` (assignments), `InventoryReservation` (a commitment) and `VendorItem` and `PriceListEntry` (offers,
+which gist makes contingent commitments).
 
 No class is tagged phase: every state is a concept (state-is-kind avoided), and the one role class is `Tenant`.
 
-By status, counting a row once for each status it names: in the repository today 56,
-Sutton only 89, later 24.
+By status, counting a row once for each status it names, whatever the row adds in brackets: in the repository today 50,
+Sutton only 90, later 27. `Grant` names all three and `Role` two. One row, `MembershipStatusScheme`, names none of the
+three: it is not proposed.
 
 Properties by owner:
 
@@ -256,9 +274,17 @@ Properties by owner:
 
 Domain and range are shortened: "none declared" where the row keeps them broad, "datatype" where the record field
 gives the datatype, "concept of" a scheme where the values are concepts. One direction each; no inverse is defined.
+"Super-property" is the gist property a row sits under, as decision 16 allows: our property's own domain and range
+fall under the gist property's, and gist's domain and range are never copied. A row with no fifth cell states
+none. `recordedActor`'s range is pending decision 44: the thin thread and slice 1 emit `Member`, because `PortalAccess` is not proposed,
+and widening the range is decision 44, which under report 05's version rules is a bump once instances exist.
+These answers changed rows here. The customer and vendor flags sit on the tenant's `SourceRecord` (decision 34), and
+the two properties that compare records for identity point at a `SourceRecord` too. A contact is a
+`ContactAssignment` with `contactPerson`, `contactAccount`, `assignmentPoint` and `servesPurpose`; `isContactOf` is
+not a row (decisions 39 and 43). `membershipIn` points at the `Tenant`, in the thin thread as in slice 1 (decision 38).
 
-| Key | Owner | Domain | Range |
-| --- | --- | --- | --- |
+| Key | Owner | Domain | Range | Super-property |
+| --- | --- | --- | --- | --- |
 | acceptsProposal | 09 | none declared | `ValueProposal` |
 | acceptsQuote | 09 | `SalesOrder` | `Quote` |
 | accountEmail | 06 | `SignInAccount` | datatype |
@@ -277,6 +303,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | arrivedAt | 08 | `StockMovement` | datatype |
 | asOf | 08 | `StockPosition` | datatype |
 | assignedPriceList | 07 | `Organization` | `PriceList` |
+| assignmentPoint | 06 | `ContactAssignment` | `ContactPoint` |
 | atLocation | 08 | none declared | `Location` |
 | attemptedAt | 09 | `AccountingSyncRecord` | datatype |
 | atWorkCenter | 07 | none declared | `WorkCenter` |
@@ -301,6 +328,8 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | closedAt | 06 | `PortalAccess` | datatype |
 | componentItem | 07 | `BomLine` | `ItemSpecification` |
 | consumes | 09 | `TransformationEvent` | `EventLine` |
+| contactAccount | 06 | `ContactAssignment` | `Organization` |
+| contactPerson | 06 | `ContactAssignment` | `Person` |
 | contactPointKind | 06 | `ContactPoint` | concept of `ContactPointKindScheme` |
 | contactValue | 06 | `ContactPoint` | datatype |
 | conversionFactor | 07 | `ItemUnitConversion` | datatype |
@@ -316,10 +345,9 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | countryCode | 06 | `PostalAddress` | datatype |
 | currency | 07 | `MoneyAmount` | `Currency` |
 | currencyCode | 07 | `Currency` | datatype |
-| decidedAt | 06 | `IdentityDecision` | datatype |
 | decidedBy | 06 | `IdentityDecision` | `Member` |
 | decidedIn | 09 | `ValueChange` | `gist:Event` |
-| decidesOn | 06 | `IdentityDecision` | `Party` |
+| decidesOn | 06 | `IdentityDecision` | `SourceRecord` |
 | decidesRow | 09 | none declared | `FileRow` |
 | defaultFor | 06 | `PostalAddress` | concept of `ContactPurposeScheme` |
 | defaultRevision | 07 | none declared | none declared |
@@ -335,7 +363,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | effectiveUntil | 07 | none declared | datatype |
 | endedAt | 09 | none declared | datatype |
 | entryOf | 07 | `PriceListEntry` | `PriceList` |
-| eventTime | 09 | `gist:Event` | datatype |
+| eventTime | 09 | `gist:Event` | datatype | `gist:atDateTime` |
 | evidenceKind | 06 | `IdentityEvidence` | concept of `EvidenceKindScheme` |
 | evidenceText | 06 | `IdentityEvidence` | datatype |
 | executesWorkOrder | 09 | `OperationExecution` | `WorkOrder` |
@@ -360,7 +388,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | grantScope | 06 | `Grant` | concept of `GrantScopeKindScheme` |
 | grantsRole | 06 | `Grant` | `Role` |
 | hasContactPoint | 06 | `Party` | `ContactPoint` |
-| hasDimension | 10 | `UnitOfMeasure` | concept of `MeasurementDimensionScheme` |
+| hasDimension | 10 | `UnitOfMeasure` | concept of `MeasurementDimensionScheme` | `gist:hasAspect` |
 | hasMeasure | 08 | `StockPosition` | `InventoryMeasure` |
 | hasParentLocation | 08 | `Location` | `Location` |
 | hasPostalAddress | 06 | `Party` | `PostalAddress` |
@@ -371,7 +399,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | identifiedBy | 07 | none declared | `gist:ID` |
 | identifierKey | 07 | `ItemIdentifier` | datatype |
 | identifierKind | 07 | `gist:ID` | concept of `IdentifierKindScheme` |
-| identifierText | 07 | `gist:ID` | datatype |
+| identifierText | 07 | `gist:ID` | datatype | `gist:idText` |
 | identityOutcome | 06 | `IdentityDecision` | concept of `IdentityOutcomeScheme` |
 | importsFile | 09 | `ItemImport` | `StagedFile` |
 | includesRole | 06 | `Role` | `Role` |
@@ -382,12 +410,11 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | invoicesShipment | 09 | `Invoice` | `Shipment` |
 | invoicingProgress | 10 | `gist:Intention` | concept of `InvoicingProgressScheme` |
 | involvesLogisticUnit | 09 | `EventLine` | `LogisticUnit` |
-| isContactOf | 06 | `Person` | `Organization` |
-| isCustomer | 06 | `Organization` | datatype |
+| isCustomer | 06 | `SourceRecord` | datatype |
 | isOptional | 07 | `BomLine` | datatype |
 | isPreferred | 07 | `VendorItem` | datatype |
 | issuedBy | 07 | `gist:ID` | `Organization` |
-| isVendor | 06 | `Organization` | datatype |
+| isVendor | 06 | `SourceRecord` | datatype |
 | itemCategory | 07 | `ItemSpecification` | concept of `ItemCategoryScheme` |
 | itemRole | 07 | `ItemSpecification` | concept of `ItemRoleScheme` |
 | joinedAt | 06 | `Member` | datatype |
@@ -404,15 +431,15 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | matchScore | 06 | `SuspectedDuplicate` | datatype |
 | maxRole | 06 | `AgentRun` | `Role` |
 | measureKind | 08 | `InventoryMeasure` | concept of `InventoryMeasureKindScheme` |
-| membershipIn | 06 | `Member` | `Tenant` |
+| membershipIn | 06 | `Member` | `Tenant` (decision 38) |
 | membershipOf | 06 | `Member` | `Person` |
 | membershipStatus | 06 | `Member` | concept of `MembershipStatusScheme` |
 | minimumQuantity | 07 | `PriceListEntry` | `QuantityValue` |
 | minorUnits | 07 | `MoneyAmount` | datatype |
 | minorUnitScale | 07 | `MoneyAmount` | datatype |
-| name | 06 | none declared | datatype |
+| name | 06 | none declared | datatype | `gist:name` |
 | nodeOf | 07 | `BomExpansionNode` | `BomExpansion` |
-| numericValue | 07 | `QuantityValue` | datatype, stated `xsd:decimal` |
+| numericValue | 07 | `QuantityValue` | datatype, stated `xsd:decimal` | `gist:numericValue` |
 | observedAt | 07 | `gist:Content` | datatype |
 | observes | 09 | `gist:Event` | `EventLine` |
 | occursAt | 09 | `gist:Event` | `Location` |
@@ -432,7 +459,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | partOfImport | 09 | `gist:Event` | `ItemImport` |
 | paymentProgress | 10 | `gist:Intention` | concept of `PaymentProgressScheme` |
 | performedBy | 09 | `gist:Event` | none declared (pending) |
-| permits | 06 | `Role` | `Permission` |
+| permits | 06 | `Role` | `Permission` (not in the thin thread, decision 41) |
 | placesHold | 09 | `HoldPlacement` | `QualityHold` |
 | portalFor | 06 | `PortalAccess` | `Organization` |
 | portalPriceList | 06 | `PortalAccess` | `PriceList` |
@@ -453,12 +480,11 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | quantityPer | 07 | `BomLine` | `QuantityValue` |
 | questionsLot | 09 | `RecallCase` | `MaterialLot` |
 | raisedFor | 09 | `gist:Intention` | `CommitmentLine` |
-| recordedActor | 06 | `AuditEntry` | `Member` |
-| recordedAt | 06 | `AuditEntry` | datatype |
+| recordedActor | 06 | `AuditEntry` | `Member` (pending decision 44) |
 | recordedBy | 09 | none declared | `gist:Event` |
 | recordedFromRow | 04 | `ItemSpecification` | `FileRow` |
 | recordOf | 04 | `SourceRecord` | none declared |
-| recordTime | 09 | `gist:Event` | datatype |
+| recordTime | 09 | `gist:Event` | datatype | `gist:isRecordedAt` |
 | region | 06 | `PostalAddress` | datatype |
 | rejectsPartOf | 09 | `ReceivingRejection` | `Receipt` |
 | releasesHold | 09 | `HoldRelease` | `QualityHold` |
@@ -486,7 +512,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | scrapRatio | 07 | `BomLine` | datatype |
 | selectedRevision | 07 | `BomExpansionNode` | `BomRevision` |
 | sequence | 07 | none declared | datatype |
-| servesPurpose | 06 | none declared | concept of `ContactPurposeScheme` |
+| servesPurpose | 06 | `ContactAssignment` | concept of `ContactPurposeScheme` |
 | settlesCount | 08 | `InventoryAdjustment` | `StockCount` |
 | setupTime | 07 | `OperationDefinition` | `QuantityValue` |
 | sitedAt | 08 | `WorkCenter` | `Location` |
@@ -497,12 +523,12 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | splitResult | 08 | `LabelSplit` | `InventoryLabel` |
 | splitSource | 08 | `LabelSplit` | `InventoryLabel` |
 | stagedFrom | 09 | `StagedFile` | `FileUpload` |
-| startedAt | 09 | none declared | datatype |
+| startedAt | 09 | none declared: an event that lasts, or a `Grant`; never a `Member`, whose interval is `joinedAt` and `removedAt` | datatype |
 | stepOf | 07 | `OperationDefinition` | `RoutingRevision` |
 | stockCondition | 10 | none declared | concept of `StockConditionScheme` |
 | subOrderOf | 09 | `ManufacturingOrder` | `ManufacturingOrder` |
 | supersedes | 06 | none declared | none declared |
-| suspects | 06 | `SuspectedDuplicate` | `Party` |
+| suspects | 06 | `SuspectedDuplicate` | `SourceRecord` |
 | syncDirection | 09 | `AccountingSyncRecord` | concept of `AccountingSyncDirectionScheme` |
 | syncOutcome | 09 | `AccountingSyncRecord` | concept of `AccountingSyncStateScheme` |
 | syncsDocument | 09 | `AccountingSyncRecord` | `gist:Content` |
@@ -513,7 +539,7 @@ gives the datatype, "concept of" a scheme where the values are concepts. One dir
 | trackingMethod | 07 | `ItemSpecification` | concept of `TrackingMethodScheme` |
 | underTransferOrder | 08 | `StockMovement` | `TransferOrder` |
 | undoes | 09 | `DecisionUndo` | `gist:Event` |
-| unit | 07 | `QuantityValue` | `UnitOfMeasure` |
+| unit | 07 | `QuantityValue` | `UnitOfMeasure` | `gist:hasUnitOfMeasure` |
 | unitOfLot | 08 | `SerialUnit` | `MaterialLot` |
 | unitPrice | 07 | `gist:Offer` | `MoneyAmount` |
 | unpackedFrom | 09 | `DisaggregationEvent` | `LogisticUnit` |
@@ -541,7 +567,9 @@ row above (05, section 10).
 ## Collisions resolved
 
 Each row names what collided, which key or report stands now, and where the edit was made. A choice that was not a
-matter of one report's own rule became a decision instead, and the row names it.
+matter of one report's own rule became a decision instead, and the row names it. Of the decisions named below, 10, 13,
+16, 21, 23 and 41 are answered and their rows state the answer. Every other one is open: its row states the agent's
+recommendation, which the reports carry as a pending design and nothing is built on.
 
 | What collided | Now | Edited |
 | --- | --- | --- |
@@ -551,14 +579,16 @@ matter of one report's own rule became a decision instead, and the row names it.
 | `WorkCenter` defined by 07 and by 08 | 07's row (decision 67) | 08 row removed |
 | `Machine` used by 09 and 11, defined nowhere | added to 08 under `gist:Equipment` | 08 |
 | `identifiedBy` in 06 and 07; `gist:isIdentifiedBy` used directly by 08 | 07's, domain none declared, range `gist:ID` | 06, 07, 08 |
-| `identifierText` (07), `identifierValue` (06), `gist:idText` (08) | 07's `identifierText` | 06, 08 |
+| `identifierText` (07), `identifierValue` (06), `gist:idText` (08) | one fact with one home, `gist:idText`: 07's `identifierText` stands only as a stored sub-property of it (the super-property column; decision 16), never as a local alias with no parent. The same holds for `numericValue` under `gist:numericValue` and `name` under `gist:name` | 06, 07, 08 |
 | `issuedBy` in 06 and 07; `gist:isAllocatedBy` (08) | 07's, domain `gist:ID` | 06, 08 |
 | `identifierKind` (07), `identifierScheme` (06 and 10), `codeScheme` (08), and their schemes `IdentifierScheme`, `ItemIdentifierKind` and a tracking-code scheme | `identifierKind` with 10's `IdentifierKindScheme` | 06, 07, 08, 10 |
 | `supersedes` in 06 and 07 | 06's, domain and range none declared | 07 row removed |
 | `lineOf` in 07 (BOM line) and 09 (order line) | 09's, domain and range `gist:Intention` | 07 row removed |
 | `lifecycleState` in 07, 09 and 10, and 09's `importLifecycleState` | 10's, domain none declared | 07 and 09 rows removed |
 | `atWorkCenter` in 07 and 09 | 07's, domain none declared | 09 row removed |
-| `endedAt` in 06 and 09; 06's `grantedAt` beside 09's `startedAt` | 09's, domain admits a `Grant` | 06 rows removed |
+| `endedAt` in 06 and 09; 06's `grantedAt` beside 09's `startedAt` | 09's, domain admits a `Grant` and excludes a `Member`, which keeps `joinedAt` and `removedAt` as its one interval | 06 rows removed |
+| 06's `decidedAt` beside 09's `eventTime`: an `IdentityDecision` is a `gist:Determination`, which is an event | 09's `eventTime`; the decided-at field points at it | 06 row removed |
+| 06's `recordedAt` beside 09's `recordTime`, both labelled "recorded at" | 09's `recordTime`; the audit entry's written-at field points at it | 06 row removed |
 | 09's `validUntil` beside 07's `effectiveUntil` for a quote | 07's | 09 row removed |
 | 06's `displayName` beside `name` used by 04 and 07 | `name`, 06's, domain none declared | 06 |
 | `description` (07, said to be 05's) and `hasQuantity` (09, said to be 07's), defined nowhere; 04's `quantity`; 08's `reservedQuantity`, `movedQuantity`, `adjustmentQuantity` | both added to 07; `hasQuantity` serves all | 07, 08, 04 |
@@ -589,39 +619,109 @@ matter of one report's own rule became a decision instead, and the row names it.
 | `numericValue` filled by integer and float fields, which 05's V11 would refuse | a stated `xsd:decimal` (decision 50) | 05, 07, 12 |
 | `Putaway`, `Pick` (09) beside 08's `StockMovement` | subkinds of `StockMovement` (decision 79) | 09 |
 | Scheme typing `gist:ControlledVocabulary` (10) beside none (05, 11) | SKOS only (decision 17) | 10 |
-| `Role` as a class (06) or `MemberRole` as a scheme (10); units as a class (07) or a scheme (10) | concepts that are also individuals (decisions 41, 61) | 05, 06, 07, 10 |
+| `Role` as a class (06) or `MemberRole` as a scheme (10); units as a class (07) or a scheme (10) | for roles, decided: each is a concept of `MemberRoleScheme` and under the same IRI an individual of `Role`, with one identity criterion, the concept's scheme and notation (decision 41). For units, the same shape is the recommendation (pending decision 61) | 05, 06, 07, 10 |
 | Cost basis `stated` (07) or none (10) | `stated` (decision 60) | 10 |
 | `Party` with two parents (06) against one parent (05) | one identity-bearing parent and category parents (decision 12) | 05 |
-| gist names not in `gist-categories.md` used by 06, 07, 09 and recommended by 11 | added under decision 13, rows marked pending | 06, 07, 09, 11 |
+| gist names not in `gist-categories.md` used by 06, 07, 09 and recommended by 11 | not added at once: a name is admitted, and added to `gist-categories.md`, only when a term in the slice being built needs it (decision 13). `gist:TemporalRelation` and `gist:Assignment` enter with the thin thread; the other rows stay marked pending | 06, 07, 09, 11 |
 | 04's CQ-C04 asking for offers known only by a vendor's name, with no property for it | `vendorName` added to 07 | 07 |
 | 09's `LineAllocation` row with no parent while its own question recommended `gist:Content` | the recommendation | 09 |
 | Whether Sutton counts reserved inside committed: "not public" (08), read from Sutton's article (10, 11) | 10's and 11's reading, marked unchecked | 08 |
 | 09 tagged its event classes `kind`, where 06 and 08 tagged theirs `event` | `event`, as 05's kind tag defines it | 09 |
 
-## Not proposed (decision 87)
+## Not proposed (the brief's rule)
 
 The brief's rule: a Sutton-only term enters the vocabulary module when a competency question of rank must or should
-needs it, never to complete a picture. A throwaway script read 04's must and should questions, took every key their
+needs it, never to complete a picture. Decision 87 does not state this rule: it only asks how the competency
+questions are ranked. A throwaway script read 04's must and should questions, took every key their
 "Terms it needs" column names, and closed that set over this index: a needed property brings the classes and schemes
-of its domain and range, a needed class its local parent, a needed scheme its concepts. The 73 terms below are
+of its domain and range, a needed class its local parent, a needed scheme its concepts. A class the closure keeps,
+and a repository term, also brings the schemes and event classes a recommended decision makes it depend on:
+`QualityHold` brings `HoldPlacement`, `HoldRelease` and `HoldReasonScheme` (decision 77), and `CostObservation` brings
+`CostBasisScheme` with its concept `CostBasisScheme-stated`, which the `unitCost` lift writes under decision 60 (a).
+Decision 60 is open, so that admission is conditional: under its no-basis answer `CostBasisScheme` and `costBasis` are
+not proposed. It is not in the list below and not in its count.
+
+After the packet's review the closure was redone by hand for two should questions whose term cells 04 corrected.
+CQ-E01 reads the pallet's positive balance at shipment, so it needs `DisaggregationEvent` with `unpacks` and
+`unpackedFrom` (their ranges `EventLine` and `LogisticUnit` were already kept), and its customer branch needs
+`SalesOrder`, `SalesOrderLine` and `CommitmentLine`, the line's parent and the range of `allocatesLine`. CQ-W03's
+scope tests name `forSerialUnit`, whose range is `SerialUnit`, and it selects the book basis,
+`PositionBasisScheme-book`. Those six left the list. Two joined it: the same review made `SignInAccount` and
+`ModelCall` later, since no schema binds either, and no must or should question names them.
+
+The 65 terms below are
 Sutton only or later and no must or should question reaches them, so they are **not proposed**: their rows stay in
 their reports as design notes, the curator does not treat them as part of the vocabulary, and each enters only when a
 question of that rank needs it. Repository terms (in the repository today) are proposed whether or not a question
-reaches them, since a record already points at them.
+reaches them, since a record already points at them. That status says a record supports the term's meaning, not that
+a record stores every notation: `GrantScopeKindScheme` rests on the organization scope every record implies, and
+`Currency` on a documented USD with no currency field (its projection is decision 88). `MembershipStatusScheme` fails
+that test and no must or should question names it, so it is not proposed either, as a sixty-sixth term: the `member`
+table stores `removedAt` and no status, and `removedAt` stays the only removal fact.
 
 `AccountStatusScheme`, `AccountingSyncDirectionScheme`, `AccountingSyncRecord`, `AccountingSyncStateScheme`,
 `AdjustmentReasonScheme`, `AliasItemSpecification`, `Bom`, `BomExpansion`, `BomExpansionNode`, `BomLine`, `BomRevision`,
-`BusinessStepScheme`, `CommitmentLine`, `ContactPointKindScheme`, `Container`, `CostBasisScheme`, `CostFinalityScheme`,
-`DisaggregationEvent`, `EvidenceKindScheme`, `FulfilmentProgressScheme`, `HoldPlacement`, `HoldReasonScheme`,
-`HoldRelease`, `InventoryAdjustment`, `InventoryReservation`, `Invoice`, `InvoicingProgressScheme`, `ItemRevision`,
-`ItemUnitConversion`, `Machine`, `ManufacturingOrder`, `ManufacturingOrderLine`, `ObjectObservation`,
+`BusinessStepScheme`, `ContactPointKindScheme`, `Container`, `CostFinalityScheme`,
+`EvidenceKindScheme`, `FulfilmentProgressScheme`,
+`InventoryAdjustment`, `InventoryReservation`, `Invoice`, `InvoicingProgressScheme`, `ItemRevision`,
+`ItemUnitConversion`, `Machine`, `ManufacturingOrder`, `ManufacturingOrderLine`, `ModelCall`, `ObjectObservation`,
 `OperationDefinition`, `OperationExecution`, `PartyIdentifier`, `PaymentProgressScheme`, `Permission`, `Pick`,
-`PortalAccess`, `PortalModuleScheme`, `PositionBasisScheme-book`, `PositionBasisScheme-counted`, `PostalAddress`,
+`PortalAccess`, `PortalModuleScheme`, `PositionBasisScheme-counted`, `PostalAddress`,
 `PriceList`, `PriceListEntry`, `PurchaseOrder`, `PurchaseOrderLine`, `Putaway`, `QualityInspection`,
 `QualityOutcomeScheme`, `QualityResult`, `Quote`, `QuoteLine`, `RecallCase`, `ReceivingRejectReasonScheme`,
-`ReceivingRejection`, `Routing`, `RoutingRevision`, `SalesOrder`, `SalesOrderLine`, `SerialUnit`,
-`ServiceItemSpecification`, `StockCount`, `StockMovement`, `SupplierBill`, `SuspectedDuplicate`, `TrackingCode`,
+`ReceivingRejection`, `Routing`, `RoutingRevision`,
+`ServiceItemSpecification`, `SignInAccount`, `StockCount`, `StockMovement`, `SupplierBill`, `SuspectedDuplicate`, `TrackingCode`,
 `TransferOrder`, `TransferOrderLine`, `WorkCenter`, `WorkOrder`, `WorkOrderLine`.
+
+The property table above is the full catalog, not the admitted set. A property is emitted only when its own domain
+and range are admitted: a proposed class or scheme, a projected gist class, a datatype, or none declared. Five
+properties of 06 have an admitted subject and a target that is not: `accountStatus` (`AccountStatusScheme`),
+`contactPointKind` (`ContactPointKindScheme`), `evidenceKind` (`EvidenceKindScheme`), `citesIdentifier`
+(`PartyIdentifier`) and `permits` (`Permission`). Each target stays not proposed, so none of the five is emitted, and
+a subject being in scope does not promote its target. `membershipStatus` is held back the same way, and so is every
+property whose domain or range is `SignInAccount` or `ModelCall`. Decision 41 keeps `permits` and `Permission` out of
+the thin thread and has them wait for slice 1; whether slice 1 admits them is settled when it is specified.
+
+`ContactAssignment` is proposed, with `contactPerson`, `contactAccount` and `assignmentPoint`: 04's CQ-P03 reads the
+purpose and the contact point from the assignment (decisions 39 and 43). The list above still has 65 terms.
+
+## The thin thread and the slices (decision 8)
+
+The thin thread is the first deliverable. Slice 1 stays the party slice and follows it; no slice is renumbered.
+
+The thread takes nine rows of this index: the classes `Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`
+and `AuditEntry`, and the schemes `MemberRoleScheme` (viewer, editor, admin) and `GrantScopeKindScheme` (the one
+concept organization). `Tenant` is a role class under `Organization`, and `membershipIn` ranges over it (decision 38).
+`Person` is there so the fixture can say two memberships are one human: one link from `Member` to the person,
+`membershipOf` in the table above, and no name or email paths (decision 94). `Grant` is there for one lift: the
+record's role field is read as one grant at organization scope (decision 40), with `grantedTo`, `grantsRole` and
+`grantScope` (decision 96); other scopes are added by the slice that needs them. The audit term's key is `AuditEntry`,
+with "Activity" as an alternative label (decision 46). The gist names the thread admits are the parents of those rows,
+`gist:Organization`, `gist:Person`, `gist:TemporalRelation`, `gist:Assignment` and `gist:Content`, each with its named
+gist ancestors as names and links only (decisions 13 and 14), and the `owl:disjointWith` pairs gist states between
+them (decision 15). `Role` has no gist parent in the thread, ships without `permits` and has one identity criterion,
+the concept's scheme and notation (decision 41). A role is written `inv:MemberRoleScheme-admin` (decision 10), and
+labels and definitions are `skos:prefLabel` and `skos:definition` (decision 11).
+
+Every field of a record that points at a term carries a pointer or `noTerm` with a reason (decision 22). On the
+`Member` record the person's name, the organization's name and the sign-in email are marked `noTerm` with the reason
+screen (decisions 21 and 93), so the thread uses neither `name` nor `accountEmail`. Slice 1 adds their paths, the name
+through `Person` and the email through `SignInAccount`.
+
+The thread answers one question, 04's CQ-P06: who belongs to this organization and with which role, on a fixture
+where one person is an admin in one organization and a viewer in another. It builds gates 1 to 9, every gate that
+needs no stored row (decision 95): the byte-compare (1), the re-parse (2), forbidden constructs and the namespace
+guard (3), vocabulary coherence (4), record pointers on the AST (5), the type-check (6), `laws ontology-terms` (7), the
+question suite (8) and the reasoner (9, decision 25). Gates 5 and 7 are enrolled on the access contract and the four
+kernel records only. Each gate is shown failing once on a planted mistake. Gate 11, SHACL over the stored sample, and
+gate 12, the alignment check, wait for their slices, and gate 10 is open decision 27's. The thread runs N3.js for the
+re-parse and Oxigraph for SPARQL; shacl-engine is added with the SHACL slice (decision 26). The thread waits on none of
+the 63 open decisions.
+
+Slice 1 brings what the thread leaves out: `SourceRecord` with `recordOf` and the customer and vendor flags,
+which CQ-P01 reads on the tenant's record (decision 34), `ContactAssignment` with its purpose and contact point
+(decisions 39 and 43), and the terms its other questions need. Each open decision a slice needs is put to Benjamin
+when that slice is specified, with a concrete record.
 
 Removed from the index altogether (not just not proposed), since the brief's no-gos rule them out (04's CQ-E05 and
 CQ-E06 are will-not): the machine telemetry terms `MachineStateInterval`, `MachineObservation`, `MachineStateScheme`
@@ -636,9 +736,9 @@ repository. What changed, with the decision that now holds the choice:
 
 | What was wrong | Now | Edited |
 | --- | --- | --- |
-| Decision 34's recommendation made a record an instance of `gist:Organization` and `gist:Person`, which gist disjoins from `gist:Content`, and gave `Person` two identity criteria | `Person` and `Organization` name the party, identity `unresolved` with one criterion; 04's `SourceRecord` and its new `recordOf` hold the reidentification key (decision 34, recommendation changed) | 06, 04, 11, DECISIONS |
+| Decision 34's recommendation made a record an instance of `gist:Organization` and `gist:Person`, which gist disjoins from `gist:Content`, and gave `Person` two identity criteria | `Person` and `Organization` name the party, identity `unresolved` with one criterion; 04's `SourceRecord` and its new `recordOf` hold the reidentification key (decision 34, answered as the changed recommendation; the customer and vendor flags sit on the tenant's `SourceRecord`) | 06, 04, 11, DECISIONS |
 | `InventoryMeasure` under `QuantityValue` inherited a value identity and stated a second | information under `gist:Content`, pointing at a `QuantityValue` by `hasQuantity` (decision 74, recommendation changed) | 08, 04, 07, 11 |
-| `QualityHold` under bare `gist:Intention` while gist 14.1.0 has `gist:Restriction` | information under `gist:Restriction` (decision 77, recommendation changed; decision 13's table B) | 08, 11, DECISIONS |
+| `QualityHold` under bare `gist:Intention` while gist 14.1.0 has `gist:Restriction` | information under `gist:Restriction` (decision 77, recommendation changed and still open; under decision 13 `gist:Restriction` is admitted only when a slice needs `QualityHold`) | 08, 11, DECISIONS |
 | Relator tags on a specification, a permission and content (`BomLine`, `ItemUnitConversion`, `PortalAccess`, `LineAllocation`) | kind or information, and 05's new rule V25 maps each gist class to the tags it admits | 05, 06, 07, 09, 12 |
 | `Party` in disjoint pairs, against V21 | the pairs are stated against `Person` and `Organization` | 06 |
 | Routings under `gist:TaskTemplate` defined as specifications, with properties whose domain is `gist:Specification` | defined as templates; `revisionOf`, `revisionCode`, `defaultRevision`, `outputItem`, `sequence`, `effectiveFrom`, `effectiveUntil` declare no domain (decision 13) | 07, 11 |
@@ -655,9 +755,9 @@ repository. What changed, with the decision that now holds the choice:
 | CQ-I08 and half of CQ-P05 asked SPARQL about identity criteria that never reach Turtle | gate 4 over the module (05's V18 now fails on `restsOn`) | 04, 05, 12 |
 | CQ-W03's fixture summed site-level measures from bins; CQ-W07 and CQ-P08 over-counted on plausible data | rewritten, with must-fail cases for each | 04 |
 | No rule named the nodes a lift path creates; two datatype rules clashed on `numericValue`; concept typing sat outside the reasoner's closure; scheme ranges written two ways | positional IRIs for lifted nodes; a stated datatype wins in SHACL; `alsoInstanceOf` typing in the OWL file; no OWL range for a scheme | 12, 05, DECISIONS |
-| The record's `Literals` built from the scheme, against decision 2 | the record writes its literals and gate 4 compares (decision 23) | 05, 10, DECISIONS |
+| The record's `Literals` built from the scheme, against decision 2 | the record writes its literals and gate 4 compares (decision 23): each literal must be one of the scheme's notations, and the two lists must be equal only for a schema that is the whole scheme. 10's section 4.12 had still said the `Role` literals come from the scheme's notations; that sentence is withdrawn | 05, 10, DECISIONS |
 | `ItemIdentifier`'s identity needed an issuer a name-only vendor cannot give; `Bin` stated an identity as a subkind; definitions that repeated their label; `defaultRevision` and `primaryBom` as second homes | each row corrected | 07, 08, 06 |
-| Alignment rows for the dormant `ContactAssignment`; `accountNumberAtParty` with no source; `duns` missing from 10 | rows removed; `duns` added to 10 | 11, 06, 10 |
+| Alignment rows for the dormant `ContactAssignment`; `accountNumberAtParty` with no source; `duns` missing from 10 | rows removed then; `duns` added to 10. Decisions 39 and 43 make `ContactAssignment` the model, so its four alignment rows return to 11 (Sutton "Contact", `org:Membership`, FIBO's Contact, schema.org's `ContactPoint`) | 11, 06, 10 |
 | Vocabulary sketches in shapes 05 rejects; `TermRef` undefined | sketches in 05's shapes; `TermRef` defined in 05 section 4.1 | 05 to 10 |
 
 ## Checks run
@@ -673,6 +773,19 @@ repository. What changed, with the decision that now holds the choice:
   269); every class's tag passes 05's V25; 04's twelve SPARQL blocks parse with rdflib's `prepareQuery`, and CQ-W03,
   CQ-W07 and CQ-P08 return their expected rows over throwaway fixtures built from their text (kept outside the
   repository), the must-fail variants included.
+- After the packet's review, by hand and by search, with no script run: two property rows removed (267 left, the
+  owners' counts summing to it), the status totals recounted from the Status column, and the not-proposed list
+  recounted (65).
+- After Benjamin's answers of 2026-11-22, by hand and by search, with no script run: the rows changed here were read
+  against report 06's tables as revised (`ContactAssignment`, `Grant`, `Member`, `Role`, and the properties
+  `contactPerson`, `contactAccount`, `assignmentPoint`, `servesPurpose`, `isCustomer`, `isVendor`, `decidesOn`,
+  `suspects`, `membershipIn`, `permits`); the term rows recounted (165, 115 of them classes), the property rows (269,
+  the owners' counts summing to it), the tags and the status totals.
+- After his seven further answers the same day (22, 26, 38, 46 and 94 to 96), by hand, with no script run: no row came
+  in or went out and no row's tag or status word changed, so the counts stand (165 term rows, 269 property rows, the
+  status totals, 65 not proposed). The rows changed here (`Tenant`, `Person`, `Grant`, `GrantScopeKindScheme`,
+  `membershipIn`) were read against the answers in DECISIONS.md, not against report 06, which was being revised at the
+  same time.
 
 ## Not checked
 

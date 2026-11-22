@@ -89,7 +89,10 @@ Proposed classes, in OntoClean terms (rigid kinds carry identity; roles do not):
 
 Decision 3 (2026-11-22) replaced the first draft's `TradingRelationship` relator and role classes with flags on
 `Organization`. What that gives up, so it is known: a role has no dates of its own, terms and portal access sit on the
-organization, and a person cannot be an Account. A flag can later become a role record without loss.
+organization, and a person cannot be an Account. Reversing it is conditional: each flag set to true becomes one
+positive role record in that tenant, with no known start or end date and none of the relationship's own commercial
+terms. An explicit false is recovered only where negative evidence was kept or the account's role set was declared
+complete; without either, a missing role reads as unknown. Going back from roles to flags drops the dates.
 
 `IdentityDecision` is where this repository already lives: the import's review of near-duplicate rows is master-data
 matching, and its rule "two rows that look alike are still two records" is the same rule as "never `owl:sameAs`".

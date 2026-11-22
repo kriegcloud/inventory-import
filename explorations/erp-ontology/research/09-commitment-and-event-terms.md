@@ -6,11 +6,16 @@ description: A design for the ontology's commitments (quotes and orders with the
 
 # Commitment and event terms
 
-This is a design to argue with, not a ratified model. No term below has a ratification record: the packet holds no
-`rat-` file and decisions 1 to 7 ratify no term by name. The conceptualizer skill works on ratified terms only, so
-every row here is a candidate for `ontology-foundational-auditor` and for Benjamin, and every edge, disjointness and
-domain or range is `proposed`. Nothing here is built: there is no vocabulary module, projector, generated Turtle, SHACL
-or competency-question suite.
+This is a design to argue with, not a ratified model. No term below has a ratification record. Decisions 1 to 7 and
+the answers of 2026-11-22 ratify none of these terms by name, and decision 32 keeps the vocabulary module to ratified
+entries only. The conceptualizer skill works on ratified terms only, so every row here is a candidate for
+`ontology-foundational-auditor` and for Benjamin, and every edge, disjointness and domain or range is `proposed`.
+Nothing in this document is built.
+
+These terms are not in the thin thread (decision 8). That thread is Organization, Member, Role, Grant for the role
+lift, the audit entry, their gist parents and ancestors, and MemberRoleScheme. A gist name this document uses is
+admitted when the slice that builds the term needs it (decision 13), not in the thread, and its named gist ancestors
+enter with it (decision 14). Open decisions stay open and are put to Benjamin with the slice that needs them.
 
 Inputs: the packet's decisions and reports 01 and 02; the skills' `_shared` files; the architecture seed and the API
 design report (where they disagree, report 01 section 5 is followed); the catalog and access contracts; the import's
@@ -26,6 +31,7 @@ other eight documents (listed again at the end of each table that uses them):
 | Borrowed term (likely key) | Owner | Used for |
 | --- | --- | --- |
 | `Organization`, `Person`, `Party` | 06 party and access | `counterparty`, `carriedBy`, `performedBy` |
+| `SourceRecord` | 06 party and access | the tenant's record of an organization, where the customer and vendor flags sit (decision 34) |
 | `ItemSpecification`, `BomRevision`, `RoutingRevision`, `OperationDefinition` | 07 catalog and value | what a line promises, what an order makes from |
 | `QuantityValue`, `MoneyAmount`, `hasQuantity` | 07 catalog and value | every quantity and price here |
 | `Location`, `Site`, `Machine`, `MaterialLot`, `InventoryLabel`, `SerialUnit`, `LogisticUnit`, `InventoryReservation`, `QualityHold`, `StockMovement` | 08 warehouse and stock | where an event happens and what stock it involves |
@@ -68,10 +74,9 @@ not stored: it is the sum of its allocations against its quantity, a View.
 
 ## Commitments
 
-Each order class is a kind whose phase is a concept of 10's one `OrderLifecycleScheme` (decision 82); each line
-class is a subkind of `CommitmentLine`. The gist
-parents of the order classes are Benjamin's (Q1), as `gist-categories.md` says ("Whether an order is an offer, a
-commitment or an agreement at each stage is a question for Benjamin").
+Each order class is a kind, and each line class is a subkind of `CommitmentLine`. The gist parents marked pending Q1
+stay open (decision 80). `gist-categories.md` leaves it to Benjamin whether an order is an offer, a commitment or an
+agreement at each stage. Which scheme names its phase is open (Q3, decision 82); see Lifecycle schemes.
 
 | Key | Label | Definition | Tag | gist parent | Identity | Source | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -90,8 +95,9 @@ commitment or an agreement at each stage is a question for Benjamin").
 | `TransferOrderLine` | Transfer order line | A line of a transfer order that names one quantity of one item, lot or label to move. | subkind | none: below `CommitmentLine` | as `CommitmentLine` | the API design report 4.1 (`transferredLabel`); NEW as a class | Sutton only |
 | `LineAllocation` | Allocation | Content that counts one exact quantity of one event line against one commitment line, so that one line is met by several events and one event meets several lines. | information | `gist:Content`, as the architecture seed's `LotAllocation` (pending Q5; this row first had none) | the commitment line and the event line it joins: one allocation per pair, its quantity summed | the architecture seed 5.5, 5.6 ("resolve many-to-many relationships through line allocations"); report 01 section 4 | Sutton only |
 
-A manufacturing order's output and its components are both `ManufacturingOrderLine`s; which one a line is comes from
-the property that joins its execution (`produces` or `consumes`, below), not from a subclass. An alias item sold on a
+Each manufacturing or work order line names its order through `plannedComponentOf` for material needed or
+`plannedOutputOf` for output expected. This distinction holds before work starts. Only an actual transformation
+`consumes` or `produces` an event line. An alias item sold on a
 line keeps its own item on the line (`promisedItem`) while the event line names the stock item that left
 (`involvesItem`), as the architecture seed 5.1 and 5.6 ask.
 
@@ -100,20 +106,18 @@ Allocation counts what happened; reservation holds what may.
 
 ### Lifecycle schemes
 
-The lifecycles are SKOS schemes, never subclasses (state-is-kind). Their concepts are document 10's. One scheme per
-commitment kind is the design; one shared scheme is the alternative (Q3). The architecture seed's `WorkflowStatus`
-(Draft, Planned, Released, In progress, Complete, Cancelled) is its "proposed common reporting vocabulary, not source
-SDL" and becomes, under the recommended answer, the target of `skos:broadMatch` rows from each scheme's concepts.
+The lifecycles are SKOS schemes, never subclasses (state-is-kind). Their concepts are document 10's. Decision 82 is
+open. The agent's recommendation, not a decision, is one shared scheme: every order's phase is a concept of 10's
+`OrderLifecycleScheme`, and fulfilment, payment and invoicing progress are 10's `FulfilmentProgressScheme`,
+`PaymentProgressScheme` and `InvoicingProgressScheme`; a quote's own phases are later. Under that recommendation the
+architecture seed's `WorkflowStatus` (Draft, Planned, Released, In progress, Complete, Cancelled), its "proposed
+common reporting vocabulary, not source SDL", is the target of `skos:broadMatch` rows from the scheme's concepts.
+The other answer is one scheme per commitment kind. This document first proposed six, `QuoteLifecycleScheme`,
+`SalesOrderLifecycleScheme`, `PurchaseOrderLifecycleScheme`, `ManufacturingOrderLifecycleScheme`,
+`WorkOrderLifecycleScheme` and `TransferOrderLifecycleScheme`, each with a `skos:broadMatch` to `WorkflowStatus`.
 
 A line's state (open, partly met, met) is not a scheme: it is the sum of the line's allocations against its quantity,
 worked out by a View. Storing it would be a second, drifting copy of the allocations.
-
-Under the recommended answer to Q3 (decision 82) there are no per-kind schemes: every order's phase is a concept of
-10's `OrderLifecycleScheme`, and fulfilment, payment and invoicing progress are 10's `FulfilmentProgressScheme`,
-`PaymentProgressScheme` and `InvoicingProgressScheme`; a quote's own phases are later. This document first proposed
-six schemes, `QuoteLifecycleScheme`, `SalesOrderLifecycleScheme`, `PurchaseOrderLifecycleScheme`,
-`ManufacturingOrderLifecycleScheme`, `WorkOrderLifecycleScheme` and `TransferOrderLifecycleScheme`, each with a
-`skos:broadMatch` to the architecture seed's `WorkflowStatus`: that is decision 82's other answer.
 
 ## Execution events
 
@@ -130,6 +134,10 @@ and the properties they share have the broad domain `gist:Event`. Every class un
 `event`, as 05's kind tag defines it (this document first tagged them `kind`, while 06 and 08 tagged theirs `event`;
 report 13).
 
+`gist:Task` and `gist:PhysicalEvent` are the parents report 11 names for `OperationExecution` and for the four
+physical events. Decision 13 admits each when the slice that builds the term needs it, not in the thin thread. This
+document no longer keeps `gist:Event` as a stand-in. Named gist ancestors enter with the parent (decision 14).
+
 `EventLine` carries the "lines" of every event: what a receipt brought in, what a shipment carried, what a
 transformation consumed and produced, what a pack put in a pallet. Its role is the property that joins it to its event
 (`observes`, `consumes`, `produces`, `packs`, `unpacks`), so the role is never a free text field.
@@ -142,11 +150,11 @@ transformation consumed and produced, what a pack put in a pallet. Its role is t
 | `Putaway` | Putaway | An event in which received or produced stock is moved from where it arrived into a storage location. | subkind | none: below 08's `StockMovement` (pending decision 79) | as `StockMovement` (08): the tenant and the move's source id | NEW: named in this document's brief; CBV `BizStep-storing` | Sutton only |
 | `Pick` | Pick | An event in which stock is taken from a storage location to meet an order line or a production need. | subkind | none: below 08's `StockMovement` (pending decision 79) | as `StockMovement` (08): the tenant and the move's source id | the architecture seed 5.4, 5.6 (material picks, picks); the API design report 1.3 (pick lists) | Sutton only |
 | `Shipment` | Shipment | A transaction in which goods leave a site of the organization and pass out of its custody, to a customer, a carrier or another of its sites. | event | `gist:Transaction` | the tenant and the shipment's source id | the architecture seed 5.6; public Sutton document "Shipping: key features" | Sutton only |
-| `OperationExecution` | Operation run | An event in which one operation is actually performed at a work center or on a machine, by a person or an organization, over an observed interval. | event | `gist:Task` (pending Q8: in gist 14.1.0 and recommended by 11; this document first kept `gist:Event`) | the tenant and the execution's source id | the architecture seed 5.4 ("`OperationExecution` is the performed activity") | Sutton only |
-| `TransformationEvent` | Transformation | An event in which input material is consumed and output material is produced, so that what the material is changes. | event | `gist:PhysicalEvent` (pending decision 13: in gist 14.1.0, recommended by 11) | the tenant and the event's source id | the architecture seed 7.1; EPCIS `TransformationEvent` | Sutton only |
-| `AggregationEvent` | Packing | An event in which items or units are put into a parent logistic unit without changing the material. | event | `gist:PhysicalEvent` (pending decision 13: in gist 14.1.0, recommended by 11) | the tenant and the event's source id | the architecture seed 7.1; EPCIS `AggregationEvent` with action ADD | Sutton only |
-| `DisaggregationEvent` | Unpacking | An event in which items or units are taken out of a parent logistic unit without changing the material. | event | `gist:PhysicalEvent` (pending decision 13: in gist 14.1.0, recommended by 11) | the tenant and the event's source id | the architecture seed 7.1 ("no invented EPCIS disaggregation class": it exports as `AggregationEvent` DELETE) | Sutton only |
-| `ObjectObservation` | Sighting | An event in which identified stock or a quantity of an item is seen at a place and time without being received, shipped, moved, transformed or packed. | event | `gist:PhysicalEvent` (pending decision 13: in gist 14.1.0, recommended by 11) | the tenant and the event's source id | the architecture seed 7.1 (`ObjectObservation` for `epcis:ObjectEvent`) | Sutton only |
+| `OperationExecution` | Operation run | An event in which one operation is actually performed at a work center or on a machine, by a person or an organization, over an observed interval. | event | `gist:Task` (decision 13) | the tenant and the execution's source id | the architecture seed 5.4 ("`OperationExecution` is the performed activity") | Sutton only |
+| `TransformationEvent` | Transformation | An event in which input material is consumed and output material is produced, so that what the material is changes. | event | `gist:PhysicalEvent` (decision 13) | the tenant and the event's source id | the architecture seed 7.1; EPCIS `TransformationEvent` | Sutton only |
+| `AggregationEvent` | Packing | An event in which items or units are put into a parent logistic unit without changing the material. | event | `gist:PhysicalEvent` (decision 13) | the tenant and the event's source id | the architecture seed 7.1; EPCIS `AggregationEvent` with action ADD | Sutton only |
+| `DisaggregationEvent` | Unpacking | An event in which items or units are taken out of a parent logistic unit without changing the material. | event | `gist:PhysicalEvent` (decision 13) | the tenant and the event's source id | the architecture seed 7.1 ("no invented EPCIS disaggregation class": it exports as `AggregationEvent` DELETE) | Sutton only |
+| `ObjectObservation` | Sighting | An event in which identified stock or a quantity of an item is seen at a place and time without being received, shipped, moved, transformed or packed. | event | `gist:PhysicalEvent` (decision 13) | the tenant and the event's source id | the architecture seed 7.1 (`ObjectObservation` for `epcis:ObjectEvent`) | Sutton only |
 | `QualityInspection` | Quality check | A determination that establishes whether stated stock, or the output of an operation, meets stated acceptance criteria. | event | `gist:Determination` | the tenant and the check's source id | the architecture seed 5.7; public Sutton document "Logging quality checks on manufacturing orders" | Sutton only |
 | `QualityResult` | Quality result | Content that records what one quality check found: its measurements, outcome, evidence and who recorded it, kept by revision when edited. | information | `gist:Content` | the check it is of and the result's revision | the architecture seed 5.7 ("Preserve revisions when source results are edited") | Sutton only |
 | `HoldPlacement` | Hold placed | An event in which one quality hold begins on stated stock. | event | `gist:Event` | the tenant and the event's source id | the architecture seed 5.7, 7.1 (CBV `BizStep-holding`); NEW as its own event | Sutton only |
@@ -179,17 +187,21 @@ These are grounded in what the repository has today: the catalog contract (`Impo
 `Import/Decision.command.ts`, `Import/Change.read.ts`, `Staging/Staged.read.ts`, `Staging/Upload.command.ts`,
 `Staging/FileProblem.read.ts`, `Catalog.contract.ts`), the Alchemy blocks merged into
 `packages/catalog/model/src` (`Import/Import.aggregate.ts`, `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`) and the
-root `DECISIONS.md`. Whether they belong in the ontology at all is Q7; they are designed here under its recommended
-answer.
+root `DECISIONS.md`. Whether they belong in the ontology at all is Q7 (decision 52), which is open. They are designed
+here under the agent's recommendation, not a decision, and they are not in the thin thread. Nothing is built on that
+recommendation until the slice that needs them is specified.
 
 Each class is a referent, not a record. The import is what the operations admin does; `ImportView`, `ImportResult` and
-`RowDecisionFlags` are records of it. Records name their term through the `term` annotation (report 02).
+`RowDecisionFlags` are records of it. Records name their term through one `term` annotation, written by the typed
+helpers (decision 20). `StagedFile` is under `gist:FormattedContent`, the parent report 11 names. Decision 13 admits
+that name when the slice that builds `StagedFile` needs it, not in the thin thread, and this document no longer falls
+back to `gist:Content`.
 
 | Key | Label | Definition | Tag | gist parent | Identity | Source | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ItemImport` | Import | An event in which a person brings one file of item records into the organization's catalogue, from its upload through review to its confirms, and possibly their take-back (pending Q7). | event | `gist:Event` | `ImportId`, which is its upload's id | `packages/catalog/contract/src/Import/Import.read.ts` (`ImportView`); `packages/catalog/model/src/Import/Import.aggregate.ts` (`Import`) | in the repository today |
 | `FileUpload` | Upload | An event in which a person sends one .csv or .xlsx file to the organization in numbered pieces, ending finished, cancelled or expired (pending Q7). | event | `gist:Event` | the browser's `UploadKey` for that file, then the `ImportId` it is given | `packages/catalog/contract/src/Staging/Upload.command.ts` (`UploadStart`, `UploadChunk`); `Catalog.contract.ts` (four upload endpoints) | in the repository today |
-| `StagedFile` | Staged file | Content that holds one uploaded file as its reader found it: its sheet, columns, rows of uncoerced cells and the reader's notes, unchanged until the import ends (pending Q7). | information | `gist:FormattedContent` (pending decision 13: in gist 14.1.0; `gist:Content` otherwise) | the import it was staged for | `packages/catalog/contract/src/Staging/Staged.read.ts` (`StagedTable`: "a staged cell is what the file said, never a corrected value") | in the repository today |
+| `StagedFile` | Staged file | Content that holds one uploaded file as its reader found it: its sheet, columns, rows of uncoerced cells and the reader's notes, unchanged until the import ends (pending Q7). | information | `gist:FormattedContent` (decision 13) | the import it was staged for | `packages/catalog/contract/src/Staging/Staged.read.ts` (`StagedTable`: "a staged cell is what the file said, never a corrected value") | in the repository today |
 | `FileRow` | File row | Content that holds one data row of a staged file, named by its row number as Excel numbers it and, for a row holding several items, its part (pending Q7). | information | `gist:Content` | the import and the `RowId` (`row-7`, `row-8.2`); never its SKU | `packages/catalog/contract/src/Catalog.id.ts` (`RowId`); `Staging/Staged.read.ts` (`StagedRow`) | in the repository today |
 | `FileProblem` | File problem | Content that says why a whole file cannot be read or staged, naming the file, and what the person can do about it (pending Q7). | information | `gist:Content` | the upload and the problem's kind | `packages/catalog/contract/src/Staging/FileProblem.read.ts` ("a problem in the person's file is data the screen shows ... never a request error") | in the repository today |
 | `ColumnMatching` | Column match | An event in which a person, or the heading rule when the file is staged, sets which file column fills one item field, or that none does (pending Q7). | event | `gist:Event` | the import and the match's number in its matching | `packages/catalog/contract/src/Import/Mapping.read.ts` (`ColumnMatch`, `MappingChoice`); `Import.aggregate.ts` (`ColumnMatched`) | in the repository today |
@@ -198,17 +210,17 @@ Each class is a referent, not a record. The import is what the operations admin 
 | `GroupDecision` | Group decision | An event in which a person settles several file rows by one act, such as accepting one proposal for every row it explains (pending Q7). | event | `gist:Event` | the import and the change number that recorded it | `Group/Group.aggregate.ts` (`GroupDecided`); CLAUDE.md "One decision where one settles a column" | in the repository today |
 | `DecisionUndo` | Undo | An event in which a person takes back an earlier row or group decision, so that the decision under it stands again (pending Q7). | event | `gist:Event` | the import and the change number that recorded it | `Row/Row.aggregate.ts` (`StepUndone`); `Group/Group.aggregate.ts` (`GroupUndone`) | in the repository today |
 | `ImportConfirmation` | Confirm | An event in which a person confirms an import, and every Ready row is written to the catalogue as created or replaced items in one batch (pending Q7). | event | `gist:Event` | `ConfirmId` | `Import/Import.read.ts` (`ImportEvent` `Confirmed`, `batchId`); `Import.aggregate.ts` (`ImportConfirmed`); CLAUDE.md "Nothing is written until the person confirms" | in the repository today |
-| `RowOutcome` | Row outcome | Content that says what an import's confirms did with one file row (created, updated, already there, not imported, taken back), with a reason wherever one is owed (pending Q7). | information | `gist:Content` | the import and the `RowId` (pending decision 53: 04 recommends one outcome per confirmation, identified by the confirm and the `RowId`) | `Import/Import.read.ts` (`RowOutcome`, `OutcomeKind`) | in the repository today |
+| `RowOutcome` | Row outcome | Content that says what happened to one file row (created, updated, already there, not imported, taken back), with a reason wherever one is owed (pending Q7). | information | `gist:Content` | the import and the `RowId` today; the confirmation and the `RowId` under 04's proposal (decision 53, open) | `Import/Import.read.ts` (`RowOutcome`, `OutcomeKind`); `migrations/0001_init.sql` lets a later confirm overwrite the outcome | latest outcome in the repository today; a complete, immutable set per confirmation is proposed |
 | `ValueChange` | Changed value | Content that records one value an import wrote in place of what its file said, with how it came to stand (by a rule, by an accepted proposal, typed) and who decided it (pending Q7). | information | `gist:Content` | the confirm, the `RowId` and the field | `Import/Import.read.ts` (`ChangeRecord`); `Import/Change.read.ts` (`Change`) | in the repository today |
 | `ImportTakeBack` | Take-back | An event in which a person reverses the confirms of an import still in force, removing the items they created and restoring the items they replaced, except items changed since, which are kept and named (pending Q7). | event | `gist:Event` | the import and the first confirm it reverses (`batchId`) | `Import/Import.read.ts` (`ImportEvent` `TakenBack`, `TakeBackState`); `Import.aggregate.ts` (`ImportTakenBack`); root `DECISIONS.md` ("Take-back after a replace") | in the repository today |
 | `ImportReopening` | Reopen | An event in which a person opens a confirmed or taken-back import again, to finish the rows it left out (pending Q7). | event | `gist:Event` | the import and the change number that recorded it | `Catalog.contract.ts` (`reopen`); `Import.aggregate.ts` (`ImportReopened`) | in the repository today |
 | `ImportRemoval` | Remove | An event in which a person removes an import that has nothing in force (pending Q7). | event | `gist:Event` | the import | `Catalog.contract.ts` (`remove`); `Import.aggregate.ts` (`ImportRemoved`, `HasItemsInForce`) | in the repository today |
-| `ItemEdit` | Item edit | An event in which a person changes the stored values of one item after an import created or replaced it, outside any import (pending Q7). | event | `gist:Event` | the item and the revision the edit was made on | `Catalog.contract.ts` (`PUT /items/:id`); `TakeBackState.changed` ("a take-back keeps them"); CLAUDE.md "a changed record kept and named" | in the repository today |
+| `ItemEdit` | Item edit | An event in which a person changes the stored values of one item after an import created or replaced it, outside any import (pending Q7). | event | `gist:Event` | the item and the revision the edit was made on | The `ItemEdit` body of `PUT /items/:id` is a request, not this event. There is no record of the event yet. | later |
 
 The schemes the import uses are 10's: `ImportLifecycleScheme`, `ReviewOutcomeScheme` (three concepts or five,
-decision 56), `ImportResultOutcomeScheme` (first written here as `RowOutcomeScheme`), `ValueChangeMethodScheme`
+decision 56, open), `ImportResultOutcomeScheme` (first written here as `RowOutcomeScheme`), `ValueChangeMethodScheme`
 (first `ChangeHowScheme`) and `ValueChangeSourceScheme` (first `ChangeSourceScheme`). A file problem's kind gets no
-scheme: 10 lists `FileProblemKind` among the code lists that are file-reading mechanics (decision 52).
+scheme: 10 lists `FileProblemKind` among the code lists that are file-reading mechanics (pending decision 52).
 
 Two "already there" rules stay record rules, not terms: a second load of the same file adds nothing (counted from the
 stored SKU keys), and a row's identity is its `RowId`, never its SKU (rows 4 and 10 of the messy sample share one).
@@ -217,18 +229,20 @@ stored SKU keys), and a row's identity is its `RowId`, never its SKU (rows 4 and
 
 One direction only; the reverse is a SPARQL `^p` path. Domains and ranges are broad where several classes use a
 property (anti-pattern 10). Where no record schema exists yet, a datatype range "moves to the record schema", and the
-owning context is Q6. A range written `skos:Concept (X)` means a concept of scheme X; how that is projected is 05's
-and 12's.
+owning context is Q6 (decision 37, open). A range written `skos:Concept (X)` means a concept of scheme X (decision 23);
+how that is projected is 05's and 12's.
 
 ### Commitments and allocation
 
 | Key | Label | Definition | Domain | Range | Source |
 | --- | --- | --- | --- | --- | --- |
 | `lineOf` | line of | Relates a line to the quote, order or bill of materials revision it is part of. | `gist:Intention`: a `CommitmentLine` here, a `BomLine` in 07 | `gist:Intention` (quotes, manufacturing, work and transfer orders are commitments and sales and purchase orders agreements, pending Q1; 07's BOM revisions are specifications; all are intentions) | the architecture seed (`hasLine`, turned to run from the part, as gist's `isPartOf` does) |
+| `plannedComponentOf` | planned component of | Relates a line to the order that calls for its item as input. | `ManufacturingOrderLine` or `WorkOrderLine` | the corresponding `ManufacturingOrder` or `WorkOrder` | 08's component demand; sub-property of `lineOf` |
+| `plannedOutputOf` | planned output of | Relates a line to the order expected to produce its item. | `ManufacturingOrderLine` or `WorkOrderLine` | the corresponding `ManufacturingOrder` or `WorkOrder` | 08's expected manufacturing supply; sub-property of `lineOf` |
 | `promisedItem` | promised item | Relates a line to the item it promises, as the commitment names it (an alias item stays the alias). | `CommitmentLine` | `ItemSpecification` (07) | the architecture seed 5.1, 5.6 |
 | `agreedUnitPrice` | agreed unit price | Relates a line to the price per unit agreed for it. | `CommitmentLine` | `MoneyAmount` (07) | the architecture seed 5.5 ("price ... line") |
 | `dueOn` | due on | Gives the calendar date a line is promised for. | `CommitmentLine` | datatype from the record field (moves to the record schema; the seed writes an ISO date string) | the architecture seed 5.8 (`dueDate`) |
-| `counterparty` | counterparty | Relates a quote or an order to the organization on the other side of it: the customer of a quote or sales order, the vendor of a purchase order. | `gist:Intention` | `Organization` (06) | decision 3 (an Account is an `Organization` with role flags; the flag a counterparty needs is a record rule) |
+| `counterparty` | counterparty | Relates a quote or an order to the organization on the other side of it: the customer of a quote or sales order, the vendor of a purchase order. | `gist:Intention` | `Organization` (06) | decisions 3 and 34: the counterparty is the organization; the customer or vendor flag sits on the tenant's `SourceRecord` of it, and that the order's counterparty has the flag it needs stays a record rule |
 | `acceptsQuote` | accepts quote | Relates a sales order to the quote it was made from. | `SalesOrder` | `Quote` | the API design report 4.1 (Quote to Sales order conversion) |
 | `raisedFor` | raised for | Relates a commitment to a line of another commitment it was raised to supply (a manufacturing order made for a sales order line, a purchase order bought for a manufacturing order line). | `gist:Intention` | `CommitmentLine` | the API design report 4.1 (`fulfillsSalesOrder`); the architecture seed 5.3 |
 | `workOrderOf` | work order of | Relates a work order to the manufacturing order it is part of. | `WorkOrder` | `ManufacturingOrder` | the architecture seed (`hasWorkOrder`, turned to run from the part) |
@@ -257,16 +271,16 @@ lifecycle phase is 10's `lifecycleState`, one property for orders, imports, item
 | `unpacks` | unpacks | Relates an unpacking to an event line it took out of the parent unit. | `DisaggregationEvent` | `EventLine` | the architecture seed 7.1 |
 | `unpackedFrom` | unpacked from | Relates an unpacking to the logistic unit it emptied. | `DisaggregationEvent` | `LogisticUnit` (08) | the architecture seed 7.1; EPCIS `parentID` |
 | `involvesLogisticUnit` | logistic unit | Relates an event line to a whole logistic unit it concerns, such as a pallet shipped or packed as one. | `EventLine` | `LogisticUnit` (08) | the architecture seed (`container`); EPCIS `childEPCs` |
-| `occursAt` | at | Relates an event to the place it happened at. | `gist:Event` | `Location` (08) | EPCIS `bizLocation`, `readPoint`; gist `occursIn` (alignment, 11) |
+| `occursAt` | at | Relates an event to the place it happened at. | `gist:Event` | `Location` (08) | EPCIS `bizLocation`, `readPoint`; a sub-property of `gist:occursIn` only where its domain and range fall under that property's (decision 16; report 11 proposes the link) |
 | `businessStep` | business step | Relates an event to the step of a business process it belongs to. | `gist:Event` | `skos:Concept` (`BusinessStepScheme`) | the architecture seed (`businessStep`); EPCIS `bizStep` |
 | `resultingDisposition` | disposition after | Relates an event to the disposition the stock it involves has afterwards. | `gist:Event` | `skos:Concept` (10's `QualityDispositionScheme`) | the architecture seed (`disposition`); EPCIS `disposition` |
 | `eventTime` | happened at | Gives the instant an event happened, with its time zone. | `gist:Event` | datatype from the record field | the architecture seed (`eventTime`); EPCIS `eventTime` |
-| `recordTime` | recorded at | Gives the instant a system recorded an event, which may be long after it happened. | `gist:Event` | datatype from the record field | the architecture seed (`recordTime`); EPCIS `recordTime` |
-| `startedAt` | started at | Gives the inclusive start of an event that lasts, or of a grant (06). | none declared: an event that lasts, under `gist:Event`, and 06's `Grant` (kept broad) | datatype from the record field | the architecture seed (`startTime`) |
-| `endedAt` | ended at | Gives the exclusive end of an event that lasts, or of a grant (06); absent while it has not ended. | none declared: as `startedAt` | datatype from the record field | the architecture seed (`endTime`; "absent for an open interval") |
+| `recordTime` | recorded at | Gives the instant a system recorded an event or wrote an audit entry, not when the act happened. | `gist:Event` or `AuditEntry` (06) | datatype from the record field | the architecture seed (`recordTime`); EPCIS `recordTime`; a sub-property of `gist:isRecordedAt` only where its domain and range fall under that property's (decision 16; report 11 proposes the link) |
+| `startedAt` | started at | Gives the inclusive start of an event that lasts, or of a `Grant` (decision 40), not of a `Member`. | a lasting `gist:Event` or `Grant` (06), not `Member` | datatype from the record field | the architecture seed (`startTime`) |
+| `endedAt` | ended at | Gives the exclusive end of an event that lasts, or of a `Grant` (decision 40), not of a `Member`; absent while it has not ended. | a lasting `gist:Event` or `Grant` (06), not `Member` | datatype from the record field | the architecture seed (`endTime`; "absent for an open interval") |
 | `correctsEvent` | corrects | Relates an event to an earlier event it corrects, which is kept as it was recorded. | `gist:Event` | `gist:Event` | the architecture seed 7.1 (`correctsEvent`; not an EPCIS `errorDeclaration` by itself) |
 | `performedBy` | by | Relates an event to the member, person or organization that did it or answers for it. | `gist:Event` | none declared: a `Member` (06) for an act in the app, a person or an organization for an act outside it; each record's SHACL says which (pending decision 91) | the architecture seed (`performedBy`); CLAUDE.md "People are told apart by id" |
-| `carriedBy` | carrier | Relates a receipt or a shipment to the organization that carried the goods. | `gist:Transaction` | `Organization` (06) | decision 3 (no carrier flag while decision 89 is open); public Sutton shipping document (bills of lading) |
+| `carriedBy` | carrier | Relates a receipt or a shipment to the organization that carried the goods. | `gist:Transaction` | `Organization` (06) | decisions 3 and 34: the carrier is the organization; no carrier flag is stated while decision 89 is open; public Sutton shipping document (bills of lading) |
 | `executesWorkOrder` | runs | Relates an operation run to the work order it carries out. | `OperationExecution` | `WorkOrder` | the architecture seed 5.4 |
 | `usesMachine` | machine | Relates an operation run to a machine it used. | `OperationExecution` | `Machine` (08) | the architecture seed (`usesMachine`) |
 | `duringRun` | during | Relates a transformation to the operation run it happened in. | `TransformationEvent` | `OperationExecution` | the architecture seed 5.4 ("Do not infer that material was consumed simply because a scheduled WO exists") |
@@ -275,7 +289,7 @@ lifecycle phase is 10's `lifecycleState`, one property for orders, imports, item
 | `resultOf` | result of | Relates a quality result to the check it records. | `QualityResult` | `QualityInspection` | the architecture seed (`inspectionResult`, turned to run from the result) |
 | `placesHold` | places | Relates a hold placement to the hold it begins. | `HoldPlacement` | `QualityHold` | the architecture seed 5.7 |
 | `releasesHold` | releases | Relates a hold release to the hold it ends. | `HoldRelease` | `QualityHold` | the architecture seed 5.7 |
-| `hasReason` | reason | Relates a hold or a receiving rejection to the reason given for it. | none declared: used by `QualityHold` and `ReceivingRejection`; the scheme each draws on is a record rule | `skos:Concept` (`HoldReasonScheme`, `ReceivingRejectReasonScheme`, `MachineStopReasonScheme`) | the architecture seed (`holdReason`); one property, not one per class (naming-conventions, "encoding class in the property name") |
+| `hasReason` | reason | Relates a hold or a receiving rejection to the reason given for it. | none declared: used by `QualityHold` and `ReceivingRejection`; the scheme each draws on is a record rule | `skos:Concept` (`HoldReasonScheme` or `ReceivingRejectReasonScheme`) | the architecture seed (`holdReason`); one property, not one per class (naming-conventions, "encoding class in the property name") |
 | `questionsLot` | questions | Relates a recall to a lot it puts in question. | `RecallCase` | `MaterialLot` (08) | the architecture seed 5.7 ("the questioned material") |
 | `affectsShipment` | affects | Relates a recall to a shipment it decided was affected; a trace that finds candidates is a View, not this. | `RecallCase` | `Shipment` | the architecture seed 5.7 ("affected shipments") |
 
@@ -377,7 +391,7 @@ the way).
 | --- | --- | --- | --- | --- | --- |
 | each commitment kind | one per kind, keyed by tenant and source id | one per lifecycle transition (`ReleasePurchaseOrder`) | one per transition (`PurchaseOrderReleased`); the state is the lifecycle concept | `NotReleased`, `AlreadyClosed` | `OpenPurchaseLines`, `OpenSalesLines` Views |
 | `CommitmentLine` | inside its commitment's aggregate | `AddLine`, `ChangeLine` | `LineAdded`, `LineChanged` | `LineClosed` (report 01) | `LineFulfilment` View: allocations summed against the line |
-| `LineAllocation` | inside the line's commitment | `AllocateToLine` | `QuantityAllocated` | `MoreThanTheEventLineHas`; whether over-delivery is refused is Q9 | `LineFulfilment` |
+| `LineAllocation` | inside the line's commitment | `AllocateToLine` | `QuantityAllocated` | `MoreThanTheEventLineHas`; whether over-delivery is refused is Q9 (decision 84, open) | `LineFulfilment` |
 | `Receipt` | `Receipt` | `RecordReceipt` | `ReceiptRecorded` (report 01) | `LineClosed` (report 01) | 08's stock projection |
 | `ReceivingRejection` | `Receipt` | `RejectReceived` | `ReceivedRejected` | `MoreThanReceived` | 08's stock projection |
 | `Putaway`, `Pick` | none: each is one event of a move | `PutAway`, `PickForLine` | `StockPutAway`, `StockPicked` | `NotAtThatLocation` | 08's stock projection |
@@ -471,18 +485,22 @@ wrote that differ from its file, who decided each, and which items a take-back k
 
 All `proposed`. The vocabulary module holds them; the architect formalizes them.
 
-- Subsumption: as the tables' gist parent column, and the six line subkinds under `CommitmentLine`.
+- Subsumption: as the tables' gist parent column, and the six line subkinds under `CommitmentLine`. A gist parent is
+  admitted when the slice that builds the term needs it (decision 13), and its named gist ancestors enter with it as
+  names and links only (decision 14). None of them is in the thin thread.
 - Disjointness, each as one all-disjoint set: the six commitment kinds; the six line subkinds; `Receipt` and
   `Shipment`; the local classes directly under `gist:Event` (`EventLine`, `ReceivingRejection`, `HoldPlacement`,
   `HoldRelease`, `RecallCase`, and the import's eleven events), with
-  `OperationExecution` (under `gist:Task`) and the four under `gist:PhysicalEvent` when decision 13 brings those in;
-  `Putaway` and `Pick` as subkinds of 08's `StockMovement` (decision 79); the local classes under `gist:Content`
-  (`QualityResult`, `Invoice`, `SupplierBill`, `AccountingSyncRecord`, `FileRow`, `FileProblem`, `ValueProposal`,
-  `RowOutcome`, `ValueChange`, and `StagedFile` unless it moves under `gist:FormattedContent`).
-  Disjointness across gist's top classes (an event that is also content) is gist's own axiom and is not copied unless
-  Benjamin says so (project profile).
+  `OperationExecution` (under `gist:Task`) and the four under `gist:PhysicalEvent` when their slice admits those
+  parents (decision 13), not in the thin thread; `Putaway` and `Pick` as subkinds of 08's `StockMovement` (pending
+  decision 79); the local classes under `gist:Content` (`QualityResult`, `Invoice`, `SupplierBill`,
+  `AccountingSyncRecord`, `FileRow`, `FileProblem`, `ValueProposal`, `RowOutcome`, `ValueChange`). `StagedFile` is
+  under `gist:FormattedContent`, admitted with its slice (decision 13), so it is not in that Content set.
+  The projection copies the `owl:disjointWith` pairs gist states between classes it has admitted, and no others
+  (decision 15). It copies none for this document's gist classes until their slice admits them.
 - No `owl:inverseOf`, no `owl:sameAs`, no keys, no cardinality, no property characteristics. A line's quantity, a
-  required `eventTime`, an allocation that names both ends, a counterparty whose customer flag is set: record rules, in
+  required `eventTime`, an allocation that names both ends, a counterparty whose tenant `SourceRecord` has the customer
+  or vendor flag the order needs (decision 34): record rules, in
   the record schemas and the SHACL generated from them, or Alchemy invariants.
 
 ## Anti-pattern review
@@ -490,7 +508,7 @@ All `proposed`. The vocabulary module holds them; the architect formalizes them.
 | # | Anti-pattern | Finding |
 | --- | --- | --- |
 | 1 | Singleton hierarchy | `CommitmentLine` has six subkinds. `gist:Offer` and `gist:Determination` have one local child each; the checklist reads `inv:` terms only, so an imported parent with one child is expected |
-| 2 | Role-as-kind | No customer, vendor or carrier class: `counterparty` and `carriedBy` point at an `Organization` whose flag is a record rule (decision 3) |
+| 2 | Role-as-kind | No customer, vendor or carrier class. `counterparty` and `carriedBy` point at an `Organization`. The customer and vendor flags sit on the tenant's `SourceRecord` (decisions 3 and 34). No carrier flag while decision 89 is open |
 | 3 | Process-object confusion | Promise and performance are split: a manufacturing order is not an operation run, a work order not a transformation, a receipt is the event and the receiving ticket is the record |
 | 4 | Missing disjointness | Planned above for every set of sibling kinds; none of the siblings is a role or a phase |
 | 5 | Circular definition | Checked by reading each definition against its key: none uses the term it defines (a pick is "stock taken", not "a picking") |
@@ -516,14 +534,20 @@ neither is inferred from the other.
 
 Moved on 2026-11-22 to the packet's [DECISIONS.md](../DECISIONS.md), "Open", merged with the other reports'
 questions. A "(pending Qn)" mark in this report means: Q1 is decision 80, Q2 is 81, Q3 is 82, Q4 is 77, Q5 is 83,
-Q6 is 37, Q7 is 52, Q8 is 13, Q9 is 84.
+Q6 is 37, Q7 is 52, Q9 is 84. Q8 is decision 13, answered on 2026-11-22: a gist name is admitted when the slice that
+builds the term needs it, not by taking every name report 11 lists. Decisions 79, 91, 53, 56 and 89, cited in the
+tables, stay open. Each open decision is put to Benjamin with the slice that needs it. Until then the recommendation
+is the agent's, and nothing here is built on it.
 
 ## Not checked
 
 - No term here went through `ontology-foundational-auditor`, and there is no `rat-` record for any of them; the
   conceptualizer skill's input rule is not met, so this is a candidate design.
 - The gist release file was not opened; every gist name is from `gist-categories.md`. `gist:Intention` is named there
-  only as a parent of other classes, and `gist:Task` not at all.
+  only as a parent of other classes, and `gist:Task` not at all. Decision 13 adds a gist name to that profile when the
+  slice that needs it is specified, so `gist:Task`, `gist:PhysicalEvent` and `gist:FormattedContent` are not admitted
+  with the thin thread. Because the gist file was not opened, decision 16's domain and range test is not done for
+  `occursAt` under `gist:occursIn` or `recordTime` under `gist:isRecordedAt`.
 - The EPCIS and CBV names were read through a fetch that listed them, not byte-compared, and EPCIS 2.0.1 was not
   read. The CBV definitions of `storing` and `stocking` were not read, so the putaway crosswalk is a candidate.
 - No Sutton page was fetched. Every Sutton fact is as the architecture seed or the API design report cites its public

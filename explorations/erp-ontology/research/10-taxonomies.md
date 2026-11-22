@@ -6,11 +6,22 @@ description: Every SKOS concept scheme the ERP ontology needs, its concepts, and
 
 # Taxonomies of the ERP ontology
 
-This is a design to argue with, not a decision. It is the conceptualizer's step for code lists: which SKOS concept
-schemes the vocabulary module holds, what each concept means, and which record field takes its allowed values from
-which scheme. No term in it is ratified: decisions 1 to 7 ratify no term by name and no `rat-` record exists, so every
-row below is a proposal that goes through the foundational auditor and Benjamin before the architect writes it into
-the vocabulary module (which is not built). TypeScript and Turtle below are sketches, not code.
+This is a design to argue with where a decision is still open, and a decided design where one is answered. It is the
+conceptualizer's step for code lists: which SKOS concept schemes the vocabulary module holds, what each concept means,
+and which record field takes its allowed values from which scheme. Two schemes are in the thin thread:
+`MemberRoleScheme` (viewer, editor and admin; decisions 8 and 41) and `GrantScopeKindScheme` with the one concept
+organization (decision 96). The terms with them are `Organization`, `Tenant` (a role class under `Organization`, keyed
+by `OrganizationId`; `membershipIn` ranges over it, decision 38), `Person` (under `gist:Person`, one link from `Member`
+to the person, no name or email paths, decision 94), `Member`, `Role` (no gist parent, no `permits`), `Grant`
+(`grantedTo`, `grantsRole`, `grantScope`) and `AuditEntry` (alternative label "Activity", decision 46). Their gist
+parents and those parents' ancestors come with them (decisions 13 and 14). The thread answers one question: who belongs
+to this organization and with which role, on a fixture where one person is an admin in one organization and a viewer in
+another. The other schemes stay proposals for the slice that needs them. Slice 1, the
+party slice, follows the thread and is not the first deliverable. No scheme has a `rat-` record yet: decision 32 says
+the module holds ratified entries only, and the answers of 2026-11-22 are the first that need those records. Except
+where an answered decision below says otherwise, a row is still a proposal that goes through the foundational auditor
+and Benjamin before the architect writes it into the vocabulary module (which is not built). TypeScript and Turtle
+below are sketches, not code.
 
 Inputs: the project profile and the packet's `DECISIONS.md`; reports 01 and 02; the shared gist, naming, anti-pattern
 and foundational files; the two seed reports ("the architecture seed" and "the API design report"); the catalog and
@@ -27,24 +38,30 @@ report 01 section 5 decides. Sutton facts are from Sutton's public help pages an
 2. **The notation is the record's literal, exactly.** `EA`, `raw-materials`, `takenBack`: the string a record schema
    holds today, or will hold. The vocabulary owns what a value means (label, definition, broader, alignment); the
    record schema owns which values a field allows (decision 2: a change to an allowed value is a change to a record
-   schema). A check, once built, fails when a record literal is not a notation of the scheme its `term` names. A
-   field may allow a subset of a scheme (`Dimensions.unit` allows `cm` and `in` only).
-3. **A concept's IRI is `inv:<SchemeKey>-<notation>`** (`inv:ItemRoleScheme-buy`, `inv:UnitOfMeasureCodeScheme-EA`),
-   under the `example.org` placeholder (decision 7); every scheme key ends in `Scheme`, 05's rule V3. The form is open
-   in the profile (pending Q1). A slash would need escaping in a Turtle local name; a hyphen does not.
+   schema). Decision 23: the record keeps storing the notation, the projector lifts it to the concept's IRI, and
+   `sh:in` lists the concept IRIs of the field's own literals, not every concept of the scheme. Every code a field
+   allows must be a notation of its scheme, and a field may allow fewer than the scheme has. `Uom` allows five of the
+   seven units and `Dimensions.unit` allows `cm` and `in`; an unknown notation fails. This is not the equality of
+   tagged-class keys (rule 1). Where the scheme lists only the notations the record schema allows, the two lists are
+   equal (section 4.12, the thin thread's three roles).
+3. **A concept's IRI is `<namespace><SchemeKey>-<notation>`** (`inv:MemberRoleScheme-admin`, `inv:ItemRoleScheme-buy`,
+   `inv:UnitOfMeasureCodeScheme-EA`), decision 10. The namespace is
+   `https://example.org/inventory-import/ontology/` for as long as decision 7 keeps the `example.org` placeholder.
+   Classes, properties and schemes sit directly under it, and every scheme key ends in `Scheme` (05's rule V3). A
+   hyphen needs no escape in Turtle or SPARQL.
 4. **Identity of a concept** is its scheme and its notation. A notation is never reused for another meaning: a change
    of meaning is a new concept and a deprecation (the architecture seed, section 6), which the curator plans.
 5. **"Closed"** means the scheme lists every value that may occur in this repository's records; a record schema then
-   generates `sh:in`. "Open" means more values are expected (an unverified Sutton list, a tenant's own), and an
-   unknown source literal goes to a person to map, never to the nearest label (the architecture seed, section 6).
+   generates `sh:in` of the concept IRIs for the notations it allows (decision 23). "Open" means more values are
+   expected (an unverified Sutton list, a tenant's own), and an unknown source literal goes to a person to map, never
+   to the nearest label (the architecture seed, section 6).
 6. **"One" or "several"** is said of one record: one value per field, or a set.
 7. **An altLabel is a word, not a licence.** A file that writes `bx` or `Finished Good` still gets the import's
    proposal and the person's decision ("The person decides; the app proposes"); the altLabel is evidence for the
    proposal, never an automatic mapping.
 8. **No `owl:inverseOf`, no `owl:sameAs`, no `skos:exactMatch` between two tenants' records.** `skos:broader` is
    written one way only; `skos:narrower` is a `^skos:broader` path. Mapping predicates are the `skos:*Match` family.
-9. **Labels and definitions** are written as `skos:prefLabel` and `skos:definition`; which properties they project
-   as is open in the profile.
+9. **Labels and definitions** are `skos:prefLabel` and `skos:definition`, in English (decision 11).
 10. **Overlap is not hierarchy.** Inventory measures overlap (Reserved is counted inside Committed, by Sutton's public
     words); that is a fact about quantities, said in a scope note, not a `skos:broader` link (report 01 section 5).
 
@@ -55,7 +72,10 @@ other documents (report 13): every key now ends in `Scheme`, `IdentifierScheme` 
 scheme for the item, party and tracking codes of 06, 07 and 08), `QualityResult` became `QualityOutcomeScheme` (09's
 name, since `QualityResult` is 09's class), and the schemes 06, 08 and 09 named without concepts were added (sections
 4.29 to 4.31). Open choices are numbered decisions in [DECISIONS.md](../DECISIONS.md), mapped from each Qn here under
-"Questions for Benjamin".
+"Questions for Benjamin". Of the schemes in the table, `MemberRoleScheme` and `GrantScopeKindScheme` are in the thin
+thread. `MemberRoleScheme` ships viewer, editor and admin (decisions 8 and 41). `GrantScopeKindScheme` ships the one
+concept organization (decision 96); location and field wait for the slice that needs them. Every other scheme waits
+for the slice that needs it.
 
 | Key | Label | Definition | Tag | gist parent | Identity | Source | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -65,7 +85,7 @@ name, since `QualityResult` is 09's class), and the schemes 06, 08 and 09 named 
 | TrackingMethodScheme | Tracking method | A controlled vocabulary of the ways an item's stock is told apart, from one pooled quantity to one identifier per unit. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | Item.read.ts (`lotTracked`); the architecture seed section 6; Sutton public tracking article | in the repository today (two of four concepts) |
 | UnitOfMeasureCodeScheme | Unit of measure code | A controlled vocabulary of the units an item's quantities and sizes are written in, each named by the code a record holds. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | Item.read.ts (`uoms`, `Dimensions.unit`); both samples | in the repository today |
 | MeasurementDimensionScheme | Measurement dimension | A controlled vocabulary of the kinds of amount a unit measures, such as count, mass, length and volume. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | NEW: a unit's dimension decides which conversions need an item factor (docs/glossary.md "Conversion factor"; the architecture seed 7.3) | later |
-| ContactPurposeScheme | Contact purpose | A controlled vocabulary of what a party's contact point is used for, such as billing, shipping or receiving goods. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3 | later |
+| ContactPurposeScheme | Contact purpose | A controlled vocabulary of the purpose a contact assignment carries for one person at one account, such as billing, shipping or receiving. The purpose does not sit on the contact point alone (decisions 39 and 43). | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3 | later |
 | IdentifierKindScheme | Identifier kind | A controlled vocabulary of the systems that issue identifiers, each saying who assigns the identifier's text and what it identifies. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3; Item.read.ts (`sku`, `vendorSku`); docs/glossary.md "Barcode"; the architecture seed 7.1 | in the repository today (two concepts) |
 | GrantScopeKindScheme | Grant scope kind | A controlled vocabulary of the extents a grant of access covers: a whole organization, one location, or one field. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3; the architecture seed 5.7 | in the repository today (one concept) |
 | MemberRoleScheme | Member role | A controlled vocabulary of the access levels a member holds in an organization, ranked by what each may do. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | packages/kernel/src/Role.schema.ts (`Role`) | in the repository today |
@@ -89,9 +109,9 @@ name, since `QualityResult` is 09's class), and the schemes 06, 08 and 09 named 
 | AccountingSyncStateScheme | Accounting sync state | A controlled vocabulary of where a document stands in being sent to an outside accounting system. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | NEW: report 01 section 4 names the accounting boundary and no state; no Sutton public list was found (pending Q12) | later |
 | AccountStatusScheme | Account status | A controlled vocabulary of whether the tenant still trades with an account organization or has set its record aside. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; Sutton public accounts article (Active, Archived) | Sutton only |
 | ContactPointKindScheme | Contact point kind | A controlled vocabulary of the kinds of electronic address at which a party is reached. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; schema.org `email`, `telephone` (fetched by 06) | Sutton only |
-| IdentityOutcomeScheme | Identity outcome | A controlled vocabulary of what an identity decision finds about two parties a tenant holds. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; report 01 section 3 | later |
-| EvidenceKindScheme | Evidence kind | A controlled vocabulary of the likenesses and differences between two parties a tenant holds that an identity decision may rest on. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; IBM MDM suspected duplicate processing (fetched by 06) | later |
-| MembershipStatusScheme | Membership status | A controlled vocabulary of where a person's membership of a tenant stands, from invited to removed. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; the `member` table (`removedAt`); Sutton public user accounts article | in the repository today (two of four concepts) |
+| IdentityOutcomeScheme | Identity outcome | A controlled vocabulary of what an identity decision finds about two source records a tenant holds that may be one party (decision 34). | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; report 01 section 3 | later |
+| EvidenceKindScheme | Evidence kind | A controlled vocabulary of the likenesses and differences between two source records a tenant holds that an identity decision may rest on (decision 34). | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; IBM MDM suspected duplicate processing (fetched by 06) | later |
+| MembershipStatusScheme | Membership status | A controlled vocabulary of where a person's membership of a tenant stands, from invited to removed. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; Sutton public user accounts article | Sutton only |
 | PortalModuleScheme | Portal module | A controlled vocabulary of the parts of a tenant's records a customer or vendor portal may show. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; Sutton public portals article | Sutton only |
 | ModelCallPurposeScheme | Model call purpose | A controlled vocabulary of what a call to a language model is made for, each call drawn from the day's allowance. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 06; `packages/access/contract/src/Allowance/ModelAllowance.gateway.ts` (`ModelCallPurpose`) | in the repository today |
 | PositionBasisScheme | Position basis | A controlled vocabulary of how the quantities of a stock position were obtained. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | 08 (book, counted, reported) | in the repository today (one concept: reported) |
@@ -103,8 +123,10 @@ name, since `QualityResult` is 09's class), and the schemes 06, 08 and 09 named 
 ## 3. Who owns what around these schemes
 
 The classes and records that carry a value from a scheme belong to the other documents, under their likely keys:
-`ItemSpecification` and its kinds, `UnitOfMeasure`, `CostObservation` (07); `ContactPoint`, `PartyIdentifier`, `Grant`,
-`Role`, `Organization` and its role flags (06); `StockPosition`, `InventoryMeasure`, `InventoryLabel`, `TrackingCode`
+`ItemSpecification` and its kinds, `UnitOfMeasure`, `CostObservation` (07); `ContactAssignment`, `ContactPoint`,
+`PartyIdentifier`, `Grant`, `Role` (06); the tenant's `SourceRecord`, which carries the customer and vendor flags
+(decisions 3 and 34) and is linked by `recordOf` to the `Organization` or `Person` it records; `StockPosition`,
+`InventoryMeasure`, `InventoryLabel`, `TrackingCode`
 (08); the orders and their lines under `gist:Intention`, the events under `gist:Event`, `QualityInspection`,
 `AccountingSyncRecord`, and the import's `ItemImport`, `FileRow`, `RowOutcome`, `ValueChange`
 (09). When a term document names a property that carries one of these schemes, its key wins (section 6). The gist
@@ -131,11 +153,11 @@ second home. The check that a record literal is a notation is 12's to specify.
 
 Sutton public: an item is Inventory (physical goods), Service (work, no stock) or Alias (sold under another name or
 SKU and fulfilled by another item). These differ in identity-bearing structure (an alias points at its fulfilment
-item; a service has no stock). gist separates product and service specifications too, but the projection takes
-neither class: decision 12 gives the item kinds one identity-bearing parent, `ItemSpecification`, and either gist
-class would be a second. So they are rigid subkinds owned by 07, and the item record's kind tag takes its
-literals from those class keys; no `ItemKind` scheme is emitted. The table lists the tag values only, to show the
-field.
+item; a service has no stock). gist separates product and service specifications too. Whether the item kinds are
+classes or a scheme is open (pending Q6, decision 65). The recommendation, still open, is rigid subkinds of one
+parent, `ItemSpecification`, owned by 07, with the item record's kind tag taking its literals from those class keys
+and no `ItemKind` scheme emitted. Either gist specification class would be a second parent. That parent is pending
+decision 92; decision 12, also open, does not select it. The table lists the tag values only, to show the field.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -214,8 +236,11 @@ whether its labels are lots or single units is decided per item by a person (pen
 ### 4.6 UnitOfMeasureCodeScheme (Unit of measure code)
 
 - Applies: one per field. An item has one counting unit; a dimensions value has one length unit.
-- Closed: the scheme is open (case, pallet and inner are expected, docs/glossary.md); each field's subset is closed by
-  its record schema.
+- Closed: the scheme is open (case, pallet and inner are expected, docs/glossary.md); each field's allowed subset is
+  closed by its record schema. Decision 23 is subset membership, not equality with every notation of this scheme and
+  not the equality of tagged-class keys (rule 1). The record stores the notation, the projector lifts it to the
+  concept's IRI, and `sh:in` lists those concept IRIs. `Uom` allows five of the seven (`EA`, `BX`, `KG`, `M`, `L`)
+  and `Dimensions.unit` allows `cm` and `in`. An unknown notation fails.
 - Concepts are units: each is also an individual of 07's `UnitOfMeasure` class, under `gist:UnitOfMeasure`
   (05's `alsoInstanceOf`; pending decision 61).
 - Record fields: `ItemFields.uom` and `ItemEdit.uom` (`Uom`: EA, BX, KG, M, L) and `Dimensions.unit` (cm, in), all in
@@ -262,25 +287,32 @@ EA and BX, from memory).
 
 ### 4.8 Party role labels: flags, not a scheme (pending Q7)
 
-Decision 3 makes customer and vendor flags on `Organization` (06's `isCustomer`, `isVendor`); carrier and contract
-manufacturer are held back by decision 89. A second home for the same meanings as concepts would break decision 2's
-"no fact with two homes". So no `PartyRole` scheme is emitted: the labels below are the prefLabel and altLabels of
-06's two properties, listed here so a file column ("Type: Customer; Vendor") has words to propose from.
-Several apply at once; the set is closed under decision 3.
+Decision 3 makes customer and vendor flags. Decision 34 puts them on the tenant's `SourceRecord`, not on the shared
+`Organization`: `Organization` names the real body, the row a tenant imports is a `SourceRecord` linked to it by
+`recordOf`, and CQ-P01 reads the flags on that record. Carrier and contract manufacturer are not added while decision
+89 is open; its recommendation, still open, is to ship only the two flags decision 3 names. Decision 47
+(pending Q7) is deferred and offers no choice of a scheme: a second home for the same meanings as concepts would
+break decision 2's "no fact with two homes". So no `PartyRole` scheme is emitted. The labels below are the prefLabel
+and altLabels of the two flag properties, listed here so a file column ("Type: Customer; Vendor") has words to
+propose from. Several apply at once.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
-| isCustomer | Customer | Client, Buyer | none | The label of the flag that says an organization buys from the business. | report 01 section 3; decision 3 |
-| isVendor | Vendor | Supplier | none | The label of the flag that says an organization sells to the business. | report 01; docs/glossary.md "Supplier"; Item.read.ts `Vendor` |
+| isCustomer | Customer | Client, Buyer | none | The label of the flag on the tenant's SourceRecord that says the recorded organization buys from the business. | report 01 section 3; decisions 3 and 34 |
+| isVendor | Vendor | Supplier | none | The label of the flag on the tenant's SourceRecord that says the recorded organization sells to the business. | report 01; docs/glossary.md "Supplier"; Item.read.ts `Vendor`; decisions 3 and 34 |
 
-Record field: none today (vendors are names inside `ItemFields.vendors`). Later 06's organization record.
+Record field: none today (vendors are names inside `ItemFields.vendors`). Later the tenant's `SourceRecord` (decision 34).
 
 ### 4.9 ContactPurposeScheme (Contact purpose)
 
-- Applies: several at once (one address may be both billing and shipping).
+- Applies: one purpose on one `ContactAssignment` (decisions 39 and 43). The assignment links one `Person` to one
+  account and carries that purpose and the contact point. The purpose does not sit on the address or the contact
+  point alone, and `isContactOf` by itself is not the model. One person who is the billing contact at one account and
+  the receiving contact at another is two assignments, so both purposes are not reported at both accounts.
 - Closed: no.
-- Concepts are categories of a contact point.
-- Record field: none today. Later 06's `ContactPoint` record, `purposes`.
+- Concepts are categories of a contact assignment, not of a contact point.
+- Record field: none today. Later the assignment's purpose, owned by 06. The scheme follows the party slice, not the
+  thin thread.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -288,6 +320,8 @@ Record field: none today (vendors are names inside `ItemFields.vendors`). Later 
 | shipping | Shipping | Ship-to | none | A contact purpose for which goods sent to the party are delivered to the contact point. | report 01 section 3 ("a ship-to address is not the customer") |
 | receiving | Receiving | Receiving dock | none | A contact purpose for which the contact point is where goods arriving at the party's site are taken in. | report 01 section 3 |
 | ordering | Ordering | Purchase orders | none | A contact purpose for which purchase orders and order questions are sent to the contact point. | NEW: a purchase order is sent to a vendor somewhere (the API design report's PO email recipients) |
+
+The definitions name the contact point the assignment carries. They do not store the purpose on the point.
 
 ### 4.10 IdentifierKindScheme (Identifier scheme)
 
@@ -319,11 +353,13 @@ them apart.
 ### 4.11 GrantScopeKindScheme (Grant scope kind)
 
 - Applies: one per grant.
-- Closed: no.
-- Concepts are categories of a grant's scope.
-- Record field: none today. In this repository a member's role applies to the whole organization (`Role`, packages/
-  kernel/src/Role.schema.ts; `Person.read.ts`, `People.command.ts`), which is `organization`. Later 06's `Grant`,
-  `grantScope`; a location grant names its place with 08's `atLocation`.
+- Closed: no. For the thread, the scheme ships the one concept `organization` (decision 96). `location` and `field`
+  are added by the slice that needs them, and adding a scope changes no existing grant.
+- Concepts are categories of a grant's scope. Only `organization` is in the thread.
+- Record field: none today. Decision 40: `Grant` is its own relator, linking a member, a role and a scope, and
+  today's `member.role` is one grant at organization scope, the notation `organization`. Decision 96: the thin thread's
+  `Grant` carries `grantScope` to that concept. A location grant names its place with 08's `atLocation` (pending
+  decision 42).
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -335,14 +371,26 @@ The architecture seed's app visibility is left out: it says app visibility canno
 
 ### 4.12 MemberRoleScheme (Member role)
 
-- Applies: one per member per organization.
-- Closed: yes.
-- Concepts are roles a member holds; they are ranked (an editor may do what a viewer may), and the rank is a rule in
+This scheme is in the thin thread (decisions 8 and 41).
+
+- Applies: one role per grant. Today's `member.role` is one grant at organization scope (decision 40), and the thread's
+  `Grant` carries `grantScope` for that scope (decision 96). The thread's fixture is one person who is an admin in one
+  organization and a viewer in another. Decision 94: `Person` is in the thread, under `gist:Person`, with one link from
+  `Member` to the person and no name or email paths, so those two memberships are one human.
+- Closed: yes for the thread. The three notations below are the whole scheme as the thread ships it, and the record's
+  `Role` literals are those three.
+- Concepts are roles a member holds. They are ranked (an editor may do what a viewer may), and the rank is a rule in
   `hasRole`, not `skos:broader`: an editor is not a kind of viewer.
+- Decision 41: viewer, editor and admin are concepts of this scheme and, under the same IRI, individuals of `Role`.
+  Such an individual has one identity criterion, the concept's: its scheme and its notation (rule 4). A tenant's
+  custom role is another individual, and another concept of this scheme, not a second class; it is not in the thread.
+  The thin thread ships `Role` without `permits`, so `Permission` waits for the party slice.
 - Record field: `Role` in packages/kernel/src/Role.schema.ts, used by `Person.read.ts`, `People.command.ts`
-  (`AddPerson`, `ChangeRole`) and `SessionState.read.ts`. 06 keeps `Role` as a class; under decision 41's recommended
-  answer each concept here is also an individual of 06's `Role`, and the record's `Role` literals come from these
-  notations.
+  (`AddPerson`, `ChangeRole`) and `SessionState.read.ts`. Decision 22: every field of a record that points at a term
+  carries a pointer or `noTerm` with a reason, and the SHACL shapes are closed. Decision 93: in the thin thread the
+  Member record's copied name and email fields are `noTerm` with reason screen (decision 21's list); only the role
+  field is lifted, to its `Grant` (decision 40). Role.schema.ts remains the source of viewer, editor and admin. While
+  the scheme lists only those three, its notations equal that list. `hasRole`'s rank is not copied into the scheme.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -359,6 +407,9 @@ The architecture seed's app visibility is left out: it says app visibility canno
   type today, not an Effect Schema; it gets a `term` when it becomes a schema. The words are set in
   `defaultReviewWords` (packages/review/src/ReviewWords.words.ts) and overridden for the import by `reviewStepWords`
   (packages/catalog/web/src/internal/format.tsx), which takes "Already there" from `importWords.already`.
+  Today neither word file reads a vocabulary prefLabel. Decision 58's recommended (a), still open, would have only
+  the inventory caller consume the projected concept labels, through that existing override; the shared
+  `defaultReviewWords` would not import inventory.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -366,13 +417,16 @@ The architecture seed's app visibility is left out: it says app visibility canno
 | decision | Needs a decision | Needs you | none | A review outcome of a row that waits for the person to take a proposal or a choice before it can be imported. | Review.rules.ts; ReviewWords.words.ts `needs` |
 | cannot | Cannot import | Can't fix here | none | A review outcome of a row that cannot be imported as written until the person types or picks a value. | Review.rules.ts; ReviewWords.words.ts `cannot` |
 | out | Left out | none | none | A review outcome of a row the person chose not to import. | Review.rules.ts; ReviewWords.words.ts `out` |
-| already | Already there | none | none | A review outcome of a row whose SKU, compared after normalising, is already stored with the same values. | Review.rules.ts; format.tsx `importWords.already` |
+| already | Already there | none | none | A review outcome of a row the confirm skips without changing the stored item: the row says what is stored, the person kept the stored item though the values differ, or the row was imported earlier from this file. | Review.rules.ts; format.tsx `importWords.already` |
 
 Two notation sets for these meanings exist today: the catalog model's `RowOutcome` (above) and the review region's
 `RowStatus` (`needs`, `cannot`, `ready`, `out`, `stored`, packages/review/src/ReviewRegion.types.ts), and the model's
 own `RowStatus` uses `needs` for decision and cannot together. The scheme takes the catalog model's notations because
 the review region is product-neutral and takes its words from its caller; the region's `RowStatus` gets no `term`.
-The altLabels "Needs you" and "Can't fix here" are the region's tab words for the same views (CLAUDE.md "UI").
+The keys map as `needs` = `decision` and `stored` = `already`; a check compares the strings ("Needs a decision",
+"Already there"), not the keys. The region's words `auto`, `accepted`, `kept`, `edited` and `chosen` are outside
+this scheme. The word files do not read prefLabels. The altLabels "Needs you" and "Can't fix here" are the region's
+tab words for the same views (CLAUDE.md "UI").
 
 ### 4.14 ImportResultOutcomeScheme (Import result outcome)
 
@@ -381,6 +435,9 @@ The altLabels "Needs you" and "Can't fix here" are the region's tab words for th
 - Concepts are categories of a row's result, each counted from what is stored.
 - Record field: `OutcomeKind` (packages/catalog/contract/src/Import/Import.read.ts). Words set in `importWords`
   (packages/catalog/web/src/internal/format.tsx); `PastImports.screen.tsx` spells "Taken back" a second time.
+  Today `importWords` does not read a vocabulary prefLabel. Decision 58's recommended (a), still open, would have
+  only this inventory caller consume the projected concept labels, through the existing review override where a
+  word is shared with the review; the shared review defaults would not import inventory.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -721,7 +778,7 @@ Candidate rows for 11: shipping and receiving `skos:relatedMatch` the CBV steps 
 
 Concepts and sources are 06's; each scheme is open unless it says closed.
 
-AccountStatusScheme (applies: one per account organization; closed: no; record field: later 06's organization record):
+AccountStatusScheme (applies: one per account's `SourceRecord`; closed: no; record field: later the tenant's `SourceRecord`, decision 34, not the shared organization):
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -735,31 +792,31 @@ ContactPointKindScheme (one per contact point; closed: no):
 | email | Email address | Email | none | A contact point kind for an address that electronic mail is sent to. | schema.org `email` (fetched by 06) |
 | phone | Telephone number | Phone | none | A contact point kind for a number that a call or a text message reaches. | schema.org `telephone` (fetched by 06) |
 
-IdentityOutcomeScheme (one per identity decision; closed: yes):
+IdentityOutcomeScheme (one per identity decision; closed: yes). Decision 34: an `IdentityDecision` joins two `SourceRecord`s a tenant holds that may be one party. These concepts, and EvidenceKindScheme below, say what is found about those records. `Organization` names the real body and `Person` the human; the records are not the parties:
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
-| sameParty | Same party | Merge | none | An identity outcome in which the two records are found to denote one party. | report 01 section 3; IBM MDM (collapse) |
-| differentParties | Different parties | Not a duplicate | none | An identity outcome in which the two records are found to denote two parties. | IBM MDM (persistence) |
+| sameParty | Same party | Merge | none | An identity outcome in which two source records a tenant holds are found to be records of one party. | report 01 section 3; IBM MDM (collapse); decision 34 |
+| differentParties | Different parties | Not a duplicate | none | An identity outcome in which two source records a tenant holds are found to be records of two parties. | IBM MDM (persistence); decision 34 |
 
 EvidenceKindScheme (several per decision or suspicion; closed: no):
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
-| sharedIdentifier | Shared identifier | none | none | An evidence kind in which both records carry an identifier with one scheme and one value. | IBM MDM (identification as critical data) |
-| similarName | Similar name | none | none | An evidence kind in which the two records' names differ by little, as a rule measures it. | IBM MDM (name as critical data) |
-| sharedPostalAddress | Shared postal address | none | none | An evidence kind in which both records hold one postal address. | IBM MDM (address as critical data) |
-| sharedContactPoint | Shared contact point | none | none | An evidence kind in which both records hold one email address or telephone number. | 06 |
-| statementByParty | Statement by the party | none | none | An evidence kind in which the party itself said the two records are, or are not, one company. | 06 (NEW) |
+| sharedIdentifier | Shared identifier | none | none | An evidence kind in which both source records carry an identifier with one scheme and one value. | IBM MDM (identification as critical data); decision 34 |
+| similarName | Similar name | none | none | An evidence kind in which the names on both source records differ by little, as a rule measures it. | IBM MDM (name as critical data); decision 34 |
+| sharedPostalAddress | Shared postal address | none | none | An evidence kind in which both source records hold one postal address. | IBM MDM (address as critical data); decision 34 |
+| sharedContactPoint | Shared contact point | none | none | An evidence kind in which both source records hold one email address or telephone number. | 06; decision 34 |
+| statementByParty | Statement by the party | none | none | An evidence kind in which a party said the two source records are, or are not, records of one company. | 06 (NEW); decision 34 |
 
-MembershipStatusScheme (one per membership; closed: yes):
+MembershipStatusScheme (one per membership; closed: yes). A Sutton note until a status column exists: the `member` table has no status column, and removal in this repository is `removedAt`, not one of these values:
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
 | invited | Invited | Pending | none | A membership status in which a person was asked to join a tenant and has not yet accepted. | Sutton public user accounts article (Pending) |
-| active | Active | none | none | A membership status in which the person may act in the tenant's workspace. | the `member` table; Sutton public |
+| active | Active | none | none | A membership status in which the person may act in the tenant's workspace. | Sutton public user accounts article |
 | suspended | Suspended | none | none | A membership status in which sign-in is blocked and the history is kept. | Sutton public user accounts article |
-| removed | Removed | none | none | A membership status in which the membership ended and its row is kept so the audit trail still names it. | the `member` table (`removedAt`); docs/auth.md |
+| removed | Removed | none | none | A membership status in which the membership ended and its row is kept so the audit trail still names it. | Sutton public user accounts article |
 
 PortalModuleScheme (several per portal access; closed: no):
 
@@ -845,10 +902,15 @@ AccountingSyncDirectionScheme (one per sync record; closed: yes):
 
 ## 6. Properties
 
-Each property points a record at a concept of one scheme. Ranges are written "skos:Concept in <Scheme>" rather than a
-class key, because a scheme is not a class (pending Q2); the record schema's SHACL (`sh:in` over the scheme's
-notations, or `skos:inScheme`) does the checking, and OWL states no range (anti-pattern 10). Each is proposed as a
-sub-property of `gist:isCategorizedBy` (pending Q3). One direction only.
+Each property points a record at a concept of one scheme. Decision 23: the record stores the notation, the projector
+lifts it to the concept's IRI, and the lifted value is a concept of that scheme, written here as "skos:Concept in
+<Scheme>". A scheme is not itself the range. Subset membership is decided (rule 2): `sh:in` lists the concept IRIs of
+the field's own literals, each of those notations one of the scheme's, and the field may list fewer than the scheme
+has. OWL states no range (anti-pattern 10). A sub-property link to `gist:isCategorizedBy` is not written. Decision 16
+allows an `inv:` property to be a sub-property of a gist property only where its own domain and range fall under that
+gist property's, and these rows state no OWL range. Decision 13 admits a gist name only when a term in the slice
+being built needs it, and the thin thread does not need `gist:isCategorizedBy`. Whether schemes and concepts are also
+gist-typed, and whether the link is added then, stays open (pending Q3, decision 17). One direction only.
 
 | Key | Label | Definition | Domain | Range | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -863,8 +925,10 @@ sub-property of `gist:isCategorizedBy` (pending Q3). One direction only.
 If 06, 07, 08 or 09 name one of these relations under another key, theirs wins and this row is dropped; the key
 and the scheme it points at are what must agree. Dropped on 2026-11-22 for that reason (report 13): `itemRole`,
 `itemCategory`, `trackingMethod`, `costBasis`, `costFinality` (07's, the same keys); `measureKind` (08's);
-`contactPurpose` (06's `servesPurpose`), `identifierScheme` (07's `identifierKind`), `scopeKind` (06's `grantScope`),
-`memberRole` (06's `grantsRole`); `reviewOutcome`, `businessStep`, `machineState` (09's, the same keys),
+`contactPurpose` (06's `servesPurpose`, which under decisions 39 and 43 is the link on `ContactAssignment`, not a
+fact of the contact point alone), `identifierScheme` (07's `identifierKind`), `scopeKind` (06's `grantScope`),
+`memberRole` (06's `grantsRole`, which under decision 40 is the link on `Grant`, not a field of `Member`);
+`reviewOutcome`, `businessStep`, `machineState` (09's, the same keys),
 `resultOutcome` (09's `outcomeKind`), `changeSource` (09's `proposedBy`), `changeMethod` (09's `changeHow`),
 `qualityResult` (09's `inspectionOutcome`), `syncState` (09's `syncOutcome`). `lifecycleState` stays here as the one
 key for every lifecycle; 07's and 09's rows of the same key point to it.
@@ -872,31 +936,39 @@ key for every lifecycle; 07's and 09's rows of the same key point to it.
 ## 7. How it looks in the vocabulary module (sketch, not code)
 
 ```ts
-// sketch, not code: one scheme in 05's shapes (section 4.4): the concepts are a tuple, each with its notation
+// sketch, not code: one scheme in 05's shapes (section 4.4), shortened: `source`, `scope` and `ratification` are required on the scheme and on every concept (05's `termFields`). They are written out on the scheme and on `EA`; the ratification name is a placeholder, not a ratified record. They are left out of the other concepts, and "..." stands for a full definition of 12 characters or more. This block as written does not decode.
 export const schemes = defineSchemes({
   UnitOfMeasureCodeScheme: {
     prefLabel: "Unit of measure code",
     definition: "A controlled vocabulary of the units an item's quantities and sizes are written in, ...",
+    source: { kind: "repository", path: "packages/catalog/contract/src/Item/Item.read.ts" },
+    scope: "repository",
+    ratification: "rat-unit-of-measure-code-scheme", // placeholder name
     closed: false,
     concepts: [
       { notation: "EA", prefLabel: "Each", altLabels: ["each", "piece"],
-        definition: "A unit of measure of count that ...", alsoInstanceOf: "UnitOfMeasure",
+        definition: "A unit of measure of count that ...",
+        source: { kind: "repository", path: "packages/catalog/contract/src/Item/Item.read.ts" },
+        scope: "repository",
+        ratification: "rat-unit-of-measure-code-scheme", // placeholder name
+        alsoInstanceOf: { kind: "local", key: "UnitOfMeasure" },
         links: { hasDimension: { kind: "concept", scheme: "MeasurementDimensionScheme", notation: "count" } } },
       { notation: "BX", prefLabel: "Box", altLabels: ["box", "bx"], definition: "...",
-        alsoInstanceOf: "PackagingUnit" },
+        alsoInstanceOf: { kind: "local", key: "PackagingUnit" } }, // PackagingUnit is pending decision 61
       { notation: "cm", prefLabel: "Centimetre", altLabels: ["centimeter"], definition: "..." },
     ],
   },
 })
+// a MeasurementDimensionScheme concept writes alsoInstanceOf: { kind: "gist", term: "gist:Aspect" }
 // sketch, not code: the record keeps its own literals (decision 2) and points at the scheme with 05's helper
 export const Uom = S.Literals(["EA", "BX", "KG", "M", "L"]).pipe(
   S.annotate({ ...aboutScheme("inv:UnitOfMeasureCodeScheme") })
 )
-// gate 4 (05's V12): every literal of a schema that points at a scheme is one of that scheme's notations
+// gate 4 (05's V12), decision 23: the record stores the notation and the projector lifts it to the concept IRI. `sh:in` lists the concept IRIs of the field's own literals, not the equality of tagged-class keys (rule 1). For Uom those are inv:UnitOfMeasureCodeScheme-EA, -BX, -KG, -M and -L. For Dimensions.unit, -cm and -in. An unknown notation fails. aboutScheme is decision 20's helper.
 ```
 
 ```turtle
-# sketch, not code: what the projector would write for one concept (pending Q1, Q3)
+# sketch, not code: what the projector would write for one concept (decision 10's IRI; decision 11's label and definition)
 inv:UnitOfMeasureCodeScheme-BX a skos:Concept ;
   skos:inScheme inv:UnitOfMeasureCodeScheme ; skos:topConceptOf inv:UnitOfMeasureCodeScheme ;
   skos:notation "BX" ; skos:prefLabel "Box"@en ; skos:altLabel "box"@en, "bx"@en ;
@@ -909,10 +981,10 @@ inv:QualityDispositionScheme-rejected skos:broader inv:QualityDispositionScheme-
 
 | Anti-pattern | Found | What this design does |
 | --- | --- | --- |
-| 6 Quality-as-class, enum-is-taxonomy | Every code list here is a candidate | SKOS schemes; only item kind is classes, with its reason (section 4.2) |
+| 6 Quality-as-class, enum-is-taxonomy | Every code list here is a candidate | SKOS schemes; item kind is classes only under section 4.2's recommendation (pending Q6) |
 | 9 Polysemy | The seed's disposition scheme mixes decisions with observations; Sutton's label status mixes lifecycle with disposition; the seed's valuation scheme mixes basis with flow; two `RowStatus` notation sets | Split (pending Q8); `CostBasisScheme` with broader links; one notation set (4.13) |
-| State-is-kind | Item, label, order, import and machine states | Concepts on `lifecycleState` and `machineState`; no state subclass |
-| Role-is-kind | Item roles, party roles, member roles | Concepts or flags, no role classes, no disjointness |
+| State-is-kind | Item, label, order and import states | Concepts on `lifecycleState`; no state subclass. `machineState` is not proposed (4.31) |
+| Role-is-kind | Item roles, party roles, member roles | Item roles are concepts. Customer and vendor are flags on the tenant's SourceRecord (decisions 3 and 34), not classes. Member roles are concepts of MemberRoleScheme and, under the same IRI, individuals of Role, not subclasses (decision 41). Role has no permits in the thin thread. No disjointness between the item roles |
 | Hierarchy for overlap | The API design report's inventory states under In stock | No broader; inclusion as scope notes (4.21) |
 | 10 Domain/range overcommitment | Concept-valued properties | No OWL range; SHACL from the record |
 | 13 False is-a | MemberRoleScheme rank, BX and EA | Rank is a rule in `hasRole`; a pack size is an item conversion |
@@ -921,15 +993,20 @@ inv:QualityDispositionScheme-rejected skos:broader inv:QualityDispositionScheme-
 ## Questions for Benjamin
 
 Moved on 2026-11-22 to the packet's [DECISIONS.md](../DECISIONS.md), "Open", merged with the other reports'
-questions. A "(pending Qn)" mark in this report means: Q1 is decision 10, Q2 is 23, Q3 is 17, Q4 is 58, Q5 is 57,
-Q6 is 65, Q7 is 47, Q8 is 78, Q9 is 82, Q10 is 63, Q11 is 73, Q12 is 86, Q13 is 60, Q14 is 35, Q15 is 56.
+questions. Q1 (decision 10) and Q2 (decision 23) were answered on 2026-11-22 and their marks are removed. A
+"(pending Qn)" mark that remains means: Q3 is decision 17, Q4 is 58, Q5 is 57, Q6 is 65, Q7 is 47, Q8 is 78, Q9 is
+82, Q10 is 63, Q11 is 73, Q12 is 86, Q13 is 60, Q14 is 35, Q15 is 56. Each of those is still open.
 
 ## Not checked
 
-- No term here went through the foundational auditor and none is ratified; the conceptualizer's input rule says it
-  should work from ratified terms only, so this is a proposal list for the auditor, not a conceptual model.
+- No term here has a `rat-` record yet (decision 32), and none has been through the foundational auditor.
+  `MemberRoleScheme`'s place in the thin thread is decided (decisions 8 and 41), and `GrantScopeKindScheme` ships there
+  with the one concept organization (decision 96). The other schemes are still a proposal list for the auditor, not a
+  conceptual model. The conceptualizer's input rule says it should work from
+  ratified terms only.
 - Nothing was built or run: no vocabulary module, projector, Turtle, SHACL, check or competency question.
-  `bun run docs:check` passed with this file in place (2026-11-22); that checks frontmatter, not content.
+  `bun run docs:check` passed on the file before this revision (2026-11-22); it was not run again on the text above.
+  That check reads frontmatter, not content.
 - The other eight documents (04 to 09, 11, 12) were being written at the same time and were not read by this
   report's author; the keys were matched with them on 2026-11-22 (report 13), which renamed every scheme key, added
   thirteen schemes from 06, 08 and 09, and dropped eighteen property rows whose keys the term documents own. The

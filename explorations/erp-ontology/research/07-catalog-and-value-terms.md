@@ -7,8 +7,8 @@ description: A proposed design of the catalog terms and the quantity, money and 
 # Catalog and value terms
 
 This is a design to argue with, written by the `ontology-conceptualizer` skill for the `ontology-architect`. It is not
-ratified. The skill takes only terms with a `rat-` record, and none exists yet (decisions 1 to 7 ratify no term by
-name), so every row below is a proposal that still goes through the `ontology-foundational-auditor` and Benjamin. No
+ratified. Decision 32 requires each term in the vocabulary module to name the `rat-` record of Benjamin's answer.
+No catalog term here has one yet. The catalog rows are proposals for the `ontology-foundational-auditor` and Benjamin. No
 vocabulary module, projector, generated Turtle, SHACL or competency-question suite exists; nothing here was run.
 
 Inputs: the packet's decisions and reports 01 and 02, the skills' `_shared` files, the architecture seed and the API
@@ -46,35 +46,35 @@ Two readings in the code need care:
 
 ### One term, many records
 
-Every record and field of the catalog that is about an item, and the term each points at. A field with "no term" is a
-fact about the record, not about the item.
+The proposed pointers below use decision 20's typed helpers. Decision 21 marks a record or field that points at no
+term with `noTerm` and a reason: transport, request, screen, error or bookkeeping.
 
 | Record | Where | Field | Term it points at | Note |
 | --- | --- | --- | --- | --- |
 | `ItemFields` | `packages/catalog/contract/src/Item/Item.read.ts` | (the record) | `ItemSpecification`, as `InventoryItemSpecification` | What one item needs before it is stored |
-| `ItemFields` | same | `sku` | `ItemIdentifier` via `identifiedBy`, `identifierText`, `identifierKind` `sku` (10's `IdentifierKindScheme`), `issuedBy` the tenant: a lift path (05) | An identifier, never the identity |
+| `ItemFields` | same | `sku` | `identifierText` on the `ItemIdentifier` reached by `identifiedBy`; fix `identifierKind` to the `sku` concept and `issuedBy` to the tenant (05) | An identifier, never the identity |
 | `ItemFields` | same | `name` | `name` (06; candidate `gist:name`) | Not a key (glossary, "Item code") |
 | `ItemFields` | same | `description` | `description` | |
 | `ItemFields` | same | `category` | `itemCategory`, a concept of `ItemCategoryScheme` (10) | A closed list of five today |
-| `ItemFields` | same | `uom` | `baseUnit`, a concept of 10's `UnitOfMeasureCodeScheme` that is also a `UnitOfMeasure` | EA, KG, M, L are units; BX is a `PackagingUnit` (Q7) |
-| `ItemFields` | same | `unitCost` | a `CostObservation`: `costAmount` a `MoneyAmount`, currency USD, scale 4, `costPerUnit` the base unit | The currency is implied by the description, not stored (Q1, Q2) |
-| `ItemFields` | same | `quantityOnHand` | `InventoryMeasure` (08), on hand, at a position the record does not name | Not a property of the item: stock is not the specification |
+| `ItemFields` | same | `uom` | `baseUnit` | The field stores a notation of 10's `UnitOfMeasureCodeScheme`; BX is a `PackagingUnit` (Q7) |
+| `ItemFields` | same | `unitCost` | `minorUnits` and `minorUnitScale` (4) on the `MoneyAmount` reached through `CostObservation.costAmount`; copy `costPerUnit` from `uom` | The record gives the amount, not the costing method. Under 60(a) the basis is `stated`; under 60(b) no basis is projected. USD needs a record rule (88) |
+| `ItemFields` | same | `quantityOnHand` | `numericValue` on the `QuantityValue` reached by `hasQuantity` from an `InventoryMeasure` (08); copy `unit` from `uom` | Under 76(a), tenant-wide reported `onHand`, as of and sourced to confirmation, with no `atLocation` |
 | `ItemFields` | same | `reorderPoint` | `reorderPoint`, a `QuantityValue` in the base unit | |
 | `ItemFields` | same | `stocking` | `lifecycleState` (10), a concept of `ItemLifecycleScheme` (10), and `discontinuedOn` | Active, inactive, discontinued on a day |
 | `ItemFields` | same | `lotTracked` | `trackingMethod`: true is `lot`, false is `untracked` (10's `TrackingMethodScheme`) | The repository has no serialized tracking |
 | `ItemFields` | same | `tags` | `taggedWith`, a `gist:Tag` (11, table A) | |
 | `ItemFields` | same | `firstReceivedOn` | `firstReceivedOn` | A stated date today; later a view over receipts (09) |
 | `ItemFields` | same | `dimensions` | `length`, `width`, `height`, each a `QuantityValue` in cm or in | Stored as floats (`S.Finite`): see section 5 |
-| `ItemFields` | same | `vendors[]` | one `VendorItem` each (Q8) | Nested values with no id of their own |
+| `ItemFields` | same | `vendors[]` | Iterate the list by position, following `offeredItem` in reverse. Each element supplies the five field paths below on its own `VendorItem` node (Q8) | No class pointer on the array |
 | `Vendor` | same | `vendorName` | `vendorName` today; `offeredBy`, an `Organization` (06), once a person links one | Only a name today: the organization is not resolved |
-| `Vendor` | same | `vendorSku` | `ItemIdentifier`, kind supplier part number (10), `issuedBy` that vendor | Glossary: "used as your own item code" is the mistake |
-| `Vendor` | same | `unitCost` | `unitPrice` of the `VendorItem`, a `MoneyAmount` | The vendor's price is the tenant's cost of buying |
-| `Vendor` | same | `leadTimeDays` | `leadTime`, a `QuantityValue` in days | |
+| `Vendor` | same | `vendorSku` | `identifierText` on the `ItemIdentifier` reached by `identifiedBy`, kind supplier part number (10) | No `issuedBy` until the vendor is linked |
+| `Vendor` | same | `unitCost` | `minorUnits` and `minorUnitScale` on the `MoneyAmount` reached by `unitPrice` | The vendor's asking price |
+| `Vendor` | same | `leadTimeDays` | `numericValue` on the `QuantityValue` reached by `leadTime`, with `unit` fixed to day | |
 | `Vendor` | same | `isPreferred` | `isPreferred` | At most one per item: a record rule |
-| `StoredItem` | same | `id` | the identity of the `ItemSpecification`, with `organizationId` | Report 01's "tenant and a source id" |
+| `StoredItem` | same | `id` | The stored-record key is `organizationId` plus the locally assigned `ItemId` | Not an upstream `SourceRecord.sourceId`, the normalised `skuKey`, or the import, batch, row and part that trace its origin |
 | `StoredItem` | same | `createdAt`, `createdBy` | no term: record bookkeeping (`noTerm`, decision 21); who made the item is the confirm's `performedBy` (09), reached through `recordedFromRow` (04) | |
 | `StoredItem` | same | `revision` | no term | A record's edit counter, not an `ItemRevision` |
-| `ItemEdit` | same | every field but `sku`, tags, dimensions, vendors | the same terms as `ItemFields` | The SKU is left out as "the item's identity" (Q9) |
+| `ItemEdit` | same | (the request) | `noTerm`, reason `request` | Asks to change a stored item at a given revision; does not carry a SKU (Q9) |
 | `item` table | `apps/inventory/migrations/0001_init.sql` | `organizationId` | the tenant, an `Organization` (06) | Every key starts with it |
 | `item` table | same | `skuKey` | `identifierKey` | The import's match key, normalised: a reidentification key |
 | `item` table | same | `isActive`, `discontinuedOn` | `lifecycleState`, `discontinuedOn` | Two columns, one value (`Stocking`) |
@@ -110,7 +110,7 @@ least one of them, or by a seed, a public Sutton document or a repository record
 
 | Key | Label | Definition | Tag | gist parent | Identity | Source | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `ItemSpecification` | Item | A catalog item that describes one kind of good or service an organization stocks, buys, makes or sells, precise enough to tell whether a delivery matches it. | kind | `gist:CatalogItem` | The tenant organization and the source system's id for it (here `organizationId` and `ItemId`); never the SKU or the name. Whether this is the identity criterion or a reidentification key is open (profile): an identity card records it `unresolved` | the architecture seed (5.1, `ItemDefinition`); report 01 (`ItemSpecification`); `packages/catalog/contract/src/Item/Item.read.ts` | in the repository today |
+| `ItemSpecification` | Item | A catalog item that describes one kind of good or service an organization stocks, buys, makes or sells, precise enough to tell whether a delivery matches it. | kind | `gist:CatalogItem` | `unresolved` for the specification. `organizationId` and the locally assigned `ItemId` identify the stored record. An upstream `SourceRecord.sourceId` identifies a source record, the normalised SKU matches an item, and the import, batch, row and part trace its origin | the architecture seed (5.1, `ItemDefinition`); report 01 (`ItemSpecification`); `packages/catalog/contract/src/Item/Item.read.ts` | in the repository today |
 | `InventoryItemSpecification` | Inventory item | An item specification whose goods are held as stock and counted in a base unit. | subkind | none: under `ItemSpecification` (pending Q3) | As its parent | the architecture seed; public Sutton items guide (Inventory items) | in the repository today |
 | `ServiceItemSpecification` | Service item | An item specification for work done or a charge made for a party, such as freight or labour, that never has stock. | subkind | none: under `ItemSpecification` (pending Q3) | As its parent | the architecture seed; public Sutton items guide (Service items); `docs/glossary.md` ("Non-stock item") | Sutton only |
 | `AliasItemSpecification` | Alias item | An item specification that sells another item specification under a second commercial identity and holds no stock, every order for it being filled from the other one. | subkind | none: under `ItemSpecification` (pending Q3) | As its parent | the architecture seed (alias carries no independent stock); public Sutton items guide (Alias items) | Sutton only |
@@ -119,22 +119,22 @@ least one of them, or by a seed, a public Sutton document or a repository record
 | `VendorItem` | Vendor item | An offer by which one organization sells one item to the tenant, with its own price, lead time and whether it is the usual source. | relator | `gist:Offer` (pending Q8) | The tenant and a source id; not the pair of vendor and item, since one vendor may sell one item in two pack sizes. The repository's nested `Vendor` has no id (section 5) | `Item.read.ts` (`Vendor`); `docs/glossary.md` ("Supplier", "Lead time") | in the repository today |
 | `UnitOfMeasure` | Unit of measure | A standard amount in which quantities of goods are counted or measured, such as each, kilogram, metre, litre or day. | kind | `gist:UnitOfMeasure` (pending Q7) | The unit it stands for in the governed list, aligned to a QUDT unit; never its code. Its codes are the concepts of 10's `UnitOfMeasureCodeScheme`, each also an individual of this class (pending Q7) | `Item.read.ts` (`Uom`, `Dimensions.unit`); the architecture seed (`UnitReference`, 7.3); `docs/glossary.md` ("Unit of measure") | in the repository today |
 | `PackagingUnit` | Packaging unit | A unit of measure for a pack level, such as a box, case or pallet, whose size in base units is set separately for each item. | subkind | none: under `UnitOfMeasure` (pending Q7) | As its parent | `Item.read.ts` (`BX`); the architecture seed ("item-specific packaging units remain contextual"); `docs/glossary.md` ("Each, inner, case, pallet") | in the repository today |
-| `Currency` | Currency | A unit of measure for amounts of money, as listed in ISO 4217, such as the US dollar. | kind | `gist:UnitOfMeasure` (pending Q10) | The ISO 4217 entry it stands for | the architecture seed (`MoneyAmount` requires currency); `Item.read.ts` ("in US dollars"); NEW as a class: a currency must be a thing a money amount points at | in the repository today |
+| `Currency` | Currency | A unit of measure for amounts of money, as listed in ISO 4217, such as the US dollar. | kind | `gist:UnitOfMeasure` (pending Q10) | The ISO 4217 entry it stands for | the architecture seed (`MoneyAmount` requires currency); `Item.read.ts` ("in US dollars"); NEW as a class: a currency must be a thing a money amount points at | Today's cost is documented in US dollars. No currency field or currency record is stored. USD may be emitted only under a record rule that states it (decision 88), not from the description |
 | `ItemUnitConversion` | Item unit conversion | A specification that states how many of one unit make one of another unit for one item, from a stated date. | kind | `gist:Specification` | The tenant and a source id; not the item and its two units, since a factor changes over time | the API design report (`ItemUnitConversion`); the architecture seed (7.3: "Case-to-each needs an item-specific packaging factor and effective interval"); public Sutton release note of 2026-10-15 (units editable on existing items), as both seeds cite it | Sutton only |
 | `Bom` | Bill of materials | A specification that names the item it makes and holds the successive versions of the components needed to make it. | kind | `gist:Specification` | The tenant and a source id; never the output item's SKU | NEW as its own class: the public Sutton BOM guide (versions, defaults) needs the enduring bill a default points from; the architecture seed has only the revision | Sutton only |
 | `BomRevision` | BOM revision | A specification that lists, for one bill of materials from a stated date, the component lines needed to make a stated output quantity. | kind | `gist:Specification` | The tenant and a source id; never the revision code alone | the architecture seed (`BomRevision`); public Sutton BOM guide (versions, a version bound to a manufacturing order) | Sutton only |
 | `BomLine` | BOM line | A specification of one component requirement within a BOM revision: which item, how much for the revision's output quantity, and its expected scrap. | kind | `gist:Specification` | The tenant and a source id; not its sequence, which can be edited | the architecture seed (`BomLine`); the API design report (`BomComponentLine`) | Sutton only |
 | `BomExpansion` | BOM expansion | A content record of one resolution of a BOM revision for a site, a day and a choice of alternatives, laid out as the graph of every component it needs. | information | `gist:Content` | The tenant and its own id; two expansions resolved from the same inputs are two records | the architecture seed (5.1: "one resolved site/date/alternative choice") | later |
 | `BomExpansionNode` | BOM expansion node | A content record that stands for one selected item and BOM revision within one BOM expansion, shared by every line that requires that item there. | information | `gist:Content` | Its expansion, the item and the selected revision: one node per pair in an expansion, so a cycle shows as a path back to a node | the architecture seed (`BomDependencyNode`: "Reuse the same dependency node for repeated references") | later |
-| `Routing` | Routing | A task template that names the item a sequence of operations makes and holds the successive versions of that sequence. | kind | `gist:TaskTemplate` (pending Q4: in gist 14.1.0, not yet in `gist-categories.md`) | The tenant and a source id | NEW as its own class, parallel to `Bom`; the API design report (`Routing`) | Sutton only |
-| `RoutingRevision` | Routing revision | A task template that lists, from a stated date, the ordered operation definitions by which one routing's output is made. | kind | `gist:TaskTemplate` (pending Q4: in gist 14.1.0, not yet in `gist-categories.md`) | The tenant and a source id | the architecture seed (`RoutingRevision`) | Sutton only |
-| `OperationDefinition` | Operation | A task template for one planned step of a routing revision: the work center it needs and the setup and run time it is expected to take. | kind | `gist:TaskTemplate` (pending Q4: in gist 14.1.0, not yet in `gist-categories.md`) | The tenant and a source id; not its sequence | the architecture seed (`OperationDefinition`); the API design report (`OperationStep`) | Sutton only |
+| `Routing` | Routing | A task template that names the item a sequence of operations makes and holds the successive versions of that sequence. | kind | `gist:TaskTemplate` (decision 13: admit it when the routing terms need it) | The tenant and a source id | NEW as its own class, parallel to `Bom`; the API design report (`Routing`) | Sutton only |
+| `RoutingRevision` | Routing revision | A task template that lists, from a stated date, the ordered operation definitions by which one routing's output is made. | kind | `gist:TaskTemplate` (decision 13: admit it when the routing terms need it) | The tenant and a source id | the architecture seed (`RoutingRevision`) | Sutton only |
+| `OperationDefinition` | Operation | A task template for one planned step of a routing revision: the work center it needs and the setup and run time it is expected to take. | kind | `gist:TaskTemplate` (decision 13: admit it when the routing terms need it) | The tenant and a source id; not its sequence | the architecture seed (`OperationDefinition`); the API design report (`OperationStep`) | Sutton only |
 | `WorkCenter` | Work center | A grouping of equipment, people and capacity against which an organization schedules production work, which need not be one machine or one place. | kind | `gist:Collection` (pending Q5; in gist 14.1.0, not yet in `gist-categories.md`) | The tenant and a source id; not its members, which change | the architecture seed (5.2: "A functional `WorkCenter` can be linked to a physical location without becoming a bin or machine"); the API design report | Sutton only |
 | `PriceList` | Price list | An offer by which the tenant states the prices it asks for items, to the organizations it is assigned to, for a period. | kind | `gist:Offer` | The tenant and a source id; never its name | the API design report (customer, group and volume price lists, from Sutton's public learning-centre collections); decision 3 (price lists sit on the organization) | Sutton only |
 | `PriceListEntry` | Price list entry | An offer within one price list that states the price of one item per unit, from a minimum quantity. | relator | `gist:Offer` | The tenant and a source id; not the item and the minimum quantity, which may repeat over periods | the API design report (volume price lists); `gist-categories.md` ("a price-list line" as an Offer) | Sutton only |
 | `QuantityValue` | Quantity | A magnitude given as an exact decimal number together with the unit of measure it counts. | value | `gist:Magnitude` | The decimal and the unit: 12 kg and 12000 g are two values of one amount, never merged | the architecture seed (5.8, `QuantityValue`); `docs/glossary.md` ("Quantity with its unit") | in the repository today |
 | `MoneyAmount` | Money amount | A magnitude of money given as a whole number of counting units at a stated scale of a stated currency. | value | `gist:Magnitude` | The whole number, the scale and the currency (pending Q1) | the architecture seed (`MoneyAmount` requires currency); `CLAUDE.md` ("Money is whole cents read from the digits"); `Item.read.ts` (`UnitCost`, `decimalUnits`) | in the repository today |
-| `CostObservation` | Cost observation | A content record that states what one unit of an item cost, on a stated basis, as known at a stated time, and whether that figure is pending or final. | information | `gist:Content` | The tenant and a source id; a recomputation is a new observation that supersedes the old one | the architecture seed (`CostObservation`, 5.8); public Sutton costing guide (pending and final costs); `Item.read.ts` (`unitCost`, pending Q2) | in the repository today |
+| `CostObservation` | Cost observation | A content record of what one unit of an item cost as known at a stated time. It can name a basis and say whether the figure is pending or final. Today's record gives no method: 60(a) would classify the amount as `stated`; 60(b) would project no basis. | information | `gist:Content` | The tenant and a source id; a recomputation is a new observation that supersedes the old one | the architecture seed (`CostObservation`, 5.8); public Sutton costing guide (pending and final costs); `Item.read.ts` (`unitCost`, pending Q2) | in the repository today |
 
 The tracking method of an item is not a class: it is the property `trackingMethod` with a concept of 10's
 `TrackingMethod` scheme. The architecture seed's scheme (Standard, Label, Lot, Unit serial) says only Standard and
@@ -148,7 +148,7 @@ cover a batch, a pallet or a part quantity (public Sutton tracking guide, as the
   - `ItemSpecification`
     - `InventoryItemSpecification`, `ServiceItemSpecification`, `AliasItemSpecification` (pairwise disjoint)
 - `gist:Specification`: `ItemRevision`, `ItemUnitConversion`, `Bom`, `BomRevision`, `BomLine`
-- `gist:TaskTemplate` (pending Q4): `Routing`, `RoutingRevision`, `OperationDefinition`
+- `gist:TaskTemplate` (decision 13, when needed): `Routing`, `RoutingRevision`, `OperationDefinition`
 - `gist:Offer`: `VendorItem`, `PriceList`, `PriceListEntry`
 - `gist:UnitOfMeasure`: `UnitOfMeasure` (with `PackagingUnit` under it), `Currency`
 - `gist:Collection`: `WorkCenter`
@@ -188,7 +188,7 @@ schema".
 | Key | Label | Definition | Domain | Range | Source |
 | --- | --- | --- | --- | --- | --- |
 | `identifiedBy` | identified by | A relation from a thing to an identifier some issuer assigned to it. | none declared: an item here, a party (06), a lot, label, serial unit or logistic unit (08) (kept broad) | `gist:ID` (11), so `ItemIdentifier`, 06's `PartyIdentifier` and 08's `TrackingCode` | the architecture seed (SKU an attribute); `Item.read.ts` (`sku`) |
-| `identifierText` | identifier text | The exact characters of an identifier as its issuer wrote them, with case, leading zeros and punctuation kept. | `gist:ID` (11) | datatype from the record field | `Item.read.ts` (`sku`, `vendorSku`); `docs/glossary.md` ("Leading zeros") |
+| `identifierText` (`gist:idText` itself) | identifier text | The exact characters of an identifier as its issuer wrote them, with case, leading zeros and punctuation kept. | `gist:ID` (11) | datatype from the record field | `Item.read.ts` (`sku`, `vendorSku`); `docs/glossary.md` ("Leading zeros") |
 | `identifierKey` | identifier key | The normalised form of an identifier's text, without spaces and in upper case, punctuation kept (decision 90), that the import compares to find a stored record. | `ItemIdentifier` | datatype from the record field | `Item.read.ts` (`skuKey`); `0001_init.sql` (`item.skuKey`) |
 | `identifierKind` | identifier kind | A relation from an identifier to the concept saying what sort of code it is and who issues such codes: a SKU, a supplier part number, a barcode, a lot code, a tax number and the others 10 lists. | `gist:ID` (11) | a concept of `IdentifierKindScheme` (10) | NEW: `docs/glossary.md` names the three kinds |
 | `issuedBy` | issued by | A relation from an identifier to the organization that assigned it. | `gist:ID` (11) | `Organization` (06) | the architecture seed (identity recipe names source scope); `docs/glossary.md` ("Supplier or manufacturer part number") |
@@ -209,6 +209,11 @@ schema".
 | `description` | description | The words that say what an item is, for people choosing or checking it, beside its name. | `ItemSpecification` | datatype from the record field | `Item.read.ts` (`description`); NEW as a row: this document named it as 05's, and 05 holds no domain terms |
 | `vendorName` | vendor name | The name of the organization offering an item, as the source wrote it, kept while no organization record is linked and never used to decide which organization it is. | `VendorItem` | datatype from the record field | `Item.read.ts` (`Vendor.vendorName`); NEW as a row: 04's CQ-C04 asks which offers name a vendor known only by name |
 | `primaryBom` | primary bill of materials | A relation from an item to the bill of materials used to make it when an order names no other, which marks one of the bills whose `outputItem` is this item: it must point at one of them (a check of 12's), and is not a second home for that link (pending Q6). | `ItemSpecification` | `Bom` | public Sutton BOM guide (defaults), as the architecture seed cites it; the API design report (primary and alternate BOMs) |
+
+`baseUnit`, `purchaseUnit` and `salesUnit` range over `UnitOfMeasure`. For a stored notation the field points at the
+property and its Literals schema points at `UnitOfMeasureCodeScheme`. Decision 23 keeps the notation in the record and
+lifts it to the concept IRI. Each field's `sh:in` lists only the concepts it allows: five for `Uom`, two for
+`Dimensions.unit`. Under the proposal in Q7, V12's `alsoInstanceOf` clause also checks that the concept is a `UnitOfMeasure`.
 
 Used here and owned elsewhere since the 2026-11-22 reconciliation (report 13): an item's lifecycle is 10's
 `lifecycleState` (one property for items, labels, orders and imports, its domain kept broad); a BOM line's revision
@@ -268,10 +273,10 @@ that replaces an earlier one is 06's `supersedes`; the item's name is 06's `name
 
 | Key | Label | Definition | Domain | Range | Source |
 | --- | --- | --- | --- | --- | --- |
-| `numericValue` | numeric value | The exact decimal number of a quantity, read from its digits. | `QuantityValue` | datatype from the record field: stated `xsd:decimal`, since integer and float fields both fill it (05's V11; pending decision 50) | the architecture seed (`numericValue`, exact decimal); `Item.read.ts` (`Count`, `Measure`) |
+| `numericValue` (`gist:numericValue` itself) | numeric value | The exact decimal number of a quantity, read from its digits. | `QuantityValue` | datatype from the record field: stated `xsd:decimal`, since integer and float fields both fill it (05's V11; pending decision 50) | the architecture seed (`numericValue`, exact decimal); `Item.read.ts` (`Count`, `Measure`) |
 | `unit` | unit | A relation from a quantity to the unit it counts. | `QuantityValue` | `UnitOfMeasure` | the architecture seed (`unit`); `Item.read.ts` (`uom`, `Dimensions.unit`) |
-| `convertedFrom` | converted from | A relation from a quantity to the original quantity it was converted from, the original being kept. | `QuantityValue` | `QuantityValue` | the architecture seed (5.8: "Preserve original and normalized values plus conversion provenance") |
-| `byConversion` | by conversion | A relation from a converted quantity to the item unit conversion that produced it. | `QuantityValue` | `ItemUnitConversion` | the architecture seed (5.8) |
+| `convertedFrom` | converted from | The original quantity for one identified use whose `hasQuantity` gives the result. | none declared: the line or its item-specific quantity observation | `QuantityValue` | the architecture seed (5.8: "Preserve original and normalized values plus conversion provenance") |
+| `byConversion` | by conversion | The reusable rule applied to that use's original quantity to produce its result. | none declared: the same line or observation as `convertedFrom` | `ItemUnitConversion` | the architecture seed (5.8) |
 | `minorUnits` | minor units | The whole number of counting units in a money amount at its scale, read from its digits (pending Q1). | `MoneyAmount` | datatype from the record field | `CLAUDE.md` (money rule); `Item.read.ts` (`decimalUnits`) |
 | `minorUnitScale` | scale | The number of decimal places of a money amount's counting unit: 2 for cents, 4 for ten-thousandths (pending Q1). | `MoneyAmount` | datatype from the record field (fixed at 4 for `UnitCost` today) | NEW: `Item.read.ts` (`decimalPattern`: up to four decimals) |
 | `currency` | currency | A relation from a money amount to its currency, which it always has. | `MoneyAmount` | `Currency` | the architecture seed (`currency`); `Item.read.ts` ("in US dollars") |
@@ -301,19 +306,22 @@ that replaces an earlier one is 06's `supersedes`; the item's name is 06's `name
 
 ### gist properties each local property would sit under
 
-For 11 to decide; nothing here is a parent link until it does. Every name is from `gist-categories.md`.
+Decision 16 allows a local property under a gist property only when its domain and range fall under the gist property's.
+The projection copies a gist property's named parent links, never its domain or range. Where the meanings are the same,
+the field path uses the gist property itself. There is no second predicate to link.
 
-| Local | gist candidate | Why it is local at all |
+| Field path or property | Proposed gist parent | How it is used |
 | --- | --- | --- |
-| `identifiedBy` | `gist:isIdentifiedBy` | Narrower domain and range |
-| `identifierText` | `gist:idText` | Same meaning; kept so the record field has one local target |
+| `identifiedBy` | `gist:isIdentifiedBy` | Identifiers assigned by an issuer |
+| `identifierText` | not linked | Use `gist:idText` itself for the exact characters |
 | `taggedWith`, `itemCategory` | `gist:isCategorizedBy` | Two kinds of categorizing kept apart |
-| `numericValue` | `gist:numericValue` | Same meaning |
-| `unit` | `gist:hasUnitOfMeasure` | The same relation from a magnitude (`QuantityValue`) to its unit. `baseUnit`, `costPerUnit` and `priceUnit` take no gist super-property: their subjects are an item, a cost observation and an offer, not magnitudes, and gist states `gist:hasUnitOfMeasure` from `gist:Magnitude`, which it disjoins from `gist:Intention` (decision 16) |
-| `offeredBy` | `gist:hasGiver` | Same meaning, narrower domain |
-| `offeredItem` | `gist:offersToProvide` | Same meaning, narrower range |
+| `numericValue` | not linked | Use `gist:numericValue` itself for the number |
+| `unit` | `gist:hasUnitOfMeasure` | Store the parent on `unit`, which relates a `QuantityValue` to its unit |
+| `baseUnit`, `costPerUnit`, `priceUnit` | not linked | Their subjects are an item, a cost observation and an offer, not magnitudes |
+| `offeredBy` | `gist:hasGiver` | Narrower domain |
+| `offeredItem` | `gist:offersToProvide` | Narrower range |
 | `hasDimension` (10) | `gist:hasAspect` | From a unit to its measurement dimension (count, mass, length, volume), a concept of 10's `MeasurementDimensionScheme` that is also a `gist:Aspect` (pending Q7) |
-| (none) | `gist:conformsTo` | Used by 08 from a lot or a serial unit to an `ItemSpecification` or an `ItemRevision` |
+| (none) | not linked | 08 uses `gist:conformsTo` directly from a lot or a serial unit to an `ItemSpecification` or an `ItemRevision` |
 
 ## 5. Design notes
 
@@ -334,6 +342,11 @@ and needs no item. A packaging unit (box) has a size only per item, through an `
 which it holds; a factor changed later never rewrites stored quantities (the architecture seed, 7.3). Mass to volume
 needs a density and is not a unit conversion at all. QUDT is an alignment only (decision 4).
 
+One line converts 1 box at 12 each per box; another converts 2 packs at 6 each per pack. A third records 12 each
+as entered. All three point by `hasQuantity` to the same value, 12 each. Only the first two carry `convertedFrom`
+and `byConversion`, each on the line that used that input and rule. If one line uses more than one conversion,
+each use has its own identified observation on that line, with its own input, rule and result.
+
 **Quantities are exact.** `quantityOnHand` and `reorderPoint` are integers, which write as exact decimals. The
 dimensions are `S.Finite` floats. The projector would write the shortest decimal that reads back as the same float,
 which is exact for any value typed with up to 15 significant digits; a record schema that reads dimensions from their
@@ -349,9 +362,9 @@ field's description text), and a check fails when a `MoneyAmount` has no currenc
 unit cost the tenant; a `unitPrice` is what an offer asks. The vendor's `unitCost` in the repository is a price the
 vendor asks, so it is `unitPrice` on the `VendorItem`; buying at it later becomes a cost observation (09).
 
-**The item's stock number is not the item's.** `quantityOnHand` points at 08's `InventoryMeasure` (on hand), because
-an item specification is not stock and measures overlap (report 01). The repository's record names no location, so
-the measure's position is "the organization, everywhere".
+**The item's stock number is not the item's.** The record names no location. Under 76(a), `quantityOnHand` supplies the quantity
+of a tenant-wide reported `onHand` measure, as of and sourced to confirmation. Its position has no `atLocation`:
+no site or bin is inferred.
 
 **A vendor known only by name.** `vendorName` is a string; no party record exists (profile, "Not decided"). Until 06's
 party records exist, `offeredBy` cannot be stated and the supplier part number's `issuedBy` cannot either; matching a
@@ -408,18 +421,19 @@ export const datatypeProperties = { minorUnits: { domain: { kind: "local", key: 
 
 ### Sketch, not code: one stored item as a test A-box
 
-A fixture shape for a competency question, under the placeholder namespace; how a concept's IRI is written is not
-decided (profile), so concepts are shown by notation in a comment.
+This catalog fixture uses decision 10's concept IRIs. It shows the proposed money scale and currency (pending Q1
+and decision 88); it is not the thin thread's membership fixture.
 
 ```turtle
 # sketch, not code
 ex:item-org1-0001 a inv:InventoryItemSpecification ;
   inv:identifiedBy ex:item-org1-0001-sku ;
-  inv:baseUnit ex:unit-each .                       # notation EA
+  inv:baseUnit inv:UnitOfMeasureCodeScheme-EA .
 ex:item-org1-0001-sku a inv:ItemIdentifier ;
-  inv:identifierText "SHH-9574" ; inv:identifierKey "SHH-9574" .   # kind: SKU (10)
+  gist:idText "SHH-9574" ; inv:identifierKey "SHH-9574" ;
+  inv:identifierKind inv:IdentifierKindScheme-sku .
 ex:cost-org1-0001 a inv:CostObservation ;
-  inv:costOf ex:item-org1-0001 ; inv:costPerUnit ex:unit-each ;
+  inv:costOf ex:item-org1-0001 ; inv:costPerUnit inv:UnitOfMeasureCodeScheme-EA ;
   inv:costAmount ex:cost-org1-0001-costAmount .     # a lifted node, named by path (12 section 2)
 ex:cost-org1-0001-costAmount a inv:MoneyAmount ;
   inv:minorUnits 123300 ; inv:minorUnitScale 4 ; inv:currency ex:usd .   # decisions 59 and 88
@@ -430,7 +444,7 @@ ex:cost-org1-0001-costAmount a inv:MoneyAmount ;
 | # | Anti-pattern | Finding |
 | --- | --- | --- |
 | 1 | Singleton hierarchy | `PackagingUnit` is the only child of `UnitOfMeasure`. It is kept because it carries a rule its parent has not (size per item); if Q7 drops it, the singleton goes with it |
-| 2 | Role as kind | Buy, Make and Sell are concepts (10), not subclasses; vendor is a flag on `Organization` (decision 3). None found |
+| 2 | Role as kind | Buy, Make and Sell are concepts (10), not subclasses; customer and vendor are flags on the tenant's `SourceRecord`, not on the shared `Organization` (decision 34 amends decision 3). None found |
 | 3 | Process and object | Expansions and observations are content, not events; executing a routing is 09's `OperationExecution`. None found |
 | 4 | Missing disjointness | Proposed in section 6 for every set of rigid siblings |
 | 5 | Circular definition | No definition uses its own label; no equivalence is written |
@@ -442,7 +456,7 @@ ex:cost-org1-0001-costAmount a inv:MoneyAmount ;
 | 11 | Individuals in the T-box | Units are concepts of 10's `UnitOfMeasureCodeScheme`, each also an individual of `UnitOfMeasure`, in the SKOS file; currencies are individuals of `Currency` in a reference module, not in the term graph (Q7) |
 | 12 | Negative universals | None |
 | 13 | False is-a from inheritance | `ItemRevision` is not under `ItemSpecification`; `BomRevision` is not under `Bom` |
-| 14 | System blueprint | `ItemFields`, `StoredItem`, `ItemEdit` and the staged row are records pointing at one term, not classes; `ItemQuery` and `RowId` point at none |
+| 14 | System blueprint | `ItemFields` and `StoredItem` point at `ItemSpecification`; the staged row points at `FileRow`. `ItemEdit` is a request with no class pointer; `ItemQuery` and `RowId` point at no term |
 | 15 | Technical perspective | The repository's float dimensions and four-decimal costs did not shape a term: they are notes for the record schemas |
 | 16 | Individuals and classes mixed | None |
 
@@ -455,16 +469,17 @@ ex:cost-org1-0001-costAmount a inv:MoneyAmount ;
 - **Customer group** for group price lists: a party term, 06's if it comes.
 - **A work center's capability list** (what a work center can do, beyond being assigned): no source names its values.
 - **Landed cost, catch weight** (glossary): a cost basis concept and a pricing rule, for 10 and a later pass.
-- **Valuation method as a property of the item** (the API design report's `valuationMethod`): a basis is stated on
-  each cost observation instead, since one item can be costed several ways.
+- **Valuation method as a property of the item** (the API design report's `valuationMethod`): a basis, when given, belongs to
+  the cost observation, since one item can be costed several ways.
 - **A dimensional unit conversion class**: standard conversions come from QUDT's coefficients through the alignment.
 
 ## Questions for Benjamin
 
-Moved on 2026-11-22 to the packet's [DECISIONS.md](../DECISIONS.md), "Open", merged with the other reports'
-questions. A "(pending Qn)" mark in this report means: Q1 is decision 59, Q2 is 60, Q3 is 12, Q4 is 13, Q5 is 67,
-Q6 is 66, Q7 is 61, Q8 is 64, Q9 is 55, Q10 is 62, Q11 is 37. The ratification gap stands: no term has a `rat-`
-record.
+The packet's [DECISIONS.md](../DECISIONS.md) collects these questions. Q4 is answered by decision 13: add a gist
+name to `gist-categories.md` only when a term in the slice being built needs it. Its named ancestors come with it
+(decision 14). This does not settle Q5. The open questions go to Benjamin with a concrete record when their slice
+is specified: Q1 is decision 59, Q2 is 60, Q3 is 12, Q5 is 67, Q6 is 66, Q7 is 61, Q8 is 64, Q9 is 55, Q10 is 62,
+Q11 is 37. None blocks the thin thread (decision 8).
 
 ## Not checked
 
@@ -480,4 +495,4 @@ record.
   the host adapters and the web package were not read. The access contract was listed, not read beyond its ids.
 - The alchemy-domain brief was read only at its README and decision 17; its other decisions on items were not.
 - The seeds' Turtle, shapes and taxonomy were read as text; none was parsed or reasoned over.
-- `bun run docs:check` passed with this file in place; it checks the frontmatter and links, not the content.
+- `bun run docs:check` passed on the earlier draft. It was not rerun for this revision.

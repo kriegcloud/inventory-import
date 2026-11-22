@@ -119,7 +119,7 @@ The generator joins the two sides. A term with no record still gets emitted. Sev
 one class. A datatype property's range is read from the field that fills it, and the generator fails if two fields
 fill it with different leaves. Checks:
 - byte-compare and an N3 re-parse in `check`;
-- a `laws ontology-terms` rule: every exported contract schema has a `term`, and no owl:inverseOf or owl:sameAs;
+- a `laws ontology-terms` rule: every exported contract schema has a `term`, which is the eventual target (report 12 states the active kernel and contract coverage and the reasoned `noTerm` exception), and no owl:inverseOf or owl:sameAs;
 - a slow test that runs the SHACL over the 155 stored rows of the messy sample plus must-fail fixtures.
 
 Cost to reverse: low. The IRIs live in the vocabulary, so moving to Turtle as source later means turning the generated

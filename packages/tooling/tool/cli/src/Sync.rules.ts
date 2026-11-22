@@ -105,6 +105,68 @@ export interface FoundBlock {
   readonly after: number
 }
 
+/**
+ * A stretch of a file with what a writer of it needs to know of the lines it is on.
+ *
+ * @category rules
+ */
+export const placed =
+  (span: { readonly start: number; readonly end: number }) =>
+  (text: string): FoundBlock => {
+    const lineStart = O.match(Str.lastIndexOf("\n")(Str.slice(0, span.start)(text)), {
+      onNone: () => 0,
+      onSome: (index) => index + 1
+    })
+    const lineEnd = O.match(Str.indexOf("\n")(Str.slice(span.end)(text)), {
+      onNone: () => text.length,
+      onSome: (index) => span.end + index
+    })
+    const indent = /^[ \t]*/.exec(Str.slice(lineStart)(text))?.[0] ?? ""
+    return { start: span.start, end: span.end, indent, before: span.start - lineStart, after: lineEnd - span.end }
+  }
+
+/**
+ * The members written directly in an array or an object: an array's items, an object's `"key": value` pairs, each
+ * from its first character to its last. What a string, a comment or a block inside a member holds divides nothing.
+ *
+ * @example
+ * membersOf({ start: 0, end: 21 })('{ "a": [1, 2], "b": 3 }') // the spans of `"a": [1, 2]` and `"b": 3`
+ *
+ * @category rules
+ */
+export const membersOf =
+  (block: { readonly start: number; readonly end: number }) =>
+  (text: string): ReadonlyArray<{ readonly start: number; readonly end: number }> => {
+    const blanked = blankComments(text)
+    const last = block.end - 1
+    const cuts: Array<number> = [block.start]
+    let depth = 0
+    let i = block.start + 1
+    while (i < last) {
+      const c = blanked[i]
+      if (c === '"') {
+        i += 1
+        while (i < last && blanked[i] !== '"') i += blanked[i] === "\\" ? 2 : 1
+      } else if (c === "[" || c === "{") {
+        depth += 1
+      } else if (c === "]" || c === "}") {
+        depth -= 1
+      } else if (c === "," && depth === 0) {
+        cuts.push(i)
+      }
+      i += 1
+    }
+    const ends = A.append(cuts, last)
+    return A.flatMap(ends, (cut, index) => {
+      const from = ends[index - 1]
+      if (from === undefined) return []
+      const piece = Str.slice(from + 1, cut)(blanked)
+      const trimmed = Str.trim(piece)
+      const start = from + 1 + (piece.length - Str.trimStart(piece).length)
+      return trimmed === "" ? [] : [{ start, end: start + trimmed.length }]
+    })
+  }
+
 const blockOf =
   (open: "[" | "{", close: "]" | "}") =>
   (key: string) =>
@@ -129,17 +191,7 @@ const blockOf =
       i += 1
     }
     if (i >= blanked.length) return O.none()
-    const end = i + 1
-    const lineStart = O.match(Str.lastIndexOf("\n")(Str.slice(0, start)(text)), {
-      onNone: () => 0,
-      onSome: (index) => index + 1
-    })
-    const lineEnd = O.match(Str.indexOf("\n")(Str.slice(end)(text)), {
-      onNone: () => text.length,
-      onSome: (index) => end + index
-    })
-    const indent = /^[ \t]*/.exec(Str.slice(lineStart)(text))?.[0] ?? ""
-    return O.some({ start, end, indent, before: start - lineStart, after: lineEnd - end })
+    return O.some(placed({ start, end: i + 1 })(text))
   }
 
 /**

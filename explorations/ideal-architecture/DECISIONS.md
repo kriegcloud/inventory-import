@@ -1191,9 +1191,10 @@ trying a falsified property again. Reverse: the three lines in `.github/workflow
 `vitest.config.ts`, and `realTime` and `saidAloud` in the four that wait in real time.
 
 A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
-(180 s; 24 s alone on two pinned cores), the draft machine's four properties and its three seeded ones (120 s; 13 s the slowest seen), Steps'
-heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (120 s: five starts, each
-stopped at 20 s). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
+(180 s; 24 s alone on two pinned cores), the draft machine's four properties and its three seeded ones (120 s; 13 s
+the slowest seen), Steps' heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up
+(300 s: five starts, the slowest seen 19 s on the clock; no start is stopped by the clock, since 2026-11-22). Limits
+set below the shared one were taken out, so the shared one applies: six test files had 10 s
 or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
 writes them into the kit's configs.
 
@@ -1539,6 +1540,39 @@ The agent chose these, and I was not asked:
 - The release notes are the conventional commits since the last tag, grouped by type, written to `CHANGELOG.md` and
   into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
   `README.md` names the version that was submitted and is never moved.
+
+After the review of 2026-11-22 the agent changed these, and I was not asked:
+
+- "Main" in every release rule is `origin/main`, fetched by the command itself, never the local `main`; a release is
+  cut only from `main` exactly where the remote's is. A fetch that fails stops the release.
+- A patch refuses a merge commit and a branch that does not hold its line's last tag. `release verify` holds every
+  rule again on the tagged commit (a release commit, over commits main holds), and refuses when git cannot answer.
+- The release commit also moves `bun.lock`'s copy of the version. `CHANGELOG.md` and the version stay on release
+  branches only; a new line's changelog starts from the last release's. `main`'s version file is not moved by a
+  release. Whether `main` should carry either is mine to change.
+- Staging deploys only `main`'s head, so a check run again for an older commit never puts it back.
+- Each deploy job waits in its own group, one for each release tag.
+- A test that was tried again after a hang or a falsified property fails the run, even if a later try passed: the
+  reporter reads every error of every try, which vitest's retry condition cannot.
+
+After that review I was asked three questions by dialog, on 2026-11-22:
+
+1. Where production's gate lives. GitHub's `production` environment named no branch or tag, so the rule "only from
+   a release tag" lived in the workflow file the tagged commit itself brings. Answer: "After CI on the release
+   branch (Recommended)". I chose; the agent recommended the same. Production starts when CI passes on a push to
+   `release/**` whose head commit carries its annotated `v*` tag. GitHub runs `main`'s copy of the workflow and of
+   the tag check for that, the `production` environment gets its `main`-only rule back, and I push branch and tag
+   together: `git push --atomic origin release/0.7 v0.7.0`. A tag pushed alone starts nothing. My approval stays.
+   Rejected: a push to `release/**` as the trigger with a `release/*` rule and admin-only release branches; leaving
+   it as it was with the approval as the only gate. This rests on GitHub's documented `workflow_run` behaviour and
+   is not verified on GitHub: the first real release is where it is.
+2. Staging's Cloudflare credentials. Answer: "Keep sharing, say so (Recommended)". I chose; the agent recommended
+   the same. Staging keeps the previews' account and token, and the code and the documents say plainly that a
+   pushed branch can reach staging. Rejected: a third account for staging; a required reviewer on `preview`.
+3. A fix that needed edits when it was cherry-picked. Answer: "Accept, and name it (Recommended)". I chose; the agent
+   recommended the same. A commit whose change differs from main's counts when its `git cherry-pick -x` line names
+   a commit that is on `origin/main`; the release's output, its notes and its tag message list it under "Picked
+   with changes". No flag. Rejected: always refusing it; accepting it only behind a flag.
 
 ### 2026-11-22 — atoms A1, the kit too
 

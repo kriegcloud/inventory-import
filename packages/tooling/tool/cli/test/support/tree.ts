@@ -11,6 +11,7 @@ import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Digest from "effect/crypto/Digest"
+import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import type { RepoError } from "../../src/Cli.errors.ts"
 import { Repo } from "../../src/Repo.service.ts"
 
@@ -22,9 +23,16 @@ export type Tree = Readonly<Record<string, string>>
 // @effect-diagnostics-next-line schemaSync:off
 export const json = (value: unknown): string => S.encodeSync(S.fromJsonString(S.Unknown))(value)
 
-/** Runs `rule` in a repository holding `tree`, started in `cwd` (a path from its root; the root by default). */
+/**
+ * Runs `rule` in a repository holding `tree`, started in `cwd` (a path from its root; the root by default). A rule may
+ * start a process of its own too.
+ */
 // @effect-diagnostics-next-line missingPipeableSignature:off
-export const inTree = <A, E>(tree: Tree, rule: Effect.Effect<A, E, Repo>, cwd = "."): Effect.Effect<A, E | RepoError> =>
+export const inTree = <A, E>(
+  tree: Tree,
+  rule: Effect.Effect<A, E, Repo | ChildProcessSpawner.ChildProcessSpawner>,
+  cwd = "."
+): Effect.Effect<A, E | RepoError> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path

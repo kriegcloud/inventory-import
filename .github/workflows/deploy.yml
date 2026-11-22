@@ -1,31 +1,38 @@
 name: Deploy
 
-# Trunk, with release branches and tags (decision "releases and deploys", docs/releasing.md):
+# Trunk, with release branches and tags (decisions "releases and deploys", docs/releasing.md):
 # - a preview for each pull request, destroyed when it closes;
-# - staging after every push to main whose CI run passed;
-# - production only from a release tag, v<major>.<minor>.<patch>, whose commit is on release/<major>.<minor> and not
-#   on main, after the approval the `production` environment asks for. Nothing deploys production from main.
+# - staging after a push to main whose CI run passed, while that commit is still main's head;
+# - production after CI passed on a push to release/<major>.<minor>, only when that branch's head commit carries its
+#   release tag, v<major>.<minor>.<patch>, and only after the approval the `production` environment asks for. A tag
+#   pushed alone starts nothing, and nothing deploys production from main.
+#
+# Staging and production start from CI's completed run (`workflow_run`). GitHub runs such a workflow from the default
+# branch: this file as it is on main, with main as its ref. So a release branch brings neither this file nor the
+# guard that judges it, and the `production` environment, which only main may deploy to, refuses a run started from
+# any other ref. Not verified on GitHub: it rests on GitHub's documented behaviour, and the first real release is
+# where it is seen.
+#
 # The environments, their secrets and variables are made by the repository's stack (packages/infra/src/GitHub.stack.ts),
-# deployed from a workstation. No job here can destroy any stage but `pr-<number>`, and no job deploys the repository's
-# stack.
+# deployed from a workstation. No job in this file destroys any stage but `pr-<number>`, and none deploys the
+# repository's stack. That is true of this file, and GitHub runs a pull request with the pull request's own copy of
+# it: the previews' token, which such a run holds, can change every stage on the previews' account, staging among
+# them (docs/releasing.md, "Staging").
 
 on:
-  push:
-    tags: ["v*"]
   pull_request:
     types: [opened, synchronize, reopened, closed]
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [main]
+    branches: [main, "release/**"]
 
 permissions:
   contents: read
 
-concurrency:
-  group: >-
-    deploy-${{ github.event.pull_request.number || (github.event_name == 'workflow_run' && 'staging') || 'prod' }}
-  cancel-in-progress: false
+# Each job that deploys waits in a group of its own, never the workflow as a whole: a run in which every job is skipped
+# then waits in no group, and cannot take the place of a deploy that was waiting its turn. GitHub keeps one waiting run
+# for each group and cancels the one before it, so a group is as narrow as what must not run twice at once.
 
 jobs:
   preview:
@@ -37,6 +44,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: preview
+    concurrency:
+      group: deploy-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -63,6 +73,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: preview
+    # The same group as the preview's deploy: its removal waits for a deploy of it that is still running.
+    concurrency:
+      group: deploy-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -89,13 +103,25 @@ jobs:
 
   staging:
     name: Staging
-    # After CI passed on a push to main: what main holds, deployed as it was checked.
+    # After CI passed on a push to main, in this repository: main's head, deployed as it was checked. The trigger's
+    # `branches: [main]` reads only the branch's name, so a pull request from a fork's own `main` starts this workflow
+    # too; this condition is what keeps it out.
     if: >-
       github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: staging
+    # A group of its own only for a run that deploys: any other run of this workflow gets a group nobody shares, so
+    # it cannot cancel a staging deploy that is waiting, whether or not GitHub reads a skipped job's group.
+    concurrency:
+      group: >-
+        ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository) && 'deploy-staging' ||
+        format('deploy-nothing-{0}', github.run_id) }}
+      cancel-in-progress: false
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -106,45 +132,92 @@ jobs:
         with:
           # The commit CI checked, not whatever main holds by now.
           ref: ${{ github.event.workflow_run.head_sha }}
+      # Staging never goes backwards: a CI run that is run again for an older commit, or one that finishes after a
+      # newer commit's, deploys nothing. Only the commit main is at now deploys; an older one's turn has passed, and
+      # main's own CI run deploys main. When git cannot say where main is, the job fails.
+      - name: Deploy only the commit main is at
+        id: head
+        env:
+          CHECKED: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          listed="$(git ls-remote origin refs/heads/main)"
+          main="${listed%%[[:space:]]*}"
+          if [ -z "$main" ]; then
+            echo "git could not say where main is, so nothing is deployed." >&2
+            exit 1
+          fi
+          if [ "$main" = "$CHECKED" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not deploying $CHECKED: main is at $main now, and that commit's own CI run deploys staging."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.head.outputs.deploy == 'true'
         with:
           node-version: 22
       - uses: oven-sh/setup-bun@v2
+        if: steps.head.outputs.deploy == 'true'
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+        if: steps.head.outputs.deploy == 'true'
       - name: Deploy staging
+        if: steps.head.outputs.deploy == 'true'
         run: bunx alchemy deploy --stage staging --yes
 
   release-tag:
-    name: Check the release tag
-    # Before production asks for its approval: the trigger matched `v*`, and this says whether the tag may deploy.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    name: Check the release
+    # After CI passed on a push to a release branch, in this repository. The trigger's `branches` reads only the
+    # branch's name, so a fork's own `release/1.0` starts this workflow too; this condition keeps it out.
+    if: >-
+      github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'release/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      # The tag that may deploy; empty when the branch's head carries none, and then production is skipped.
+      tag: ${{ steps.verify.outputs.tag }}
     steps:
+      # Main's code, with every branch: the guard that runs is main's, and it looks for the release's commits on the
+      # release branch and on main.
       - uses: actions/checkout@v4
         with:
-          # Every branch, so the tag's commit can be looked for on its release branch and on main.
+          ref: main
           fetch-depth: 0
-      # A checkout of a tag can hold it as a lightweight one; this takes the tag object as it was pushed.
-      - name: Fetch the tag as pushed
-        run: git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+      # A checkout can hold an annotated tag as a lightweight one; this takes every tag object as it was pushed.
+      - name: Fetch the tags as pushed
+        run: git fetch --force --tags origin
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      - name: Refuse a tag that is not a release
-        run: bun run beep release verify "$GITHUB_REF_NAME"
+      # The branch's name and the commit are passed as values, never written into the command: a branch may be named
+      # anything.
+      - name: Refuse a release that is not one
+        id: verify
+        env:
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          CHECKED: ${{ github.event.workflow_run.head_sha }}
+        run: bun run beep release verify-head "$BRANCH" "$CHECKED" --output "$GITHUB_OUTPUT"
 
   production:
     name: Production
     needs: release-tag
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # Only when the guard named a tag: a release branch's head with no tag deploys nothing and asks nobody.
+    if: needs.release-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Waits for the approval the environment asks for.
+    # Waits for the approval the environment asks for. Only a run whose ref is main may use it, which a run started
+    # from CI's completed run is, and a pull request's or a pushed branch's own workflow is not.
     environment: production
+    # One group for each tag. A release that waits for its approval holds its group, and with one group for all of
+    # them a third release would cancel the second without anyone refusing it. Two releases are never deployed at
+    # once because one person approves them, one at a time.
+    concurrency:
+      group: deploy-prod-${{ needs.release-tag.outputs.tag }}
+      cancel-in-progress: false
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -153,8 +226,10 @@ jobs:
       DEPLOY_WITHOUT_MODEL_KEY: ${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}
       SIGN_UP: ${{ vars.SIGN_UP }}
     steps:
-      # The tag's own commit: the release commit on its release branch.
+      # The release commit: the one CI checked and the guard passed.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -15,7 +15,8 @@
  * | the Effect language service's schema | the installed `@effect/tsgo` | a `$schema` that names the library's repository instead |
  *
  * The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` (its evidence folders `docs/qa` and
- * `docs/session` left out) and `.claude/agents`. `explorations/`, `goals/` and the root's `DECISIONS.md` are records
+ * `docs/session` left out) and `.claude/agents`. A version is read only after its own name, and after a name written
+ * small only when it is whole: "Effect 4.1" and "effect 4.1.4" are versions, "no effect 1.5 s later" is not. `explorations/`, `goals/` and the root's `DECISIONS.md` are records
  * of what was true when they were written, and are never rewritten.
  *
  * Two sources that disagree (a package at another `effect` than the rest) are a problem the command names and does
@@ -118,10 +119,19 @@ const isRegistryVersion = (spec: string) => !Str.startsWith("workspace:")(spec) 
  * @category rules
  */
 export const places =
-  (site: { readonly at: Text; readonly what: string; readonly expected: (found: string) => string }) =>
+  (site: {
+    readonly at: Text
+    readonly what: string
+    readonly expected: (found: string) => string
+    /** A match that is not a place after all, from its whole text and what it captured. */
+    readonly unless?: (whole: string, found: string) => boolean
+  }) =>
   (pattern: RegExp): Plan => {
     const { at, what, expected } = site
-    const matches = A.fromIterable(Str.matchAll(pattern)(at.text))
+    const matches = A.filter(
+      A.fromIterable(Str.matchAll(pattern)(at.text)),
+      (match) => site.unless === undefined || !site.unless(match[0], match[1] ?? "")
+    )
     return Plan.make({
       checked: matches.length,
       problems: [],
@@ -157,6 +167,12 @@ export const named = (names: ReadonlyArray<string>): RegExp =>
     `(?<![\\w@/.-])(?:${A.join(A.map(names, literally), "|")})\`?(?:'s)?\\s+v?(\\d+\\.\\d+(?:\\.\\d+)?(?:-[0-9A-Za-z]+(?:\\.[0-9A-Za-z]+)*)?)(?![\\w])`,
     "g"
   )
+
+/**
+ * Two numbers after a name written small ("no effect 1.5 s later") are a figure, not a version: after such a name
+ * only a whole version is read.
+ */
+const aFigure = (whole: string, found: string): boolean => /^[a-z]/.test(whole) && /^\d+\.\d+$/.test(found)
 
 /**
  * A version as precisely as a sentence states it: "4.1" stays two numbers, anything longer is the whole version.
@@ -290,7 +306,12 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   const inDocuments = (label: string, names: ReadonlyArray<string>, version: string, source: string): Plan =>
     mergePlans(
       A.map(documents, (at) =>
-        places({ at: at, what: `${label}'s version, from ${source}`, expected: asWritten(version) })(named(names))
+        places({
+          at,
+          what: `${label}'s version, from ${source}`,
+          expected: asWritten(version),
+          unless: aFigure
+        })(named(names))
       )
     )
   const dependencyNames = A.dedupe(

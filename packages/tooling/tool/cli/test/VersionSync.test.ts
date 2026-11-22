@@ -120,7 +120,7 @@ describe("version-sync", () => {
             "CLAUDE.md": "This repo uses Effect 4.1. Checked in `effect` 4.1.4's source; Effect 4 only.\n",
             "docs/auth.md": "Better Auth 1.7.20 (pinned). TypeScript 7.0.1 with @effect/tsgo 0.68.1.\n",
             "docs/standards/schema.md":
-              "No such schema in 4.1.4; side-effect 4.1.4 and @effect/vitest 4.1.4 are not Effect's.\n"
+              "No such schema in 4.1.4; side-effect 4.1.4 and @effect/vitest 4.1.4 are not Effect's, and no effect 1.5 s later.\n"
           },
           [
             "packages/kernel/package.json",
@@ -165,7 +165,7 @@ describe("version-sync", () => {
           "CLAUDE.md": "This repo uses Effect 4.2. Checked in `effect` 4.2.0's source; Effect 4 only.\n",
           "docs/auth.md": "Better Auth 1.7.22 (pinned). TypeScript 7.0.2 with @effect/tsgo 0.70.0.\n",
           "docs/standards/schema.md":
-            "No such schema in 4.1.4; side-effect 4.1.4 and @effect/vitest 4.1.4 are not Effect's.\n"
+            "No such schema in 4.1.4; side-effect 4.1.4 and @effect/vitest 4.1.4 are not Effect's, and no effect 1.5 s later.\n"
         })
         expect(result.after[0]).toMatch(/^out: version-sync OK /)
         expect(result.again).toEqual(result.after)

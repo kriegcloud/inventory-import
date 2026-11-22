@@ -100,8 +100,8 @@ describe("deps update", () => {
       const result = yield* run(tree(), registry(newest), "dry-run", ["packages/kernel/package.json"])
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 3 to move, 2 held, 1 not compared (nothing written)",
-        "out:   held  @tool/patcher 0.70.0: Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2: Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   move   @effect/vitest 4.1.4 -> 4.1.5 (1 package.json)",
         "out:   move   effect 4.1.4 -> 4.1.5 (2 package.json files)",
@@ -124,8 +124,8 @@ describe("deps update", () => {
       ])
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 3 moved, 2 held, 1 not compared",
-        "out:   held  @tool/patcher 0.70.0: Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2: Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   moved  @effect/vitest 4.1.4 -> 4.1.5 (1 package.json)",
         "out:   moved  effect 4.1.4 -> 4.1.5 (2 package.json files)",
@@ -143,8 +143,8 @@ describe("deps update", () => {
       expect(result.installed).toBe(true)
       expect(printed(result.second)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 0 moved, 2 held, 1 not compared",
-        "out:   held  @tool/patcher 0.70.0: Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2: Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about"
       ])
     })
@@ -156,8 +156,8 @@ describe("deps update", () => {
       const result = yield* run(tree(), registry(behind), "write", ["packages/kernel/package.json"])
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 1 moved, 2 held, 1 not compared",
-        "out:   held  @tool/patcher 0.70.0: Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2: Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   wait  effect and the @effect/* packages released with it are not at one newest version (@effect/vitest 4.1.4, effect 4.1.5): none of them moves until they are",
         "out:   moved  vitest ^5.1.0 -> ^5.2.0 (1 package.json)",
@@ -186,6 +186,15 @@ describe("deps update", () => {
         "out:   skip  vitest ^5.1.0: the registry named no newest version for it",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about"
       ])
+    })
+  )
+
+  it.effect("a registry that answers for nothing is said, and nothing is written", () =>
+    Effect.gen(function* () {
+      const error = yield* inTree(tree(), Effect.flip(depsUpdate("write", registry({}))))
+      expect(error.message).toBe(
+        "deps:update could not learn the newest version of any of the 5 dependencies it asked about: `bun info <name> version` answered for none. Is the registry reachable? Nothing was written"
+      )
     })
   )
 

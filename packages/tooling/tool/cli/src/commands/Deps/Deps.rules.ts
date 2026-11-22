@@ -28,7 +28,7 @@ import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import type { RepoError } from "../../Cli.errors.ts"
+import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { err, Line, out } from "../../Report.schema.ts"
 import { decodeJsonc, fits, type Found, lineAt, objectOf, stringsIn } from "../../Sync.rules.ts"
@@ -218,18 +218,16 @@ export const movesWithEffect = (name: string): boolean =>
   name === "effect" || (Str.startsWith("@effect/")(name) && !A.contains(apart, name))
 
 /**
- * The dependencies the registry has to be asked about: every one written as a version and not held.
+ * The dependencies the registry has to be asked about: every one written as a version, the held ones too, so a
+ * held dependency is shown with how far behind it is.
  *
  * @category rules
  */
-export const toAsk = (input: {
-  readonly asks: ReadonlyArray<Ask>
-  readonly holds: ReadonlyArray<Hold>
-}): ReadonlyArray<string> =>
+export const toAsk = (asks: ReadonlyArray<Ask>): ReadonlyArray<string> =>
   A.sort(
     A.dedupe(
       A.map(
-        A.filter(input.asks, (ask) => O.isSome(writtenAs(ask.spec.value)) && O.isNone(holdOf(input.holds)(ask.name))),
+        A.filter(asks, (ask) => O.isSome(writtenAs(ask.spec.value))),
         (ask) => ask.name
       )
     ),
@@ -483,13 +481,20 @@ export const depsUpdate = Effect.fn("Deps.depsUpdate")(function* (mode: Mode, pa
       : []
   )
 
-  const names = toAsk({ asks, holds })
+  const names = toAsk(asks)
   const answers = yield* Effect.forEach(
     names,
     (name) => Effect.map(packages.newest(name), (newest) => O.map(newest, (version) => [name, version] as const)),
     { concurrency: 8 }
   )
-  const plan = depsPlan({ asks, holds, latest: R.fromEntries(A.getSomes(answers)), written: mode === "write" })
+  const known = A.getSomes(answers)
+  if (names.length > 0 && known.length === 0) {
+    return yield* RepoError.make({
+      path: "bun info",
+      message: `deps:update could not learn the newest version of any of the ${names.length} dependencies it asked about: \`bun info <name> version\` answered for none. Is the registry reachable? Nothing was written`
+    })
+  }
+  const plan = depsPlan({ asks, holds, latest: R.fromEntries(known), written: mode === "write" })
   if (mode !== "write" || plan.drifts.length === 0) return plan.findings
 
   yield* settle(

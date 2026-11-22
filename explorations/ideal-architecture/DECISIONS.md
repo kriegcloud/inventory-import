@@ -873,7 +873,14 @@ says its waiting decisions were taken up by another tab.
 An import matched before migration 0002 has no record of the column a field read earlier, so whether a re-match changed
 how a row compares cannot be known for a Replace or Keep-stored made before it. Question: what becomes of it? Options:
 "Take it back, say so (Recommended)"; "Keep it as made". Answer: "Take it back, say so". I chose; the agent
-recommended the same. The server takes it back, as it did; the screen names it.
+recommended the same. The server takes it back, as it did; the screen names it. The answer is about a decision that
+arrives after the re-match.
+
+Not decided: a Replace or Keep-stored already saved on such an import, when nobody matches that field again. Built: a
+confirm does not judge saved decisions, so it is applied as made; the next match of that same field takes it back and
+names it, whether or not the row's comparison changed, because the server cannot tell whether it was made before or
+after the old match; a match of another field leaves it. Case: Replace saved on row 2, Unit cost matched before moves
+were kept, Reorder point matched since: the confirm overwrites row 2's stored item.
 
 ### 2026-11-21 — atoms, a held row, a refused row and the confirm
 

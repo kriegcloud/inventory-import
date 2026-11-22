@@ -23,8 +23,9 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
-    // oxlint, and the design-system lint in packages with screens.
-    "lint": { "outputs": [] },
+    // oxlint, and the design-system lint in packages with screens. A package's own lint profile is in its files; the
+    // root profiles they extend (the atoms rule, the design lints) are inputs too, so a change to one is not replayed.
+    "lint": { "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc*.json"], "outputs": [] },
     // The fast tests. Their limits and retries are the root's (vitest.shared.ts, vitest.retries.ts), which every
     // package's vitest.config.ts imports.
     "test": {

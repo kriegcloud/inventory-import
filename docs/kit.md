@@ -253,8 +253,8 @@ return (
   filter menu the value box is keyed by its column, so choosing another field empties it. On a phone the toolbar's
   search boxes fill the row and the paging is one row, with the page size's label for a screen reader only. The
   stepper's line between two steps is never narrower than 12 px. Upstream keeps the table's state in the address with
-  nuqs. Here `data-table-state.ts` does it through the app's own router when `urlState` is set, and in React state
-  otherwise (the review's table, which sits inside a step). `DataTableConfigOptions.id` takes `undefined`, for this
+  nuqs. Here `data-table-state.ts` does it through the app's own router when `urlState` is set, and in atoms of the
+  table's own otherwise (the review's table, which sits inside a step). `DataTableConfigOptions.id` takes `undefined`, for this
   repo's exact optional properties.
 - On a page as narrow as a phone, show the same page of rows as cards (`DataTableCards`, a local addition built on the
   same table instance) between the toolbar and `DataTablePagination`: a table wider than the screen fails the phone
@@ -425,6 +425,16 @@ bun run check
 
 - **Never `--overwrite`.** The starter's components were changed after installing (the table grid, the data grid,
   the stepper); an overwrite puts the upstream version back without saying so. `yes n |` keeps them.
+- **The kit files moved to atoms** no longer match their registry (goals/atoms, "The kit on atoms"): their state is
+  in atoms, not React's hooks, and each says so on its first line. `shadcn add` over one of them is a merge by hand,
+  never `--overwrite`: take upstream's change into the file as it is here, and keep it on atoms
+  (`packages/ui/.oxlintrc.kit.json` reads these files and refuses an effect hook or a state hook). Moved so far
+  (batch 1, the data table), all under `packages/ui/src/`:
+  - `hooks/use-data-table.ts`, `hooks/use-debounced-callback.ts`
+  - `components/data-table/`: `data-table-state.ts`, `data-table-records.tsx`, `data-table-toolbar.tsx`,
+    `data-table-view-options.tsx`, `data-table-sort-menu.tsx`, `data-table-filter-menu.tsx`,
+    `data-table-slider-filter.tsx`, `data-table-range-filter.tsx`, `data-table-date-filter.tsx`
+  - `components/faceted.tsx`, `components/sortable.tsx`, `components/calendar.tsx`, `components/slider.tsx`
 - **`bunx`, not `npx`, for `add`.** Under `npx` the CLI's own `npm install` stopped with `EALLOWSCRIPTS` (npm 11
   refuses an `allow-scripts` setting handed down as an environment variable). `bunx` without `--bun` still runs the
   CLI on Node. The CLI installs with npm here, so

@@ -1,4 +1,5 @@
-import * as React from "react"
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
+import type { ComponentProps } from "react"
 import { cn } from "cn"
 import { Slider as SliderPrimitive } from "radix-ui"
 
@@ -9,11 +10,9 @@ function Slider({
   min = 0,
   max = 100,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
-    [value, defaultValue, min, max]
-  )
+}: ComponentProps<typeof SliderPrimitive.Root>) {
+  // Only its length is read (one thumb per value), so it is worked out in each draw.
+  const _values = Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]
 
   return (
     <SliderPrimitive.Root

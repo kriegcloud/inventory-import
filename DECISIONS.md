@@ -29,6 +29,8 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
   - "Why flagged?" asks about the rows that the view, the problem kind and the search narrow the table to. There is
     no tick box for picking rows one at a time.
   - On a phone the grey line under the result's heading is cut to one line.
+  - On Items, a filter value typed in the Filter menu and followed within a third of a second by a click on another
+    page is written into that page's address (`/activity?name=brass`). It was so before the table moved to atoms.
   - A take-back restores at most ten replaces of one item in turn. No test covers two rows of one file replacing the
     same SKU.
   - **A review that saves as you decide, open in two tabs or by two people.** Each of these needs two tabs, two people

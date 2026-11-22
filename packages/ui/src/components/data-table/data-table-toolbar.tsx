@@ -1,8 +1,9 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 import { type Column, type ReactTable, type RowData, Subscribe } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import { type ChangeEvent, type ComponentProps, lazy, type ReactNode, Suspense } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -25,19 +26,19 @@ import { CalendarIcon, PlusCircle, X } from "lucide-react"
 // The date and range filters bring a calendar, a date library and a slider: more code than the rest of a table's
 // page, for buttons few people press. They arrive after the table, each with a stand-in of the same size.
 // Cast back to the generic components: React.lazy keeps the props but not the row type.
-const DataTableDateFilter = React.lazy(() =>
+const DataTableDateFilter = lazy(() =>
   import("@inventory/ui/components/data-table/data-table-date-filter").then((module) => ({
     default: module.DataTableDateFilter
   }))
 ) as unknown as typeof DateFilter
-const DataTableSliderFilter = React.lazy(() =>
+const DataTableSliderFilter = lazy(() =>
   import("@inventory/ui/components/data-table/data-table-slider-filter").then((module) => ({
     default: module.DataTableSliderFilter
   }))
 ) as unknown as typeof SliderFilter
 
 /** The filter's button as it looks with nothing chosen, until its code arrives. */
-function FilterStandIn(props: { title: string; icon: React.ReactNode }) {
+function FilterStandIn(props: { title: string; icon: ReactNode }) {
   return (
     <Button variant="outline" className="max-w-full shrink" disabled>
       {props.icon}
@@ -52,7 +53,7 @@ const BOOLEAN_OPTIONS = [
   { label: "No", value: "false" }
 ]
 
-interface DataTableToolbarProps<TData extends RowData> extends React.ComponentProps<"div"> {
+interface DataTableToolbarProps<TData extends RowData> extends ComponentProps<"div"> {
   table: ReactTable<DataTableFeatures, TData, unknown>
   globalFilterPlaceholder?: string
   /**
@@ -65,7 +66,7 @@ interface DataTableToolbarProps<TData extends RowData> extends React.ComponentPr
    * Local addition: the table's one search box, drawn first, alone at the left with Reset. With it, the quick
    * filters move to the right beside the menus, so the search reads first and the filters and actions after it.
    */
-  search?: React.ReactNode
+  search?: ReactNode
 }
 
 export function DataTableToolbar<TData extends RowData>({
@@ -77,11 +78,11 @@ export function DataTableToolbar<TData extends RowData>({
   className,
   ...props
 }: DataTableToolbarProps<TData>) {
-  const columns = React.useMemo(() => {
-    const filterable = table.getAllLeafColumns().filter((column) => column.getCanFilter())
-    if (quick === undefined) return filterable
-    return quick.flatMap((id) => filterable.filter((column) => column.id === id))
-  }, [table, quick])
+  // Worked out in each draw: the table handed in is a new object in each draw of its owner, so upstream's memo on it
+  // never kept anything.
+  const filterable = table.getAllLeafColumns().filter((column) => column.getCanFilter())
+  const columns =
+    quick === undefined ? filterable : quick.flatMap((id) => filterable.filter((column) => column.id === id))
 
   function onReset() {
     table.resetColumnFilters(true)
@@ -161,9 +162,9 @@ function DataTableToolbarFilter<TData extends RowData>({ column }: DataTableTool
     number: () => {
       if (getIsNumberRangeColumn(column)) {
         return (
-          <React.Suspense fallback={<FilterStandIn title={title} icon={<PlusCircle />} />}>
+          <Suspense fallback={<FilterStandIn title={title} icon={<PlusCircle />} />}>
             <DataTableSliderFilter column={column} title={title} />
-          </React.Suspense>
+          </Suspense>
         )
       }
 
@@ -180,9 +181,9 @@ function DataTableToolbarFilter<TData extends RowData>({ column }: DataTableTool
     },
 
     date: () => (
-      <React.Suspense fallback={<FilterStandIn title={title} icon={<CalendarIcon />} />}>
+      <Suspense fallback={<FilterStandIn title={title} icon={<CalendarIcon />} />}>
         <DataTableDateFilter column={column} title={title} multiple />
-      </React.Suspense>
+      </Suspense>
     ),
 
     select: () => (
@@ -198,7 +199,7 @@ function DataTableToolbarFilter<TData extends RowData>({ column }: DataTableTool
   })
 }
 
-interface DataTableFilterInputProps<TData extends RowData> extends React.ComponentProps<"input"> {
+interface DataTableFilterInputProps<TData extends RowData> extends ComponentProps<"input"> {
   column: Column<DataTableFeatures, TData>
   unit?: string | undefined
 }
@@ -217,8 +218,7 @@ function DataTableFilterInput<TData extends RowData>({
           type,
           ...props,
           value: readFilterInputValue(filterValue),
-          onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
-            column.setFilterValue(event.target.value || undefined)
+          onChange: (event: ChangeEvent<HTMLInputElement>) => column.setFilterValue(event.target.value || undefined)
         }
 
         if (!unit) return <Input {...inputProps} className={className} />

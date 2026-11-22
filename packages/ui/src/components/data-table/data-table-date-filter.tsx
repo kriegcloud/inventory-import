@@ -1,9 +1,10 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 import type { DateRange } from "react-day-picker"
 
 import { type Column, type RowData, Subscribe } from "@tanstack/react-table"
-import * as React from "react"
+import type { MouseEvent } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -40,54 +41,34 @@ function DataTableDateFilterContent<TData extends RowData>({
   columnFilterValue: unknown
 }) {
   const dir = useDirection()
-  const selectedDates = React.useMemo<DateSelection>(() => {
-    if (!columnFilterValue) {
-      return multiple ? { from: undefined, to: undefined } : []
-    }
+  // Worked out in each draw from the filter's value; nothing here is held between draws.
+  const selectedDates = getSelectedDates(columnFilterValue, multiple)
 
-    const timestamps = parseColumnFilterValue(columnFilterValue)
-    if (multiple) {
-      return {
-        from: parseAsDate(timestamps[0]),
-        to: parseAsDate(timestamps[1])
-      }
-    }
-
-    const date = parseAsDate(timestamps[0])
-    return date ? [date] : []
-  }, [columnFilterValue, multiple])
-
-  const onSelect = React.useCallback(
-    (date: Date | DateRange | undefined) => {
-      if (!date) {
-        column.setFilterValue(undefined)
-        return
-      }
-
-      if (multiple && !("getTime" in date)) {
-        const from = date.from ?? date.to
-        const to = date.to ?? date.from
-        if (!from || !to) {
-          column.setFilterValue(undefined)
-        } else if (from.toDateString() === to.toDateString()) {
-          column.setFilterValue(from.getTime())
-        } else {
-          column.setFilterValue([from.getTime(), to.getTime()])
-        }
-      } else if (!multiple && "getTime" in date) {
-        column.setFilterValue(date.getTime())
-      }
-    },
-    [column, multiple]
-  )
-
-  const onReset = React.useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation()
+  function onSelect(date: Date | DateRange | undefined) {
+    if (!date) {
       column.setFilterValue(undefined)
-    },
-    [column]
-  )
+      return
+    }
+
+    if (multiple && !("getTime" in date)) {
+      const from = date.from ?? date.to
+      const to = date.to ?? date.from
+      if (!from || !to) {
+        column.setFilterValue(undefined)
+      } else if (from.toDateString() === to.toDateString()) {
+        column.setFilterValue(from.getTime())
+      } else {
+        column.setFilterValue([from.getTime(), to.getTime()])
+      }
+    } else if (!multiple && "getTime" in date) {
+      column.setFilterValue(date.getTime())
+    }
+  }
+
+  function onReset(event: MouseEvent) {
+    event.stopPropagation()
+    column.setFilterValue(undefined)
+  }
 
   const hasValue = getIsDateRange(selectedDates)
     ? Boolean(selectedDates.from || selectedDates.to)
@@ -151,6 +132,23 @@ function DataTableDateFilterContent<TData extends RowData>({
       </PopoverContent>
     </Popover>
   )
+}
+
+function getSelectedDates(columnFilterValue: unknown, multiple: boolean | undefined): DateSelection {
+  if (!columnFilterValue) {
+    return multiple ? { from: undefined, to: undefined } : []
+  }
+
+  const timestamps = parseColumnFilterValue(columnFilterValue)
+  if (multiple) {
+    return {
+      from: parseAsDate(timestamps[0]),
+      to: parseAsDate(timestamps[1])
+    }
+  }
+
+  const date = parseAsDate(timestamps[0])
+  return date ? [date] : []
 }
 
 function parseColumnFilterValue(value: unknown) {

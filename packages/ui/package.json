@@ -148,7 +148,7 @@
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && beep-cli laws exports && beep-cli quality strict strict-ceiling.json",
-    "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../.oxlintrc.shadcn.json src && exit $lint"
+    "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c .oxlintrc.kit.json src || lint=1; oxlint --disable-nested-config --deny-warnings -c ../../.oxlintrc.shadcn.json src && exit $lint"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

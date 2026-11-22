@@ -1271,7 +1271,7 @@ chose; the agent recommended the same.
 
 Three defaults I was shown and accepted with the whole: the warning is at 30 days old or 200 files; an experiment
 that needs a database or a dev server keeps its state in its own ignored folder (`.state`) and on its own port,
-never the app's; a build session may use the scratchpad for trial code instead of a cache folder.
+never the app's; trial code written while building something goes in the scratchpad, not a cache folder.
 
 The agent chose these, and I was not asked:
 
@@ -1408,3 +1408,28 @@ second refines the entry "a keep when a rival row is decided": accepting a fix o
 on it" that wins over the keep; keeping it or editing it is. Reverse: a rival with accepted fixes makes a clash too,
 as the earlier entry reads on its own; a waiting undo is held like a waiting act.
 
+### 2026-11-22 — the scratchpad: its install
+
+The scratchpad was built as a workspace of the root, so the root's install, on CI and in every deploy, installed what
+its package.json asked for, a library an experiment added included, and `bun run check` read that package.json. That
+went against answer 2 above (its own commands only). Measured before asking: outside the workspaces, every package
+and every library still resolves from the root's one `node_modules`, the templates pass their tests and the
+type-check, and a library added in the scratchpad goes into its own `node_modules` and lockfile, the root's
+untouched.
+
+1. **The scratchpad's install?** Options: "Out of the workspaces, its own lock (Recommended)"; "Keep it a workspace";
+   "Workspace, no libraries of its own". Answer: "Out of the workspaces, its own lock". I chose; the agent recommended
+   the same. Its package.json lists only libraries experiments added; the repository's packages and the shared
+   libraries resolve from the root's install; CI and a deploy never install an experiment's library; `bun run check`
+   reads the scratchpad only for the import boundary, keys and private paths. Its costs, each said before I chose: a
+   second lockfile against "one lockfile" (the one exception, for the scratchpad as a whole: answer 4 still refuses an
+   install inside one experiment); a library with its own `effect` would be a second copy, so a library the root
+   already has never goes there (`scratch:check` refuses it); an experiment cannot try another version of React or
+   Effect; the CLI keeps the scratchpad's configuration, so CI reads nothing of the folder.
+2. **Its lockfile?** Options: "Committed (Recommended)"; "Ignored". Answer: "Committed". I chose; the agent
+   recommended the same. bun writes `scratchpad/bun.lock` with the first library; `scratch:check` asks for it once
+   the scratchpad lists one.
+
+The agent chose, and I was not asked: the Verify template takes the prover from the root's install (a library of the
+scratchpad would be a second Effect), so it works once a package asks for `@alchemy.run/domain`, and until then
+`scratch:new` says so.

@@ -13,10 +13,11 @@ tree and changes nothing) and only then writes, so a check, a dry run and a writ
 
 | Command | What it does | In `bun run check` |
 | --- | --- | --- |
-| `bun run deps:update` | Moves every dependency of every package to the registry's newest version, except the ones held back; installs; then runs `version-sync --write`. `-- --dry-run` lists the same and writes nothing | no: it asks the registry |
+| `bun run deps:update` | Moves every dependency of every package to the registry's newest version, except the ones held back; runs `version-sync --write`; then installs once. `-- --dry-run` lists the moves and the held, and writes nothing: what `version-sync` would then bring along is not listed | no: it asks the registry |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source, and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written | yes |
 | `bun run config-sync` | Writes the lists and paths that follow from the workspaces. `-- --dry-run` lists what would be written | as `config-sync:check` |
 | `bun run config-sync:check` | Names what `config-sync` would write, and fails | yes |
+| `bun run lockfile:check` | `bun.lock` holds what every package.json asks for, so CI's frozen install accepts it: resolved from bun's cache, never the network, writing nothing | yes |
 | `bun run deps:lint` | syncpack: one version of a dependency across the packages, Effect's pinned exactly | no |
 | `bun run deps:outdated` | syncpack: what has a newer version, the held dependencies left out | no: it asks the registry |
 
@@ -26,18 +27,27 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 ## Moving dependencies: `deps:update`
 
 - **Every package.** The root's `package.json` and every workspace's under `apps` and `packages`, 25 files today.
-  The scratchpad's is not one of them: what it shares with the packages follows through `version-sync`, and a
-  library an experiment added is the experiment's. A dependency keeps the way it is
+  The scratchpad's is not one of them: it is no workspace, and its libraries and its own lockfile are the
+  experiments'. A dependency keeps the way it is
   written: an exact version stays exact, `^1.2.3` stays a caret range.
 - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version. When
   the registry's newest version is the same for all of them, all move; when one was published later than the rest,
   none moves and the command says which is behind.
-- **Held dependencies stay**, and each is named at every run with the registry's newest version, and its group
+- **Held dependencies stay**, and each is named at every run with the registry's newest version (one written as an
+  address, as `xlsx` is, has none: the registry cannot be asked about it), and its group
   with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for
   what did not, the command or the steps. The list is `updateGroups` in `.syncpackrc.json`: a group's `label` is its
   reason, and what follows ` To move: ` in it is how it moves. `deps:outdated` leaves the same ones out.
-- **After the move** `bun install` runs, then `version-sync --write`, and the command says what moved from which
-  version to which. Run `bun run check:full` before committing: a new formatter or type-checker can find new things.
+- **After the move** `version-sync --write` brings along every place a moved version is repeated (the documents,
+  the pins in code), and only then `bun install` runs, once, so `bun.lock` is made from what the files
+  finally say. The command says what moved from which version to which. Run `bun run check:full` before committing: a
+  new formatter or type-checker can find new things.
+- **If the install fails**, every file the command wrote is put back as it was, `bun.lock` included, and it says so.
+  `node_modules` may be half installed: `bun install` puts it back. Fix what bun said and run `bun run deps:update`
+  again: it finds the same moves.
+- **`config-sync` installs too** when it writes a package.json (a package's scripts),
+  so `bun.lock` follows at once. `bun run lockfile:check`, in `bun run check`, refuses a package.json that asks for a
+  version `bun.lock` does not hold, which is what CI's frozen install refuses.
 
 ### What is held, and why
 
@@ -66,7 +76,6 @@ what moves it; to release one, remove the group.
 | A GitHub action's version | `.github/workflows/ci.yml` | the same action in every other workflow |
 | The CLI's version | its `package.json` | `version` in its `src/bin.ts` |
 | The Effect language service's schema | the installed `@effect/tsgo` | a tsconfig's `$schema` that names the library's repository instead |
-| What the scratchpad runs on | the version the `package.json` files state for each dependency | the same dependency in `scratchpad/package.json`; a library only an experiment uses is left alone |
 
 The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`. A version is read in
 a sentence only after its own name ("Effect 4.1", "`effect` 4.1.5's source"), and as precisely as the sentence
@@ -103,14 +112,18 @@ depends on where it is and what it holds is written from that.
 | sources | `source` in `.syncpackrc.json` | the root's `workspaces` patterns |
 | coverage | every package fits a `workspaces` pattern, and every pattern names a package (a problem, not repaired) | the folders with a `package.json` under `apps` and `packages` |
 | paths | a `$schema`, an `extends` and a path in a script that names nothing where it is, and would from the root | the depth of the folder it is in |
-| references | a solution file (`"files": []`) references every project beside it, the root's also each package's projects other than its `tsconfig.json`; a reference that names nothing is removed; a project that has `references` lists the workspace packages its `package.json` declares | the `tsconfig*.json` files on disk, and each package's dependencies |
+| references | a solution file (`"files": []`) references every project beside it, the root's also each package's projects other than its `tsconfig.json`; a reference that names nothing is removed, one a person added is kept. A package's own projects are type-checked from source and have no references; none is derived | the `tsconfig*.json` files on disk |
 | scripts | `check` type-checks each of the package's projects and counts against its ceiling file; `test` exists beside a `vitest.config.ts`; `lint` exists unless the package is vendored | what the package holds |
 | tasks | `check`, `check:full` and `check:ci` (CI's main job) run every root task `turbo.json` defines and no other; each has a root script (a problem when it has none) | the `//#name` tasks of `turbo.json` |
-| vendored | the formatter's `ignorePatterns` name every vendored package | the packages with a `vendor.json` |
-| scratchpad | the scratchpad's `dependencies` name every package, as `workspace:*` ([the scratchpad](scratchpad.md)); syncpack's sources leave the scratchpad out | the packages under `packages/` |
+| vendored | the formatter's `ignorePatterns` name every vendored package, and no package of the repository's own | the packages with a `vendor.json` |
 
-A reference a person added by hand to a solution file is kept while it names something. No package has project
-references today (each is type-checked from source by `tsrs -p`); the rule for them is there for the day one does.
+A reference a person added by hand to a solution file is kept while it names something. The scratchpad is no workspace, and no rule reads it. A list or object that holds
+a comment is never rewritten whole: the command names what differs and leaves the change to a person, so the comment
+stays. A `./` path that names nothing beside its file is a problem, never a repoint at the root's file of that name.
+
+Every rule reads the root and each package's own folder, not the folders below it: a project or a configuration file
+in a package's subfolder (`apps/inventory/scripts/tsconfig.json`) is not checked, and a solution file keeps the
+reference a person gave it.
 
 The rest of what repeats the workspaces is held elsewhere: the two stylesheet lists by `bun run beep laws screens`,
 which package may import which by `bun run beep laws boundaries`.

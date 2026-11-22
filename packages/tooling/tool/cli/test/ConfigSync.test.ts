@@ -1,12 +1,23 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { configSync } from "../src/commands/ConfigSync/ConfigSync.rules.ts"
+import { Repo } from "../src/Repo.service.ts"
 import { syncSentence } from "../src/Sync.schema.ts"
 import { cycle, lines } from "./support/sync.ts"
 import { json } from "./support/tree.ts"
 
+// An install that writes a lockfile from the scratchpad's package.json as it is when the install runs, as bun does:
+// no network, nothing installed. A test then sees in bun.lock what the install was given.
+const install = Effect.gen(function* () {
+  const repo = yield* Repo
+  const scratch = repo.join(repo.root, "scratchpad", "package.json")
+  const text = (yield* repo.exists(scratch)) ? yield* repo.text(scratch) : ""
+  yield* repo.write(repo.join(repo.root, "bun.lock"), `locked from: ${text}`)
+  return { code: 0, output: "" }
+})
+
 const run = (tree: Record<string, string>, files: ReadonlyArray<string> = []) =>
-  cycle({ tree, command: configSync, sentence: syncSentence, files })
+  cycle({ tree, command: (mode) => configSync(mode, install), sentence: syncSentence, files })
 
 // A package that already has every script turbo runs in it, so a test of something else stays about that.
 const scripts = { check: "tsrs -p tsconfig.json", lint: "oxlint --quiet src" }
@@ -164,7 +175,7 @@ describe("config-sync", () => {
         "err:   packages/group/web/package.json:5  a script's path, from the folder's depth: found ../../.oxlintrc.shadcn.json, expected ../../../.oxlintrc.shadcn.json",
         "err:   packages/group/web/tsconfig.json:3  `extends`, from the folder's depth: found ../../tsconfig.base.json, expected ../../../tsconfig.base.json",
         "err:   packages/group/web/tsconfig.json:4  `$schema`, from the folder's depth: found node_modules/tool/schema.json, expected ../../../node_modules/tool/schema.json",
-        "err:   packages/group/web/.oxlintrc.json: line 2: `extends` names ./missing.json, which does not exist here or from the repository's root (run `bun install` if it is an installed package's file)"
+        "err:   packages/group/web/.oxlintrc.json: line 2: `extends` names ./missing.json, which is not beside it: write the file's new name"
       ])
       expect(result.files).toEqual({
         "packages/group/web/package.json": lines([
@@ -191,7 +202,7 @@ describe("config-sync", () => {
       })
       const left = [
         "err: config-sync FAIL  1 problem needs a person, and no command repairs it",
-        "err:   packages/group/web/.oxlintrc.json: line 2: `extends` names ./missing.json, which does not exist here or from the repository's root (run `bun install` if it is an installed package's file)"
+        "err:   packages/group/web/.oxlintrc.json: line 2: `extends` names ./missing.json, which is not beside it: write the file's new name"
       ]
       expect(result.after).toEqual(left)
       expect(result.again).toEqual(left)
@@ -271,50 +282,95 @@ describe("config-sync", () => {
     })
   )
 
-  it.effect("a project that has references lists the workspace packages its package.json declares", () =>
+  it.effect("a package's own project references are left as written: no rule derives them", () =>
     Effect.gen(function* () {
+      const references = lines([
+        "{",
+        '  "references": [{ "path": "../../schema" }, { "path": "./tsconfig.json" }]',
+        "}"
+      ])
       const result = yield* run(
         {
           "package.json": json({ name: "root", workspaces: ["packages/*", "packages/catalog/*"] }),
-          "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
-          "packages/kernel/tsconfig.json": "{}",
           "packages/schema/package.json": json({ name: "@x/schema", scripts }),
           "packages/schema/tsconfig.json": "{}",
           "packages/catalog/model/package.json": json({
             name: "@x/model",
             scripts,
-            dependencies: { "@x/schema": "workspace:*", effect: "4.1.4" },
+            dependencies: { "@x/schema": "workspace:*" },
             devDependencies: { "@x/kernel": "workspace:*" }
           }),
-          "packages/catalog/model/tsconfig.json": lines([
-            "{",
-            '  "references": [{ "path": "../../schema" }, { "path": "../../gone" }]',
-            "}"
-          ]),
-          // No `references` at all: the project is left as it is.
-          "packages/catalog/host/package.json": json({
-            name: "@x/host",
-            scripts,
-            dependencies: { "@x/model": "workspace:*" }
-          }),
-          "packages/catalog/host/tsconfig.json": "{}"
+          "packages/catalog/model/tsconfig.json": references
         },
-        ["packages/catalog/model/tsconfig.json", "packages/catalog/host/tsconfig.json"]
+        ["packages/catalog/model/tsconfig.json"]
+      )
+      expect(result.before[0]).toMatch(/^out: config-sync OK /)
+      expect(result.files).toEqual({ "packages/catalog/model/tsconfig.json": references })
+    })
+  )
+
+  it.effect("a `./` path that names nothing beside it is a problem, never the root's file of that name", () =>
+    Effect.gen(function* () {
+      const project = lines(["{", '  "extends": "./tsconfig.base.json"', "}"])
+      const result = yield* run(
+        {
+          "package.json": json({ name: "root", workspaces: ["packages/*"] }),
+          "tsconfig.base.json": "{}",
+          "packages/web/package.json": json({ name: "@x/web", scripts }),
+          // Its own base was renamed: the root's base is another file, with other options.
+          "packages/web/tsconfig.json": project
+        },
+        ["packages/web/tsconfig.json"]
+      )
+      expect(result.before).toEqual([
+        "err: config-sync FAIL  1 problem needs a person, and no command repairs it",
+        "err:   packages/web/tsconfig.json: line 2: `extends` names ./tsconfig.base.json, which is not beside it: write the file's new name"
+      ])
+      expect(result.files).toEqual({ "packages/web/tsconfig.json": project })
+    })
+  )
+
+  it.effect("a list with a comment inside is never rewritten whole: the comment would be lost", () =>
+    Effect.gen(function* () {
+      const syncpack = lines(["{", '  "source": [', "    // the root first", '    "package.json"', "  ]", "}"])
+      const result = yield* run(
+        {
+          "package.json": json({ name: "root", workspaces: ["packages/*"] }),
+          ".syncpackrc.json": syncpack,
+          "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
+          "packages/kernel/tsconfig.json": "{}"
+        },
+        [".syncpackrc.json"]
+      )
+      expect(result.before).toEqual([
+        "err: config-sync FAIL  1 problem needs a person, and no command repairs it",
+        "err:   .syncpackrc.json: line 2: `source`, from the `workspaces` of package.json differs (found package.json; expected package.json, packages/*/package.json), and writing it would lose the comment inside it: change it by hand"
+      ])
+      expect(result.files).toEqual({ ".syncpackrc.json": syncpack })
+    })
+  )
+
+  it.effect("the formatter reads again a package that stopped being vendored", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        {
+          "package.json": json({ name: "root", workspaces: ["apps/*", "packages/*"] }),
+          ".oxfmtrc.json": lines(["{", '  "ignorePatterns": ["**/dist/**", "packages/once-kit/**"]', "}"]),
+          "apps/shop/package.json": json({ name: "@x/shop", scripts }),
+          "apps/shop/tsconfig.json": "{}",
+          // No vendor.json any more: the repository's own code.
+          "packages/once-kit/package.json": json({ name: "@x/once-kit", scripts }),
+          "packages/once-kit/tsconfig.json": "{}"
+        },
+        [".oxfmtrc.json"]
       )
       expect(result.before).toEqual([
         "err: config-sync FAIL  1 place differs from what it is derived from (`bun run config-sync` writes it)",
-        "err:   packages/catalog/model/tsconfig.json:2  `references`, from the workspace packages its package.json declares: found ../../schema, ../../gone, expected ../../schema, ../../kernel"
+        "err:   .oxfmtrc.json:2  `ignorePatterns`, from the packages with a vendor.json: found with packages/once-kit/**, which is no vendored package, expected every vendored package, and no package of the repository's own"
       ])
       expect(result.files).toEqual({
-        "packages/catalog/model/tsconfig.json": lines([
-          "{",
-          '  "references": [{ "path": "../../schema" }, { "path": "../../kernel" }]',
-          "}"
-        ]),
-        "packages/catalog/host/tsconfig.json": "{}"
+        ".oxfmtrc.json": lines(["{", '  "ignorePatterns": ["**/dist/**"]', "}"])
       })
-      expect(result.after[0]).toMatch(/^out: config-sync OK /)
-      expect(result.again).toEqual(result.after)
     })
   )
 
@@ -422,7 +478,7 @@ describe("config-sync", () => {
       )
       expect(result.before).toEqual([
         "err: config-sync FAIL  4 places differ from what they are derived from (`bun run config-sync` writes them); 1 problem needs a person, and no command repairs it",
-        "err:   .oxfmtrc.json:2  `ignorePatterns`, from the packages with a vendor.json: found without packages/kit/**, expected with packages/kit/**",
+        "err:   .oxfmtrc.json:2  `ignorePatterns`, from the packages with a vendor.json: found without packages/kit/**, expected every vendored package, and no package of the repository's own",
         "err:   package.json:5  the `check` script, from the root tasks of turbo.json: found without //#docs:check, //#keys:check, with //#gone:check, which is no task, expected every root task turbo.json defines, and no other",
         "err:   package.json:6  the `check:full` script, from the root tasks of turbo.json: found without //#keys:check, expected every root task turbo.json defines, and no other",
         "err:   package.json:7  the `check:ci` script, from the root tasks of turbo.json: found with //#gone:check, which is no task, expected every root task turbo.json defines, and no other",
@@ -453,53 +509,25 @@ describe("config-sync", () => {
     })
   )
 
-  it.effect("the scratchpad depends on every package, and syncpack does not read it", () =>
+  it.effect("the scratchpad is no workspace and is not read: its manifest and configuration are the CLI's", () =>
     Effect.gen(function* () {
+      const scratch = lines(["{", '  "name": "@x/scratchpad",', '  "dependencies": { "left-pad": "^1.0.0" }', "}"])
       const result = yield* run(
         {
-          "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
+          "package.json": json({ name: "root", workspaces: ["packages/*"] }),
           ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"]),
           "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
           "packages/kernel/tsconfig.json": "{}",
-          "packages/ui/package.json": json({ name: "@x/ui", scripts }),
-          "packages/ui/tsconfig.json": "{}",
-          // One package is missing, one that is gone is still there, and a library an experiment added stays.
-          "scratchpad/package.json": lines([
-            "{",
-            '  "name": "@x/scratchpad",',
-            '  "dependencies": {',
-            '    "@x/gone": "workspace:*",',
-            '    "@x/kernel": "workspace:*",',
-            '    "zod": "^4.0.0"',
-            "  }",
-            "}"
-          ]),
-          "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"]),
-          "tsconfig.base.json": "{}"
+          "scratchpad/package.json": scratch,
+          "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"])
         },
-        ["scratchpad/package.json", "scratchpad/tsconfig.json", ".syncpackrc.json"]
+        ["scratchpad/package.json", "scratchpad/tsconfig.json"]
       )
-      expect(result.before).toEqual([
-        "err: config-sync FAIL  2 places differ from what they are derived from (`bun run config-sync` writes them)",
-        "err:   scratchpad/package.json:3  the scratchpad's `dependencies`, from the packages under packages/: found without @x/ui, with @x/gone, which is no package, expected every package, as workspace:*",
-        "err:   scratchpad/tsconfig.json:2  `extends`, from the folder's depth: found ../../tsconfig.base.json, expected ../tsconfig.base.json"
-      ])
+      expect(result.before[0]).toMatch(/^out: config-sync OK /)
       expect(result.files).toEqual({
-        "scratchpad/package.json": lines([
-          "{",
-          '  "name": "@x/scratchpad",',
-          '  "dependencies": {',
-          '    "@x/kernel": "workspace:*",',
-          '    "@x/ui": "workspace:*",',
-          '    "zod": "^4.0.0"',
-          "  }",
-          "}"
-        ]),
-        "scratchpad/tsconfig.json": lines(["{", '  "extends": "../tsconfig.base.json"', "}"]),
-        ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"])
+        "scratchpad/package.json": scratch,
+        "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"])
       })
-      expect(result.after[0]).toMatch(/^out: config-sync OK /)
-      expect(result.again).toEqual(result.after)
     })
   )
 

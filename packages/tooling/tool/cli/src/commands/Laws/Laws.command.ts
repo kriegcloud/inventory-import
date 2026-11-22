@@ -14,6 +14,7 @@ import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
+import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
 import { tags, tagsSentence } from "./Tags.rules.ts"
@@ -42,6 +43,11 @@ export const deprecatedApisCommand = Command.make("deprecated-apis", {}, () =>
 export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(), emit(keysSentence))).pipe(
   Command.withDescription("No key-shaped string is in any file git would commit")
 )
+
+/** `laws private-paths`: no home path or private folder named in the scratchpad. */
+export const privatePathsCommand = Command.make("private-paths", {}, () =>
+  Effect.flatMap(privatePaths(), emit(privatePathsSentence))
+).pipe(Command.withDescription("No home path or private folder is named in any file of the scratchpad"))
 
 /** `laws ref-callbacks`: every ref is a DOM ref or a callback that stays the same across draws. */
 export const refCallbacksCommand = Command.make("ref-callbacks", {}, () =>
@@ -82,6 +88,7 @@ export const lawsCommand = Command.make("laws").pipe(
     effectImportsCommand,
     exportsCommand,
     keysCommand,
+    privatePathsCommand,
     refCallbacksCommand,
     screensCommand,
     tagsCommand

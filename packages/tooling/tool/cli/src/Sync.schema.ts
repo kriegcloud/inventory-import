@@ -140,6 +140,11 @@ export const SyncFinding = S.TaggedUnion({
     files: S.Int.pipe(S.annotateKey({ description: "In how many files" }))
   },
   Pending: place,
+  Installed: { command },
+  InstallFailed: {
+    command,
+    output: S.String.pipe(S.annotateKey({ description: "What bun said, its last lines" }))
+  },
   Unrepaired: {
     file: S.String.pipe(S.annotateKey({ description: "The file the problem is in" })),
     message: S.String.pipe(S.annotateKey({ description: "What is wrong and what a person does about it" }))
@@ -181,6 +186,12 @@ export const syncSentence: (finding: SyncFinding) => Line = SyncFinding.match({
   WouldWrite: ({ command: name, places, files }) =>
     out(`${name}  would write ${plural(places, "place", "places")} in ${plural(files, "file", "files")} (dry run)`),
   Pending: (at) => out(`${placed(at)}: ${at.found} -> ${at.expected}`),
+  Installed: ({ command: name }) =>
+    out(`${name}  a package.json changed, so bun install ran: bun.lock follows what the package.json files say`),
+  InstallFailed: ({ command: name, output }) =>
+    err(
+      `${name} FAIL  a package.json changed and bun install did not finish, so bun.lock may not follow it: run \`bun install\` and commit bun.lock with the change. bun said:\n${output}`
+    ),
   Unrepaired: ({ file, message }) => err(`  ${file}: ${message}`)
 })
 

@@ -17,9 +17,12 @@
  *   is not there for its code (`@tanstack/store`, kept for one test of the review package, once came back into its
  *   `src` this way and passed).
  *
- * And nothing reaches the scratchpad (`scratchpad/`, decision "the scratchpad", 2026-11-22): no workspace declares
- * its package, and no file of a workspace imports it, by its name or by a path into its folder. For this one rule a
- * workspace's `scripts` folder and the files at its root (a build's configuration) are read too. The scratchpad
+ * And nothing reaches the scratchpad (`scratchpad/`, decision "the scratchpad", 2026-11-22): neither the root's
+ * package.json nor a workspace's declares its package or maps a `#` import into it, and no file imports it, by its
+ * name, by a path into its folder or by an alias that climbs into it (`@/../../scratchpad/...`), nor pulls it in
+ * through `import.meta.glob` or a stylesheet's `@import` or `@source`. For this one rule a workspace's `scripts`
+ * folder, the files at its root (a build's configuration), its stylesheets and the files at the repository's root
+ * (`alchemy.run.ts`, what a deploy runs) are read too. A path written some other way, built at run time, is not seen. The scratchpad
  * imports every package; if a package could import it back, an experiment would be part of the app.
  *
  * Every form of import is read: `import`, `export … from`, `import x = require(…)` and `import(…)`.
@@ -36,6 +39,7 @@ import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
+import { objectOf, stringsIn } from "../../Sync.rules.ts"
 import { readImports } from "./internal/importsCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Boundaries.rules")
@@ -221,10 +225,73 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
   const scratchName = hasScratchpad
     ? O.fromUndefinedOr((yield* repo.json(S.Struct({ name: S.optionalKey(S.String) }))(scratchManifest)).name)
     : O.none<string>()
-  const intoScratchpad = (file: string, specifier: string): boolean =>
-    O.contains(scratchName, packageOf(specifier)) ||
-    (Str.startsWith(".")(specifier) &&
-      Str.startsWith(`${scratchDir}/`)(`${repo.resolve(repo.dirname(file), specifier)}/`))
+  // By its name; by a path from the file; or by an alias that climbs out of its folder into the scratchpad (`@/` and
+  // `#` forms, `~/`): such a path names the scratchpad's folder among its parts after a `..`.
+  const intoScratchpad = (file: string, specifier: string): boolean => {
+    const path = Str.replace(/^!/, "")(specifier)
+    if (O.contains(scratchName, packageOf(path))) return true
+    if (Str.startsWith(".")(path)) {
+      return Str.startsWith(`${scratchDir}/`)(`${repo.resolve(repo.dirname(file), path)}/`)
+    }
+    const parts = Str.split("/")(path)
+    return !packageName.test(path) && A.contains(parts, "..") && A.contains(parts, scratchpadFolder)
+  }
+  // What a file names besides its imports: the paths of `import.meta.glob`, and in a stylesheet, `@import` and
+  // `@source`. Either pulls files into a build.
+  const named = (file: string, text: string): ReadonlyArray<string> =>
+    Str.endsWith(".css")(file)
+      ? A.map(A.fromIterable(Str.matchAll(/@(?:import|source)\s+(?:url\()?["']([^"']+)["']/g)(text)), (m) => m[1] ?? "")
+      : A.flatMap(
+          A.fromIterable(
+            Str.matchAll(/import\.meta\.glob(?:Eager)?\s*(?:<[^>]*>)?\(\s*(\[[^\]]*\]|["'`][^"'`]*["'`])/g)(text)
+          ),
+          (m) => A.map(A.fromIterable(Str.matchAll(/["'`]([^"'`]+)["'`]/g)(m[1] ?? "")), (g) => g[1] ?? "")
+        )
+  /** Every way a file reaches into the scratchpad, as findings. */
+  const reaching = (file: string, text: string): ReadonlyArray<BoundariesFinding> =>
+    A.map(
+      A.filter(
+        A.appendAll(Str.endsWith(".css")(file) ? [] : readImports({ file, source: text }), named(file, text)),
+        (specifier) => intoScratchpad(file, specifier)
+      ),
+      (specifier) => BoundariesFinding.cases.IntoScratchpad.make({ where: repo.relative(repo.root, file), specifier })
+    )
+  /** A package.json's `imports` map (`#exp/*`) whose target is in the scratchpad. */
+  const mappedInto = (file: string, text: string): ReadonlyArray<BoundariesFinding> =>
+    O.match(objectOf("imports")(text), {
+      onNone: () => A.empty<BoundariesFinding>(),
+      onSome: (block) =>
+        A.map(
+          A.filter(stringsIn(block)(text), (found) => intoScratchpad(file, found.value)),
+          (found) =>
+            BoundariesFinding.cases.IntoScratchpad.make({
+              where: repo.relative(repo.root, file),
+              specifier: found.value
+            })
+        )
+    })
+  // The repository's own files at its root (alchemy.run.ts is what a deploy runs) and its own package.json.
+  const rootEntries = yield* repo.entries(repo.root)
+  const rootFiles = A.map(
+    A.filter(rootEntries, (entry) => !entry.directory && /\.(c?m?[jt]s|tsx)$/.test(entry.name)),
+    (entry) => entry.path
+  )
+  const fromRootFiles = yield* Effect.forEach(
+    rootFiles,
+    (file) => Effect.map(repo.text(file), (text) => reaching(file, text)),
+    { concurrency: 1 }
+  )
+  const rootManifestFile = repo.join(repo.root, "package.json")
+  const rootManifestText = yield* repo.text(rootManifestFile)
+  const fromRootManifest = A.appendAll(
+    A.map(
+      A.filter(R.keys({ ...root.dependencies, ...root.devDependencies }), (dependency) =>
+        O.contains(scratchName, dependency)
+      ),
+      (dependency) => BoundariesFinding.cases.DeclaresScratchpad.make({ name: "the root's package.json", dependency })
+    ),
+    mappedInto(rootManifestFile, rootManifestText)
+  )
   const perWorkspace = yield* Effect.forEach(
     workspaces,
     Effect.fnUntraced(function* (workspace) {
@@ -263,20 +330,22 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
           (entry) => entry.path
         )
       )
+      const underSrc = yield* repo.files(repo.join(workspace.dir, "src"))
+      const stylesheets = A.filter(
+        A.appendAll(
+          underSrc,
+          A.map(atRoot, (entry) => entry.path)
+        ),
+        (file) => !Str.includes("/node_modules/")(file) && Str.endsWith(".css")(file)
+      )
       const fromBeside = yield* Effect.forEach(
-        beside,
-        (file) =>
-          repo.text(file).pipe(
-            Effect.map((text) =>
-              A.map(
-                A.filter(readImports({ file, source: text }), (specifier) => intoScratchpad(file, specifier)),
-                (specifier): BoundariesFinding =>
-                  BoundariesFinding.cases.IntoScratchpad.make({ where: repo.relative(repo.root, file), specifier })
-              )
-            )
-          ),
+        A.appendAll(beside, stylesheets),
+        (file) => Effect.map(repo.text(file), (text) => reaching(file, text)),
         { concurrency: 1 }
       )
+      const manifestFile = repo.join(workspace.dir, "package.json")
+      const manifestText = yield* repo.text(manifestFile)
+      const fromImportsMap = mappedInto(manifestFile, manifestText)
       const fromFiles = yield* Effect.forEach(
         A.appendAll(
           A.map(inSrc, (file) => ({ file, code: true })),
@@ -293,41 +362,49 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
               const testOnly = (imported: string): boolean => code && !A.contains(forCode, imported)
               const testOnlyFinding = (imported: string) =>
                 A.of(BoundariesFinding.cases.TestOnly.make({ where, imported, name }))
-              return A.flatMap(readImports({ file, source: text }), (specifier) => {
-                if (intoScratchpad(file, specifier)) {
-                  return A.of(BoundariesFinding.cases.IntoScratchpad.make({ where, specifier }))
-                }
-                if (kind.family !== "app" && Str.startsWith(".")(specifier) && Str.includes("apps/")(specifier)) {
-                  return A.of(BoundariesFinding.cases.IntoApps.make({ where, specifier }))
-                }
-                const imported = packageOf(specifier)
-                if (imported === name) return A.empty<BoundariesFinding>()
-                if (!R.has(byName, imported)) {
-                  if (!isThirdParty(specifier) || A.contains(thirdParty, imported)) return A.empty<BoundariesFinding>()
-                  // Declared by the workspace for its tests only: said as that, with where to move it.
-                  return A.contains(forTests, imported)
-                    ? testOnlyFinding(imported)
-                    : A.of(BoundariesFinding.cases.UndeclaredThirdParty.make({ where, imported, name }))
-                }
-                if (!A.contains(declared, imported)) {
-                  return A.of(BoundariesFinding.cases.Undeclared.make({ where, imported, name }))
-                }
-                if (testOnly(imported)) return testOnlyFinding(imported)
-                return may(imported)
-                  ? A.empty<BoundariesFinding>()
-                  : A.of(BoundariesFinding.cases.ImportedAgainstRow.make({ where, imported }))
-              })
+              const globbed = A.map(
+                A.filter(named(file, text), (specifier) => intoScratchpad(file, specifier)),
+                (specifier) => BoundariesFinding.cases.IntoScratchpad.make({ where, specifier })
+              )
+              return A.appendAll(
+                globbed,
+                A.flatMap(readImports({ file, source: text }), (specifier) => {
+                  if (intoScratchpad(file, specifier)) {
+                    return A.of(BoundariesFinding.cases.IntoScratchpad.make({ where, specifier }))
+                  }
+                  if (kind.family !== "app" && Str.startsWith(".")(specifier) && Str.includes("apps/")(specifier)) {
+                    return A.of(BoundariesFinding.cases.IntoApps.make({ where, specifier }))
+                  }
+                  const imported = packageOf(specifier)
+                  if (imported === name) return A.empty<BoundariesFinding>()
+                  if (!R.has(byName, imported)) {
+                    if (!isThirdParty(specifier) || A.contains(thirdParty, imported))
+                      return A.empty<BoundariesFinding>()
+                    // Declared by the workspace for its tests only: said as that, with where to move it.
+                    return A.contains(forTests, imported)
+                      ? testOnlyFinding(imported)
+                      : A.of(BoundariesFinding.cases.UndeclaredThirdParty.make({ where, imported, name }))
+                  }
+                  if (!A.contains(declared, imported)) {
+                    return A.of(BoundariesFinding.cases.Undeclared.make({ where, imported, name }))
+                  }
+                  if (testOnly(imported)) return testOnlyFinding(imported)
+                  return may(imported)
+                    ? A.empty<BoundariesFinding>()
+                    : A.of(BoundariesFinding.cases.ImportedAgainstRow.make({ where, imported }))
+                })
+              )
             })
           ),
         { concurrency: 1 }
       )
-      return A.flatten([fromManifest, A.flatten(fromFiles), A.flatten(fromBeside)])
+      return A.flatten([fromManifest, A.flatten(fromFiles), A.flatten(fromBeside), fromImportsMap])
     }),
     { concurrency: 1 }
   )
   // One line per problem, as the person reads it: the same import twice in a file is said once.
   const problems = A.dedupeWith(
-    A.flatten(perWorkspace),
+    A.flatten([fromRootManifest, A.flatten(fromRootFiles), A.flatten(perWorkspace)]),
     (a, b) => boundariesSentence(a).text === boundariesSentence(b).text
   )
   return A.isArrayNonEmpty(problems)

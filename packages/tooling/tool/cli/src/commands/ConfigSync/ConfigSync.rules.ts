@@ -16,10 +16,11 @@
  *   counts against its ceiling file, `test` exists beside a `vitest.config.ts`, `lint` unless it is vendored;
  * - `tasks`: every root task `turbo.json` defines (`//#name`) has a root script and is run by `check`, `check:full`
  *   and `check:ci` (CI's main job);
- * - `vendored`: the formatter leaves every vendored package alone;
- * - `scratchpad`: the scratchpad (`scratchpad/`) depends on every package under `packages`, so an experiment can
- *   import any of them and a new package is there without anyone remembering. syncpack does not read the scratchpad:
- *   what an experiment adds there is the experiment's, and `version-sync` holds the rest to the packages' versions.
+ * - `vendored`: the formatter leaves every vendored package alone.
+ *
+ * The scratchpad (`scratchpad/`) is no workspace and is not read: its experiments import every package from the
+ * root's install, and `bun run check` reads it only for the import boundary, keys and private paths.
+
  *
  * @packageDocumentation
  */
@@ -28,17 +29,16 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
-import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
+import type { RepoError } from "../../Cli.errors.ts"
 import { Repo, type Workspace } from "../../Repo.service.ts"
-import { scratchpadFolder } from "../../Repo.schema.ts"
 import {
   anchorless,
+  blankComments,
   arrayOf,
   decodeJsonc,
-  entriesOf,
   fits,
   type Found,
   type FoundBlock,
@@ -46,11 +46,10 @@ import {
   lineAt,
   objectOf,
   renderArray,
-  renderObject,
   stringsIn,
   stringValues
 } from "../../Sync.rules.ts"
-import { Drift, mergePlans, type Mode, Plan, Problem, settle } from "../../Sync.schema.ts"
+import { Drift, mergePlans, type Mode, Plan, Problem, settle, SyncFinding } from "../../Sync.schema.ts"
 
 const $I = $RepoCliId.create("commands/ConfigSync/ConfigSync.rules")
 
@@ -124,6 +123,30 @@ const drift = (
 const one = (plan: { readonly drifts?: ReadonlyArray<Drift>; readonly problems?: ReadonlyArray<Problem> }): Plan =>
   Plan.make({ checked: 1, drifts: plan.drifts ?? [], problems: plan.problems ?? [] })
 const agreed = Plan.make({ checked: 1, drifts: [], problems: [] })
+
+/** Whether a stretch of a file holds a comment, which rewriting the stretch whole would lose. */
+const commentIn = (at: Text, span: { readonly start: number; readonly end: number }): boolean =>
+  Str.slice(span.start, span.end)(at.text) !== Str.slice(span.start, span.end)(blankComments(at.text))
+
+/**
+ * A list or an object rewritten whole, or, when it holds a comment that the rewrite would lose, a problem that says
+ * what to change by hand.
+ */
+const blockDrift = (
+  at: Text,
+  span: { readonly start: number; readonly end: number },
+  words: { readonly what: string; readonly found: string; readonly expected: string; readonly text: string }
+): Plan =>
+  commentIn(at, span)
+    ? one({
+        problems: [
+          Problem.make({
+            file: at.file,
+            message: `line ${lineAt(at.text)(span.start)}: ${words.what} differs (found ${words.found}; expected ${words.expected}), and writing it would lose the comment inside it: change it by hand`
+          })
+        ]
+      })
+    : one({ drifts: [drift(at, span, words)] })
 const nothing = Plan.make({ checked: 0, drifts: [], problems: [] })
 const quoted = (value: string) => `"${value}"`
 const listed = (values: ReadonlyArray<string>) => (values.length === 0 ? "nothing" : A.join(values, ", "))
@@ -165,10 +188,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     const config = yield* readIfThere(repo.join(repo.root, ".syncpackrc.json"))
     if (O.isNone(config)) return nothing
     const expected = A.prepend(
-      A.map(
-        A.filter(patterns, (pattern) => pattern !== scratchpadFolder),
-        (pattern) => `${pattern}/package.json`
-      ),
+      A.map(patterns, (pattern) => `${pattern}/package.json`),
       "package.json"
     )
     const block = arrayOf("source")(config.value.text)
@@ -184,21 +204,16 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     }
     const found = A.map(stringsIn(block.value)(config.value.text), (entry) => entry.value)
     if (A.join(found, "\n") === A.join(expected, "\n")) return agreed
-    return one({
-      drifts: [
-        drift(config.value, block.value, {
-          what: "`source`, from the `workspaces` of package.json",
-          found: listed(found),
-          expected: listed(expected),
-          text: renderArray(block.value)(A.map(expected, quoted))
-        })
-      ]
+    return blockDrift(config.value, block.value, {
+      what: "`source`, from the `workspaces` of package.json",
+      found: listed(found),
+      expected: listed(expected),
+      text: renderArray(block.value)(A.map(expected, quoted))
     })
   })
 
   // coverage: every package fits a workspace pattern, and every pattern names a package.
-  const scratchPackage = yield* readIfThere(repo.join(repo.root, scratchpadFolder, "package.json"))
-  const folders = A.appendAll(A.map(workspaces, folderOf), O.isSome(scratchPackage) ? [scratchpadFolder] : [])
+  const folders = A.map(workspaces, folderOf)
   const coverage = Plan.make({
     checked: folders.length + patterns.length,
     drifts: [],
@@ -228,12 +243,18 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     const dir = repo.dirname(at.absolute)
     if (yield* repo.exists(repo.resolve(dir, found.value))) return agreed
     const fromRoot = repo.join(repo.root, anchorless(found.value))
-    if (!(yield* repo.exists(fromRoot))) {
+    // Only a path that climbs (`../`) or names an installed file can have the wrong depth; `./x` names the folder
+    // the file is in, so when nothing is there, the file was moved or renamed, and the root's file of that name is
+    // another file.
+    const climbs = Str.startsWith("../")(found.value) || Str.startsWith("node_modules/")(found.value)
+    if (!climbs || !(yield* repo.exists(fromRoot))) {
       return one({
         problems: [
           Problem.make({
             file: at.file,
-            message: `line ${lineAt(at.text)(found.start)}: ${what} names ${found.value}, which does not exist here or from the repository's root (run \`bun install\` if it is an installed package's file)`
+            message: climbs
+              ? `line ${lineAt(at.text)(found.start)}: ${what} names ${found.value}, which does not exist here or from the repository's root (run \`bun install\` if it is an installed package's file)`
+              : `line ${lineAt(at.text)(found.start)}: ${what} names ${found.value}, which is not beside it: write the file's new name`
           })
         ]
       })
@@ -300,8 +321,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     A.map(workspaces, (workspace) => workspace.dir),
     repo.root
   )
-  const withScratchpad = A.appendAll(dirs, O.isSome(scratchPackage) ? [repo.join(repo.root, scratchpadFolder)] : [])
-  const inConfigs = yield* Effect.forEach(withScratchpad, configPaths, { concurrency: 1 })
+  const inConfigs = yield* Effect.forEach(dirs, configPaths, { concurrency: 1 })
   const inScripts = yield* Effect.forEach(workspaces, scriptPaths, { concurrency: 1 })
   const paths = mergePlans(A.appendAll(inConfigs, inScripts))
 
@@ -352,15 +372,11 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
       A.filter(wanted, (want) => !A.some(kept, (path) => target(path) === target(want)))
     )
     if (A.join(written, "\n") === A.join(expected, "\n")) return agreed
-    return one({
-      drifts: [
-        drift(at, block.value, {
-          what,
-          found: listed(written),
-          expected: listed(expected),
-          text: renderArray(block.value)(A.map(expected, (path) => `{ "path": ${quoted(path)} }`))
-        })
-      ]
+    return blockDrift(at, block.value, {
+      what,
+      found: listed(written),
+      expected: listed(expected),
+      text: renderArray(block.value)(A.map(expected, (path) => `{ "path": ${quoted(path)} }`))
     })
   })
   const solutions = yield* Effect.forEach(
@@ -391,57 +407,6 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
           ? "`references`, from the projects beside it and each package's projects other than its tsconfig.json"
           : "`references`, from the projects beside it"
       )
-    }),
-    { concurrency: 1 }
-  )
-  const byName = R.fromEntries(
-    A.map(workspaces, (workspace) => [String(workspace.manifest.name), workspace.dir] as const)
-  )
-  const declared = (workspace: Workspace) =>
-    A.sort(
-      A.dedupe(
-        A.flatMap(
-          R.toEntries({
-            ...workspace.manifest.dependencies,
-            ...workspace.manifest.devDependencies,
-            ...workspace.manifest.peerDependencies
-          }),
-          ([name, spec]) =>
-            P.isString(spec) && Str.startsWith("workspace:")(spec) ? O.toArray(R.get(byName, name)) : []
-        )
-      ),
-      Order.String
-    )
-  const projects = yield* Effect.forEach(
-    workspaces,
-    Effect.fnUntraced(function* (workspace) {
-      const others = yield* projectsOf(workspace.dir)
-      const names = A.append(others, "tsconfig.json")
-      const withProject = yield* Effect.filter(
-        declared(workspace),
-        (dir) => repo.exists(repo.join(dir, "tsconfig.json")),
-        { concurrency: 1 }
-      )
-      const wanted = A.map(withProject, (dir) => fromHere(workspace.dir, dir))
-      const plans = yield* Effect.forEach(
-        names,
-        Effect.fnUntraced(function* (name) {
-          const found = yield* tsconfigOf(repo.join(workspace.dir, name))
-          if (O.isNone(found) || isSolution(found.value.config) || found.value.config.references === undefined) {
-            return nothing
-          }
-          return yield* referencesDrift(
-            workspace.dir,
-            found.value.at,
-            found.value.config,
-            wanted,
-            false,
-            "`references`, from the workspace packages its package.json declares"
-          )
-        }),
-        { concurrency: 1 }
-      )
-      return mergePlans(plans)
     }),
     { concurrency: 1 }
   )
@@ -624,7 +589,15 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
       onSome: (found) => A.map(stringsIn(found)(config.value.text), (entry) => entry.value)
     })
     const missing = A.filter(wanted, (pattern) => !A.contains(written, pattern))
-    if (missing.length === 0) return Plan.make({ checked: wanted.length, drifts: [], problems: [] })
+    // A package that stops being vendored is the repository's own code again, so the formatter reads it again.
+    const ownCode = A.map(
+      A.filter(workspaces, (workspace) => !A.contains(wanted, `${folderOf(workspace)}/**`)),
+      (workspace) => `${folderOf(workspace)}/**`
+    )
+    const stale = A.filter(written, (pattern) => A.contains(ownCode, pattern))
+    if (missing.length === 0 && stale.length === 0) {
+      return Plan.make({ checked: wanted.length, drifts: [], problems: [] })
+    }
     return O.match(block, {
       onNone: () =>
         Plan.make({
@@ -638,90 +611,34 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
           ]
         }),
       onSome: (found) =>
-        Plan.make({
-          checked: wanted.length,
-          drifts: [
-            drift(config.value, found, {
-              what: "`ignorePatterns`, from the packages with a vendor.json",
-              found: `without ${listed(missing)}`,
-              expected: `with ${listed(missing)}`,
-              text: renderArray(found)(A.map(A.appendAll(written, missing), quoted))
-            })
-          ],
-          problems: []
+        blockDrift(config.value, found, {
+          what: "`ignorePatterns`, from the packages with a vendor.json",
+          found: A.join(
+            A.appendAll(
+              missing.length === 0 ? [] : [`without ${listed(missing)}`],
+              stale.length === 0 ? [] : [`with ${listed(stale)}, which is no vendored package`]
+            ),
+            ", "
+          ),
+          expected: "every vendored package, and no package of the repository's own",
+          text: renderArray(found)(
+            A.map(
+              A.appendAll(
+                A.filter(written, (pattern) => !A.contains(stale, pattern)),
+                missing
+              ),
+              quoted
+            )
+          )
         })
     })
-  })
-
-  // scratchpad: it depends on every package, so an experiment can import any of them.
-  const scratch = O.match(scratchPackage, {
-    onNone: () => nothing,
-    onSome: (at) => {
-      const wanted = A.map(
-        A.filter(workspaces, (workspace) => Str.startsWith("packages/")(folderOf(workspace))),
-        (workspace) => String(workspace.manifest.name)
-      )
-      const block = objectOf("dependencies")(at.text)
-      if (O.isNone(block)) {
-        return one({
-          problems: [
-            Problem.make({
-              file: at.file,
-              message: `has no "dependencies", and the scratchpad depends on every package: add "dependencies": {} and run \`bun run config-sync\``
-            })
-          ]
-        })
-      }
-      const written = A.map(entriesOf(block.value)(at.text), ([key, value]) => [key.value, value.value] as const)
-      const others = A.filter(written, ([, spec]) => !Str.startsWith("workspace:")(spec))
-      const byName = Order.mapInput(Order.String, (entry: readonly [string, string]) => entry[0])
-      const expected = A.sort(
-        A.appendAll(
-          others,
-          A.map(wanted, (name) => [name, "workspace:*"] as const)
-        ),
-        byName
-      )
-      const linked = A.map(
-        A.filter(written, ([, spec]) => Str.startsWith("workspace:")(spec)),
-        ([name]) => name
-      )
-      const missing = A.filter(wanted, (name) => !A.contains(linked, name))
-      const stale = A.filter(linked, (name) => !A.contains(wanted, name))
-      if (missing.length === 0 && stale.length === 0)
-        return Plan.make({ checked: wanted.length, drifts: [], problems: [] })
-      return Plan.make({
-        checked: wanted.length,
-        problems: [],
-        drifts: [
-          drift(at, block.value, {
-            what: "the scratchpad's `dependencies`, from the packages under packages/",
-            found: A.join(
-              A.appendAll(
-                missing.length === 0 ? [] : [`without ${listed(missing)}`],
-                stale.length === 0 ? [] : [`with ${listed(stale)}, which is no package`]
-              ),
-              ", "
-            ),
-            expected: "every package, as workspace:*",
-            text: renderObject(block.value.indent)(expected)
-          })
-        ]
-      })
-    }
   })
 
   const sources = yield* sourcesPlan()
   const tasks = yield* tasksPlan()
   const vendored = yield* vendoredPlan()
   return mergePlans(
-    A.flatten<ReadonlyArray<ReadonlyArray<Plan>>>([
-      [sources, coverage, paths],
-      solutions,
-      projects,
-      scripts,
-      [tasks, vendored, scratch]
-    ])
+    A.flatten<ReadonlyArray<ReadonlyArray<Plan>>>([[sources, coverage, paths], solutions, scripts, [tasks, vendored]])
   )
 })
 
@@ -730,7 +647,25 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
  *
  * @category rules
  */
-export const configSync = Effect.fn("ConfigSync.configSync")(function* (mode: Mode) {
+export const configSync = Effect.fn("ConfigSync.configSync")(function* (
+  mode: Mode,
+  install: Effect.Effect<{ readonly code: number; readonly output: string }, RepoError, Repo>
+) {
   const plan = yield* configSyncPlan()
-  return yield* settle({ command: "config-sync", repair: "bun run config-sync", mode }, plan)
+  const said = yield* settle({ command: "config-sync", repair: "bun run config-sync", mode }, plan)
+  // A package.json it wrote (a package's scripts) changes what bun.lock must say, so
+  // the lockfile is brought along at once, as `deps:update` does: committed without it, the change can make CI's
+  // frozen install refuse the lockfile.
+  const manifests = A.some(plan.drifts, (drift) => Str.endsWith("package.json")(drift.file))
+  if (mode !== "write" || !manifests) return said
+  const installed = yield* install
+  return A.append<SyncFinding, SyncFinding>(
+    said,
+    installed.code === 0
+      ? SyncFinding.cases.Installed.make({ command: "config-sync" })
+      : SyncFinding.cases.InstallFailed.make({
+          command: "config-sync",
+          output: A.join(A.takeRight(Str.split("\n")(installed.output), 12), "\n")
+        })
+  )
 })

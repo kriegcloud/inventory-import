@@ -710,6 +710,12 @@ Overrule any line by saying so.
   and taken once made on the matching now; built in `Undoing` (`madeOn`) at `53654e6`, with the story "a row's undo
   pressed on a screen that has not received a match is refused and held, and taken once it has" and the mutant
   `undo-madeon`.
+- A row's undo from a screen that has not received an undo landed on the row: another person decided over the
+  sender's decision and took that back, so the row holds the sender's decision again as that screen shows it; refused
+  `UndoneSince`, naming who took that undo and which change, and held, as a row's act is, and taken once the screen has
+  it; built in `Undoing` (`sawUndone`, `UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo`) after `4ffd798`,
+  with the story "a row's undo from a screen that has neither another person's decision over its sender's nor that
+  person's undo is held, not applied" and the mutant `undo-undone`.
 - A press or an undo sent twice, its first answer lost, with another person's act landing between (a match for a
   press; a group act, or a confirm and a reopening, for an undo); answered as the first time, with nothing new
   recorded; a press sent twice after a group act landed is still refused `GroupedSince` until the screen has it, and

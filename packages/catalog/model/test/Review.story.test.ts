@@ -129,6 +129,7 @@ const undo = (input: {
   readonly next?: Level
   readonly below?: string
   readonly madeOn?: number
+  readonly sawUndone?: number
 }) =>
   UndoRowStep.make({
     importId: id,
@@ -138,6 +139,7 @@ const undo = (input: {
     sawGroup: input.sawGroup ?? 0,
     covered: input.covered ?? false,
     madeOn: input.madeOn ?? 0,
+    sawUndone: input.sawUndone ?? 0,
     opening: input.opening ?? 0,
     next: input.next ?? noLevel,
     below: input.below ?? ""
@@ -1020,7 +1022,13 @@ it.effect("undos go down every level exactly as it was, and end at none", () =>
     ),
     Story.then(life, undone({ change: 5, row: "row-12", step: "u1", holds: 3, by: "ana", flags: "3" })),
     Story.when(
-      undo({ row: "row-12", undo: 3, step: "u2", next: level({ change: 1, by: "ana", step: "a1", flags: "1" }) })
+      undo({
+        row: "row-12",
+        undo: 3,
+        step: "u2",
+        sawUndone: 4,
+        next: level({ change: 1, by: "ana", step: "a1", flags: "1" })
+      })
     ),
     Story.then(
       row12,
@@ -1033,10 +1041,10 @@ it.effect("undos go down every level exactly as it was, and end at none", () =>
       })
     ),
     Story.then(life, undone({ change: 6, row: "row-12", step: "u2", holds: 2, by: "ana", flags: "2" })),
-    Story.when(undo({ row: "row-12", undo: 2, step: "u3" })),
+    Story.when(undo({ row: "row-12", undo: 2, step: "u3", sawUndone: 3 })),
     Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u3", by: "ana" })),
     Story.then(life, undone({ change: 7, row: "row-12", step: "u3", holds: 1, by: "ana", flags: "1" })),
-    Story.when(undo({ row: "row-12", undo: 1, step: "u4" })),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u4", sawUndone: 2 })),
     Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u4", by: "ana" })),
     Story.then(life, undone({ change: 8, row: "row-12", step: "u4", holds: 0, by: "", flags: "", madeOn: -1 })),
     // A row with no decision has no step to undo.
@@ -1256,7 +1264,7 @@ it.effect("an undo that puts back another person's decision stops there", () =>
   )
 )
 it.effect(
-  "a row's undo of its sender's own decision is taken from a screen that has neither another person's decision over it nor its undo: Dana keeps row 12, Ana leaves it out and takes that back, and Dana, whose screen has neither, takes her keep back",
+  "a row's undo from a screen that has neither another person's decision over its sender's nor that person's undo is held, not applied: Dana keeps row 12, Ana leaves it out and takes that back, and Dana, whose screen has neither, takes her keep back",
   () =>
     story(
       Story.given(life, staged),
@@ -1269,10 +1277,13 @@ it.effect(
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "ana" })),
       Story.then(life, undone({ change: 3, row: "row-12", step: "u1", holds: 1, by: "dana", flags: kept })),
-      // The row holds Dana's keep again, as her screen shows it: the undo names nothing of the row it has seen but
-      // the decision it takes back, which is hers and is there.
+      // The row holds Dana's keep again, as her screen shows it, and her undo names it. It is refused with who took
+      // the undo her screen has not received and of which change, and nothing is recorded.
       Story.provide(CurrentActor, dana),
       Story.when(undo({ row: "row-12", undo: 1, step: "u2" })),
+      Story.rejected(UndoneSince.make({ by: "ana", change: 2 })),
+      // Once her screen has Ana's undo, the same press is taken.
+      Story.when(undo({ row: "row-12", undo: 1, step: "u2", sawUndone: 2 })),
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u2", by: "dana" })),
       Story.then(
         life,
@@ -1299,7 +1310,7 @@ it.effect(
       Story.when(undo({ row: "row-12", undo: 6, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: letGo, below: "", undo: 6, step: "u1", by: "ana" })),
       Story.then(life, undone({ change: 7, row: "row-12", step: "u1", holds: 5, by: "ana", flags: "5" })),
-      Story.when(undo({ row: "row-12", undo: 5, step: "u2" })),
+      Story.when(undo({ row: "row-12", undo: 5, step: "u2", sawUndone: 6 })),
       Story.rejected(HistoryEnds.make({}))
     )
 )

@@ -165,6 +165,7 @@ const undo = (input: {
   readonly row?: string
   readonly covered?: boolean
   readonly madeOn?: number
+  readonly sawUndone?: number
 }) =>
   UndoRowStep.make({
     importId: id,
@@ -174,6 +175,7 @@ const undo = (input: {
     sawGroup: input.sawGroup,
     covered: input.covered ?? false,
     madeOn: input.madeOn ?? 0,
+    sawUndone: input.sawUndone ?? 0,
     opening: 0,
     next: noLevel,
     below: ""

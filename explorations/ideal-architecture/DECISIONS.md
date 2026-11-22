@@ -1581,7 +1581,7 @@ answered before, and not asked. I can overrule any of them.
 5. **A group's undo is taken from a screen that is behind on the rows.** This stands by my answer "Row 14 stays
    whole": the undo takes back its sender's own act and touches no row, so a row decided since keeps that person's
    whole decision, and the screen then names it. It takes a press from a screen that is behind because it replaces
-   nothing of anyone else's (a row's undo does too, in the one case 15 names). The answer is the group's undo and its number; which rows
+   nothing of anyone else's. No other press from such a screen is taken. The answer is the group's undo and its number; which rows
    were decided since and stay is read from the rows, not carried in the answer: the model keeps no reading of a
    group's rows.
 6. From the entry above: a row left with no decision is guarded as a decided one is (a "clear" from a screen that
@@ -1624,13 +1624,13 @@ answered before, and not asked. I can overrule any of them.
     the two sendings** (a fourth review, the same day; 12 said it of an undo only). Before, the copy was refused
     `GroupedSince` or `ConfirmedSince` though the row held that very press: this step, from this person, with this
     text on the matching it was made on.
-15. **Not decided by the rule, and said as it stands: a row's undo of its sender's own decision is taken from a screen
-    that has neither another person's decision over it nor that person's undo.** Dana keeps row 12, Ana leaves it
-    out and takes that back, and Dana, whose screen shows only her keep, takes it back: taken. The row holds her
-    decision again, as her screen shows it, and the undo replaces nothing of anyone else's, as a group's undo does
-    not. `UndoRowStep` has no `sawUndone` as `DecideRow` has; to hold this press instead, add it and refuse
-    `UndoneSince`. A story holds what happens now (66 stories). Items 5 and 10 said a group's undo was the one
-    decision that takes a press from a screen that is behind, which this case made untrue.
+15. **A row's undo from a screen that has not received an undo on the row is held** (2026-11-22, a later review).
+    Dana keeps row 12, Ana leaves it out and takes that back: the row holds Dana's keep again, as her screen shows
+    it, and her screen has neither of Ana's acts. Before, her undo of her keep was taken from that screen; now
+    `UndoRowStep` says the last undo its screen has of the row (`sawUndone`, as `DecideRow` does in 8), and a press
+    without it is refused `UndoneSince` with who took the undo and of which change. Once her screen has Ana's undo
+    the same press is taken. Reverse: remove `sawUndone` from `UndoRowStep` and its check. I first wrote this case
+    down as not decided by the rule and left the press applied; the rule decides it, as it does 8.
 
 With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
 excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
@@ -1670,7 +1670,8 @@ Rules that said less than their names, each either made to say it or renamed (th
 
 143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these. With 14:
 `DecideRow` at 234 paths, the relation still proved across it, no rule changed; 65 stories, 190 mutants. With 15:
-nothing in the model changed, one story more, 66.
+`UndoRowStep` at 364 paths, one rule more (144 of the kinds a proof covers under `CI=true`), the lock written again
+on purpose for it; 66 stories, 191 mutants.
 
 ### 2026-11-22 — the review's model, rows already stored: start empty
 

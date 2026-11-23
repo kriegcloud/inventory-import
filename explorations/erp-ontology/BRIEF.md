@@ -18,8 +18,9 @@ him, and until then its recommendation is the agent's and nothing is built on it
 (22, 26, 38, 46 and three new ones, 94 to 96), which settle the thin thread's terms, gates and engines, and after a
 second review six more (24 and five new ones, 97 to 101). [Report 14](research/14-thin-thread.md) is the one
 specification of the thin thread, written against the repository's code: where this brief and report 14 differ about
-the thread, report 14 holds. This brief says what is built first, what follows, and what is never built. Sixty-two
-decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92). The first deliverable, the thin
+the thread, report 14 holds. Decisions 112 to 118 update the thread where this brief and report 14 still differ. This brief says what is built
+first, what follows, and what is never built. Sixty-three decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37,
+42, 44, 45, 47 to 92 and 116). The first deliverable, the thin
 thread of decision 8, waits on none of them.
 
 ## Problem
@@ -35,7 +36,7 @@ thread of decision 8, waits on none of them.
 - **The Alchemy domain layer needs terms to point at.** Report 01 section 6: every aggregate, event and view carries
   the IRI of its term, and a check fails when one has none ([alchemy-domain BRIEF](../alchemy-domain/BRIEF.md),
   "Every single thing"). Nothing exists for them to point at.
-- **The design is large and unbuilt.** Eleven reports (04 to 14), 62 open decisions; nothing can be checked until
+- **The design is large and unbuilt.** Eleven reports (04 to 14), 63 open decisions; nothing can be checked until
   something runs, and nothing in the design has yet been made to fail.
 
 ## Appetite
@@ -67,9 +68,8 @@ its. This brief keeps only what the order of the work needs.
 - **The stations** (section 7). The term model in `@beep/vocabulary`; the terms in `@inventory/kernel` under
   `./Terms`, with the pointer helpers under `./TermsPointer`; the projector and the generated files in
   `@inventory/ontology` (decision 9). IRIs are decision 10's (`inv:MemberRoleScheme-admin`), labels and definitions
-  are `skos:prefLabel` and `skos:definition` (decision 11), and every term in the module names the `rat-` record that
-  holds Benjamin's answer (decision 32). The thread needs 18 such records, for seven classes, nine properties and two
-  schemes: the ruling on a scheme covers the concepts its proposal lists (decision 101). The version is a semantic
+  are `skos:prefLabel` and `skos:definition` (decision 11). The thread's seven classes, nine properties, two schemes
+  and four concepts name decision 111 in the module, rather than `rat-` records (decisions 107 and 111). The version is a semantic
   version string written in the module, never taken from the clock, and `0.1.0` for the thread (decision 24, section
   8).
 - **The pointers** (section 3). The typed helpers of decision 20 write three annotation keys: `term`, `path` and
@@ -86,8 +86,9 @@ its. This brief keeps only what the order of the work needs.
 - **The gates** (section 6). Every gate that needs no stored row, gates 1 to 9 (decision 95): byte-compare (gate 1),
   re-parse (gate 2), forbidden constructs and the namespace guard (gate 3), vocabulary coherence (gate 4), record
   pointers on the AST (gate 5), the type-check (gate 6), `laws ontology-terms` (gate 7), the question suite (gate 8),
-  and ROBOT with HermiT (gate 9, decisions 6 and 25). Gates 1 to 8 run in `check` and gate 9 in `check:full`; whether
-  `check:ci` runs the reasoner too belongs to Benjamin's approval of the download. Gates 5 and 7 read the enrolment
+  and ROBOT with HermiT (gate 9, decisions 6 and 25). Gates 1 to 8 run in `check` and gate 9 in `check:full`. CI
+  runs gate 9 in its own job with Java 17 and the jar restored from a cache keyed by its sha256. It fetches the jar
+  only on a cache miss and checks the hash (decision 114). Gates 5 and 7 read the enrolment
   list and nothing else (decision 99, which replaces decision 95's "the access contract and the four kernel
   records"). The engines in Vitest are N3.js for the re-parse and Oxigraph for SPARQL (decision 26). SHACL over the
   stored sample (gate 11) and the alignment check (gate 12) wait for their slices, and gate 10 is decision 27's
@@ -107,15 +108,24 @@ is not on the exception list (gate 4), a record with one unplaced field (gate 5)
 typed as a tenant (gate 9). A class under two parents gist states disjoint is no gate's mistake: a class has one
 parent field, so it cannot be written (section 6.4).
 
-The thread waits on no open decision. One thing is still owed from Benjamin (section 1.5). It is the approval of the Java
-pin and the jar download for ROBOT, with the release, its source, its hash and its size named first (decision 25).
-The other was the 18 `rat-` records (decisions 32, 97 and 101): decisions 107 and 111 replace them for the thread,
-whose terms name the decision that accepted them ([report 14](research/14-thin-thread.md), section 1.6). Gates 1 to 8 can be built before the download; the thread is not done until the reasoner has run and has
-failed once.
+The thread waits on no open decision. Nothing is owed from Benjamin for it now. ROBOT v1.9.11 is approved and was
+tried outside the repository on 2026-11-23 (decision 112). The jar is 82,708,624 bytes, sha256
+`53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`, from
+`https://github.com/ontodev/robot/releases/download/v1.9.11/robot.jar`. Under Java 17.0.2 the DL profile check
+passed a small test ontology, HermiT found it consistent with exit 0, and the inconsistent variant exited 1. The pin
+names Java 17 by major version (decision 113). Java 27 was never tried and is not the pin. This trial does not run
+the thread's gate 9, which is still unbuilt.
+
+Decision 117 adds three to five forbidden conclusions over the thread's terms to the goal's SPEC. The list is not
+yet drafted. Each ban has a fixture that must be refused and a near miss that must pass, routed to the reasoner or
+a must-fail query. The agent drafts the list and Benjamin rules on each ban. Decision 118 uses the expected rows
+as the answer lock, with no new file or update flag. A commit that changes an expected-rows file says so, and the
+release notes name the question with its old and new answer.
 
 Out of the thread (section 1.3): `Party`, `SignInAccount`, `SourceRecord`, `AgentRun`, `Permission` and `permits`,
 every other party term, the name and email paths, any grant scope but organization, the lift of `Activity`, any stored
-row, gates 10 to 12, SHACL and shacl-engine, the alignment file, and everything in the slices below.
+row, gates 10 to 12, SHACL and shacl-engine, the alignment file, and everything in the slices below. Decision 115 keeps the audit notes outside the thread. Organization scope is
+enough while it is the only kind; how a grant names a location or field stays open as decision 116.
 
 ### Slice 1, the party slice
 
@@ -259,11 +269,11 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
 
 ## Rabbit holes
 
-- **The reasoner's route.** The reasoner is ROBOT with HermiT (decision 25). It needs a Java pin and a jar download;
-  nothing is fetched before Benjamin is told the file, its source and its size and approves. Gate 4's TypeScript
+- **The reasoner's route.** ROBOT v1.9.11 with HermiT and Java 17 by major version are approved (decisions 112 and
+  113). The small Java 17.0.2 trial passed the DL profile and consistency checks and rejected an inconsistent variant. Gate 4's TypeScript
   coherence check reads the module only. A class there has one parent, so a class under two disjoint parents cannot
   be written, and disjointness is the reasoner's to show, on an individual (report 14 sections 6.4 and 6.9). Gates 1
-  to 8 can be built before the download. The thread is not done until ROBOT has run, and gate 4 does not meet
+  to 8 need no Java. The thread is not done until its gate 9 has run and rejected its planted mistake; gate 4 does not meet
   decision 6 (report 12).
 - **Type inference in the module.** 05's F-bounded `defineClasses`, the per-kind CURIE registries (class, property,
   scheme, concept) derived from the module's keys, and gate 5's check of a record's literals against a scheme's
@@ -320,14 +330,14 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
 - No change to a stored row, a table, a screen or a product rule in the thread or slice 1: pointers are annotations.
 - No identity from a SKU, a name or an email.
 - No FSMA, machine telemetry or planning terms (04, will-not).
-- Nothing downloaded, published, committed or deployed without Benjamin asking. The Java pin and the ROBOT jar are
-  his to approve (decision 25).
+- Nothing downloaded, published, committed or deployed without Benjamin asking. The Java 17 pin and the ROBOT
+  v1.9.11 jar are approved (decisions 112 and 113).
 
 ## Map
 
 | Part | Goal | Cites |
 | --- | --- | --- |
-| The thin thread, one vertical cut through every station, as [report 14](research/14-thin-thread.md) specifies it (its section 1.2 counts the parts). As much of the term model as its terms use; seven classes (`Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`, `AuditEntry`), nine properties, `MemberRoleScheme` and `GrantScopeKindScheme` (the one concept organization) in the vocabulary module, with seven gist classes and the three disjointness pairs gist states between them; typed marks on the five enrolled records (the kernel's `Member`, `Role` and `Activity`, the access contract's `Person` and `AuditTrail`), every field carrying a pointer, a path or `noTerm` with a reason, the role field lifted to a `Grant` with its scope; the projector's OWL and SKOS writers and the question's graph; gates 1 to 8 in `check` (gate 7 is `laws ontology-terms`, every rule but rule 2; gate 8 the one question, CQ-P06, on the two-organization fixture), gate 9 in `check:full`; gates 5 and 7 reading the enrolment list only; N3.js for the re-parse and Oxigraph for SPARQL. Each gate has one committed test that plants a mistake | `erp-vocabulary`, the thin thread | NET-NEW: `@beep/vocabulary`, `@inventory/kernel` (`./Terms`, `./TermsPointer`), `@inventory/ontology`, with two new lines for the `ontology` family in `laws boundaries` (decision 9; report 14 section 7.2); the gate 7 command beside `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts`; `packages/kernel/src/Member.schema.ts`, `Role.schema.ts`, `Activity.schema.ts`; `packages/access/contract/src/People/Person.read.ts`, `Activity/AuditTrail.read.ts`; the query and the fixture inside the ontology package (`packages/ontology/fixtures/cq/`); report 14, and reports 05, 06, 10 (4.11, 4.12), 11 and 12 where it does not replace them. Decided: 8 to 11, 13 to 16, 20 to 26, 32, 34, 38, 40, 41, 46, 93 to 101. Open: none. Owed: Benjamin's approval of the Java pin and the jar download (decision 25), and the 18 `rat-` records (decisions 32 and 101) |
+| The thin thread, one vertical cut through every station, as [report 14](research/14-thin-thread.md) specifies it (its section 1.2 counts the parts). As much of the term model as its terms use; seven classes (`Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`, `AuditEntry`), nine properties, `MemberRoleScheme` and `GrantScopeKindScheme` (the one concept organization) in the vocabulary module, with seven gist classes and the three disjointness pairs gist states between them; typed marks on the five enrolled records (the kernel's `Member`, `Role` and `Activity`, the access contract's `Person` and `AuditTrail`), every field carrying a pointer, a path or `noTerm` with a reason, the role field lifted to a `Grant` with its scope; the projector's OWL and SKOS writers and the question's graph; gates 1 to 8 in `check` (gate 7 is `laws ontology-terms`, every rule but rule 2; gate 8 the one question, CQ-P06, on the two-organization fixture), gate 9 in `check:full` and its own CI job (decision 114); gates 5 and 7 reading the enrolment list only; N3.js for the re-parse and Oxigraph for SPARQL. Each gate has one committed test that plants a mistake | `erp-vocabulary`, the thin thread | NET-NEW: `@beep/vocabulary`, `@inventory/kernel` (`./Terms`, `./TermsPointer`), `@inventory/ontology`, with two new lines for the `ontology` family in `laws boundaries` (decision 9; report 14 section 7.2); the gate 7 command beside `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts`; `packages/kernel/src/Member.schema.ts`, `Role.schema.ts`, `Activity.schema.ts`; `packages/access/contract/src/People/Person.read.ts`, `Activity/AuditTrail.read.ts`; the query and the fixture inside the ontology package (`packages/ontology/fixtures/cq/`); report 14, and reports 05, 06, 10 (4.11, 4.12), 11 and 12 where it does not replace them. Decided: 8 to 11, 13 to 16, 20 to 26, 32, 34, 38, 40, 41, 46, 93 to 115, 117 and 118. Open: none. Owed: nothing. The goal SPEC will carry the three to five forbidden conclusions, not yet drafted (117), and the expected-rows change rule (118) |
 | The rest of the term model: `ClassTerm`, `ObjectPropertyTerm`, `DatatypePropertyTerm`, `ConceptScheme`, `Concept`, `DisjointGroup`, `AlignmentRow`, `Vocabulary` and their small values, with `violations` (V1 to V26, V25 rewritten to decision 97's exception list). The foundation package holds the checker. The inventory namespace guard, the source names and the seed names are the kernel module's policy, not literals of that package | `erp-vocabulary`, slice 1 | Begun in the thread (`@beep/vocabulary`, decision 9); patterns from `packages/foundation/modeling/identity/src/Vocab.ts` and `Curie.ts`, `LiteralKit` from `packages/foundation/modeling/schema`; report 05. The vendored `Vocab.ts` is never edited: an OWL or XSD term it lacks is added in a registry of this repository's own that extends it (report 14 section 7.3). Decided: 97. Open: 12, 18 |
 | The gist classes this slice's terms need beyond the thread's, each with its named ancestors, and the disjointness pairs gist states between the classes taken. Not tables A and B wholesale, and not all 24 pairs. The list is the inventory module's, not the foundation package's. Reports 10 and 11 stay references | `erp-vocabulary`, slice 1 | `.agents/skills/_shared/gist-categories.md`, which gains a name when a term needs it; gist 14.1.0 pinned by sha256 in the project profile; report 11 section (a). Decided: 13 to 16. Open: 17 |
 | Party and access terms and their schemes in the vocabulary module, beyond the thread's: `SourceRecord` carrying the customer and vendor flags, `ContactAssignment` carrying the purpose and the contact point, `ContactPurposeScheme` (4.9), `IdentityOutcomeScheme`, `ModelCallPurposeScheme`, and any concept of `GrantScopeKindScheme` (4.11) beyond the thread's organization that a term of the slice needs. Not section 4.29 as a whole | `erp-vocabulary`, slice 1 | `@inventory/kernel`: `./Terms`, the vocabulary value, for the projector and tests; `./TermsPointer`, the pointer helpers, for record schemas; its registry import is type-only (decision 9). That no browser bundle carries the vocabulary is proved by gate 7's rule 7, on the imports; report 05's app build-report check cannot be the proof, since that report prints only each chunk's largest owners (report 14 section 6.7). Reports 06 and 10 (4.9, 4.11, and the two schemes taken from 4.29); 04's `SourceRecord`. Decided: 34, 38, 39, 40, 41, 43, 46, 96. Open: 12 (for `Party` only), 18, 35 to 37, 44, 45, 47, 89 |
@@ -336,14 +346,14 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
 | Gates 1 to 6 in `bun run check` on the larger module, all built in the thread. Gate 5 reads the records on the enrolment list only (decision 99; report 14 section 3.7), with the records slice 1 adds. It does not scan the catalog contract or other kernel schemas. Same list as gate 7 | `erp-vocabulary`, slice 1 | Built in the thread: the tests in the ontology package. Decided: 26 (N3.js for the re-parse), 95, 99 |
 | Gate 7, `laws ontology-terms`. The thread's rules on the same enrolment list (report 14 section 6.7). Rule 2 stays off until the Alchemy row. The command only reads source text | `erp-vocabulary`, slice 1 | Built in the thread (decision 95): the command beside `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts`. It imports no package of the repository, so it needs no import exception |
 | Gate 8, the party competency questions on `test_` fixtures. The queries for CQ-P02, CQ-P03 and CQ-P07 are NET-NEW (04 drafts CQ-P01, CQ-P04 and the CQ-P05 ASK only; CQ-P06's is the thread's) | `erp-vocabulary`, slice 1 | NET-NEW fixtures under `explorations/erp-ontology/assets/requirements/`, named as an input of the ontology package's `test` and `reason` tasks in its turbo.json (`$TURBO_ROOT$/explorations/erp-ontology/assets/requirements/**`, report 12 section 6.3), besides the package's own files, or a changed query or fixture replays a cached pass. A fixture-only edit must miss both caches, and a changed expected answer must re-run the comparison. Read by imports of the files' text, since `node:fs` is refused in tests. The thread's own query and fixture are inside the package instead (`packages/ontology/fixtures/cq/`), and its `reason` task reads only committed files of the package (report 14 section 6.10); slice 1 says which home its fixtures take when it is specified. Report 04 CQ-P01 to CQ-P07, the party half of CQ-P09, and section 4. Decided: 26 (Oxigraph for SPARQL). Open: 27, 36, 87 |
-| Gate 9, the reasoner on the larger module, in `bun run check:full` | `erp-vocabulary`, slice 1 | Built in the thread: the package turbo task `reason` (report 14 sections 6.9 and 6.10). The task fails when Java or the jar is missing. ROBOT with HermiT (decision 25) and a download Benjamin approves; whether `check:ci` runs it too, with a Java setup in CI's main job, belongs to that approval |
+| Gate 9, the reasoner on the larger module, in `bun run check:full` | `erp-vocabulary`, slice 1 | Built in the thread: the package turbo task `reason` (report 14 sections 6.9 and 6.10). The task fails when Java or the jar is missing. ROBOT v1.9.11 with HermiT and Java 17 by major version (decisions 112 and 113). CI runs gate 9 in its own job, restoring the jar from a cache keyed by its sha256, fetching only on a miss and checking the hash (114) |
 | Gate 10, the reasoned competency-question suite. It runs in no slice unless decision 27 is answered (b). Under recommendation (a) each query walks subclasses itself in gate 8, so this gate has nothing to run | no slice while that recommendation holds | decision 27; report 12 |
 | Catalog and value terms, the item records' pointers and lift paths, the item schemes from `categories` and `uoms`. Adds the catalog contract's item records to the enrolment list of gates 5 and 7 (decision 99). Not on slice 1's list. Under decision 76 (a) the `quantityOnHand` lift brings 08's `StockPosition`, `InventoryMeasure`, `hasMeasure`, `measureKind`, `positionBasis`, `asOf`, `reportedIn`, `forItem`, and the `onHand` and `reported` concepts, with their schemes, into this slice (report 13 marks these in the repository today). `reportedIn` declares no range, so the confirmation is written as an IRI before slice 3 types it. Under 76 (b) the field takes `noTerm` and gate 11 lists it as not validated. Decision 12 does not choose the item kinds' parent | `erp-vocabulary`, slice 2 | `packages/catalog/contract/src/Item/Item.read.ts`; reports 07 and 10 (4.3 to 4.7). Open: 50, 54, 55, 59 to 66, 74, 76, 88, 90, 92 |
 | SHACL from the item record and gate 11 over the stored messy sample. The test needs the stored rows, the shapes and the lift together. The ontology package does not import the app, and the thread's boundary row refuses every import of the ontology package, a test's included, since the law does not tell test code from production code (report 14 section 7.2). So this slice either puts the test in the ontology package or teaches the law a test-only row. Decisions 76 and 88 govern the on-hand lift and the currency of `unitCost` | `erp-vocabulary`, slice 2 | `apps/inventory/test/server/Imports.slow.test.ts` (155 items through Confirm); the generated shapes are an input of that test; report 12 section 4. Decided: 22 (the shapes are closed), 26 (shacl-engine for SHACL Core, added with this slice). Open: 48, 49, 51, 76, 88 |
 | The import's terms and their pointers, with CQ-P10. Adds the import's records in the catalog contract to the enrolment list. The aggregate paths are evidence for those terms. They are not a slice 1 model dependency, and they do not turn on the Alchemy block rule | `erp-vocabulary`, slice 3 | `packages/catalog/contract/src/Import/`, `Staging/`, `Suggestion/`; `packages/catalog/model/src/Import/Import.aggregate.ts`, `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`; reports 04 and 09. Open: 52, 53, 56 to 58, 91 |
 | The alignment file and the SSSOM table generated from the same alignment rows (report 12 section 1.3), with gate 12. The rows include the four that decisions 39 and 43 bring back for `ContactAssignment` (Sutton "Contact", `org:Membership`, FIBO's Contact, schema.org's `ContactPoint`). The mapper's candidate file under `assets/mappings/` is its review input, not a second home | later, when decisions 28 to 31 are answered and a row is ratified, naming its `rat-` record (decision 32) | NET-NEW; report 11 section (b); report 12 section 1.3; gate 12 in `check`. Open: 28 to 31 |
 | Pointers on Alchemy domain blocks (the law's rule 2). Not slice 1, and not turned on by slice 3's contract enrolment. The thread enrols no block, so decision 20's augmentation of `@alchemy.run/domain`'s `Annotations` is written here, not in the thread (report 14 section 1.3). Activation needs the designated model exports, a runtime check of the bindings (the annotations live on the class, not only in the source text), and those exports named as dependency and cache inputs | later, when the alchemy-domain build declares blocks with annotations on main | `packages/catalog/model/src/`; [alchemy-domain BRIEF](../alchemy-domain/BRIEF.md); report 12 section 7 |
-| The rest of the warehouse and stock terms, with CQ-P08 and CQ-P09's stock-position must-fail, except the terms slice 2 takes for `quantityOnHand` under decision 76 (a) | later, when a stock, location or lot record is built | NET-NEW; report 08. Open: 42 (CQ-P08 reads it), 67 to 73, 75, 77 to 79; 74 and 76 if slice 2 has not answered them |
+| The rest of the warehouse and stock terms, with CQ-P08 and CQ-P09's stock-position must-fail, except the terms slice 2 takes for `quantityOnHand` under decision 76 (a) | later, when a stock, location or lot record is built | NET-NEW; report 08. Open: 42 (CQ-P08 reads it), 67 to 73, 75, 77 to 79, 116; 74 and 76 if slice 2 has not answered them |
 | Commitment, execution and accounting terms | later, when the first order or event record is built and its context named (decision 37) | NET-NEW; report 09. Open: 80 to 86 |
 | A Sutton description from the same vocabulary | later, when Benjamin asks for one | report 11's Sutton rows; decision 1's reversal |
 
@@ -355,7 +365,7 @@ their records' pointers and the access lifts, and the thread's gates on the larg
 questions on their fixtures. Slice 2 adds the first SHACL over real stored rows; slice 3 points the import at its
 terms. Law rule 2 stays on its own later row.
 
-What each part waits on, of the 62 open decisions. Each is put to Benjamin when its part is specified, with a concrete
+What each part waits on, of the 63 open decisions. Each is put to Benjamin when its part is specified, with a concrete
 record in front of him:
 
 | Part | Open decisions it waits on | Count |
@@ -365,7 +375,7 @@ record in front of him:
 | Slice 2, the catalog terms and SHACL | 48 to 51, 54, 55, 59 to 66, 74, 76, 88, 90, 92 | 19 |
 | Slice 3, the import's terms | 52, 53, 56 to 58, 91 | 6 |
 | The alignment file | 28 to 31 | 4 |
-| The warehouse and stock terms | 42, 67 to 73, 75, 77 to 79 | 12 |
+| The warehouse and stock terms | 42, 67 to 73, 75, 77 to 79, 116 | 13 |
 | The commitment, execution and accounting terms | 80 to 86 | 7 |
 
 Decisions 74 and 76 are counted once, with slice 2, which meets them first. Decision 37 is counted with slice 1 and
@@ -376,9 +386,11 @@ Gate 10 (the reasoned CQ suite) is built only if decision 27 is answered (b).
 ## What would make this brief graduate
 
 The packet scheme's four conditions ([explorations/README.md](../README.md)): the appetite answered (decision 8, on
-2026-11-22); no open question blocking the first deliverable (the thin thread waits on none of the 62, by the ruling
+2026-11-22); no open question blocking the first deliverable (the thin thread waits on none of the 63, by the ruling
 of the same day); the Map as above; and Benjamin saying the brief matches, logged as a decision. Then
-`goals/erp-vocabulary/SPEC.md` is seeded from this brief and from report 14, with the thread as its first deliverable.
+`goals/erp-vocabulary/SPEC.md` and `PLAN.md` are written from this brief, report 14 and decisions 112 to 118, with
+the thread as the first deliverable. The SPEC includes decision 117's list for Benjamin to rule on and decision
+118's rule for changed expected answers.
 The thread's done line is report 14 section 1.1: decision 8's question returning its two expected rows on the
 two-organization fixture, gates 1 to 9 passing, and each gate's planted mistake kept as a committed test. Slice 1 and each later part is specified only after the decisions in its row above are put to Benjamin and
 answered.

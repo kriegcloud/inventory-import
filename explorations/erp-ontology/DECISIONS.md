@@ -8,7 +8,7 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Sixty-two questions are open: 12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92. They are what is left
+Sixty-three questions are open: 12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92 and 116 (the audit added 116 on 2026-11-23; it is the last row). They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
@@ -95,6 +95,7 @@ none of these rows; slice 1, the party slice, follows it.
 | 89 | Are carrier and contract manufacturer role flags of an organization? | (a) Not yet: only `isCustomer` and `isVendor`, the two decision 3 names and Sutton shows ("a customer, a vendor, or both"); the other two are added when a source or a competency question of rank must or should needs them; (b) four flags, as report 01 and the project profile wrote them; (c) never flags: a carrier is read from `carriedBy`, a contract manufacturer from `operatedBy` | (a) | Decision 3's recorded answer names customer and vendor only, and Benjamin's words were "Organization with role flags"; report 01 added the other two and the project profile then listed four as decided; no public Sutton page shows either | 06's `isCarrier` and `isContractManufacturer` held back as notes; a flag added later sits on the tenant's `SourceRecord`, where decision 34 put the two there are; CQ-P02 reads the flags there are; 09's `carriedBy` and 08's `operatedBy` keep their range | NEW, sceptic review 2026-11-22 (06, the project profile) |
 | 90 | Does the SKU match key drop punctuation? | (a) No: the key is the SKU without spaces, in upper case, as `skuKey` computes it, and `CLAUDE.md`'s "case, spaces, punctuation" is corrected to "case and spaces"; (b) yes: `skuKey` also drops punctuation, so "SHH-9574" and "SHH9574" are one key (a product rule, written in the product `DECISIONS.md`) | (a) | The code and the stored unique index compare `skuKey`, which keeps the hyphen (`Item.read.ts`); 07's `identifierKey` and CQ-I03 follow the code; (b) changes which rows count as "Already there" | 07's `identifierKey` definition; CQ-I03's fixture; one `CLAUDE.md` sentence, or `skuKey` | NEW, sceptic review 2026-11-22 (04 CQ-I03) |
 | 91 | What does `performedBy` point at? | (a) No range declared: a member for an act in the app (CQ-I01, I04, P10), an organization or a person for an act outside it (a vendor's shipment), each record's SHACL saying which; (b) `Member` only, with a separate `Party`-ranged property for outside actors; (c) `Party`, as 09 first wrote | (a) | Under (c) a reasoner types every member a party and "who confirmed" loses the membership the audit trail keeps; 06's `decidedBy`, `calledFor` and `actsFor` point at `Member`, and `recordedActor` does in the index, pending decision 44, which does not change this row while `PortalAccess` is not proposed; (a) keeps one key, as anti-pattern 10 advises, and (b) is its narrower form | 09's `performedBy` row; CQ-I01, I04, P10 | NEW, sceptic review 2026-11-22 (09) |
+| 116 | When a grant covers one location or one field, how does it say which? | (a) A property from the grant to the thing it covers, beside `grantScope`, which keeps the kind; (b) one concept per location or field in `GrantScopeKindScheme`; (c) the kind only, the thing covered read from another record | (a) | With the kind alone two grants at two sites look the same (the blinded seat, report 15); a concept per site turns data into vocabulary | One property; CQ-P11's answer once a second kind exists; no change while organization is the only kind (decision 115) | NEW, audit 2026-11-23 (15 section 5) |
 
 ## Answered
 
@@ -621,3 +622,68 @@ for `Role` names decision 97. The agent recommended the same.
 - Rationale: I decided each term's shape in decisions 8 to 110; ruling on each again would ask the same things
   eighteen times.
 - Reverse: walk the 18 one by one; a term I then refuse leaves the module and report 14.
+
+### 112. The ROBOT release for the reasoner (2026-11-23)
+
+The download decision 25 left owed. I approved ROBOT v1.9.11: the file `robot.jar`, 82,708,624 bytes, published
+2026-10-01, sha256 `53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`, from
+`https://github.com/ontodev/robot/releases/download/v1.9.11/robot.jar`, and I chose to have it fetched once and tried
+that day. The agent recommended the same. It was tried on 2026-11-23, outside the repository: the bytes hashed to the
+value above; under Java 17.0.2 `validate-profile --profile DL` passed a seven-line test ontology and
+`reason --reasoner hermit` found it consistent (exit 0); with its one person also typed as a tenant, HermiT reported
+"The ontology is inconsistent" and exited 1. The gate 9 script fetches this file, checks this hash and keeps the jar
+outside the repository.
+
+- Rationale: the architecture seed pinned the same release, and no report had checked that it starts here.
+- Reverse: pin another release; I approve its file, source, hash and size the same way first.
+
+### 113. Which Java the reasoner pin names (2026-11-23)
+
+I chose Java 17, pinned by its major version. The agent recommended the same.
+
+- Rationale: ROBOT 1.9.11 is compiled for Java 11 and its own CI tests 11, 15 and 17; 17.0.2 is already installed on
+  my machine, so nothing is fetched there, and my machine and CI differ in patch level.
+- Reverse: pin 21 or 25; neither is in ROBOT's tests, and 21 is a second download to approve.
+
+### 114. Whether CI runs the reasoner (2026-11-23)
+
+The question decision 25's approval carried. I chose a CI job of its own: it sets up Java 17, restores the jar from a
+cache keyed by its sha256, fetches it only when the cache has none, checks the hash and runs gate 9. The agent
+recommended the same.
+
+- Rationale: a change that makes the vocabulary inconsistent then fails its pull request, not only a `check:full` on
+  a machine that has Java and the jar.
+- Reverse: run gate 9 in `check:full` only, or nightly; CI then fetches nothing and an inconsistency can reach main.
+
+### 115. Where the blinded seat's notes land (2026-11-23)
+
+Report 15, section 5, point 5. I chose all three outside the thread, and the 18 terms stay as decision 111 accepted
+them. `Member.id` needs no change: report 14 already makes it the identity of a membership, not of a person. A grant
+scope that records only its kind is enough while organization is the only kind, since the member's tenant says what
+is covered; how a grant names the location or field it covers is open decision 116. Account, Session, the agent named
+on an audit entry and the rule that an organization keeps an admin stay out, as report 14 section 1.3 and decision 98
+say. The agent recommended the same.
+
+- Rationale: none of the three changes an answer to a thread question.
+- Reverse: add a property from a grant to the thing it covers now; a nineteenth term, accepted like the 18.
+
+### 117. Whether the thread carries a list of forbidden conclusions (2026-11-23)
+
+An idea of the adhd pass, not adopted until now. I chose yes, sized to the thread: three to five bans over the
+thread's own terms, in my words, in the goal's SPEC, each with one fixture that must be refused and one near miss
+that must pass, each routed to the reasoner or to a must-fail query. The agent drafts the list and I rule on each
+ban. The agent recommended the same.
+
+- Rationale: the audit found no quoted fact that makes a term more than a stored row; a ban is something a term says
+  that a row does not.
+- Reverse: ship the thread with gate 9's one negative and write the list with slice 1.
+
+### 118. Whether competency answers are locked (2026-11-23)
+
+The other adhd idea. I chose the expected rows as the lock: no new file and no update flag. A commit that changes an
+expected-rows file says so, and the release notes name the question with its old and its new answer. The agent
+recommended the same.
+
+- Rationale: gate 8 already compares each question's rows to a committed file; a rule about changing it shows a
+  changed meaning that unchanged Turtle bytes hide.
+- Reverse: a lock file a run writes and an update flag, as the catalog model's rule lock has.

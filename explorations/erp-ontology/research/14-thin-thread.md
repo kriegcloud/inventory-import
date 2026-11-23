@@ -7,18 +7,17 @@ description: The one specification of decision 8's thin thread as it now stands:
 # The thin thread
 
 Design only: nothing here is built. No vocabulary module, no pointer helper, no projector, no generated file, no gate
-and no `rat-` record exists today (decision 107: the thread uses none; section 1.6). TypeScript, Turtle and SPARQL in this document are sketches, not code, and none was
-compiled or run. This report is the one specification of the thin thread (decision 8 as amended by decisions 38, 40,
-41, 46 and 93 to 101). Where reports 04 to 13 or the brief say something else about the thread, this report is the one
-to follow; what they say about later slices is untouched.
+exists today. TypeScript, Turtle and SPARQL in this document are sketches, not code, and none was compiled or run.
+This report is the one specification of the thin thread (decision 8 as amended by decisions 38, 40, 41, 46 and
+93 to 115, 117 and 118, as this report uses them). Where reports 04 to 13 or the brief say something else about the
+thread, this report is the one to follow; what they say about later slices is untouched.
 
-Inputs: the answered decisions in `DECISIONS.md` (8 to 11, 13 to 16, 20 to 26, 32, 34, 38 to 41, 46, 93 to 101), the
-kernel and access contract files named in section 3 as they stand today, `laws boundaries` as written, the root
-`turbo.json`, the vendored `@beep/identity`, the ratification and proposal schemas of the ontology skills with the
-auditor's validator, and Effect 4.1.5 as installed. Every statement about a file was made with the file open; every
-Effect API named was read in `node_modules/effect/src`. Section 10 lists what was not checked.
+Inputs: the answered decisions in `DECISIONS.md` (8 to 11, 13 to 16, 20 to 26, 32, 34, 38 to 41, 46, 93 to 115, 117,
+118), the kernel and access contract files named in section 3 as they stand today, `laws boundaries` as written, the root
+`turbo.json`, the vendored `@beep/identity`, the advisory audit in report 15, and Effect 4.1.5 as installed. Every
+statement about a file was made with the file open; every Effect API named was read in `node_modules/effect/src`. Section 10 lists what was not checked.
 
-Sixty-two decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92). The thread is designed so
+Sixty-three decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92 and 116). The thread is designed so
 that it rests on none of them. Section 1 says how, for each open decision it comes near.
 
 ## 1. Scope
@@ -31,7 +30,8 @@ The thread is done when all of the following hold on a clean checkout:
    `packages/ontology/generated/inventory.owl.ttl`, `packages/ontology/generated/inventory.skos.ttl` and
    `packages/ontology/generated/fixtures/CQ-P06.graph.ttl`.
 2. The seven classes, nine properties, two schemes and four concepts of section 2 are in the vocabulary module, each
-   naming the decision that accepted it (decision 111; a concept names its scheme's, decision 101; section 1.6).
+   naming decision 111, which accepted the 18 terms as a set and the four concepts under their schemes
+   (decision 101 as amended by decision 107; section 1.6).
 3. The five enrolled records of section 3 carry their marks, every field of each is placed, and each field's mark is
    the one section 3 gives it. Gate 5's rule P13 compares the marks read from the records with those placements,
    field by field, so `Activity` with its actor and tenant pointers the wrong way round fails it (6.5).
@@ -39,9 +39,10 @@ The thread is done when all of the following hold on a clean checkout:
    from the lift of two decoded `Member` values, read through the `aboutPath` mark on `Member.role`, and from nowhere
    else. Must-fail cases M6 and M7 change that mark and nothing else, and the answer changes with it (5.4); the
    second guard of section 4.4 holds the graph equal to what `lift` returns.
-5. Gates 1 to 8 run in `bun run check` and pass. Gate 9 runs in `bun run check:full` and passes, on a run that started
-   the reasoner: its task is never replayed from a cache, and it fails when Java or the jar is missing or is not the
-   approved one (6.9, 6.10).
+5. Gates 1 to 8 run in `bun run check` and pass. Gate 9 runs in `bun run check:full`, and in a CI job of its own
+   (decision 114), and passes, on a run that started the reasoner: its task is never replayed from a cache, and it
+   fails when Java is missing or is not Java 17, or when the jar cannot be fetched or does not hash to the approved value
+   (6.9, 6.10).
 6. Each of the nine gates has one committed test that plants the mistake of section 6 and asserts that the gate
    reports it. That is what "shown failing once" means here: the failure is a permanent test, not a screenshot. The
    further negatives section 6 names for gates 2, 3, 4, 5 and 7 are committed tests too, and section 6.11 walks each
@@ -91,51 +92,39 @@ The thread is done when all of the following hold on a clean checkout:
 | 36, what data proves the party model | The fixture is decision 8's and 94's, for one question. It proves nothing about parties. |
 | 44, the actor of a portal request | `recordedActor` ranges over `Member`, as decision 98 says for the thread. `PortalAccess` is not a term. |
 | 45, a software agent class | `Activity.agent` is `noTerm`, reason deferred, naming the party slice (decision 98). |
+| 116, how a grant names the location or field it covers | The thread's one scope kind is organization, and the member's tenant says what is covered (decision 115). Each option adds a property or concepts and removes none. |
 
 ### 1.5 What is owed from Benjamin before code
 
-Two things, both already recorded as his:
+Nothing is owed. The reasoner download decision 25 left owed is approved by decision 112: ROBOT v1.9.11, the file
+`robot.jar` from `https://github.com/ontodev/robot/releases/download/v1.9.11/robot.jar`, 82,708,624 bytes, sha256
+`53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`. It was tried on 2026-11-23 outside the
+repository under Java 17.0.2: the OWL 2 DL profile check passed, HermiT found the test ontology consistent, and an
+inconsistent one was reported with exit 1. Decision 113 pins Java 17 by its major version. Decision 114 runs gate 9 in
+a CI job of its own as well, with the jar restored from a cache keyed by its sha256. Gates 1 to 9 can all be built.
 
-1. **The reasoner download (decision 25).** ROBOT with HermiT is chosen; the Java pin and the jar are not approved.
-   Before anything is fetched the builder names the release, its URL, its sha256 and its size to Benjamin. This report
-   did not look them up. Gate 9 cannot be built until then; gates 1 to 8 can. Whether `check:ci` also runs the
-   reasoner belongs to the same approval, since CI would fetch the same jar.
-2. **The `rat-` records (decisions 32 and 101). No longer owed: decisions 107 and 111 replace them for the thread
-   (section 1.6). What follows is the first plan, kept for the slices that may use it.** Every term names the `rat-` record that holds Benjamin's answer, and
-   none is written. A record ratifies one term proposal. The thread has 22 terms (7 classes, 9 properties, 2 schemes, 4
-   concepts). The ruling on a scheme covers the concepts its proposal lists (decision 101), so the thread needs 18
-   records: seven classes, nine properties and two schemes. The labels, definitions, parents, tags and identity criteria in section 2 are the proposals: they are
-   reports 06 and 10's text where a term exists there under the same key, and written here where it does not (marked
-   "new"). A record lives at `explorations/erp-ontology/assets/audit/<audit>/governance/ratifications/rat-<nnn>.yaml`
-   (the project profile and the foundational auditor's outputs table), with the fields `id`, `proposal_ref`,
-   `proposal_sha256`, `decision`, `steward`, `decided_at`, `verbatim_decision` and `rationale`
-   (`.agents/skills/_shared/schemas/ratification.schema.yaml`). `proposal_sha256` is required: it is the sha256 of
-   the bytes of the proposal file Benjamin saw, `work/proposals/otp-<slug>-<nnn>.yaml` in the same audit folder
-   (`ontology-term-proposal.schema.yaml`). The auditor's validator rejects a record without it, and rejects as stale
-   a record whose proposal file has changed since (`validate_artifacts.ts`, the check that compares the two
-   digests); gate 4 holds the same (6.4, rule C12). A scheme's proposal names each concept its ruling covers, so that
-   decision 101's "listed" is read from the bytes he approved; where in the proposal they are written is the second
-   question of section 9.2. The exception entry for `Role` (decision 97) is ratified too.
+Decision 117 puts three to five forbidden conclusions in the goal's SPEC. The agent drafts them there and Benjamin
+rules on each ban then; none is drafted yet, and no gate of this report waits on them (6.8).
 
-The two smaller questions this report raised are answered by decisions 100 and 101 (section 9.2).
+The two smaller questions this report raised are answered by decision 100, and by decision 101 as amended by
+decisions 107 and 111 (section 9.2).
 
 ### 1.6 Decisions 107 to 111: what replaces the `rat-` chain in the thread
 
 The foundational auditor ran twice on the terms of section 2 and its adversary failed every proposal
-([report 15](15-audit-findings.md)). Decision 107 makes that audit advisory, and decision 111 accepts the 18 terms as
-a set. So in the thread no `rat-` record and no proposal file is read by anything. Wherever this report says a term
-names a `rat-` record, read the following instead:
+([report 15](15-audit-findings.md)). Decision 107 makes that audit advisory and amends decisions 32 and 101 for the
+thread. Decisions 108 and 109 settle Person's definition and Role's identity; decision 110 keeps Organization.
+Decision 111 accepts the 18 terms as a set (7 classes, 9 properties, 2 schemes), plus the four concepts under their
+schemes. Each of these 22 terms names decision 111; Role's exception entry names decision 97.
 
-- **The module (2.6).** A term's `ratification` is `{ decision: <n> }`, the number of the entry of
-  `explorations/erp-ontology/DECISIONS.md` that accepted it. For the 18 terms and the four concepts that is 111; for
-  `Role`'s entry on the exception list it is 97.
-- **Gate 4, rule C12 (6.4).** Every term and the exception entry names a decision number, and `DECISIONS.md` has a
-  heading `### <n>. ` for it. The gate reads that one file as text and checks nothing else about it. The planted
-  negative is a term naming a decision that has no heading, reported by its key. The two negatives about a stale
-  proposal digest and a concept missing from a proposal file do not apply.
-- **Turbo inputs (6.10).** `DECISIONS.md` is the input that is neither a dependency edge nor a default, in place of
-  the `rat-` records and the proposal files.
-- **What is owed (1.5).** Only the reasoner download.
+The terms are Benjamin's commitments about what the application means. The audit cannot certify them from code.
+Their `ratification` is `{ decision: <n> }`. C12 checks only that the number has a `### <n>. ` heading in
+`DECISIONS.md`, read as text. That file is the out-of-package input named in 6.10. Nothing is owed (1.5).
+
+Section 2 as it stands is what decision 111 accepted. A change to a term's text (its label, definition, parent or
+identity criterion, in section 2 or in the module) needs a decision, and no gate detects a change made without one.
+Decision 101's other clause stands: a concept added later to a scheme needs a decision of its own. C12 cannot see one
+that wrongly names 111 (section 10).
 
 The definitions and identity criteria of section 2 carry decisions 103, 104, 108 and 109. A later slice may still
 use the auditor and its `rat-` records; that is decided with the slice.
@@ -287,7 +276,7 @@ export const vocabulary = {
       label: "Member", definition: "A relationship between one person and one tenant ...",
       tag: "relator", parent: { kind: "gist", name: "TemporalRelation" },
       identity: { kind: "stated", criterion: "The MemberId within its tenant, kept after removal." },
-      ratification: { decision: 111 }  // section 1.6; was a rat- record and a proposal before decision 107
+      ratification: { decision: 111 }
     },
     Role: { /* ... */ parent: { kind: "none", reason: "Its individuals are the concepts of MemberRoleScheme; gist:Permission fits once permits exists." } },
     Tenant: { /* ... */ tag: "role", parent: { kind: "local", key: "Organization" }, identity: { kind: "inherited" } }
@@ -307,14 +296,19 @@ export const vocabulary = {
     MemberRoleScheme: {
       /* ... */ closed: true,
       concepts: {
-        viewer: { /* label, altLabel, definition, ratification */ alsoInstanceOf: "Role" },
-        editor: { alsoInstanceOf: "Role" }, admin: { alsoInstanceOf: "Role" }
+        viewer: { /* label, altLabel, definition */ ratification: { decision: 111 }, alsoInstanceOf: "Role" },
+        editor: { ratification: { decision: 111 }, alsoInstanceOf: "Role" },
+        admin: { ratification: { decision: 111 }, alsoInstanceOf: "Role" }
       }
     },
-    GrantScopeKindScheme: { /* ... */ closed: false, concepts: { organization: {} } }
+    GrantScopeKindScheme: { /* ... */ closed: false, concepts: { organization: { ratification: { decision: 111 } } } }
   }
 } as const satisfies S.Codec.Encoded<typeof Vocabulary>
 ```
+
+Every class, property, scheme and concept has `ratification: { decision: 111 }`, including the entries whose
+fields the sketch omits. Decision 111 accepts the 18 terms as a set and the four concepts under their schemes
+(decision 101 as amended by decision 107). Role's term names 111; only its exception entry names 97 (6.4).
 
 The value is a literal kept `as const` and checked with `satisfies` against the encoded side of the metamodel's
 `Vocabulary`, as report 05 section 4.7 writes it. It is not built with `Vocabulary.make`. `make` returns the schema's
@@ -864,6 +858,10 @@ Exactly these two rows, in this order. One person appears twice with two roles, 
 The test builds the expected IRIs from the module's `base` and namespace, never from the literal, which gate 7's rule
 5 allows in one file only.
 
+These rows are the lock on the question's answer (decision 118): there is no lock file and no update flag. A commit
+that changes them says so in its message, and the release notes name the question with its old and its new answer
+(section 8).
+
 ### 5.4 The must-fail cases
 
 Each is a committed test that changes one thing and asserts that the result no longer equals the expected rows. M1 to
@@ -909,12 +907,12 @@ where each runs and what it reads; the subsections give each gate's rules and it
 | 1 | Byte-compare | `check` (`test`) | `packages/ontology/test/Generated.test.ts` | The projector's output in memory; the three committed files under `generated/` |
 | 2 | Re-parse | `check` (`test`) | the same file | The three files' text, parsed with N3.js; the triples the writer was given |
 | 3 | Forbidden constructs and the namespace guard | `check` (`test`) | the same file | The parsed triples of the three files |
-| 4 | Vocabulary coherence | `check` (`test`) | `packages/ontology/test/Coherence.test.ts` | The vocabulary literal, decoded; `packages/ontology/exceptions/no-gist-parent.json`; the `rat-` records and the proposal files they name |
+| 4 | Vocabulary coherence | `check` (`test`) | `packages/ontology/test/Coherence.test.ts` | The vocabulary literal, decoded; `packages/ontology/exceptions/no-gist-parent.json`; `explorations/erp-ontology/DECISIONS.md` as text |
 | 5 | Record pointers on the AST | `check` (`test`) | `packages/ontology/test/Pointers.test.ts` | `enrolment.json`; `Enrolled.ts`; each enrolled schema's AST; the vocabulary value; the placements of section 3, stated in the test |
 | 6 | The type-check | `check` (`check`) | Every package's type-check; the compile-only files `packages/kernel/test/TermsPointer.types.ts` and `ActivityMarks.types.ts` | Source |
 | 7 | `laws ontology-terms` | `check` (root task `//#ontology-terms:check`) | `packages/tooling/tool/cli`; its test `test/OntologyTerms.test.ts` | Source text of every workspace's `src` and `test` code files, the law's own source and test left out; `enrolment.json`; for rule 7, each workspace's `package.json` and tsconfig, to resolve an import to a file |
 | 8 | The question suite | `check` (`test`) | `packages/ontology/test/Questions.test.ts` | `threadGraph()` in memory, loaded into Oxigraph; `CQ-P06.rq` |
-| 9 | The reasoner | `check:full` (`reason`, a task of `@inventory/ontology`, never cached) | `packages/ontology/scripts/reason.ts` | `generated/inventory.owl.ttl`, `generated/fixtures/CQ-P06.graph.ttl`, `fixtures/reason/*.ttl`; `robot.lock.json`, and the installed Java and jar it pins |
+| 9 | The reasoner | `check:full` (`reason`, a task of `@inventory/ontology`, never cached), and a CI job of its own (decision 114) | `packages/ontology/scripts/reason.ts` | `generated/inventory.owl.ttl`, `generated/fixtures/CQ-P06.graph.ttl`, `fixtures/reason/*.ttl`; `robot.lock.json`, and the installed Java and jar it pins |
 
 Gates 1, 2 and 3 work on three files; gates 4 and 5 are split so that a mistake in the terms and a mistake in a mark
 are reported by different gates: gate 4 never reads a record, and gate 5 reports nothing about a term that no mark
@@ -1001,7 +999,7 @@ input, and neither does the `reason` task (6.9).
 
 ### 6.4 Gate 4, vocabulary coherence
 
-A pure function over the decoded vocabulary, the exception list, the `rat-` records and the proposal files they name.
+A pure function over the decoded vocabulary, the exception list and the text of `DECISIONS.md`.
 The test decodes the kernel's literal strictly first (2.6); a literal that does not decode fails the gate before any
 rule runs. Its rules for the thread:
 
@@ -1018,7 +1016,7 @@ rule runs. Its rules for the thread:
 | C9 | A sub-property link names a property on the gist list whose domain and range the property falls under (decision 16) | none in the thread |
 | C10 | A scheme has at least one concept; `alsoInstanceOf` names a class of the vocabulary | the three roles |
 | C11 | The tag is one of kind, role, relator, information; a `role` class has a local parent | `Tenant` |
-| C12 | (Replaced for the thread by section 1.6: every term and the exception entry names a decision of `DECISIONS.md` that exists.) First plan: Every term and every exception entry names a `rat-` record that exists and reads `decision: accept`, and whose `proposal_ref` equals the proposal the term names; the proposal file that reference names exists, and the sha256 of its bytes equals the record's `proposal_sha256`; a concept that names its scheme's record is named, by its local name `<SchemeKey>-<notation>`, in that scheme's proposal file; no two of the classes, properties and schemes name the same record | 22 terms, 1 entry; the two scheme proposals name the four concepts |
+| C12 | Every term and every exception entry has `ratification: { decision: <n> }`, naming a decision number for which `DECISIONS.md` has a heading `### <n>. ` (decisions 107 and 111) | 22 terms name 111; 1 exception entry names 97 |
 | C13 | The version is three numbers, and `0.y.0` before publication (decision 24) | `0.1.0` |
 
 Decision 97 settles the conflict four findings name (03-schema.grok#1, 05-ontology.astra#1, 07-provenance.astra#1,
@@ -1027,28 +1025,16 @@ V17 excepted `Role` on identity only. C4 replaces V25 for the thread. Category c
 admits no other case.
 
 The exception list is `packages/ontology/exceptions/no-gist-parent.json`: an array of
-`{ "class": "inv:Role", "reason": "...", "ratification": { "record": "...", "proposal": "..." } }`. It is a file apart
+`{ "class": "inv:Role", "reason": "...", "ratification": { "decision": 97 } }`. It is a file apart
 from the module on purpose: the module says `none`, the list says who allowed it, and the gate compares the two.
 
-The `rat-` records are read as text from
-`explorations/erp-ontology/assets/audit/*/governance/ratifications/rat-*.yaml`, and the proposal files from
-`work/proposals/otp-*.yaml` of the same audit folder, where the proposal schema puts them. The gate needs four
-top-level scalars of each record (`id`, `proposal_ref`, `proposal_sha256`, `decision`) and one of each proposal
-(`id`, which a `proposal_ref` equals), which it reads by line; no YAML library is added. The rules stay a pure
-function: the test reads the files and hands it each record's four scalars and, for each proposal, its id, the
-sha256 of its bytes and its text.
-
-The digest is the one the auditor's validator compares (`validate_artifacts.ts`: a record whose `proposal_sha256`
-differs from the digest of the referenced proposal is reported as a stale ratification). Without it, C12 read three
-values that an edit to an approved proposal leaves alone, so gate 4 could pass on a proposal Benjamin never saw, and
-on records the validator rejects. With it, a proposal changed after the ruling fails gate 4 until it is shown to him
-again.
-
-A concept listed in its scheme's ratified proposal names the scheme's record; a concept added later names its own
-(decision 101). "Listed" is read from the bytes he approved: the concept's local name occurs in the proposal file,
-as a whole name and not as the start of a longer one.
-Adding a concept to an approved scheme proposal changes its bytes, so the digest catches it; adding one to the
-module alone leaves the proposal without its name, so the last clause catches it.
+The test reads `explorations/erp-ontology/DECISIONS.md` as text and hands it to the pure function. C12 checks
+that each term and exception entry names a decision number and that a line begins `### <n>. ` for that number.
+An open decision has no heading: it is a row of the table under `## Open`. So a heading means the decision is
+answered. A combined heading such as `### 39 and 43.` is not matched for either number; whether a term may name a
+combined entry is undecided (section 10). C12 reads that one file and checks nothing else about it. It does not read
+whether the decision's text accepts the term. That limit is this report's design; decision 107 says only that a term
+names the decision that accepted it.
 
 **Planted mistake.** In the test, a copy of the kernel's literal is made in which `Grant`'s parent is
 `{ kind: "none", reason: "planted" }`; it is decoded, and the gate is run with the real exception list. It reports C4
@@ -1057,12 +1043,9 @@ type-checks and decodes and gate 6 is silent; it is a value in a test, so gates 
 planted mistake, a class under two disjoint parents, cannot be written: a class has one `parent` field (findings
 01-gates.fable#4, 03-schema.grok#5, 06-testing.fable#5, 08-docs.fable#3). Disjointness is gate 9's to show.
 
-**Two further negatives, for C12.** Both are copies in memory of the real inputs, with every `rat-` record unchanged:
-
-- The text of `MemberRoleScheme`'s proposal gains one line naming a fifth concept, and its digest is taken again.
-  C12 reports that record as stale.
-- The vocabulary gains a concept `owner` in `MemberRoleScheme` that names the scheme's record, the proposal
-  unchanged. C12 reports `MemberRoleScheme-owner` as not named in the proposal.
+**One further negative, for C12.** In the test, a copy of the kernel's literal gives `Member` the decision number
+999, which has no entry in `DECISIONS.md`, and is decoded, as the planted mistake's copy is. The gate is run on it
+with the unchanged decision text. C12 reports `Member` by its key. No committed input changes.
 
 ### 6.5 Gate 5, record pointers on the AST
 
@@ -1211,7 +1194,12 @@ the repository does not read its own test, so the planted text fails nothing but
 ### 6.8 Gate 8, the question suite
 
 The test loads `threadGraph()` into Oxigraph, runs `CQ-P06.rq`, and compares the rows with section 5.3. It then runs
-the seven must-fail cases of section 5.4 and the three guards of section 4.4.
+the seven must-fail cases of section 5.4 and the three guards of section 4.4. A change to the expected rows of 5.3 is
+said in its commit and in the release notes (decision 118).
+
+Decision 117 adds three to five forbidden conclusions over the thread's own terms, in the goal's SPEC, each with one
+fixture that must be refused and one near miss that must pass, each routed to the reasoner or to a must-fail query.
+None is drafted yet, so neither this gate nor gate 9 names one here.
 
 **Planted mistake.** M2: the two `grantsRole` triples removed from the lifted part. The suite reports both expected
 rows missing. Gate 5 is silent (the marks are unchanged), and gate 1 is silent (the committed graph file is
@@ -1219,10 +1207,19 @@ unchanged; the removal is in memory).
 
 ### 6.9 Gate 9, the reasoner
 
-`reason` is a task of `@inventory/ontology`, never a root task, named in the root `check:full` (decision 25). It is
-never cached (6.10), so every `check:full` starts the script. The script first reads `robot.lock.json` and compares
-it with what is installed: the Java version, and the sha256 of the jar's bytes. It fails, never skips, when Java or
-the jar is missing, and when either is not the one the pin names. Only then does it run ROBOT with HermiT, twice:
+`reason` is a task of `@inventory/ontology`, never a root task, named in the root `check:full` (decision 25). A CI job
+of its own runs it too (decision 114). It is never cached (6.10), so every `check:full` starts the script.
+
+The pin, `robot.lock.json`, holds what decisions 112 and 113 approved: ROBOT v1.9.11, `robot.jar` from
+`https://github.com/ontodev/robot/releases/download/v1.9.11/robot.jar`, 82,708,624 bytes, sha256
+`53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`, and Java 17 by its major version. The release was
+tried on 2026-11-23 outside the repository under Java 17.0.2: the DL profile check passed, HermiT found the test
+ontology consistent, and with an inconsistent one it reported the inconsistency and exited 1.
+
+The script first reads the pin and compares it with what is installed: the major version of the installed Java, and
+the sha256 of the jar's bytes. When the jar is missing it fetches it from the pinned URL and keeps it outside the
+repository (decision 112). It fails, never skips, when Java is missing or its major version is not 17, when the fetch
+fails, and when the jar's bytes do not hash to the pin. Only then does it run ROBOT with HermiT, twice:
 
 1. **Positive.** `inventory.owl.ttl` merged with `fixtures/CQ-P06.graph.ttl`: the OWL 2 DL profile check passes and
    the merged ontology is consistent.
@@ -1243,12 +1240,10 @@ The SKOS file is not in the reasoner's input, and no alignment exists (1.4).
 The root `test` task hashes the package's own files (`$TURBO_DEFAULT$`), two root Vitest files, and, through
 `transit`, the source of the packages it depends on. It hashes nothing else outside the package. So the kernel's
 module and records, `@beep/vocabulary` and the access contract are covered by the dependency edges, and the exception
-list, the enrolment list, `fixtures/` and `generated/` by `$TURBO_DEFAULT$`. The inputs that are neither are the
-`rat-` records and the proposal files they name: without the first, deleting a record would replay gate 4's last
-pass, and without the second, so would an edit to an approved proposal (findings 01-gates.fable#7,
-02-architecture.astra#4, 07-provenance.astra#6; the last names a path, `explorations/erp-ontology/governance/`, that
-is not where the profile puts them). Both are globs, so a file that is added or deleted changes the hash as an edit
-does.
+list, the enrolment list, `fixtures/` and `generated/` by `$TURBO_DEFAULT$`. The input that is neither a dependency
+edge nor a default is `explorations/erp-ontology/DECISIONS.md` (decisions 107 and 111). It must be named explicitly:
+without it, removing a heading could replay gate 4's last pass. An edit or deletion of the decision file must change
+the hash (findings 01-gates.fable#7, 02-architecture.astra#4, 07-provenance.astra#6).
 
 ```json
 // packages/ontology/turbo.json (sketch), after the pattern of packages/catalog/model/turbo.json
@@ -1260,8 +1255,7 @@ does.
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
-        "$TURBO_ROOT$/explorations/erp-ontology/assets/audit/*/governance/ratifications/**",
-        "$TURBO_ROOT$/explorations/erp-ontology/assets/audit/*/work/proposals/**"
+        "$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md"
       ]
     },
     "reason": { "dependsOn": ["transit"], "cache": false }
@@ -1272,18 +1266,22 @@ does.
 `reason` is not cached, as the root's `test:slow` is not. Its pass depends on two things no input can stand for:
 the Java that is installed and the jar on the machine. A hash over committed files, the pin included, stays the same
 when either is removed, and Turbo would then replay the last pass without starting the script, so the script's own
-check for a missing jar would never run. The root file says the same of `//#patches:check`, which reads
+check of Java and the jar would never run. The root file says the same of `//#patches:check`, which reads
 `node_modules` and so runs every time. With `"cache": false` every `check:full` starts `scripts/reason.ts`, which
 verifies Java and the jar against `robot.lock.json` before its two runs (6.9).
 
 What the script reads is still committed files only, beside the two tools: the two generated files (which gate 1
 holds equal to the projector's output), the negative fixture under `fixtures/reason/`, and `robot.lock.json`, the pin
-of the jar and of Java that Benjamin approves (release, URL, sha256, size, and the Java version). The thread keeps no
-question file under `explorations/`: the query and fixture are in the package.
+of the jar and of Java that Benjamin approved (decisions 112 and 113: release, URL, sha256, size, and Java 17 by its
+major version). The thread keeps no question file under `explorations/`: the query and fixture are in the package.
 
-So no cached task replays a pass over something that is gone. Java or the jar: `reason` is never replayed. A `rat-`
-record or a proposal file: it is an input of `test`, so its removal changes the hash and gate 4 runs and fails on
-the term that names it.
+Decision 114 also runs gate 9 in a CI job of its own. The job sets up Java 17, restores the jar from a cache keyed by
+its sha256, fetches it only when the cache has none, checks the hash and runs the script. That cache holds the jar,
+never a result: the job starts the script every time. This report does not design the workflow file.
+
+So no cached task replays a pass over something that is gone. Java or the jar: `reason` is never replayed.
+`DECISIONS.md`: it is an input of `test`, so its removal changes the hash and gate 4 cannot read its required input.
+Removing a named heading makes C12 fail on the key that names it.
 
 The root task `//#ontology-terms:check` takes the inputs the other source laws take, plus
 `packages/ontology/enrolment.json` and, for rule 7's resolution, every workspace's `package.json` and tsconfig files.
@@ -1310,7 +1308,8 @@ The further negatives of sections 6.2 to 6.7 and the must-fail cases of 5.4 are 
 a test's memory, a file under `fixtures/negative/`, or a fixture text in the law's own test. The same reasons hold
 for each. Two were checked with care because they call helpers in a test: the copies of M6 and M7 and the swapped
 `Activity` of 6.5 are not enrolled, so gate 5 reads none of them on its real run, and they sit in test files, which
-gate 7's rules 1b and 3 do not read.
+gate 7's rules 1b and 3 do not read. C12's negative of 6.4 is a copy in memory too: only gate 4 reads the
+changed decision number, and it reports the term's key. The number is legal in the model, so it decodes and compiles.
 
 Three changes of this review keep rows that would otherwise fail a second gate. Row 3: the test once had to write
 the forbidden predicate, and rule 4 would have reported the test file. Rows 5 and 6: rule 1b once refused every
@@ -1456,6 +1455,10 @@ thread checks that a change did advance `y`: a gate would need the previous vers
 slice brings. Until then it is a step of the change, and gate 1 at least makes every change to the generated bytes
 visible in the diff.
 
+A change to a question's expected rows (5.3) is named in the release notes with the question and its old and its new
+answer, and its commit says so (decision 118). The first line changes no answer. Nothing checks that the notes name
+it: like the version, it is a step of the change.
+
 ## 9. Second-review findings and where this report settles them
 
 ### 9.1 The findings
@@ -1471,11 +1474,11 @@ file or a later slice. Sixty-four findings, ten reviews.
 | 01-gates.fable#4 | Settled | 6.4 and 6.9: one planted mistake per gate, each writable; the two-parent case is dropped |
 | 01-gates.fable#5 | Settled | 6.3 and 6.7: gate 3 reads parsed triples, rule 4 reads code files, the planted `owl:sameAs` is a Turtle fixture; 6.7 lists which rules run |
 | 01-gates.fable#6 | Settled | 3.1 and 3.4: the scheme pointer is a schema annotation, a field's mark a key annotation |
-| 01-gates.fable#7 | Settled | 6.10: one input list for `test` and one for `reason`, with the `rat-` records |
+| 01-gates.fable#7 | Settled | Decisions 107 and 111 replaced the earlier plan (1.6); 6.4 and 6.10 use `DECISIONS.md` |
 | 02-architecture.astra#1 | Settled | 3.2 and 7.2: `pathFor` is generic, the kernel binds it; no foundation to kernel import |
 | 02-architecture.astra#2 | Settled | 7.3: a registry of this repository's own extends the vendored one; `Vocab.ts` is not edited |
 | 02-architecture.astra#3 | Settled | 3.3: the five real fields; decision 93 records the correction |
-| 02-architecture.astra#4 | Settled | 6.10: the ratifications folder is a `test` input |
+| 02-architecture.astra#4 | Settled | Decisions 107 and 111 replaced the earlier plan (1.6); 6.4 and 6.10 use `DECISIONS.md` |
 | 02-architecture.astra#5 | Settled | 6.7 rule 7: the proof is a source law on imports; the bundle report is not used as proof |
 | 03-schema.grok#1 | Settled | Decision 97; 6.4 rule C4 and the exception list |
 | 03-schema.grok#2 | Settled | 3.3 (fields), 3.1 (the subject's id), 6.5 rule P11 (`membershipOf` is fixture evidence) |
@@ -1508,7 +1511,7 @@ file or a later slice. Sixty-four findings, ten reviews.
 | 07-provenance.astra#3 | Settled | 4.4 and the guards of 6.8 |
 | 07-provenance.astra#4 | Settled | 3.3 and 6.5 rule P11 |
 | 07-provenance.astra#5 | Settled | 4.3 case (c) |
-| 07-provenance.astra#6 | Settled; the path it names is false | 6.10. The records are under `assets/audit/<audit>/governance/ratifications/` (`project-profile.md`), not `explorations/erp-ontology/governance/` |
+| 07-provenance.astra#6 | Settled; the path it names is false | Decisions 107 and 111 replaced the earlier plan (1.6); 6.4 and 6.10 use `DECISIONS.md` |
 | 07-provenance.astra#7 | Settled | Decision 98, as 05-ontology.astra#7 |
 | 07-provenance.astra#8 | Settled | 6.9: the pair is inferred through `gist:PhysicalIdentifiableItem`, and the three copied pairs are named in 2.1. The brief's wording is that file's |
 | 08-docs.fable#1 | Settled | 3.5 |
@@ -1516,7 +1519,7 @@ file or a later slice. Sixty-four findings, ten reviews.
 | 08-docs.fable#3 | Settled | 6: one planted mistake per gate, stated once |
 | 08-docs.fable#4 | Settled | 3.3; `removedAt` is not a thread term (1.3), so the brief's example of it has no field to sit on |
 | 08-docs.fable#5 | Settled | Decision 24 is answered; 8 |
-| 08-docs.fable#6 | Settled | 1.5 names both things owed |
+| 08-docs.fable#6 | Settled | Decisions 107 and 111 replaced the earlier plan (1.6); 1.5 owes nothing, since decisions 112 to 114 settle the reasoner download |
 | 08-docs.fable#7 | Outside | The words of decisions 8 and 93 are `DECISIONS.md`'s, which keeps an answer as given and amends it by later entries; 1.2 holds the counts as they stand |
 | 08-docs.fable#8 | Outside | Decision 47 is not a thread matter |
 | 09-reuse.grok#1 | Settled | 3.3 |
@@ -1532,28 +1535,24 @@ file or a later slice. Sixty-four findings, ten reviews.
 
 ### 9.2 Questions for Benjamin
 
-One is open, the reasoner download approval. It is not answered here, and the design does not rest on an answer
-except where the row says what waits.
+None is open. The former question 1, the reasoner download approval, is answered: decision 112 approves ROBOT
+v1.9.11 with its URL, size and sha256, decision 113 pins Java 17, and decision 114 runs gate 9 in a CI job of its own
+as well as in `check:full` (1.5, 6.9, 6.10). Gate 9 waits on nothing.
 
-| # | Question | Options | What waits |
-| --- | --- | --- | --- |
-| 1 | The reasoner (decision 25): do you approve the ROBOT jar and the Java pin once the builder has named the release, its source, its hash and its size, and does `check:ci` run the reasoner too? | (a) approve, `check:full` only; (b) approve, `check:full` and `check:ci`; (c) not yet | Gate 9. Gates 1 to 8 do not wait |
-
-Question 2, where a scheme's proposal lists its concepts, is settled by design, not by Benjamin. The two scheme
-proposals list their concepts in the definition text, each by its local name, because that needs no change to the
-proposal schema or the validator and gate 4's rule C12 reads the proposal's bytes.
+The former question 2, where a scheme's proposal lists its concepts, no longer applies to the thread. Decisions 107
+and 111 replace the proposal and `rat-` record chain (1.6). C12 reads decision headings only. No records are owed.
 
 Two questions this report raised are decided:
 
 - **The People page's `Person` record (decision 100).** Its `email` and `joinedAt` fields, whose terms are the party
   slice's, are both `noTerm`, reason deferred, naming the party slice (3.6). The record stays on the thread's list.
-- **A concept's ratification (decision 101).** The ruling on a scheme covers the concepts listed in the proposal
-  Benjamin sees; a concept added later to a ratified scheme is a proposal of its own. The thread needs 18 rulings:
-  seven classes, nine properties and two schemes.
+- **A concept's ratification (decision 101).** Its "listed in the proposal" condition no longer applies to the
+  thread. Decision 107 replaces that chain, and decision 111 accepts the 18 terms as a set (seven classes, nine
+  properties and two schemes), plus the four concepts under their schemes. All 22 terms name decision 111. Its other
+  clause stands: a concept added later to a scheme needs a decision of its own. C12 cannot see one that wrongly
+  names 111 (section 10).
 
-Beyond these, section 1.5's second item stands: the 18 records themselves are owed, one per term proposal, and
-section 2 is the text they would ratify, including the wording marked new (`action`, `recordedAt`, `grantScope`),
-`Grant`'s one criterion and the exception entry for `Role`.
+Role's exception entry names decision 97. Nothing remains owed (1.5).
 
 ### 9.3 What other files say that this report replaces, for the thread only
 
@@ -1561,11 +1560,16 @@ When this report was first written, the brief and reports 04, 05, 06, 12 and 13 
 and `gist-categories.md` and `project-profile.md` were behind the decisions. They have since been edited: the brief
 and those reports name this report wherever they touch the thread, `gist-categories.md` has a row for each of the
 seven gist classes and states the three pairs (2.5), and `project-profile.md` lists decisions 8 to 11, 13 to 16, 20
-to 26 and 93 to 101 as decided. Reports 05, 06 and 11 were searched for the claims this section once listed and
+to 26, 93 to 101, 107, 111 to 114, 117 and 118 as decided. Reports 05, 06 and 11 were searched for the claims this section once listed and
 for their mentions of this report, not read whole.
 
 Nothing remains: reports 04, 12 and 13, opened again at the places the rows named, now say what this report holds,
 and the other rows already found no difference.
+
+One difference stays on purpose. The ontology skills still describe the `rat-` record chain as the record of an
+accepted term. Decision 107 replaces that chain for the thread only, and `project-profile.md`, which every ontology
+skill reads first and which wins over a skill, says so: the thread's terms name a decision of `DECISIONS.md`, and a
+later slice may use `rat-` records.
 
 ### 9.4 Third-review findings
 
@@ -1574,7 +1578,7 @@ nineteen were true. "Settled" and "Outside" mean what they mean in 9.1.
 
 | Finding | Verdict | Where, or why |
 | --- | --- | --- |
-| code.astra#1 | Settled | 1.5 names `proposal_sha256`; 6.4 rule C12 checks the proposal file, its digest and the concepts it names, with two negatives; 6.10 makes the proposal files an input of `test` |
+| code.astra#1 | Settled | Decisions 107 and 111 replaced the earlier plan (1.6); 6.4 and 6.10 use `DECISIONS.md`. The ruling is now bound to the approved text by decision 111's words, "as that section states them", and that binding is not checked: no gate detects a change to a term's text (1.6, section 10) |
 | code.astra#2 | Settled | 2.6: the value is a literal `as const satisfies` the encoded side, never `Vocabulary.make`; types come from the literal, gate 4 and the projector decode it |
 | code.astra#3 | Settled | 3.5: the marks are hoisted as annotation objects and applied with `s.annotateKey(mark)` in place; a compile-only file holds the types equal to the unmarked fields' |
 | code.astra#4 | Settled | 6.7: rule 3 has a literal form for each helper; rule 1b reads every `src` file and counts a referenced module-level constant as part of its declaration; tests are not read by either. Report 12's sentence is that file's (9.3) |
@@ -1625,25 +1629,30 @@ nineteen were true. "Settled" and "Outside" mean what they mean in 9.1.
   How the law resolves a tsconfig `paths` alias and a `package.json` `imports` alias from text, without the
   compiler, was not designed further than "it resolves them". The root tsconfig's module settings were not opened
   for this.
-- **Reading files outside the package in a test.** Gate 4 reads the `rat-` records and the proposal files under
-  `explorations/`. Whether that is a `?raw` glob import or `node:fs` under the documented `nodeBuiltinImport:off`
-  comment, and whether `laws boundaries` accepts a relative glob that leaves the package, was not tried. The same for
-  importing `enrolment.json`. A `?raw` import gives text, and the digest is of bytes: the two agree for a UTF-8 file
-  with no byte-order mark, which was not tried. The sha256 itself can come from `effect/crypto/Digest`
-  (`digestHex` with `Digest.sha256`, and `layerWebCrypto`), which was read and not run.
-- **The `rat-` chain beyond the record.** The ratification schema, the proposal schema and the validator's stale
-  check were read. No proposal file exists, so none was. The proposal schema has no field for a scheme's concepts
-  and the validator closes its key sets, so where a scheme's proposal names them is open (9.2, question 2); whether
-  the validator and the adversary's review accept the names in the definition text was not tried. Rule C12 checks
-  the record, the reference, the digest and the names, not that the proposal's text is the term's.
-- **ROBOT.** Its commands and flags, the Java version it needs, the jar's release, size and hash, where the jar is
-  kept on a machine, how the script reads the installed Java's version, and whether the merged file passes the OWL 2
-  DL profile check as designed (undeclared fixture individuals, the four annotation property declarations). ROBOT is
-  not installed and nothing was downloaded.
+- **Reading files outside the package in a test.** Gate 4 reads `explorations/erp-ontology/DECISIONS.md` as text.
+  Whether that is a `?raw` import or `node:fs` under the documented `nodeBuiltinImport:off` comment, and whether
+  `laws boundaries` accepts an import that leaves the package, was not tried. The same for importing
+  `enrolment.json`.
+- **What a decision accepts.** C12 checks the number and the heading only. Nothing reads whether the decision's
+  text really accepts the term or the exception entry. That limit is this report's design; decision 107 says only
+  that a term names the decision that accepted it. Decision 111 accepts the thread's 18 terms and four concepts, and
+  decision 97 accepts Role's exception. Three limits follow. A change to a term's text in section 2 or the module
+  needs a decision, and no gate detects one made without it. A concept added later to a scheme needs a decision of
+  its own (decision 101), and C12 cannot see one that wrongly names 111. Whether a term may name a combined entry such
+  as `### 39 and 43.` is undecided; C12 as designed does not match it.
+- **ROBOT.** Decision 112 records the release, its URL, size and sha256, and a trial on 2026-11-23 outside the
+  repository under Java 17.0.2: the DL profile check passed, HermiT found a seven-line test ontology consistent, and
+  an inconsistent one was reported with exit 1. This report ran none of it and downloaded nothing. Not checked: the
+  other commands and flags the script uses, where the jar is kept on a machine, how the script reads the installed
+  Java's major version, and whether the merged file of 6.9 passes the OWL 2 DL profile check as designed (undeclared
+  fixture individuals, the four annotation property declarations).
+- **The CI job of decision 114.** Its workflow file, its cache step and how it sets up Java 17 are not designed here.
+- **Decision 117's forbidden conclusions.** The three to five bans are not drafted; which gate runs each is known only
+  as "the reasoner or a must-fail query".
 - **N3.js and Oxigraph.** Neither is installed; their APIs were not read.
 - **Turbo and the sync commands.** Whether a package's `turbo.json` may declare a task the root file does not name
-  (`reason`) and mark it `"cache": false` there, that a glob input changes a task's hash when a matching file is
-  deleted, how `config-sync` writes the task lists of the three root checks and a new package's scripts, exports and
+  (`reason`) and mark it `"cache": false` there, that naming `DECISIONS.md` as an input changes the task's hash
+  when the file is edited or deleted, how `config-sync` writes the task lists of the three root checks and a new package's scripts, exports and
   tsconfig references, and the exact inputs the existing source-law root tasks declare.
 - **The stored tables.** No migration was opened. That the stored member row's `userId` links a sign-in account and
   not the human is report 06's statement.

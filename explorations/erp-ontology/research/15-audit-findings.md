@@ -79,7 +79,8 @@ are Benjamin's commitments about what the application means. That is what decisi
 
 Each is a finding about the design, not about the audit. Benjamin ruled on points 2, 3 and 4 the same day
 (decisions 110, 108 and 109) and accepted the 18 terms as a set (decision 111); point 1 stands as decisions 40 and 102
-set it, and point 5 is not decided.
+set it. On 2026-11-23 he ruled on point 5 (decision 115): all three notes land outside the thread, and how a
+grant names the location or field it covers is open decision 116.
 
 1. **Whether Grant is its own thing.** CQ-P11 (at which scope does each member hold which role) can be answered by
    one statement on the member naming a role and a scope, with no grant. The adversary's rival: no `Grant` class,

@@ -32,10 +32,15 @@ is the one specification of the first deliverable, the thin thread. It is a desi
 | 22 | Every field of a pointed record has a pointer or a `noTerm` reason | Generate closed SHACL shapes when the SHACL slice comes |
 | 23 | A record stores the notation; the projector lifts it to the scheme concept's IRI | Every allowed code must belong to the scheme. List only the field's own concept IRIs in `sh:in` |
 | 24 | Write the semantic version in the module, never from the clock. The thread starts at `0.1.0` | Before publication advance `y` in `0.y.0` for every change and note breaks in the release notes. `1.0` is the first published namespace |
-| 25 | ROBOT with HermiT checks the OWL 2 DL profile and consistency in `check:full` | Before fetching anything, ask Benjamin to approve the Java pin and jar with its release, source, hash and size; `check:ci` inclusion is still open |
+| 25 | ROBOT with HermiT checks the OWL 2 DL profile and consistency in `check:full` | The jar, the Java pin and CI are settled by decisions 112 to 114. Any other release is approved first with its file, source, hash and size |
 | 26 | Vitest uses N3.js to re-parse Turtle and Oxigraph for SPARQL | Add shacl-engine for SHACL Core only with the SHACL slice |
-| 32, 101 | The module admits only terms backed by Benjamin's `rat-` record. A scheme ruling covers the concepts listed in its proposal; a later concept needs its own ruling | The thread needs 18 rulings: seven classes, nine properties and two schemes covering four concepts |
-| 107, 111 | For the thin thread the foundational audit is advisory (two runs, every proposal failed; report 15). Its 18 terms are accepted as a set and name decision 111 in the module, not a `rat-` record | A later slice may still use the auditor and `rat-` records; that is decided with the slice |
+| 32, 101 | The module admits only terms backed by Benjamin's `rat-` record. A scheme ruling covers the concepts listed in its proposal; a later concept needs its own ruling | Decision 107 amends both for the thin thread (next row). A concept added later to a scheme still needs a decision of its own |
+| 107, 111 | For the thin thread the foundational audit is advisory (two runs, every proposal failed; report 15). Its 18 terms are accepted as a set and name decision 111 in the module, not a `rat-` record | A thread term's `ratification` is `{ decision: <n> }`, a decision of the packet's `DECISIONS.md`. A later slice may still use the auditor and `rat-` records; that is decided with the slice |
+| 112 | ROBOT v1.9.11 is approved: `robot.jar`, 82,708,624 bytes, sha256 `53cd275c…ab26`, from the release's GitHub URL; tried under Java 17.0.2 | Gate 9 fetches that file, checks that hash and keeps the jar outside the repository. Report 14, 6.9, has the full hash and URL |
+| 113 | The reasoner pin names Java 17 by its major version | Compare the major version only; patch levels may differ between machines |
+| 114 | Gate 9 also runs in a CI job of its own, the jar restored from a cache keyed by its sha256 | The job fetches the jar only when the cache has none, checks the hash, then runs gate 9 |
+| 117 | The thread carries three to five forbidden conclusions, in the goal's SPEC, each with a fixture to refuse and a near miss to pass | The agent drafts the bans and Benjamin rules on each; none is drafted yet |
+| 118 | The expected rows are the lock on competency answers: no lock file, no update flag | A commit that changes an expected-rows file says so; the release notes name the question with its old and new answer |
 | 34 | `Person` is the human and `Organization` the real body. The tenant's `SourceRecord` links to the party by `recordOf` | Reidentify the record by tenant, source system, source type and exact source id. Join possible matches only by an `IdentityDecision` |
 | 38 | `Tenant` is a role class under `Organization`, keyed by `OrganizationId` | `membershipIn` ranges over `Tenant`, not any organization |
 | 39, 43 | A `ContactAssignment` links one person to one account | Put the purpose and contact point on that assignment |
@@ -43,7 +48,7 @@ is the one specification of the first deliverable, the thin thread. It is a desi
 | 41, 97 | Viewer, editor and admin are `MemberRoleScheme` concepts and `Role` individuals under the same IRIs | `Role` has no gist parent until `permits` exists. Gate 4 checks every parentless class and its reason against a committed list of exceptions ratified by Benjamin |
 | 46 | The audit record's term is `AuditEntry`, with alternative label Activity | Leave the page and record names alone |
 | 93, 94 | The fixture links two memberships to one `Person`, admin in one tenant and viewer in the other | Mark `Member.name` and `Member.organizationName` as `noTerm` for the screen; the kernel's `Member` has no email or person id |
-| 95, 99 | Build gates 1 to 8 in `check` and gate 9 in `check:full`, each with a test that plants a mistake | Enrol by record for gates 5 and 7: kernel `Member`, `Role`, `Activity`; access contract `Person`, `AuditTrail`. No stored rows in the thread |
+| 95, 99 | Build gates 1 to 8 in `check` and gate 9 in `check:full` and in a CI job of its own (114), each with a test that plants a mistake | Enrol by record for gates 5 and 7: kernel `Member`, `Role`, `Activity`; access contract `Person`, `AuditTrail`. No stored rows in the thread |
 | 98 | Mark `Activity` with `recordedActor` (to the member), `action`, `recordedAt` and `inTenant` | The copied actor name and detail are for the screen; defer the agent to the party slice. The thread does not lift audit entries |
 | 100 | The People page's `Person` describes a membership, not the human | Keep it enrolled as `Member` and defer `email` and `joinedAt` to the party slice |
 
@@ -83,7 +88,8 @@ Beware: `gist:Account` is an agreement with a balance, not the Sutton Account (d
   commit until Benjamin commits it.
 - Does not exist yet: the vocabulary module, the projector, any generated Turtle, any SHACL, any competency-question
   suite, the reasoner step. A skill never reports a check as run that has no code behind it; it says "not built".
-- ROBOT and oaklib are not installed on Benjamin's machine. `uvx` is, so `uvx --from oaklib runoak`,
+- ROBOT and oaklib are not installed on Benjamin's machine. ROBOT v1.9.11 is the approved release (decision 112): it
+  was tried once outside the repository, and the gate 9 script, not a skill, fetches it. `uvx` is, so `uvx --from oaklib runoak`,
   `uvx --from sssom sssom` and `uvx pyshacl` run. `uv run --no-project --with rdflib` may read and query an external
   or generated file. None of them writes this repository's terms. On gist (labels in `skos:prefLabel` only) a
   `runoak lexmatch` wrote 0 rows and exited 0, with or without a `skos:prefLabel` rule, and `runoak info` printed no
@@ -107,9 +113,10 @@ Beware: `gist:Account` is an agreement with a balance, not the Sutton Account (d
     `governance/ratifications/`. `.oxfmtrc.json` ignores `explorations/**`, so its digests hold.
   - Mapping candidates: `explorations/erp-ontology/assets/mappings/*.sssom.tsv`. SSSOM is a review format here; a
     published SSSOM, if ever wanted, is generated from the vocabulary's alignment rows.
-- A ratification is Benjamin's answer, scribed in a `rat-` file under `$ONT/governance/ratifications/`: that file is
-  the record the conceptualizer, architect, mapper and curator read. The packet's `DECISIONS.md` holds a one-line
-  mirror of each. Decisions 1 to 7 ratify no term by name, so `Organization` still goes through the auditor.
+- For the thin thread, a term names the decision of the packet's `DECISIONS.md` that accepted it (decisions 107 and
+  111); there is no `rat-` file. For a later slice, a ratification may be Benjamin's answer scribed in a `rat-` file
+  under `$ONT/governance/ratifications/`, the record the conceptualizer, architect, mapper and curator read, with a
+  one-line mirror in `DECISIONS.md`; that is decided with the slice.
 - Hand-written fixture Turtle (instance data for a competency question, never a term fact) may sit under
   `explorations/erp-ontology/assets/`. No skill writes a `.ttl` that states a term.
 - A proposal for terms is written as a diff or a typed TypeScript sketch in a research report, for Benjamin to argue

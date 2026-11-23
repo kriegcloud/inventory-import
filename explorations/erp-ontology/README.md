@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: active
 stage: shape
-next: Take the thin thread to Benjamin for brief review. None of the 62 open decisions blocks it.
+next: Write the thin thread goal (SPEC.md and PLAN.md). None of the 63 open decisions blocks it.
 goals: []
 ---
 
@@ -15,11 +15,21 @@ this repository's domain model point at them?
 
 The thin thread is the first deliverable (decision 8). It answers one question: who belongs to this organization and
 with which role? [Report 14](research/14-thin-thread.md) is its one specification. Section 1.1 says what counts as
-done, section 5 gives the question and its expected answer, and section 1.5 names what still needs Benjamin's approval.
-Nothing is built yet.
+done and section 5 gives the question and its expected answer. Decisions 112 to 118 update the design. Nothing is
+owed from Benjamin for the thread now. The next step is to write its goal, `SPEC.md` and `PLAN.md`. The SPEC will
+carry three to five forbidden conclusions, not yet drafted, for Benjamin to rule on (117). A commit that changes an
+expected-rows file says so, and the release notes name the question with its old and new answer (118). Nothing is
+built yet.
 
-Slice 1, the party slice, follows the thread. Benjamin will take each of the 62 open decisions with a concrete record
-when the slice that needs it is specified. Gate 10 remains open (pending Q27).
+ROBOT v1.9.11 was approved and tried outside the repository (112). Its jar is 82,708,624 bytes, sha256
+`53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`. Under Java 17.0.2 the DL profile check
+passed a small test ontology, HermiT found it consistent with exit 0, and an inconsistent variant exited 1. Java 17
+is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job, with
+the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
+
+Slice 1, the party slice, follows the thread. Benjamin will take each of the 63 open decisions with a concrete record
+when the slice that needs it is specified. Decision 116 asks how a grant names the location or field it covers;
+organization scope remains enough for the thread (115). Gate 10 remains open (pending Q27).
 
 | Report | Headline |
 | --- | --- |

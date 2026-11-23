@@ -1,8 +1,10 @@
 // What the item table itself refuses, whoever writes to it: a cost that is not digits with up to four decimals and
-// twelve whole digits, in an item or in the copy a replace keeps; and a key that is not its SKU's key, which would let
-// "one item per SKU" compare something the import never compared. On a fresh D1, with the migrations applied.
+// twelve whole digits, in an item or in the copy a replace keeps; a SKU not in the contract's form; and a key that is
+// not its SKU's key, which would let "one item per SKU" compare something the import never compared. SQLite's `upper`
+// knows only ASCII, so the table holds the SKU's form itself, where the key is the SKU, rather than redoing the key
+// (Unicode spaces and case) in SQL. On a fresh D1, with the migrations applied.
 import { expect, layer } from "@effect/vitest"
-import { decimalPattern, ItemFields, skuKey, UnitCost } from "@inventory/catalog-contract/Item"
+import { decimalPattern, ItemFields, skuKey, skuPattern, UnitCost } from "@inventory/catalog-contract/Item"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
@@ -14,10 +16,17 @@ const runs = { arbitrary: { runs: 40 } }
 
 /** A cost as the contract writes it, or any text at all. */
 const CostText = S.Union([S.toEncoded(UnitCost), S.String])
-/** A SKU as an item has it, or any printable ASCII text with the whitespace a key drops. */
-const SkuText = S.Union([ItemFields.fields.sku, S.String.check(S.isPattern(/^[\x20-\x7E\t\n\v\f\r]*$/))])
-/** A key: the SKU's own (`own`), or any text. */
-const KeyChoice = S.Struct({ own: S.Boolean, other: S.String })
+/**
+ * A SKU as an item has it; one in lower case or with spaces in it, the key of which is still in the SKU's form; or any
+ * text at all, Unicode spaces and letters included.
+ */
+const SkuText = S.Union([
+  ItemFields.fields.sku,
+  S.String.check(S.isPattern(/^[A-Za-z]{3}[ \t\u00A0\u2003\u3000]?-[0-9]{4}[ \n\u00A0\uFEFF]?$/)),
+  S.String
+])
+/** A key: the SKU's own, the SKU as it is written, or any text. */
+const KeyChoice = S.Struct({ of: S.Literals(["own", "written", "other"]), other: S.String })
 
 // The rows an item points at: a seeded member of a seeded organization (seeds/organizations.sql), and one import and
 // its confirm, made once and kept.
@@ -50,15 +59,16 @@ const removeItem = (sql: SqlClient.SqlClient) =>
 
 layer(TestDatabase, { timeout: "60 seconds" })("the item table's own checks", (it) => {
   it.effect.prop(
-    "an item is held only with the key of its own SKU",
+    "an item is held only with a SKU in the contract's form and the key of its own SKU",
     [Arbitrary.schema(SkuText), Arbitrary.schema(KeyChoice), UnitCost.pipe(S.toEncoded, Arbitrary.schema)],
     ([sku, key, cost]) =>
       Effect.gen(function* () {
         const sql = yield* parents
         const own = skuKey({ sku })
-        const written = yield* writeItem(sql, { sku, key: key.own ? own : key.other, cost })
+        const given = key.of === "own" ? own : key.of === "written" ? sku : key.other
+        const written = yield* writeItem(sql, { sku, key: given, cost })
         yield* removeItem(sql)
-        expect(written).toBe(key.own || key.other === own)
+        expect(written).toBe(skuPattern.test(sku) && given === own)
       }),
     runs
   )

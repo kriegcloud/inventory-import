@@ -1,7 +1,10 @@
 -- The item table holds only what the import's schema would write: a cost is digits with up to four decimals and
 -- twelve whole digits (the contract's `decimalPattern`, "12.5", never "-1", "1e3" or "12."), in `item` and in the copy
--- a replace keeps in `importReplaced`; and `skuKey` is the key of the row's own SKU (upper case, no spaces), so the
--- unique index that makes "one item per SKU" true compares the key the import compared, whoever writes the row.
+-- a replace keeps in `importReplaced`; a SKU is in the contract's form (`skuPattern`, three capitals, a hyphen, four
+-- digits); and `skuKey` is the SKU itself, which is the key the import compares (upper case, no spaces) for every SKU
+-- in that form. So the unique index that makes "one item per SKU" true compares the key the import compared, whoever
+-- writes the row. The key is not worked out again here: SQLite's `upper` knows only ASCII, and the import's key drops
+-- every Unicode space and upper-cases every letter.
 --
 -- SQLite adds a CHECK to a table only by building it again. `item` is built again with its rowids kept, so the search
 -- index (`itemSearch`, by rowid) still points at the same items, and rebuilt all the same from the table at the end.
@@ -13,9 +16,8 @@ PRAGMA defer_foreign_keys = true;
 CREATE TABLE item_new (
   id TEXT NOT NULL,
   organizationId TEXT NOT NULL REFERENCES organization (id),
-  sku TEXT NOT NULL,
-  skuKey TEXT NOT NULL CHECK (skuKey = upper(replace(replace(replace(replace(replace(replace(sku, ' ', ''), char(9), ''),
-    char(10), ''), char(11), ''), char(12), ''), char(13), ''))),
+  sku TEXT NOT NULL CHECK (sku GLOB '[A-Z][A-Z][A-Z]-[0-9][0-9][0-9][0-9]'),
+  skuKey TEXT NOT NULL CHECK (skuKey = sku),
   name TEXT NOT NULL,
   description TEXT,
   category TEXT NOT NULL CHECK (category IN ('raw-materials', 'components', 'finished-goods', 'packaging', 'supplies')),

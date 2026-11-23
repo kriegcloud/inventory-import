@@ -18,7 +18,7 @@ passing and a commit; the app is never broken between steps.
 | 3 | `@inventory/ontology`, empty but wired: the package, its `turbo.json`, the two `laws boundaries` rows (7.2), `enrolment.json`, the exception list | `boundaries:check`, `config-sync:check` | done |
 | 4 | Gate 4, vocabulary coherence, with its planted mistake, the C12 negative and the test that the 22 terms name 111 and the exception entry 97 (6.4) | `Coherence.test.ts` | done |
 | 5 | The marks on the five enrolled records (3.3 to 3.7), then gate 5 with P13 and its negatives (6.5) | `Pointers.test.ts`; `ActivityMarks.types.ts` (6.6); the app's own tests unchanged || done |
-| 6 | The lift, `graphOf` and `threadGraph` (4), in memory | The seventeen triples of 4.4, asserted on the value `threadGraph()` returns | todo |
+| 6 | The lift, `graphOf` and `threadGraph` (4), in memory | The seventeen triples of 4.4, asserted on the value `threadGraph()` returns || done |
 | 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | todo |
 | 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | todo |
 | 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | todo |
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 5 are done; step 6 starts on Benjamin's word.
+None. Steps 1 to 6 are done; step 7 starts on Benjamin's word.
 
 ## Choices made
 
@@ -126,6 +126,27 @@ Where the design left a choice open, or the code showed it could not be followed
   found six things; five were changed and one (`Activity.agent`) measured and left. The Opus lane that made the
   changes ran out of quota before it handed back, so what it left was read and run by the orchestrator, not by
   another provider. Step 13's reviewers read it again.
+
+- **`lift` and `graphOf` take what they read as their first argument**: `lift(context, record, value)`, where
+  report 14 section 4.2 writes `lift(record, value)`. The context is the decoded vocabulary, the prefix the marks
+  carry and the class whose instances are tenants; `packages/ontology/src/Thread.ts` is the one file that says they
+  are the kernel's vocabulary, `inv` and `Tenant`, so `Lift.ts` names no term of its own.
+- **A graph in memory is the package's own `Triple` schema** (`Graph.schema.ts`): IRIs, and a literal with its
+  datatype. No blank node and no language tag; a Turtle text that holds one is refused when read. Two graphs are
+  compared as the sorted lines of their distinct triples.
+- **`n3` came with step 6, not step 7.** The hand-written part of the fixture is Turtle and `graphOf` must read it.
+  `n3` is 2.13.12; `@types/n3` is 1.26.6, the newest there is, one major behind the library. Only `Parser` is used.
+- **The lift writes no literal yet.** Section 4.3's case (a) is refused with a reason: no record the thread lifts
+  has a datatype property, and the lift of `Activity` is outside SPEC. Cases (b) and (c) and the link to another
+  record are built; (c) and the link are what `Member` uses, and (b) has no test.
+- **A value that goes into an IRI is held to the kernel's id pattern** (letters, digits, `_`, `-`, 64 at most), so
+  the lift never escapes a path segment; any other value is refused.
+- **`Thread.ts` reads the hand-written fixture with a `?raw` import**, which Vite resolves and bun alone does not.
+  Step 7's `ontology:write` runs where Vite resolves it, or changes that one import; the step says which.
+- **What gate 5 and the lift both read is in one file** (`packages/ontology/src/internal/terms.ts`): a CURIE's local
+  name, the class, scheme or property it is, the term a schema points at.
+- **Step 6 was built by the orchestrator and read by no second provider**: the Opus quota is spent until 28 November
+  and Codex's was until 24 November. Step 13's reviewers read it.
 
 ## Closing note
 

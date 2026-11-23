@@ -20,10 +20,12 @@
     "@beep/vocabulary": "workspace:*",
     "@inventory/access-contract": "workspace:*",
     "@inventory/kernel": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "n3": "^2.13.12"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "@types/n3": "^1.26.6",
     "@types/node": "catalog:",
     "vitest": "catalog:"
   },

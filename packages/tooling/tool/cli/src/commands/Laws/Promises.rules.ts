@@ -8,8 +8,15 @@
  * What is refused, in every code file git would commit: an `async` function or method, an `await` (`for await`
  * included), a `new Promise`, any call of `Promise.*`, a `Promise<…>` or `PromiseLike<…>` type, a `.then(`, `.catch(`
  * or `.finally(` call on anything but a name an import binds (`Effect.catch` and `Story.then` are a module's members,
- * not a promise's), and an Effect run as a Promise (`runPromise`, `runPromiseExit`, `runPromiseWith`). The parser
- * alone cannot tell a promise's `.then` from another value's, so a `.then` on a local name is taken for a promise's.
+ * not a promise's), an Effect run as a Promise (`runPromise`, `runPromiseExit`, `runPromiseWith`), and `Promise`
+ * taken as a value (`const Q = Promise`). `Promise` is caught however it is reached: by its name, through
+ * `globalThis`, `self` or `window`, or by a member in brackets (`Promise["all"]`).
+ *
+ * The parser alone cannot read types, so this is where the law stops: a `.then` on a local name is taken for a
+ * promise's, and a thenable imported from a module passes its `.then` as a module's member. The type-aware rules
+ * that would close that, `typescript/no-floating-promises`, `typescript/await-thenable` and
+ * `typescript/no-misused-promises`, are oxlint's on `oxlint-tsgolint`, which is installed here for the
+ * deprecated-API law; none is run by this law.
  *
  * Three lists, each by name. `promiseEntryPoints`: where a platform calls in and takes a Promise, which may run an
  * Effect as one and name the type. `promisesVendored`: components copied from a registry as published, with where each
@@ -32,6 +39,7 @@ import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { unreadSentence } from "./internal/budget.ts"
+import { heldAs } from "./internal/held.ts"
 import { type PromiseUse, readPromises } from "./internal/promiseCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Promises.rules")
@@ -142,12 +150,31 @@ export const promisesListed: ReadonlyArray<string> = [
   "packages/review/src/SavedProgress.hook.ts"
 ]
 
+/**
+ * What the lists are held by, from their contents (`internal/held.ts`): a file swapped for another changes the number,
+ * and the law refuses the list until it is recorded again. Recorded only when files came off.
+ */
+export const promisesHeld = { listed: -142488807, vendored: 75817709, entryPoints: -1064530232 }
+
+/** Each list whose files are not the ones it is held by. */
+const changedLists = (): ReadonlyArray<PromiseFinding> =>
+  A.getSomes(
+    A.map(
+      [
+        ["promisesListed", heldAs(promisesListed), promisesHeld.listed],
+        ["promisesVendored", heldAs(R.keys(promisesVendored)), promisesHeld.vendored],
+        ["promiseEntryPoints", heldAs(R.keys(promiseEntryPoints)), promisesHeld.entryPoints]
+      ] as const,
+      ([list, now, held]) => (now === held ? O.none() : O.some(PromiseFinding.cases.Changed.make({ list, held, now })))
+    )
+  )
+
 const isLeftOut = (file: string): boolean => A.some(promisesLeftOut, (path) => Str.startsWith(path)(file))
 
 /** The paths not read, as the output names them each time. */
 const notRead = `${A.join(promisesLeftOut, ", ")} are not read; ${A.length(promisesListed)} files are listed and ${R.size(promisesVendored)} vendored`
 
-const PromiseUseSchema = S.Literals(["async", "await", "new", "static", "type", "chain", "run"])
+const PromiseUseSchema = S.Literals(["async", "await", "new", "static", "type", "chain", "run", "value"])
 
 /**
  * What `laws promises` finds: nothing, or a refusal and each use; a listed file with none left; and what keeps it
@@ -167,6 +194,11 @@ export const PromiseFinding = S.TaggedUnion({
   },
   Settled: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file that uses no Promise any more" }))
+  },
+  Changed: {
+    list: S.String.pipe(S.annotateKey({ description: "The list whose files are not the ones it is held by" })),
+    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
+    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
   },
   Unread: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line the law stopped at, as file:line" })),
@@ -202,6 +234,8 @@ const insteadOf = (use: PromiseUse): string => {
       return "a .then, .catch or .finally on a promise: write Effect.map, Effect.catch or Effect.ensuring"
     case "run":
       return "an Effect run as a Promise: run it at an entry point (promiseEntryPoints), or yield* it"
+    case "value":
+      return "Promise taken as a value, to be called or made under another name: write the Effect that does the work"
   }
 }
 
@@ -217,7 +251,11 @@ export const promiseSentence: (finding: PromiseFinding) => Line = PromiseFinding
   At: ({ place, use }) => err(`${place}  ${insteadOf(use)}`),
   Settled: ({ file }) =>
     err(`${file}  is listed in promisesListed but uses no Promise any more: take its line off the list`),
-  Unread: ({ place, why }) => err(`${place}  ${why}`)
+  Unread: ({ place, why }) => err(`${place}  ${why}`),
+  Changed: ({ held, list, now }) =>
+    err(
+      `${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
+    )
 })
 
 /**
@@ -271,7 +309,7 @@ export const promises = Effect.fn("Promises.promises")(function* () {
       }),
     { concurrency: 1 }
   )
-  const problems = A.flatten(found)
+  const problems = A.appendAll(changedLists(), A.flatten(found))
   return A.isArrayNonEmpty(problems)
     ? A.prepend<PromiseFinding, PromiseFinding>(problems, PromiseFinding.cases.Refused.make({}))
     : A.of<PromiseFinding>(PromiseFinding.cases.Clean.make({}))

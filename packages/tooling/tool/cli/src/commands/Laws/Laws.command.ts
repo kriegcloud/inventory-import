@@ -8,7 +8,7 @@ import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
-import { assertions, assertionsSentence } from "./Assertions.rules.ts"
+import { assertions, assertionsSentence, recordedHolds } from "./Assertions.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
 import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
 import { diagnostics, diagnosticsSentence } from "./Diagnostics.rules.ts"
@@ -74,7 +74,7 @@ export const tryCommand = Command.make("try", {}, () => Effect.flatMap(tryStatem
 
 /** `laws assertions`: the type-assertion ban's lists only shrink, and no comment turns its rule off. */
 export const assertionsCommand = Command.make("assertions", {}, () =>
-  Effect.flatMap(assertions(), emit(assertionsSentence))
+  Effect.flatMap(assertions(recordedHolds), emit(assertionsSentence))
 ).pipe(Command.withDescription("The type-assertion ban's lists only shrink, and no comment turns its rule off"))
 
 /** `laws promises`: no Promise is written, but in what its three lists name. */

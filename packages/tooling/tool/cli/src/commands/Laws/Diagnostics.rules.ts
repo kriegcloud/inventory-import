@@ -26,6 +26,7 @@ import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
+import { heldAs } from "./internal/held.ts"
 import { linesOf } from "./internal/lines.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Diagnostics.rules")
@@ -78,6 +79,12 @@ export const diagnosticsListed: ReadonlyArray<string> = [
   "packages/patches/test/alchemy-domain/02-text-length-in-a-template/Label.aggregate.ts"
 ]
 
+/**
+ * What the list is held by, from its contents (`internal/held.ts`): a file swapped for another changes the number, and
+ * the law refuses the list until it is recorded again. Recorded only when files came off.
+ */
+export const diagnosticsHeld = 751397261
+
 const isLeftOut = (file: string): boolean => A.some(diagnosticsLeftOut, (path) => Str.startsWith(path)(file))
 
 /** A directive the checker reads: the word, then a rule (or `*`) and a setting. */
@@ -90,7 +97,11 @@ const directive = /@effect-diagnostics(?:-next-line)?\s+[A-Za-z*]+:(?:off|error|
  */
 export const directiveLines = (text: string): ReadonlyArray<number> => {
   const lineAt = linesOf(text)
-  return A.dedupe(A.map(A.fromIterable(Str.matchAll(directive)(text)), (found) => lineAt(found.index ?? 0)))
+  return A.dedupe(
+    A.map(A.fromIterable(Str.matchAll(directive)(text)), (found) =>
+      lineAt(O.getOrElse(O.fromUndefinedOr(found.index), () => 0))
+    )
+  )
 }
 
 /** The paths not read, as the output names them each time. */
@@ -112,6 +123,11 @@ export const DiagnosticsFinding = S.TaggedUnion({
   },
   Settled: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file that holds no directive any more" }))
+  },
+  Changed: {
+    list: S.String.pipe(S.annotateKey({ description: "The list whose files are not the ones it is held by" })),
+    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
+    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
   }
 }).pipe(
   $I.annoteSchema("DiagnosticsFinding", {
@@ -140,7 +156,11 @@ export const diagnosticsSentence: (finding: DiagnosticsFinding) => Line = Diagno
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   At: ({ place }) => err(`${place}  an @effect-diagnostics directive: remove it and write the code the rule asks for`),
   Settled: ({ file }) =>
-    err(`${file}  is listed in diagnosticsListed but holds no directive any more: take its line off the list`)
+    err(`${file}  is listed in diagnosticsListed but holds no directive any more: take its line off the list`),
+  Changed: ({ held, list, now }) =>
+    err(
+      `${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
+    )
 })
 
 /**
@@ -181,7 +201,12 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
       }),
     { concurrency: 1 }
   )
-  const problems = A.flatten(found)
+  const now = heldAs(diagnosticsListed)
+  const changed =
+    now === diagnosticsHeld
+      ? []
+      : [DiagnosticsFinding.cases.Changed.make({ list: "diagnosticsListed", held: diagnosticsHeld, now })]
+  const problems = A.appendAll(changed, A.flatten(found))
   return A.isArrayNonEmpty(problems)
     ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(problems, DiagnosticsFinding.cases.Refused.make({}))
     : A.of<DiagnosticsFinding>(DiagnosticsFinding.cases.Clean.make({}))

@@ -23,6 +23,7 @@ import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { blankComments } from "../../Sync.rules.ts"
 import { silencings } from "./internal/directives.ts"
+import { heldAs } from "./internal/held.ts"
 import { children, isNode, type Node, parsedAs } from "./internal/tryCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Assertions.rules")
@@ -39,8 +40,58 @@ export const assertionCeilings: ReadonlyArray<number> = [23, 33, 64]
 const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
 const leftOut = [".agents/", ".codex/", `${scratchpadFolder}/`, "vendor/"]
 
-/** The part of the configuration the law reads: each override's files. */
-const Config = S.fromJsonString(S.Struct({ overrides: S.Array(S.Struct({ files: S.Array(S.String) })) }))
+/**
+ * What each list is held by, from its contents (`internal/held.ts`), in the order the overrides stand: a file swapped
+ * for another changes the number, and the law refuses the list until it is recorded again. Recorded only when files
+ * came off.
+ */
+export const assertionsHeld: ReadonlyArray<number> = [153817800, -322494103, 118790471]
+
+/** An override that turns the rule off for the files it lists, and nothing else. */
+const Override = S.Struct({
+  files: S.Array(S.String).pipe(S.annotateKey({ description: "The files the rule is off for, from the root" })),
+  rules: S.Struct({ "typescript/consistent-type-assertions": S.Literal("off") }).pipe(
+    S.annotateKey({ description: "The rule, off, and no other" })
+  )
+})
+
+/**
+ * The configuration as it must be: the one rule, an error with no assertion style allowed, every other rule off, the
+ * folders not read as written here, and three lists. A path added to `ignorePatterns`, a rule changed or a fourth list
+ * would let a file go unread, so any of them refuses the whole.
+ */
+const Profile = S.fromJsonString(
+  S.Struct({
+    $schema: S.optionalKey(S.String).pipe(S.annotateKey({ description: "oxlint's own schema, for an editor" })),
+    plugins: S.Tuple([S.Literal("typescript")]).pipe(S.annotateKey({ description: "The one plugin the rule is in" })),
+    categories: S.Struct({ correctness: S.Literal("off") }).pipe(
+      S.annotateKey({ description: "The rules on by default, off: each package's own lint runs them" })
+    ),
+    rules: S.Struct({
+      "typescript/consistent-type-assertions": S.Tuple([
+        S.Literal("error"),
+        S.Struct({ assertionStyle: S.Literal("never") })
+      ])
+    }).pipe(S.annotateKey({ description: "The one rule, an error, no assertion allowed" })),
+    ignorePatterns: S.Tuple([
+      S.Literal("packages/ui/src/components/ui/**"),
+      S.Literal(".agents/**"),
+      S.Literal(".codex/**"),
+      S.Literal("scratchpad/**"),
+      S.Literal("vendor/**"),
+      S.Literal("**/node_modules/**"),
+      S.Literal("**/dist/**"),
+      S.Literal("**/.wrangler/**"),
+      S.Literal("**/.turbo/**"),
+      S.Literal(".claude/**")
+    ]).pipe(S.annotateKey({ description: "What is not read: shadcn's components, and what is no source" })),
+    overrides: S.Tuple([Override, Override, Override]).pipe(
+      S.annotateKey({ description: "The three lists: the vendored kit, the registry's components, everyone else's" })
+    )
+  }).pipe(
+    $I.annoteSchema("AssertionsProfile", { description: "The type-assertion ban's configuration, as it must be" })
+  )
+)
 
 /** Whether a directive turns the rule off: it names it, under either plugin's spelling. */
 const silences = (rules: ReadonlyArray<string>) =>
@@ -64,7 +115,9 @@ export const holdsAssertion = (input: { readonly file: string; readonly source: 
     )
   }
   const left: Array<Node> = [read.program.value]
-  for (let node = left.pop(); node !== undefined; node = left.pop()) {
+  while (A.isArrayNonEmpty(left)) {
+    const node = A.lastNonEmpty(left)
+    left.splice(-1, 1)
     if (node.type === "TSTypeAssertion" || (node.type === "TSAsExpression" && !asConst(node))) return true
     for (const next of children(node)) left.push(next)
   }
@@ -96,6 +149,11 @@ export const AssertionsFinding = S.TaggedUnion({
     list: S.Int.pipe(S.annotateKey({ description: "Which list, from 1" })),
     length: S.Int.pipe(S.annotateKey({ description: "How many files it names" })),
     ceiling: S.Int.pipe(S.annotateKey({ description: "The ceiling still written for it" }))
+  },
+  Changed: {
+    list: S.Int.pipe(S.annotateKey({ description: "Which list, from 1" })),
+    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
+    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
   },
   Silenced: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line of the comment, as file:line" })),
@@ -132,34 +190,57 @@ export const assertionsSentence: (finding: AssertionsFinding) => Line = Assertio
     ),
   Shrunk: ({ ceiling, length, list }) =>
     err(`  list ${list} names ${length} files: lower its ceiling from ${ceiling} to ${length} in assertionCeilings`),
+  Changed: ({ held, list, now }) =>
+    err(
+      `  list ${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} in assertionsHeld; never add one`
+    ),
   Silenced: ({ directive, place }) =>
     err(`  ${place}  a comment that turns the type-assertion rule off (${directive}): no comment does. Remove it`)
 })
 
 /**
- * Reads the configuration's lists and every code file git would commit.
+ * Reads the configuration's lists and every code file git would commit, holding each list to `holds`.
  *
  * @category rules
  */
-export const assertions = Effect.fn("Assertions.assertions")(function* () {
+/** What the lists are held to: each one's ceiling and the number its contents give, in the order they stand. */
+export interface AssertionHolds {
+  readonly ceilings: ReadonlyArray<number>
+  readonly held: ReadonlyArray<number>
+}
+
+/** The holds this repository records. */
+export const recordedHolds: AssertionHolds = { ceilings: assertionCeilings, held: assertionsHeld }
+
+export const assertions = Effect.fn("Assertions.assertions")(function* (holds: AssertionHolds) {
   const repo = yield* Repo
   const refused = (problems: ReadonlyArray<AssertionsFinding>) =>
     A.prepend<AssertionsFinding, AssertionsFinding>(problems, AssertionsFinding.cases.Refused.make({}))
   const text = yield* repo.text(repo.join(repo.root, assertionsConfig))
-  const config = S.decodeOption(Config)(blankComments(text))
+  const config = S.decodeOption(Profile, { onExcessProperty: "error" })(blankComments(text))
   if (O.isNone(config)) {
     return refused([
-      AssertionsFinding.cases.Unreadable.make({ why: `${assertionsConfig} does not read as its overrides' files` })
+      AssertionsFinding.cases.Unreadable.make({
+        why: `${assertionsConfig} is not the profile this law holds: one rule, an error, assertionStyle never, the folders not read as written in the law, and three lists`
+      })
     ])
   }
   const lists = A.map(config.value.overrides, (override) => override.files)
-  const lengths = A.flatMap(lists, (files, index): ReadonlyArray<AssertionsFinding> => {
-    const ceiling = assertionCeilings[index] ?? 0
-    const list = index + 1
-    if (files.length > ceiling) return [AssertionsFinding.cases.Grown.make({ list, length: files.length, ceiling })]
-    if (files.length < ceiling) return [AssertionsFinding.cases.Shrunk.make({ list, length: files.length, ceiling })]
-    return []
-  })
+  const lengths = A.flatMap(
+    A.zip(lists, A.zip(holds.ceilings, holds.held)),
+    ([files, [ceiling, held]], index): ReadonlyArray<AssertionsFinding> => {
+      const list = index + 1
+      const now = heldAs(files)
+      const changed = now === held ? [] : [AssertionsFinding.cases.Changed.make({ list, held, now })]
+      if (files.length > ceiling) {
+        return [AssertionsFinding.cases.Grown.make({ list, length: files.length, ceiling }), ...changed]
+      }
+      if (files.length < ceiling) {
+        return [AssertionsFinding.cases.Shrunk.make({ list, length: files.length, ceiling }), ...changed]
+      }
+      return changed
+    }
+  )
   const listed = A.flatten(lists)
   const settled = yield* Effect.filter(
     listed,

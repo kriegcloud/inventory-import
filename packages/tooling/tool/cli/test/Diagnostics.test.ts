@@ -3,12 +3,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import {
   diagnostics,
+  diagnosticsHeld,
   diagnosticsListed,
   diagnosticsSentence,
   directiveLines
 } from "../src/commands/Laws/Diagnostics.rules.ts"
+import { heldAs } from "../src/commands/Laws/internal/held.ts"
 import { diagnosticDirective } from "../src/commands/Scratch/Scratch.templates.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
@@ -36,7 +39,7 @@ describe("laws diagnostics", () => {
         "err: packages/x/src/a.ts:3  an @effect-diagnostics directive: remove it and write the code the rule asks for"
       )
       expect(said.length).toBe(4)
-      const listed = diagnosticsListed[0] ?? ""
+      const listed = O.getOrElse(A.head(diagnosticsListed), () => "")
       const said1 = yield* inTree({ [listed]: off }, inRepository)
 
       expect(said1).toEqual([expect.stringContaining("out: diagnostics:check OK")])
@@ -54,5 +57,6 @@ describe("laws diagnostics", () => {
   it("the list only shrinks: its length is held here, and lowered with it", () => {
     expect(diagnosticsListed.length).toBe(31)
     expect(A.dedupe(diagnosticsListed).length).toBe(diagnosticsListed.length)
+    expect(heldAs(diagnosticsListed)).toBe(diagnosticsHeld)
   })
 })

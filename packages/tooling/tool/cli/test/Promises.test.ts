@@ -9,10 +9,12 @@ import * as Str from "effect/String"
 import {
   promiseEntryPoints,
   promises,
+  promisesHeld,
   promiseSentence,
   promisesListed,
   promisesVendored
 } from "../src/commands/Laws/Promises.rules.ts"
+import { heldAs } from "../src/commands/Laws/internal/held.ts"
 import { readPromises } from "../src/commands/Laws/internal/promiseCode.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
@@ -65,6 +67,19 @@ describe("laws promises", () => {
     expect(readPromises({ file: "b.ts", source: passes }).found).toEqual([])
   })
 
+  it("catches Promise however it is reached: through the global object, in brackets, or under another name", () => {
+    const uses = (source: string) => A.map(readPromises({ file: "c.ts", source }).found, (found) => found.use)
+    expect(uses("const Q = Promise\nQ.all([])\nnew Q(() => {})\n")).toEqual(["value"])
+    expect(uses("globalThis.Promise.resolve(1)\n")).toEqual(["static"])
+    expect(
+      uses("new globalThis.Promise(() => {})\nnew self.Promise(() => {})\nnew window.Promise(() => {})\n")
+    ).toEqual(["new", "new", "new"])
+    expect(uses('Promise["all"]([])\nexport const all = Promise.all\n')).toEqual(["static", "static"])
+    expect(uses('promise["then"](() => 1)\n')).toEqual(["chain"])
+    // A name in a type, a key, or a member of another object is no use of Promise.
+    expect(uses("export const box = { Promise: 1 }\nexport const n = box.Promise\n")).toEqual([])
+  })
+
   it.effect("refuses each use in a file no list names, and says what to write instead", () =>
     Effect.gen(function* () {
       const said = yield* inTree({ "packages/x/src/a.ts": uses }, inRepository)
@@ -110,5 +125,12 @@ describe("laws promises", () => {
   it("the lists only shrink: their lengths are held here, and lowered with them", () => {
     expect([promisesListed.length, R.size(promisesVendored), R.size(promiseEntryPoints)]).toEqual([57, 7, 2])
     expect(A.dedupe(promisesListed).length).toBe(promisesListed.length)
+    // Held by their contents too: a file swapped for another changes the number the law compares.
+    expect([heldAs(promisesListed), heldAs(R.keys(promisesVendored)), heldAs(R.keys(promiseEntryPoints))]).toEqual([
+      promisesHeld.listed,
+      promisesHeld.vendored,
+      promisesHeld.entryPoints
+    ])
+    expect(heldAs(A.append(A.drop(promisesListed, 1), "packages/x/src/new.ts"))).not.toBe(promisesHeld.listed)
   })
 })

@@ -277,6 +277,41 @@ describe("coherenceFindings", () => {
     })
   )
 
+  it.effect("C5: a gist class that is its own gist parent", () =>
+    Effect.gen(function* () {
+      const copy = { ...valid, gist: { ...gist, classes: { ...gist.classes, Content: { parent: "Content" } } } }
+      const found = yield* findingsOf(copy)
+      expect(found).toEqual([["C5", "gist", "Content"]])
+    })
+  )
+
+  it.effect("C5: two gist classes that are each other's gist parent", () =>
+    Effect.gen(function* () {
+      const classes = { ...gist.classes, Person: { parent: "LivingThing" }, LivingThing: { parent: "Person" } }
+      const found = yield* findingsOf({ ...valid, gist: { ...gist, classes } })
+      expect(found).toEqual([
+        ["C5", "gist", "Person"],
+        ["C5", "gist", "LivingThing"]
+      ])
+    })
+  )
+
+  it.effect("C6: a disjoint pair that names one class twice", () =>
+    Effect.gen(function* () {
+      const copy = { ...valid, gist: { ...gist, disjointPairs: [...gist.disjointPairs, ["Content", "Content"]] } }
+      const found = yield* findingsOf(copy)
+      expect(found).toEqual([["C6", "gist", "Content"]])
+    })
+  )
+
+  it.effect("C6: a disjoint pair repeated in reverse", () =>
+    Effect.gen(function* () {
+      const copy = { ...valid, gist: { ...gist, disjointPairs: [...gist.disjointPairs, ["Content", "Organization"]] } }
+      const found = yield* findingsOf(copy)
+      expect(found).toEqual([["C6", "gist", "Content"]])
+    })
+  )
+
   it.effect("C7: an inherited identity with a gist parent", () =>
     Effect.gen(function* () {
       const found = yield* findingsOf(withClasses({ Book: { ...book, identity: { kind: "inherited" } } }))

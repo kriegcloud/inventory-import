@@ -404,18 +404,28 @@ export const readSchemaMark = (ast: SchemaAST.AST): MarkReading =>
 
 /**
  * Reads the mark in a node's key annotations, where `S.annotateKey` writes it, as `S.resolveAnnotationsKey` reads
- * them. A mark written on a schema before a `decodeTo` (inside `S.OptionFromOptionalKey`, say) is on the encoded side
- * and is not found here.
+ * them. A mark is found only when its `annotateKey` is the last step that builds the field's node: any step after it
+ * makes a new node with no key annotations, and the mark is lost. So `S.optional(X.pipe(S.annotateKey(mark)))`,
+ * `S.NullOr(...)`, `S.UndefinedOr(...)` or `S.Array(...)` around a marked schema, and a `decodeTo` after it (inside
+ * `S.OptionFromOptionalKey`, say, where the mark is left on the encoded side), all read as unmarked. Put the
+ * `annotateKey` last in the field's pipe.
  *
  * @example readKeyMark(Book.fields.title.ast) // TermReading { term: "lib:title" }
  */
 export const readKeyMark = (ast: SchemaAST.AST): MarkReading => readStore(ast.context?.annotations)
 
+/**
+ * The annotation key Effect 4's `S.Class` (and so `Model.Class`) writes on the declaration it makes, and no other
+ * declaration carries (`getClassSchemaFactory` in effect's `Schema.ts`). It is how a class over a struct is told
+ * from any other one-parameter declaration over one, such as `S.Option(Book)`, whose fields are not its own.
+ */
+const classConstructorKey = "~constructor"
+
 const fieldsOf = (ast: SchemaAST.AST): O.Option<ReadonlyArray<SchemaAST.PropertySignature>> => {
   if (SchemaAST.isObjects(ast)) {
     return O.some(ast.propertySignatures)
   }
-  if (SchemaAST.isDeclaration(ast)) {
+  if (SchemaAST.isDeclaration(ast) && P.hasProperty(ast.annotations, classConstructorKey)) {
     return O.flatMap(A.head(ast.typeParameters), (inner) =>
       ast.typeParameters.length === 1 && SchemaAST.isObjects(inner) ? O.some(inner.propertySignatures) : O.none()
     )
@@ -425,7 +435,8 @@ const fieldsOf = (ast: SchemaAST.AST): O.Option<ReadonlyArray<SchemaAST.Property
 
 /**
  * Reads every mark a schema carries: its own, and each field's when it is a struct (`S.Struct`, an `S.Opaque` over
- * one) or a class over one (`S.Class`, `Model.Class`, whose fields are its default variant's). A field's mark is read
+ * one) or a class over one (`S.Class`, `Model.Class`, whose fields are its default variant's). Any other declaration
+ * has no fields here, even one over a struct: `S.Option(Book)` holds a book, it is not one. A field's mark is read
  * from its key annotations only, so a field whose schema is itself a marked record reads as unmarked unless the field
  * is marked.
  *

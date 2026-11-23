@@ -228,9 +228,30 @@ describe("reading classes", () => {
     expect(R.get(fieldsOf(readMarks(Loan.ast)), "book")).toEqual(O.some(none))
   })
 
-  it("reads an S.Opaque over an annotated struct like the struct", () => {
-    class OpaqueBook extends S.Opaque<OpaqueBook, { readonly brand: unique symbol }>()(Book) {}
-    expect(readMarks(OpaqueBook.ast)).toEqual(readMarks(Book.ast))
+  it("reads an opaque class over an annotated struct, a field marked last after its OptionFromNullOr included", () => {
+    class Reader extends S.Opaque<Reader, { readonly brand: unique symbol }>()(
+      S.Struct({
+        id: BookId.pipe(S.annotateKey({ description: "The reader's id", ...aboutClass("lib:Loan") })),
+        title: S.OptionFromNullOr(S.String).pipe(
+          S.annotateKey({ description: "The title last borrowed; null for none", ...aboutProperty("lib:title") })
+        ),
+        card: S.String
+      }).pipe($I.annoteSchema("Reader", { description: "A reader of the library", ...aboutClass("lib:Loan") }))
+    ) {}
+    const marks = readMarks(Reader.ast)
+    expect(marks.mark).toEqual(term("lib:Loan"))
+    expect(fieldsOf(marks)).toEqual({ id: term("lib:Loan"), title: term("lib:title"), card: none })
+  })
+
+  it("reads no fields on a declaration over a struct that is not a class: S.Option(Book) is not a book", () => {
+    expect(readMarks(S.Option(Book).ast).fields).toEqual(O.none())
+  })
+
+  it("loses a mark that a wrapper is built around: S.optional over a marked schema reads as none", () => {
+    const Wrapped = S.Struct({
+      title: S.optional(S.String.pipe(S.annotateKey({ description: "The title", ...aboutProperty("lib:title") })))
+    })
+    expect(fieldsOf(readMarks(Wrapped.ast))).toEqual({ title: none })
   })
 })
 
@@ -286,9 +307,19 @@ describe("reading a Model.Class", () => {
   })
 
   it("reads the same mark on every variant a field has, and no class pointer on a variant", () => {
-    for (const variant of [LoanRow.insert, LoanRow.update, LoanRow.json, LoanRow.jsonCreate, LoanRow.jsonUpdate]) {
+    // Each variant's fields are named first: a variant read with no fields, or one short, would otherwise compare
+    // nothing and pass.
+    const variants = [
+      [LoanRow.insert, ["id", "status", "lender", "hidden", "createdAt"]],
+      [LoanRow.update, ["id", "status", "lender", "hidden"]],
+      [LoanRow.json, ["id", "status", "lender", "hidden", "createdAt"]],
+      [LoanRow.jsonCreate, ["status", "lender", "hidden"]],
+      [LoanRow.jsonUpdate, ["status", "lender", "hidden"]]
+    ] as const
+    for (const [variant, names] of variants) {
       const marks = readMarks(variant.ast)
       expect(marks.mark).toEqual(none)
+      expect(R.keys(fieldsOf(marks))).toEqual(names)
       for (const [name, mark] of R.toEntries(fieldsOf(marks))) {
         expect(O.some(mark)).toEqual(R.get(expected, name))
       }

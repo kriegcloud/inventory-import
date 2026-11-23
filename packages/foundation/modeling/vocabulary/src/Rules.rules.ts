@@ -234,27 +234,57 @@ const c4 = (vocabulary: Vocabulary, exceptions: ExceptionList): ReadonlyArray<Fi
   return A.appendAll(fromClasses, fromEntries)
 }
 
-/** C5 (decision 14): the gist list is closed upward; each gist class's parent is on it. */
+/** True when following gist parents on the gist list from `start` comes back to it, a self-parent included. */
+const onGistCycle = (vocabulary: Vocabulary, start: string): boolean => {
+  const step = (name: string, left: number): boolean => {
+    const next = O.flatMap(R.get(vocabulary.gist.classes, name), (gist) => gist.parent)
+    if (O.isNone(next)) return false
+    if (next.value === start) return true
+    return left > 0 && step(next.value, left - 1)
+  }
+  return step(start, R.size(vocabulary.gist.classes))
+}
+
+/**
+ * C5 (decision 14): the gist list is closed upward, each gist class's parent is on it, and no gist class is its own
+ * ancestor. A cycle is refused here so that every later walk up the gist ancestors (a projection's named ancestors, a
+ * range that is the parent's class or an ancestor of it) ends.
+ */
 const c5 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
-  A.flatMap(R.toEntries(vocabulary.gist.classes), ([name, gist]) =>
-    O.match(gist.parent, {
+  A.flatMap(R.toEntries(vocabulary.gist.classes), ([name, gist]) => [
+    ...O.match(gist.parent, {
       onNone: () => [],
       onSome: (parent) =>
         R.has(vocabulary.gist.classes, parent)
           ? []
           : [finding("C5", "gist", name, `Its gist parent ${parent} is not on the gist list.`)]
-    })
-  )
+    }),
+    ...(onGistCycle(vocabulary, name)
+      ? [finding("C5", "gist", name, "Its chain of gist parents comes back to it.")]
+      : [])
+  ])
 
-/** C6 (decision 15): each disjoint pair names two classes on the gist list. Reported at each name not on it. */
+const samePair = (a: readonly [string, string], b: readonly [string, string]): boolean =>
+  (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0])
+
+/**
+ * C6 (decision 15): each disjoint pair names two different classes on the gist list, and no two pairs name the same
+ * classes, in either order. A name not on the list is reported at that name; a pair naming one class twice, or
+ * repeating an earlier pair, at its first name. A class disjoint with itself has no instance, so every term under it
+ * would fail the reasoner for a reason other than its own.
+ */
 const c6 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
-  A.flatMap(vocabulary.gist.disjointPairs, (pair) =>
-    A.flatMap(pair, (name) =>
+  A.flatMap(vocabulary.gist.disjointPairs, (pair, index) => [
+    ...A.flatMap(pair, (name) =>
       R.has(vocabulary.gist.classes, name)
         ? []
         : [finding("C6", "gist", name, `A disjoint pair names ${name}, which is not on the gist list.`)]
-    )
-  )
+    ),
+    ...(pair[0] === pair[1] ? [finding("C6", "gist", pair[0], `A disjoint pair names ${pair[0]} twice.`)] : []),
+    ...(A.some(A.take(vocabulary.gist.disjointPairs, index), (earlier) => samePair(earlier, pair))
+      ? [finding("C6", "gist", pair[0], `The disjoint pair of ${pair[0]} and ${pair[1]} is stated twice.`)]
+      : [])
+  ])
 
 /** C7: an inherited identity criterion needs a local parent to inherit it from. */
 const c7 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>

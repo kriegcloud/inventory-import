@@ -3,15 +3,7 @@
 // a discontinued item or a received date. Each schema here draws 100 values with no discard at all, and what it draws
 // is what an item may hold, read off the value itself.
 import { describe, expect, it } from "@effect/vitest"
-import {
-  calendarDayPattern,
-  decimalPattern,
-  discontinuedOn,
-  isoDate,
-  ItemFields,
-  UnitCost,
-  Vendor
-} from "@inventory/catalog-contract/Item"
+import { calendarDayPattern, discontinuedOn, ItemFields, UnitCost, Vendor } from "@inventory/catalog-contract/Item"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as BigDecimal from "effect/BigDecimal"
@@ -22,14 +14,24 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 
+const twoDigits = Str.padStart(2, "0")
+// Twelve whole digits at most: a cost is below 10^12 dollars.
+const trillion = BigDecimal.fromBigInt(1_000_000_000_000n)
+
 /** A hundred values of a schema, drawn with no discard: a discard fails the draw. */
 const draw = <T>(schema: S.Codec<T, unknown>) =>
   Arbitrary.sampleEffect(Arbitrary.schema(schema), { count: 100, maxDiscards: 0 })
 
-/** The day a year-month-day text names, read back through the calendar: the same text only for a day on it. */
+/**
+ * Whether a year-month-day text names a day the clock's calendar has, from year 1000 to 9999: read back through
+ * `DateTime`, not through the item's own reading of a day, so the two can be told apart.
+ */
 const onTheCalendar = (day: string): boolean => {
   const [year, month, date] = A.map(Str.split("-")(day), Number)
-  return O.contains(isoDate({ year: year ?? 0, month: month ?? 0, day: date ?? 0 }), day)
+  if (year === undefined || month === undefined || date === undefined) return false
+  const landed = DateTime.toPartsUtc(DateTime.makeUnsafe({ year, month, day: date }))
+  const written = `${year}-${twoDigits(`${month}`)}-${twoDigits(`${date}`)}`
+  return written === day && year >= 1000 && year <= 9999 && landed.month === month && landed.day === date
 }
 
 // A year, a month and a day of the month up to 31: about one in twenty is no day (the 31st of a 30-day month, the 29th
@@ -39,7 +41,6 @@ const DayParts = S.Struct({
   month: S.Int.check(S.isBetween({ minimum: 1, maximum: 12 })),
   day: S.Int.check(S.isBetween({ minimum: 1, maximum: 31 }))
 })
-const twoDigits = Str.padStart(2, "0")
 
 const schemas: Readonly<Record<string, S.Codec<unknown, unknown>>> = {
   UnitCost,
@@ -74,8 +75,10 @@ describe("an item's values", () => {
     Effect.gen(function* () {
       const costs = yield* draw(UnitCost)
       for (const cost of costs) {
+        // Read off the decimal itself, not through the cost's own pattern.
         expect(BigDecimal.isNegative(cost)).toBe(false)
-        expect(decimalPattern.test(BigDecimal.format(cost))).toBe(true)
+        expect(BigDecimal.normalize(cost).scale).toBeLessThanOrEqual(4)
+        expect(BigDecimal.isLessThan(cost, trillion)).toBe(true)
       }
     })
   )

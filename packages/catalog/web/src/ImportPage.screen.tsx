@@ -257,3 +257,6 @@ export function ImportPage() {
     </Stepper>
   )
 }
+
+/** The page as a lazy load takes it: `lazy(() => import("@inventory/catalog-web/ImportPage"))`. */
+export default ImportPage

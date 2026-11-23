@@ -770,3 +770,6 @@ export function ItemsPage() {
     </div>
   )
 }
+
+/** The page as a lazy load takes it: `lazy(() => import("@inventory/catalog-web/ItemsPage"))`. */
+export default ItemsPage

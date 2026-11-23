@@ -3,6 +3,8 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 import { categories, maxNameLength } from "@inventory/catalog-contract/Item"
 import * as S from "effect/Schema"
+import { isCategory } from "../Review/CellReading.rules.ts"
+import { plural } from "../Words.rules.ts"
 import { type Review, type ReviewedRow } from "../Review/Review.rules.ts"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -25,8 +27,6 @@ import {
  */
 /** The most rows of one kind a single request asks about; the rest wait for the next press. */
 export const suggestCap = 20
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
 /** What a model answers with: a value per row it was shown, and a heading per field. No rating: the guard rates. */
 export const SuggestAnswer = S.Struct({
@@ -251,7 +251,7 @@ export const guard = (input: {
           other.id !== row.value.id &&
           first !== "" &&
           words(other.values.name)[0] === first &&
-          A.contains(categories as ReadonlyArray<string>, other.values.category)
+          isCategory(other.values.category)
       )
       const agree = A.filter(kin, (other) => other.values.category === to.value).length
       const written = Str.trim(row.value.file.category)

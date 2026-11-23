@@ -66,7 +66,8 @@ import {
   suggestionField as suggestionFieldOf,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
-import { matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
+import { keepSome, matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
+import { plural } from "../Words.rules.ts"
 import {
   rowId,
   RowDecision,
@@ -91,12 +92,6 @@ const cellText = (field: Field, cell: StagedCell | undefined): string => {
   // A cell holding only spaces is an empty cell: the screen then says "Empty" instead of showing nothing.
   return Str.trim(text) === "" ? "" : text
 }
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-
-/** Maps and keeps the values that exist. Effect 4's `A.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
-  A.getSomes(A.map(list, f))
 
 const preferredOf = (vendors: ReadonlyArray<Vendor>): ReadonlyArray<Vendor> =>
   A.filter(vendors, (vendor) => vendor.isPreferred)

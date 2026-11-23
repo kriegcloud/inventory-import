@@ -66,6 +66,7 @@ import * as S from "effect/Schema"
 import { stagingProblem } from "../Staging/Staging.rules.ts"
 import {
   type HeldTries,
+  sameDecision,
   heldToTries,
   type CompareAtMatch,
   type ComparisonQuestion,
@@ -135,9 +136,8 @@ const withUnsaved = (
   stored: StoredDecisions,
   unsaved: { readonly delta: DecisionDelta; readonly author: string; readonly authorId: string }
 ): StoredDecisions => {
-  const same = S.toEquivalence(RowDecision)
   const changed = R.filter(unsaved.delta.set, (decision, id) =>
-    O.match(R.get(stored.decisions, id), { onNone: () => true, onSome: (old) => !same(old, decision) })
+    O.match(R.get(stored.decisions, id), { onNone: () => true, onSome: (old) => !sameDecision(old, decision) })
   )
   const cleared = (_: unknown, id: string): boolean => !A.contains(unsaved.delta.clear, id)
   return {

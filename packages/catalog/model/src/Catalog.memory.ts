@@ -50,6 +50,7 @@ import * as Eq from "effect/Equal"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
+import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
@@ -100,6 +101,7 @@ import {
 } from "./Import/Rematch.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
+import { plural } from "./Words.rules.ts"
 
 // -- What the tables hold -------------------------------------------------------------------------------------
 
@@ -253,8 +255,6 @@ const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
 const TakenBackJson = MatchTakeBack.pipe(S.Array, S.fromJsonString)
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
 const line = (input: {
   readonly id: string
@@ -658,11 +658,12 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     entry.organizationId === org && entry.confirm === confirm
   const copiesOf = (confirm: ConfirmId) => (copy: MemReplaced) =>
     copy.organizationId === org && copy.confirm === confirm
+  const takenBackBy: string = audit.actorName
   const confirms = A.map(state.confirms, (confirm) =>
     isMarked(confirm.id) && confirm.organizationId === org
       ? {
           ...confirm,
-          takeBack: O.some({ id: write.takeBack, byName: audit.actorName as string, at }),
+          takeBack: O.some({ id: write.takeBack, byName: takenBackBy, at }),
           removed: A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision === 1).length,
           restored: A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && copy.restored).length,
           kept:
@@ -766,7 +767,7 @@ const numberOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<number> 
       ? O.some(Number(costDigits(item.unitCost)))
       : O.none()
 
-const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (typeof value === "string" ? [value] : value)
+const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (P.isString(value) ? [value] : value)
 
 const asNumber = (text: string): O.Option<number> =>
   Str.trim(text) === "" || !Number.isFinite(Number(text)) ? O.none() : O.some(Number(text))

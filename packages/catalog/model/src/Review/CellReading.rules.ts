@@ -17,8 +17,8 @@ import * as Str from "effect/String"
 import {
   UnitCost,
   isoDate,
-  categories,
-  uoms,
+  Category,
+  Uom,
   Dimensions,
   Vendor,
   ItemFields,
@@ -69,9 +69,9 @@ export const readDate = (text: string): O.Option<string> => {
 }
 
 /** Whether the text is one of the listed categories, exactly as listed. */
-export const isCategory = (text: string): boolean => A.contains(categories as ReadonlyArray<string>, text)
+export const isCategory = S.is(Category)
 /** Whether the text is one of the listed units of measure, exactly as listed. */
-export const isUom = (text: string): boolean => A.contains(uoms as ReadonlyArray<string>, text)
+export const isUom = S.is(Uom)
 
 /** A category as people write it, reduced to the list's own form: lower case, hyphens for spaces and underscores. */
 export const categoryKey = (text: string): string => Str.replace(/[\s_]+/g, "-")(Str.toLowerCase(Str.trim(text)))

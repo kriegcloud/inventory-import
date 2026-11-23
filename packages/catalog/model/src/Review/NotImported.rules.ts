@@ -5,11 +5,7 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { StagedTable } from "@inventory/catalog-contract/Staged"
 import { rowPlace } from "./Review.rules.ts"
-import { shownText } from "./Mapping.rules.ts"
-
-/** Maps and keeps the values that exist. Effect 4's `A.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
-  A.getSomes(A.map(list, f))
+import { keepSome, shownText } from "./Mapping.rules.ts"
 
 const csvCell = (cell: string): string => (/[",\r\n]/.test(cell) ? `"${Str.replaceAll('"', '""')(cell)}"` : cell)
 

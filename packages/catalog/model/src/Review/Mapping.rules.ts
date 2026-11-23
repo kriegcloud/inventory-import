@@ -1,6 +1,7 @@
 // Which file column fills which field: by its heading, ignoring case, spaces and punctuation, or as a person chose.
 // The one thing not to break: a heading is matched by name only, never by what the column holds.
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import {
@@ -22,8 +23,12 @@ import {
 } from "@inventory/catalog-contract/Mapping"
 
 /** Maps and keeps the values that exist. Effect 4's `A.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
+export const keepSome: {
+  <A, B>(f: (a: A, index: number) => O.Option<B>): (list: ReadonlyArray<A>) => Array<B>
+  <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B>
+} = dual(2, <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
   A.getSomes(A.map(list, f))
+)
 
 /** What a cell shows on screen: what Excel displays when that differs from its value, or nothing for no cell. */
 export const shownText = (cell: StagedCell | undefined): string => (cell === undefined ? "" : (cell.shown ?? cell.text))

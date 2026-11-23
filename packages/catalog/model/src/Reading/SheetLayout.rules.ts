@@ -20,6 +20,7 @@ import {
   type SpreadsheetTable,
   WorkbookFormat
 } from "./Spreadsheet.rules.ts"
+import { plural } from "../Words.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 /** One row of the grid as read, before the header is known. `cells[i]` is spreadsheet column `i` (0 = A). */
 export interface GridRow {
@@ -149,7 +150,6 @@ const note = (kind: NoteKind, level: Note["level"], message: string, rows: Reado
   rows
 })
 
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 const quote = (text: string, max = 60): string =>
   `"${text.length > max ? `${Str.trimEnd(Str.slice(0, max)(text))}...` : text}"`
 

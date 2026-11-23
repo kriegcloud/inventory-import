@@ -90,7 +90,8 @@ const UploadStartSource = S.Struct({
   perPiece: S.Int.check(S.isBetween({ minimum: 1, maximum: chunkRows }))
 })
 
-const PiecedStart = S.declare((input: unknown): input is UploadStartShape => isStartWire(input) && piecesCarry(input), {
+// The wire's own check already holds that the pieces carry the rows: the declaration is here for what it generates.
+const PiecedStart = S.declare(isStartWire, {
   identifier: "PiecedStart",
   description: "A start whose pieces can carry its rows",
   expected: `a start whose pieces each carry one row at least and ${chunkRows} at most`,

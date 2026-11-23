@@ -179,7 +179,7 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
     ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(
         problems,
         DiagnosticsFinding.cases.Refused.make({
-          directive: A.some(problems, (problem) => !DiagnosticsFinding.guards.Ledger(problem))
+          directive: A.some(problems, DiagnosticsFinding.guards.At)
         })
       )
     : A.of<DiagnosticsFinding>(DiagnosticsFinding.cases.Clean.make({}))

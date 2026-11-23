@@ -405,7 +405,13 @@ export const promises = Effect.fn("Promises.promises")(function* () {
     ? A.prepend<PromiseFinding, PromiseFinding>(
         problems,
         PromiseFinding.cases.Refused.make({
-          broken: A.some(problems, (problem) => !PromiseFinding.guards.Ledger(problem))
+          broken: A.some(
+            problems,
+            (problem) =>
+              PromiseFinding.guards.At(problem) ||
+              PromiseFinding.guards.Typed(problem) ||
+              PromiseFinding.guards.Silenced(problem)
+          )
         })
       )
     : A.of<PromiseFinding>(PromiseFinding.cases.Clean.make({}))

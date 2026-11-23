@@ -205,10 +205,56 @@ const renamedSince = Effect.fn("ledger.renamedSince")(function* (base: string) {
   return R.fromEntries(renames)
 })
 
+/** What a file held where this branch's base is, or why that could not be read. */
+export interface AtBase {
+  /** Why the file could not be compared with its base, when it could not: then nothing else is said of it. */
+  readonly problem: O.Option<string>
+  /** The file's text at the base; none when the base holds no such file yet (the first one comes in whole). */
+  readonly text: O.Option<string>
+  /** Each file renamed since the base, by its name now, with the name it had there. */
+  readonly renamed: Readonly<Record<string, string>>
+}
+
 /**
- * What the ledger at `path`, as it is now (`now`), says against the files there are and against the same ledger on
- * `main`, each as one sentence: an entry for a file that is not there, a file `main` does not list, a number above
- * `main`'s, and why `main` could not be read.
+ * The file at `path` as it stood at this branch's base (where it left main; on a push, the commit CI names), with
+ * what was renamed since: the part of a ledger's comparison that does not depend on its shape, for a law that keeps a
+ * list of its own kind (`Defaults.rules.ts`).
+ *
+ * @category rules
+ */
+export const atBase = Effect.fn("ledger.atBase")(function* (path: string) {
+  const repo = yield* Repo
+  const problem = (said: string): AtBase => ({ problem: O.some(said), text: O.none(), renamed: {} })
+  const main = yield* mainCommit()
+  if (O.isNone(main)) {
+    return problem(
+      `${path} could not be compared with main: neither origin/main nor main is here. Fetch it (git fetch origin main), so a number that rose is seen`
+    )
+  }
+  const shallow = yield* repo.run("git", ["rev-parse", "--is-shallow-repository"])
+  if (Str.trim(shallow.stdout) === "true") {
+    return problem(
+      `${path} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
+    )
+  }
+  const unfit = yield* pushBaseProblem(path)
+  if (O.isSome(unfit)) return problem(unfit.value)
+  const base = yield* baseCommit(main.value)
+  // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
+  if (O.isNone(base)) return { problem: O.none(), text: O.none(), renamed: {} } satisfies AtBase
+  const shown = yield* repo.run("git", ["show", `${base.value}:${path}`])
+  const renamed = yield* renamedSince(base.value)
+  return {
+    problem: O.none(),
+    text: shown.code === 0 ? O.some(shown.stdout) : O.none(),
+    renamed
+  } satisfies AtBase
+})
+
+/**
+ * What the ledger at `path`, as it is now (`now`), says against the files there are and against the same ledger at
+ * the branch's base, each as one sentence: an entry for a file that is not there, a file the base does not list, a
+ * number above the base's, and why the base could not be read.
  *
  * @category rules
  */
@@ -217,41 +263,21 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
   readonly now: Ledger
   readonly files: ReadonlyArray<string>
 }) {
-  const repo = yield* Repo
   const missing = A.map(
     A.filter(ledgerFiles(input.now), (file) => !A.contains(input.files, file)),
     (file) =>
       `${file}  is in ${input.path} but is not there: take its line off, so a new file at its path inherits nothing`
   )
-  const main = yield* mainCommit()
-  if (O.isNone(main)) {
-    return A.append(
-      missing,
-      `${input.path} could not be compared with main: neither origin/main nor main is here. Fetch it (git fetch origin main), so a number that rose is seen`
-    )
-  }
-  const shallow = yield* repo.run("git", ["rev-parse", "--is-shallow-repository"])
-  if (Str.trim(shallow.stdout) === "true") {
-    return A.append(
-      missing,
-      `${input.path} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
-    )
-  }
-  const unfit = yield* pushBaseProblem(input.path)
-  if (O.isSome(unfit)) return A.append(missing, unfit.value)
-  const base = yield* baseCommit(main.value)
-  // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
-  if (O.isNone(base)) return missing
-  const shown = yield* repo.run("git", ["show", `${base.value}:${input.path}`])
-  // A main with no such ledger yet: the first one comes in whole, and nothing is compared.
-  if (shown.code !== 0) return missing
-  const before = S.decodeOption(LedgerJson)(shown.stdout)
+  const base = yield* atBase(input.path)
+  if (O.isSome(base.problem)) return A.append(missing, base.problem.value)
+  // A base with no such ledger yet: the first one comes in whole, and nothing is compared.
+  if (O.isNone(base.text)) return missing
+  const before = S.decodeOption(LedgerJson)(base.text.value)
   if (O.isNone(before)) return A.append(missing, `${input.path} on main is not a ledger, so nothing could be compared`)
-  const renamed = yield* renamedSince(base.value)
   const moved = A.flatMap(ledgerFiles(input.now), (file) => {
     const now = O.getOrElse(R.get(input.now, file), () => 0)
     // A file renamed since then is held at what main held it under its old name.
-    const was = O.getOrElse(R.get(renamed, file), () => file)
+    const was = O.getOrElse(R.get(base.renamed, file), () => file)
     return O.match(R.get(before.value, was), {
       onNone: () => [`${file}  is in ${input.path} but not on main: a ledger only loses files. Fix the file instead`],
       onSome: (held) =>

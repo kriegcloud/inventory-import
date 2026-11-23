@@ -145,7 +145,7 @@ export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSp
   const refused = (problems: ReadonlyArray<ListedFinding>) =>
     A.prepend<ListedFinding, ListedFinding>(
       problems,
-      ListedFinding.cases.Refused.make({ broken: A.some(problems, (problem) => !ListedFinding.guards.Ledger(problem)) })
+      ListedFinding.cases.Refused.make({ broken: A.some(problems, ListedFinding.guards.At) })
     )
   const ledger = yield* readLedger(spec.ledger)
   if (Result.isFailure(ledger)) return refused([ListedFinding.cases.Ledger.make({ said: ledger.failure })])

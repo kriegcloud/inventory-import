@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  # The bans' ledgers are compared, on a push, with the last commit of the branch whose run passed: read the runs.
-  actions: read
 
 # A pull request's new push cancels its run in progress. A push to main or a release branch does not cancel the run in
 # progress, though GitHub still keeps only the newest of the runs waiting in the group: the bans' ledgers are compared
@@ -24,6 +22,11 @@ jobs:
     name: Check, test and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A job's permissions replace the workflow's: the bans' ledgers are compared, on a push, with the last commit of the
+    # branch whose run passed, so this job alone reads the runs.
+    permissions:
+      contents: read
+      actions: read
     steps:
       # The bans' ledgers may only fall, compared with where this commit left main (their merge base): the whole
       # history is fetched so git can find it (packages/tooling/tool/cli/ledgers).
@@ -33,25 +36,42 @@ jobs:
       # On a push, the ledgers are compared with the last commit pushed to this branch whose run passed, so a number
       # raised in a push whose run was cancelled, failed or skipped is seen all the same. Only push runs count: a
       # pull request's run reports its own head branch, which a fork may call main. Each candidate is taken only when
-      # it is fetched and HEAD holds it, so a force push or a commit only under refs/pull never stops every later run:
-      # on main, the last passing push, then the push's `before`; on a release branch, the last passing push. With
-      # none, LEDGER_BASE stays unset and the law compares with where the branch left main (on main, HEAD^1).
+      # it is fetched, holds the ledgers and HEAD holds it, so a force push, a commit only under refs/pull or one from
+      # before the ledgers never stops every later run or weakens it: on main, the last passing push, then the push's
+      # `before`; on a release branch, the last passing push. A candidate fetched but not in HEAD's history (a force
+      # push) gives way to its merge base with HEAD, when that holds the ledgers. With none, LEDGER_BASE stays unset
+      # and the law takes its own default. A `gh` that fails (an outage, a rate limit) is warned about, not fatal.
       - name: Base of the bans' ledgers
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
         run: |
-          passed=$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          passed=$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty') || {
+            echo "::warning::gh could not list this branch's passing runs, so the bans' ledgers fall back to the push's before or the law's own base"
+            passed=
+          }
           if [ "$GITHUB_REF_NAME" = main ]; then candidates="$passed $BEFORE"; else candidates="$passed"; fi
+          ledger=packages/tooling/tool/cli/ledgers/promises.json
+          holds() { git cat-file -e "$1^{commit}" 2>/dev/null && git cat-file -e "$1:$ledger" 2>/dev/null; }
           for candidate in $candidates; do
-            if git cat-file -e "$candidate^{commit}" 2>/dev/null && git merge-base --is-ancestor "$candidate" HEAD; then
+            if holds "$candidate" && git merge-base --is-ancestor "$candidate" HEAD; then
               echo "LEDGER_BASE=$candidate" >> "$GITHUB_ENV"
               echo "The bans' ledgers are compared with $candidate"
               exit 0
             fi
           done
-          echo "No passing push this run holds: the bans' ledgers are compared with where the branch left main"
+          for candidate in $candidates; do
+            if holds "$candidate"; then
+              joined=$(git merge-base "$candidate" HEAD) || continue
+              if holds "$joined"; then
+                echo "LEDGER_BASE=$joined" >> "$GITHUB_ENV"
+                echo "The bans' ledgers are compared with $joined, where $candidate and this push meet"
+                exit 0
+              fi
+            fi
+          done
+          echo "No candidate holds the ledgers: the law takes its own base (the merge base with main; on main, HEAD^1)"
       - uses: actions/setup-node@v4
         with:
           node-version: 22

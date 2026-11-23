@@ -199,7 +199,7 @@ export const fastRefresh = Effect.fn("FastRefresh.fastRefresh")(function* () {
       FastRefreshFinding.cases.Refused.make({
         broken: A.some(
           problems,
-          (problem) => !FastRefreshFinding.guards.Ledger(problem) && !FastRefreshFinding.guards.Unreadable(problem)
+          (problem) => FastRefreshFinding.guards.At(problem) || FastRefreshFinding.guards.Silenced(problem)
         )
       })
     )

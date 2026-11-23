@@ -577,8 +577,9 @@ profile, its copied tests included, with no override.
   reads a binary file (a PDF) is to read it without `node:fs` and without a diagnostics comment; no reader for that is
   set up yet. The eight test files that read one through `node:fs` today do it under an `@effect-diagnostics` comment
   held in `packages/tooling/tool/cli/ledgers/diagnostics.json`, and come off as they move. No new such comment is
-  written (`diagnostics:check` refuses one), and a test returns no Promise and is no `async` function
-  (`promises:check`). Provide layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
+  written (`diagnostics:check` refuses one), and a test writes no `async` function, `await`,
+  `new Promise`, `Promise.*` call or `.then` chain (`promises:check`; a Promise a call hands back without naming one
+  is caught only where its type is read). Provide layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
 
 In `src/web` the same compiler flags apply, but the type-check's rules that forbid native array methods, truthiness
 checks, `async` and browser globals are off there; `async` is refused everywhere all the same, by `promises:check`. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect

@@ -45,25 +45,63 @@ export type Mode = typeof Mode.Type
 export const modeOf = (flags: { readonly write: boolean; readonly dryRun: boolean }): Mode =>
   flags.dryRun ? "dry-run" : flags.write ? "write" : "check"
 
+// One segment of a path: any name but `.` and `..`, with no `/` and no NUL. Written without a lookahead, which the
+// schema's generator cannot read.
+const segment = String.raw`(?:[^/\0.][^/\0]*|\.[^/\0.][^/\0]*|\.\.[^/\0]+)`
+
+/**
+ * A file named from the repository's root: relative, and with no `.` or `..` segment, so joined to the root it
+ * stays inside the repository. `settle` writes to it.
+ *
+ * @category schemas
+ */
+export const RepoFile = S.String.check(
+  S.isMaxLength(1024),
+  S.isPattern(new RegExp(`^(?:${segment}/)*${segment}$`))
+).pipe(
+  $I.annoteSchema("RepoFile", {
+    description: "A file from the repository's root: relative, with no . or .. segment, so it stays inside it"
+  })
+)
+
+/** A line of a file, from 1. */
+const LineNumber = S.Int.check(S.isGreaterThanOrEqualTo(1))
+
 /**
  * One place whose text is not what it is derived from: where it is, what is there, what belongs there, and the
- * stretch of the file to replace.
+ * stretch of the file to replace. The stretch starts at or before it ends, so a repair never writes a part of the
+ * file twice.
  *
  * @category schemas
  */
 export class Drift extends S.Class<Drift, { readonly brand: unique symbol }>($I`Drift`)(
-  {
-    file: S.String.pipe(S.annotateKey({ description: "The file, from the repository's root" })),
-    line: S.Int.pipe(S.annotateKey({ description: "The line the place is on, from 1" })),
+  S.Struct({
+    file: RepoFile.pipe(S.annotateKey({ description: "The file, from the repository's root" })),
+    line: LineNumber.pipe(S.annotateKey({ description: "The line the place is on, from 1" })),
     what: S.String.pipe(S.annotateKey({ description: "What the place states, and what it is derived from" })),
     found: S.String.pipe(S.annotateKey({ description: "What is written there" })),
     expected: S.String.pipe(S.annotateKey({ description: "What its source says belongs there" })),
-    start: S.Int.pipe(S.annotateKey({ description: "Where the text to replace starts, as an offset into the file" })),
-    end: S.Int.pipe(S.annotateKey({ description: "Where it ends: the offset after its last character" })),
+    start: S.Natural.pipe(
+      S.annotateKey({ description: "Where the text to replace starts, as an offset into the file" })
+    ),
+    end: S.Natural.pipe(S.annotateKey({ description: "Where it ends: the offset after its last character" })),
     text: S.String.pipe(S.annotateKey({ description: "The text that replaces it" }))
-  },
+  }).check(
+    S.makeFilter((drift: { readonly start: number; readonly end: number }) => drift.start <= drift.end, {
+      expected: "a stretch that starts at or before it ends"
+    })
+  ),
   $I.annote("Drift", { description: "A place whose text differs from its source, and the text that repairs it" })
 ) {}
+
+/**
+ * Whether two repairs of one file touch the same characters. The same stretch with the same text is one repair
+ * twice, which `repaired` writes once; any other two that meet would write some characters twice.
+ */
+const clash = (a: Drift, b: Drift): boolean =>
+  a.file === b.file &&
+  !(a.start === b.start && a.end === b.end && a.text === b.text) &&
+  (a.start === b.start || (a.start < b.end && b.start < a.end))
 
 /**
  * Something a sync command found that it cannot repair itself: two sources that disagree, a path that names
@@ -86,8 +124,16 @@ export class Problem extends S.Class<Problem, { readonly brand: unique symbol }>
  */
 export class Plan extends S.Class<Plan, { readonly brand: unique symbol }>($I`Plan`)(
   {
-    checked: S.Int.pipe(S.annotateKey({ description: "How many places were compared with their source" })),
-    drifts: S.Array(Drift).pipe(S.annotateKey({ description: "The places that differ, each with its repair" })),
+    checked: S.Natural.pipe(S.annotateKey({ description: "How many places were compared with their source" })),
+    drifts: S.Array(Drift)
+      .check(
+        S.makeFilter(
+          (drifts: ReadonlyArray<Drift>) =>
+            A.every(drifts, (a, i) => A.every(A.drop(drifts, i + 1), (b) => !clash(a, b))),
+          { expected: "repairs of a file that do not touch the same characters" }
+        )
+      )
+      .pipe(S.annotateKey({ description: "The places that differ, each with its repair" })),
     problems: S.Array(Problem).pipe(S.annotateKey({ description: "What the command cannot repair" }))
   },
   $I.annote("Plan", { description: "The places a sync command compared, those that differ, and what it cannot repair" })

@@ -198,6 +198,13 @@ export interface World {
   pressedOver: ReadonlyArray<{ readonly row: string; readonly value: Value; readonly saw: ReadonlyArray<Value> }>
   /** The rows that are not a live press any more: they waited, or somebody saved since. */
   waited: Record<string, boolean>
+  /**
+   * The rows whose line a closed tab's decision was taken up onto, beside this tab's own press (waiting or on its way),
+   * which is as it was: that decision waited, and is never sent as a live press. Let go when the person decides the row
+   * again with no decision of that tab's, not refused, standing on the line: what goes of the row is then this tab's
+   * own, live or not as it was. With no press of this tab's beside it, the row itself waited (`waited`).
+   */
+  readonly besideWaited: Record<string, boolean>
   /** The decisions the server refused, until the person makes them again. */
   refused: ReadonlyArray<{ readonly row: string; readonly value: Value }>
   /** The rows the server confirmed for the person, until somebody else changes the row or the person does again. */
@@ -239,6 +246,7 @@ const start = (decisions: SavedDecisions): World => {
     couldSee: {},
     pressedOver: [],
     waited: {},
+    besideWaited: {},
     refused: [],
     confirmed: {},
     restarts: 0,
@@ -467,9 +475,7 @@ const perform = (world: World, effect: DraftEffect): void =>
       const rows = rowsOf(delta)
       ownRows(world, rows)
       for (const row of R.keys(rows)) {
-        expect(world.waited[row] === true && !R.has(names, row), `row ${row} waited and goes as a live press`).toBe(
-          false
-        )
+        expect(hasWaited(world, row) && !R.has(names, row), `row ${row} waited and goes as a live press`).toBe(false)
         expect(names[row]?.length ?? 0, "more decisions named than the contract takes").toBeLessThanOrEqual(50)
       }
       // What it names of each row the person knew of: she saw it, or a tab of hers sent it.
@@ -489,7 +495,7 @@ const perform = (world: World, effect: DraftEffect): void =>
         }
       }
       sent(world, rows)
-      const live = A.filter(R.keys(rows), (row) => world.waited[row] !== true)
+      const live = A.filter(R.keys(rows), (row) => !hasWaited(world, row))
       world.saves = [...world.saves, { id, delta, madeOn, over: names, live, answer: O.none() }]
     },
     Ask: () => {
@@ -521,7 +527,7 @@ const perform = (world: World, effect: DraftEffect): void =>
       const rows = rowsOf(delta)
       ownRows(world, rows)
       sent(world, rows)
-      const live = A.filter(R.keys(rows), (row) => world.waited[row] !== true)
+      const live = A.filter(R.keys(rows), (row) => !hasWaited(world, row))
       world.confirm = O.some({ id, revision, delta, madeOn, shown: shown(world.draft), live, answer: O.none() })
     }
   })
@@ -626,6 +632,9 @@ const pending = (draft: Draft): ReadonlyArray<string> => [
   ...R.keys(draft.unsent),
   ...O.match(draft.flight, { onNone: () => [], onSome: (flight) => R.keys(flight.rows) })
 ]
+
+/** True when what goes of a row is no live press: it waited, or a closed tab's decision beside it did. */
+const hasWaited = (world: World, row: string): boolean => world.waited[row] === true || world.besideWaited[row] === true
 
 /** Every row that waits is no live press from now on. */
 const allWaited = (world: World): void => {
@@ -878,6 +887,12 @@ const runIn = (world: World, command: Command): void => {
       presses(world, row, value, [showed])
       // What the screen knows is behind (an answer said so) makes it no live press.
       if (!wasPending) world.waited[row] = O.isSome(world.draft.landed)
+      // Decided again with no closed tab's decision standing on the line (a refused one is settled by this one, and one
+      // not refused stays a side beside it): what goes of the row is this tab's own, as it was.
+      const theirsStands = O.exists(R.get(world.draft.lines, row), (line) =>
+        A.some(line.sides, (side) => !side.here && O.isNone(side.refused))
+      )
+      if (!theirsStands) delete world.besideWaited[row]
       world.region = O.some(after)
       dispatchIn(world, DraftEvent.Decided({ changes: change(row, to) }))
       // Decided back to what the screen knew before anything of it was sent: an undo, not a decision of its own.
@@ -1119,14 +1134,21 @@ const runIn = (world: World, command: Command): void => {
       world.refused = A.filter(world.refused, (one) => !isOwn(one))
       dispatchIn(world, DraftEvent.TakenUp({ kept: O.some(entry).pipe(keptForm, O.getOrThrow) }))
       // What it added to the row waited: it is sent over what it names, never as a live press.
-      // (A refused one beside is a notice: this tab's own press is as it was.)
-      const ofRow = (draft: Draft) => [
+      // (A refused one beside is a notice: this tab's own press is as it was.) Added only beside this tab's own, waiting
+      // or on its way, as a side of the row's line, that press is as it was too: what waited is the side
+      // (`besideWaited`). With no press of this tab's of the row, what goes of it later is what the take-up brought.
+      const ownOf = (draft: Draft) => [
         R.get(draft.unsent, row),
-        O.flatMap(draft.flight, (flight) => R.get(flight.rows, row)),
+        O.flatMap(draft.flight, (flight) => R.get(flight.rows, row))
+      ]
+      const ofRow = (draft: Draft) => [
+        ...ownOf(draft),
         A.filter(draft.lines[row]?.sides ?? [], (side) => O.isNone(side.refused))
       ]
       if (!Eq.equals(ofRow(before), ofRow(world.draft))) {
-        world.waited[row] = true
+        if (A.some(ownOf(before), O.isSome) && Eq.equals(ownOf(before), ownOf(world.draft))) {
+          world.besideWaited[row] = true
+        } else world.waited[row] = true
         // The person decided the row again, in that tab: what the server took of it before is not what stands.
         delete world.confirmed[row]
         delete world.promised[row]

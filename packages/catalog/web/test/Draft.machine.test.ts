@@ -765,6 +765,38 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
 
 describe("orderings the properties met, pinned", () => {
   // Each is played as the properties play an ordering, and every rule they check after it is checked here too.
+  it("her decision of a row, made again over her own press on its way, goes as a live press after a closed tab's same decision beside it was found saved", () => {
+    expect(
+      broken([
+        Command.cases.ReturnToTab.make({}),
+        Command.cases.Decide.make({ row: "a", to: "out" }),
+        Command.cases.TakeUp.make({ row: "a", to: "out", beside: "refused", as: "waiting" }),
+        Command.cases.ServerTakesSave.make({ which: "last" }),
+        Command.cases.ServerTakesRead.make({}),
+        Command.cases.ReadArrives.make({}),
+        Command.cases.Decide.make({ row: "a", to: "kept" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("a closed tab's decisions taken up with no press of this tab's beside them: what she decides of the row after waited", () => {
+    expect(
+      broken([
+        Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
+        Command.cases.SomeoneElse.make({ row: "a", to: "kept" }),
+        Command.cases.TakeUp.make({ row: "a", to: "acceptedOut", beside: "another", as: "waiting" }),
+        Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.Decide.make({ row: "a", to: "kept" }),
+        Command.cases.ServerTakesSave.make({}),
+        Command.cases.SaveAnswers.make({}),
+        Command.cases.SomeoneElse.make({ row: "a", to: "accepted" }),
+        Command.cases.ServerTakesSave.make({})
+      ])
+    ).toEqual(O.none())
+  })
+
   it("a closed tab's refused decision, beside the one this tab took up and sent, is settled when she decides the row again: nothing of it is owed", () => {
     expect(
       broken([
@@ -1145,6 +1177,11 @@ describe("seeds the properties were falsified by, played again", () => {
     {
       name: "with reloads, sign-outs and closed tabs taken up",
       seed: -5469710740912195,
+      may: { confirms: false, elsewhere: false, tabs: true }
+    },
+    {
+      name: "with reloads, sign-outs and closed tabs taken up",
+      seed: 1376949052012291,
       may: { confirms: false, elsewhere: false, tabs: true }
     }
   ] as const

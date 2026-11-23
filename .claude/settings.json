@@ -36,5 +36,19 @@
     "shadcn",
     "playwright",
     "better-auth"
-  ]
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/defaults.sh",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
 }

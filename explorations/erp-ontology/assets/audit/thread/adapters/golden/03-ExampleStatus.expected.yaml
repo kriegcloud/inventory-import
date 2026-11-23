@@ -1,0 +1,40 @@
+{
+  "id": "so:sha256:6e3ed3485283f67b37ddb23dce92b3d58942b50987f3dcbc938e0b8d0e7ad797",
+  "schema_version": 1,
+  "repository": {
+    "commit": "1111111111111111111111111111111111111111",
+    "path": "golden/input/schemas.ts"
+  },
+  "source_span": {
+    "start_line": 12,
+    "end_line": 12,
+    "content_sha256": "72f34b4389fd53c88fae356915b67fddbfe875717d28d521cb3c47558a0263ff"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "ExampleStatus",
+    "lexical_name": "ExampleStatus",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_literal_member",
+      "object": "ready"
+    },
+    {
+      "predicate": "declares_literal_member",
+      "object": "signed-out"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "ExampleStatus"
+    }
+  ],
+  "source_excerpt": "export const ExampleStatus = S.Literals([\"ready\", \"signed-out\"]);\n",
+  "epistemic_status": "parser_derived"
+}

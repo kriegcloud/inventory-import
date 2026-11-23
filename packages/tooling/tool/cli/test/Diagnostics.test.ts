@@ -2,9 +2,11 @@
 // number of directives against its ledger and against main's. A directive is put together here, never written out,
 // since the checker reads one in a string too.
 import { describe, expect, it } from "@effect/vitest"
+import { vi } from "vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import {
   diagnostics,
   diagnosticsLedger,
@@ -176,6 +178,50 @@ describe("laws diagnostics", () => {
         })
       )
       expect(renamed).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+      // A file changed beside a listed one is no rename: git's records are a status and one path each.
+      const beside = yield* inTree(
+        { ...held, "README.md": "# a\n" },
+        Effect.gen(function* () {
+          yield* onMain()
+          yield* write({ "README.md": "# b\n" })
+          return yield* run
+        })
+      )
+      expect(beside).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+      // A push of two commits, the number raised in the first: CI names the commit main moved from, so both count.
+      const twoCommits = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["checkout", "-q", "main"])
+          const before = Str.trim((yield* repo.run("git", ["rev-parse", "HEAD"])).stdout)
+          yield* write({ ...ledger({ [listed]: 3 }), [listed]: directives(3) })
+          yield* commit("raises it")
+          yield* write({ "README.md": "# only\n" })
+          yield* commit("touches the readme")
+          vi.stubEnv("LEDGER_BASE", before)
+          return yield* run
+        })
+      )
+      vi.unstubAllEnvs()
+      expect(twoCommits).toContain(
+        `err: ${listed}  is held at 3 in ${diagnosticsLedger}, above the 2 main holds it to: a number only falls`
+      )
+      // A shallow checkout may not hold the base: refused, not passed in silence.
+      const shallow = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          const head = Str.trim((yield* repo.run("git", ["rev-parse", "HEAD"])).stdout)
+          yield* repo.write(repo.join(repo.root, ".git", "shallow"), `${head}\n`)
+          return yield* run
+        })
+      )
+      expect(shallow).toContain(
+        `err: ${diagnosticsLedger} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
+      )
     })
   )
 

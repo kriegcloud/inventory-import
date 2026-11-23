@@ -62,13 +62,26 @@ const calleeName = (call: Node): O.Option<string> => {
   return O.none()
 }
 
+/** Whether a call is `Effect.<one of names>(…)`, on the module imported as `Effect`. */
+const effectMember = (call: Node, names: ReadonlyArray<string>): boolean => {
+  const callee = call["callee"]
+  return (
+    isNode(callee) &&
+    callee.type === "MemberExpression" &&
+    isNode(callee["object"]) &&
+    callee["object"]["name"] === "Effect" &&
+    O.exists(calleeName(call), (name) => A.contains(names, name))
+  )
+}
+
 /** The function `Effect.fn("f")(function* …)` or `Effect.fnUntraced(function* …)` makes a helper of, when it is one. */
 const effectFnBody = (call: Node): O.Option<Node> => {
   const callee = call["callee"]
-  // `Effect.fn("f")(function* …)`, `Effect.fn(function* …)` unnamed, or `Effect.fnUntraced(function* …)`.
+  // `Effect.fn("f")(function* …)`, `Effect.fn(function* …)` unnamed, or `Effect.fnUntraced(function* …)`: Effect's
+  // own, by the module's name. A `fn` of another object (`Atom.fn`, `vi.fn`) is a library's callback.
   const named =
-    O.exists(calleeName(call), (name) => name === "fnUntraced" || name === "fn") ||
-    (isNode(callee) && callee.type === "CallExpression" && O.exists(calleeName(callee), (name) => name === "fn"))
+    effectMember(call, ["fn", "fnUntraced"]) ||
+    (isNode(callee) && callee.type === "CallExpression" && effectMember(callee, ["fn"]))
   return named ? A.findFirst(nodesIn(call["arguments"]), isFunction) : O.none()
 }
 
@@ -105,7 +118,15 @@ export const helpersNotDual = (program: Node): ReadonlyArray<number> =>
     // `dual(2, (self, that) => …)`: dual, so it is read only for the order of its values, typed or not (the house
     // style writes a dual's two signatures on the const).
     if (isNode(init) && init.type === "CallExpression" && O.exists(calleeName(init), (name) => name === "dual")) {
-      return A.some(A.filter(nodesIn(init["arguments"]), isFunction), subjectAfterFirst) ? [node.start] : []
+      // Its body is a function, or one an `Effect.fn` makes (`dual(2, Effect.fn("f")(function* (self, n) …))`).
+      const bodies = A.flatMap(nodesIn(init["arguments"]), (argument): ReadonlyArray<Node> =>
+        argument.type === "CallExpression"
+          ? A.fromOption(effectFnBody(argument))
+          : isFunction(argument)
+            ? [argument]
+            : []
+      )
+      return A.some(bodies, subjectAfterFirst) ? [node.start] : []
     }
     // Any other `const` with a type of its own is typed by that type, which sets its order. Without the checker the
     // law cannot tell a type of ours from a library's, so neither is read.

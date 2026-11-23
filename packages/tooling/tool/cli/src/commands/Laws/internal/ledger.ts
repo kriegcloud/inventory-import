@@ -2,12 +2,22 @@
 // JSON file of its own under `packages/tooling/tool/cli/ledgers/`. The number may only fall, and that is held by the
 // code, not by a review: a file that gains a place is refused, so no new one goes in under a file already listed; a file
 // that loses one is refused until its number is lowered, so it cannot gain it back later; a file at none comes off; an
-// entry for a file that is not there is refused, so a new file at its path inherits nothing; and the ledger itself is
-// compared with the same file where this branch left `main` (`origin/main`, else `main`: their merge base, or on main
-// itself the commit before), so a number that rose or a file added is refused, whatever the same commit wrote; a file
-// git sees renamed since then is held at its old name's number. On a branch whose base has no such ledger yet, nothing
-// is compared.
+// entry for a file that is not there is refused; and the ledger itself is compared with the same file at its base, so
+// a number that rose or a file added is refused, whatever the same commit wrote.
+//
+// The base is where this branch left `main` (the merge base of HEAD and `origin/main`, else `main`). On the branch
+// `main` it is what main was before the change being checked: in CI's run for a push, the commit the push moved main
+// from (`LEDGER_BASE`, which CI sets to the push's `before`), so every commit of a push of several is in it; locally,
+// `origin/main` when HEAD is ahead of it, else the commit before HEAD. A shallow checkout is refused, since its base
+// may be missing and the comparison would pass in silence. On a branch whose base has no such ledger yet, nothing is
+// compared.
+//
+// A file git sees renamed since the base is held at its old name's number: git sees a rename once both paths are
+// staged (`git mv`, or `git add` of both), so an unstaged one reads as a file removed and one added. A file deleted and
+// made again at the same path in one change is the same path to git, and keeps that path's number.
 import * as A from "effect/Array"
+import * as Config from "effect/Config"
+import * as ConfigProvider from "effect/ConfigProvider"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
@@ -124,27 +134,46 @@ const commitOf = Effect.fn("ledger.commitOf")(function* (revision: string) {
  */
 const baseCommit = Effect.fn("ledger.baseCommit")(function* (main: string) {
   const repo = yield* Repo
+  const mergeBase = Effect.fn("ledger.mergeBase")(function* (other: string) {
+    const merged = yield* repo.run("git", ["merge-base", "HEAD", other])
+    return merged.code === 0 ? O.some(Str.trim(merged.stdout)) : O.none<string>()
+  })
   const branch = yield* repo.run("git", ["symbolic-ref", "--quiet", "--short", "HEAD"])
-  if (branch.code === 0 && Str.trim(branch.stdout) === "main") return yield* commitOf("HEAD^1")
-  const merged = yield* repo.run("git", ["merge-base", "HEAD", main])
-  return merged.code === 0 ? O.some(Str.trim(merged.stdout)) : O.none<string>()
+  const onMain = branch.code === 0 && Str.trim(branch.stdout) === "main"
+  // CI's run for a push names the commit main moved from; a branch's run, or a push that made the branch, names none.
+  const before = yield* Config.String("LEDGER_BASE")
+    .pipe(Config.option)
+    .parse(ConfigProvider.fromEnv())
+    .pipe(Effect.orElseSucceed(() => O.none<string>()))
+  const pushedFrom = yield* O.match(
+    O.filter(before, (commit) => Str.isNonEmpty(commit) && !/^0+$/.test(commit)),
+    { onNone: () => Effect.succeedNone, onSome: (commit) => commitOf(commit) }
+  )
+  if (O.isSome(pushedFrom)) return yield* mergeBase(pushedFrom.value)
+  if (!onMain) return yield* mergeBase(main)
+  const head = yield* commitOf("HEAD")
+  // Locally on main: what origin/main holds, when HEAD is ahead of it; else the commit before HEAD.
+  return O.exists(head, (commit) => commit === main) ? yield* commitOf("HEAD^1") : yield* mergeBase(main)
 })
 
 /** Each file renamed since `base`, by its name now, with the name it had there (git's own finding of a rename). */
 const renamedSince = Effect.fn("ledger.renamedSince")(function* (base: string) {
   const repo = yield* Repo
   const answer = yield* repo.run("git", ["diff", "--name-status", "-M", "-z", base])
-  const parts = Str.split("\0")(answer.stdout)
-  // Each rename is three parts: its status (R and a score), the name it had, the name it has.
-  return R.fromEntries(
-    A.getSomes(
-      A.map(parts, (part, i) =>
-        Str.startsWith("R")(part)
-          ? O.zipWith(A.get(parts, i + 1), A.get(parts, i + 2), (from, to) => [to, from] as const)
-          : O.none()
-      )
-    )
-  )
+  const parts = A.filter(Str.split("\0")(answer.stdout), Str.isNonEmpty)
+  // Records, read in turn: a status, then one path, or two for a rename (R) or a copy (C), the name it had first.
+  const renames: Array<readonly [string, string]> = []
+  let at = 0
+  while (at < parts.length) {
+    const status = O.getOrElse(A.get(parts, at), () => "")
+    const two = Str.startsWith("R")(status) || Str.startsWith("C")(status)
+    if (two && Str.startsWith("R")(status)) {
+      const pair = O.zipWith(A.get(parts, at + 1), A.get(parts, at + 2), (from, to) => [to, from] as const)
+      if (O.isSome(pair)) renames.push(pair.value)
+    }
+    at += two ? 3 : 2
+  }
+  return R.fromEntries(renames)
 })
 
 /**
@@ -170,6 +199,13 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
     return A.append(
       missing,
       `${input.path} could not be compared with main: neither origin/main nor main is here. Fetch it (git fetch origin main), so a number that rose is seen`
+    )
+  }
+  const shallow = yield* repo.run("git", ["rev-parse", "--is-shallow-repository"])
+  if (Str.trim(shallow.stdout) === "true") {
+    return A.append(
+      missing,
+      `${input.path} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
     )
   }
   const base = yield* baseCommit(main.value)

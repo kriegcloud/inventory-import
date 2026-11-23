@@ -149,6 +149,9 @@ const useOf: {
     // A runner imported by name, under any name (`runPromise as go`): the name it is imported under does not matter.
     case "ImportSpecifier":
       return O.exists(nameOf(node["imported"]), isPromiseRunner) ? O.some("run") : O.none()
+    // `export { runPromise as runApp } from "effect/Effect"`: passed on to another module under any name.
+    case "ExportSpecifier":
+      return O.exists(nameOf(node["local"]), isPromiseRunner) ? O.some("run") : O.none()
     // `const { runPromise: go } = Effect`, from a runtime too: taken out of an object under another name.
     case "ObjectPattern":
       return A.some(nodesIn(node["properties"]), (property) => O.exists(nameOf(property["key"]), isPromiseRunner))

@@ -115,6 +115,9 @@ export const c = FiberSet.makeRuntimePromise
 export const d = go
 `)
     ).toEqual(["run", "run", "run", "run", "run"])
+    expect(
+      uses(`export { runPromise as runApp } from "effect/Effect"\nexport { succeed } from "effect/Effect"\n`)
+    ).toEqual(["run"])
   })
 
   it("catches Promise however it is reached: through the global object, in brackets, or under another name", () => {

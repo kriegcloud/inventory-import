@@ -106,6 +106,14 @@ export const c = Effect.fn(function* (n: number, self: string) { return self })
 export const d: { (that: number): (self: string) => string; (self: string, that: number): string } = dual(2, (self: string, that: number) => self + that)
 `
     expect(lines(typed, helpersNotDual)).toEqual([3, 4, 5])
+    // Another object's fn is a library's callback; a dual over Effect.fn is read for its order.
+    const libraries = `import { dual } from "effect/Function"
+import * as Effect from "effect/Effect"
+export const a = Atom.fn((input: string, get: unknown) => input)
+export const b = dual(2, Effect.fn("b")(function* (that: number, self: string) { return self }))
+export const c = vi.fn((n: number, cause: unknown) => cause)
+`
+    expect(lines(libraries, helpersNotDual)).toEqual([4])
   })
 
   it.effect("refuses each place in a file no list names, and holds a listed file at its number of places", () =>

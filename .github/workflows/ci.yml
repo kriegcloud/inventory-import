@@ -42,6 +42,9 @@ jobs:
         run: bun run check:ci -- --summarize --continue --concurrency=2
         env:
           VITEST_MAX_WORKERS: 1
+          # On a push, the commit main moved from: the bans' ledgers are compared with it, so every commit of a push of
+          # several is checked (a pull request's run leaves it empty and compares with where the branch left main).
+          LEDGER_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
       # Chrome at this path (CHROME_BIN in actions/runner-images; the runs are on Ubuntu 26.04, whose image lists
       # Google Chrome as 24.04's does). The browser says its version first,

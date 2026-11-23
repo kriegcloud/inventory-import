@@ -1,10 +1,10 @@
 // The plan of a confirm is the review's verdict and nothing else: whatever a file holds and whatever was decided,
 // the plan has one row per item of the file, in the review's order, and its statuses add up to the review's.
 import { describe, expect, it } from "@effect/vitest"
-import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { DecidedBy } from "@inventory/catalog-contract/Import"
-import { confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
+import { ConfirmPlan, confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
 import { review } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
 import * as R from "effect/Record"
@@ -49,4 +49,24 @@ describe("confirmPlan", () => {
     },
     { arbitrary: { runs: 60 } }
   )
+})
+
+// Generated from the plan's own schema, so a plan the schema lets through is one a store can be handed.
+describe("a plan a confirm can be handed", () => {
+  it.prop(
+    "places every row on a row of the file: the contract's row id can be made from its row and part",
+    [ConfirmPlan],
+    ([plan]) => {
+      for (const row of plan.rows) {
+        expect(rowId({ rowNumber: row.rowNumber, part: row.part })).toBe(
+          row.part === 0 ? `row-${row.rowNumber}` : `row-${row.rowNumber}.${row.part}`
+        )
+      }
+    }
+  )
+
+  it.prop("says why for every row it leaves out or skips: no reason is empty", [ConfirmPlan], ([plan]) => {
+    const said = A.filter(plan.rows, PlannedRow.isAnyOf(["notImported", "already"]))
+    expect(A.filter(said, (row) => row.reason === "")).toEqual([])
+  })
 })

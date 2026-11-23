@@ -498,7 +498,9 @@ const refusedWords = [
  * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "v" vault') // "refused"
  */
 export const onePasswordFailure = (stderr: string): OnePasswordFailure => {
-  const unquoted = A.map(linesOf(Str.toLowerCase(stderr)), Str.replaceAll(/"[^"]*"|'op:\/\/[^']*'/g, '""'))
+  // A quoted name ends at its quote followed by what op writes after one (a colon, a space, a comma, a full stop or
+  // the end of the line), so an apostrophe inside a name ("Benjamin's vault") does not end it early.
+  const unquoted = A.map(linesOf(Str.toLowerCase(stderr)), Str.replaceAll(/(?:"|'op:\/\/).*?["'](?=[\s:,.]|$)/g, '""'))
   const says = (words: ReadonlyArray<string>) =>
     A.some(unquoted, (line) => A.some(words, (word) => Str.includes(word)(line)))
   if (onePasswordUnreachable(stderr)) return "unreachable"
@@ -1361,7 +1363,10 @@ const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
     ])
     if (stored !== 0) {
       return yield* stop(
-        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR] …"), Alchemy was never started. When they say op never reached the app ("error initializing client"), that it is locked or not signed in, or that a prompt was dismissed or timed out, ${theApp}. When they say a vault, an item or a field "isn't" one, 1Password refused a reference: check ${referencesRefused}. Any other line of 1Password's may be either: try both, then run this again.`
+        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR] …"), Alchemy was never started. When they say op never reached the app ("error initializing client"), that it is locked or not signed in, or that a prompt was dismissed or timed out, ${theApp}. When they say ${A.join(
+          A.map(refusedWords, (word) => `"${word}"`),
+          ", "
+        )}, 1Password refused a reference: check ${referencesRefused}. Any other line of 1Password's may be either: try both, then run this again.`
       )
     }
     const now = yield* listed

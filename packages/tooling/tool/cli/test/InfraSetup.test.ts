@@ -1832,6 +1832,22 @@ describe("infra setup: failures named for what failed", () => {
           )
         ).toBe("refused")
         expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "timed out" item: something else')).toBe("unclear")
+        // An apostrophe inside a quoted name does not end it: the rest of the name is still not op's words.
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Benjamin's vault/token is locked/field': no item matched"
+          )
+        ).toBe("refused")
+        expect(
+          onePasswordFailure(
+            '[ERROR] 2026/11/22 10:00:00 "Benjamin\'s timeout token" isn\'t an item in the "Benjamin\'s vault" vault'
+          )
+        ).toBe("refused")
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Benjamin's vault/i/f': authorization timeout"
+          )
+        ).toBe("held")
         // Outside a name the held words still count.
         expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 reading "Vault": authorization timeout')).toBe("held")
         expect(onePasswordFailure("")).toBe("unclear")
@@ -1894,6 +1910,17 @@ describe("infra setup: failures named for what failed", () => {
       // A line of 1Password's is not all one thing: the app's lines and a refused reference are told apart.
       expect(said).toContain("that it is locked or not signed in, or that a prompt was dismissed or timed out")
       expect(said).toContain("1Password refused a reference: check the references in packages/infra/env/op.env.local")
+      // The stop names a refused reference by the same words the classifier reads.
+      for (const word of [
+        "isn't a vault",
+        "isn't an item",
+        "isn't a field",
+        "could not resolve item",
+        "no item matched",
+        "invalid secret reference"
+      ]) {
+        expect(said).toContain(`"${word}"`)
+      }
       // A line of 1Password's that says neither is not said to be a refused reference: both fixes are named.
       expect(said).toContain("Any other line of 1Password's may be either: try both")
       expect(said).not.toContain("Any other line of 1Password's is a reference it refused")

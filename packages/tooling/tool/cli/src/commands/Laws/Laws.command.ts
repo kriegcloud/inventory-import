@@ -10,7 +10,7 @@ import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
 import { assertions, assertionsLedger, assertionsSentence } from "./Assertions.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
-import { defaults, defaultsSentence } from "./Defaults.rules.ts"
+import { defaults, defaultsSentence, exemptions } from "./Defaults.rules.ts"
 import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
 import { diagnostics, diagnosticsSentence } from "./Diagnostics.rules.ts"
 import { effectImports } from "./EffectImports.rules.ts"
@@ -139,7 +139,7 @@ export const defaultsCommand = Command.make(
     ),
     files
   },
-  (flags) => Effect.flatMap(defaults(flags.write, flags.files), emit(defaultsSentence))
+  (flags) => Effect.flatMap(defaults(flags.write, flags.files, exemptions), emit(defaultsSentence))
 ).pipe(
   Command.withDescription("Absence, starting values and clean-ups are a schema's: no file holds more than its baseline")
 )

@@ -1,0 +1,6 @@
+id: "po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 179, end_line: 179}
+quote: "The tenant whose workspace holds this record, not the owner of the body it describes."
+epistemic_status: quoted_prose

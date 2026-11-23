@@ -1,0 +1,35 @@
+id: ic:audit-action-content:001
+hypothesis_ref: dh:audit-action-content:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Candidate occurrence identity is the particular action-content component of one
+    audit entry, not the reusable string value or the described change. Unresolved: if the wording is
+    edited, the corpus does not decide whether this content occurrence changes state or a new version
+    replaces it.'
+  reidentification_key:
+  - Containing audit entry handle plus field action
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unity
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Repeatable linguistic information object versus entry-bound occurrence
+  existential_dependencies:
+  - As an entry-bound wording occurrence it depends on the containing audit information object, not on
+    the claimed action having actually happened (po:982423dfeb61 and po:160303617dee). Equal strings in
+    different entries may realize equivalent wording but are different occurrences. An independent controlled
+    Action taxonomy is not established.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states:
+  - Removal or replacement of containing content may end the occurrence; version policy absent.
+counterexamples:
+- description: Two entries each say Imported items but refer to different purported changes. String equality
+    cannot identify the occurrence, and the words may remain after the underlying assertion is discovered
+    false.
+status: proposed

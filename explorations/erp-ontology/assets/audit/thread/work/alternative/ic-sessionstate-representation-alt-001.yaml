@@ -1,0 +1,34 @@
+{
+  "id": "ic:sessionstate-representation-alt:001",
+  "hypothesis_ref": "dh:sessionstate-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'SessionState' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "phase partition of a Session continuant (signed-out / no-organization / ready)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "signed-out is 'nobody' — absence of a signed-in party, not a state of an enduring session, so the union is not a phase partition of one continuant."
+    }
+  ],
+  "status": "proposed"
+}

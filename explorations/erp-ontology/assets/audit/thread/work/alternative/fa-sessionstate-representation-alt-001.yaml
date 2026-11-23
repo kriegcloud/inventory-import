@@ -1,0 +1,23 @@
+{
+  "id": "fa:sessionstate-representation-alt:001",
+  "hypothesis_ref": "dh:sessionstate-representation:001",
+  "identity_card_ref": "ic:sessionstate-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Tagged union representation (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Phase partition of a Session artifact",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Admitting phases requires first admitting a Session continuant; no CQ asks about sessions.",
+  "verdict": "analyzed"
+}

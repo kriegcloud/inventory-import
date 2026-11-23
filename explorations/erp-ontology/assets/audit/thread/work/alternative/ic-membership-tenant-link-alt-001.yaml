@@ -1,0 +1,38 @@
+{
+  "id": "ic:membership-tenant-link-alt:001",
+  "hypothesis_ref": "dh:membership-tenant-link:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "Not an individual: a mediation link individuated only by its relata (Membership, Tenant).",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "mediation of Membership to the workspace/tenancy (the thing that persists on succession)",
+      "mediation of Membership to the Tenant role-bearer Organization (as stated: membershipIn ranges over Tenant)"
+    ],
+    "existential_dependencies": [
+      "Membership",
+      "Tenant (or workspace)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Succession: the Tenant role passes to a successor Organization that keeps the workspace. If membershipIn mediates the role-bearer, every existing membership's relatum changes Organization without any membership event — impossible for a rigid mediation. If it mediates the workspace, memberships survive unchanged, which is what the retained MemberId implies."
+    }
+  ],
+  "status": "proposed"
+}

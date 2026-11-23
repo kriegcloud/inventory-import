@@ -1,0 +1,93 @@
+id: otp:action:001
+hypothesis_ref: dh:audit-action-content:001
+identity_card_ref: ic:audit-action-content:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: action
+  local_name: action
+  proposed_iri: https://example.org/inventory-import/ontology/action
+  owl_entity_kind: data_property
+  in_scheme: ''
+definition:
+  text: The action-description relation linking an audit entry to the human-readable string stating what the
+    entry says was done, without identifying or proving an actual change event.
+  source:
+  - po:sha256:982423dfeb614079c6304825f455f5ba08b8fd862df43b6693e53fec3fec3048
+  - po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+  - po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+  - CQ-P10
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: intrinsic
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P10
+  semantic_support_for: []
+alternatives_rejected:
+- 'Foundational analysis rejects: Actual business action event.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The explicit aboutness and human-readable reporting role justify informational content; no independent taxonomy
+  of action types is inferred.'
+open_issues:
+- 'FLAGGED FOR STEWARD — foundational_status explicitly_deferred; this proposal does not settle the foundational
+  question. Needed evidence: Specify whether action denotes a literal value, shared linguistic content or an
+  entry-bound versioned component, and provide an amendment example deciding whether replacing wording preserves
+  identity. Event identity is not a viable substitute for the content distinction.'
+- 'Identity-card criterion (no independent property individual is minted): Candidate occurrence identity is
+  the particular action-content component of one audit entry, not the reusable string value or the described
+  change. Unresolved: if the wording is edited, the corpus does not decide whether this content occurrence
+  changes state or a new version replaces it.'
+- 'Proposed usage: subject AuditEntry; object xsd:string. These endpoints describe intended use, not extra
+  subclass edges, inverse properties or identity claims.'
+- The joined identity-card category describes the underlying referent, not a separately minted property individual;
+  identity uncertainty is retained verbatim rather than inventing property-level identity.
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Entry-bound content occurrence, distinct even where strings match; Repeatable linguistic
+  content shared by multiple inscriptions. This synthesis makes no selection by omission. The selected model
+  may require a revised proposal or a separate future candidate; no such additional term is admitted in this
+  18-key scope.'
+- 'Strongest counterexample carried forward: Two entries each say Imported items but refer to different purported
+  changes. String equality cannot identify the occurrence, and the words may remain after the underlying assertion
+  is discovered false.'
+- 'Identity-card alternatives carried forward: Repeatable linguistic information object versus entry-bound
+  occurrence'
+- 'Existential dependencies carried forward: As an entry-bound wording occurrence it depends on the containing
+  audit information object, not on the claimed action having actually happened (po:982423dfeb61 and po:160303617dee).
+  Equal strings in different entries may realize equivalent wording but are different occurrences. An independent
+  controlled Action taxonomy is not established.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:audit-action-content:001: “The quoted audit decision asks what the entry says was done
+  and explicitly distinguishes entry content from proof of a change actor. The action words therefore function
+  as report content read by people, rather than being the executed act itself.” The claim must fail for a pure
+  data-transfer twin: the action content belongs to the audit record created with the change and reports its
+  claim; a free transfer string detached from that audit lifecycle does not meet the intended term. No executed
+  immutability or amendment rule is supplied.'
+- 'Datatype-property shape is provisional: the intended string-valued field is preserved, while the analysis’s
+  entry-bound occurrence versus reusable linguistic-content choice remains open. No action occurrence class
+  is admitted and equal strings never establish event identity.'
+- 'Warrant necessity: CQ-P10 explicitly requests claim-bearing entries, the member each entry names and the
+  action each states. Without action-description content, the requested action column cannot be answered.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=unresolved; ontoclean.supplies_identity=unresolved;
+  ontoclean.carries_identity=true. Closed proposal identity value=unresolved. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): A completed business change event; representation_status=domain_referent;
+  plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

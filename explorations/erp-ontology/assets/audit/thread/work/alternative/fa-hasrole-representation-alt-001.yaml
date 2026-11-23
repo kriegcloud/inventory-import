@@ -1,0 +1,23 @@
+{
+  "id": "fa:hasrole-representation-alt:001",
+  "hypothesis_ref": "dh:hasrole-representation:001",
+  "identity_card_ref": "ic:hasrole-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "not_applicable",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Implementation comparison (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Policy information object (permission inclusion), derivable once Permission ships",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The rank order is the only place the role ordering exists; once Permission is modelled it should be derived, not asserted.",
+  "verdict": "analyzed"
+}

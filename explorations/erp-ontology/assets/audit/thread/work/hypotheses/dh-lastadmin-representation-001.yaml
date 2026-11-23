@@ -1,0 +1,24 @@
+id: dh:lastadmin-representation:001
+observation_refs:
+- so:sha256:00b6e5ac41e9125093447195277dcdf87734ed038188322d4a89559ea6740963
+cq_warrants: []
+proposed_referent:
+  label: LastAdmin rejection representation
+  description: 'Candidate real/domain referents: none established for a new entity kind. The rejection
+    reports that a proposed change would leave no administrator. An error occurrence is individuated by
+    a refused operation response, not a person who is intrinsically a LastAdmin.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A threatened violation of an administrator retention rule
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

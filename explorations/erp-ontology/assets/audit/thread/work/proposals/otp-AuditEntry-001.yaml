@@ -1,0 +1,100 @@
+id: otp:AuditEntry:001
+hypothesis_ref: dh:audit-entry:001
+identity_card_ref: ic:audit-entry:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Audit entry
+  local_name: AuditEntry
+  proposed_iri: https://example.org/inventory-import/ontology/AuditEntry
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A claim-bearing information record of a stated change to tenant data, written in the same batch as
+    that change, recording an action description, a named member and its writing time without establishing
+    actual agency.
+  source:
+  - so:sha256:c94fc69a82421478564d8bad567599e059b61ec1d0009fdcf8619b839690c5c9
+  - po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+  - po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+  - po:sha256:67ff51b75ca5446a6aa75c17d6c7e116ca807760d45ef2d4246594215123c638
+  - po:sha256:89e5463325c44a76a128c4dff85caed068911d4e9354c960107bc822d66f0304
+  - po:sha256:8e6b8e4428f59f50f4bfcc6b8100db1692104086505630db8c9dca418239430b
+  - po:sha256:a2954515f0563e447882b597c9c9efb2f780016b31552fa2b41b3b21a3989ea1
+  - CQ-P10
+foundational:
+  ufo_category: information_object
+  gufo_alignment: gufo:FunctionalComplex
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: unresolved
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Content
+    compatibility: A claim-bearing audit information record fits the projection’s information-in-a-medium meaning
+      of gist:Content. Record/version individuation remains unresolved and the candidate alignment does not
+      assert an event parent.
+operational_warrant:
+  competency_questions:
+  - CQ-P10
+  semantic_support_for: []
+alternatives_rejected:
+- 'Foundational analysis rejects: Actual change event or proof of actual agency.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  Creation as an audit record about another occurrence and explicit limits on its evidential force support
+  an information object. Same-batch writing is a quoted claim, not independently verified transactional behavior.'
+open_issues:
+- 'FLAGGED FOR STEWARD — foundational_status explicitly_deferred; this proposal does not settle the foundational
+  question. Needed evidence: Provide audit immutability/versioning, correction, copying, deletion and id-reuse
+  rules, with examples deciding whether correction creates a new entry. Identify which persistent informational
+  unit tenant/id is intended to track; do not infer event identity from that handle.'
+- 'Steward thin-thread identity convention: tenant plus entry id (Activity.organizationId and Activity.id).
+  Two entries can describe one change and a false attribution remains record content. Amendments, copies, deletion/recreation
+  and id reuse are unresolved for informational continuity; the handle does not prove record or event sameness.'
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Persistent audit record allowing amendments while retaining identity; Immutable audit-entry
+  version or writing occurrence content. This synthesis makes no selection by omission. The selected model
+  may require a revised proposal or a separate future candidate; no such additional term is admitted in this
+  18-key scope.'
+- 'Strongest counterexample carried forward: A record falsely naming a member remains an audit entry; two entries
+  may describe the same change. Conversely, replacing action and actor under the same tenant/id leaves the
+  technical key unchanged while potentially replacing the record claim.'
+- 'Identity-card alternatives carried forward: Immutable record-version information object; event interpretation
+  is excluded by po:160303617dee.'
+- 'Existential dependencies carried forward: Requires informational realization; no specific physical carrier
+  is established as essential. Tenant placement is the recorded context. The asserted actual change and actor
+  are objects of claims, not existential prerequisites for a claim-bearing record being present or intelligible
+  (po:160303617dee). The same-batch writing statement is supplied prose, not executed transactional proof.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:audit-entry:001: “The quoted use case says data changes write Activity rows, and the
+  explicit audit decision distinguishes what an entry says from who actually made a change: the entry cannot
+  prove that actor. Thus the intended object is a persistent claim-bearing record read by people, not only
+  a schema construct or the event itself.” The claim must fail for a pure data-transfer twin: the record is
+  created in the same batch as the stated data change; transferring matching fields without that creation coupling
+  fails this supplied lifecycle claim.'
+- Parent withheld pending identity and rival-model resolution. The proposed thin-thread parent is a candidate
+  only; no ancestor identity supplier has been established for this unresolved branch.
+- 'Activity is the steward-supplied alternative label. recordedAt is not proposed: dh:audit-writing-time:001
+  keeps the null. The unbuilt CQ-P10 therefore remains incomplete in this proposal set; information about the
+  writing time does not admit a time property by implication.'
+- 'Warrant necessity: CQ-P10 explicitly requests claim-bearing entries, the member each entry names and the
+  action each states. Without an audit information record, the question cannot group the named member, action
+  and writing time as claims of each entry.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=unresolved; ontoclean.supplies_identity=unresolved;
+  ontoclean.carries_identity=true. Closed proposal identity value=unresolved. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): The actual change event or proof of the named
+  member acting; representation_status=domain_referent; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

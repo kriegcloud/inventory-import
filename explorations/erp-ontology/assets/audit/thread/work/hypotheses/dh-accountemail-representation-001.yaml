@@ -1,0 +1,26 @@
+id: dh:accountemail-representation:001
+observation_refs:
+- so:sha256:a5c48b718277555e2da4ae55918ea8e6f5efa56553adc18a2200e7f433bd4bf1
+- so:sha256:f373eb467631716d2f8d2aa9b7401eb3f3a053e18ccc641f02bed8e95f0338a8
+cq_warrants: []
+proposed_referent:
+  label: AccountEmail representation
+  description: 'Candidate real/domain referents: none established. These chains describe a branded or
+    inferred string representation used for sign-in email. An instance at the representation level is
+    a string value in that schema; account ownership, address identity and a human identity criterion
+    are not established.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: An email address associated with an account
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

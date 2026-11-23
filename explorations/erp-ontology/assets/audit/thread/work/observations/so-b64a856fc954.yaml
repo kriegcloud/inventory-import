@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:b64a856fc95435fa6e3a8cd9f6126738425bba74ac02add2edc4b3030d761e05",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 91,
+    "end_line": 101,
+    "content_sha256": "281aabe0756f2c19e2e243cd1a8d19d1231627c18486ffa00454c85d6e59b6cb"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AddPersonProblem",
+    "lexical_name": "AddPersonProblem",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class AddPersonProblem extends S.Opaque<AddPersonProblem, { readonly brand: unique symbol }>()(\n  S.TaggedStruct(\"AddPersonProblem\", {\n    kind: AddPersonProblemKind,\n    problem: Sentence.pipe(S.annotateKey({ description: \"What is wrong with the email given, in a sentence\" })),\n    todo: Sentence.pipe(S.annotateKey({ description: \"What the admin can do instead, in a sentence\" }))\n  }).pipe(\n    $I.annoteSchema(\"AddPersonProblem\", {\n      description: \"Why a person could not be added, as data the form shows beside the email typed\"\n    })\n  )\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

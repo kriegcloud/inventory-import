@@ -1,0 +1,26 @@
+id: dh:write-authorization-retry-rule:001
+observation_refs:
+- po:sha256:3a7e6ee160c6a967361ebc21831995185a188888f32816ec8d2a7142426644d0
+cq_warrants: []
+proposed_referent:
+  label: Write guard and retry protocol
+  description: 'Candidate real/domain referents: none required for this protocol as an entity. The quote
+    describes role checks, matching UI checks, operation-target or request keys, and origin refusal. Instances
+    are implementation procedures or guarded request attempts; a request key does not identify a person,
+    a grant or a new kind of domain change.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: An access and retry policy specification
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: Checks, request-key generation and origin rejection explain implementation control flow.
+    They can serve the scoped-role decision without a separate domain entity for this protocol, so the
+    null stands. The quoted behavior has not been executed or independently verified.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

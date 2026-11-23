@@ -1,0 +1,28 @@
+id: dh:audit-writing-time:001
+observation_refs:
+- po:sha256:ce82cb2fd95e4131746a50f6f6a39395dac6eeabf4feff1a2414407dde92f924
+- po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+cq_warrants:
+- CQ-P10
+proposed_referent:
+  label: Audit entry writing-time candidate
+  description: 'Candidate referent under evaluation: the instant an entry was written. An instant would
+    be individuated by its temporal position, shared by different entries if simultaneous; a stored timestamp
+    is a representation of that position. The supplied proposed wording and field selection do not verify
+    how the timestamp is produced or how precisely it denotes writing.'
+representation_status: unresolved
+alternatives:
+- label: A timestamp value recorded on an audit entry
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The prose declares an intended timestamp interpretation but gives no independently observed
+    writing occurrence, time-generation contract or clock evidence. The actual-instant candidate remains
+    unresolved rather than equating a timestamp field with an occurrence.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

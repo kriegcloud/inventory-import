@@ -1,0 +1,33 @@
+id: ic:tenant-role:001
+hypothesis_ref: dh:tenant-role:001
+identity:
+  supplies_identity: false
+  identity_criterion: Inherits the identity of the organized body that bears the workspace-hosting relation
+    (po:7b635e2155ff and po:715824f4fc19); supplies no new identity. OrganizationId reidentifies a workspace-facing
+    representation. Unresolved bearer continuity follows the organization-body analysis.
+  reidentification_key:
+  - OrganizationId
+ontoclean:
+  rigidity: anti_rigid
+  carries_identity: true
+  supplies_identity: false
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: role
+  alternatives:
+  - Workspace partition is a distinct referent rather than an equivalent interpretation of the body in
+    its role.
+  existential_dependencies:
+  - Depends on the body standing in the relation for which the application keeps a workspace and isolates
+    records (po:e93ff65f63c8); the body can persist after ceasing to be Tenant. The workspace can persist
+    while a successor body assumes Tenant. Tenant is not the workspace itself.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - 'Workspace-hosting relation ends: body leaves Tenant without necessarily ceasing to exist.'
+counterexamples:
+- description: A successor keeps the same OrganizationId and workspace, but is a new organization. Treating
+    Tenant identity as the partition key would falsely identify distinct role bearers.
+status: proposed

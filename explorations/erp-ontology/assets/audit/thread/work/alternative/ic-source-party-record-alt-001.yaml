@@ -1,0 +1,44 @@
+{
+  "id": "ic:source-party-record-alt:001",
+  "hypothesis_ref": "dh:source-party-record:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "An imported record as held by one tenant: same (tenant, source system, source type, exact source id) is the same SourceRecord (po:79e6720f1b1d). I accept this as a criterion for the information object itself, since for an imported record the provenance tuple is what individuates it.",
+    "reidentification_key": [
+      "tenant",
+      "source system",
+      "source type",
+      "exact source id"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "no separate kind: a representation of the party (null)"
+    ],
+    "existential_dependencies": [
+      "tenant holding it",
+      "the party it is a record of (recordOf)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": [
+      "deleted / re-imported"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Source id reuse: a source system recycles an id for a different customer; under the tuple criterion the new import is the same SourceRecord about a different party, so recordOf changes for a 'same' record."
+    }
+  ],
+  "status": "proposed"
+}

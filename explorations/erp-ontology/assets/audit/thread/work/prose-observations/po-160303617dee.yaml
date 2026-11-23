@@ -1,0 +1,6 @@
+id: "po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 556, end_line: 560}
+quote: "The auditor's adversary failed AuditEntry and `recordedActor` because CQ-P10 asked who did each recorded act, and an audit entry is a record about a change, not the change, and cannot prove who made it. I chose to reword the question to ask about the entries: what does each audit entry say was done, which member does it name, and when was it written. The terms stay as decision 98 set them. The change itself stays a parked candidate. The agent recommended the same."
+epistemic_status: quoted_prose

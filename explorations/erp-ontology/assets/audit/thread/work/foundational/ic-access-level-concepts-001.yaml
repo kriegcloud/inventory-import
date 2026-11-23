@@ -1,0 +1,35 @@
+id: ic:access-level-concepts:001
+hypothesis_ref: dh:access-level-concepts:001
+identity:
+  supplies_identity: true
+  identity_criterion: Under po:cf426b237ec8 and po:318a83669135, the same controlled concept is the same
+    scheme-and-notation individual; labels and which member holds it do not individuate it. This is an
+    explicit stipulated identity for concepts, not an inference that equal literal strings across schemes
+    denote one concept.
+  reidentification_key:
+  - MemberRoleScheme plus notation
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Repeatable entitlement specification is informational; no permission entities or implemented custom-role
+    instances are inferred.
+  existential_dependencies:
+  - Concept is scheme-relative and bears the supplied entitlement description (po:53dc6c25de9b, po:415373127028,
+    po:471a16ce6f74). Its existence as a controlled concept does not depend on any member currently receiving
+    it. Grant/holding relation is separate; viewer/editor/admin are not human kinds or episodes.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - Retirement from use does not by itself erase the concept; corpus supplies no destruction rule.
+counterexamples:
+- description: The notation admin in two different schemes need not be one concept; two humans holding
+    admin are not identical and create no new admin concept. A changed permission description under the
+    same notation exposes versioning policy not specified here.
+status: proposed

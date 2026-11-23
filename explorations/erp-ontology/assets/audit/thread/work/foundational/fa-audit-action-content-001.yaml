@@ -1,0 +1,22 @@
+id: fa:audit-action-content:001
+hypothesis_ref: dh:audit-action-content:001
+identity_card_ref: ic:audit-action-content:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: true
+rival_models:
+- label: Entry-bound content occurrence, distinct even where strings match
+  still_viable: true
+- label: Repeatable linguistic content shared by multiple inscriptions
+  still_viable: true
+- label: Actual business action event
+  still_viable: false
+strongest_counterexample: Two entries each say Imported items but refer to different purported changes.
+  String equality cannot identify the occurrence, and the words may remain after the underlying assertion
+  is discovered false.
+verdict: explicitly_deferred
+needed_evidence: Specify whether action denotes a literal value, shared linguistic content or an entry-bound
+  versioned component, and provide an amendment example deciding whether replacing wording preserves identity.
+  Event identity is not a viable substitute for the content distinction.

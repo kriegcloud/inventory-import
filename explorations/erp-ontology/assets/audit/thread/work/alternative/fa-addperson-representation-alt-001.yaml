@@ -1,0 +1,23 @@
+{
+  "id": "fa:addperson-representation-alt:001",
+  "hypothesis_ref": "dh:addperson-representation:001",
+  "identity_card_ref": "ic:addperson-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Request message specifying a membership-founding act (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Implementation DTO only",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The domain referent behind AddPerson is the founding of a Membership; the class is the request, not that founding.",
+  "verdict": "analyzed"
+}

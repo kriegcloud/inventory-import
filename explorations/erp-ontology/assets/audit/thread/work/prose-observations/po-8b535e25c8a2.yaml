@@ -1,0 +1,6 @@
+id: "po:sha256:8b535e25c8a2cc2dfb8d33ef90801cd51458c927d540c9ccbe11aff2918848c2"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 135, end_line: 135}
+quote: "A relationship between one person and one tenant that lets the person act in the tenant's workspace from the day it is made until it is removed."
+epistemic_status: quoted_prose

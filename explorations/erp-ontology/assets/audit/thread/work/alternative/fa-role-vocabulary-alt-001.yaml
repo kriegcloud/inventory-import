@@ -1,0 +1,28 @@
+{
+  "id": "fa:role-vocabulary-alt:001",
+  "hypothesis_ref": "dh:role-vocabulary:001",
+  "identity_card_ref": "ic:role-vocabulary-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "ConceptScheme as an information object (semantic-support term, my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Collective whose identity is its member concepts",
+      "still_viable": true
+    },
+    {
+      "label": "Scaffolding only (null)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The concept's identity criterion references the scheme; a scheme with no identity criterion makes that criterion indeterminate.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "A steward ruling on scheme identity (single global MemberRoleScheme vs per-tenant schemes for custom roles), and whether custom roles share the scheme."
+}

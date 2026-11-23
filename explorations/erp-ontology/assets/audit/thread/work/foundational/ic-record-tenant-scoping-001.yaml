@@ -1,0 +1,37 @@
+id: ic:record-tenant-scoping:001
+hypothesis_ref: dh:record-tenant-scoping:001
+identity:
+  supplies_identity: false
+  identity_criterion: 'No separate containment individual is established: proposed contextual record-in-workspace
+    relation. Same assertion requires the same record, containing workspace/tenant context and snapshot.
+    Reidentification by tenant/id must not be used circularly to identify the tenant body or the body
+    described by the record. Persistence through state change is not asserted for a separate individual;
+    changing an endpoint or snapshot changes the contextual assertion.'
+  reidentification_key:
+  - Record handle
+  - Containing tenant/workspace handle
+  - Snapshot
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - relator
+  existential_dependencies:
+  - Depends on a customer-data record and workspace holding it; the body described by the record and legal
+    ownership are separate (po:745d38853519). Current application role bearer must be context-indexed
+    during succession. Query isolation is asserted by prose po:fdb5b79b2faf, not observed live. Missing
+    containment is not a violation without a complete customer-record snapshot.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states: []
+counterexamples:
+- description: The tenant imports a record of a counterparty, then a successor takes over the workspace.
+    Neither the counterparty nor the record must become identical to its holder, and unchanged organizationId
+    does not prove unchanged legal tenant bearer.
+status: proposed

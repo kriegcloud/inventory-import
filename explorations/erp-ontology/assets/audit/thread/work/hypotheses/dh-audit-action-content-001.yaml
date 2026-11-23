@@ -1,0 +1,30 @@
+id: dh:audit-action-content:001
+observation_refs:
+- po:sha256:982423dfeb614079c6304825f455f5ba08b8fd862df43b6693e53fec3fec3048
+- po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+- po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+cq_warrants:
+- CQ-P10
+proposed_referent:
+  label: Audit action wording
+  description: 'Candidate referent: human-readable action content within an audit entry. Instances are
+    wording occurrences attached to particular entries; equal strings in different entries need not be
+    one occurrence or identify one change. The wording reports what was done without demonstrating the
+    actual event.'
+representation_status: information_artifact
+alternatives:
+- label: A completed business change event
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The explicit aboutness and human-readable reporting role justify informational content; no
+    independent taxonomy of action types is inferred.
+  discriminator: The quoted audit decision asks what the entry says was done and explicitly distinguishes
+    entry content from proof of a change actor. The action words therefore function as report content
+    read by people, rather than being the executed act itself.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

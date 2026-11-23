@@ -1,0 +1,6 @@
+id: "po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 200, end_line: 204}
+quote: "I chose the party itself: `Organization` names the real body and `Person` the human. The row a tenant imports, matches and reviews is a `SourceRecord` linked to it by `recordOf`, reidentified by tenant, source system, source type and exact source id; two records a tenant holds that may be one party are joined only by an `IdentityDecision`. The agent recommended the same. This amends decision 3: the Sutton Account is the organization, and what is imported is the tenant's record of it."
+epistemic_status: quoted_prose

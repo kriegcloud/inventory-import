@@ -1,0 +1,34 @@
+{
+  "id": "ic:hasrole-representation-alt:001",
+  "hypothesis_ref": "dh:hasrole-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'hasRole' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "normative inclusion rule (admin ⊇ editor ⊇ viewer) — a policy specification"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Policy-as-fact risk: rank(role) >= rank(minimum) is an access policy, not a descriptive fact about roles."
+    }
+  ],
+  "status": "proposed"
+}

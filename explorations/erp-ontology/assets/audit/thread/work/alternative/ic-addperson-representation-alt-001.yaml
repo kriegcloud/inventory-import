@@ -1,0 +1,35 @@
+{
+  "id": "ic:addperson-representation-alt:001",
+  "hypothesis_ref": "dh:addperson-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'AddPerson' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "none (pure wire DTO)",
+      "event type: founding a Membership (the execution this request asks for)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "It adds 'the person who signed up with this email' — resolution goes through an account email, so the command cannot add a human with no account, while the ontology says membership is independent of any account."
+    }
+  ],
+  "status": "proposed"
+}

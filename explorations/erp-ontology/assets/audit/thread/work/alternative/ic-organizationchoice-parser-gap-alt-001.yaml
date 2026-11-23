@@ -1,0 +1,35 @@
+{
+  "id": "ic:organizationchoice-parser-gap-alt:001",
+  "hypothesis_ref": "dh:organizationchoice-parser-gap:001",
+  "identity": {
+    "supplies_identity": "unresolved",
+    "identity_criterion": "unresolved: the chain records only that the adapter could not represent CallExpression in 'OrganizationChoice'; it supplies no domain content of its own.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": "unresolved",
+    "supplies_identity": "unresolved",
+    "unity": "unresolved",
+    "dependence": "unresolved"
+  },
+  "ufo_analysis": {
+    "candidate_category": "unresolved",
+    "alternatives": [
+      "no separate referent: the chain denotes the same declaration analysed under dh:organizationchoice-representation:001 and collapses onto that ruling",
+      "partially observed encoding of a domain concept whose content sits in the unrepresented constructs"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "The unrepresented CallExpression hold the OrganizationId/name struct. Any category read from this chain alone would be read from what the adapter did NOT see; the same source span is already observed with excerpt under the sibling hypothesis."
+    }
+  ],
+  "status": "proposed"
+}

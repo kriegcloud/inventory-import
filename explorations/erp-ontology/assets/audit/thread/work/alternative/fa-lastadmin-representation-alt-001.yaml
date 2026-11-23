@@ -1,0 +1,23 @@
+{
+  "id": "fa:lastadmin-representation-alt:001",
+  "hypothesis_ref": "dh:lastadmin-representation:001",
+  "identity_card_ref": "ic:lastadmin-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Rejection encoding (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Encodes a cardinality constraint worth a SHACL shape",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The invariant is real and decision-relevant; the error class is not a referent.",
+  "verdict": "analyzed"
+}

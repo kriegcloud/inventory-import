@@ -1,0 +1,25 @@
+id: dh:sessionstatus-representation:001
+observation_refs:
+- so:sha256:21a713b4df0a3e6e64c73e4a5496866651b6347dd4c4091e15088c349f85821c
+- so:sha256:43752bd544ddfa7975ceb572c85570646949e39178e7445444fdbd1be224f04c
+cq_warrants: []
+proposed_referent:
+  label: SessionStatus branch codes
+  description: 'Candidate real/domain referents: none established for the status vocabulary as a domain
+    kind. The codes select signed-out, no-organization and ready representations. Instances are code values
+    within snapshots, not intrinsic kinds of humans or organizations.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: Application authentication-context states
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

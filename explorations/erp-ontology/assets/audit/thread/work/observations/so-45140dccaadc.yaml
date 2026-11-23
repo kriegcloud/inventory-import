@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:45140dccaadc35b3b6db76e6f7b4f67f8084e2d73007df767843760a603a1b13",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 43,
+    "end_line": 52,
+    "content_sha256": "167eb09c473c74193aa47a283c968bd075ac464519e093e280d6a62db10d8657"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Membership",
+    "lexical_name": "Membership",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class Membership extends S.Opaque<Membership, { readonly brand: unique symbol }>()(\n  S.Struct({\n    organizationName: DisplayName.pipe(S.annotateKey({ description: \"The organization's name\" })),\n    role: Role\n  }).pipe(\n    $I.annoteSchema(\"Membership\", {\n      description: \"An organization the account belongs to, earliest first, and its role there.\"\n    })\n  )\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

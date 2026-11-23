@@ -1,0 +1,26 @@
+id: dh:audittrail-representation:001
+observation_refs:
+- so:sha256:77f603223fd9fe6714b114671bb72a6a71e1158467f5743c961be383b24a31b0
+- so:sha256:7f71ea10b334f583a0205967b2099b4b9f550c88142ad10f11912a9b132b4d16
+cq_warrants: []
+proposed_referent:
+  label: AuditTrail response collection
+  description: 'Candidate real/domain referents: none established for a separate collection kind. These
+    chains encode a bounded newest-first array of entry representations. A returned array is individuated
+    by a response and its ordered elements; that does not individuate an enduring audit trail independently
+    of its entries.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A tenant audit log as an information collection
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

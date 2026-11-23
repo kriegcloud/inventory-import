@@ -1,0 +1,27 @@
+{
+  "id": "fa:organization-body-alt:001",
+  "hypothesis_ref": "dh:organization-body:001",
+  "identity_card_ref": "ic:organization-body-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Kind 'Organization' with legal-entity criterion (my ruling, with the disjunction flagged)",
+      "still_viable": true
+    },
+    {
+      "label": "Category 'organized body' with subkinds RegisteredLegalEntity and UnregisteredBody, each supplying its own criterion",
+      "still_viable": true
+    },
+    {
+      "label": "Workspace/record only (null)",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "Registration of a previously unregistered body: the two halves of the identity decision give opposite answers to whether the registered company is the same Organization.",
+  "verdict": "analyzed"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "ic:personnotfound-representation-alt:001",
+  "hypothesis_ref": "dh:personnotfound-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'PersonNotFound' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "situation: addressed membership does not exist in this tenant"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "'The member in the address is not in this organization': the human may well exist; only the membership does not."
+    }
+  ],
+  "status": "proposed"
+}

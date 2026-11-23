@@ -1,0 +1,34 @@
+id: ic:scope-concepts:001
+hypothesis_ref: dh:scope-concepts:001
+identity:
+  supplies_identity: true
+  identity_criterion: The same scope concept is the same controlled-scheme-and-notation individual, following
+    po:318a83669135; organization-wide coverage applied in two different tenants does not make the concept
+    two individuals. Application targets and concept identity remain distinct.
+  reidentification_key:
+  - GrantScopeKindScheme plus notation organization
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Concrete application of the concept needs a tenant context; it is separate from concept identity.
+  existential_dependencies:
+  - Depends on the scope concept scheme and its coverage meaning. Does not depend on a particular grant
+    or tenant using it. The current shipped organization concept describes coverage of all records of
+    one organization (po:cf88db38b0c8 and po:19ca3041dabc); it is not that organization or its record
+    collection.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - No concept extinction rule supplied; removal from a shipped list alone does not prove extinction.
+counterexamples:
+- description: Two grants share organization scope concept but apply to distinct tenants. Treating the
+    concept as the actual extent would collapse their target sets. Mention of site or field scope does
+    not prove shipped concept instances.
+status: proposed

@@ -1,0 +1,24 @@
+{
+  "id": "fa:source-party-record-alt:001",
+  "hypothesis_ref": "dh:source-party-record:001",
+  "identity_card_ref": "ic:source-party-record-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Information object kind SourceRecord (my ruling on category)",
+      "still_viable": true
+    },
+    {
+      "label": "Not admitted: no CQ warrant in this thread (null for admission, not for category)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Category is clear; admission is not: no supplied CQ requires source records.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "A Must/Should CQ that needs source-record identity (import matching/review); category itself is settled as information_object."
+}

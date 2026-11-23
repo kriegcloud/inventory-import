@@ -1,0 +1,94 @@
+id: otp:Role:001
+hypothesis_ref: dh:access-level-concepts:001
+identity_card_ref: ic:access-level-concepts:001
+foundational_status: analyzed
+term:
+  preferred_label: Role
+  local_name: Role
+  proposed_iri: https://example.org/inventory-import/ontology/Role
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A repeatable access-level information concept assigned to a membership through a scoped grant, specifying
+    a level of permitted workspace activity, such as viewer, editor or admin.
+  source:
+  - so:sha256:9f27182cb6fa04b772602a4c652c17a0c00aac9798a67870470f4c01853e8b4b
+  - so:sha256:b83c15c49f2ccbd3cce461e637392107250b8a310b82823472d4a8096a60e7f2
+  - po:sha256:17438ea944b4c4d7360830228707f119a5ed9bdd1620fdaaff4443e1dce4d3b9
+  - po:sha256:4153731270284017dd2f93816b22863dd78e69e1cc7b10fd3e13c940002dba8a
+  - po:sha256:471a16ce6f740e347c1f3f38e5480a050530104d4e167e047ef69c00c1899d7e
+  - po:sha256:53dc6c25de9b99130d5c7b2b8dae181251cb671d41edcc57d4a250ac3eb405d0
+  - po:sha256:cf426b237ec8182ac1c1c7893b2e21fcdbe11f6c682e625af8517f5042bc694c
+  - po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2
+foundational:
+  ufo_category: information_object
+  gufo_alignment: gufo:FunctionalComplex
+ontoclean:
+  rigidity: rigid
+  identity: supplies
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: http://www.w3.org/2004/02/skos/core#Concept
+    compatibility: Role instances have controlled-concept semantics, but Role selects access-level concepts
+      only; SKOS is an alignment vocabulary here, never an asserted parent, and no scheme is admitted by this
+      match.
+operational_warrant:
+  competency_questions: []
+  semantic_support_for:
+  - otp:Member:001
+  - otp:Grant:001
+alternatives_rejected:
+- 'Foundational analysis rejects: Bearer role or anti-rigid human class named Admin rather than the repeatable
+  concept.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The supplied permission meanings and explicit scheme-and-notation identity support controlled information
+  concepts. The source alias observations provide no extra behavioral proof, and no permission entities are
+  inferred.'
+open_issues:
+- 'Steward identity commitment: the concept’s scheme and notation. Labels, spelling of display names, assignment
+  to different humans and copying a representation do not create another controlled concept; the same notation
+  in a different scheme is different. Changing entitlement content under the same scheme/notation has unresolved
+  version semantics.'
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Version-specific entitlement specification with finer identity than scheme and notation
+  if future content-version policy requires it. This synthesis makes no selection by omission. The selected
+  model may require a revised proposal or a separate future candidate; no such additional term is admitted
+  in this 18-key scope.'
+- 'Strongest counterexample carried forward: The notation admin in two different schemes need not be one concept;
+  two humans holding admin are not identical and create no new admin concept. A changed permission description
+  under the same notation exposes versioning policy not specified here.'
+- 'Identity-card alternatives carried forward: Repeatable entitlement specification is informational; no permission
+  entities or implemented custom-role instances are inferred.'
+- 'Existential dependencies carried forward: Concept is scheme-relative and bears the supplied entitlement
+  description (po:53dc6c25de9b, po:415373127028, po:471a16ce6f74). Its existence as a controlled concept does
+  not depend on any member currently receiving it. Grant/holding relation is separate; viewer/editor/admin
+  are not human kinds or episodes.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:access-level-concepts:001: “The prose assigns different normative contents to the concepts:
+  viewer may read and write none, editor may read and write but not manage people, admin may additionally manage
+  people. These are descriptions of access entitlements held through grants, not merely three opaque literal
+  spellings.” The claim must fail for a pure data-transfer twin: viewer is forbidden to write and editor is
+  forbidden to manage people; a code transfer without these entitlement constraints is insufficient.'
+- 'No gist parent: decision 97’s exception is preserved. Its instances are access-level concepts, not human
+  subclasses; gist:Permission would require permits, which is outside this thread. MemberRoleScheme is not
+  proposed because dh:role-vocabulary:001 keeps the null. This class does not admit its scheme or mint separate
+  viewer/editor/admin proposals.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=true; ontoclean.supplies_identity=true;
+  ontoclean.carries_identity=true. Closed proposal identity value=supplies. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): String literals used solely as implementation
+  branch keys; representation_status=implementation_artifact_only; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

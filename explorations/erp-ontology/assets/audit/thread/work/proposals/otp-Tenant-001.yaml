@@ -1,0 +1,86 @@
+id: otp:Tenant:001
+hypothesis_ref: dh:tenant-role:001
+identity_card_ref: ic:tenant-role:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Tenant
+  local_name: Tenant
+  proposed_iri: https://example.org/inventory-import/ontology/Tenant
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: An organization in the workspace-hosting role for which the application keeps a workspace and isolates
+    its records from those of other organizations.
+  source:
+  - po:sha256:2c332e9298fcc6c7c51b57fa34c20af8a9e6d8906f610b7584ce170c17dd3733
+  - po:sha256:7b635e2155ffb47af78fa15060c100ae1b805f024646ccf60c805e91a1103b8f
+  - po:sha256:e93ff65f63c8e0b6104d61b4f751695b64819a77bc122f66d8701c03ffbaa02d
+  - po:sha256:fdb5b79b2fafe375c4e785c1c568682819f47cb24bcc548c43c74e27061fba78
+  - po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f
+  - po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3
+foundational:
+  ufo_category: role
+  gufo_alignment: gufo:Role
+ontoclean:
+  rigidity: anti_rigid
+  identity: carries
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Organization
+    compatibility: A workspace-hosting organizational bearer fits the organized-body meaning of gist:Organization,
+      but the local term adds an anti-rigid workspace relation; it is not exact reuse.
+operational_warrant:
+  competency_questions: []
+  semantic_support_for:
+  - otp:Member:001
+  - otp:inTenant:001
+alternatives_rejected:
+- 'Foundational analysis rejects: Rigid subkind of Organization.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The supplied tenancy isolation account motivates a workspace role of an organizational bearer, while the
+  succession decision separates bearer identity from database addressing.'
+open_issues:
+- 'FLAGGED FOR STEWARD — foundational_status explicitly_deferred; this proposal does not settle the foundational
+  question. Needed evidence: Resolve the Organization identity continuity questions, then supply a dated workspace-to-body
+  succession example showing which body bears Tenant before and after takeover; this is needed for bearer identity,
+  not for the anti-rigid role classification.'
+- Identity is inherited from the organizational bearer, not supplied by OrganizationId. Succession to a new
+  legal body changes the bearer despite the same workspace. Workspace retention does not fuse successive bodies.
+  Organization continuity and dated role succession remain unresolved.
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Workspace partition as a separately identifiable information/system object. This synthesis
+  makes no selection by omission. The selected model may require a revised proposal or a separate future candidate;
+  no such additional term is admitted in this 18-key scope.'
+- 'Strongest counterexample carried forward: A successor keeps the same OrganizationId and workspace, but is
+  a new organization. Treating Tenant identity as the partition key would falsely identify distinct role bearers.'
+- 'Identity-card alternatives carried forward: Workspace partition is a distinct referent rather than an equivalent
+  interpretation of the body in its role.'
+- 'Existential dependencies carried forward: Depends on the body standing in the relation for which the application
+  keeps a workspace and isolates records (po:e93ff65f63c8); the body can persist after ceasing to be Tenant.
+  The workspace can persist while a successor body assumes Tenant. Tenant is not the workspace itself.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:tenant-role:001: “The prose distinguishes the legal body from the retained workspace
+  and says the Tenant role passes to a successor organization. A role borne by distinct legal bodies across
+  succession cannot be identical to an unchanged partition key alone.” The claim must fail for a pure data-transfer
+  twin: the role changes legal bearer across succession despite the unchanged partition.'
+- Parent withheld pending identity and rival-model resolution. The proposed thin-thread parent is a candidate
+  only; no ancestor identity supplier has been established for this unresolved branch.
+- 'Joined IdentityCard provider fields: identity.supplies_identity=false; ontoclean.supplies_identity=false;
+  ontoclean.carries_identity=true. Closed proposal identity value=carries. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): The workspace partition or database tenant
+  key alone; representation_status=implementation_artifact_only; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

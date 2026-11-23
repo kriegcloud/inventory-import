@@ -1,0 +1,35 @@
+id: dh:tenant-role:001
+observation_refs:
+- po:sha256:2c332e9298fcc6c7c51b57fa34c20af8a9e6d8906f610b7584ce170c17dd3733
+- po:sha256:7b635e2155ffb47af78fa15060c100ae1b805f024646ccf60c805e91a1103b8f
+- po:sha256:e93ff65f63c8e0b6104d61b4f751695b64819a77bc122f66d8701c03ffbaa02d
+- po:sha256:fdb5b79b2fafe375c4e785c1c568682819f47cb24bcc548c43c74e27061fba78
+- po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f
+- po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3
+cq_warrants:
+- CQ-P06
+- CQ-P09
+- CQ-P11
+proposed_referent:
+  label: Organization hosting an application workspace
+  description: 'Candidate referent: the tenant capacity of an organized body for which the application
+    maintains a workspace and separates records. An instance is the particular body in that workspace-bearing
+    relation, inheriting body identity; OrganizationId is a repository handle rather than a proof of legal
+    identity. Successor bodies can take over the same workspace.'
+representation_status: domain_referent
+alternatives:
+- label: The workspace partition or database tenant key alone
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The supplied tenancy isolation account motivates a workspace role of an organizational bearer,
+    while the succession decision separates bearer identity from database addressing.
+  discriminator: The prose distinguishes the legal body from the retained workspace and says the Tenant
+    role passes to a successor organization. A role borne by distinct legal bodies across succession cannot
+    be identical to an unchanged partition key alone.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

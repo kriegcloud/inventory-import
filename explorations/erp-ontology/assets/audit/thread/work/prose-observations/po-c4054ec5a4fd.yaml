@@ -1,0 +1,6 @@
+id: "po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 228, end_line: 229}
+quote: "I chose `Grant` as its own relator: it links a member, a role and a scope, and today's `member.role` is read as one grant at organization scope. The agent recommended the same."
+epistemic_status: quoted_prose

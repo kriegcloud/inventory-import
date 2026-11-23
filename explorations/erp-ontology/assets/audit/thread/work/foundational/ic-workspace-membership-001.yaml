@@ -1,0 +1,36 @@
+id: ic:workspace-membership:001
+hypothesis_ref: dh:workspace-membership:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: same continuing establishment of authorization between a particular
+    human and a particular tenant is the candidate criterion. Tenant plus MemberId is the supplied retained
+    handle, not proof that removal/rejoining, duplicate rows or bearer replacement continue the same membership.
+    Same person-tenant pair alone cannot distinguish episodes.'
+  reidentification_key:
+  - Member.organizationId
+  - Member.id
+ontoclean:
+  rigidity: rigid
+  carries_identity: unresolved
+  supplies_identity: unresolved
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: relator
+  alternatives:
+  - role
+  - information_object
+  existential_dependencies:
+  - Mediates a human and tenant workspace context, with the authorization interval from creation to removal
+    (po:8b535e25c8a2). Dependence is on those participants for the active relation, not on a display name
+    or account. A retained post-removal record can exist after this active relation ends.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - Removal ends active membership authorization; retained MemberId does not prove a still-existing relator.
+counterexamples:
+- description: Remove a member and later recreate access for the same human in the same tenant, perhaps
+    reusing a handle. Two different establishments and one suspended relation fit the same current row
+    projection; no supplied history distinguishes them.
+status: proposed

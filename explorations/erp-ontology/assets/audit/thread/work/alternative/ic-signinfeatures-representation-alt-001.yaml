@@ -1,0 +1,34 @@
+{
+  "id": "ic:signinfeatures-representation-alt:001",
+  "hypothesis_ref": "dh:signinfeatures-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'SignInFeatures' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "deployment configuration (information object)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Values come from environment flags (TEST_ACCOUNTS, PWNED_PASSWORD_CHECK, SIGN_UP); they describe a deployment, not a tenant."
+    }
+  ],
+  "status": "proposed"
+}

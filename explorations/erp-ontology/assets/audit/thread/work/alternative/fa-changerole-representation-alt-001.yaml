@@ -1,0 +1,23 @@
+{
+  "id": "fa:changerole-representation-alt:001",
+  "hypothesis_ref": "dh:changerole-representation:001",
+  "identity_card_ref": "ic:changerole-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Request message (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "DTO only",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Its execution is where Grant identity is decided: mutate-in-place vs new grant.",
+  "verdict": "analyzed"
+}

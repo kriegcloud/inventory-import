@@ -1,0 +1,42 @@
+{
+  "id": "ic:human-person-alt:001",
+  "hypothesis_ref": "dh:human-person:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "Same human being: one human organism-and-life is one Person, persisting through name, email, account and membership changes and after death (decision quoted at po:409cfb4d8ae1). Records, accounts and member ids are explicitly excluded as criteria.",
+    "reidentification_key": [
+      "no stored person key is observed; the thread fixture names one Person linked from Member records"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "kind",
+    "alternatives": [
+      "role over a human kind ('a human a tenant deals with', read definitionally from po:6978a469f8c2)",
+      "party category (non-sortal) shared with Organization, of which Person would be a subkind-provider only"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": [
+      "death (the Person persists as a referent after death per the identity decision; no terminal state for the individual)"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Definitional clash: po:6978a469f8c2 defines Person as 'a human being that a tenant deals with' (relational, anti-rigid wording) while po:409cfb4d8ae1 makes the individual persist for life and after death independently of any tenant. If the definitional clause were the category test, a human whose last membership and contact link are removed would cease to be a Person — which the identity decision forbids. I read the clause as a population/scope restriction of the dataset, not a category condition."
+    },
+    {
+      "description": "Code-level tension: Member.id is annotated 'Who this is: people are told apart by this id' (so:ef1f0d4ea98a) and CLAUDE.md says 'People are told apart by id (actor.id)' (po:e2b5eec09f7b), contradicting 'a member id never identifies a person'. Under my model those annotations are about members (memberships), and the code conflates the human with the membership handle."
+    }
+  ],
+  "status": "proposed"
+}

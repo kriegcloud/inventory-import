@@ -1,0 +1,6 @@
+id: "po:sha256:3a7e6ee160c6a967361ebc21831995185a188888f32816ec8d2a7142426644d0"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "CLAUDE.md"}
+source_span: {start_line: 598, end_line: 602}
+quote: "Anything that writes starts with `yield* requireRole(\"editor\")` (or `\"admin\"`). The UI mirrors the rule with `hasRole` so nobody is offered a button that will be refused. A write is safe to send twice: it names what it acts on (an upload's key, the revision an edit was made on, an import still open), so a retry writes once; `newRequestId()` makes a key once per press for a new write that has nothing of its own. A write from another site is refused before identity (`SameOrigin`)."
+epistemic_status: quoted_prose

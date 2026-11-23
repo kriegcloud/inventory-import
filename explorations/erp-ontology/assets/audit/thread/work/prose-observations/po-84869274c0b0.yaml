@@ -1,0 +1,6 @@
+id: "po:sha256:84869274c0b0aa4e0b7806eec23063acf78b38f3d188f4fb97a8b574945469bc"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 171, end_line: 171}
+quote: "Links a membership to the human who holds it, independently of any account."
+epistemic_status: quoted_prose

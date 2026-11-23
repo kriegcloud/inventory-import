@@ -1,0 +1,20 @@
+id: fa:human-person:001
+hypothesis_ref: dh:human-person:001
+identity_card_ref: ic:human-person:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Account or membership information object as the human itself; contradicted by the explicit duplicate-record
+    decision
+  still_viable: false
+- label: Tenant-contact role of a human, useful as a separate participation predicate but not the referent
+    of this identity commitment
+  still_viable: false
+strongest_counterexample: One human has two Member records, later one is removed and both account details
+  change. Neither operation creates another human; death also does not end Person identity under the supplied
+  decision. A living-organism-only interpretation would conflict with this post-death stipulation.
+verdict: analyzed
+needed_evidence: ''

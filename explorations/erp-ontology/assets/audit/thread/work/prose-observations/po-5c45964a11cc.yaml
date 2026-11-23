@@ -1,0 +1,6 @@
+id: "po:sha256:5c45964a11cc82365db545213f1efa9e3c4ba4a5204bc0d1676d50f935806267"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 173, end_line: 173}
+quote: "Links a grant to the member who holds it."
+epistemic_status: quoted_prose

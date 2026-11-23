@@ -1,0 +1,24 @@
+id: dh:ready-representation:001
+observation_refs:
+- so:sha256:a6b73da539694c2557bdc5460e939c274d5662cd57aa0321881fd9830591b41a
+cq_warrants: []
+proposed_referent:
+  label: Ready session branch
+  description: 'Candidate real/domain referents: none established for a separate Ready entity. The record
+    groups actor, email, organizations and features under a status tag. Instances are session snapshots
+    with an available acting member; they are not new persons or memberships.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: An authenticated acting context for one membership
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

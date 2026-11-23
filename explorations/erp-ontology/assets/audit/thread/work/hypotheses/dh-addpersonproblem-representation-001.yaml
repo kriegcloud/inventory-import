@@ -1,0 +1,24 @@
+id: dh:addpersonproblem-representation:001
+observation_refs:
+- so:sha256:cf37511ec5357a7168c2e5e3215a830fc64438adb23e182d95698a2a7f792e5c
+cq_warrants: []
+proposed_referent:
+  label: AddPersonProblem form data
+  description: 'Candidate real/domain referents: none established beyond form feedback. The kind, problem
+    sentence and suggested action are display data. A feedback value is individuated by its content and
+    form response context, not by a separately demonstrated failure event.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A diagnostic message about an unsuccessful addition
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

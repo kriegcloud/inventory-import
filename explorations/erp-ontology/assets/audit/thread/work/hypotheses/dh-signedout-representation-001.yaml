@@ -1,0 +1,24 @@
+id: dh:signedout-representation:001
+observation_refs:
+- so:sha256:8c360f48707d692f0f4a41bc2aafa203fcb5916cbd3c8d9773532e86a8f9ff89
+cq_warrants: []
+proposed_referent:
+  label: SignedOut session branch
+  description: 'Candidate real/domain referents: none established. The tagged record represents an unauthenticated
+    browser context with feature settings. Instances are session-state snapshots, not an enduring kind
+    of person.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: An absence of authenticated account context
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

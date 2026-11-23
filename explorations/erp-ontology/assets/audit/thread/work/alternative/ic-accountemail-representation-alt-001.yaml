@@ -1,0 +1,35 @@
+{
+  "id": "ic:accountemail-representation-alt:001",
+  "hypothesis_ref": "dh:accountemail-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'AccountEmail' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "quality value of an Account (its sign-in email)",
+      "identifier information object for an account"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Decision 93 keeps email paths off Person; an email belongs to an account, and a member with no account has none (Person.read.ts) — so the email never denotes the human."
+    }
+  ],
+  "status": "proposed"
+}

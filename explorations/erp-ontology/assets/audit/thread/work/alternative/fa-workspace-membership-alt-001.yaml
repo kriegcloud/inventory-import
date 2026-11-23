@@ -1,0 +1,27 @@
+{
+  "id": "fa:workspace-membership-alt:001",
+  "hypothesis_ref": "dh:workspace-membership:001",
+  "identity_card_ref": "ic:workspace-membership-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "merged",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Relator Membership mediating Person and Tenant (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Role 'Member' of Person (qua-individual) — observationally equivalent while no membership-owned properties beyond role exist",
+      "still_viable": true
+    },
+    {
+      "label": "Member row only (null)",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "Removal followed by re-adding the same human to the same tenant: the founding criterion yields two memberships, the pair criterion yields one; the MemberId behaviour on re-add (new id or old id) is not observed.",
+  "verdict": "analyzed"
+}

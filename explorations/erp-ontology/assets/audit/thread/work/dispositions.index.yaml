@@ -1,0 +1,939 @@
+- observation: po:sha256:020743f3cadf0467e6f94f024b74d06b24fc542c5381f072586777707b229f1a
+  outcome: proposed
+  ref: otp:Organization:001
+- observation: po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62
+  outcome: proposed
+  ref: otp:Member:001
+- observation: po:sha256:11d1b53834c38359f84295b255a9249cef0d3f03d3a302aab2b61de3b75c1871
+  outcome: proposed
+  ref: otp:grantsRole:001
+- observation: po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: po:sha256:17438ea944b4c4d7360830228707f119a5ed9bdd1620fdaaff4443e1dce4d3b9
+  outcome: proposed
+  ref: otp:Role:001
+- observation: po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45
+  outcome: proposed
+  ref: otp:Grant:001
+- observation: po:sha256:218d99fcdef200927a39668d5aef017716150daa8a3ee3767ad8c0d5a784e374
+  outcome: proposed
+  ref: otp:grantScope:001
+- observation: po:sha256:2263348a61c74a8002ba7d66289dfa64deb20d97c9fa37f4c1d154a9dacc06de
+  outcome: proposed
+  ref: otp:Member:001
+- observation: po:sha256:2c332e9298fcc6c7c51b57fa34c20af8a9e6d8906f610b7584ce170c17dd3733
+  outcome: proposed
+  ref: otp:Tenant:001
+- observation: po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2
+  outcome: proposed
+  ref: otp:Role:001
+- observation: po:sha256:3a7e6ee160c6a967361ebc21831995185a188888f32816ec8d2a7142426644d0
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:write-authorization-retry-rule:001 keeps the null hypothesis: "Write guard and retry protocol" at CLAUDE.md lines 598-602 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: po:sha256:409cfb4d8ae1c4cf7180ff65594c3914c5b37da84b47ac137190b65e159c21ef
+  outcome: proposed
+  ref: otp:Person:001
+- observation: po:sha256:4153731270284017dd2f93816b22863dd78e69e1cc7b10fd3e13c940002dba8a
+  outcome: proposed
+  ref: otp:Role:001
+- observation: po:sha256:471a16ce6f740e347c1f3f38e5480a050530104d4e167e047ef69c00c1899d7e
+  outcome: proposed
+  ref: otp:Role:001
+- observation: po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9
+  outcome: proposed
+  ref: otp:Grant:001
+- observation: po:sha256:53dc6c25de9b99130d5c7b2b8dae181251cb671d41edcc57d4a250ac3eb405d0
+  outcome: proposed
+  ref: otp:Role:001
+- observation: po:sha256:54da2f53fbca640bc6194127d5133624bf87036f456e144813d9a91362920579
+  outcome: proposed
+  ref: otp:Person:001
+- observation: po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8
+  outcome: proposed
+  ref: otp:Grant:001
+- observation: po:sha256:5c45964a11cc82365db545213f1efa9e3c4ba4a5204bc0d1676d50f935806267
+  outcome: proposed
+  ref: otp:grantedTo:001
+- observation: po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: po:sha256:67ff51b75ca5446a6aa75c17d6c7e116ca807760d45ef2d4246594215123c638
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: po:sha256:6978a469f8c2d0ff495c6dad024e4ea8420d2032a4f4f22db396decff519d8bb
+  outcome: proposed
+  ref: otp:Person:001
+- observation: po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f
+  outcome: proposed
+  ref: otp:Organization:001
+- observation: po:sha256:737ff1456ab1b977ef7fb4179c8c5d5b1b9ef1c5c65a2b69ec33c606b56daef4
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:membership-tenant-link:001 ("Membership-to-tenant link candidate") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 172-172: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3
+  outcome: proposed
+  ref: otp:inTenant:001
+- observation: po:sha256:773104c28ed467a30f132e112bcb7ae328f88cde089c66e73c56e487d48b30f8
+  outcome: proposed
+  ref: otp:Grant:001
+- observation: po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c
+  outcome: proposed
+  ref: otp:Organization:001
+- observation: po:sha256:7b635e2155ffb47af78fa15060c100ae1b805f024646ccf60c805e91a1103b8f
+  outcome: proposed
+  ref: otp:Tenant:001
+- observation: po:sha256:84869274c0b0aa4e0b7806eec23063acf78b38f3d188f4fb97a8b574945469bc
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:membership-human-link:001 ("Membership-to-human link candidate") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 171-171: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:89e5463325c44a76a128c4dff85caed068911d4e9354c960107bc822d66f0304
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: po:sha256:8b535e25c8a2cc2dfb8d33ef90801cd51458c927d540c9ccbe11aff2918848c2
+  outcome: proposed
+  ref: otp:Member:001
+- observation: po:sha256:8e6b8e4428f59f50f4bfcc6b8100db1692104086505630db8c9dca418239430b
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: po:sha256:982423dfeb614079c6304825f455f5ba08b8fd862df43b6693e53fec3fec3048
+  outcome: proposed
+  ref: otp:action:001
+- observation: po:sha256:a189eb95f95d457aa06a751fa0eeeb541f07eecb66ad261d9ac709c5bd4b03ca
+  outcome: proposed
+  ref: otp:Grant:001
+- observation: po:sha256:a2954515f0563e447882b597c9c9efb2f780016b31552fa2b41b3b21a3989ea1
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: po:sha256:a9f7e334db4f34fc0728f5c7109c7a1280d0cc01ba2037a45aeb86b7224f197c
+  outcome: proposed
+  ref: otp:Organization:001
+- observation: po:sha256:b32d63c6c6ff8121657d1f6e1cbe10edb75ce2885e9ff6a458178ca1e5db1f1b
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:scope-vocabulary:001 ("Grant extent vocabulary candidate") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 191-191: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:badeb1dc1a0680ab75832b2858d545aed1b7e203be21606c8b64935bfbac9227
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:role-vocabulary:001 ("Member access-level vocabulary candidate") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 193-195: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5
+  outcome: proposed
+  ref: otp:Grant:001
+- observation: po:sha256:c8e8fdebd997dbac3d3e155859f2f36e0a483bd39803752034c82e0dc7ad5bfe
+  outcome: proposed
+  ref: otp:recordedActor:001
+- observation: po:sha256:ce82cb2fd95e4131746a50f6f6a39395dac6eeabf4feff1a2414407dde92f924
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:audit-writing-time:001 ("Audit entry writing-time candidate") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 178-178: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:cf426b237ec8182ac1c1c7893b2e21fcdbe11f6c682e625af8517f5042bc694c
+  outcome: proposed
+  ref: otp:Role:001
+- observation: po:sha256:cf88db38b0c877168ea7fc86a91d7ee12704ce01e2b9fe3321b841240c924551
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:scope-concepts:001 ("Grant scope extent concepts") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 207-207: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863
+  outcome: proposed
+  ref: otp:Member:001
+- observation: po:sha256:de408e7eb4c4400b6371a6c0953e638fee6eac266149fcc5e73488616fa0ea1e
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'dh:role-vocabulary:001 ("Member access-level vocabulary candidate") kept the null hypothesis open for the text at explorations/erp-ontology/research/14-thin-thread.md lines 190-190: it needs a quoted fact that would be false of a plain data shape (an enforced rule, a refusal or a lifecycle) before a term can be proposed from it.'
+  since: '2026-11-22'
+- observation: po:sha256:e2b5eec09f7b75d471242308ed66f9815f1217127ff0c27b2c6af0238da41321
+  outcome: proposed
+  ref: otp:Member:001
+- observation: po:sha256:e93ff65f63c8e0b6104d61b4f751695b64819a77bc122f66d8701c03ffbaa02d
+  outcome: proposed
+  ref: otp:Tenant:001
+- observation: po:sha256:fdb5b79b2fafe375c4e785c1c568682819f47cb24bcc548c43c74e27061fba78
+  outcome: proposed
+  ref: otp:Tenant:001
+- observation: so:sha256:00b6e5ac41e9125093447195277dcdf87734ed038188322d4a89559ea6740963
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:lastadmin-representation:001 keeps the null hypothesis: "LastAdmin rejection representation" at packages/access/contract/src/People/People.rejection.ts lines 35-42 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:0871ed980d60c863fc2e8b6f98f1164541a613bda51127e237448fd87d03c4d9
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:person-representation:001 keeps the null hypothesis: "Person People-page projection" at packages/access/contract/src/People/Person.read.ts lines 21-38 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:0e85c3094e55c1f397ab7b0af90f9cc6517375c69069f4025bc545017f2c92f7
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:membership-representation:001 keeps the null hypothesis: "Membership sign-in summary" at packages/access/contract/src/Session/SessionState.read.ts lines 43-52 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:0ee30d759e66a868a6ca923e29572c311e8ddaa061f78d59a8603b3e80e67f85
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 156-161; dh:sessionstatus-parser-gap:001 ("SessionStatus constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:0f5f5576733a239aa7779cc985f9623a8a776310dcd4c7b78bb1c8aa557b8aaf
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/Session/SessionState.read.ts lines 104-104; dh:signupoffer-parser-gap:001 ("SignUpOffer constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:131d82983aabe33a6b8a69384bc46ffad424744514c10e64011b16fa15cc0834
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.command.ts lines 71-75; dh:addpersonproblemkind-parser-gap:001 ("AddPersonProblemKind constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:17c5631a636fd0c5a7770920d9de468378ffcdf910e53e44114e1ef68ef1fbe9
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:actorofsession-representation:001 keeps the null hypothesis: "actorOfSession selector" at packages/access/contract/src/Session/SessionState.read.ts lines 249-250 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:1c626eb64e784a9f19ddd94dabcd07d882777032d3e71cc7c74966287e7c9df3
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 59-71; dh:testaccount-parser-gap:001 ("TestAccount constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:21a713b4df0a3e6e64c73e4a5496866651b6347dd4c4091e15088c349f85821c
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:sessionstatus-representation:001 keeps the null hypothesis: "SessionStatus branch codes" at packages/access/contract/src/Session/SessionState.read.ts lines 168-168 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:2a94f58e6c6e5d4c9afba2601fc6fc264715b4b9847b532a97de97a34179f6e3
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.command.ts lines 110-114; dh:addpersonoutcome-parser-gap:001 ("AddPersonOutcome constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:2d8f4bd42573011f573e6bc1eddc6d47008c53904a4c812ae91882eeffbbf771
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:signinfeatures-representation:001 keeps the null hypothesis: "SignInFeatures browser settings representation" at packages/access/contract/src/Session/SessionState.read.ts lines 112-135 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:30bd828e03d56c5333e7a8a7036d61f0c110b8f8e4543a68aeb0844b68598692
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.rejection.ts lines 35-42; dh:lastadmin-parser-gap:001 ("LastAdmin constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:36067f43cd2e47ebd50af2186cb0c37dbbb8ed358d480c7d888f80fe0f14815b
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/Session/SessionState.read.ts lines 36-36; dh:accountemail-parser-gap:001 ("AccountEmail constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:366966689fcd7d3bda653f22467434196f1ffffe724f782ef5795fdcca0d117b
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/kernel/src/Role.schema.ts lines 30-30; dh:role-parser-gap:001 ("Role constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:3f721624eb4cbdbcd93430156e8d02d9f0d6eea70e3f9b37a15c1e601cc00457
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.command.ts lines 60-64; dh:changerole-parser-gap:001 ("ChangeRole constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:40e342b4d121407a96c71fa5f1f28f9d24a57d1167e41882a6af1fe90e060051
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.rejection.ts lines 19-28; dh:personnotfound-parser-gap:001 ("PersonNotFound constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:43752bd544ddfa7975ceb572c85570646949e39178e7445444fdbd1be224f04c
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:sessionstatus-representation:001 keeps the null hypothesis: "SessionStatus branch codes" at packages/access/contract/src/Session/SessionState.read.ts lines 156-161 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:45140dccaadc35b3b6db76e6f7b4f67f8084e2d73007df767843760a603a1b13
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 43-52; dh:membership-parser-gap:001 ("Membership constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:4e34e72580014581a647eaf3f65990e3e14a49b2786adf09ec468af3b9479534
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.command.ts lines 27-32; dh:emailtofind-parser-gap:001 ("EmailToFind constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:4fce61580f21c547a2ad57ef2cf3d2af5e6af419c3f31209d3ebb3d68550560f
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 204-213; dh:ready-parser-gap:001 ("Ready constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:5028d5a3834babd774993ddc3fe7bd704d418b7ed95767bfa9ddcffb27ea7a50
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:addpersonproblemkind-representation:001 keeps the null hypothesis: "AddPersonProblemKind codes" at packages/access/contract/src/People/People.command.ts lines 71-75 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:5542f9556137c4c4bc92545cd08dfbee5c8784e9d434dccc06cc4d1582d72ca3
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/People/People.command.ts lines 82-82; dh:addpersonproblemkind-parser-gap:001 ("AddPersonProblemKind constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:6086b535648a5990e39d04f21959857cdede42def27f4718d250884bfa8fbdc4
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:personnotfound-representation:001 keeps the null hypothesis: "PersonNotFound rejection representation" at packages/access/contract/src/People/People.rejection.ts lines 19-28 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:61d4d5420477cc5ec2042753c8bbbb95cf2f7ca38bf50416e6a72d850979f5ca
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:addpersonproblemkind-representation:001 keeps the null hypothesis: "AddPersonProblemKind codes" at packages/access/contract/src/People/People.command.ts lines 82-82 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:6a4f5d6bfd4e6d87bfaa06929285933faaafdbe9ff7d5f3e70a116145ecb70b0
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:sessionstate-representation:001 keeps the null hypothesis: "SessionState tagged representation" at packages/access/contract/src/Session/SessionState.read.ts lines 235-235 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:6ded226bb1a7568038c937bc0d4164f3cedfeb5d5d51341a795e72c8cfe050f2
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:testaccountsoffer-representation:001 keeps the null hypothesis: "TestAccountsOffer fixture display bundle" at packages/access/contract/src/Session/SessionState.read.ts lines 78-87 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:776234f856c04d2a667ac8b4a6b0015afdbbea28b1602e971081e3e296c54a95
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 26-29; dh:accountemail-parser-gap:001 ("AccountEmail constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:77f603223fd9fe6714b114671bb72a6a71e1158467f5743c961be383b24a31b0
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:audittrail-representation:001 keeps the null hypothesis: "AuditTrail response collection" at packages/access/contract/src/Activity/AuditTrail.read.ts lines 17-19 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:79a46ff5be135807082a5ccc0a35461b567f4ecff1d87502386f0f32fde302a5
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:organizationchoice-representation:001 keeps the null hypothesis: "OrganizationChoice switch data" at packages/access/contract/src/Session/SessionState.read.ts lines 142-149 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:7db64201a7befcc82199ae8c407c98c28b36447c68086a237e9b77cf5dc87dc0
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Activity/AuditTrail.read.ts lines 17-19; dh:audittrail-parser-gap:001 ("AuditTrail constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:7f71ea10b334f583a0205967b2099b4b9f550c88142ad10f11912a9b132b4d16
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:audittrail-representation:001 keeps the null hypothesis: "AuditTrail response collection" at packages/access/contract/src/Activity/AuditTrail.read.ts lines 26-26 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:7fef0007e0ef906767810df1513881abc51f00539f3cd30bbec037f52ace36e3
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:testaccount-representation:001 keeps the null hypothesis: "TestAccount local fixture representation" at packages/access/contract/src/Session/SessionState.read.ts lines 59-71 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:8711fd30663c1360206935d0a7e71773b7838730daace56a17cb751c5198b594
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/kernel/src/Member.schema.ts lines 28-47; dh:member-parser-gap:001 ("Member constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:87829d86d3fdb9ab914b21454fb9fdd25804492a5e593f04616ca54b50aeebc5
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 95-97; dh:signupoffer-parser-gap:001 ("SignUpOffer constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:8c360f48707d692f0f4a41bc2aafa203fcb5916cbd3c8d9773532e86a8f9ff89
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:signedout-representation:001 keeps the null hypothesis: "SignedOut session branch" at packages/access/contract/src/Session/SessionState.read.ts lines 180-184 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:95f64fa8eaf2d28748c072af03662dc08351142412c7d906d52c7c708ab5fc0f
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 78-87; dh:testaccountsoffer-parser-gap:001 ("TestAccountsOffer constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:9edaa3a1bae11a4846ebc981224fba419aa76cefe9000be940eb8fb1c803e642
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 223-228; dh:sessionstate-parser-gap:001 ("SessionState constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:9f27182cb6fa04b772602a4c652c17a0c00aac9798a67870470f4c01853e8b4b
+  outcome: proposed
+  ref: otp:Role:001
+- observation: so:sha256:a03562dbe07ee40f4651dc27307c3cd2800e851748a53bd46d4e424e95351181
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/Activity/AuditTrail.read.ts lines 26-26; dh:audittrail-parser-gap:001 ("AuditTrail constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:a1cd7ef956abd7f2020494c480326eced3144a131138c624ea13ab25ea25a44a
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:noorganization-representation:001 keeps the null hypothesis: "NoOrganization session branch" at packages/access/contract/src/Session/SessionState.read.ts lines 191-197 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:a5c48b718277555e2da4ae55918ea8e6f5efa56553adc18a2200e7f433bd4bf1
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:accountemail-representation:001 keeps the null hypothesis: "AccountEmail representation" at packages/access/contract/src/Session/SessionState.read.ts lines 36-36 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:a6b73da539694c2557bdc5460e939c274d5662cd57aa0321881fd9830591b41a
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:ready-representation:001 keeps the null hypothesis: "Ready session branch" at packages/access/contract/src/Session/SessionState.read.ts lines 204-213 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:a73c1ed7866b21a0ab576608020aeb820df7153522eb14cf1f07faa2f63b1ad0
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe PropertyDeclaration at packages/kernel/src/Member.schema.ts lines 28-47; dh:member-parser-gap:001 ("Member constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:a7cc303ddb9cbad069bff607b86251629c7296d4e2edc36e2a061f1a3ec7655d
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:emailtofind-representation:001 keeps the null hypothesis: "EmailToFind normalization representation" at packages/access/contract/src/People/People.command.ts lines 39-39 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:a806262539ec1114c50332e082d08ad2f7126a23054b0f61d13f8ebb71350b3d
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:emailtofind-representation:001 keeps the null hypothesis: "EmailToFind normalization representation" at packages/access/contract/src/People/People.command.ts lines 27-32 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:a91ae9c8738321116885abb03de9ca32068efa0db4441a1a3d90b6c987db72ea
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:addpersonoutcome-representation:001 keeps the null hypothesis: "AddPersonOutcome result encoding" at packages/access/contract/src/People/People.command.ts lines 110-114 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:ac377b1e6d8115ad314d92c67593da01baf3d99b88b7ca95da3fc107f3d3e0da
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/People/People.command.ts lines 121-121; dh:addpersonoutcome-parser-gap:001 ("AddPersonOutcome constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:b33d40e617809c66528845544fc58859c82fef5ba9f94f9a5a243ff3f17f7e0c
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:sessionstate-representation:001 keeps the null hypothesis: "SessionState tagged representation" at packages/access/contract/src/Session/SessionState.read.ts lines 223-228 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:b64a856fc95435fa6e3a8cd9f6126738425bba74ac02add2edc4b3030d761e05
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.command.ts lines 91-101; dh:addpersonproblem-parser-gap:001 ("AddPersonProblem constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:b83c15c49f2ccbd3cce461e637392107250b8a310b82823472d4a8096a60e7f2
+  outcome: proposed
+  ref: otp:Role:001
+- observation: so:sha256:b8d27ff1c8a1324cf20db78d54b6d3c079aa58d5653328d59eea0791a5e44779
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/Session/SessionState.read.ts lines 235-235; dh:sessionstate-parser-gap:001 ("SessionState constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:b9f46c2743d35f40d791877eec33924de0790e9112d8b3860a4feb52f354ed65
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/kernel/src/Role.schema.ts lines 52-55; dh:hasrole-parser-gap:001 ("hasRole constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:bc907de0af739ba7a2892b532ddb7e6624984a45f38b8900ab82d2dd5e51317c
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 142-149; dh:organizationchoice-parser-gap:001 ("OrganizationChoice constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:c94fc69a82421478564d8bad567599e059b61ec1d0009fdcf8619b839690c5c9
+  outcome: proposed
+  ref: otp:AuditEntry:001
+- observation: so:sha256:cac58603ce91da9ae8e00a6349f561e496aee56c3ff5ca856893635b164e5c03
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 191-197; dh:noorganization-parser-gap:001 ("NoOrganization constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:cf37511ec5357a7168c2e5e3215a830fc64438adb23e182d95698a2a7f792e5c
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:addpersonproblem-representation:001 keeps the null hypothesis: "AddPersonProblem form data" at packages/access/contract/src/People/People.command.ts lines 91-101 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:d5379402b45d76c616af2441244076ab5049b8a4c65a84b8e2c45c47162a106a
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 112-135; dh:signinfeatures-parser-gap:001 ("SignInFeatures constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:dc5ef82e70337e83085e9f044628a03aa350886c891b96bc226f415aec47287c
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/kernel/src/Activity.schema.ts lines 21-46; dh:activity-parser-gap:001 ("Activity constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:dcd84cbd44297d85d7e8beb69d3911a8dbff4661c2e055cda30d19c449e7c01e
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/Person.read.ts lines 21-38; dh:person-parser-gap:001 ("Person constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:e0e0bb1af58048eb583edbc473ae08937e5332fbb70daa1dfd9aedcb632ade76
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/kernel/src/Role.schema.ts lines 18-23; dh:role-parser-gap:001 ("Role constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:e5af360e57a895596afef2eca808f2c2c69377076bf95d92f6fde42924a6d5db
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:hasrole-representation:001 keeps the null hypothesis: "hasRole comparison implementation" at packages/kernel/src/Role.schema.ts lines 52-55 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:eb2692cd1bd94ca0d47e0002316be9321863966de6a35fd71e443ab08460ec17
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/Session/SessionState.read.ts lines 180-184; dh:signedout-parser-gap:001 ("SignedOut constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb
+  outcome: proposed
+  ref: otp:Member:001
+- observation: so:sha256:f1d5dd405b2d3cd5a3871a55881d9e2bbe39838c1ad943eac21a1206ef400e1b
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:changerole-representation:001 keeps the null hypothesis: "ChangeRole command representation" at packages/access/contract/src/People/People.command.ts lines 60-64 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:f25ec1a0d819cd8dd06f0e389a5435aaeed206f8efa0863088e5535a94dd3e99
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/People/People.command.ts lines 39-39; dh:emailtofind-parser-gap:001 ("EmailToFind constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:f2f1fa37c05dc4717a06f998c797413d84a06165f536e5ff1096b91b452c2cd8
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:signupoffer-representation:001 keeps the null hypothesis: "SignUpOffer availability codes" at packages/access/contract/src/Session/SessionState.read.ts lines 95-97 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:f373eb467631716d2f8d2aa9b7401eb3f3a053e18ccc641f02bed8e95f0338a8
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:accountemail-representation:001 keeps the null hypothesis: "AccountEmail representation" at packages/access/contract/src/Session/SessionState.read.ts lines 26-29 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:f4c6c0354f56615ae7a0d7e12ddbb03a17a316c28fe241ee203fb4afdaaff4c5
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:signupoffer-representation:001 keeps the null hypothesis: "SignUpOffer availability codes" at packages/access/contract/src/Session/SessionState.read.ts lines 104-104 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:f5a19e5b4f111cb4520db9b4e8cb5182da84e81668f820791b66f01699f0b496
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe CallExpression at packages/access/contract/src/People/People.command.ts lines 46-53; dh:addperson-parser-gap:001 ("AddPerson constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:fb3d28b83f221031761b02097f789d8ef480393b2a3905e1ca2c79a93d57168d
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:addpersonoutcome-representation:001 keeps the null hypothesis: "AddPersonOutcome result encoding" at packages/access/contract/src/People/People.command.ts lines 121-121 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:fc503554c4e9499fc379e6aaa602e85fb4b5380e14473df631987661aa239d81
+  outcome: irrelevant
+  ref: ''
+  reason: 'dh:addperson-representation:001 keeps the null hypothesis: "AddPerson command representation" at packages/access/contract/src/People/People.command.ts lines 46-53 is a wire, validation or protocol shape with no fact that would be false of a pure data-transfer type, and scope.md limits the thread to the organization, tenant, person, member, role, grant and audit-entry terms.'
+- observation: so:sha256:fe8385d5a02b0dd4777b660cd5288473c21ba74c7c1800b70532378772f67468
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe ArrowFunction at packages/access/contract/src/Session/SessionState.read.ts lines 249-250; dh:actorofsession-parser-gap:001 ("actorOfSession constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: so:sha256:ffe10e759bc74c904bcd981655c35d69195b540469cf235e0b8aa1b5acff484d
+  outcome: unresolved
+  ref: ''
+  needed_evidence: 'Second run, limit waived by decision 105: adapter-typescript 1.0.0 still cannot describe TypeQuery at packages/access/contract/src/Session/SessionState.read.ts lines 168-168; dh:sessionstatus-parser-gap:001 ("SessionStatus constructs not represented by the adapter") needs an adapter version that reads it, or a quoted rule about it, before it can be denoted.'
+  since: '2026-11-22'
+- observation: po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 138-138 is re-identified in this run as po:sha256:a2954515f0563e447882b597c9c9efb2f780016b31552fa2b41b3b21a3989ea1, whose row carries its outcome.'
+- observation: po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 179-179 is re-identified in this run as po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3, whose row carries its outcome.'
+- observation: po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 174-174 is re-identified in this run as po:sha256:11d1b53834c38359f84295b255a9249cef0d3f03d3a302aab2b61de3b75c1871, whose row carries its outcome.'
+- observation: po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 171-171 is re-identified in this run as po:sha256:84869274c0b0aa4e0b7806eec23063acf78b38f3d188f4fb97a8b574945469bc, whose row carries its outcome.'
+- observation: po:sha256:4f84af70495b7304f5a3e7b576f8ad387255992240c31f7818b983dd431aa438
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 177-177 is re-identified in this run as po:sha256:982423dfeb614079c6304825f455f5ba08b8fd862df43b6693e53fec3fec3048, whose row carries its outcome.'
+- observation: po:sha256:50ddbe3ee62ac9bdcea8d9e597cb1145c3bcde88a7c204db80291da9e5d053ad
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 178-178 is re-identified in this run as po:sha256:ce82cb2fd95e4131746a50f6f6a39395dac6eeabf4feff1a2414407dde92f924, whose row carries its outcome.'
+- observation: po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 133-133 is re-identified in this run as po:sha256:e93ff65f63c8e0b6104d61b4f751695b64819a77bc122f66d8701c03ffbaa02d, whose row carries its outcome.'
+- observation: po:sha256:8746f14a1bc5f08392dc18e902915c61f9f21e9403967eed57cc9c873aa67dc7
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 134-134 is re-identified in this run as po:sha256:6978a469f8c2d0ff495c6dad024e4ea8420d2032a4f4f22db396decff519d8bb, whose row carries its outcome.'
+- observation: po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 173-173 is re-identified in this run as po:sha256:5c45964a11cc82365db545213f1efa9e3c4ba4a5204bc0d1676d50f935806267, whose row carries its outcome.'
+- observation: po:sha256:b638b95df94a10990df79b6cb627319a6cae7b29d4362ab928fe404fb5f708a6
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 176-176 is re-identified in this run as po:sha256:c8e8fdebd997dbac3d3e155859f2f36e0a483bd39803752034c82e0dc7ad5bfe, whose row carries its outcome.'
+- observation: po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 172-172 is re-identified in this run as po:sha256:737ff1456ab1b977ef7fb4179c8c5d5b1b9ef1c5c65a2b69ec33c606b56daef4, whose row carries its outcome.'
+- observation: po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 137-137 is re-identified in this run as po:sha256:a189eb95f95d457aa06a751fa0eeeb541f07eecb66ad261d9ac709c5bd4b03ca, whose row carries its outcome.'
+- observation: po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 175-175 is re-identified in this run as po:sha256:218d99fcdef200927a39668d5aef017716150daa8a3ee3767ad8c0d5a784e374, whose row carries its outcome.'
+- observation: po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 136-136 is re-identified in this run as po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2, whose row carries its outcome.'
+- observation: po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 135-135 is re-identified in this run as po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863, whose row carries its outcome.'
+- observation: po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 132-132 is re-identified in this run as po:sha256:a9f7e334db4f34fc0728f5c7109c7a1280d0cc01ba2037a45aeb86b7224f197c, whose row carries its outcome.'
+- observation: po:sha256:f37962927f2b535604cb61961ace9335b1c86887f87b34c62bfde0dd0d1866e9
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 190-190 is re-identified in this run as po:sha256:de408e7eb4c4400b6371a6c0953e638fee6eac266149fcc5e73488616fa0ea1e, whose row carries its outcome.'
+- observation: po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at explorations/erp-ontology/research/14-thin-thread.md lines 191-191 is re-identified in this run as po:sha256:b32d63c6c6ff8121657d1f6e1cbe10edb75ce2885e9ff6a458178ca1e5db1f1b, whose row carries its outcome.'
+- observation: so:sha256:03f7cfc73e58f44243817da57e55cd6aee0e42713b78172bd5e27b19c37fd5f5
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 142-149 is re-identified in this run as so:sha256:bc907de0af739ba7a2892b532ddb7e6624984a45f38b8900ab82d2dd5e51317c, whose row carries its outcome.'
+- observation: so:sha256:04dcef11465f0ff56877f8d9e7d89780d93a432a49341ed9ffe3def7e764d7a2
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 78-87 is re-identified in this run as so:sha256:95f64fa8eaf2d28748c072af03662dc08351142412c7d906d52c7c708ab5fc0f, whose row carries its outcome.'
+- observation: so:sha256:0597f86e71a79be6b9278cfc4a4811429252ed8df3f85457ad3552b8f93d53b2
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 110-114 is re-identified in this run as so:sha256:a91ae9c8738321116885abb03de9ca32068efa0db4441a1a3d90b6c987db72ea, whose row carries its outcome.'
+- observation: so:sha256:14609510049a10b95b58d02c5a03c3df4d62f3eb93b90fabfe36c554bbdb3c16
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Role.schema.ts lines 52-55 is re-identified in this run as so:sha256:e5af360e57a895596afef2eca808f2c2c69377076bf95d92f6fde42924a6d5db, whose row carries its outcome.'
+- observation: so:sha256:14deb02703c6540851ac3908190975fc2687a82bcf666adb158dcd85ccfd57cd
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 60-64 is re-identified in this run as so:sha256:f1d5dd405b2d3cd5a3871a55881d9e2bbe39838c1ad943eac21a1206ef400e1b, whose row carries its outcome.'
+- observation: so:sha256:21db00c53f8d21c54d4ecc301275c63ee5510095aa137c3922560116bd221107
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 235-235 is re-identified in this run as so:sha256:b8d27ff1c8a1324cf20db78d54b6d3c079aa58d5653328d59eea0791a5e44779, whose row carries its outcome.'
+- observation: so:sha256:29d4544f6564acc6e6d3157a2ab5c3dc3bdadf10a3b9829764d4af1abfb99fae
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 249-250 is re-identified in this run as so:sha256:fe8385d5a02b0dd4777b660cd5288473c21ba74c7c1800b70532378772f67468, whose row carries its outcome.'
+- observation: so:sha256:2ac062f8fb63f30f1d4f4862a1dbeca43d2e12670cb464c93ad9b08d165eb25a
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 91-101 is re-identified in this run as so:sha256:cf37511ec5357a7168c2e5e3215a830fc64438adb23e182d95698a2a7f792e5c, whose row carries its outcome.'
+- observation: so:sha256:2d591ae1e8585eb3a9bc494adf9ae9ac51902ca96f919be5170a4e105c45d5a5
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 43-52 is re-identified in this run as so:sha256:45140dccaadc35b3b6db76e6f7b4f67f8084e2d73007df767843760a603a1b13, whose row carries its outcome.'
+- observation: so:sha256:307f5b8f0c9c84eb53136163354673d3cf1b6d1974cf665b5736fb97db5c879a
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 95-97 is re-identified in this run as so:sha256:f2f1fa37c05dc4717a06f998c797413d84a06165f536e5ff1096b91b452c2cd8, whose row carries its outcome.'
+- observation: so:sha256:316b315fcdafdcb437ca36d84507c2d2bf4388e0cf555afe094e8f8e98373dba
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 191-197 is re-identified in this run as so:sha256:cac58603ce91da9ae8e00a6349f561e496aee56c3ff5ca856893635b164e5c03, whose row carries its outcome.'
+- observation: so:sha256:319a2addc69c457189cf4429d9f89e762ac3a8f93f09bb0b6e8adf14123a1cde
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 156-161 is re-identified in this run as so:sha256:43752bd544ddfa7975ceb572c85570646949e39178e7445444fdbd1be224f04c, whose row carries its outcome.'
+- observation: so:sha256:360ad08374b3a5bdbea5885520bdc67226db5f653cc7007d81deed5de02d519d
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 95-97 is re-identified in this run as so:sha256:f2f1fa37c05dc4717a06f998c797413d84a06165f536e5ff1096b91b452c2cd8, whose row carries its outcome.'
+- observation: so:sha256:382c3166a9d777ddc098f0a8a5b6c82443c9676637f1a411f5bff7d7e921d80a
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 26-29 is re-identified in this run as so:sha256:f373eb467631716d2f8d2aa9b7401eb3f3a053e18ccc641f02bed8e95f0338a8, whose row carries its outcome.'
+- observation: so:sha256:3a7a172ed0466ab2780a70eb63d5d8b77c275dc7d182b16a40a6cd335ab3fc27
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 142-149 is re-identified in this run as so:sha256:bc907de0af739ba7a2892b532ddb7e6624984a45f38b8900ab82d2dd5e51317c, whose row carries its outcome.'
+- observation: so:sha256:3d7c9c0f6d71ea58b0d93fd76ecfd4fd0814eebbd794b1feb9039246ec78ec48
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 204-213 is re-identified in this run as so:sha256:a6b73da539694c2557bdc5460e939c274d5662cd57aa0321881fd9830591b41a, whose row carries its outcome.'
+- observation: so:sha256:428d0c4d2bed1fae8dd6493a96f7d8275401a76a59caad5c6c89e081573dea66
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.rejection.ts lines 35-42 is re-identified in this run as so:sha256:30bd828e03d56c5333e7a8a7036d61f0c110b8f8e4543a68aeb0844b68598692, whose row carries its outcome.'
+- observation: so:sha256:4565b951504ae3b985bba1a71ef0a6e91ad1f7f43570532fb68ae58ce5d2b1f9
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Activity/AuditTrail.read.ts lines 26-26 is re-identified in this run as so:sha256:a03562dbe07ee40f4651dc27307c3cd2800e851748a53bd46d4e424e95351181, whose row carries its outcome.'
+- observation: so:sha256:4574120c97289b69119fcb9a4cf3a6d660bd2efd898e1e500b14ff3210540e39
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Member.schema.ts lines 28-47 is re-identified in this run as so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb, whose row carries its outcome.'
+- observation: so:sha256:4b60f32391b77bde317af08f56ad864ab9b49b0b02fc96f079515a0c117f635f
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/Person.read.ts lines 21-38 is re-identified in this run as so:sha256:dcd84cbd44297d85d7e8beb69d3911a8dbff4661c2e055cda30d19c449e7c01e, whose row carries its outcome.'
+- observation: so:sha256:4d75a820906a45b69ce7d9cd67845e890c2264fd42d60aa4623b50a65a119e54
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 43-52 is re-identified in this run as so:sha256:45140dccaadc35b3b6db76e6f7b4f67f8084e2d73007df767843760a603a1b13, whose row carries its outcome.'
+- observation: so:sha256:4d9187ffd59135a4f8c6849c0549d46cafeb5c22f28f445d55ee9f09cd72947e
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 104-104 is re-identified in this run as so:sha256:f4c6c0354f56615ae7a0d7e12ddbb03a17a316c28fe241ee203fb4afdaaff4c5, whose row carries its outcome.'
+- observation: so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Role.schema.ts lines 18-23 is re-identified in this run as so:sha256:e0e0bb1af58048eb583edbc473ae08937e5332fbb70daa1dfd9aedcb632ade76, whose row carries its outcome.'
+- observation: so:sha256:51bc20c321f4bcacedd44c346d158fe25eeb43dadf3e9e1a41ee59fb4bd821c5
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 71-75 is re-identified in this run as so:sha256:5028d5a3834babd774993ddc3fe7bd704d418b7ed95767bfa9ddcffb27ea7a50, whose row carries its outcome.'
+- observation: so:sha256:51fcc0f05a9a41f1278c8d01855adefcbd8900aff83eb503a37affcc97f28afe
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 59-71 is re-identified in this run as so:sha256:7fef0007e0ef906767810df1513881abc51f00539f3cd30bbec037f52ace36e3, whose row carries its outcome.'
+- observation: so:sha256:52c916fb7854298d2a4bb9f3ce68e0c438a62dc0b4bab015811c3f9984dc690b
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 223-228 is re-identified in this run as so:sha256:b33d40e617809c66528845544fc58859c82fef5ba9f94f9a5a243ff3f17f7e0c, whose row carries its outcome.'
+- observation: so:sha256:538d2cc42036aa94c1f72eec954f3a6bf6d74adb681a63e5ed121597bb31145f
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 46-53 is re-identified in this run as so:sha256:fc503554c4e9499fc379e6aaa602e85fb4b5380e14473df631987661aa239d81, whose row carries its outcome.'
+- observation: so:sha256:5540a3d628e3d5b6652895d00c91f2a6db3621fc2c566fcdcc9e0477d959a4ed
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 112-135 is re-identified in this run as so:sha256:d5379402b45d76c616af2441244076ab5049b8a4c65a84b8e2c45c47162a106a, whose row carries its outcome.'
+- observation: so:sha256:5546cd58c3f39c8592e55b1bb358dc632f8c78116553df41e2b1947c72737992
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 191-197 is re-identified in this run as so:sha256:cac58603ce91da9ae8e00a6349f561e496aee56c3ff5ca856893635b164e5c03, whose row carries its outcome.'
+- observation: so:sha256:5935f8b3539d4dc8c90e2351419a960faddf5a4b9cd809a6ff3d3eeff9a93ae1
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 249-250 is re-identified in this run as so:sha256:fe8385d5a02b0dd4777b660cd5288473c21ba74c7c1800b70532378772f67468, whose row carries its outcome.'
+- observation: so:sha256:5a929ddf3ccaf9725041771ca00d54a1a4c0181819974eedd5e05aa18f90b772
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 36-36 is re-identified in this run as so:sha256:a5c48b718277555e2da4ae55918ea8e6f5efa56553adc18a2200e7f433bd4bf1, whose row carries its outcome.'
+- observation: so:sha256:65f40cb681a6ae0beda880706435b642918f57bde153dcc48428f298b91bfdbb
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 168-168 is re-identified in this run as so:sha256:ffe10e759bc74c904bcd981655c35d69195b540469cf235e0b8aa1b5acff484d, whose row carries its outcome.'
+- observation: so:sha256:68de2c656adba380bf27088384f3dbf0204150d43cdd55e26ea9c47f6433a8d4
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 180-184 is re-identified in this run as so:sha256:eb2692cd1bd94ca0d47e0002316be9321863966de6a35fd71e443ab08460ec17, whose row carries its outcome.'
+- observation: so:sha256:6c41aa8277f43a6d828cbb02423bccde71bb8b45583e393c2e781ac253a1eefa
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 27-32 is re-identified in this run as so:sha256:a806262539ec1114c50332e082d08ad2f7126a23054b0f61d13f8ebb71350b3d, whose row carries its outcome.'
+- observation: so:sha256:6f54b80e294095d222eb7a51dd3d91bd39f64a878e4e0ea6eb8097c43996010b
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 82-82 is re-identified in this run as so:sha256:61d4d5420477cc5ec2042753c8bbbb95cf2f7ca38bf50416e6a72d850979f5ca, whose row carries its outcome.'
+- observation: so:sha256:6fcb58e8c340ddb94be2344b09743370b4dd3745c7b414b5714368af81ec96ae
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Role.schema.ts lines 30-30 is re-identified in this run as so:sha256:b83c15c49f2ccbd3cce461e637392107250b8a310b82823472d4a8096a60e7f2, whose row carries its outcome.'
+- observation: so:sha256:7157b5782475fde29670176da606c01096e8171515efaacc44cdbcb9f23fce1e
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 78-87 is re-identified in this run as so:sha256:95f64fa8eaf2d28748c072af03662dc08351142412c7d906d52c7c708ab5fc0f, whose row carries its outcome.'
+- observation: so:sha256:7213a1aef129f79797e999eff79becbad5fc15c5184d02bfed4a25019482b251
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/Person.read.ts lines 21-38 is re-identified in this run as so:sha256:dcd84cbd44297d85d7e8beb69d3911a8dbff4661c2e055cda30d19c449e7c01e, whose row carries its outcome.'
+- observation: so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Activity.schema.ts lines 21-46 is re-identified in this run as so:sha256:dc5ef82e70337e83085e9f044628a03aa350886c891b96bc226f415aec47287c, whose row carries its outcome.'
+- observation: so:sha256:804033f441cdbfb34c2122fa90d4fc65f014c70072e51006757c397f60a2e02b
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Activity/AuditTrail.read.ts lines 17-19 is re-identified in this run as so:sha256:7db64201a7befcc82199ae8c407c98c28b36447c68086a237e9b77cf5dc87dc0, whose row carries its outcome.'
+- observation: so:sha256:82246491958754434a36c4f49b48cdd1b3a31e1fcc07271d5ad7bb4978c44e37
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 168-168 is re-identified in this run as so:sha256:ffe10e759bc74c904bcd981655c35d69195b540469cf235e0b8aa1b5acff484d, whose row carries its outcome.'
+- observation: so:sha256:83e4df2b7e8a0f61ff20faa8fa6610d060026a6d31dd809613f08cb7c695f063
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 121-121 is re-identified in this run as so:sha256:fb3d28b83f221031761b02097f789d8ef480393b2a3905e1ca2c79a93d57168d, whose row carries its outcome.'
+- observation: so:sha256:84998881948e5bc6e0cea2c6103db9e3f5b9c755e6eeab00c1bc552647a5ef0b
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 60-64 is re-identified in this run as so:sha256:f1d5dd405b2d3cd5a3871a55881d9e2bbe39838c1ad943eac21a1206ef400e1b, whose row carries its outcome.'
+- observation: so:sha256:880561c3b55794cd594883a11a7dfcc70e66bb524cdf64f3f1db736aef6dd158
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Member.schema.ts lines 28-47 is re-identified in this run as so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb, whose row carries its outcome.'
+- observation: so:sha256:969abd0a6695390ef078f29a1ae8cdff370b73585c5e5ca8c28298654ba4b38b
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 235-235 is re-identified in this run as so:sha256:b8d27ff1c8a1324cf20db78d54b6d3c079aa58d5653328d59eea0791a5e44779, whose row carries its outcome.'
+- observation: so:sha256:9943dcbebffa29e5fd4cdfd39bb9a2e77e1163659ab979d6480d01a5b2198006
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 180-184 is re-identified in this run as so:sha256:eb2692cd1bd94ca0d47e0002316be9321863966de6a35fd71e443ab08460ec17, whose row carries its outcome.'
+- observation: so:sha256:a1bb2b146b20802328abbc736083a712010655c154ce118603cdec6ec93187e2
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Role.schema.ts lines 18-23 is re-identified in this run as so:sha256:e0e0bb1af58048eb583edbc473ae08937e5332fbb70daa1dfd9aedcb632ade76, whose row carries its outcome.'
+- observation: so:sha256:a48cd96114639e0029acd7da6e58aaec1467d54baaf0ce7205332a0224499e02
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 71-75 is re-identified in this run as so:sha256:5028d5a3834babd774993ddc3fe7bd704d418b7ed95767bfa9ddcffb27ea7a50, whose row carries its outcome.'
+- observation: so:sha256:a6988c5e0250715c876cccaa5b01ab65d6539256a7a411d571f1db8f8fc82d81
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 39-39 is re-identified in this run as so:sha256:f25ec1a0d819cd8dd06f0e389a5435aaeed206f8efa0863088e5535a94dd3e99, whose row carries its outcome.'
+- observation: so:sha256:b1091af312e4b3a598d4d5e027749d3d4dc470483f6b82ee9cfae261a41c7a95
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Activity/AuditTrail.read.ts lines 26-26 is re-identified in this run as so:sha256:a03562dbe07ee40f4651dc27307c3cd2800e851748a53bd46d4e424e95351181, whose row carries its outcome.'
+- observation: so:sha256:b339a8850f9d3ff0ed78bd56a74cdcc4105c9c48ec6313437a3276cff4540bc6
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 91-101 is re-identified in this run as so:sha256:cf37511ec5357a7168c2e5e3215a830fc64438adb23e182d95698a2a7f792e5c, whose row carries its outcome.'
+- observation: so:sha256:b9961ca022875a53924dc661cd759e8a048e2f90838e0fc1a731275507fe363f
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Activity/AuditTrail.read.ts lines 17-19 is re-identified in this run as so:sha256:7db64201a7befcc82199ae8c407c98c28b36447c68086a237e9b77cf5dc87dc0, whose row carries its outcome.'
+- observation: so:sha256:bec411d37bdd3acb2a319442f4cb4235481e6486cd2be3f3fba837ac82ebf8e3
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 26-29 is re-identified in this run as so:sha256:f373eb467631716d2f8d2aa9b7401eb3f3a053e18ccc641f02bed8e95f0338a8, whose row carries its outcome.'
+- observation: so:sha256:c4439ed52559caead85cce5b8a3f2e364358357de1799c1ce6a368ee64682b8c
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 223-228 is re-identified in this run as so:sha256:b33d40e617809c66528845544fc58859c82fef5ba9f94f9a5a243ff3f17f7e0c, whose row carries its outcome.'
+- observation: so:sha256:c470dfafc8bcabb8f2dfd9e5286f18cbbba80baeb60b47302b95e984b495adec
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 156-161 is re-identified in this run as so:sha256:43752bd544ddfa7975ceb572c85570646949e39178e7445444fdbd1be224f04c, whose row carries its outcome.'
+- observation: so:sha256:c9b824c607aeb918ddb8d57f74229f013dd3591f17c72c29620909ac61a7cfa3
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Activity.schema.ts lines 21-46 is re-identified in this run as so:sha256:dc5ef82e70337e83085e9f044628a03aa350886c891b96bc226f415aec47287c, whose row carries its outcome.'
+- observation: so:sha256:cbfdd84c67b022e83278656ad8930fc268cf6385b5bde14f138707be1821f3f6
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 46-53 is re-identified in this run as so:sha256:fc503554c4e9499fc379e6aaa602e85fb4b5380e14473df631987661aa239d81, whose row carries its outcome.'
+- observation: so:sha256:cc424d4085c6b9a793b91355b818198ed042eacca6ad338758f8bf23c001cb71
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.rejection.ts lines 35-42 is re-identified in this run as so:sha256:30bd828e03d56c5333e7a8a7036d61f0c110b8f8e4543a68aeb0844b68598692, whose row carries its outcome.'
+- observation: so:sha256:d20b16049cf886b70d0abe8fc4f2ed22932915427521021b4c034d8b46a9bff3
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 59-71 is re-identified in this run as so:sha256:7fef0007e0ef906767810df1513881abc51f00539f3cd30bbec037f52ace36e3, whose row carries its outcome.'
+- observation: so:sha256:d33c08da91acdf765057bdb172d3ed56f1c01606b35421191abbadbaa9d63f62
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 104-104 is re-identified in this run as so:sha256:f4c6c0354f56615ae7a0d7e12ddbb03a17a316c28fe241ee203fb4afdaaff4c5, whose row carries its outcome.'
+- observation: so:sha256:d3ec1b48f0727eb53aec1635a2cb99fc47f3a9a3698b8df078b000c7b2c3629a
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 27-32 is re-identified in this run as so:sha256:a806262539ec1114c50332e082d08ad2f7126a23054b0f61d13f8ebb71350b3d, whose row carries its outcome.'
+- observation: so:sha256:dc25cf654dd9936396d196877e6d372cd28559bcfebfc6d6a274605b00af8855
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 39-39 is re-identified in this run as so:sha256:f25ec1a0d819cd8dd06f0e389a5435aaeed206f8efa0863088e5535a94dd3e99, whose row carries its outcome.'
+- observation: so:sha256:e0a523695707511ed69bb30747dd9eb0f0ff6c70dfd15103846bfc04fd1d5137
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Role.schema.ts lines 52-55 is re-identified in this run as so:sha256:e5af360e57a895596afef2eca808f2c2c69377076bf95d92f6fde42924a6d5db, whose row carries its outcome.'
+- observation: so:sha256:e4cfcc1912f9e9d70993a064ac3447dab24bd480eeb6896138180e607ccf26ba
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 204-213 is re-identified in this run as so:sha256:a6b73da539694c2557bdc5460e939c274d5662cd57aa0321881fd9830591b41a, whose row carries its outcome.'
+- observation: so:sha256:e529b03ff56e449261ee2219c6889a2029b560b3aa7c463c9c6ccd124d638362
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.rejection.ts lines 19-28 is re-identified in this run as so:sha256:6086b535648a5990e39d04f21959857cdede42def27f4718d250884bfa8fbdc4, whose row carries its outcome.'
+- observation: so:sha256:e83455245320c475e3ccecc303d49d365b3271d155aa4a4287be172d83f3ff3c
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 36-36 is re-identified in this run as so:sha256:a5c48b718277555e2da4ae55918ea8e6f5efa56553adc18a2200e7f433bd4bf1, whose row carries its outcome.'
+- observation: so:sha256:eb096a1254163a33ac3a6d958da433eed1ff61f2721b487a4f9b8081cd4123a9
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Role.schema.ts lines 30-30 is re-identified in this run as so:sha256:b83c15c49f2ccbd3cce461e637392107250b8a310b82823472d4a8096a60e7f2, whose row carries its outcome.'
+- observation: so:sha256:eb8860120c3e342eb7a324ab966df659c284476dd0fd679f4478a8bfd10d3324
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/Session/SessionState.read.ts lines 112-135 is re-identified in this run as so:sha256:d5379402b45d76c616af2441244076ab5049b8a4c65a84b8e2c45c47162a106a, whose row carries its outcome.'
+- observation: so:sha256:ec706aa8fdc7cdab6a59b96f1e5477fbf5da74e2f946db54131a98901517e9f2
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.rejection.ts lines 19-28 is re-identified in this run as so:sha256:6086b535648a5990e39d04f21959857cdede42def27f4718d250884bfa8fbdc4, whose row carries its outcome.'
+- observation: so:sha256:ed5055e915afe25a9c0e6d8492fdd229f9b83b353ed46d0e38071559c4feb9c6
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 110-114 is re-identified in this run as so:sha256:a91ae9c8738321116885abb03de9ca32068efa0db4441a1a3d90b6c987db72ea, whose row carries its outcome.'
+- observation: so:sha256:ee9154205a48581fb6646533e511b4f5398a588af92350ade0e1c9f9c45dfa47
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/kernel/src/Member.schema.ts lines 28-47 is re-identified in this run as so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb, whose row carries its outcome.'
+- observation: so:sha256:f5e7d433650a0a22e14ab38f0a77628bd75465f341847f210d8c88aad2aeeaca
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 121-121 is re-identified in this run as so:sha256:fb3d28b83f221031761b02097f789d8ef480393b2a3905e1ca2c79a93d57168d, whose row carries its outcome.'
+- observation: so:sha256:fb162a0dd7346f06ce23ea1a47230af2081659d92ea10a9ec5992296ea2989e7
+  outcome: irrelevant
+  ref: ''
+  carried_from_prior: true
+  reason: 'Retired by the re-pin from commit 7f7c2b3 to a645f59 (observation ids embed the commit): the same span at packages/access/contract/src/People/People.command.ts lines 82-82 is re-identified in this run as so:sha256:61d4d5420477cc5ec2042753c8bbbb95cf2f7ca38bf50416e6a72d850979f5ca, whose row carries its outcome.'

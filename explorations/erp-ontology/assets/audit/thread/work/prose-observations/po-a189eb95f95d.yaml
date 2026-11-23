@@ -1,0 +1,6 @@
+id: "po:sha256:a189eb95f95d457aa06a751fa0eeeb541f07eecb66ad261d9ac709c5bd4b03ca"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 137, end_line: 137}
+quote: "Stated, one criterion: the member it is granted to and the record field it is read from. In the thread that field is `role`, so a member has exactly one grant. See the note below."
+epistemic_status: quoted_prose

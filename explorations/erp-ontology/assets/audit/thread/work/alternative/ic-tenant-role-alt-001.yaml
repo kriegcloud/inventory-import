@@ -1,0 +1,43 @@
+{
+  "id": "ic:tenant-role-alt:001",
+  "hypothesis_ref": "dh:tenant-role:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "Carries Organization identity; supplies none. Two Tenants are the same iff they are the same Organization in the workspace-bearing relation.",
+    "reidentification_key": [
+      "OrganizationId (po:7b635e2155ff) — a repository handle that, per the succession decision, survives a change of bearer and therefore keys the workspace, not the Tenant's bearer"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "anti_rigid",
+    "carries_identity": true,
+    "supplies_identity": false,
+    "unity": "unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "role",
+    "alternatives": [
+      "the workspace / tenancy itself (an artifact or a hosting relator between the application operator and the organization), with Organization only its current party",
+      "phase of Organization (rejected: the condition is relational — a workspace is kept for it — not intrinsic)"
+    ],
+    "existential_dependencies": [
+      "Organization (bearer)",
+      "the workspace-hosting relation (a tenancy relator: the application keeps a workspace for this body)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": [
+      "workspace closed",
+      "role passed to a successor organization"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Succession: the Tenant role passes to a successor Organization that keeps the workspace (po:715824f4fc19). Every Membership 'in' the Tenant and every record 'inTenant' now relates to a different bearer although nothing in the workspace changed. Under a pure role model those memberships must either end (they mediated the old bearer) or silently re-target — evidence that membership and record scoping actually relate to the workspace/tenancy, not the role-bearer."
+    }
+  ],
+  "status": "proposed"
+}

@@ -1,0 +1,22 @@
+id: fa:role-assignment:001
+hypothesis_ref: dh:role-assignment:001
+identity_card_ref: ic:role-assignment:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Continuing authorization relator whose level may change
+  still_viable: true
+- label: Distinct grant episodes each created by an assignment act
+  still_viable: true
+- label: Current contextual role assertion without separately persisting grant individual
+  still_viable: true
+strongest_counterexample: At successive times member.role is viewer, admin, viewer; the same lifted IRI
+  names every snapshot. That invariant node address cannot establish one continuing grant, and duplicate
+  assignments with identical endpoints could still be distinct episodes.
+verdict: explicitly_deferred
+needed_evidence: Provide authorized assignment/revocation history with effective intervals and a steward
+  decision on whether changing role or scope preserves assignment identity. Include repeated equal assignments
+  and later return to the prior value; distinguish relation, establishing act and lifted representation.

@@ -1,0 +1,26 @@
+id: dh:party-identity-decision:001
+observation_refs:
+- po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c
+cq_warrants: []
+proposed_referent:
+  label: Party identity adjudication candidate
+  description: 'Candidate referent under evaluation: a decision joining records that may denote one party.
+    An instance would be a particular adjudication of a record pair in a tenant context; no identity,
+    maker, time or outcome contract for such decisions is supplied. Joining records cannot be assumed
+    to merge the real parties.'
+representation_status: unresolved
+alternatives:
+- label: An implementation match marker between imported records
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The quote mentions a decision as a constraint on joining records, but the supplied CQs do
+    not address identity adjudication and no decision evidence is present. This possible information object
+    remains unresolved with the null standing.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

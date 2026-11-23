@@ -1,0 +1,45 @@
+{
+  "id": "ic:access-level-concepts-alt:001",
+  "hypothesis_ref": "dh:access-level-concepts:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "Scheme + notation (po:cf426b237ec8, po:318a83669135). NB this depends on the scheme's identity, which the source denies having its own criterion (po:badeb1dc1a06).",
+    "reidentification_key": [
+      "MemberRoleScheme + notation ('viewer' | 'editor' | 'admin')",
+      "Role LiteralKit literal"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "intrinsic"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "high-order type: viewer/editor/admin are role-TYPES (powertype instances of 'Role') whose instances are members-qua-editor",
+      "normative description / deontic content (permission bundle) that grants instantiate"
+    ],
+    "existential_dependencies": [
+      "MemberRoleScheme (generic dependence for identity)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": [
+      "deprecated/removed from scheme"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Custom roles: 'A tenant's custom role is another individual' (po:cf426b237ec8). If identity is scheme+notation and custom roles live in MemberRoleScheme, two tenants' custom 'auditor' roles with different permissions collapse into one individual; if they live in per-tenant schemes, the scheme needs an identity criterion the source says it lacks."
+    },
+    {
+      "description": "Content change: if 'editor' later stops permitting writes, scheme+notation says it is the same concept with new meaning; the code's rank-based hasRole would silently re-interpret every historical grant."
+    }
+  ],
+  "status": "proposed"
+}

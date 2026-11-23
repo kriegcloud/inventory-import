@@ -1,0 +1,24 @@
+{
+  "id": "fa:activity-parser-gap-alt:001",
+  "hypothesis_ref": "dh:activity-parser-gap:001",
+  "identity_card_ref": "ic:activity-parser-gap-alt:001",
+  "tests": {
+    "spec_vs_execution": "unresolved",
+    "world_vs_information": "unresolved",
+    "role_vs_bearer": "unresolved",
+    "context_reification_needed": "unresolved"
+  },
+  "rival_models": [
+    {
+      "label": "Collapse onto dh:audit-entry:001 (my preferred reading: a coverage gap is an observation fact, not a referent)",
+      "still_viable": true
+    },
+    {
+      "label": "Independent partial encoding of a domain concept",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The gap hides Model.Class field builders (UuidV4Insert id, length checks, key annotations) — the content the audit-entry hypothesis relies on; whether that content changes the category of 'Activity' cannot be decided from this chain.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "Adapter coverage of CallExpression for Effect Schema pipe/annotate/check calls so that Model.Class field builders (UuidV4Insert id, length checks, key annotations) — the content the audit-entry hypothesis relies on become parser-derived observed facts; then re-run denotation for 'Activity' and test whether it adds anything beyond dh:audit-entry:001."
+}

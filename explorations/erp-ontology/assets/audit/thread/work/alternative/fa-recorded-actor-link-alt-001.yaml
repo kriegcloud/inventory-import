@@ -1,0 +1,23 @@
+{
+  "id": "fa:recorded-actor-link-alt:001",
+  "hypothesis_ref": "dh:recorded-actor-link:001",
+  "identity_card_ref": "ic:recorded-actor-link-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Mention/aboutness object property from an information object to a Membership (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Mention of the Person in their member role",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "An agent acting for a member: the entry names the member; neither the membership nor the human made the change.",
+  "verdict": "analyzed"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "ic:scope-concepts-alt:001",
+  "hypothesis_ref": "dh:scope-concepts:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "Scheme + notation of the scope KIND concept (po:318a83669135).",
+    "reidentification_key": [
+      "GrantScopeKindScheme + notation 'organization'"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "intrinsic"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "the actual scope of a grant is a particular (this organization, this site, this field), and the 'kind' concept is only its type — grantScope should point at the particular",
+      "implementation constant (null)"
+    ],
+    "existential_dependencies": [
+      "GrantScopeKindScheme"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Kind vs particular: the Grant definition says 'at one scope (the whole tenant, one site or one field)' (po:559ba5ec7c7d) — scopes are particulars. The shipped grantScope points at a scope KIND ('organization'). When site scope ships, 'site' as a kind cannot say WHICH site; the scope particular must be a further relatum."
+    },
+    {
+      "description": "Degenerate value: with one shipped concept, grantScope is constant and carries no information."
+    }
+  ],
+  "status": "proposed"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "fa:addpersonproblem-representation-alt:001",
+  "hypothesis_ref": "dh:addpersonproblem-representation:001",
+  "identity_card_ref": "ic:addpersonproblem-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "UI/response data (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Its kinds encode domain situations; the wrapper itself does not.",
+  "verdict": "analyzed"
+}

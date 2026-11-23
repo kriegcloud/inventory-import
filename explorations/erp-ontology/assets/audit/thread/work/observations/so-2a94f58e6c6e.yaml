@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:2a94f58e6c6e5d4c9afba2601fc6fc264715b4b9847b532a97de97a34179f6e3",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 110,
+    "end_line": 114,
+    "content_sha256": "33cb6eb238cefcc0c9713c970cf1aadaed02210e3c12d3e96a04a3b8ee448a5e"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AddPersonOutcome",
+    "lexical_name": "AddPersonOutcome",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export const AddPersonOutcome = S.Result(Person, AddPersonProblem).pipe(\n  $I.annoteSchema(\"AddPersonOutcome\", {\n    description: \"The person added, or why they could not be (an AddPersonProblem)\"\n  })\n)\n",
+  "epistemic_status": "parser_derived"
+}

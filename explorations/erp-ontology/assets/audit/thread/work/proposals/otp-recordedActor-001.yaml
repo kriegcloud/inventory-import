@@ -1,0 +1,86 @@
+id: otp:recordedActor:001
+hypothesis_ref: dh:recorded-actor-link:001
+identity_card_ref: ic:recorded-actor-link:001
+foundational_status: analyzed
+term:
+  preferred_label: recorded actor
+  local_name: recordedActor
+  proposed_iri: https://example.org/inventory-import/ontology/recordedActor
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: A recorded-attribution relation linking an audit entry to the membership it names as having made the
+    stated change, without asserting that membership’s human actually made it.
+  source:
+  - po:sha256:c8e8fdebd997dbac3d3e155859f2f36e0a483bd39803752034c82e0dc7ad5bfe
+  - po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+  - po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+  - CQ-P10
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P10
+  semantic_support_for: []
+alternatives_rejected:
+- 'Foundational analysis rejects: Actual actor-to-change participation relation.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The attribution has informational content distinct from the truth of actual agency. This is the member-reference
+  content of an entry, not a new executed action or guaranteed true causal relation.'
+open_issues:
+- 'Identity-card criterion (no independent property individual is minted): No independent individual is required:
+  proposed typed recorded-attribution relation from an audit entry to the Member reference it asserts in a
+  given entry version/snapshot. Two equal assertions have the same entry, referenced member and evaluation
+  context; this is relational equality, not a supplied identity criterion for a new relator. Persistence through
+  state change is not asserted for a separate individual; changing an endpoint or snapshot changes the contextual
+  assertion.'
+- 'Proposed usage: subject AuditEntry; object Member. These endpoints describe intended use, not extra subclass
+  edges, inverse properties or identity claims.'
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Typed entry-to-member relation with no new independently persisting individual; Reified
+  attribution claim information object if provenance, versions or multiple claims must be individually identified.
+  This synthesis makes no selection by omission. The selected model may require a revised proposal or a separate
+  future candidate; no such additional term is admitted in this 18-key scope.'
+- 'Strongest counterexample carried forward: A false or mistaken audit attribution still names a member. Equating
+  the attribution with actual event participation would turn record content into proof and would confuse a
+  Member reference with a human actor identity.'
+- 'Identity-card alternatives carried forward: information_object'
+- 'Existential dependencies carried forward: Assertion needs the audit entry content and a denoted/reference
+  Member target; actual causal participation in a real change is not required (po:c8e8fdebd997 and po:160303617dee).
+  A dangling target would be unresolved reference data, not proof that the named human acted. The record can
+  name a retained membership after active authorization ends.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:recorded-actor-link:001: “The audit decision explicitly states that the entry cannot
+  prove who made the change and rewords the question to ask which member it names. A recorded attribution can
+  therefore be understood and read without establishing the corresponding actual action participation.” The
+  claim must fail for a pure data-transfer twin: recorded attribution persists as a claim even when actual
+  agency is unproved or mistaken; this is not evidence of causal action participation. Independent execution
+  of that distinction is not supplied.'
+- 'Warrant necessity: CQ-P10 explicitly requests claim-bearing entries, the member each entry names and the
+  action each states. Without recorded-attribution semantics, the requested named-member column cannot be answered;
+  actual actor participation cannot substitute.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=false; ontoclean.supplies_identity=false;
+  ontoclean.carries_identity=false. Closed proposal identity value=none. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): An actual agent-to-change participation relation;
+  representation_status=domain_referent; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

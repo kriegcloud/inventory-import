@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:9f27182cb6fa04b772602a4c652c17a0c00aac9798a67870470f4c01853e8b4b",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/kernel/src/Role.schema.ts"
+  },
+  "source_span": {
+    "start_line": 18,
+    "end_line": 23,
+    "content_sha256": "7af476098cec37e85b3a7700cb8c69737df17cdc95b689bbd8e23eb165a67769"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Role",
+    "lexical_name": "Role",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "Role"
+    }
+  ],
+  "source_excerpt": "export const Role = LiteralKit([\"viewer\", \"editor\", \"admin\"]).pipe(\n  $I.annoteSchema(\"Role\", {\n    description: \"What a member may do: a viewer reads, an editor also writes, an admin also manages people.\",\n    examples: [\"editor\"]\n  })\n)\n",
+  "epistemic_status": "parser_derived"
+}

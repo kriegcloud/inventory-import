@@ -351,6 +351,11 @@
       ],
       "outputs": []
     },
+    // Every file of screens exports components only (`beep laws fast-refresh`, `.oxlintrc.fast-refresh.json`).
+    "//#fast-refresh:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false
+    },
     // No type assertion is written (oxlint, `.oxlintrc.assertions.json`, from the root), and its lists only shrink
     // (`beep laws assertions`).
     "//#assertions:check": {

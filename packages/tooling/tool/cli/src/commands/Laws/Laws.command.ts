@@ -15,6 +15,7 @@ import { diagnostics, diagnosticsSentence } from "./Diagnostics.rules.ts"
 import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
+import { fastRefresh, fastRefreshSentence } from "./FastRefresh.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
 import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { promises, promiseSentence } from "./Promises.rules.ts"
@@ -100,6 +101,11 @@ export const readonlyCommand = Command.make("readonly", {}, () =>
   Effect.flatMap(readonlyProperties, emit(readonlySentence))
 ).pipe(Command.withDescription("Every property of an object type or an interface is readonly, but in the files listed"))
 
+/** `laws fast-refresh`: every file of screens exports components only, but in the files its ledger names. */
+export const fastRefreshCommand = Command.make("fast-refresh", {}, () =>
+  Effect.flatMap(fastRefresh(), emit(fastRefreshSentence))
+).pipe(Command.withDescription("Every file of screens exports components only, so fast refresh keeps its state"))
+
 const write = Flag.Boolean("write").pipe(
   Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
   Flag.withDefault(false)
@@ -129,6 +135,7 @@ export const lawsCommand = Command.make("laws").pipe(
     dualCommand,
     effectImportsCommand,
     exportsCommand,
+    fastRefreshCommand,
     keysCommand,
     privatePathsCommand,
     promisesCommand,

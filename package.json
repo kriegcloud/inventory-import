@@ -76,7 +76,7 @@
     "oxlint-tsgolint": "catalog:",
     "syncpack": "^15.3.3",
     "tsrs": "catalog:",
-    "turbo": "2.11.11",
+    "turbo": "^2.11.13",
     "typescript": "catalog:"
   },
   "overrides": {

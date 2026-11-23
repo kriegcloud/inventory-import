@@ -157,7 +157,11 @@ const PromiseUseSchema = S.Literals(["async", "await", "new", "static", "type", 
  */
 export const PromiseFinding = S.TaggedUnion({
   Clean: {},
-  Refused: {},
+  Refused: {
+    broken: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a place breaks the rule, or only the ledger or what it reads fails" })
+    )
+  },
   Unlisted: {
     why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" }))
   },
@@ -233,7 +237,10 @@ const insteadOf = (use: PromiseUse): string => {
  */
 export const promiseSentence: (finding: PromiseFinding) => Line = PromiseFinding.match({
   Clean: () => out(`promises:check OK  no Promise is written (${notRead})`),
-  Refused: () => err(`promises:check FAIL  a Promise is written. Write what each line says instead (${notRead}):`),
+  Refused: ({ broken }) =>
+    broken
+      ? err(`promises:check FAIL  a Promise is written. Write what each line says instead (${notRead}):`)
+      : err(`promises:check FAIL  its ledger, or what it reads, does not hold (${notRead}):`),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   At: ({ place, use }) => err(`${place}  ${insteadOf(use)}`),
   Standing: ({ file, words }) => err(`${file}  ${words}`),
@@ -321,7 +328,7 @@ export const promises = Effect.fn("Promises.promises")(function* () {
   const ledger = yield* readLedger(promisesLedger)
   if (Result.isFailure(ledger)) {
     return A.make<[PromiseFinding, PromiseFinding]>(
-      PromiseFinding.cases.Refused.make({}),
+      PromiseFinding.cases.Refused.make({ broken: false }),
       PromiseFinding.cases.Ledger.make({ said: ledger.failure })
     )
   }
@@ -335,7 +342,7 @@ export const promises = Effect.fn("Promises.promises")(function* () {
   ])
   if (listed.code !== 0) {
     return A.make<[PromiseFinding, PromiseFinding]>(
-      PromiseFinding.cases.Refused.make({}),
+      PromiseFinding.cases.Refused.make({ broken: false }),
       PromiseFinding.cases.Unlisted.make({ why: Str.trim(listed.stderr) })
     )
   }
@@ -395,6 +402,11 @@ export const promises = Effect.fn("Promises.promises")(function* () {
     A.appendAll(typed.problems, A.flatten(found))
   )
   return A.isArrayNonEmpty(problems)
-    ? A.prepend<PromiseFinding, PromiseFinding>(problems, PromiseFinding.cases.Refused.make({}))
+    ? A.prepend<PromiseFinding, PromiseFinding>(
+        problems,
+        PromiseFinding.cases.Refused.make({
+          broken: A.some(problems, (problem) => !PromiseFinding.guards.Ledger(problem))
+        })
+      )
     : A.of<PromiseFinding>(PromiseFinding.cases.Clean.make({}))
 })

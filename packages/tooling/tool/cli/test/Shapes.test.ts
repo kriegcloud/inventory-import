@@ -160,6 +160,14 @@ export const c = vi.fn((n: number, cause: unknown) => cause)
       expect(got4).toContain(
         `err: ${listed}  is listed in packages/x/ledger.json but breaks the rule no more: take its line off`
       )
+      // A ledger that names a file not there fails on the ledger alone, and its heading says so.
+      const gone = yield* inTree(
+        { "packages/x/ledger.json": json({ "packages/x/src/gone.ts": 1 }) },
+        inRepository(law, sentence)
+      )
+      expect(gone[0]).toBe(
+        `err: readonly:check FAIL  its ledger, or what it reads, does not hold (.agents/, .codex/, scratchpad/, vendor/ and the kit's hashed files are not read; the files in packages/x/ledger.json are listed):`
+      )
       // The ui package's components are read; only code another check holds to its source is not: the files a kit
       // manifest hashes. Its local files are read.
       const read = yield* inTree(

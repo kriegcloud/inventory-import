@@ -92,7 +92,11 @@ const silences = (rules: ReadonlyArray<string>) =>
  */
 export const FastRefreshFinding = S.TaggedUnion({
   Clean: {},
-  Refused: {},
+  Refused: {
+    broken: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a place breaks the rule, or only the ledger or what it reads fails" })
+    )
+  },
   Unreadable: {
     why: S.String.pipe(
       S.annotateKey({ description: "Why the profile, git's list or oxlint's report could not be read" })
@@ -134,10 +138,12 @@ const read = `${A.join(screenFolders, ", ")} are read but ${A.join(fastRefreshLe
  */
 export const fastRefreshSentence: (finding: FastRefreshFinding) => Line = FastRefreshFinding.match({
   Clean: () => out(`fast-refresh:check OK  every file of screens exports components only (${read})`),
-  Refused: () =>
-    err(
-      `fast-refresh:check FAIL  a file of screens exports more than components. Write what each line says (${read}):`
-    ),
+  Refused: ({ broken }) =>
+    broken
+      ? err(
+          `fast-refresh:check FAIL  a file of screens exports more than components. Write what each line says (${read}):`
+        )
+      : err(`fast-refresh:check FAIL  its ledger, or what it reads, does not hold (${read}):`),
   Unreadable: ({ why }) => err(`  ${why}`),
   At: ({ place }) =>
     err(
@@ -188,7 +194,15 @@ const placesIn = Effect.fn("FastRefresh.placesIn")(function* (files: ReadonlyArr
 export const fastRefresh = Effect.fn("FastRefresh.fastRefresh")(function* () {
   const repo = yield* Repo
   const refused = (problems: ReadonlyArray<FastRefreshFinding>) =>
-    A.prepend<FastRefreshFinding, FastRefreshFinding>(problems, FastRefreshFinding.cases.Refused.make({}))
+    A.prepend<FastRefreshFinding, FastRefreshFinding>(
+      problems,
+      FastRefreshFinding.cases.Refused.make({
+        broken: A.some(
+          problems,
+          (problem) => !FastRefreshFinding.guards.Ledger(problem) && !FastRefreshFinding.guards.Unreadable(problem)
+        )
+      })
+    )
   const written = yield* repo.text(repo.join(repo.root, fastRefreshProfile))
   if (O.isNone(S.decodeOption(Profile, { onExcessProperty: "error" })(written))) {
     return refused([

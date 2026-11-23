@@ -5,10 +5,12 @@
 // entry for a file that is not there is refused; and the ledger itself is compared with the same file at its base, so
 // a number that rose or a file added is refused, whatever the same commit wrote.
 //
-// The base is where this branch left `main` (the merge base of HEAD and `origin/main`, else `main`). On the branch
-// `main` it is what main was before the change being checked: in CI's run for a push, the commit the push moved main
-// from (`LEDGER_BASE`, which CI sets to the push's `before`), so every commit of a push of several is in it; locally,
-// `origin/main` when HEAD is ahead of it, else the commit before HEAD. A shallow checkout is refused, since its base
+// The base is where this branch left `main` (the merge base of HEAD and `origin/main`, else `main`). In CI's run for a
+// push, it is the commit CI names in `LEDGER_BASE`: the last commit pushed to that branch whose run passed, else on
+// main the push's `before`, each taken only when it is fetched and HEAD holds it (ci.yml); with none of them, the
+// merge base. On the branch `main` with no `LEDGER_BASE`, it is `origin/main` when HEAD is ahead of it, else the
+// commit before HEAD. A `LEDGER_BASE` that is not fetched or not in HEAD's history is refused: CI never sets one, so
+// it is one set by hand. A shallow checkout is refused, since its base
 // may be missing and the comparison would pass in silence. On a branch whose base has no such ledger yet, nothing is
 // compared.
 //

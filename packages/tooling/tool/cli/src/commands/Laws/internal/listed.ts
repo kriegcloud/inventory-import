@@ -53,7 +53,11 @@ export interface ListedSpec {
  */
 export const ListedFinding = S.TaggedUnion({
   Clean: {},
-  Refused: {},
+  Refused: {
+    broken: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a place breaks the rule, or only the ledger or what it reads fails" })
+    )
+  },
   Unlisted: {
     why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" }))
   },
@@ -119,7 +123,10 @@ export const listedSentence = (spec: ListedSpec): ((finding: ListedFinding) => L
   const notRead = `${A.join(spec.leftOut, ", ")}${spec.leavesHashedKit ? " and the kit's hashed files" : ""} are not read; the files in ${spec.ledger} are listed`
   return ListedFinding.match({
     Clean: () => out(`${spec.check} OK  ${spec.rule} (${notRead})`),
-    Refused: () => err(`${spec.check} FAIL  not ${spec.rule}. Write what each line says instead (${notRead}):`),
+    Refused: ({ broken }) =>
+      broken
+        ? err(`${spec.check} FAIL  not ${spec.rule}. Write what each line says instead (${notRead}):`)
+        : err(`${spec.check} FAIL  its ledger, or what it reads, does not hold (${notRead}):`),
     Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
     At: ({ place }) => err(`${place}  ${spec.instead}`),
     Standing: ({ file, words }) => err(`${file}  ${words}`),
@@ -136,7 +143,10 @@ export const listedSentence = (spec: ListedSpec): ((finding: ListedFinding) => L
 export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSpec) {
   const repo = yield* Repo
   const refused = (problems: ReadonlyArray<ListedFinding>) =>
-    A.prepend<ListedFinding, ListedFinding>(problems, ListedFinding.cases.Refused.make({}))
+    A.prepend<ListedFinding, ListedFinding>(
+      problems,
+      ListedFinding.cases.Refused.make({ broken: A.some(problems, (problem) => !ListedFinding.guards.Ledger(problem)) })
+    )
   const ledger = yield* readLedger(spec.ledger)
   if (Result.isFailure(ledger)) return refused([ListedFinding.cases.Ledger.make({ said: ledger.failure })])
   const git = yield* repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--deduplicate"])

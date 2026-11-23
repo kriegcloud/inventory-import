@@ -295,6 +295,104 @@
       ],
       "outputs": []
     },
+    // No Promise is written (`beep laws promises`), but in the files its lists name: every code file git would commit
+    // is an input, as for the try law, with the law's own source, and what its typed half reads besides: its profile,
+    // every tsconfig and every package.json, so a cached answer is never replayed over a changed one.
+    "//#promises:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".oxlintrc.promises.json",
+        "**/tsconfig*.json",
+        "**/package.json",
+        "!**/node_modules/**",
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // No `@effect-diagnostics` directive turns a rule off (`beep laws diagnostics`), but in the files it lists.
+    "//#diagnostics:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every helper declared with two values or more takes the one it acts on first and is dual (`beep laws dual`).
+    "//#dual:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every property of an object type or an interface is readonly (`beep laws readonly`).
+    "//#readonly:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every file of screens exports components only (`beep laws fast-refresh`, `.oxlintrc.fast-refresh.json`).
+    "//#fast-refresh:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false
+    },
+    // No type assertion is written (oxlint, `.oxlintrc.assertions.json`, from the root), and its lists only shrink
+    // (`beep laws assertions`).
+    "//#assertions:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".oxlintrc.assertions.json",
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // The root's own .ts files and each package's vitest.config.ts type-check (tsconfig.config.json). Only the linter
     // above reads that project otherwise, and an import that does not resolve there would hide a deprecated call.
     "//#configs:check": {

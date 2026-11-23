@@ -423,6 +423,12 @@ bun install --lockfile-only                                 # the CLI ran npm in
 bun run check
 ```
 
+- **Make it readonly and dual as it comes in.** The components and hooks under `packages/ui` are held to the
+  repository's bans like our own code (Benjamin, 2026-11-23: "Hold them to the rules"): `bun run check` refuses a
+  property that is not `readonly`, a helper that names its subject and is not `dual`, a type assertion, a Promise and
+  an `@effect-diagnostics` comment. A component already there is held at the number of places its ledger records
+  (`packages/tooling/tool/cli/ledgers/`), which only falls as it is cleaned; a fresh one has no line in any ledger,
+  so write `readonly` on its props and types and fix the rest before `bun run check` passes. Never add it to a ledger.
 - **Never `--overwrite`.** The starter's components were changed after installing (the table grid, the data grid,
   the stepper); an overwrite puts the upstream version back without saying so. `yes n |` keeps them.
 - **The kit files moved to atoms** no longer match their registry (goals/atoms, "The kit on atoms"): their state is

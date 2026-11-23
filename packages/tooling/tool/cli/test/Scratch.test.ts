@@ -618,7 +618,10 @@ describe("scratch", () => {
     expect(
       leakingLines("/** @effect-leakable-service */\nclass Database {}\n// @Effect-Expect-Leaking Database\n")
     ).toEqual([1, 3])
-    expect(leakingLines("// @effect-diagnostics floatingEffect:off\n")).toEqual([])
+    // A directive is input here: leakingLines must not take one for a leaking-requirement comment. It is put
+    // together from diagnosticDirective, as every test of scratch:check builds its directives, so this test file does
+    // not itself turn floatingEffect off for its next line, which the checker would do for a written one.
+    expect(leakingLines(`// ${diagnosticDirective} floatingEffect:off\n`)).toEqual([])
   })
 
   it.effect("check refuses a comment that silences a leaking requirement, and lets a quoted directive stand", () =>

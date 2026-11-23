@@ -163,7 +163,6 @@ export default Alchemy.Stack(
               : Output.map(password.text, Redacted.value)
       })
     }
-    // The stack is the entry point the CLI runs: this is where its one layer is provided.
-    // @effect-diagnostics-next-line strictEffectProvide:off
-  }).pipe(Effect.provide(InfraStage.layer))
+    // The stack is the entry point the CLI runs: this is where the plan of its stage is given.
+  }).pipe(InfraStage.provided)
 )

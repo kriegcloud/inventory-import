@@ -1,0 +1,21 @@
+{
+  "apps/inventory/src/web/Root.tsx": 1,
+  "apps/inventory/src/web/components/app/AppSidebar.tsx": 2,
+  "apps/inventory/src/web/pages/ActivityPage.tsx": 1,
+  "packages/access/web/src/AuditEvents.screen.tsx": 3,
+  "packages/access/web/src/People.screen.tsx": 3,
+  "packages/catalog/web/src/ImportDecisions.screen.tsx": 3,
+  "packages/catalog/web/src/ImportPage.screen.tsx": 1,
+  "packages/catalog/web/src/ItemEditor.screen.tsx": 3,
+  "packages/catalog/web/src/ItemsPage.screen.tsx": 6,
+  "packages/catalog/web/src/PastImports.screen.tsx": 5,
+  "packages/catalog/web/src/ResultStep.screen.tsx": 1,
+  "packages/catalog/web/src/TableAssistant.screen.tsx": 7,
+  "packages/catalog/web/src/UploadStep.screen.tsx": 1,
+  "packages/catalog/web/src/internal/format.tsx": 8,
+  "packages/review/src/internal/ReviewGrid.tsx": 4,
+  "packages/review/src/internal/ReviewQueue.tsx": 1,
+  "packages/review/src/internal/parts.tsx": 3,
+  "packages/ui/src/Skeletons.component.tsx": 1,
+  "packages/ui/src/Theme.provider.tsx": 3
+}

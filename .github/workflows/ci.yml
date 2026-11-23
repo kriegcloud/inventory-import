@@ -9,10 +9,15 @@ on:
 
 permissions:
   contents: read
+  # The bans' ledgers are compared, on a push, with the last commit of the branch whose run passed: read the runs.
+  actions: read
 
+# A pull request's new push cancels its run in progress. A push to main or a release branch does not cancel the run in
+# progress, though GitHub still keeps only the newest of the runs waiting in the group: the bans' ledgers are compared
+# with the last push whose run passed, so a run skipped that way is checked by the next.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -20,7 +25,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # The bans' ledgers may only fall, compared with where this commit left main (their merge base): the whole
+      # history is fetched so git can find it (packages/tooling/tool/cli/ledgers).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # On a push, the ledgers are compared with the last commit pushed to this branch whose run passed, so a number
+      # raised in a push whose run was cancelled, failed or skipped is seen all the same. Only push runs count: a
+      # pull request's run reports its own head branch, which a fork may call main. Each candidate is taken only when
+      # it is fetched and HEAD holds it, so a force push or a commit only under refs/pull never stops every later run:
+      # on main, the last passing push, then the push's `before`; on a release branch, the last passing push. With
+      # none, LEDGER_BASE stays unset and the law compares with where the branch left main (on main, HEAD^1).
+      - name: Base of the bans' ledgers
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          passed=$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          if [ "$GITHUB_REF_NAME" = main ]; then candidates="$passed $BEFORE"; else candidates="$passed"; fi
+          for candidate in $candidates; do
+            if git cat-file -e "$candidate^{commit}" 2>/dev/null && git merge-base --is-ancestor "$candidate" HEAD; then
+              echo "LEDGER_BASE=$candidate" >> "$GITHUB_ENV"
+              echo "The bans' ledgers are compared with $candidate"
+              exit 0
+            fi
+          done
+          echo "No passing push this run holds: the bans' ledgers are compared with where the branch left main"
       - uses: actions/setup-node@v4
         with:
           node-version: 22

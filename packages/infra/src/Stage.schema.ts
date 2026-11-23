@@ -12,6 +12,24 @@ import { $InfraId } from "./internal/identity.ts"
 const $I = $InfraId.create("Stage")
 
 /**
+ * The name of production's stage: `prod`, and no other.
+ *
+ * @category schemas
+ */
+export const ProductionStageName = S.Literal("prod").pipe(
+  $I.annoteSchema("ProductionStageName", { description: "Production's stage name: prod" })
+)
+
+/**
+ * The name of staging's stage: `staging`, and no other.
+ *
+ * @category schemas
+ */
+export const StagingStageName = S.Literal("staging").pipe(
+  $I.annoteSchema("StagingStageName", { description: "Staging's stage name: staging" })
+)
+
+/**
  * The name of a pull request's preview: `pr-` and the pull request's number.
  *
  * @category schemas
@@ -46,8 +64,8 @@ export const PersonalStageName = S.String.check(S.isPattern(/^dev_[a-z0-9][-_a-z
  * @category schemas
  */
 export const StageName = S.Union([
-  S.Literal("prod"),
-  S.Literal("staging"),
+  ProductionStageName,
+  StagingStageName,
   PreviewStageName,
   TestStageName,
   PersonalStageName

@@ -7,8 +7,6 @@
  *
  * @packageDocumentation
  */
-// The entry point is where the layers are provided.
-// @effect-diagnostics strictEffectProvide:off
 import * as BunRuntime from "@effect/platform-bun/BunRuntime"
 import * as BunServices from "@effect/platform-bun/BunServices"
 import * as Cause from "effect/Cause"
@@ -21,14 +19,17 @@ import { Workstation } from "./commands/Infra/Workstation.service.ts"
 import { Repo } from "./Repo.service.ts"
 import { rootCommand } from "./Root.command.ts"
 
-Command.run(rootCommand, { version: "0.0.0" }).pipe(
-  Effect.provide(
-    Workstation.layer.pipe(
-      Layer.provideMerge(Repo.layer()),
-      Layer.provideMerge(BunServices.layer),
-      Layer.provide(Digest.layerWebCrypto)
-    )
-  ),
+/** What every command runs with: the workstation's tools, the repository, Bun's services and a digest. */
+const services = Workstation.layer.pipe(
+  Layer.provideMerge(Repo.layer()),
+  Layer.provideMerge(BunServices.layer),
+  Layer.provide(Digest.layerWebCrypto)
+)
+
+// The entry point: the services are built once, for the run, and the command is given what they made.
+Layer.build(services).pipe(
+  Effect.flatMap((context) => Command.run(rootCommand, { version: "0.0.0" }).pipe(Effect.provideContext(context))),
+  Effect.scoped,
   Effect.tapErrorTag("RepoError", (error) => Console.error(error.message)),
   Effect.tapDefect((defect) => Console.error(Cause.die(defect).pipe(Cause.pretty))),
   BunRuntime.runMain({ disableErrorReporting: true })

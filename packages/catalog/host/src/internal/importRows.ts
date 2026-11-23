@@ -4,8 +4,16 @@
 import { D1Instant } from "@beep/d1/D1Instant"
 import { ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
-import { DecidedBy, RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } from "@inventory/catalog-contract/Import"
+import {
+  DecidedBy,
+  maxReason,
+  RowOutcome,
+  decidedByNobody,
+  decidedByPerson,
+  outcomeOf
+} from "@inventory/catalog-contract/Import"
 import { StagedHeadJson } from "@inventory/catalog-contract/Staged"
+import { said } from "@inventory/catalog-model/CellReading"
 import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as A from "effect/Array"
@@ -91,12 +99,6 @@ export const ItemsPiece = piece(ItemInsert).annotate({ description: "Items a con
 export const OutcomeReason = PlannedRow.cases.notImported.fields.reason
 
 /**
- * The longest reason the result reads (the contract's `RowOutcome`): a stored reason longer than this, which a past
- * version wrote by quoting whole cells, is read cut to it.
- */
-export const resultReasonLength = 4000
-
-/**
  * Text cut to at most `max` UTF-16 units, the last of them "…" when anything was cut; never a character cut in two,
  * so a pair of surrogates is kept whole or left out.
  *
@@ -111,47 +113,38 @@ export const clipped: {
   return `${/[\uD800-\uDBFF]$/.test(kept) ? Str.takeLeft(kept, max - 2) : kept}…`
 })
 
-/** The most of a quoted value a long stored reason keeps: about the first 80 characters, as the review quotes one. */
-export const quotedValueLength = 80
-
-// How many characters a value has, as a person counts them: a pair of surrogates is one.
-const charactersIn = (text: string): string => new Intl.NumberFormat("en-US").format(A.fromIterable(text).length)
+// A value a past version quoted whole, captured. A quote opens a value after the start, a space or "(", and closes
+// it before a space, a stop, a comma, a colon, ")" or the end; the value runs to the last such closing quote before
+// the next quote that only opens. So an inch mark (`12" pipe`) or a quote inside a word stays in its value.
+const quotedValue = /(?<=^|[\s(])"((?:(?!(?<=[\s(])"(?![\s.,;:)]|$))[\s\S])*)"(?=[\s.,;:)]|$)/
 
 /**
- * A reason whose quoted values (`Category "…"`) are each cut to `quotedValueLength`, with how long the value was
- * after its closing quote: every problem's sentence stays whole. A value is what stands between a pair of quotes, so
- * a value with a quote of its own shifts the pairs; a reason still too long is then cut at its end.
+ * A reason whose quoted values are each said again as the review says one today (`said`): a value past `maxSaid`
+ * characters becomes its first ones and "…", with its length after the closing quote, and every sentence around it
+ * stays whole. What it cannot tell apart is left as it is: a value holding a quote that opens a word of its own
+ * (`say "hi`) ends early, and a long value a sentence named without quotes (a vendor, a SKU) is not shortened.
  *
  * @example quotesShortened(`Category "${"x".repeat(4000)}" is not one of the 5 categories.`)
- * // `Category "${"x".repeat(79)}…" (4,000 characters) is not one of the 5 categories.`
+ * // `Category "${"x".repeat(80)}…" (4,000 characters) is not one of the 5 categories.`
  */
-export const quotesShortened = (reason: string): string => {
-  const parts = Str.split(reason, '"')
-  return A.join(
-    A.map(parts, (part, index) =>
-      index % 2 === 1
-        ? clipped(part, quotedValueLength)
-        : O.match(
-            O.filter(A.get(parts, index - 1), (quoted) => quoted.length > quotedValueLength),
-            { onNone: () => part, onSome: (quoted) => ` (${charactersIn(quoted)} characters)${part}` }
-          )
-    ),
-    '"'
+export const quotesShortened = (reason: string): string =>
+  A.join(
+    A.map(Str.split(reason, quotedValue), (part, index) => (index % 2 === 1 ? said(part) : part)),
+    ""
   )
-}
 
 /**
- * A reason as `importOutcome` holds it, written by any version. One longer than the result reads (a version that
- * quoted whole cells) reads with its long quoted values shortened, so each problem it names still reads, and is cut
- * at its end only if it is still too long; a past import's Result and download still answer. Encoding writes it as
- * it is.
+ * A reason as `importOutcome` holds it, written by any version. A confirm today never writes one past `maxReason`
+ * (`fitted` holds the plan to it), so it reads as written. One a past version wrote by quoting whole cells, and that
+ * is longer, reads with its quoted values said again as the review says them, and is cut at its end only if it is
+ * still too long, losing the problems past the cut: a past import's Result and download still answer. Encoding writes
+ * it as it is.
  */
 export const StoredReason = S.String.pipe(
   S.decodeTo(
-    S.toType(S.String.check(S.isMaxLength(resultReasonLength))),
+    S.toType(S.String.check(S.isMaxLength(maxReason))),
     SchemaTransformation.transform({
-      decode: (reason) =>
-        reason.length <= resultReasonLength ? reason : clipped(quotesShortened(reason), resultReasonLength),
+      decode: (reason) => (reason.length <= maxReason ? reason : clipped(quotesShortened(reason), maxReason)),
       encode: (reason) => reason
     })
   )

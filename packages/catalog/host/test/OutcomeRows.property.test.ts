@@ -3,23 +3,23 @@
 // out, and a row whose item was written with no reason and nobody. What is stored is read back as any version of the
 // app wrote it, so a past import's result and its download of left-out rows still open.
 import { describe, expect, it } from "@effect/vitest"
-import { DecidedBy, outcomeReasonOf, RowOutcome } from "@inventory/catalog-contract/Import"
+import { DecidedBy, maxReason, outcomeReasonOf, RowOutcome } from "@inventory/catalog-contract/Import"
 import {
   OutcomeInsert,
   OutcomeRow,
   outcomeInsertOf,
   Part,
-  quotedValueLength,
-  resultReasonLength,
   StoredReason,
   RowNumber,
   storedOutcome
 } from "@inventory/catalog-host/ImportRows"
+import { maxSaid } from "@inventory/catalog-model/CellReading"
 import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -37,7 +37,7 @@ const StoredByAnyVersion = S.Struct({
   sku: S.String,
   name: S.String,
   outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]),
-  reason: S.Union([S.Literal(""), S.Literal("  "), S.String.check(S.isMaxLength(resultReasonLength))]),
+  reason: S.Union([S.Literal(""), S.Literal("  "), S.String.check(S.isMaxLength(maxReason))]),
   decidedBy: S.OptionFromNullOr(S.Literals(["person", "nobody"])),
   decidedByName: S.OptionFromNullOr(S.Union([DisplayName, S.Literal(""), S.Literal(" "), S.String]))
 })
@@ -101,22 +101,43 @@ describe("the outcome rows a confirm stores", () => {
 })
 
 // A long stored reason, as a version that quoted whole cells wrote it: one problem after another, each quoting a value
-// made of one character (one or two UTF-16 units) many times, so the oracle can count it without the code under test.
-const Character = S.Literals(["x", "é", "😀"])
+// made of one piece many times. A piece is a character of one or two UTF-16 units, or a value's own quote: an inch
+// mark (`12" `) or a quote inside a word (`a"b`), which a version that quoted whole cells wrote as it was.
+const Piece = S.Literals(["x", "é", "😀", '12" ', 'a"b'])
 const Problem = S.Struct({
   field: S.Literals(["Category", "Unit of measure", "Name"]),
-  character: Character,
+  piece: Piece,
   times: S.Int.check(S.isBetween({ minimum: 1, maximum: 3000 })),
   rest: S.Literals([" is not one of the 5 categories.", " has spaces around it."])
 })
 const Problems = S.Array(Problem).check(S.isMinLength(1), S.isMaxLength(4))
-const Unquoted = S.Struct({ character: Character, times: S.Int.check(S.isBetween({ minimum: 4001, maximum: 6000 })) })
+const Unquoted = S.Struct({
+  character: S.Literals(["x", "é", "😀"]),
+  times: S.Int.check(S.isBetween({ minimum: 4001, maximum: 6000 }))
+})
 
 const readReason = S.decodeEffect(StoredReason)
 const thousands = new Intl.NumberFormat("en-US")
+
 /** As many whole copies of `character` as fit in `units` UTF-16 units. */
-const copiesWithin = (character: string, units: number): string =>
-  Str.repeat(Math.floor(units / character.length))(character)
+const copiesWithin: {
+  (units: number): (character: string) => string
+  (character: string, units: number): string
+} = dual(2, (character: string, units: number): string => Str.repeat(Math.floor(units / character.length))(character))
+
+/** The whole characters from the start that fit in `units` UTF-16 units, worked out character by character. */
+const firstUnits: {
+  (units: number): (text: string) => string
+  (text: string, units: number): string
+} = dual(
+  2,
+  (text: string, units: number): string =>
+    A.reduce(A.fromIterable(text), { kept: "", full: false }, (cut, character) =>
+      cut.full || cut.kept.length + character.length > units
+        ? { kept: cut.kept, full: true }
+        : { kept: `${cut.kept}${character}`, full: false }
+    ).kept
+)
 
 describe("a stored reason longer than the result reads", () => {
   it.effect.prop(
@@ -127,19 +148,18 @@ describe("a stored reason longer than the result reads", () => {
         const quoting = (cut: boolean) =>
           A.join(
             A.map(problems, (problem) => {
-              const value = Str.repeat(problem.times)(problem.character)
-              const long = cut && value.length > quotedValueLength
-              return long
-                ? `${problem.field} "${copiesWithin(problem.character, quotedValueLength - 1)}…" (${thousands.format(problem.times)} characters)${problem.rest}`
+              const value = Str.repeat(problem.times)(problem.piece)
+              return cut && value.length > maxSaid
+                ? `${problem.field} "${firstUnits(value, maxSaid)}…" (${thousands.format(value.length)} characters)${problem.rest}`
                 : `${problem.field} "${value}"${problem.rest}`
             }),
             " "
           )
         const stored = quoting(false)
         const read = yield* readReason(stored)
-        expect(read).toBe(stored.length <= resultReasonLength ? stored : quoting(true))
+        expect(read).toBe(stored.length <= maxReason ? stored : quoting(true))
       }),
-    { arbitrary: { runs: 100 } }
+    { arbitrary: { runs: 200 } }
   )
 
   it.effect.prop(
@@ -148,7 +168,7 @@ describe("a stored reason longer than the result reads", () => {
     ([unquoted]) =>
       Effect.gen(function* () {
         const read = yield* readReason(Str.repeat(unquoted.times)(unquoted.character))
-        expect(read).toBe(`${copiesWithin(unquoted.character, resultReasonLength - 1)}…`)
+        expect(read).toBe(`${copiesWithin(unquoted.character, maxReason - 1)}…`)
       }),
     { arbitrary: { runs: 50 } }
   )

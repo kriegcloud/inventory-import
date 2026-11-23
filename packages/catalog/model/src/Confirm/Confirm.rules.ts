@@ -3,7 +3,7 @@
 // review made an item for it, so the store can never be handed an item the screen refused.
 import { Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
 import { ImportId } from "@inventory/catalog-contract/Ids"
-import { DecidedBy, decidedByNobody, decidedByPerson } from "@inventory/catalog-contract/Import"
+import { DecidedBy, decidedByNobody, decidedByPerson, maxReason } from "@inventory/catalog-contract/Import"
 import { ItemFields } from "@inventory/catalog-contract/Item"
 import { maxPart, RowNumber } from "@inventory/catalog-contract/Staged"
 import { LiteralKit } from "@beep/schema/LiteralKit"
@@ -53,9 +53,6 @@ const written = {
     S.annotateKey({ description: "The values that differ from the file, for the record of changed values" })
   )
 }
-/** The most characters a reason may have: what the outcome rows store and the result reads. */
-export const maxReason = 4000
-
 // One sentence of a reason, and a whole reason: never blank, so a row that is left out or skipped always says why, in
 // the result and in the download.
 const Sentence = S.String.check(

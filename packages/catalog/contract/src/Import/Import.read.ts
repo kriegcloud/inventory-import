@@ -79,8 +79,15 @@ const outcomeRow = {
     S.annotateKey({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] })
   )
 }
+/**
+ * The most characters a reason may have, counted in UTF-16 units as a store and Excel count them: what a confirm
+ * plans, what the outcome rows store and what the result reads. One number for all three, so a reason written today
+ * always reads back as written, and only one a past version wrote, quoting whole cells, is ever read shortened.
+ */
+export const maxReason = 4000
+
 // Text as stored: a reason written before a rule on its form existed must still read, so only its length is held.
-const outcomeReason = S.String.check(S.isMaxLength(4000)).pipe(
+const outcomeReason = S.String.check(S.isMaxLength(maxReason)).pipe(
   S.annotateKey({
     description: "Why the row was not imported or was already there, one sentence per problem",
     examples: ["Name is empty."]

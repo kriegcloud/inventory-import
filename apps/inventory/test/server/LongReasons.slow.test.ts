@@ -13,8 +13,7 @@ import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import * as SqlClient from "effect/sql/SqlClient"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
-import { type ImportView, outcomeReasonOf } from "@inventory/catalog-contract/Import"
-import { resultReasonLength } from "@inventory/catalog-host/ImportRows"
+import { type ImportView, maxReason, outcomeReasonOf } from "@inventory/catalog-contract/Import"
 import { Api } from "../../src/api/v1/Api.ts"
 import { as, TypedApp } from "./support/app.ts"
 import { upload } from "./support/upload.ts"
@@ -77,7 +76,7 @@ layer(TypedApp)("a row whose cell is thousands of characters long", (it) => {
           Str.startsWith('Category "xxxx')(text),
           Str.includes("is not one of the")(text),
           Str.includes('Unit of measure "XX" is not one of')(text),
-          text.length <= resultReasonLength
+          text.length <= maxReason
         ]),
         [true, true, true, true]
       )
@@ -99,7 +98,7 @@ layer(TypedApp)("a row whose cell is thousands of characters long", (it) => {
         const view = yield* client.imports.get({ params: { id: staged.id } }).pipe(marcus)
         assertSome(
           reasonOfRow2(view),
-          `Category "${Str.repeat(79)("y")}…" (6,000 characters) is not one of the 5 categories. Unit of measure "XX" is not one of EA, KG.`
+          `Category "${Str.repeat(80)("y")}…" (6,000 characters) is not one of the 5 categories. Unit of measure "XX" is not one of EA, KG.`
         )
       })
   )
@@ -137,7 +136,7 @@ layer(TypedApp)("a row whose cell is thousands of characters long", (it) => {
                 result.notImported,
                 row.sku.length,
                 row.name.length,
-                O.exists(outcomeReasonOf(row), (reason) => reason.length > 0 && reason.length <= resultReasonLength)
+                O.exists(outcomeReasonOf(row), (reason) => reason.length > 0 && reason.length <= maxReason)
               ]
             )
           ),

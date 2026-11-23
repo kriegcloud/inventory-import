@@ -27,7 +27,7 @@ A press from a screen that is behind is never silently dropped or applied: it is
 Eleven moves (0 to 10) in four goals, each leaving a working app. Move 1, the review's model in memory, is on main,
 with 164 rules in its lock. The proofs cover what must never happen, and the stories cover that each valid act
 is taken, as you required. Eight rules are only searched over sequences, not proved, and eleven only show that an act can happen. Move 0's pin is
-on main, but its check is still to write. Nothing the app runs calls the model yet.
+on main, but its check is still to write. Nothing the app runs uses the model yet.
 
 ## What you decided
 

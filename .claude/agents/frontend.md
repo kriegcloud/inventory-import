@@ -57,7 +57,8 @@ at props. For a screen people work in all day, the `design-taste-frontend` skill
 
 A screen receives values that are already settled: the contract's schemas decode absence to an `Option`, hold the
 starting values and do the trimming (`docs/standards/schema-first.md`, SF-3 to SF-5). So a screen writes no `??`, no
-`=== undefined`, no `.trim()`. The one thing it does with an `Option` is draw it, with `O.match` at the last step:
+`=== undefined`, no `O.getOrElse`, no `.trim()`. The one thing it does with an `Option` is draw it, with `O.match` at
+the last step:
 `O.match(value, { onNone: () => <span className="text-muted-foreground">Not set</span>, onSome: (code) => <Code>{code}</Code> })`. A vendored
 component's optional prop is given from the Option the same way
 (`...O.match(x, { onNone: () => ({}), onSome: (x) => ({ x }) })`). `defaults:check` refuses a new fallback or

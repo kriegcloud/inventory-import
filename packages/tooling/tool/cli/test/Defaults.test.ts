@@ -43,6 +43,11 @@ describe("what the reader takes for a place", () => {
   if (typeof x === "undefined") return 2
   const z = x.trim().toLowerCase() + Str.toUpperCase(x) + pipe(x, Str.trim)
   return [O.getOrUndefined(o), O.getOrNull(o), <b title={x ?? "t"}>{y}</b>]
+}
+export const g = (o: O.Option<string>, s: string, t: Array<string>) => {
+  let u = s || "none"
+  u ||= \`n\${s}\`
+  return [O.getOrElse(o, () => ""), pipe(o, O.getOrElse(() => u)), t || [], (s || ({}))]
 }`),
       [
         '2 fallback x ?? "d"',
@@ -57,7 +62,13 @@ describe("what the reader takes for a place", () => {
         "6 normalise Str.trim",
         "7 unwrap O.getOrUndefined",
         "7 unwrap O.getOrNull",
-        '7 fallback x ?? "t"'
+        '7 fallback x ?? "t"',
+        '10 fallback s || "none"',
+        "11 fallback u ||= `n${s}`",
+        "12 fallback O.getOrElse",
+        "12 fallback O.getOrElse",
+        "12 fallback t || []",
+        "12 fallback s || ({})"
       ]
     )
   })
@@ -70,6 +81,7 @@ const re = /null ?? undefined/
 export const Sku = S.String.pipe(S.decodeTo(S.Trimmed, SchemaTransformation.trim()))
 export const upper = SchemaGetter.toUpperCase()
 export const f = (x: string | undefined, n: number | null): x is string => n !== 0 && x !== ""
+export const either = (a: boolean, b: boolean, n = 0, { m = 1 } = {}) => (a || b || n > m ? a : b)
 `),
       []
     )

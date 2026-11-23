@@ -516,7 +516,7 @@ profile, its copied tests included, with no override.
   `S.OptionFromNullOr`, `S.OptionFromNullishOr`); a starting value is on the field (`S.withConstructorDefault`,
   `S.withDecodingDefaultTypeKey`); a trim or a change of case is a transformation (`S.decodeTo` with
   `SchemaTransformation` or `SchemaGetter`). A handler gets the type it works with from one decode at its boundary
-  and trusts it after that line. So our own code writes no `??`, no comparison with `null` or `undefined`, no
+  and trusts it after that line. So our own code writes no `??`, no `||` before a value, no `getOrElse`, no comparison with `null` or `undefined`, no
   `O.getOrUndefined` or `O.getOrNull`, and no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema.
   `bun run check` counts them in every src and test folder against `defaults-baseline.json` (`defaults:check`): a file
   may hold what the baseline names for it and no more, a file it does not name holds none, and the numbers only fall

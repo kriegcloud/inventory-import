@@ -140,18 +140,16 @@ export const fitted = (reasons: ReadonlyArray<string>): string =>
       const short = A.map(sentences, (sentence) =>
         sentence.length <= maxSentence ? sentence : saidParts(sentence).text
       )
-      // The room the closing count may need, kept free while any sentence is still to come.
-      const reserve = notListed(short.length).length + 1
+      const shortened = A.join(short, " ")
+      if (shortened.length <= maxReason) return shortened
+      // Some sentence is left off, so the reason ends with the count: its room is kept free of every sentence.
+      const room = maxReason - notListed(short.length).length - 1
       const kept = A.reduce(short, { text: "", taken: 0, full: false }, (held, sentence, index) => {
         if (held.full) return held
         const next = held.text === "" ? sentence : `${held.text} ${sentence}`
-        const last = index === short.length - 1
-        return next.length <= maxReason - (last ? 0 : reserve)
-          ? { text: next, taken: index + 1, full: false }
-          : { ...held, full: true }
+        return next.length <= room ? { text: next, taken: index + 1, full: false } : { ...held, full: true }
       })
-      const left = short.length - kept.taken
-      return left === 0 ? kept.text : `${kept.text} ${notListed(left)}`
+      return `${kept.text} ${notListed(short.length - kept.taken)}`
     }
   })
 

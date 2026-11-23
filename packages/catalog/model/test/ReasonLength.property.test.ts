@@ -202,6 +202,22 @@ describe("the one reason a plan holds for a row", () => {
     const six = A.join(A.replicate(most, 6), " ")
     expect(fitted(A.replicate(most, 7))).toBe(`${six} 1 more problem is not listed here.`)
     expect(fitted(A.replicate(most, 9))).toBe(`${six} 3 more problems are not listed here.`)
+    // The count's own room is kept free: a sentence that fits the bound and not that room is left off with the rest.
+    const crowded = fitted([...A.replicate(most, 6), Str.repeat(394)("y"), "z"])
+    expect(crowded).toBe(`${six} 2 more problems are not listed here.`)
+    expect(crowded.length).toBeLessThanOrEqual(maxReason)
+  })
+
+  it("holds no room back for a count when the sentences, long ones said by their start, all fit", () => {
+    const most = Str.repeat(maxSentence)("x")
+    const start = `${Str.repeat(maxSaid)("a")}…`
+    const six = A.join(A.replicate(most, 6), " ")
+    expect(fitted([Str.repeat(5000)("a"), ...A.replicate(most, 6), Str.repeat(300)("z")])).toBe(
+      `${start} ${six} ${Str.repeat(300)("z")}`
+    )
+    expect(fitted([Str.repeat(5000)("a"), ...A.replicate(most, 6), Str.repeat(300)("z"), "q"])).toBe(
+      `${start} ${six} ${Str.repeat(300)("z")} q`
+    )
   })
 
   // The first sentence is always said: one kept whole when the rest do not fit leaves room for the count.

@@ -2,6 +2,7 @@
 import { expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as P from "effect/Predicate"
 import * as Str from "effect/String"
@@ -10,15 +11,24 @@ import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { toTracedFetch } from "../../src/server/App.ts"
+import { toTracedServe } from "../../src/server/App.ts"
 import { RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
 import { collector } from "../../src/server/Telemetry.ts"
-import { inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
+import {
+  afterAnswerInto,
+  inMemoryApp,
+  jsonOf,
+  settingsLayer,
+  settled,
+  testOrigin,
+  testSettings
+} from "./support/app.ts"
 
 // Telemetry to a collector (src/server/Telemetry.ts). On: every request's traces, logs and metrics are sent once it
 // has answered, and the browser's batches are forwarded from the app's own pages only. A stopped collector costs the
 // page nothing. Off: nothing is sent and there is no forwarding route. The collector is a stand-in at
-// http://collector.test, answered by a spy on `fetch`.
+// http://collector.test, answered by a spy on `fetch`. Each test runs on the real clock, as the Worker does: the exporter
+// waits between its tries, and a test clock would hold that wait forever.
 
 const tom = Member.make({
   id: MemberId.make("mem_tom"),
@@ -67,30 +77,30 @@ afterAll(() => spy.mockRestore())
 const serving = (settings: Record<string, string>) =>
   Effect.acquireRelease(
     Effect.sync(() => {
-      const pending: Array<Promise<unknown>> = []
+      const pending: Array<Fiber.Fiber<void>> = []
       const app = inMemoryApp({ member: tom, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")), settings })
-      const served = toTracedFetch({
+      const served = toTracedServe({
         app,
         telemetry: RequestTelemetry.layer.pipe(
           Layer.provide(collector({ production: false })),
           Layer.provide(settingsLayer(settings))
         ),
-        waitUntil: (promise) => pending.push(promise)
+        afterAnswer: afterAnswerInto(pending)
       })
       return { ...served, pending }
     }),
-    (served) => Effect.promise(() => served.dispose())
+    (served) => served.dispose
   )
 
 const page = (path: string, init: RequestInit = {}) => new Request(`${testOrigin}${path}`, init)
 
-it.effect("on: each request sends its traces, logs and metrics after it has answered", () =>
+it.live("on: each request sends its traces, logs and metrics after it has answered", () =>
   Effect.scoped(
     Effect.gen(function* () {
       collectorSeen.reset()
       const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
       for (const path of ["/api/v1/identity/me", "/api/v1/activity", "/api/v1/system/status"]) {
-        const answer = yield* Effect.promise(() => served.fetch(page(path)))
+        const answer = yield* served.serve(page(path))
         expect(answer.status).toBe(200)
       }
       yield* settled(served.pending)
@@ -101,13 +111,12 @@ it.effect("on: each request sends its traces, logs and metrics after it has answ
   )
 )
 
-it.effect("on: every batch names this isolate as one instance, so its counters are one series", () =>
+it.live("on: every batch names this isolate as one instance, so its counters are one series", () =>
   Effect.scoped(
     Effect.gen(function* () {
       collectorSeen.reset()
       const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
-      for (const path of ["/api/v1/identity/me", "/api/v1/activity"])
-        yield* Effect.promise(() => served.fetch(page(path)))
+      for (const path of ["/api/v1/identity/me", "/api/v1/activity"]) yield* served.serve(page(path))
       yield* settled(served.pending)
       const instances = A.dedupe(
         A.flatMap(collectorSeen.bodies, (body) =>
@@ -123,16 +132,14 @@ it.effect("on: every batch names this isolate as one instance, so its counters a
   )
 )
 
-it.effect(
+it.live(
   "on: the browser's batches are forwarded from the app's own pages only, and a stopped collector costs nothing",
   () =>
     Effect.scoped(
       Effect.gen(function* () {
         collectorSeen.reset()
         const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
-        const status = yield* Effect.promise(() =>
-          served.fetch(page("/api/otlp/status")).then((answer) => answer.json())
-        )
+        const status = yield* Effect.flatMap(served.serve(page("/api/otlp/status")), jsonOf)
         expect(status).toEqual({ on: true })
         const batch = (site: string) =>
           page("/api/otlp/v1/traces", {
@@ -140,31 +147,29 @@ it.effect(
             headers: { "content-type": "application/json", "sec-fetch-site": site, origin: testOrigin },
             body: '{"resourceSpans":[]}'
           })
-        const forwarded = yield* Effect.promise(() => served.fetch(batch("same-origin")))
+        const forwarded = yield* served.serve(batch("same-origin"))
         expect([forwarded.status, collectorSeen.sent]).toEqual([200, expect.arrayContaining(["/v1/traces"])])
         // From another site: refused, and the collector is answered nothing (it sees only the batch above).
         collectorSeen.answer = () => Promise.reject(new Error("a refused batch must not be forwarded"))
-        const refused = yield* Effect.promise(() => served.fetch(batch("cross-site")))
+        const refused = yield* served.serve(batch("cross-site"))
         expect(refused.status).toBe(403)
         // The stack is stopped: the batch is dropped quietly, with no failed request in the page's console.
         collectorSeen.answer = () => Promise.reject(new TypeError("fetch failed"))
-        const stopped = yield* Effect.promise(() => served.fetch(batch("same-origin")))
+        const stopped = yield* served.serve(batch("same-origin"))
         expect(stopped.status).toBe(204)
         yield* settled(served.pending)
       })
     )
 )
 
-it.effect("off, the default: nothing is sent, and the page is told so without a failed request", () =>
+it.live("off, the default: nothing is sent, and the page is told so without a failed request", () =>
   Effect.scoped(
     Effect.gen(function* () {
       collectorSeen.reset()
       const served = yield* serving(testSettings)
-      const me = yield* Effect.promise(() => served.fetch(page("/api/v1/identity/me")))
-      const status = yield* Effect.promise(() => served.fetch(page("/api/otlp/status")).then((answer) => answer.json()))
-      const forward = yield* Effect.promise(() =>
-        served.fetch(page("/api/otlp/v1/traces", { method: "POST", body: "{}" }))
-      )
+      const me = yield* served.serve(page("/api/v1/identity/me"))
+      const status = yield* Effect.flatMap(served.serve(page("/api/otlp/status")), jsonOf)
+      const forward = yield* served.serve(page("/api/otlp/v1/traces", { method: "POST", body: "{}" }))
       yield* settled(served.pending)
       expect({ me: me.status, status, forward: forward.status }).toEqual({
         me: 200,

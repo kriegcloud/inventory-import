@@ -1,7 +1,10 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import * as S from "effect/Schema"
 import {
   CheckIcon,
   ChevronsUpDownIcon,
@@ -86,12 +89,59 @@ export const addressInAnother = (at: { readonly pathname: string; readonly searc
   new URLSearchParams(at.search).has("import") ? "/" : at.pathname
 
 /**
+ * A switch of organization, said as it happens: a toast while the server checks the membership, gone when it has
+ * answered, and the reason when the person is still in the organization they were in.
+ */
+const switchSaid = Atom.fn(
+  Effect.fnUntraced(function* (
+    target: { readonly id: string; readonly name: string; readonly from: string },
+    get: Atom.FnContext
+  ) {
+    const switching = toast.loading(`Switching to ${target.name}`)
+    const exit = yield* Effect.exit(get.setResult(switchOrganization, target.id))
+    toast.dismiss(switching)
+    if (Exit.isFailure(exit)) toastError(Cause.squash(exit.cause), { lead: `Still in ${target.from}.` })
+  })
+)
+
+/** Better Auth's client did not change who is signed in; its own error is kept for the sentence the toast says. */
+class AccountNotChanged extends S.TaggedError<AccountNotChanged, { readonly brand: unique symbol }>()(
+  "AccountNotChanged",
+  { cause: S.Defect() }
+) {}
+
+/** Signing in as another test account, said as it happens. When it works the page reloads, so only a refusal is said. */
+const signInSaid = Atom.fn(
+  (target: { readonly email: string; readonly password: string; readonly name: string; readonly from: string }) => {
+    const switching = toast.loading(`Signing in as ${target.name}`)
+    return Effect.tryPromise({
+      try: () => signInAs({ email: target.email, password: target.password }),
+      catch: (cause) => AccountNotChanged.make({ cause })
+    }).pipe(
+      Effect.catch((refused) =>
+        Effect.sync(() => {
+          toast.dismiss(switching)
+          toastError(refused.cause, { lead: `Still signed in as ${target.from}.` })
+        })
+      )
+    )
+  }
+)
+
+/** Signing out; a refusal is said, and the person stays signed in. */
+const signOutSaid = Atom.fn(() =>
+  Effect.tryPromise({ try: () => signOut(), catch: (cause) => AccountNotChanged.make({ cause }) }).pipe(
+    Effect.catch((refused) => Effect.sync(() => toastError(refused.cause, { lead: "You are still signed in." })))
+  )
+)
+
+/**
  * Which organization the person is working in, and their role there. With more than one they switch here: the
  * server changes the session's organization after checking membership, and everything on screen is asked for again.
  */
 function OrganizationPicker() {
   const { actor, organizations } = useAtomValue(sessionView)
-  const switchTo = useAtomSet(switchOrganization, { mode: "promiseExit" })
+  const switchTo = useAtomSet(switchSaid)
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
   return (
@@ -130,13 +180,7 @@ function OrganizationPicker() {
                       navigate(addressInAnother(window.location))
                       // The server checks the membership, so the switch is not shown before it answers: it says
                       // what it is doing, and the pages show their skeletons once it has.
-                      const switching = toast.loading(`Switching to ${organization.name}`)
-                      void switchTo(organization.id).then((exit) => {
-                        toast.dismiss(switching)
-                        if (Exit.isFailure(exit)) {
-                          toastError(Cause.squash(exit.cause), { lead: `Still in ${actor.organizationName}.` })
-                        }
-                      })
+                      switchTo({ id: organization.id, name: organization.name, from: actor.organizationName })
                     }
                   }}
                 >
@@ -163,6 +207,8 @@ function UserMenu() {
   const { actor, email, features } = useAtomValue(sessionView)
   const theme = useAtomValue(themeChoice)
   const setTheme = useAtomSet(themeChoice)
+  const signInTo = useAtomSet(signInSaid)
+  const leave = useAtomSet(signOutSaid)
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
   const testAccounts = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)
@@ -229,10 +275,11 @@ function UserMenu() {
                     <DropdownMenuItem
                       key={account.email}
                       onSelect={() => {
-                        const switching = toast.loading(`Signing in as ${account.name}`)
-                        signInAs({ email: account.email, password: testAccounts.password }).catch((error: unknown) => {
-                          toast.dismiss(switching)
-                          toastError(error, { lead: `Still signed in as ${actor.name}.` })
+                        signInTo({
+                          email: account.email,
+                          password: testAccounts.password,
+                          name: account.name,
+                          from: actor.name
                         })
                       }}
                     >
@@ -251,11 +298,7 @@ function UserMenu() {
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() =>
-                signOut().catch((error: unknown) => toastError(error, { lead: "You are still signed in." }))
-              }
-            >
+            <DropdownMenuItem onSelect={() => leave()}>
               <LogOutIcon />
               Sign out
             </DropdownMenuItem>

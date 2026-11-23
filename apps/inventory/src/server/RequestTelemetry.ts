@@ -15,7 +15,7 @@ import { devToolsSettings } from "./Settings.ts"
 // SPANS OUT OF THE WORKER, ONE REQUEST AT A TIME. The Workers runtime refuses to let one request's I/O be awaited from
 // another: a client built once for the isolate keeps a connection, a batching fiber and timers that belong to the
 // first request, and after that request has answered they never run again. So each request gets its own: its
-// handler runs with their tracer (the context handed to the router's web handler, App.ts `toFetch`), and once it has
+// handler runs with their tracer (the context handed to the router's web handler, App.ts `toServe`), and once it has
 // answered and its last span has ended, `done` closes their scope under `waitUntil`, inside the same request, which
 // sends what they hold.
 //

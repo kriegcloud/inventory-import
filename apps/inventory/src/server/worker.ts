@@ -1,8 +1,9 @@
 import { D1 } from "@beep/d1/D1"
 import { env, waitUntil } from "cloudflare:workers"
 import * as ConfigProvider from "effect/ConfigProvider"
+import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { makeApp, toTracedFetch } from "./App.ts"
+import { makeApp, toTracedServe } from "./App.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
 import { signIn } from "@inventory/access-host/SignIn"
@@ -11,7 +12,9 @@ import { collector } from "./Telemetry.ts"
 // Cloudflare Worker entry: the app (App.ts) on the D1 binding, with every setting and secret read through one
 // ConfigProvider built from this Worker's `env` (wrangler.jsonc `vars` and `.dev.vars` locally, the stack's `env`
 // deployed). Nothing else reads `env`; bindings such as `DB` are passed here and nowhere else. Tracing that leaves
-// the Worker (RequestTelemetry.ts) is built per request and finished under `waitUntil` after the answer.
+// the Worker (RequestTelemetry.ts) is built per request and finished under `waitUntil` after the answer. This file is
+// the one place an Effect is run: the platform asks for a promise of each answer, and `waitUntil` takes a promise of
+// the work after it.
 
 const settings = ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
@@ -26,14 +29,14 @@ const app = makeApp({
   docs: import.meta.env.DEV
 }).pipe(Layer.provide(settings))
 
-const { fetch } = toTracedFetch({
+const { serve } = toTracedServe({
   app,
   telemetry: RequestTelemetry.layer.pipe(
     Layer.provide(collector({ production: import.meta.env.PROD })),
     Layer.provide(settings)
   ),
-  waitUntil
+  afterAnswer: (work) => Effect.sync(() => waitUntil(work.pipe(Effect.runPromise)))
 })
 
 /** The Worker's request handler: every /api/* request, with the API's security headers on the way out. */
-export default { fetch } satisfies ExportedHandler<Env>
+export default { fetch: (request) => Effect.runPromise(serve(request)) } satisfies ExportedHandler<Env>

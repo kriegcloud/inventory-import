@@ -44,15 +44,18 @@ const settle = Effect.sleep("30 millis")
 
 /** A page of the app: its modules loaded afresh, its root registry made, and the session asked for the first time. */
 const load = (options: Parameters<typeof openPage>[0] = {}) =>
-  Effect.promise(() => {
+  Effect.suspend(() => {
     const page = openPage(options)
     vi.resetModules()
-    return Promise.all([
-      import("../../src/web/lib/root.ts"),
-      import("@inventory/access-web/Session"),
-      import("@inventory/client/MemberAtoms"),
-      import("@inventory/ui/Route")
-    ]).then(([root, session, member, route]) => ({ page, root, session, member, route }))
+    return Effect.all(
+      [
+        Effect.promise(() => import("../../src/web/lib/root.ts")),
+        Effect.promise(() => import("@inventory/access-web/Session")),
+        Effect.promise(() => import("@inventory/client/MemberAtoms")),
+        Effect.promise(() => import("@inventory/ui/Route"))
+      ],
+      { concurrency: "unbounded" }
+    ).pipe(Effect.map(([root, session, member, route]) => ({ page, root, session, member, route })))
   }).pipe(
     Effect.tap(() => settle),
     Effect.map((loaded) => {
@@ -281,16 +284,17 @@ describe("a write pressed on the page", () => {
     Effect.gen(function* () {
       const page = openPage()
       vi.resetModules()
-      const [root, api, member, http, HttpClient, HttpClientRequest, HttpClientResponse] = yield* Effect.promise(() =>
-        Promise.all([
-          import("../../src/web/lib/root.ts"),
-          import("@inventory/client/Api"),
-          import("@inventory/client/MemberAtoms"),
-          import("../../src/web/lib/ofThisPage.ts"),
-          import("effect/http/HttpClient"),
-          import("effect/http/HttpClientRequest"),
-          import("effect/http/HttpClientResponse")
-        ])
+      const [root, api, member, http, HttpClient, HttpClientRequest, HttpClientResponse] = yield* Effect.all(
+        [
+          Effect.promise(() => import("../../src/web/lib/root.ts")),
+          Effect.promise(() => import("@inventory/client/Api")),
+          Effect.promise(() => import("@inventory/client/MemberAtoms")),
+          Effect.promise(() => import("../../src/web/lib/ofThisPage.ts")),
+          Effect.promise(() => import("effect/http/HttpClient")),
+          Effect.promise(() => import("effect/http/HttpClientRequest")),
+          Effect.promise(() => import("effect/http/HttpClientResponse"))
+        ],
+        { concurrency: "unbounded" }
       )
       const sent: Array<string> = []
       const answers = { status: 401 }
@@ -340,15 +344,16 @@ describe("what is typed, chosen or open", () => {
   it.live("is one member's: kept when the same member is asked again, and gone in another organization", () =>
     Effect.gen(function* () {
       const t = yield* loadAs(signedInAs("dana"))
-      const [people, activity, upload, uploading, assistant, machine] = yield* Effect.promise(() =>
-        Promise.all([
-          import("@inventory/access-web/People"),
-          import("../../src/web/pages/ActivityPage.tsx"),
-          import("@inventory/catalog-web/UploadStep"),
-          import("@inventory/catalog-web/Upload"),
-          import("@inventory/catalog-web/TableAssistant"),
-          import("@inventory/catalog-web/UploadMachine")
-        ])
+      const [people, activity, upload, uploading, assistant, machine] = yield* Effect.all(
+        [
+          Effect.promise(() => import("@inventory/access-web/People")),
+          Effect.promise(() => import("../../src/web/pages/ActivityPage.tsx")),
+          Effect.promise(() => import("@inventory/catalog-web/UploadStep")),
+          Effect.promise(() => import("@inventory/catalog-web/Upload")),
+          Effect.promise(() => import("@inventory/catalog-web/TableAssistant")),
+          Effect.promise(() => import("@inventory/catalog-web/UploadMachine"))
+        ],
+        { concurrency: "unbounded" }
       )
       const { registry } = t
       /** A state of a screen that is drawn: what the person put in it, and whether it is there. */
@@ -449,18 +454,19 @@ const browserWithServer = Effect.fnUntraced(function* () {
   const page = openPage()
   vi.resetModules()
   const [root, api, member, session, http, HttpClient, HttpClientRequest, HttpClientResponse, Headers] =
-    yield* Effect.promise(() =>
-      Promise.all([
-        import("../../src/web/lib/root.ts"),
-        import("@inventory/client/Api"),
-        import("@inventory/client/MemberAtoms"),
-        import("@inventory/access-web/Session"),
-        import("../../src/web/lib/ofThisPage.ts"),
-        import("effect/http/HttpClient"),
-        import("effect/http/HttpClientRequest"),
-        import("effect/http/HttpClientResponse"),
-        import("effect/http/Headers")
-      ])
+    yield* Effect.all(
+      [
+        Effect.promise(() => import("../../src/web/lib/root.ts")),
+        Effect.promise(() => import("@inventory/client/Api")),
+        Effect.promise(() => import("@inventory/client/MemberAtoms")),
+        Effect.promise(() => import("@inventory/access-web/Session")),
+        Effect.promise(() => import("../../src/web/lib/ofThisPage.ts")),
+        Effect.promise(() => import("effect/http/HttpClient")),
+        Effect.promise(() => import("effect/http/HttpClientRequest")),
+        Effect.promise(() => import("effect/http/HttpClientResponse")),
+        Effect.promise(() => import("effect/http/Headers"))
+      ],
+      { concurrency: "unbounded" }
     )
   const server = { cookie: "mem_dana/org_prairie", done: A.empty<string>(), named: A.empty<string>() }
   const client = http.ofThisPage(

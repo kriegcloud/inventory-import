@@ -1,4 +1,5 @@
 import type { D1 } from "@beep/d1/D1"
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
@@ -21,7 +22,7 @@ import { CatalogLive } from "@inventory/catalog-host/Host"
 import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
-import { withSecurityHeaders } from "./security.ts"
+import { unsecuredAnswer, withSecurityHeaders } from "./security.ts"
 import { HttpTracing, OtlpProxyRoute, RequestMetrics } from "./Telemetry.ts"
 
 // The app as layers, without the Cloudflare runtime: worker.ts gives it the D1 binding and the environment, and the
@@ -120,38 +121,74 @@ export const makeApp = <E, R, IE, IR, AE, AR>(options: {
     Layer.provideMerge(HttpTracing)
   )
 
-/** A `fetch` for the app: every response leaves with the API's security headers. `dispose` closes the app's layer. */
-export const toFetch = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>) => {
-  const { dispose, handler } = HttpRouter.toWebHandler(app)
-  return {
-    fetch: (request: Request): Promise<Response> => handler(request).then(withSecurityHeaders(request)),
-    dispose
-  }
+/**
+ * The app as the Worker's entry runs it: `serve` answers one request, `dispose` closes the app's layer. Both are
+ * Effects, so nothing here runs one: the entry (worker.ts) does, and a test yields them.
+ */
+export type Served = {
+  readonly serve: (request: Request) => Effect.Effect<Response>
+  readonly dispose: Effect.Effect<void>
 }
 
 /**
- * The Worker's `fetch`: `toFetch`, and each request also runs with its own tracing (RequestTelemetry.ts: Effect
- * DevTools in development when EFFECT_DEVTOOLS_URL is set), finished after the answer under `waitUntil`. Off, the
- * default, it builds nothing and adds no wait.
+ * The response with the API's security headers. If the API reference page cannot be read to hash its scripts, the
+ * answer is a 500 that still carries them: nothing leaves without the headers.
  */
-export const toTracedFetch = <E, TE>(options: {
+const secured = (request: Request) => (response: Response) =>
+  withSecurityHeaders(response, request).pipe(
+    Effect.catch((cause) =>
+      Effect.logError("The response could not be given its security headers", cause).pipe(Effect.as(unsecuredAnswer()))
+    )
+  )
+
+/**
+ * `answer` served in the services of `edge` (the hashing the headers need, and whatever `answer` asks for), each
+ * response secured; `dispose` closes the router's layer and `edge`.
+ */
+const servedIn = <R, ER>(
+  edge: ManagedRuntime.ManagedRuntime<R | Digest.Digest, ER>,
+  answer: (request: Request) => Effect.Effect<Response, never, R>,
+  dispose: () => Promise<void>
+): Served => ({
+  serve: (request) =>
+    edge.contextEffect.pipe(
+      Effect.flatMap((context) => Effect.provideContext(Effect.flatMap(answer(request), secured(request)), context)),
+      Effect.orDie
+    ),
+  dispose: Effect.all([Effect.promise(dispose), edge.disposeEffect], { concurrency: "unbounded", discard: true })
+})
+
+/**
+ * The app served: every response leaves with the API's security headers. The router's web handler is a promise, the
+ * library's edge, taken in here; it answers every request, failures included, so it never rejects.
+ */
+export const toServe = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>): Served => {
+  const memoMap = Layer.makeMemoMapUnsafe()
+  const { dispose, handler } = HttpRouter.toWebHandler(app, { memoMap })
+  const edge = ManagedRuntime.make(Digest.layerWebCrypto, { memoMap })
+  return servedIn(edge, (request) => Effect.promise(() => handler(request)), dispose)
+}
+
+/**
+ * The Worker's app: `toServe`, and each request also runs with its own tracing (RequestTelemetry.ts: Effect DevTools
+ * in development when EFFECT_DEVTOOLS_URL is set), finished after the answer by `afterAnswer`, which the entry hands to
+ * the platform's `waitUntil`. Off, the default, it builds nothing and adds no wait.
+ */
+export const toTracedServe = <E, TE>(options: {
   readonly app: Layer.Layer<never, E, HttpRouter.HttpRouter>
   readonly telemetry: Layer.Layer<RequestTelemetry, TE>
-  readonly waitUntil: (promise: Promise<unknown>) => void
-}) => {
+  readonly afterAnswer: (work: Effect.Effect<void>) => Effect.Effect<void>
+}): Served => {
   const memoMap = Layer.makeMemoMapUnsafe()
   const { dispose, handler } = HttpRouter.toWebHandler(options.app, { memoMap })
-  const edge = ManagedRuntime.make(options.telemetry, { memoMap })
-  const serve = Effect.fnUntraced(function* (request: Request) {
+  const edge = ManagedRuntime.make(Layer.merge(options.telemetry, Digest.layerWebCrypto), { memoMap })
+  const answer = Effect.fnUntraced(function* (request: Request) {
     const telemetry = yield* RequestTelemetry
     const scope = yield* telemetry.begin
     const response = yield* Effect.promise(() => handler(request, scope.context))
     // After the answer: finish this request's tracing, inside this request, so the runtime lets its I/O through.
-    yield* Effect.sync(() => options.waitUntil(edge.runPromise(scope.done)))
+    yield* options.afterAnswer(scope.done)
     return response
   })
-  return {
-    fetch: (request: Request): Promise<Response> => edge.runPromise(serve(request)).then(withSecurityHeaders(request)),
-    dispose: () => Promise.all([dispose(), edge.dispose()]).then(() => undefined)
-  }
+  return servedIn(edge, answer, dispose)
 }

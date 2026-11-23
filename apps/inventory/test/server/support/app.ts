@@ -12,6 +12,7 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
+import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
@@ -33,7 +34,7 @@ import { type Member } from "@inventory/kernel/Member"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
+import { makeApp, makeRoutes, servicesWith, toServe } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { Handlers } from "../../../src/server/handlers.ts"
 import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
@@ -260,23 +261,41 @@ export const TypedApp = testAppWith(OpenRouterTest.off("noKey", ModelId.make(tes
 export const testAppAround = (around: Layer.Layer<ImportStore, never, StoreNeeds>) =>
   handlersOn(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)), around)
 
-/** The app's `fetch`, as the Worker exports it: security headers included. `dispose` runs when the test block ends. */
+/** The app as the Worker serves it: security headers included. `dispose` runs when the test block ends. */
 export class TestFetch extends Context.Service<
   TestFetch,
-  { readonly handle: (request: Request) => Promise<Response> }
+  { readonly handle: (request: Request) => Effect.Effect<Response> }
 >()("@inventory/app/test/server/support/app/TestFetch") {
   static readonly layer = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>) =>
     Layer.effect(
       TestFetch,
       Effect.map(
         Effect.acquireRelease(
-          Effect.sync(() => toFetch(app)),
-          (running) => Effect.promise(() => running.dispose())
+          Effect.sync(() => toServe(app)),
+          (running) => running.dispose
         ),
-        (running) => TestFetch.of({ handle: running.fetch })
+        (running) => TestFetch.of({ handle: running.serve })
       )
     )
 }
+
+/** A response's body as text: the platform's promise, taken in. */
+export const textOf = (response: Response): Effect.Effect<string> => Effect.promise(() => response.text())
+
+/** A response's body as JSON, or its text when it is not JSON. */
+export const jsonOf = (response: Response): Effect.Effect<unknown> =>
+  Effect.flatMap(textOf(response), (text) => fromJson(text).pipe(Effect.orElseSucceed(() => text)))
+
+/**
+ * What a request hands the platform after its answer, started at once as `waitUntil` starts it, and kept in `pending`
+ * to be waited for by `settled`.
+ */
+export const afterAnswerInto =
+  (pending: Array<Fiber.Fiber<void>>) =>
+  (work: Effect.Effect<void>): Effect.Effect<void> =>
+    Effect.map(Effect.forkDetach(work), (fiber) => {
+      pending.push(fiber)
+    })
 
 const toJson = S.encodeEffect(S.fromJsonString(S.Unknown))
 const fromJson = S.decodeUnknownEffect(S.fromJsonString(S.Unknown))
@@ -285,11 +304,11 @@ const fromJson = S.decodeUnknownEffect(S.fromJsonString(S.Unknown))
 export const testOrigin = "http://localhost:5320"
 
 /**
- * Waits for everything a request handed to `waitUntil`. Each promise is already running, so nothing is started here:
- * they are only waited for, all of them at once, and a rejected one fails the test.
+ * Waits for everything a request handed on after its answer. Each piece is already running, so nothing is started
+ * here: they are only waited for, all of them at once, and a failed one fails the test.
  */
-export const settled = (pending: ReadonlyArray<Promise<unknown>>): Effect.Effect<void> =>
-  Effect.forEach(pending, (promise) => Effect.promise(() => promise), { concurrency: "unbounded", discard: true })
+export const settled = (pending: ReadonlyArray<Fiber.Fiber<void>>): Effect.Effect<void> =>
+  Effect.asVoid(Fiber.joinAll(pending))
 
 /**
  * Sends one request to the app the way a browser or curl would, as the member named by `actingAs` (the demo
@@ -307,16 +326,14 @@ export const send = Effect.fn("test.send")(function* (options: {
   const headers = new Headers(options.headers)
   if (options.actingAs !== undefined) headers.set("x-acting-as", options.actingAs)
   if (body !== undefined) headers.set("content-type", "application/json")
-  const response = yield* Effect.promise(() =>
-    handle(
-      new Request(`${testOrigin}${options.path}`, {
-        method: options.method ?? (body === undefined ? "GET" : "POST"),
-        headers,
-        ...(body === undefined ? {} : { body })
-      })
-    )
+  const response = yield* handle(
+    new Request(`${testOrigin}${options.path}`, {
+      method: options.method ?? (body === undefined ? "GET" : "POST"),
+      headers,
+      ...(body === undefined ? {} : { body })
+    })
   )
-  const text = yield* Effect.promise(() => response.text())
+  const text = yield* textOf(response)
   const json = text === "" ? undefined : yield* fromJson(text).pipe(Effect.orElseSucceed(() => text))
   return { status: response.status, headers: response.headers, json, text }
 })
@@ -375,20 +392,18 @@ export const browser = (address: string) => {
       ...extra
     }
     const payload = body === undefined ? undefined : yield* encodeAny(body).pipe(Effect.orDie)
-    const response = yield* Effect.promise(() =>
-      handle(
-        new Request(`${testOrigin}${path}`, {
-          method,
-          headers: R.filter(headers, (value) => value !== ""),
-          ...(payload === undefined ? {} : { body: payload })
-        })
-      )
+    const response = yield* handle(
+      new Request(`${testOrigin}${path}`, {
+        method,
+        headers: R.filter(headers, (value) => value !== ""),
+        ...(payload === undefined ? {} : { body: payload })
+      })
     )
     const setCookie = O.getOrUndefined(
       A.findFirst(response.headers.getSetCookie(), (line) => Str.includes("inventory.session_token=")(line))
     )
     if (setCookie !== undefined) cookie = Str.split(setCookie, ";")[0] ?? ""
-    const text = yield* Effect.promise(() => response.text())
+    const text = yield* textOf(response)
     const json = text === "" ? undefined : yield* decodeAny(text).pipe(Effect.orElseSucceed(() => text))
     return { status: response.status, json, setCookie }
   })

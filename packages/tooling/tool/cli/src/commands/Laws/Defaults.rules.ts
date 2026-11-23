@@ -4,7 +4,8 @@
  * fallback written at a call site is a rule nobody can find, and two call sites can disagree about it.
  *
  * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`, `??=`,
- * `||` and `||=` before a value written out, `getOrElse`), a comparison with `null` or `undefined`, an Option turned
+ * `||` and `||=` before a value written out, `getOrElse`, and outside a `.tsx` file a default given to a parameter or
+ * a destructured name), a comparison with `null` or `undefined`, an Option turned
  * back into a missing value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not
  * `SchemaGetter`'s or `SchemaTransformation`'s. The law does not judge whether a place is "really" a default: a law
  * that judges is argued with, and one that reads types costs the whole program on every run.
@@ -27,6 +28,11 @@
  * still cover the tree, but the run takes under half a second, most of it starting bun, so the same law can answer the
  * moment a file is edited (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places
  * said are the ones its committed version does not have, so the line just written is the line named.
+ *
+ * A place that is where the rule wants it is not left in the baseline to be argued over: its file is named in
+ * `exemptions` with the kinds and the reason, and those kinds are not counted there. So the baseline can still reach
+ * empty, what stays on purpose is read in one list, and the same code in any other file is still refused. A file an
+ * exemption names that is not there fails the run over the whole tree.
  *
  * Left alone: the vendored kit and components, `.agents`, the scratchpad and `packages/tooling` (this package reads
  * arguments and files, not the business's data).
@@ -54,6 +60,27 @@ export const baselineFile = "defaults-baseline.json"
 
 /** The order the baseline writes a file's four counts in. */
 const kinds: ReadonlyArray<DefaultsKind> = ["fallback", "absence", "unwrap", "normalise"]
+
+/** One file whose places of some kinds are where the rule wants them, and why. */
+export interface DefaultsExemption {
+  readonly file: string
+  readonly kinds: ReadonlyArray<DefaultsKind>
+  readonly why: string
+}
+
+/**
+ * The files that keep places on purpose. A cell of a file the person reviews is read by a small function that returns
+ * a value or a reason, and its trim or change of case is a proposal shown as before and after, never a silent decode
+ * (Benjamin, 2026-11-23: cells keep their readers; no schema decodes a cell to a clean value). Code that reads a cell
+ * lives in a file named here, and nowhere else.
+ */
+export const exemptions: ReadonlyArray<DefaultsExemption> = [
+  {
+    file: "packages/catalog/model/src/Review/CellReading.rules.ts",
+    kinds: ["normalise"],
+    why: "a file cell's reader: its clean-up is a proposal the person sees as before and after"
+  }
+]
 
 const Count = S.Int.check(S.isGreaterThanOrEqualTo(0))
 
@@ -171,7 +198,7 @@ export type DefaultsFinding = typeof DefaultsFinding.Type
 /** What to write instead, for each kind: the line an agent reads the moment it wrote the place. */
 const remedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
-    "a `??`, a `||` before a value, or a getOrElse supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
+    "a `??`, a `||` before a value, a getOrElse, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
   absence:
     "a comparison with null or undefined. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
   unwrap:
@@ -427,8 +454,13 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
  *
  * @param write Lower the baseline. Refused with files named, and when any file is over its baseline.
  * @param only The files to read, from the root or from the folder the command runs in; every file when none is named.
+ * @param exempt The files that keep places on purpose: `exemptions`, unless a test names its own.
  */
-export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean, only: ReadonlyArray<string>) {
+export const defaults = Effect.fn("Defaults.defaults")(function* (
+  write: boolean,
+  only: ReadonlyArray<string>,
+  exempt: ReadonlyArray<DefaultsExemption> = exemptions
+) {
   const repo = yield* Repo
   const git = (pathspec: ReadonlyArray<string>) =>
     repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", ...pathspec], { cwd: repo.root })
@@ -473,10 +505,24 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
                 grew: false
               })
             ]
+  const isExempt = (file: string, kind: DefaultsKind): boolean =>
+    A.some(exempt, (one) => one.file === file && A.contains(one.kinds, kind))
+  // An exemption outlives its file only by mistake, and a new file at that path would inherit it.
+  // Held against the files that are there, not git's list: a file deleted and not yet staged is still in the index.
+  const orphaned = A.isReadonlyArrayNonEmpty(only)
+    ? []
+    : A.map(
+        A.filter(exempt, (one) => !A.contains(files, one.file)),
+        (one) =>
+          `${one.file}  is named in the law's exemptions but is not a file the law reads: take it off the list (Defaults.rules.ts)`
+      )
   const read = yield* Effect.forEach(
     files,
     (file) =>
-      Effect.map(repo.text(repo.join(repo.root, file)), (source) => ({ file, ...readDefaults({ file, source }) })),
+      Effect.map(repo.text(repo.join(repo.root, file)), (source) => {
+        const one = readDefaults({ file, source })
+        return { file, unread: one.unread, found: A.filter(one.found, (place) => !isExempt(file, place.kind)) }
+      }),
     { concurrency: 1 }
   )
   const unread = A.flatMap(read, (one) =>
@@ -540,7 +586,12 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
     { concurrency: 1 }
   )
   const places = A.flatten(problems)
-  const failures = A.flatten<ReadonlyArray<ReadonlyArray<DefaultsFinding>>>([against, unread, places])
+  const failures = A.flatten<ReadonlyArray<ReadonlyArray<DefaultsFinding>>>([
+    against,
+    A.map(orphaned, (said) => Said.make({ said, grew: false })),
+    unread,
+    places
+  ])
   if (A.isReadonlyArrayNonEmpty(failures)) {
     return A.prepend<DefaultsFinding, DefaultsFinding>(
       failures,

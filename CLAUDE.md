@@ -516,15 +516,21 @@ profile, its copied tests included, with no override.
   `S.withDecodingDefaultTypeKey`); a trim or a change of case is a transformation (`S.decodeTo` with
   `SchemaTransformation` or `SchemaGetter`). A handler gets the type it works with from one decode at its boundary
   and trusts it after that line. So our own code writes no `??`, no `||` before a value, no `getOrElse`, no comparison with `null` or `undefined`, no
-  `O.getOrUndefined` or `O.getOrNull`, and no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema.
+  `O.getOrUndefined` or `O.getOrNull`, no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema, and
+  in a `.ts` file no default on a parameter or a destructured name (`(n = 0) =>`). Two things stay on purpose
+  (Benjamin, 2026-11-23). A React component's optional prop stays `?:` and takes its default in the destructuring
+  (`{ size = "sm" }`), never with `??` in the body; `Option` is for data that came through a schema. And a cell of a
+  file the person reviews keeps its reader: its trim or change of case is a proposal shown as before and after, so
+  code that reads a cell lives in a file the law names (`exemptions` in `Laws/Defaults.rules.ts`, each with its
+  kinds and its reason) and nowhere else. Adding a file to that list is Benjamin's decision.
   `bun run check` counts them in every src and test folder against `defaults-baseline.json` (`defaults:check`): a file
   may hold what the baseline names for it and no more, a file it does not name holds none, and the numbers only fall
   (`bun run beep laws defaults --write` lowers them, never raises): over the whole tree the baseline is compared with
   main's, as the bans' ledgers are, so a count raised or a file added in the same commit is refused. In a Claude Code session the same law reads each
   file as it is edited and names the new line and what to write (`.claude/hooks/defaults.sh`). An old place in a file
   you are changing is not yours to clean unless the task says so; a new one is refused.
-- **Optional properties**: never pass `undefined` for an optional property. In our own types there is none: the field
-  is an `Option`. Where another library's API has one, spread it from the Option:
+- **Optional properties**: never pass `undefined` for an optional property. In our own types there is none but a
+  React component's props: the field is an `Option`. Where another library's API has one, spread it from the Option:
   `...O.match(x, { onNone: () => ({}), onSome: (x) => ({ x }) })`.
 - **Indexing can miss**: `rows[0]` is `T | undefined`. Take it as an Option: `A.head(rows)`, `A.get(rows, i)`.
 - **Conditions are booleans**: `if (name !== "")`, `if (count > 0)`, `if (O.isSome(row))`. Not

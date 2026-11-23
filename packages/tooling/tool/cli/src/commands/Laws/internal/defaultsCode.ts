@@ -1,6 +1,8 @@
 // The places one file settles absence, a starting value or a clean-up in its own code, read from its syntax tree and
 // from nothing else: no types, no flow, no judgement of what the code means. Four things are found, each by how it is
-// written: a fallback (`??`, `??=`, `||` and `||=` before a value written out, `getOrElse`),
+// written: a fallback (`??`, `??=`, `||` and `||=` before a value written out, `getOrElse`, and outside a `.tsx` file a
+// parameter or a destructured name given a default: in a `.tsx` file that is where a component's optional prop takes
+// its default, Benjamin's decision of 2026-11-23, and the reader cannot tell a component from another function),
 // a comparison with `null` or `undefined`, an Option turned back into a missing
 // value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not a schema's own
 // (`SchemaGetter.trim()`, `SchemaTransformation.toLowerCase()`). A pattern over the text would also take the words
@@ -86,17 +88,20 @@ export const whatIsCounted: ReadonlyArray<string> = [
   "|| value",
   "||= value",
   ...fallbacks,
+  "name = value outside .tsx",
   "null",
   "undefined",
   ...unwraps,
   ...cleanUps
 ]
 
-const kindOf = (node: Node): O.Option<DefaultsKind> => {
+const kindOf = (node: Node, screen: boolean): O.Option<DefaultsKind> => {
   const operator = text(node, "operator")
   const is = (written: string): boolean => O.exists(operator, (own) => own === written)
   if (node.type === "LogicalExpression" && is("??")) return O.some("fallback")
   if (node.type === "AssignmentExpression" && is("??=")) return O.some("fallback")
+  // `(n = 0) =>` and `const { n = 0 } = x`: the same fallback, written where the name is bound.
+  if (node.type === "AssignmentPattern" && !screen) return O.some("fallback")
   if (
     ((node.type === "LogicalExpression" && is("||")) || (node.type === "AssignmentExpression" && is("||="))) &&
     O.exists(child(node, "right"), (right) => A.contains(writtenOut, bare(right).type))
@@ -142,13 +147,14 @@ export const readDefaults = (input: { readonly file: string; readonly source: st
   if (O.isSome(refused)) return { found: [], unread: O.some(refused.value.message) }
   if (!isNode(parsed.program)) return { found: [], unread: O.some("the parser gave no program") }
   const lineOf = linesOf(input.source)
+  const screen = Str.endsWith(".tsx")(input.file)
   const found: Array<DefaultsPlace> = []
   // The walk keeps its own list, so no file nests it past the stack.
   const pending: Array<Node> = [parsed.program]
   while (A.isArrayNonEmpty(pending)) {
     const node = pending.pop()
     if (!isNode(node)) continue
-    const kind = kindOf(node)
+    const kind = kindOf(node, screen)
     if (O.isSome(kind)) {
       found.push({ kind: kind.value, line: lineOf(node.start), code: Str.slice(node.start, node.end)(input.source) })
     }

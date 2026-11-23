@@ -102,6 +102,7 @@ means I chose and the agent recommended the same.
 | Review's filter and column menus; scrollbars; the problems strip; messages | the table's menus; thin; one line of pills; top centre | Mine, in my words: "canonical filters dropdown form the datatable", "less 'thiccc' ... scroll bars", "scroll more naturally", "blocks page navigation controls" | seen on screen |
 | A stored SKU on a row that cannot be read yet | It waits; already there | the agent's default; I was told | rows 148, 195 |
 | A stored SKU that reads, on a row where another cell does not | Already there, the stored item not changed; it waits with its proposal offered again | I chose; the agent recommended the same, 2026-11-22 | rows 55, 85, 135, 172, 186, 191, stored after an accepted proposal: the same file again gives Already there 161, Needs a decision 18, Cannot import 21 |
+| A stored SKU that reads, with another cell that does not, on a row the person acted on | It waits and shows the cell; already there | the agent's default; I was told, 2026-11-22 | narrows the row above: a typed value, an accepted proposal or Replace on the row stays on screen. It follows the row before that one too: a row the person has work on waits until it reads |
 | A two-digit year; a cost below zero; quantity 12.5 | Typed by the person; proposed | the agent's default; I was told | "0 or more", "integer" |
 | Discontinued yet active | Both readings; one | the agent's default, both; both are built | rows 45, 164 |
 | "2024-13-01" | Cannot import until fixed; import without the date | same | rows 92, 103 |

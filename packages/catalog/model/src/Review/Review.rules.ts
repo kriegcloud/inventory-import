@@ -1293,9 +1293,14 @@ export const review = (input: {
     const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
     const replace = differs && StoredChoice.guards.replace(decision.stored)
+    // What the person did to this row stands: a row they typed a value on, or chose to replace the stored item
+    // with, is not put away as already there because a cell of it stopped reading. It waits and shows that cell.
+    const theirs = !R.isEmptyRecord(decision.edits) || StoredChoice.guards.replace(decision.stored)
     const already =
       mine ||
-      (O.isSome(storedItem) && skuPattern.test(values.sku) && (!differs || StoredChoice.guards.keep(decision.stored)))
+      (O.isSome(storedItem) &&
+        skuPattern.test(values.sku) &&
+        (item === null ? !theirs : !differs || StoredChoice.guards.keep(decision.stored)))
     return {
       row,
       decision,

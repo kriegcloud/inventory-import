@@ -239,6 +239,17 @@ describe("a second import", () => {
         true,
         1
       ])
+      // What the person did to the row stands when one of its cells then stops reading: the row waits and shows
+      // that cell. It is not put away as already there, with the Replace or the typed value gone from the screen.
+      const broken = { edits: { quantityOnHand: "12.5" } }
+      for (const decision of [{ stored: "replace" as const, ...broken }, broken]) {
+        const waits = reviewOf(table, { "row-2": decision }, other)
+        expect([rowOf(waits, 2).status, rowOf(waits, 2).problems[0]?.field, waits.counts.already]).toEqual([
+          "needs",
+          "quantityOnHand",
+          24
+        ])
+      }
     })
   )
 })

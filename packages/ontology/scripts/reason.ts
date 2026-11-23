@@ -89,7 +89,9 @@ const machine = Effect.gen(function* () {
       input.command === "validate-profile" ? ["--profile", "DL", "--output", report] : ["--reasoner", "hermit"]
     const ran = spawnSync(input.java, ["-jar", jar, input.command, "--input", document, ...flags], {
       cwd: work,
-      encoding: "utf8"
+      encoding: "utf8",
+      // A run takes under a second. One that hangs is stopped and counted failed, as a Java that did not start is.
+      timeout: 300_000
     })
     const written = yield* Effect.orElseSucceed(
       Effect.tryPromise({ try: () => readFile(report, "utf8"), catch: () => "none" as const }),

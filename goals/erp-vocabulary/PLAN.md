@@ -54,7 +54,16 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 10 are done; step 11 starts on Benjamin's word.
+Steps 1 to 10 are done; step 11 starts on Benjamin's word.
+
+`bun run check` fails since `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`): six laws
+that came with the merge refuse code this goal wrote, and the merge left them for a follow-up. Counted on that
+commit: `diagnostics:check`, 15 `@effect-diagnostics` directives in `packages/ontology`; `defaults:check`, 25
+places in `packages/ontology` and `@beep/vocabulary` (a `getOrElse`, a `??`, a comparison with `undefined`);
+`promises:check`, 7 in `scripts/reason.ts` and `scripts/write.ts`; `readonly:check`, 4 in `packages/kernel`;
+`dual:check`, 1 in `Pointer.mark.ts`; `assertions:check`, 1 in `ontologyTermsCode.ts`. Nothing of the goal's own
+gates fails: the ontology's tests, `ontology-terms:check` and `reason` pass on that commit. Whether these are
+fixed before step 11 is Benjamin's to say.
 
 ## Choices made
 
@@ -255,6 +264,13 @@ Where the design left a choice open, or the code showed it could not be followed
   with the same call. Step 4 had switched an Effect diagnostic off on the kernel's `noTerm`, and the CLI's slow
   test refuses that in any file the scratchpad can reach; `check:full` showed it at this step, the first since
   step 4 to run the slow tests.
+- **Step 10 was built by the orchestrator and read by Grok 4.7**; Opus, Cursor's Opus seat and Codex were out of
+  quota. Its first reading ran out of time with no report. Its second read the source and found no way for the
+  gate to pass when it should fail; it named the CI job as missing, which is step 11, and that a run that hangs
+  would wait for ever, now stopped after five minutes and counted failed. Its sandbox did not let it start ROBOT,
+  so what the reasoner itself says was tried by the orchestrator alone: the five runs, the three refused files
+  turning consistent without gist's disjointness, a jar that is not the approved file, a cache that cannot be
+  written, and a real fetch into an empty cache. Step 13's reviewers read the step again.
 
 ## Closing note
 

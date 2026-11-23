@@ -561,6 +561,9 @@ const makeContext = (input: {
 /** The most rows a sentence about a repeated SKU names. Past it, it says how many more there are. */
 export const maxRowsNamed = 10
 
+/** What a row says when no rule gave it a sentence: a row that is not imported is still never without a reason. */
+export const unreadReason = "A value could not be read."
+
 const quoted = (text: string): string => (text === "" ? "An empty cell" : said(text))
 
 const proposal = (
@@ -1405,7 +1408,7 @@ export const review = (input: {
         : head !== undefined
           ? head.message
           : item === null
-            ? "A value could not be read."
+            ? unreadReason
             : null
     const shown = RowStatus.is.needs(status) ? problems : []
     return {

@@ -170,12 +170,12 @@ describe("the one reason a plan holds for a row", () => {
     expect(reason).toMatch(/\S/)
   })
 
+  // At most 90 sentences of at most 40 characters: joined, they always fit.
   it.prop(
     "is every sentence, joined, when they fit",
-    [S.Array(S.String.check(S.isPattern(/^\S{1,40}$/)))],
+    [S.Array(S.String.check(S.isPattern(/^\S{1,40}$/))).check(S.isMinLength(1), S.isMaxLength(90))],
     ([sentences]) => {
-      const joined = A.join(sentences, " ")
-      if (joined.length <= maxReason - 60 && sentences.length > 0) expect(fitted(sentences)).toBe(joined)
+      expect(fitted(sentences)).toBe(A.join(sentences, " "))
     }
   )
 
@@ -183,7 +183,12 @@ describe("the one reason a plan holds for a row", () => {
     const long = Str.repeat(1500)("x")
     expect(fitted([long, long, long, long])).toBe(`${long} ${long} 2 more problems are not listed here.`)
     expect(fitted([long, long, Str.repeat(950)("y")])).toBe(`${long} ${long} ${Str.repeat(950)("y")}`)
-    expect(fitted([Str.repeat(5000)("x")])).toBe("1 more problem is not listed here.")
+    // A first sentence too long to hold is said by its first characters and its length, and the rest follow.
+    expect(fitted([Str.repeat(5000)("x")])).toBe(`${Str.repeat(maxSaid)("x")}… (5,000 characters)`)
+    expect(fitted([Str.repeat(5000)("x"), "Name is empty."])).toBe(
+      `${Str.repeat(maxSaid)("x")}… (5,000 characters) Name is empty.`
+    )
+    expect(fitted([Str.repeat(3990)("x"), long])).toBe(`${Str.repeat(maxSaid)("x")}… (3,990 characters) ${long}`)
     expect(fitted([])).toBe("A value could not be read.")
     expect(fitted(["  "])).toBe("A value could not be read.")
   })

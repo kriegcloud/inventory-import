@@ -14,7 +14,9 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
-import { type Review, RowStatus } from "../Review/Review.rules.ts"
+import { named } from "../Review/CellReading.rules.ts"
+import { type Review, RowStatus, unreadReason } from "../Review/Review.rules.ts"
+import { plural } from "../Words.rules.ts"
 
 /** A value of a ready row that differs from its file, and who decided it when a person did. */
 export class PlannedChange extends S.Opaque<PlannedChange, { readonly brand: unique symbol }>()(
@@ -54,13 +56,18 @@ const written = {
 /** The most characters a reason may have: what the outcome rows store and the result reads. */
 export const maxReason = 4000
 
-// Never blank: a row that is left out or skipped always says why, in the result and in the download. And never longer
-// than the outcome rows store, so no plan holds a reason the store cannot write.
-const reason = S.String.check(
+// One sentence of a reason, and a whole reason: never blank, so a row that is left out or skipped always says why, in
+// the result and in the download.
+const Sentence = S.String.check(
   S.isMinLength(1),
-  S.isMaxLength(maxReason),
   S.isPattern(/\S/, { expected: "a reason with at least one character that is not a space" })
-).pipe(S.annotateKey({ description: "Every reason the row is not imported, joined: what the not-imported rows store" }))
+)
+const isSentence = S.is(Sentence)
+
+// And never longer than the outcome rows store, so no plan holds a reason the store cannot write.
+const reason = Sentence.check(S.isMaxLength(maxReason)).pipe(
+  S.annotateKey({ description: "Every reason the row is not imported, joined: what the not-imported rows store" })
+)
 
 class PlannedReady extends S.Opaque<PlannedReady, { readonly brand: unique symbol }>()(
   S.Struct({ status: S.tag("ready"), ...written }).annotate({
@@ -108,37 +115,38 @@ export class ConfirmPlan extends S.Opaque<ConfirmPlan, { readonly brand: unique 
   }).annotate({ identifier: "ConfirmPlan", description: "What one confirm will do with each item of a file" })
 ) {}
 
-/** What a row says when the review gave it no sentence: it is still never blank. */
-const unread = "A value could not be read."
-
-const moreProblems = (left: number): string =>
-  left === 1 ? "1 more problem is not listed here." : `${left} more problems are not listed here.`
+const notListed = (left: number): string => `${plural(left, "more problem is", "more problems are")} not listed here.`
 
 /**
  * A row's reasons as the one reason a plan holds: joined by a space, and never past `maxReason` nor blank, whatever
  * the review said. The review keeps each sentence short (`said` in `CellReading.rules.ts`), so every one fits in
  * practice; this holds the bound where the plan is made, so a confirm cannot fail on the length of a reason. A
  * sentence that would pass the bound is left off, with every one after it, and the reason ends by saying how many.
+ * Where the first sentence alone would pass it, that one is said by its first characters and its length, as a long
+ * value is, so the reason never counts problems without naming one.
  *
  * @example fitted(["Name is empty.", 'Category "Misc" is not one of the 5 categories.'])
  * // 'Name is empty. Category "Misc" is not one of the 5 categories.'
  */
-export const fitted = (reasons: ReadonlyArray<string>): string => {
-  const sentences = A.filter(reasons, (sentence) => /\S/.test(sentence))
-  // The room the closing count may need, kept free while any sentence is still to come.
-  const reserve = moreProblems(sentences.length).length + 1
-  const kept = A.reduce(sentences, { text: "", taken: 0, full: false }, (held, sentence, index) => {
-    if (held.full) return held
-    const next = held.text === "" ? sentence : `${held.text} ${sentence}`
-    const last = index === sentences.length - 1
-    return next.length <= maxReason - (last ? 0 : reserve)
-      ? { text: next, taken: index + 1, full: false }
-      : { ...held, full: true }
+export const fitted = (reasons: ReadonlyArray<string>): string =>
+  A.match(A.filter(reasons, isSentence), {
+    onEmpty: () => unreadReason,
+    onNonEmpty: (sentences) => {
+      // The room the closing count may need, kept free while any sentence is still to come.
+      const reserve = notListed(sentences.length).length + 1
+      const kept = A.reduce(sentences, { text: "", taken: 0, full: false }, (held, sentence, index) => {
+        if (held.full) return held
+        const next = held.text === "" ? sentence : `${held.text} ${sentence}`
+        const last = index === sentences.length - 1
+        return next.length <= maxReason - (last ? 0 : reserve)
+          ? { text: next, taken: index + 1, full: false }
+          : { ...held, full: true }
+      })
+      if (kept.taken === 0) return fitted([named(A.headNonEmpty(sentences)), ...A.tailNonEmpty(sentences)])
+      const left = sentences.length - kept.taken
+      return left === 0 ? kept.text : `${kept.text} ${notListed(left)}`
+    }
   })
-  const left = sentences.length - kept.taken
-  const text = left === 0 ? kept.text : kept.text === "" ? moreProblems(left) : `${kept.text} ${moreProblems(left)}`
-  return text === "" ? unread : text
-}
 
 /** The rows of a plan that write an item: the new ones and the replacements. */
 export const plannedItems = (

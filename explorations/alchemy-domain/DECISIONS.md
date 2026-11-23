@@ -675,6 +675,15 @@ named as ours (Recommended)". I chose; the agent recommended the same. So "no ha
 hand-written list of rule names or standings; this one check, `missingRules` in `packages/catalog/model/test/proving.ts`,
 called by each of the four decision proofs on main, is kept and named as ours.
 
+### 2026-11-22 — `@alchemy.run/better-auth` stays in move 2
+
+His note: "we aren't using https://alchemy.run/domain/better-auth/". Question: should `@alchemy.run/better-auth` (the
+model's Worker reading the actor from the session cookie, tested on the harness, with the pin widened to it and
+`@alchemy.run/test`) be pulled ahead of move 2? Options: "Keep it in move 2 (Recommended)"; "Start it now, before
+approval" (re-pin now; the Worker's sign-in check built ahead of the rest of move 2); "Approve the brief now". Answer:
+"Keep it in move 2 (Recommended)". I chose; the agent recommended the same. Nothing is built or re-pinned for it before
+the brief is approved. Reverse: a new decision by him.
+
 ### Decided by the rule, for him to overrule
 
 Each edge case among several people that the rule "a press from a screen that is behind is never silently dropped or

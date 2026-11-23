@@ -18,7 +18,8 @@
     "./AssistantLogD1": "./src/AssistantLog.adapter.ts",
     "./ModelAllowance": "./src/ModelAllowance.adapter.ts",
     "./AuditLine": "./src/internal/auditLine.ts",
-    "./CatalogTest": "./src/CatalogTest.test-layer.ts"
+    "./CatalogTest": "./src/CatalogTest.test-layer.ts",
+    "./ImportRows": "./src/internal/importRows.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

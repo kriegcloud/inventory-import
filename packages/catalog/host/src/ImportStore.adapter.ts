@@ -21,7 +21,7 @@ import { RowDecision, DecisionDelta } from "@inventory/catalog-contract/Decision
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { ChangeSource, Confidence, changeToStored, changeFromStored } from "@inventory/catalog-contract/Change"
-import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
+import { ImportId, ConfirmId, ItemId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { Instant, DisplayName } from "@inventory/kernel/Text"
 import {
   OutcomeKind,
@@ -69,6 +69,8 @@ import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/U
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { lineOf } from "./internal/auditLine.ts"
 import { JsonPiece, jsonPieces } from "./internal/pieces.ts"
+import { AbandonedBefore, Acting, HeadJson, UploadInsert } from "./internal/importRows.ts"
+import { D1Instant } from "@beep/d1/D1Instant"
 import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
 import {
   type CompareAtMatch,
@@ -81,7 +83,6 @@ import {
   withTakeBacks
 } from "@inventory/catalog-model/Rematch"
 
-const HeadJson = S.fromJsonString(StagedHead)
 const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
@@ -100,8 +101,6 @@ const Scope = S.Struct({ org: OrganizationId, id: S.String }).annotate({
 })
 const Ids = S.Array(S.Struct({ id: S.String })).annotate({ description: "The ids a write returned" })
 const Count = S.Array(S.Struct({ n: S.Int })).annotate({ description: "One COUNT(*)" })
-/** Who is acting and where: every write is scoped to the actor's organization and names them in the audit line. */
-const Acting = { org: OrganizationId, actor: MemberId, name: S.String }
 
 // One decision as it travels to SQL: the row it is for, and the decision as the JSON `importDecision` stores.
 const DecisionEntry = S.Struct({ rowId: S.String, json: DecisionJson })
@@ -227,7 +226,7 @@ export const ImportStoreD1 = Layer.effect(
     const d1 = yield* D1
     const { batch, run } = d1
     const random = yield* SecureRandom.SecureRandom
-    const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
+    const now = DateTime.now
     const acting = (actor: Member) => ({ org: actor.organizationId, actor: actor.id, name: actor.name })
 
     // -- Reads ---------------------------------------------------------------------------------------------------
@@ -340,7 +339,7 @@ export const ImportStoreD1 = Layer.effect(
           WHERE organizationId = ${org} AND id = ${id} AND actorId = ${actor}`
     })
     const findUploadByKey = SqlSchema.findOne({
-      Request: S.Struct({ org: OrganizationId, actor: MemberId, key: S.String }),
+      Request: S.Struct({ org: OrganizationId, actor: MemberId, key: UploadKey }),
       Result: S.Struct({ id: ImportId }),
       execute: ({ org, actor, key }) =>
         sql`SELECT id FROM importUpload WHERE organizationId = ${org} AND actorId = ${actor} AND requestKey = ${key}`
@@ -364,27 +363,18 @@ export const ImportStoreD1 = Layer.effect(
 
     const UploadScope = S.Struct({ org: OrganizationId, actor: MemberId, id: S.String })
     const dropAbandonedChunks = D1.statement({
-      Request: S.Struct({ org: OrganizationId, before: S.String }),
+      Request: AbandonedBefore,
       Result: NoRows,
       execute: (r) => sql`DELETE FROM importUploadChunk WHERE organizationId = ${r.org}
         AND uploadId IN (SELECT id FROM importUpload WHERE organizationId = ${r.org} AND createdAt < ${r.before})`
     })
     const dropAbandonedUploads = D1.statement({
-      Request: S.Struct({ org: OrganizationId, before: S.String }),
+      Request: AbandonedBefore,
       Result: NoRows,
       execute: (r) => sql`DELETE FROM importUpload WHERE organizationId = ${r.org} AND createdAt < ${r.before}`
     })
     const insertUpload = D1.statement({
-      Request: S.Struct({
-        ...Acting,
-        id: S.String,
-        key: S.String,
-        fileName: S.String,
-        headJson: HeadJson,
-        rowCount: S.Int,
-        chunkCount: S.Int,
-        at: S.String
-      }),
+      Request: UploadInsert,
       Result: NoRows,
       execute: (r) => sql`INSERT INTO importUpload (id, organizationId, actorId, actorName, requestKey, fileName,
           headJson, rowCount, chunkCount, createdAt)
@@ -401,9 +391,9 @@ export const ImportStoreD1 = Layer.effect(
     ) {
       const made = yield* random.uuidV4()
       const id = ImportId.make(made)
-      const now = yield* DateTime.now
-      const at = DateTime.formatIso(now)
-      const before = DateTime.formatIso(DateTime.subtract(now, { minutes: abandonedAfterMinutes }))
+      const uploadKey = yield* S.decodeEffect(UploadKey)(key).pipe(Effect.orDie)
+      const at = yield* now
+      const before = DateTime.subtract(at, { minutes: abandonedAfterMinutes })
       const headJson = yield* S.encodeEffect(HeadJson)(head).pipe(Effect.orDie)
       // D1 refuses a value over 2 MB. Say so in words before it does.
       if (headJson.length > maxChunkChars) {
@@ -413,10 +403,10 @@ export const ImportStoreD1 = Layer.effect(
       yield* batch([
         dropAbandonedChunks({ org, before }),
         dropAbandonedUploads({ org, before }),
-        insertUpload({ ...acting(actor), id, key, fileName: head.fileName, headJson: head, ...counts, at })
+        insertUpload({ ...acting(actor), id, key: uploadKey, fileName: head.fileName, headJson: head, ...counts, at })
       ]).pipe(Effect.orDie)
       // The upload this key started: the one just written, or the one an earlier begin with the same key wrote.
-      const started = yield* findUploadByKey({ org, actor: actor.id, key }).pipe(Effect.orDie)
+      const started = yield* findUploadByKey({ org, actor: actor.id, key: uploadKey }).pipe(Effect.orDie)
       return Result.succeed(started.id)
     })
 
@@ -462,7 +452,7 @@ export const ImportStoreD1 = Layer.effect(
     }, Effect.orDie)
 
     const draftFromUpload = D1.statement({
-      Request: S.Struct({ ...UploadScope.fields, at: S.String, needsAtStart: S.Int }),
+      Request: S.Struct({ ...UploadScope.fields, at: D1Instant, needsAtStart: S.Int }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO importDraft (id, organizationId, actorId, actorName, fileName, headJson,
           rowCount, status, createdAt, needsAtStart)
@@ -482,7 +472,7 @@ export const ImportStoreD1 = Layer.effect(
         upload: S.String,
         activity: S.String,
         detail: S.String,
-        at: S.String
+        at: D1Instant
       }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -756,7 +746,7 @@ export const ImportStoreD1 = Layer.effect(
             OR EXISTS (SELECT 1 FROM ${inList(r.org, r.write, "clears")}))`
     })
     const upsertDecisions = D1.statement({
-      Request: S.Struct({ ...SaveWrite.fields, ...Acting, at: S.String }),
+      Request: S.Struct({ ...SaveWrite.fields, ...Acting, at: D1Instant }),
       Result: NoRows,
       // The same decision sent again leaves the row (who made it, and the revision it was saved at) as it is. Saved at
       // the revision this save moved the draft to, the statement before; a row new or changed moved it by one, so the
@@ -867,7 +857,7 @@ export const ImportStoreD1 = Layer.effect(
       id: S.String,
       activity: S.String,
       detail: S.String,
-      at: S.String
+      at: D1Instant
     })
     const reopenedLine = D1.statement({
       Request: ReopenRequest,
@@ -945,7 +935,7 @@ export const ImportStoreD1 = Layer.effect(
       id: S.String,
       activity: S.String,
       detail: S.String,
-      at: S.String
+      at: D1Instant
     })
     const removedLine = D1.statement({
       Request: RemoveRequest,
@@ -1019,7 +1009,7 @@ export const ImportStoreD1 = Layer.effect(
       before: S.String,
       activity: S.String,
       detail: S.String,
-      at: S.String
+      at: D1Instant
     })
     // The audit line, written only while the import is open at the revision and with the choices the match was worked
     // out from, and the stored items its review read are as read. It is the match's own row: every statement after it
@@ -1166,7 +1156,7 @@ export const ImportStoreD1 = Layer.effect(
 
     // -- The confirm ---------------------------------------------------------------------------------------
 
-    const CommitScope = S.Struct({ ...Acting, id: S.String, batch: S.String, at: S.String })
+    const CommitScope = S.Struct({ ...Acting, id: S.String, batch: S.String, at: D1Instant })
     // The confirm's own row is written first, and only while the import is open at the revision the confirm was
     // made on; the import is closed next. Every statement after them checks that this confirm's row exists, so a
     // second confirm (a double click, a retry, another tab) finds the import closed, and a confirm made on a draft
@@ -1459,7 +1449,7 @@ export const ImportStoreD1 = Layer.effect(
       id: S.String,
       takeBack: S.String,
       confirms: IdList,
-      at: S.String
+      at: D1Instant
     })
     const ofTakeBack = (org: string, takeBack: string) =>
       sql`(SELECT id FROM importBatch WHERE organizationId = ${org} AND takeBackId = ${takeBack})`

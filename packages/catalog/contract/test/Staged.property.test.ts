@@ -3,11 +3,22 @@
 // upload announces are ones the browser's own chunking produces. All data here is generated from the schemas.
 import { describe, expect, it } from "@effect/vitest"
 import { rowId } from "@inventory/catalog-contract/Decision"
-import { maxColumns, maxStagedRows, StagedHead, StagedRow } from "@inventory/catalog-contract/Staged"
+import {
+  maxColumns,
+  maxNotes,
+  maxStagedRows,
+  StagedHead,
+  StagedHeadJson,
+  StagedNote,
+  StagedRow,
+  UploadHead
+} from "@inventory/catalog-contract/Staged"
 import { chunkRows, UploadChunk, UploadStart } from "@inventory/catalog-contract/Upload"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
+import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import * as SchemaIssue from "effect/SchemaIssue"
 
 const runs = { arbitrary: { runs: 200 } }
 
@@ -51,7 +62,8 @@ describe("a staged head", () => {
       expect(head.columns.length).toBeGreaterThanOrEqual(1)
       expect(head.columns.length).toBeLessThanOrEqual(maxColumns)
       for (const column of head.columns) {
-        // XFD, Excel's last column, is index 16,383; its letters are one to three capitals.
+        // XFD, Excel's last column, is index 16,383 (Excel's own limit, written out); its letters are one to three
+        // capitals.
         expect(column.index).toBeGreaterThanOrEqual(0)
         expect(column.index).toBeLessThanOrEqual(16_383)
         expect(column.letter).toMatch(/^[A-Z]{1,3}$/)
@@ -73,6 +85,50 @@ describe("a staged head", () => {
   )
 })
 
+/** This many copies of a note: none for 0 (`A.makeBy` makes one at least). */
+const copies = (count: number, note: StagedNote): ReadonlyArray<StagedNote> =>
+  count === 0 ? [] : A.makeBy(count, () => note)
+
+describe("a staged head's notes", () => {
+  it.prop(
+    "an upload sends at most the most a file may carry: that many is accepted, one more refused",
+    [Arbitrary.schema(UploadHead), Arbitrary.schema(StagedNote)],
+    ([head, note]) => {
+      const full = [...head.notes, ...copies(maxNotes - head.notes.length, note)]
+      expect(full.length).toBe(1000)
+      expect(S.is(UploadHead)({ ...head, notes: full })).toBe(true)
+      expect(S.is(UploadHead)({ ...head, notes: [...full, note] })).toBe(false)
+    },
+    { arbitrary: { runs: 20 } }
+  )
+
+  it.effect.prop(
+    "a file stored with more notes than an upload may send still reads, as the server reads it back",
+    [Arbitrary.schema(UploadHead), Arbitrary.schema(StagedNote)],
+    ([head, note]) =>
+      Effect.gen(function* () {
+        const stored = { ...head, notes: [...head.notes, ...copies(maxNotes + 1, note)] }
+        const json = yield* S.encodeEffect(StagedHeadJson)(stored)
+        const read = yield* S.decodeEffect(StagedHeadJson)(json)
+        expect(read.notes.length).toBe(head.notes.length + 1001)
+        expect(read).toEqual(stored)
+      }),
+    { arbitrary: { runs: 10 } }
+  )
+
+  it.prop(
+    "may name every row of a sheet, data or not",
+    [Arbitrary.schema(StagedNote)],
+    ([note]) => {
+      // A label merged down a whole worksheet: 1,048,576 rows, Excel's last, far more than an import stages.
+      const sheet = A.makeBy(1_048_576, (n) => n + 1)
+      expect(sheet.length).toBeGreaterThan(maxStagedRows)
+      expect(S.is(StagedNote)({ ...note, rows: sheet })).toBe(true)
+    },
+    { arbitrary: { runs: 5 } }
+  )
+})
+
 describe("the start of an upload", () => {
   it.prop(
     "announces at least one row and no more than an import stages",
@@ -82,6 +138,42 @@ describe("the start of an upload", () => {
       expect(start.rowCount).toBeLessThanOrEqual(maxStagedRows)
       expect(start.chunkCount).toBeGreaterThanOrEqual(1)
     },
+    runs
+  )
+
+  it.prop(
+    "is refused when its pieces cannot carry its rows: one piece more than rows, or one fewer than they need",
+    [Arbitrary.schema(UploadStart)],
+    ([start]) => {
+      expect(start.chunkCount).toBeLessThanOrEqual(start.rowCount)
+      expect(start.chunkCount * chunkRows).toBeGreaterThanOrEqual(start.rowCount)
+      expect(S.is(UploadStart)({ ...start, chunkCount: start.rowCount + 1 })).toBe(false)
+      const fewest = Math.ceil(start.rowCount / chunkRows)
+      if (fewest > 1) expect(S.is(UploadStart)({ ...start, chunkCount: fewest - 1 })).toBe(false)
+    },
+    runs
+  )
+
+  it.prop(
+    "is refused when its file carries more notes than an upload may send",
+    [Arbitrary.schema(UploadStart), Arbitrary.schema(StagedNote)],
+    ([start, note]) => {
+      const notes = [...start.head.notes, ...copies(maxNotes + 1 - start.head.notes.length, note)]
+      expect(S.is(UploadStart)({ ...start, head: { ...start.head, notes } })).toBe(false)
+    },
+    { arbitrary: { runs: 20 } }
+  )
+
+  it.effect.prop(
+    "says which field is wrong when its pieces cannot carry its rows: the number of pieces",
+    [Arbitrary.schema(UploadStart)],
+    ([start]) =>
+      Effect.gen(function* () {
+        const wire = yield* S.encodeEffect(UploadStart)(start)
+        const refused = yield* Effect.flip(S.decodeEffect(UploadStart)({ ...wire, chunkCount: wire.rowCount + 1 }))
+        const issues = SchemaIssue.makeFormatterStandardSchemaV1()(refused.issue).issues
+        expect(A.map(issues, (issue) => issue.path)).toEqual([["chunkCount"]])
+      }),
     runs
   )
 

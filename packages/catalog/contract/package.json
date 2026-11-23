@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@beep/schema": "workspace:*",
+    "@beep/xlsx": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "effect": "catalog:"
   },

@@ -2,6 +2,7 @@
 // columns and its notes. The one thing not to break: a staged cell is what the file said, never a corrected value.
 import * as S from "effect/Schema"
 import { nullAsNone } from "@inventory/kernel/Wire"
+import { MAX_COLUMN } from "@beep/xlsx/XlsxAddress"
 
 /** The fields of an item, in the order the screens list them. */
 export const fields = [
@@ -30,7 +31,7 @@ export const Field = S.Literals(fields).annotate({
 export type Field = typeof Field.Type
 
 /** The words the screens use for each field. Every reason uses these, never the property name. */
-export const fieldLabels: Record<Field, string> = {
+export const fieldLabels: Readonly<Record<Field, string>> = {
   sku: "SKU",
   name: "Name",
   description: "Description",
@@ -66,8 +67,16 @@ export const maxStagedRows = 50000
  */
 export const maxColumns = 200
 
-/** Excel's last column, XFD, from 0: a column's place in a file is never past it. */
-export const lastColumnIndex = 16_383
+/** Excel's last column, XFD, from 0: a column's place in a file is never past it. The workbook reader's own bound. */
+export const lastColumnIndex = MAX_COLUMN
+
+/**
+ * The most notes an upload may send with its file (`UploadHead`). A reader writes a few notes about the file and one
+ * for each number format it could not show, which a workbook built to do so can have thousands of: staging keeps the
+ * warnings first and says in one more how many it did not keep (`stageTable`), so a file is never refused for its
+ * notes. A file staged before this bound keeps every note it has: `StagedHead` reads it without the bound.
+ */
+export const maxNotes = 1000
 
 /**
  * The highest row number a row id can carry (`row-9999999`): a staged row numbered past it could not be named by
@@ -86,6 +95,12 @@ export const RowNumber = S.Int.check(S.isBetween({ minimum: 1, maximum: maxRowNu
 })
 /** The decoded value of `RowNumber`: a row of the file as Excel numbers it. */
 export type RowNumber = typeof RowNumber.Type
+
+/**
+ * The most items one row of a file can hold, and so the highest part a row id can carry (`row-7.9999`): the result
+ * and the plan of a confirm number a row's items no higher.
+ */
+export const maxPart = 9_999
 
 /** One cell as the reader found it: `text` with nothing coerced, and `shown` when Excel displays it differently. */
 export const StagedCell = S.Struct({
@@ -143,8 +158,11 @@ export const StagedNote = S.Struct({
   message: S.String.check(S.isMinLength(1), S.isMaxLength(4000)).annotateKey({
     description: "The sentence the reader wrote: never empty"
   }),
+  // A note names rows of the file, not only rows of data: blank rows, a second table, a merge down the sheet. Each is
+  // named once, so the list is never longer than a file can number rows, however few of them are data.
   rows: S.Array(RowNumber).check(S.isMaxLength(maxRowNumber)).annotateKey({
-    description: "The rows of the file it is about, as Excel numbers them; empty when it is about the whole file"
+    description:
+      "The rows of the file it is about, each once, as Excel numbers them, data or not; empty when it is about the whole file"
   })
 }).annotate({
   identifier: "StagedNote",
@@ -171,6 +189,8 @@ export const StagedTable = S.Struct({
   rows: S.Array(StagedRow)
     .check(S.isMaxLength(maxStagedRows))
     .annotateKey({ description: `The data rows, in file order: at most ${maxStagedRows}` }),
+  // Not bounded in count here: this is also how a stored file is read, and one staged before `maxNotes` may hold more.
+  // What an upload sends is bounded (`UploadHead`).
   notes: S.Array(StagedNote).annotateKey({ description: "What the reader did, skipped or noticed" })
 }).annotate({
   identifier: "StagedTable",
@@ -192,3 +212,23 @@ export const StagedHead = S.Struct(headFields).annotate({
 })
 /** The decoded value of `StagedHead`: a staged file without its rows. */
 export type StagedHead = typeof StagedHead.Type
+
+/**
+ * A staged head as the server stores it, beside its rows: `StagedHead` as JSON text. It reads every note a stored file
+ * has, so a file staged before `maxNotes` still opens.
+ */
+export const StagedHeadJson = S.fromJsonString(StagedHead)
+
+/**
+ * A staged file without its rows as an upload sends it: a `StagedHead` with at most `maxNotes` notes. The bound is
+ * where a head is written, not where one is read, so a file stored with more notes still opens.
+ */
+export const UploadHead = S.Struct({
+  ...headFields,
+  notes: S.Array(StagedNote)
+    .check(S.isMaxLength(maxNotes))
+    .annotateKey({ description: `What the reader did, skipped or noticed: at most ${maxNotes} notes` })
+}).annotate({
+  identifier: "UploadHead",
+  description: `A staged file without its rows as an upload sends it: at most ${maxNotes} notes`
+})

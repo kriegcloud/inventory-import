@@ -180,7 +180,7 @@ which is not checked from main.
   decisions).
 - **What the prover reads**: handlers written `Effect.fn("name")(…)` (whose parameters are typed `any` unless `keyOf`'s
   parameter is annotated); an id or a value schema from another package; not a request context imported from another
-  package; `new Event(…)`, not `Event.make(…)`.
+  package; `Event.make(…)` as it reads `new Event(…)`, since the repository's third patch to it (decision 33, reversed).
 
 ## Sketch
 
@@ -215,7 +215,7 @@ his answer of 2026-11-22, "Keep it, named as ours", keeps it as our check: "no h
 hand-written list of rule names or standings. `review14` has no error under a strict type-check, with no cast, nor has
 `review15` with its stories. Under the repository's profile as it was then (effect-tsgo 0.70.0, Effect 4.1.4; not run
 again under main's 0.73.2 and Effect 4.1.5) it had 133 Effect diagnostics and no type error: 73 `newSchemaClass`
-(decision 33's answer keeps `new` in the files that hold a `decide`), 32 `effectFnOpportunity`, 26 `preferEffectArray`,
+(decision 33's first answer kept `new` in the files that hold a `decide`; reversed since, and they build with `.make`), 32 `effectFnOpportunity`, 26 `preferEffectArray`,
 1 `missingPipeableSignature` and 1 `schemaClassMissingBrand`. Its functions are written `(p) => Effect.gen(...)`,
 because written `Effect.fn(function* (p) ...)` their parameters were typed `any`. The model on main writes the import
 and the four decisions with `Effect.fn`, and its counts above are of that form on `734c27a`.
@@ -438,9 +438,9 @@ cell:
 | A group's undo is taken only from a screen that has every change | `UndoGroup.AGroupsUndoIsMadeOnEveryChange` | in the lock, proved by the build's own report; not in `review15` | The number `seen` states | Any change the screen lacks holds it, on a row of the group or not: the model keeps no reading of a group's rows. The story "a group's undo from a screen that is behind on the rows is held, and taken once the screen has them, touching none" |
 | A group decided is the import's last group act and the last in force, and keeps which one was before it; only the last in force is taken back, and then the one under it is | `DecideGroup.TheImportHoldsItAsItsLastGroupAct`, `.AGroupDecidedIsTheLastInForce`, `.AndKeepsWhichOneWasBeforeIt`; `UndoGroup.OnlyTheLastGroupInForceIsTakenBack`, `.ThenTheOneUnderItIsTheLastInForce`, `.TheImportHoldsItAsItsLastGroupAct` | proved | `lastGroup`, `topGroup` and the group's `under` | That the group the import holds as last in force is in force: checked, below |
 | Only its maker takes a group back, once; only its organization changes a group; a viewer changes none | `UndoGroup.AGroupsUndoTakesBackOnlyItsSendersOwn`, `.AGroupIsTakenBackOnce`, `.NobodyUndoesAnotherPersonsGroup`, `.OnlyItsOwnOrganizationChangesTheGroup`, `.AViewerChangesNoGroup`; `DecideGroup.OnlyItsOwnOrganizationChangesTheGroup`, `.AViewerChangesNoGroup` | proved | The group's maker and the actor | `review15` states `NobodyUndoesAnotherPersonsGroup` on `DecideGroup` too; the lock does not, since a group's act takes nothing back |
-| A group says at least one row, and never changes once decided (its rows, its count, what it does, its number, what was under it, its maker), except to be taken back once | `Group.AGroupSaysAtLeastOneRow`, `.AGroupKeepsItsRows`, `.AGroupKeepsItsCount`, `.AGroupKeepsItsPatch`, `.AGroupKeepsItsNumber`, `.AGroupKeepsWhatWasUnderIt`, `.AGroupKeepsItsMaker`, `.ADecidedGroupStaysDecided`, `.AGroupTakenBackStaysTakenBack` | proved; `.AGroupKeepsItsCount` in the lock at `53654e6`, proved by the build's own report; not in `review15` | The group's state | A redo of a group is a new group. The count is its sender's word: the model reads no row out of a group's rows, so nothing ties the count to them |
+| A group says at least one row, and never changes once decided (its rows, its count, what it does, its number, what was under it, its maker), except to be taken back once | the state's schema (`GroupSize`, proved kept as "The state stays in its schema"; a rule of its own, `AGroupSaysAtLeastOneRow`, until 2026-11-23), `Group.AGroupKeepsItsRows`, `.AGroupKeepsItsCount`, `.AGroupKeepsItsPatch`, `.AGroupKeepsItsNumber`, `.AGroupKeepsWhatWasUnderIt`, `.AGroupKeepsItsMaker`, `.ADecidedGroupStaysDecided`, `.AGroupTakenBackStaysTakenBack` | proved; `.AGroupKeepsItsCount` in the lock at `53654e6`, proved by the build's own report; not in `review15` | The group's state | A redo of a group is a new group. The count is its sender's word: the model reads no row out of a group's rows, so nothing ties the count to them |
 | A match is made on the last one, is the next one, holds the columns it says, and is of this opening | `Import.AMatchIsMadeOnTheLastOne`, `.AMatchIsTheNextOne`, `.AMatchHoldsTheColumnsItSays`, `.AMatchIsOfThisOpening` | proved | The numbers and the text the match states | That the text says every field the match moved: one encoder over `matchColumns`, a test, not run |
-| A confirm's four outcomes add up to the rows; no count is negative; no more is in force than the file has rows | `Import.OutcomesAddUpToTheRows`, `.NoMoreInForceThanRows`, `.RowsAreNotNegative`, `.InForceIsNotNegative`, `.ReplacedIsNotNegative`, `.StandingIsNotNegative`, `.CreatedIsNotNegative`, `.UpdatedIsNotNegative`, `.AlreadyIsNotNegative`, `.NotImportedIsNotNegative`, `.RemovedIsNotNegative`, `.KeptIsNotNegative` | proved | The counts the confirm and the take-back state | That they are what is stored: the Result step's query reads them back; under decision 17's answer they are the numbers the handler stated |
+| A confirm's four outcomes add up to the rows; no count is negative; no more is in force than the file has rows | `Import.OutcomesAddUpToTheRows`, `.NoMoreInForceThanRows`; no count is negative by the state's schema (each count is `S.Natural`, proved kept as "The state stays in its schema"; ten rules of their own, `.RowsAreNotNegative` to `.KeptIsNotNegative`, until 2026-11-23) | proved | The counts the confirm and the take-back state | That they are what is stored: the Result step's query reads them back; under decision 17's answer they are the numbers the handler stated |
 | The status becomes Imported only by a confirm; a confirm of a closed import leaves its status | `Import.NothingIsWrittenBeforeConfirm`, `.AConfirmLeavesAClosedImportsStatusAsItWas` | proved | The status | That a batch never writes twice: the marker and its test (Proof 4) |
 | A take-back needs a confirm that stands, is of everything created and everything replaced, and nothing stands after it | `Import.OnlyAnImportWithAConfirmStandingIsTakenBack`, `.ATakeBackIsOfEverythingInForce`, `.AndOfEverythingReplaced`, `.NothingStandsThatWasTakenBack`, `.WhatIsInForceThenIsWhatWasKept` | proved | The counts | That a changed item is kept: the item's own rule under decision 17's first option. That a take-back waits for the confirm's items: no rule (decision 17) |
 | A suggestion writes nothing; a closed import's matching does not change; it opens only by Reopen; a removed import stays removed and had nothing in force | `Import.ASuggestionWritesNothing`, `.TheMatchingMovesOnlyOnAnOpenImport`, `.AnImportIsOpenedAgainOnlyByReopen`, `.ARemovedImportStaysRemoved`, `.OnlyAnImportWithNothingInForceIsRemoved` | proved | The status and the counts | |
@@ -1627,8 +1627,11 @@ path; an id or value schema may come from another package.
 
 ### 33. Are domain blocks built with `new`?
 
-**Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"). The
-others are kept below as what was rejected.
+**Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"), and
+**reversed the same day**: "Teach the prover .make" ([DECISIONS.md](DECISIONS.md), "decision 33 reversed: the prover
+reads `.make`"). Every file builds with `.make`, a file that holds a `decide` included, and none turns a diagnostic
+off; the prover reads `X.make(…)` through the repository's third patch to it. What follows is the question as it was
+first put.
 
 The house rule is `.make`. The prover reads `new Event(…)` in `decide` and not `Event.make(…)`.
 
@@ -2058,7 +2061,7 @@ taken.
 | 23: a Discord sign-in with an unverified email refused | A Discord sign-in with an unverified email creates no account (move 8): to write |
 | 25, 26: the allowance per organization, back at 00:00 UTC | `Allowance`'s Verify test, with the `TestClock` across midnight UTC (move 2): to write |
 | 27, 28, 29, 30, 31: the hosts, two Workers, `alchemy dev`, the screens on the model's Api | Each move's rows of "Every single thing" (moves 2 and 7): to write, in that move |
-| 32, 33: blocks in each model package; `new` only in decide files | Built on main (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
+| 32, 33: blocks in each model package; `.make` everywhere, the prover taught to read it (33 reversed) | Built on main (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
 | 35, 36, 37, 38, 39: by rule; the activity table stays; start empty; mark removed, events stay; keep, delete when an org leaves | A stored event of an older shape read by its rule; each write of the model adding its `activity` line; no row the current app stored carried into the model, with no carry-over code in the repository; Remove leaving the import's events and deleting its D1 rows; an operator's command deleting an organization's objects (moves 2 to 6): to write, in the move that builds each |
 | 40: review in memory, then host | The order of moves itself |
 | "Undecided: Ana took it back" | The story "a group taken back gives no row anything again: Ana's group of twelve rows, Dana types on row 14, both are taken back, and row 14 holds nothing" |

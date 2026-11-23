@@ -2,6 +2,7 @@ import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import * as S from "effect/Schema"
 import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -22,8 +23,12 @@ import {
   reviewJobs
 } from "../../../../../../packages/review/test/fixtures/jobs.ts"
 
-type View = "jobs" | "questions"
-type JobFilter = "waiting" | "ready" | "out" | "all"
+/** The two views of the jobs page: the jobs themselves, or the questions they wait on. */
+const View = S.Literals(["jobs", "questions"])
+type View = typeof View.Type
+/** Which jobs the list shows. */
+const JobFilter = S.Literals(["waiting", "ready", "out", "all"])
+type JobFilter = typeof JobFilter.Type
 
 const jobs = makeJobs()
 const whole = new Intl.NumberFormat("en-US")
@@ -87,10 +92,10 @@ export function JobsReview() {
 
   const tally = { ready: 0, waiting: 0, out: 0 }
   for (const review of reviews) tally[review.status] += 1
-  const questions = reviews.reduce((total, review) => total + review.waiting, 0)
-  const linesIn = reviews.reduce((total, review) => total + review.importing, 0)
-  const linesAll = jobs.reduce((total, job) => total + job.lines.length, 0)
-  const shown = filter === "all" ? reviews : reviews.filter((review) => review.status === filter)
+  const questions = A.reduce(reviews, 0, (total, review) => total + review.waiting)
+  const linesIn = A.reduce(reviews, 0, (total, review) => total + review.importing)
+  const linesAll = A.reduce(jobs, 0, (total, job) => total + job.lines.length)
+  const shown = filter === "all" ? reviews : A.filter(reviews, (review) => review.status === filter)
   const filters: ReadonlyArray<{ id: JobFilter; label: string; n: number }> = [
     { id: "waiting", label: pageWords.needs, n: tally.waiting },
     { id: "ready", label: pageWords.ready, n: tally.ready },
@@ -119,7 +124,7 @@ export function JobsReview() {
           aria-label="View"
           value={view}
           onValueChange={(next) => {
-            if (next !== "") setView(next as View)
+            if (S.is(View)(next)) setView(next)
           }}
         >
           <ToggleGroupItem value="jobs">
@@ -137,10 +142,10 @@ export function JobsReview() {
             aria-label="Show jobs"
             value={filter}
             onValueChange={(next) => {
-              if (next !== "") setFilter(next as JobFilter)
+              if (S.is(JobFilter)(next)) setFilter(next)
             }}
           >
-            {filters.map((entry) => (
+            {A.map(filters, (entry) => (
               <ToggleGroupItem key={entry.id} value={entry.id}>
                 {entry.label} <span className="text-muted-foreground tabular-nums">{whole.format(entry.n)}</span>
               </ToggleGroupItem>
@@ -153,7 +158,7 @@ export function JobsReview() {
         // A phone gets a list, not the table scrolled sideways: each job with its status, its reason and its answer.
         <div role="region" aria-label="Jobs in jobs.csv" className="min-h-0 flex-1 overflow-y-auto border-y">
           <ItemGroup>
-            {shown.map((review) => (
+            {A.map(shown, (review) => (
               <Item key={review.job.code} size="sm" data-row-id={review.job.code}>
                 <ItemContent className="min-w-0">
                   <ItemTitle>
@@ -172,7 +177,7 @@ export function JobsReview() {
                     <Button
                       variant="ghost"
                       size="touch"
-                      onClick={() => setLeftOut((before) => before.filter((code) => code !== review.job.code))}
+                      onClick={() => setLeftOut((before) => A.filter(before, (code) => code !== review.job.code))}
                     >
                       Bring back<span className="sr-only"> {review.job.code}</span>
                     </Button>
@@ -185,7 +190,13 @@ export function JobsReview() {
       ) : view === "jobs" ? (
         <RecordsTable
           key={filter}
-          caption={`Jobs in jobs.csv: ${filters.find((entry) => entry.id === filter)?.label ?? "All"}`}
+          caption={`Jobs in jobs.csv: ${O.getOrElse(
+            O.map(
+              A.findFirst(filters, (entry) => entry.id === filter),
+              (entry) => entry.label
+            ),
+            () => "All"
+          )}`}
           columns={jobColumns({
             onAnswer: () => setView("questions"),
             onLeaveOut: (code) =>
@@ -195,7 +206,7 @@ export function JobsReview() {
                   code
                 )
               ),
-            onBringBack: (code) => setLeftOut((before) => before.filter((at) => at !== code))
+            onBringBack: (code) => setLeftOut((before) => A.filter(before, (at) => at !== code))
           })}
           rows={shown}
           rowKey={(review) => review.job.code}
@@ -232,10 +243,13 @@ export function JobsReview() {
         <p role="status" className="min-w-0 flex-1 truncate text-sm text-muted-foreground tabular-nums">
           {held === 0
             ? `All ${reviews.length} jobs ready · ${linesIn} of ${linesAll} lines`
-            : `${tally.ready} jobs ready, ${held} won't be imported (${[
-                ...(tally.waiting > 0 ? [`${tally.waiting} waiting on you`] : []),
-                ...(tally.out > 0 ? [`${tally.out} left out`] : [])
-              ].join(", ")}) · ${linesIn} of ${linesAll} lines`}
+            : `${tally.ready} jobs ready, ${held} won't be imported (${A.join(
+                [
+                  ...(tally.waiting > 0 ? [`${tally.waiting} waiting on you`] : []),
+                  ...(tally.out > 0 ? [`${tally.out} left out`] : [])
+                ],
+                ", "
+              )}) · ${linesIn} of ${linesAll} lines`}
         </p>
         <Button
           variant={tally.waiting > 0 ? "outline" : "default"}

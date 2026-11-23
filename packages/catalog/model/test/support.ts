@@ -7,9 +7,10 @@ import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import type { Role } from "@inventory/kernel/Role"
 import * as A from "effect/Array"
+import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
+import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
-import * as Str from "effect/String"
 
 const member = (id: string, name: string, role: Role, organization: string): Member =>
   Member.make({
@@ -89,15 +90,27 @@ export const fiveLines: ReadonlyArray<Line> = [
 
 let uploads = 0
 
+// The keys the uploads of this run have taken.
+const taken = MutableHashSet.empty<UploadKey>()
+
+// An upload key drawn from the contract's schema that no upload of this run has taken: the same draws on every run,
+// seeded by the count of uploads so far.
+const nextUploadKey = Effect.fnUntraced(function* (seed: number) {
+  const drawn = yield* Arbitrary.sampleEffect(Arbitrary.schema(UploadKey), { count: 64, seed }).pipe(Effect.orDie)
+  const key = yield* Effect.fromOption(A.findFirst(drawn, (one) => !MutableHashSet.has(taken, one)))
+  MutableHashSet.add(taken, key)
+  return key
+})
+
 /** Stages `table` through the upload endpoints, as the screen does, and answers the import it became. */
 export const stage = Effect.fnUntraced(function* (table: StagedTable) {
   const imports = yield* importsEndpoints
   const { rows, ...head } = table
   uploads += 1
+  const key = yield* nextUploadKey(uploads)
   const begun = yield* imports.beginUpload({
-    // A version 4 UUID as the screen makes one, its last group the count of uploads so far.
     payload: {
-      key: UploadKey.make(`7a1d3f52-9c4e-4b60-8d21-${Str.padStart(12, "0")(uploads.toString(16))}`),
+      key,
       head,
       rowCount: rows.length,
       chunkCount: 1

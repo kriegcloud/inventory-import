@@ -1,7 +1,11 @@
 import * as A from "effect/Array"
-import * as O from "effect/Option"
-import * as Str from "effect/String"
+import * as Digest from "effect/crypto/Digest"
+import * as Effect from "effect/Effect"
+import * as Base64 from "effect/encoding/Base64"
 import { dual } from "effect/Function"
+import * as O from "effect/Option"
+import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import { docsPath } from "../api/v1/Api.ts"
 
 // SECURITY HEADERS for every response the Worker sends (/api/*). Static files get theirs from public/_headers, with
@@ -61,42 +65,62 @@ const docsPolicy = (scriptHashes: ReadonlyArray<string>) =>
     "; "
   )
 
-const sha256Base64 = (text: string) =>
-  crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then((digest) =>
-    btoa(
-      A.join(
-        A.map(A.fromIterable(new Uint8Array(digest)), (byte) => String.fromCharCode(byte)),
-        ""
-      )
-    )
-  )
+const encoder = new TextEncoder()
+
+/** A script's SHA-256 hash in base64, as a content security policy names it. */
+const sha256Base64 = Effect.fnUntraced(function* (text: string) {
+  const digest = yield* Digest.Digest
+  const bytes = yield* digest.digest(Digest.sha256, encoder.encode(text))
+  return Base64.encode(bytes)
+})
 
 const inlineScripts = /<script>([\s\S]*?)<\/script>/g
 
+/** The API reference page could not be read to hash its scripts: its body failed as it was read. */
+export class UnreadablePage extends S.TaggedError<UnreadablePage, { readonly brand: unique symbol }>()(
+  "UnreadablePage",
+  { cause: S.Defect() }
+) {}
+
 /**
  * The API response with the headers above set, replacing any the handler chose. The API reference page, which only a
- * development build serves, gets its own content security policy instead of the API's. Data-first
- * (`withSecurityHeaders(response, request)`) or for a promise chain (`.then(withSecurityHeaders(request))`).
+ * development build serves, gets its own content security policy instead of the API's, from the hashes of its inline
+ * scripts (`Digest`). Data-first (`withSecurityHeaders(response, request)`) or piped
+ * (`Effect.flatMap(withSecurityHeaders(request))`).
  */
 export const withSecurityHeaders: {
-  (request: Request): (response: Response) => Promise<Response>
-  (response: Response, request: Request): Promise<Response>
-} = dual(2, (response: Response, request: Request): Promise<Response> => {
-  const secured = new Response(response.body, response)
-  for (const [name, value] of headers) secured.headers.set(name, value)
-  if (!import.meta.env.DEV || new URL(request.url).pathname !== docsPath || response.status !== 200) {
-    return Promise.resolve(secured)
-  }
-  return secured.text().then((html) =>
-    Promise.all(A.map(A.fromIterable(Str.matchAll(inlineScripts)(html)), (match) => sha256Base64(match[1] ?? ""))).then(
-      (hashes) => {
-        const page = new Response(html, secured)
-        page.headers.set("Content-Security-Policy", docsPolicy(hashes))
-        return page
-      }
+  (request: Request): (response: Response) => Effect.Effect<Response, UnreadablePage, Digest.Digest>
+  (response: Response, request: Request): Effect.Effect<Response, UnreadablePage, Digest.Digest>
+} = dual(
+  2,
+  Effect.fnUntraced(function* (response: Response, request: Request) {
+    const secured = new Response(response.body, response)
+    for (const [name, value] of headers) secured.headers.set(name, value)
+    if (!import.meta.env.DEV || new URL(request.url).pathname !== docsPath || response.status !== 200) return secured
+    const html = yield* Effect.tryPromise({
+      try: () => secured.text(),
+      catch: (cause) => UnreadablePage.make({ cause })
+    })
+    const hashes = yield* Effect.forEach(
+      A.fromIterable(Str.matchAll(inlineScripts)(html)),
+      (match) => sha256Base64(match[1] ?? ""),
+      { concurrency: "unbounded" }
     )
-  )
-})
+    const page = new Response(html, secured)
+    page.headers.set("Content-Security-Policy", docsPolicy(hashes))
+    return page
+  })
+)
+
+/**
+ * The answer when a response could not be given its headers: a bare 500 that carries them, so nothing leaves the
+ * Worker without the API's policies.
+ */
+export const unsecuredAnswer = (): Response => {
+  const refused = new Response(null, { status: 500 })
+  for (const [name, value] of headers) refused.headers.set(name, value)
+  return refused
+}
 
 /**
  * A place to send a person back to, if it is a path on this site; otherwise none. Use it for any `return to` or

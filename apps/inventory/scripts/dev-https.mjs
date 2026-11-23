@@ -11,7 +11,7 @@
 //    authority to the system and browser trust stores. This script never runs that; it changes what the machine
 //    trusts, so it is your call. Without it the page still loads after the browser's certificate warning.
 import { spawn, spawnSync } from "node:child_process"
-import { existsSync, mkdirSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -19,8 +19,10 @@ const root = fileURLToPath(new URL("..", import.meta.url))
 const folder = `${root}.wrangler/certs`
 const made = { cert: `${folder}/localhost.pem`, key: `${folder}/localhost-key.pem` }
 
-const own = process.env.DEV_HTTPS_CERT !== undefined && process.env.DEV_HTTPS_KEY !== undefined
-const files = own ? { cert: process.env.DEV_HTTPS_CERT, key: process.env.DEV_HTTPS_KEY } : made
+const ownCert = process.env.DEV_HTTPS_CERT
+const ownKey = process.env.DEV_HTTPS_KEY
+const files = ownCert !== undefined && ownKey !== undefined ? { cert: ownCert, key: ownKey } : made
+const own = files !== made
 
 if (!own && !(existsSync(made.cert) && existsSync(made.key))) {
   const version = spawnSync("mkcert", ["-version"], { encoding: "utf8" })
@@ -53,10 +55,15 @@ const installed = (path) => {
   }
 }
 
+// Vite's configuration reads no file: it is handed the certificate and key as text (vite.config.ts, `buildSettings`).
 const vite = installed("vite/bin/vite.js")
 const child = spawn(process.execPath, [vite, ...process.argv.slice(2)], {
   stdio: "inherit",
-  env: { ...process.env, DEV_HTTPS_CERT: files.cert, DEV_HTTPS_KEY: files.key }
+  env: {
+    ...process.env,
+    INVENTORY_HTTPS_CERT_PEM: readFileSync(files.cert, "utf8"),
+    INVENTORY_HTTPS_KEY_PEM: readFileSync(files.key, "utf8")
+  }
 })
 for (const signal of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(signal, () => child.kill(signal))
 child.on("exit", (code, signal) => process.exit(code ?? (signal === null ? 0 : 1)))

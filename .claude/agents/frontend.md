@@ -53,6 +53,18 @@ For how a component is meant to be used, ask the shadcn tools (`mcp__shadcn`) or
 at props. For a screen people work in all day, the `design-taste-frontend` skill has the house rules
 (`references/app-screens.md`).
 
+## What a screen does with a value that may be missing
+
+A screen receives values that are already settled: the contract's schemas decode absence to an `Option`, hold the
+starting values and do the trimming (`docs/standards/schema-first.md`, SF-3 to SF-5). So a screen writes no `??`, no
+`=== undefined`, no `O.getOrElse`, no `.trim()`. The one thing it does with an `Option` is draw it, with `O.match` at
+the last step:
+`O.match(value, { onNone: () => <span className="text-muted-foreground">Not set</span>, onSome: (code) => <Code>{code}</Code> })`. A vendored
+component's optional prop is given from the Option the same way
+(`...O.match(x, { onNone: () => ({}), onSome: (x) => ({ x }) })`). `defaults:check` refuses a new fallback or
+comparison, and the edit hook says so at once with the line; an old one in a file you are changing is not yours to
+clean unless the brief says so.
+
 ## What the design lints fail
 
 - A raw element where a component exists.

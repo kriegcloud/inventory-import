@@ -33,11 +33,13 @@ import {
   Vendor
 } from "@inventory/catalog-contract/Item"
 import { ColumnMatch, UnusedColumn, MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import {
   canonicalTags,
@@ -45,6 +47,9 @@ import {
   readDecimal,
   dateReadings,
   readVendors,
+  said,
+  named,
+  wholeNumber,
   readCount,
   readDimensions,
   readUnitCost,
@@ -63,10 +68,12 @@ import {
 } from "./CellReading.rules.ts"
 import {
   Suggestion,
+  type SuggestionByKind,
   suggestionField as suggestionFieldOf,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
-import { matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
+import { keepSome, matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
+import { plural } from "../Words.rules.ts"
 import {
   rowId,
   RowDecision,
@@ -91,12 +98,6 @@ const cellText = (field: Field, cell: StagedCell | undefined): string => {
   // A cell holding only spaces is an empty cell: the screen then says "Empty" instead of showing nothing.
   return Str.trim(text) === "" ? "" : text
 }
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-
-/** Maps and keeps the values that exist. Effect 4's `A.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
-  A.getSomes(A.map(list, f))
 
 const preferredOf = (vendors: ReadonlyArray<Vendor>): ReadonlyArray<Vendor> =>
   A.filter(vendors, (vendor) => vendor.isPreferred)
@@ -191,7 +192,7 @@ export type Proposal = {
   readonly kind: ProblemKindId
   readonly to: string
   /** Who proposes it: a fixed rule, or a language model whose suggestion the guard checked and stored. */
-  readonly by: "rule" | "model"
+  readonly by: SuggestionByKind
   /**
    * The id of the stored suggestion behind it (`Suggestion.id`), when it came from one. Such a proposal is a guess
    * at a value the file does not hold: it never changes the row's outcome until the person accepts it.
@@ -243,7 +244,12 @@ export type Problem = {
 }
 
 /** Where a row stands. The four counts add up to the rows of the file. `needs` splits into decision and cannot (`RowOutcome`). */
-export type RowStatus = "ready" | "needs" | "out" | "already"
+export const RowStatus = LiteralKit(["ready", "needs", "out", "already"]).annotate({
+  identifier: "RowStatus",
+  description: "Where a row stands: ready, needs the person, left out, or already there"
+})
+/** The decoded value of `RowStatus`. */
+export type RowStatus = typeof RowStatus.Type
 
 /**
  * The outcome of a row in the brief's words: Ready, Needs a decision (a proposal or a choice is open), Cannot import
@@ -338,12 +344,11 @@ export type Review = {
   }
 }
 
-type DateField = "firstReceivedOn" | "discontinuedOn"
-const isDateField = (field: Field): field is DateField => field === "firstReceivedOn" || field === "discontinuedOn"
-const isCountField = (field: Field): field is "quantityOnHand" | "reorderPoint" =>
-  field === "quantityOnHand" || field === "reorderPoint"
-const isBooleanField = (field: Field): field is "isActive" | "lotTracked" =>
-  field === "isActive" || field === "lotTracked"
+const DateField = Field.pick(["firstReceivedOn", "discontinuedOn"])
+type DateField = typeof DateField.Type
+const isDateField = S.is(DateField)
+const isCountField = S.is(Field.pick(["quantityOnHand", "reorderPoint"]))
+const isBooleanField = S.is(Field.pick(["isActive", "lotTracked"]))
 
 /**
  * What a typed value is stored as. A person who types "bx" means BX and one who types "yes" means true, so their own
@@ -359,6 +364,12 @@ const canonical = (field: Field, text: string): string => {
   if (field === "tags") return canonicalTags(trimmed)
   return trimmed
 }
+
+/**
+ * One value for each field of an item, worked out field by field in the order the screens list them (`fieldLabels` is
+ * written in that order, which the contract's `CatalogContract.test.ts` holds).
+ */
+const ofEachField = <V>(of: (field: Field) => V): Record<Field, V> => R.map(fieldLabels, (_label, field) => of(field))
 
 /** True when the row says it is discontinued and active at once: a date that reads, and Active true or left empty. */
 const discontinuedYetActive = (values: Readonly<Record<Field, string>>): boolean =>
@@ -479,12 +490,10 @@ const makeContext = (input: {
   const totalNumbers = totalRowNumbers({ table: input.table, skuColumn: columnOf("sku") })
   const columns = R.fromEntries(A.map(fields, (field) => [field, columnOf(field)] as const))
   const read = (row: StagedRow): Readonly<Record<Field, string>> =>
-    R.fromEntries(
-      A.map(fields, (field) => {
-        const column = columns[field]
-        return [field, column === null || column === undefined ? "" : cellText(field, row.cells[column])] as const
-      })
-    ) as Record<Field, string>
+    ofEachField((field) => {
+      const column = columns[field]
+      return column === null || column === undefined ? "" : cellText(field, row.cells[column])
+    })
   const itemsOf = input.itemsOf ?? itemsOfRow
   const fileRows = A.filter(input.table.rows, (row) => !A.contains(totalNumbers, row.rowNumber))
   // Each row of the file is behind at least one item: a row that holds none is one entry, part 0, never dropped.
@@ -549,7 +558,13 @@ const makeContext = (input: {
   }
 }
 
-const quoted = (text: string): string => (text === "" ? "An empty cell" : `"${text}"`)
+/** The most rows a sentence about a repeated SKU names. Past it, it says how many more there are. */
+export const maxRowsNamed = 10
+
+/** What a row says when no rule gave it a sentence: a row that is not imported is still never without a reason. */
+export const unreadReason = "A value could not be read."
+
+const quoted = (text: string): string => (text === "" ? "An empty cell" : said(text))
 
 const proposal = (
   parts: Omit<Proposal, "by" | "alternatives" | "labels" | "targets"> & {
@@ -638,7 +653,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         : isDateField(field)
           ? `${quoted(trimmed)} on ${rows} is ${to} written another way; it has no other reading.`
           : field === "tags"
-            ? `${quoted(trimmed)} on ${rows} becomes "${to}": tags are lower case, each once.`
+            ? `${quoted(trimmed)} on ${rows} becomes ${said(to)}: tags are lower case, each once.`
             : field === "unitCost"
               ? `${quoted(trimmed)} on ${rows} carries a "$"; costs are in US dollars already, and ${plural(ctx.pointCosts, "row writes", "rows write")} the digits alone.`
               : `${quoted(trimmed)} on ${rows}; ${others} ${to}.`
@@ -666,7 +681,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
           to: upper,
           lossless: false,
           confidence: "medium",
-          basis: `"${trimmed}" is ${upper} in capitals, the form a SKU has${also > 0 ? `; ${plural(also, "other row already has", "other rows already have")} ${upper}, so the two would then share it` : ""}.`,
+          basis: `${said(trimmed)} is ${upper} in capitals, the form a SKU has${also > 0 ? `; ${plural(also, "other row already has", "other rows already have")} ${upper}, so the two would then share it` : ""}.`,
           group: "sku:capitals"
         })
       )
@@ -682,7 +697,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
           to: near.value,
           lossless: false,
           confidence: "medium",
-          basis: `"${trimmed}" on ${rows} is close to ${near.value}, one of the ${categories.length} categories; ${plural(ctx.countOf(field, near.value), "row says", "rows say")} ${near.value}.`,
+          basis: `${said(trimmed)} on ${rows} is close to ${near.value}, one of the ${categories.length} categories; ${plural(ctx.countOf(field, near.value), "row says", "rows say")} ${near.value}.`,
           group: `category:${near.value}:near`
         })
       )
@@ -702,7 +717,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
             to: digits,
             lossless: false,
             confidence: "low",
-            basis: `"${trimmed}" is ${digits} with a comma between thousands or ${asDecimal} with a decimal comma; the file does not say which.`,
+            basis: `${said(trimmed)} is ${digits} with a comma between thousands or ${asDecimal} with a decimal comma; the file does not say which.`,
             alternatives: [asDecimal],
             group: `unitCost:ask:${trimmed}`
           })
@@ -716,7 +731,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
             to: digits,
             lossless: false,
             confidence: "medium",
-            basis: `"${trimmed}" reads as ${digits} with a comma between thousands.`,
+            basis: `${said(trimmed)} reads as ${named(digits)} with a comma between thousands.`,
             group: "unitCost:thousands"
           })
         )
@@ -732,7 +747,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
             to: asDecimal,
             lossless: false,
             confidence: "medium",
-            basis: `"${trimmed}" reads as ${asDecimal} with a decimal comma: a comma between thousands is followed by three digits. ${plural(ctx.pointCosts, "cost", "costs")} of ${ctx.filledOf(field)} in this file write a point.`,
+            basis: `${said(trimmed)} reads as ${asDecimal} with a decimal comma: a comma between thousands is followed by three digits. ${plural(ctx.pointCosts, "cost", "costs")} of ${ctx.filledOf(field)} in this file write a point.`,
             group: "unitCost:decimal-comma"
           })
         )
@@ -748,7 +763,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         to: digits,
         lossless: false,
         confidence: "medium",
-        basis: `"${trimmed}" on ${rows} reads as ${digits} with a comma between thousands: ${Str.toLowerCase(label)} is a whole number, so the comma is not a decimal one.`,
+        basis: `${said(trimmed)} on ${rows} reads as ${named(digits)} with a comma between thousands: ${Str.toLowerCase(label)} is a whole number, so the comma is not a decimal one.`,
         group: `${field}:thousands`
       })
     )
@@ -761,7 +776,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         to: "true",
         lossless: false,
         confidence: "low",
-        basis: `"${trimmed}" on ${rows} is neither true nor false; ${plural(ctx.countOf(field, "true"), "row says", "rows say")} true and ${ctx.countOf(field, "false")} false. Only you know which this is.`,
+        basis: `${said(trimmed)} on ${rows} is neither true nor false; ${plural(ctx.countOf(field, "true"), "row says", "rows say")} true and ${ctx.countOf(field, "false")} false. Only you know which this is.`,
         alternatives: ["false"],
         group: `${field}:ask:${trimmed}`
       })
@@ -807,7 +822,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
           to: monthFirst.value,
           lossless: false,
           confidence: "low",
-          basis: `"${trimmed}" is ${monthFirst.value} with the month first or ${dayFirst.value} with the day first, and no other date in this column says which.`,
+          basis: `${said(trimmed)} is ${monthFirst.value} with the month first or ${dayFirst.value} with the day first, and no other date in this column says which.`,
           alternatives: [dayFirst.value],
           labels: [`${monthFirst.value} (month first)`, `${dayFirst.value} (day first)`],
           group: `${field}:ask:${trimmed}`
@@ -857,7 +872,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
               lossless: false,
               confidence: "low",
               basis: `${preferred.length} vendors are marked preferred (${A.join(
-                A.map(preferred, (vendor) => vendor.vendorName),
+                A.map(preferred, (vendor) => named(vendor.vendorName)),
                 ", "
               )}); an item has at most one.`,
               alternatives: A.map(A.drop(picks, 1), (pick) => pick.to),
@@ -897,7 +912,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (field === "isActive" && (empty || text === "true") && discontinuedYetActive(values)) {
     return {
       kind: "discontinued",
-      message: `Discontinued on ${Str.trim(values.discontinuedOn)}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
+      message: `Discontinued on ${named(Str.trim(values.discontinuedOn))}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
       ask: "Choose not active",
       choices: ["true", "false"]
     }
@@ -906,15 +921,16 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (field === "sku") {
     if (skuPattern.test(text)) return undefined
     return text !== Str.trim(text) && skuPattern.test(Str.trim(text))
-      ? { kind: "spaces", message: `SKU "${text}" has spaces around it.`, ask: null }
+      ? { kind: "spaces", message: `SKU ${said(text)} has spaces around it.`, ask: null }
       : {
           kind: "sku",
-          message: `SKU "${Str.trim(text)}" is not three capital letters, a hyphen and four digits, like BLT-0042.`,
+          message: `SKU ${said(Str.trim(text))} is not three capital letters, a hyphen and four digits, like BLT-0042.`,
           ask: "Type the SKU"
         }
   }
   if (field === "name") {
-    if (text !== Str.trim(text)) return { kind: "spaces", message: `Name "${text}" has spaces around it.`, ask: null }
+    if (text !== Str.trim(text))
+      return { kind: "spaces", message: `Name ${said(text)} has spaces around it.`, ask: null }
     return text.length > maxNameLength
       ? {
           kind: "name",
@@ -928,7 +944,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "category",
-          message: `Category "${text}" is not one of the ${categories.length} categories.`,
+          message: `Category ${said(text)} is not one of the ${categories.length} categories.`,
           ask: "Pick a category",
           choices: categories
         }
@@ -938,7 +954,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "uom",
-          message: `Unit of measure "${text}" is not one of ${A.join(uoms, ", ")}.`,
+          message: `Unit of measure ${said(text)} is not one of ${A.join(uoms, ", ")}.`,
           ask: "Pick a unit",
           choices: uoms
         }
@@ -949,10 +965,10 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     return {
       kind: "cost",
       message: /^-\s*\$?[\d.,]+$/.test(shown)
-        ? `Unit cost "${shown}" is below zero. A cost is 0 or more.`
+        ? `Unit cost ${said(shown)} is below zero. A cost is 0 or more.`
         : /^\$?\d+\.\d{5,}$/.test(shown)
-          ? `Unit cost "${shown}" has more than 4 decimals.`
-          : `Unit cost "${shown}" is not an amount in dollars written as digits.`,
+          ? `Unit cost ${said(shown)} has more than 4 decimals.`
+          : `Unit cost ${said(shown)} is not an amount in dollars written as digits.`,
       ask: "Type the unit cost"
     }
   }
@@ -962,10 +978,10 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     return {
       kind: "number",
       message: /^\d+\.\d+$/.test(shown)
-        ? `${label} "${shown}" is not a whole number.`
+        ? `${label} ${said(shown)} is not a whole number.`
         : /^-\d/.test(shown)
-          ? `${label} "${shown}" is below zero.`
-          : `${label} "${shown}" is not a whole number written as digits.`,
+          ? `${label} ${said(shown)} is below zero.`
+          : `${label} ${said(shown)} is not a whole number written as digits.`,
       ask: `Type the ${lower}`
     }
   }
@@ -974,7 +990,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "boolean",
-          message: `${label} "${Str.trim(text)}" is not true or false.`,
+          message: `${label} ${said(Str.trim(text))} is not true or false.`,
           ask: "Choose true or false",
           choices: ["true", "false"]
         }
@@ -983,7 +999,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     // A cell of separators only ("|") holds no tag: it is empty, not badly written.
     return canonicalTags(text) === text || canonicalTags(text) === ""
       ? undefined
-      : { kind: "tags", message: `Tags "${text}" are not lower case, each once.`, ask: "Type the tags" }
+      : { kind: "tags", message: `Tags ${said(text)} are not lower case, each once.`, ask: "Type the tags" }
   }
   if (isDateField(field)) {
     return O.isSome(readDate(text))
@@ -991,10 +1007,10 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : {
           kind: "date",
           message: /^\d{4}-\d{2}-\d{2}$/.test(Str.trim(text))
-            ? `${label} "${Str.trim(text)}" is not a day on the calendar.`
+            ? `${label} ${said(Str.trim(text))} is not a day on the calendar.`
             : twoDigitYear(text)
               ? `${label} “${Str.trim(text)}” has a two-digit year; type it as year-month-day.`
-              : `${label} "${Str.trim(text)}" is not written as year-month-day.`,
+              : `${label} ${said(Str.trim(text))} is not written as year-month-day.`,
           ask: "Type the date"
         }
   }
@@ -1014,7 +1030,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? {
           kind: "vendors",
           message: `${preferred.length} vendors are marked preferred (${A.join(
-            A.map(preferred, (vendor) => vendor.vendorName),
+            A.map(preferred, (vendor) => named(vendor.vendorName)),
             ", "
           )}). An item has at most one.`,
           ask: "Choose the preferred vendor"
@@ -1085,7 +1101,7 @@ const problemsOf = (
             kind: "stored",
             tone: "blocker",
             field: "sku",
-            message: `SKU ${Str.trim(values.sku)} is already there: an item your organization has uses it.`,
+            message: `SKU ${named(Str.trim(values.sku))} is already there: an item your organization has uses it.`,
             ask: "Type another SKU",
             choices: [],
             note: null,
@@ -1095,10 +1111,13 @@ const problemsOf = (
         ]
       : []
   const ids = A.map(rivals, (rival) => rival.id)
-  const where = A.join(
-    A.map(rivals, (rival) => rival.place),
+  // The first rows by name, then how many more: a SKU on thousands of rows would otherwise name them all.
+  const first = A.join(
+    A.map(A.take(rivals, maxRowsNamed), (rival) => named(rival.place)),
     ", "
   )
+  const where =
+    rivals.length > maxRowsNamed ? `${first} and ${wholeNumber.format(rivals.length - maxRowsNamed)} more` : first
   // Rows that agree in every field are copies; rows that share only the SKU are two items clashing over it.
   const copies = A.every(rivals, (rival) => rival.same)
   const twice: ReadonlyArray<Problem> =
@@ -1111,7 +1130,7 @@ const problemsOf = (
             field: "sku",
             message: copies
               ? `This row is a copy of row ${where}.`
-              : `SKU ${Str.toUpperCase(Str.trim(values.sku))} is also on row ${where} with different values. Keep one row, or leave one out.`,
+              : `SKU ${named(Str.toUpperCase(Str.trim(values.sku)))} is also on row ${where} with different values. Keep one row, or leave one out.`,
             ask: "Type another SKU",
             choices: [],
             note: `${copies ? "copy of" : "also"} row ${where}`,
@@ -1260,29 +1279,27 @@ export const review = (input: {
     const decision = decisionOf(row)
     const proposals = keepSome(fields, (field) => proposeFor(ctx, row, field))
     const changes: Array<Change> = []
-    const values = R.fromEntries(
-      A.map(fields, (field) => {
-        const typed = typedValue(decision, field)
-        const proposed = A.findFirst(proposals, (p) => p.field === field)
-        const text = row.file[field]
-        if (O.isSome(typed)) {
-          const to = canonical(field, typed.value)
-          if (to !== text) {
-            changes.push(typedChange({ field, from: text, to }))
-          }
-          return [field, to] as const
+    const values = ofEachField((field) => {
+      const typed = typedValue(decision, field)
+      const proposed = A.findFirst(proposals, (p) => p.field === field)
+      const text = row.file[field]
+      if (O.isSome(typed)) {
+        const to = canonical(field, typed.value)
+        if (to !== text) {
+          changes.push(typedChange({ field, from: text, to }))
         }
-        if (O.isSome(proposed) && inForce(proposed.value, decision)) {
-          const p = proposed.value
-          const accepted = A.contains(decision.accepted, field)
-          const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
-          // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
-          changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
-          return [field, p.to] as const
-        }
-        return [field, text] as const
-      })
-    ) as Record<Field, string>
+        return to
+      }
+      if (O.isSome(proposed) && inForce(proposed.value, decision)) {
+        const p = proposed.value
+        const accepted = A.contains(decision.accepted, field)
+        const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
+        // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
+        changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
+        return p.to
+      }
+      return text
+    })
     const key = skuKey({ sku: values.sku })
     const mine = HashSet.has(created, row.id)
     // The file's own SKU is stored. Compared by key, so a SKU whose spaces were trimmed is still the file's SKU.
@@ -1350,7 +1367,7 @@ export const review = (input: {
             kind: "changed",
             tone: "decision",
             field: "sku",
-            message: `SKU ${sku} is already there with other values (${A.join(
+            message: `SKU ${named(sku)} is already there with other values (${A.join(
               A.map(entry.stored, (difference) => fieldLabels[difference.field]),
               ", "
             )}). Keep the stored item, or replace it with this row.`,
@@ -1377,24 +1394,23 @@ export const review = (input: {
     const twice = (problem: Problem): boolean => problem.kind === "duplicate" || problem.kind === "clash"
     const problems = A.filter(all, (problem) => !twice(problem) || !(live.length === 0 || keptFirst))
     const open: RowStatus = entry.out ? "out" : entry.already ? "already" : problems.length > 0 ? "needs" : "ready"
-    const item = open === "ready" ? entry.item : null
-    const status: RowStatus = open === "ready" && item === null ? "needs" : open
+    const item = RowStatus.is.ready(open) ? entry.item : null
+    const status: RowStatus = RowStatus.is.ready(open) && item === null ? "needs" : open
     const head = problems[0]
-    const reason =
-      status === "out"
-        ? "You left this row out."
-        : status === "already"
-          ? entry.mine
-            ? "This row was imported from this file earlier."
-            : entry.keptStored
-              ? `SKU ${sku} is already there with other values. You kept the stored item.`
-              : `SKU ${sku} is already there. It is skipped, not changed.`
-          : head !== undefined
-            ? head.message
-            : item === null
-              ? "A value could not be read."
-              : null
-    const shown = status === "needs" ? problems : []
+    const reason = RowStatus.is.out(status)
+      ? "You left this row out."
+      : RowStatus.is.already(status)
+        ? entry.mine
+          ? "This row was imported from this file earlier."
+          : entry.keptStored
+            ? `SKU ${named(sku)} is already there with other values. You kept the stored item.`
+            : `SKU ${named(sku)} is already there. It is skipped, not changed.`
+        : head !== undefined
+          ? head.message
+          : item === null
+            ? unreadReason
+            : null
+    const shown = RowStatus.is.needs(status) ? problems : []
     return {
       rowNumber: entry.row.rowNumber,
       ...(entry.row.part === 0 ? {} : { part: entry.row.part }),
@@ -1405,21 +1421,20 @@ export const review = (input: {
       proposals: entry.proposals,
       problems: shown,
       status,
-      outcome:
-        status !== "needs"
-          ? status
-          : shown.length === 0 || A.some(shown, (problem) => problem.tone === "blocker")
-            ? "cannot"
-            : "decision",
+      outcome: !RowStatus.is.needs(status)
+        ? status
+        : shown.length === 0 || A.some(shown, (problem) => problem.tone === "blocker")
+          ? "cannot"
+          : "decision",
       kept: hasKeep(entry.decision),
       changes: entry.changes,
       item,
-      update: status === "ready" && entry.replace,
+      update: RowStatus.is.ready(status) && entry.replace,
       stored: entry.stored,
       reason,
       // Every problem of a row that waits, in the order the screen asks them: a row with two names both.
       reasons:
-        status === "needs" && problems.length > 0
+        RowStatus.is.needs(status) && problems.length > 0
           ? A.dedupe(A.map(problems, (problem) => problem.message))
           : reason === null
             ? []
@@ -1429,7 +1444,7 @@ export const review = (input: {
 
   const count = (status: RowStatus): number => A.filter(rows, (row) => row.status === status).length
   const outcome = (wanted: RowOutcome): number => A.filter(rows, (row) => row.outcome === wanted).length
-  const ready = A.filter(rows, (row) => row.status === "ready")
+  const ready = A.filter(rows, (row) => RowStatus.is.ready(row.status))
   const readyItems = keepSome(ready, (row) => O.fromNullishOr(row.item))
   const readyQuantities = keepSome(uoms, (unit): O.Option<UnitTotal> => {
     const inUnit = A.filter(readyItems, (item) => item.uom === unit)
@@ -1438,7 +1453,7 @@ export const review = (input: {
       : O.some({ unit, quantity: A.reduce(inUnit, 0, (total, item) => total + item.quantityOnHand) })
   })
   const byRule = A.map(
-    A.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
+    A.filter(rows, (row) => RowStatus.is.ready(row.status) || RowStatus.is.needs(row.status)),
     (row) => A.filter(row.changes, Change.guards.appliedByRule).length
   )
 
@@ -1494,12 +1509,10 @@ export const recheckRow = (input: {
   return (row) => {
     const known = R.get(byId, row.id)
     if (O.isNone(known)) return undefined
-    const values = R.fromEntries(
-      A.map(fields, (field) => {
-        const text = O.getOrElse(R.get(row.values, field), () => "")
-        return [field, text === known.value.file[field] ? text : canonical(field, text)] as const
-      })
-    ) as Record<Field, string>
+    const values = ofEachField((field) => {
+      const text = O.getOrElse(R.get(row.values, field), () => "")
+      return text === known.value.file[field] ? text : canonical(field, text)
+    })
     const rivals = A.map(
       A.filter(
         O.getOrElse(R.get(byKey, `sku:${skuKey({ sku: values.sku })}`), () => []),

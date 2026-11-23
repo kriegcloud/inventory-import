@@ -141,6 +141,26 @@
       ],
       "outputs": []
     },
+    // Absence, starting values and clean-ups are a schema's (`beep laws defaults`): no file holds more fallbacks,
+    // comparisons with null or undefined, Options turned back into missing values, or clean-ups outside a schema than
+    // `defaults-baseline.json` allows it. The baseline only falls.
+    "//#defaults:check": {
+      // Its baseline is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        "apps/*/src/**/*.{ts,tsx}",
+        "apps/*/test/**/*.{ts,tsx}",
+        "packages/**/src/**/*.{ts,tsx}",
+        "packages/**/test/**/*.{ts,tsx}",
+        "packages/client/**/*.{ts,tsx}",
+        "packages/review/**/*.{ts,tsx}",
+        "packages/ui/**/*.{ts,tsx}",
+        "packages/**/vendor.json",
+        "defaults-baseline.json",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // No `_tag` is told apart or built by hand in our own code and every test (`beep laws tags`), with no file
     // excepted: a count per file would let one hand-written tag be swapped for another.
     "//#tags:check": {
@@ -293,6 +313,104 @@
         "!.claude/worktrees/**",
         "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
         "!apps/inventory/public/theme-init.js",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // No Promise is written (`beep laws promises`), but in the files its lists name: every code file git would commit
+    // is an input, as for the try law, with the law's own source, and what its typed half reads besides: its profile,
+    // every tsconfig and every package.json, so a cached answer is never replayed over a changed one.
+    "//#promises:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".oxlintrc.promises.json",
+        "**/tsconfig*.json",
+        "**/package.json",
+        "!**/node_modules/**",
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // No `@effect-diagnostics` directive turns a rule off (`beep laws diagnostics`), but in the files it lists.
+    "//#diagnostics:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every helper declared with two values or more takes the one it acts on first and is dual (`beep laws dual`).
+    "//#dual:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every property of an object type or an interface is readonly (`beep laws readonly`).
+    "//#readonly:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every file of screens exports components only (`beep laws fast-refresh`, `.oxlintrc.fast-refresh.json`).
+    "//#fast-refresh:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false
+    },
+    // No type assertion is written (oxlint, `.oxlintrc.assertions.json`, from the root), and its lists only shrink
+    // (`beep laws assertions`).
+    "//#assertions:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
+      "inputs": [
+        ".oxlintrc.assertions.json",
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
         "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []

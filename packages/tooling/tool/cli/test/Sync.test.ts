@@ -3,6 +3,7 @@ import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import {
   anchorless,
@@ -117,6 +118,30 @@ describe("the text a sync command reads and repairs", () => {
   })
 })
 
+/** Whether a file's repairs keep each character no repair replaces exactly once, and lose the replaced ones. */
+const keepsOnce = (own: ReadonlyArray<Drift>): boolean => {
+  const length = A.reduce(own, 0, (most, drift) => Math.max(most, drift.start, drift.end)) + 2
+  const counts = counted(repaired(own)(marked(length)))
+  const kept = A.makeBy(length, (i) => O.getOrElse(R.get(counts, String.fromCharCode(0xe000 + i)), () => 0))
+  const expected = A.makeBy(length, (i) => (A.some(own, (drift) => drift.start <= i && i < drift.end) ? 0 : 1))
+  return A.every(kept, (count, i) => count === expected[i])
+}
+
+/**
+ * Repairs drawn the way a plan's meet: two files and a dozen offsets, so two repairs of one file often touch the same
+ * characters. Each is decoded through `Drift` and the whole through `Plan`, which decide what a plan may hold.
+ */
+const Candidate = S.Struct({
+  file: S.Literals(["a.ts", "b/c.ts"]),
+  line: S.Int.check(S.isBetween({ minimum: 1, maximum: 3 })),
+  what: S.Literal("a place"),
+  found: S.Literal("x"),
+  expected: S.Literal("y"),
+  start: S.Int.check(S.isBetween({ minimum: 0, maximum: 12 })),
+  end: S.Int.check(S.isBetween({ minimum: 0, maximum: 12 })),
+  text: S.String.check(S.isMaxLength(3))
+})
+
 describe("a plan's repairs, generated from the schema", () => {
   // Every plan the schema allows writes each file inside the repository, and keeps every character of it that no
   // repair replaces exactly once, in place: no repair writes a part of the file twice or loses one.
@@ -128,15 +153,27 @@ describe("a plan's repairs, generated from the schema", () => {
         expect([drift.file, O.isSome(resolved(drift.file))]).toEqual([drift.file, true])
       }
       for (const [, own] of R.toEntries(A.groupBy(plan.drifts, (drift) => drift.file))) {
-        const length = A.reduce(own, 0, (most, drift) => Math.max(most, drift.start, drift.end)) + 2
         // A longer file says nothing more, and the private-use block holds 6,400 characters.
-        if (length > 6000) continue
-        const text = marked(length)
-        const counts = counted(repaired(own)(text))
-        const kept = A.makeBy(length, (i) => O.getOrElse(R.get(counts, String.fromCharCode(0xe000 + i)), () => 0))
-        const expected = A.makeBy(length, (i) => (A.some(own, (drift) => drift.start <= i && i < drift.end) ? 0 : 1))
-        expect(kept).toEqual(expected)
+        if (A.some(own, (drift) => drift.end > 6000)) continue
+        expect(keepsOnce(own)).toBe(true)
       }
+    }
+  )
+
+  // Repairs of one file that meet: a plan that holds them keeps every character once all the same, and a plan of
+  // repairs that would write a character twice is refused.
+  it.prop(
+    "a plan of repairs that meet in one file is refused unless they keep each character once",
+    [Arbitrary.schema(S.Array(Candidate).check(S.isMaxLength(5)))],
+    ([candidates]) => {
+      // Each candidate a drift may be, and the plan of all of them.
+      const valid = A.filter(candidates, (candidate) => O.isSome(S.decodeOption(Drift)(candidate)))
+      const drifts = A.getSomes(A.map(valid, (candidate) => S.decodeOption(Drift)(candidate)))
+      const plan = S.decodeOption(Plan)({ checked: valid.length, drifts: valid, problems: [] })
+      const byFile = R.toEntries(A.groupBy(drifts, (drift) => drift.file))
+      const writesTwice = A.some(byFile, ([, own]) => !keepsOnce(own))
+      if (writesTwice) expect(O.isNone(plan)).toBe(true)
+      if (O.isSome(plan)) expect(writesTwice).toBe(false)
     }
   )
 })

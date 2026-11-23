@@ -3,13 +3,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import { decisionFromFlags, rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId, ItemId } from "@inventory/catalog-contract/Ids"
-import { DecidedBy } from "@inventory/catalog-contract/Import"
+import { DecidedBy, maxReason } from "@inventory/catalog-contract/Import"
 import { ConfirmPlan, confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite } from "@inventory/catalog-model/ImportStore"
 import { review } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import { marcus, tableOf } from "./support.ts"
 
 const Line = S.Struct({
@@ -73,14 +75,31 @@ describe("a plan a confirm can be handed", () => {
     }
   )
 
-  it.prop("says why for every row it leaves out or skips: no reason is empty", [ConfirmPlan], ([plan]) => {
-    const said = A.filter(plan.rows, PlannedRow.isAnyOf(["notImported", "already"]))
-    expect(A.filter(said, (row) => row.reason === "")).toEqual([])
+  it.prop(
+    "says why for every row it leaves out or skips: no reason is blank, or longer than a store writes",
+    [ConfirmPlan],
+    ([plan]) => {
+      const said = A.filter(plan.rows, PlannedRow.isAnyOf(["notImported", "already"]))
+      // The store's rule written out by hand, not asked of the plan's schema: the schema drew these plans, so asking
+      // it again would hold whatever it said. A reason has a character that is not a space, and at most `maxReason`.
+      expect(A.filter(said, (row) => O.isNone(Str.match(/\S/)(row.reason)) || row.reason.length > maxReason)).toEqual(
+        []
+      )
+    }
+  )
+
+  it("refuses a reason of spaces alone, and one past what a store writes", () => {
+    const at = { status: "already", rowNumber: 2, part: 0, sku: "AAA-0001", name: "Oak Crate" }
+    expect(S.is(PlannedRow)({ ...at, reason: "SKU AAA-0001 is already there." })).toBe(true)
+    expect(S.is(PlannedRow)({ ...at, reason: "   " })).toBe(false)
+    expect(S.is(PlannedRow)({ ...at, reason: Str.repeat(maxReason)("x") })).toBe(true)
+    expect(S.is(PlannedRow)({ ...at, reason: Str.repeat(maxReason + 1)("x") })).toBe(false)
   })
 })
 
-// Generated from the schemas of a write, a plan and an item id, each drawn apart, so the ids are as often too few
-// or too many as right. Both stores pair the rows a plan creates with the ids by `A.zip`, which stops at the shorter
+// Generated from the schemas of a write, a plan and a list of item ids, each drawn on its own: nothing makes the
+// number of ids agree with the number of rows the plan creates, so they agree only by chance (most often with none
+// of either), and the test holds whichever way a draw falls. Both stores pair the rows a plan creates with the ids by `A.zip`, which stops at the shorter
 // list: a write with an id missing would leave a ready row out without a word.
 describe("a confirm as it is written", () => {
   it.prop(

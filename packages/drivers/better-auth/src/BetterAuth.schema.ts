@@ -5,7 +5,6 @@
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as O from "effect/Option"
-import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -128,10 +127,20 @@ export const authEndpointOf = (request: { readonly url: string; readonly basePat
   return endpoint === "" ? "/" : Str.slice(0, 200)(endpoint)
 }
 
+/** The shortest secret accepted: Better Auth's own warning threshold. */
+const minimumSecretLength = 32
+
+/** A secret long enough to sign sessions with: 32 characters or more. */
+const SigningSecret = S.String.check(S.isMinLength(minimumSecretLength)).annotate({
+  description: "A secret of 32 characters or more"
+})
+
 class ConfiguredSecret extends S.Opaque<ConfiguredSecret, { readonly brand: unique symbol }>()(
   S.Struct({
     kind: S.tag("configured"),
-    secret: S.Redacted(S.String).pipe(S.annotateKey({ description: "The configured secret, 32 characters or more" }))
+    secret: S.Redacted(SigningSecret).pipe(
+      S.annotateKey({ description: "The configured secret, 32 characters or more" })
+    )
   }).pipe($I.annoteSchema("ConfiguredSecret", { description: "Sessions are signed with the configured secret" }))
 ) {}
 
@@ -160,9 +169,6 @@ export const AuthSecret = LiteralKit(["configured", "ephemeral"])
  */
 export type AuthSecret = typeof AuthSecret.Type
 
-/** The shortest secret accepted: Better Auth's own warning threshold. */
-const minimumSecretLength = 32
-
 /**
  * The secret policy: a configured secret of 32 characters or more is used; none, or a shorter one, fails in
  * production and is `ephemeral` in development.
@@ -172,9 +178,8 @@ const minimumSecretLength = 32
 export const resolveAuthSecret = (
   settings: Pick<BetterAuthSettings, "secret" | "production">
 ): Result.Result<AuthSecret, BetterAuthConfigError> => {
-  const configured = O.filter(settings.secret, (secret) => Redacted.value(secret).length >= minimumSecretLength)
-  if (O.isSome(configured))
-    return Result.succeed(ConfiguredSecret.make({ kind: "configured", secret: configured.value }))
+  const configured = O.flatMap(settings.secret, (secret) => ConfiguredSecret.makeOption({ kind: "configured", secret }))
+  if (O.isSome(configured)) return Result.succeed(configured.value)
   if (settings.production) {
     return Result.fail(
       BetterAuthConfigError.make({ problem: O.isNone(settings.secret) ? "missingSecret" : "shortSecret" })

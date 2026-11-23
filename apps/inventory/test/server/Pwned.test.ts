@@ -1,4 +1,3 @@
-// @effect-diagnostics globalFetch:off
 import { expect, it } from "@effect/vitest"
 import { betterAuth } from "better-auth"
 import { memoryAdapter } from "better-auth/adapters/memory"
@@ -53,24 +52,19 @@ const signUp = Effect.fnUntraced(function* (auth: ReturnType<typeof authWith>, e
   )
 })
 
-/** Every request to the breach service while `effect` runs, answered by `answer`; anything else goes out as usual. */
+/**
+ * Every request sent out while `effect` runs, answered by `answer`: the breach service is the only one sign-up asks,
+ * and nothing else is reached. The requests are read from the stand-in's own record of its calls.
+ */
 const watchingPwned = <A, E, R>(answer: () => Promise<Response>, effect: Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
-    Effect.sync(() => {
-      const calls: Array<string> = []
-      const real = globalThis.fetch
-      const spy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-        const url = String(input instanceof Request ? input.url : input)
-        if (Str.startsWith("https://api.pwnedpasswords.com/")(url)) {
-          calls.push(url)
-          return answer()
-        }
-        return real(input, init)
-      })
-      return { calls, spy }
-    }),
-    ({ calls }) => Effect.map(effect, (result) => ({ result, calls })),
-    ({ spy }) => Effect.sync(() => spy.mockRestore())
+    Effect.sync(() => vi.spyOn(globalThis, "fetch").mockImplementation(answer)),
+    (spy) =>
+      Effect.map(effect, (result) => ({
+        result,
+        calls: A.map(spy.mock.calls, ([input]) => (input instanceof Request ? input.url : String(input)))
+      })),
+    (spy) => Effect.sync(() => spy.mockRestore())
   )
 
 it.effect("off: a breached password is let through and the service is never called", () =>

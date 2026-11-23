@@ -15,7 +15,7 @@ import * as Result from "effect/Result"
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import * as S from "effect/Schema"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { Answerer, modelIsOn, ModelQuestion } from "../Answer/Answerer.external.ts"
+import { Answerer, ModelAvailability, ModelQuestion } from "../Answer/Answerer.external.ts"
 import { AllowanceAnswer, ModelAllowance } from "../Answer/ModelAllowance.external.ts"
 import { AssistantLog } from "./AssistantLog.store.ts"
 import * as SecureRandom from "effect/crypto/SecureRandom"
@@ -73,7 +73,7 @@ export const view = Effect.fn("TableAssistant.view")(function* (request: ViewReq
   const allowance = yield* ModelAllowance
   const log = yield* AssistantLog
   const random = yield* SecureRandom.SecureRandom
-  if (!modelIsOn(answerer.status)) {
+  if (!ModelAvailability.is.on(answerer.status)) {
     return answerByRules({ request, why: noKey })
   }
   // One call from the day's allowance, taken before the call is made, so a call that fails still counts.

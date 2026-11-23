@@ -1,14 +1,13 @@
 // A suggestion for something the fixed rules cannot settle: a name, a category, or a file column for a field. It
 // never applies itself; the person accepts or rejects it. Its table's columns are read and written by the two
 // mappers here, so the stored rows keep their shape.
-import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { RowId, SuggestionId } from "../Catalog.id.ts"
-import { categories, maxNameLength } from "../Item/Item.read.ts"
+import { Category, maxNameLength } from "../Item/Item.read.ts"
 import { Field } from "../Staging/Staged.read.ts"
 
 /** Who made a suggestion: a language model, or a fixed rule. */
@@ -232,6 +231,9 @@ export const suggestionFromStored = (row: StoredSuggestionRow): O.Option<Suggest
       )
 }
 
+// One of the listed categories, told by the category's own schema.
+const isCategory = S.is(Category)
+
 /**
  * Whether a suggestion still fits its row: a name only for a row whose name is empty, at most 120 characters; a
  * category only one of the listed ones, for a row whose category is not listed. The guard asks before storing and
@@ -247,10 +249,7 @@ export const suggestionFits = (input: {
     return Str.trim(input.file.name) === "" && to !== "" && to === input.to && to.length <= maxNameLength
   }
   if (input.kind === "category") {
-    return (
-      A.contains(categories as ReadonlyArray<string>, input.to) &&
-      !A.contains(categories as ReadonlyArray<string>, input.file.category)
-    )
+    return isCategory(input.to) && !isCategory(input.file.category)
   }
   return false
 }

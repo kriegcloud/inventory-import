@@ -8,7 +8,7 @@
 import { Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
 import { RowDecision, type DecisionDelta } from "@inventory/catalog-contract/Decision"
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
-import { type ConfirmId, ImportId, type ItemId } from "@inventory/catalog-contract/Ids"
+import { type ConfirmId, ImportId, type ItemId, type UploadKey } from "@inventory/catalog-contract/Ids"
 import {
   ChangedItem,
   type ChangeRecord,
@@ -17,7 +17,7 @@ import {
   decidedByNobody,
   ImportEvent,
   MatchTakeBack,
-  type OutcomeKind,
+  OutcomeKind,
   outcomeOf,
   type PastImport,
   type RowOutcome,
@@ -36,7 +36,13 @@ import {
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { type Field, StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
+import {
+  type Field,
+  type StagedHead,
+  StagedHeadJson,
+  type StagedRow,
+  type StagedTable
+} from "@inventory/catalog-contract/Staged"
 import { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, type MemberId, type OrganizationId } from "@inventory/kernel/Ids"
@@ -50,6 +56,7 @@ import * as Eq from "effect/Equal"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
+import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
@@ -77,6 +84,7 @@ import {
   decisionsRematched,
   decisionsSaved,
   type Draft,
+  DraftStatus,
   draftTries,
   ImportStore,
   nothingInForce,
@@ -100,6 +108,7 @@ import {
 } from "./Import/Rematch.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
+import { plural } from "./Words.rules.ts"
 
 // -- What the tables hold -------------------------------------------------------------------------------------
 
@@ -248,13 +257,10 @@ export class CatalogMemoryRef extends Context.Service<CatalogMemoryRef, Ref.Ref<
 
 // -- Small helpers ----------------------------------------------------------------------------------------------
 
-const HeadJson = S.fromJsonString(StagedHead)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
 const TakenBackJson = MatchTakeBack.pipe(S.Array, S.fromJsonString)
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
 const line = (input: {
   readonly id: string
@@ -292,7 +298,7 @@ const mapDraft = (
 })
 
 const isOpen = (state: CatalogState, organizationId: OrganizationId, id: string): boolean =>
-  A.some(state.drafts, (entry) => sameDraft(organizationId, id)(entry) && entry.draft.status === "open")
+  A.some(state.drafts, (entry) => sameDraft(organizationId, id)(entry) && DraftStatus.is.open(entry.draft.status))
 
 const byMoment = Order.mapInput(DateTime.Order, (confirm: MemConfirm) => confirm.at)
 
@@ -327,7 +333,7 @@ const readNow = (state: CatalogState, organizationId: OrganizationId, importId: 
   created: A.map(
     A.filter(
       state.outcomes,
-      (row) => row.organizationId === organizationId && row.importId === importId && row.outcome === "created"
+      (row) => row.organizationId === organizationId && row.importId === importId && OutcomeKind.is.created(row.outcome)
     ),
     (row) => ({ rowNumber: row.rowNumber, part: row.part })
   ),
@@ -349,7 +355,10 @@ const commitStep = (
 ): readonly [Confirmed, CatalogState] => {
   const audit = write.audit
   const org = audit.organizationId
-  const open = A.findFirst(state.drafts, (entry) => sameDraft(org, write.draft)(entry) && entry.draft.status === "open")
+  const open = A.findFirst(
+    state.drafts,
+    (entry) => sameDraft(org, write.draft)(entry) && DraftStatus.is.open(entry.draft.status)
+  )
   if (O.isNone(open)) return [confirmClosed, state]
   // Made on another revision than the draft is at: nothing is written.
   if (open.value.draft.revision !== write.expected) return [confirmMoved(open.value.draft.revision), state]
@@ -658,11 +667,12 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     entry.organizationId === org && entry.confirm === confirm
   const copiesOf = (confirm: ConfirmId) => (copy: MemReplaced) =>
     copy.organizationId === org && copy.confirm === confirm
+  const takenBackBy: string = audit.actorName
   const confirms = A.map(state.confirms, (confirm) =>
     isMarked(confirm.id) && confirm.organizationId === org
       ? {
           ...confirm,
-          takeBack: O.some({ id: write.takeBack, byName: audit.actorName as string, at }),
+          takeBack: O.some({ id: write.takeBack, byName: takenBackBy, at }),
           removed: A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision === 1).length,
           restored: A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && copy.restored).length,
           kept:
@@ -695,7 +705,7 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
   const outcomes = A.map(state.outcomes, (row): MemOutcome => {
     if (row.organizationId !== org || row.importId !== write.draft) return row
     const going =
-      row.outcome === "created" &&
+      OutcomeKind.is.created(row.outcome) &&
       A.some(
         put.items,
         (entry) =>
@@ -707,7 +717,7 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
           isMarked(entry.confirm)
       )
     const undone =
-      row.outcome === "updated" &&
+      OutcomeKind.is.updated(row.outcome) &&
       A.some(
         put.replaced,
         (copy) =>
@@ -737,7 +747,7 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
       draft: {
         ...entry.draft,
         revision: entry.draft.revision + 1,
-        status: entry.draft.status === "imported" && !anyInForce ? "takenBack" : entry.draft.status
+        status: DraftStatus.is.imported(entry.draft.status) && !anyInForce ? "takenBack" : entry.draft.status
       }
     })
   )
@@ -766,7 +776,7 @@ const numberOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<number> 
       ? O.some(Number(costDigits(item.unitCost)))
       : O.none()
 
-const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (typeof value === "string" ? [value] : value)
+const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (P.isString(value) ? [value] : value)
 
 const asNumber = (text: string): O.Option<number> =>
   Str.trim(text) === "" || !Number.isFinite(Number(text)) ? O.none() : O.some(Number(text))
@@ -941,14 +951,14 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
 
     const beginUpload = Effect.fnUntraced(function* (
       actor: Member,
-      key: string,
+      key: UploadKey,
       head: StagedHead,
       counts: { readonly rowCount: number; readonly chunkCount: number }
     ) {
       const made = yield* random.uuidV4()
       const now = yield* DateTime.now
       const before = DateTime.subtract(now, { minutes: abandonedAfterMinutes })
-      const headJson = yield* S.encodeEffect(HeadJson)(head)
+      const headJson = yield* S.encodeEffect(StagedHeadJson)(head)
       const id = yield* Ref.modify(ref, (state): readonly [ImportId, CatalogState] => {
         // An upload left unfinished for an hour is gone before the next one of its organization starts.
         const kept = A.filter(
@@ -1078,7 +1088,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       return yield* Ref.modify(ref, (state): readonly [Decided, CatalogState] => {
         const org = actor.organizationId
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (O.isNone(found) || found.value.draft.status !== "open") return [decisionsClosed, state]
+        if (O.isNone(found) || !DraftStatus.is.open(found.value.draft.status)) return [decisionsClosed, state]
         // Checked against other choices than the draft has now: a match came between, and nothing is saved.
         if (found.value.draft.choicesJson !== draft.choicesJson) return [decisionsRematched, state]
         // Its rows that waited were compared at another revision than the draft is at, or another save has named a row
@@ -1134,14 +1144,14 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const attempt = Effect.gen(function* () {
         const state = yield* Ref.get(ref)
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (O.isNone(found) || found.value.draft.status !== "open") return O.some<ChoicesSaved>("closed")
+        if (O.isNone(found) || !DraftStatus.is.open(found.value.draft.status)) return O.some<ChoicesSaved>("closed")
         const entry = found.value
         const before = yield* S.decodeEffect(ChoicesJson)(entry.draft.choicesJson)
         // Choices that are already so are not a change: no audit line and no new revision.
         if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
           return O.some<ChoicesSaved>("same")
         }
-        const head = yield* S.decodeEffect(HeadJson)(entry.draft.headJson)
+        const head = yield* S.decodeEffect(StagedHeadJson)(entry.draft.headJson)
         const moves = yield* S.decodeEffect(MovesJson)(entry.draft.movesJson)
         const plan = yield* planMatch({
           head,
@@ -1221,7 +1231,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       yield* Ref.update(ref, (state) => {
         const org = actor.organizationId
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (O.isNone(found) || found.value.draft.status === "open") return state
+        if (O.isNone(found) || DraftStatus.is.open(found.value.draft.status)) return state
         const next = mapDraft(state, org, draft.id, (entry) => ({
           ...entry,
           draft: { ...entry.draft, status: "open", revision: entry.draft.revision + 1 }
@@ -1236,10 +1246,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
               actorId: actor.id,
               actorName: actor.name,
               action: "Reopened an import",
-              detail:
-                draft.status === "takenBack"
-                  ? `${draft.fileName}: to review again after it was taken back`
-                  : `${draft.fileName}: to fix the rows that were not imported`,
+              detail: DraftStatus.is.takenBack(draft.status)
+                ? `${draft.fileName}: to review again after it was taken back`
+                : `${draft.fileName}: to fix the rows that were not imported`,
               at
             })
           )
@@ -1437,7 +1446,10 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const state = yield* Ref.get(ref)
         const open = A.reverse(
           A.sort(
-            A.filter(state.drafts, (entry) => entry.organizationId === organizationId && entry.draft.status === "open"),
+            A.filter(
+              state.drafts,
+              (entry) => entry.organizationId === organizationId && DraftStatus.is.open(entry.draft.status)
+            ),
             Order.mapInput(DateTime.Order, (entry: MemDraft) => entry.draft.createdAt)
           )
         )
@@ -1518,7 +1530,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         return A.map(
           A.filter(
             state.outcomes,
-            (row) => row.organizationId === organizationId && row.importId === importId && row.outcome === "created"
+            (row) =>
+              row.organizationId === organizationId && row.importId === importId && OutcomeKind.is.created(row.outcome)
           ),
           (row) => ({ rowNumber: row.rowNumber, part: row.part })
         )
@@ -1564,7 +1577,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       }),
       table: Effect.fnUntraced(function* (organizationId: OrganizationId, draft: Draft) {
         const state = yield* Ref.get(ref)
-        const head = yield* S.decodeEffect(HeadJson)(draft.headJson)
+        const head = yield* S.decodeEffect(StagedHeadJson)(draft.headJson)
         const table: StagedTable = {
           ...head,
           rows: O.match(A.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {
@@ -1594,7 +1607,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
                 row.importId === importId &&
                 row.rowNumber === entry.rowNumber &&
                 row.part === entry.part &&
-                (row.outcome === "created" || row.outcome === "updated")
+                (OutcomeKind.is.created(row.outcome) || OutcomeKind.is.updated(row.outcome))
             )
         )
         return {

@@ -267,7 +267,8 @@ export interface SessionView {
   readonly actor: Member | undefined
   readonly email: string | undefined
   readonly organizations: ReadonlyArray<OrganizationChoice>
-  readonly features: SignInFeatures | undefined
+  /** What sign-in offers (test accounts, sign-up), once the answer says: none while it is asked. */
+  readonly features: O.Option<SignInFeatures>
   /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
   readonly probablySignedOut: boolean
   /** Why the session could not be read, while it is not being asked again; with a member known, they stay. */
@@ -282,12 +283,14 @@ export interface SessionView {
 export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): SessionView => {
   const known = result.pipe(AsyncResult.value, O.getOrUndefined)
   const state = result.waiting && known?.status !== "ready" ? undefined : known
+  // The answer as the shell may show it: a new answer is waited for unless it is already a member's.
+  const shown = O.filter(AsyncResult.value(result), (answer) => !result.waiting || answer.status === "ready")
   return {
     status: state?.status ?? "loading",
     actor: state?.status === "ready" ? state.actor : undefined,
     email: state === undefined || state.status === "signed-out" ? undefined : state.email,
     organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
-    features: state?.features,
+    features: O.map(shown, (answer) => answer.features),
     probablySignedOut: state === undefined && !wasSignedIn(),
     error: AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
   }

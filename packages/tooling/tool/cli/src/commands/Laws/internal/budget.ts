@@ -56,13 +56,13 @@ export const maxFileSize = 1_000_000
 /** Why a law did not read a file. */
 export type Unread = Data.TaggedEnum<{
   /** Its names lead into each other past the steps the file allows, or past `maxDepth` judgements. */
-  Names: {}
+  readonly Names: {}
   /** It is nested past `maxNesting`, `maxBrackets` or `maxChain`. */
-  Nested: {}
+  readonly Nested: {}
   /** It is longer than `maxFileSize`. */
-  Large: {}
+  readonly Large: {}
   /** The parser read it with errors: the first is `message`. */
-  Unparsed: { readonly message: string }
+  readonly Unparsed: { readonly message: string }
 }>
 
 /** The constructors, guards and matcher of `Unread`. */

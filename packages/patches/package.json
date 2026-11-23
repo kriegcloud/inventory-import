@@ -9,6 +9,7 @@
   "scripts": {
     "check": "tsrs -p tsconfig.test.json",
     "lint": "oxlint --quiet test",
+    "mutants": "python3 -I mutants/run.py",
     "test": "vitest run"
   },
   "dependencies": {

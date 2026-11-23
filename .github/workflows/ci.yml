@@ -10,17 +10,75 @@ on:
 permissions:
   contents: read
 
+# A pull request's new push cancels its run in progress. A push to main or a release branch does not cancel the run in
+# progress, though GitHub still keeps only the newest of the runs waiting in the group: the bans' ledgers are compared
+# with the last push whose run passed, so a run skipped that way is checked by the next.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     name: Check, test and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A job's permissions replace the workflow's: the bans' ledgers are compared, on a push, with the last commit of the
+    # branch whose run passed, so this job alone reads the runs.
+    permissions:
+      contents: read
+      actions: read
     steps:
+      # The bans' ledgers may only fall, compared with where this commit left main (their merge base): the whole
+      # history is fetched so git can find it (packages/tooling/tool/cli/ledgers).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # On a push, the ledgers are compared with the last commit pushed to this branch whose run passed, so a number
+      # raised in a push whose run was cancelled, failed or skipped is seen all the same. Only push runs count: a
+      # pull request's run reports its own head branch, which a fork may call main. Each candidate is taken only when
+      # it is fetched, holds every ledger (and defaults' baseline) and HEAD holds it, so a force push, a commit only under refs/pull or one from
+      # before the ledgers never stops every later run or weakens it: on main, the last passing push, then the push's
+      # `before`; on a release branch, the last passing push. A candidate fetched but not in HEAD's history (a force
+      # push) gives way to its merge base with HEAD, when that holds the ledgers. With none, no base is named and the
+      # laws take their own default. A `gh` that fails (an outage, a rate limit) is warned about, not fatal.
+      # The base is this step's output, never GITHUB_ENV: only the step that runs the laws below sees LEDGER_BASE. The
+      # laws' own tests build repositories that do not hold the commit, and refused it when the whole job saw it.
+      - name: Base of the bans' ledgers
+        id: base
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          passed=$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty') || {
+            echo "::warning::gh could not list this branch's passing runs, so the bans' ledgers fall back to the push's before or the law's own base"
+            passed=
+          }
+          if [ "$GITHUB_REF_NAME" = main ]; then candidates="$passed $BEFORE"; else candidates="$passed"; fi
+          # Every ledger HEAD keeps, and the defaults law's baseline: a base must hold them all.
+          ledgers="$(git ls-tree --name-only HEAD packages/tooling/tool/cli/ledgers/) defaults-baseline.json"
+          holds() {
+            git cat-file -e "$1^{commit}" 2>/dev/null || return 1
+            for ledger in $ledgers; do git cat-file -e "$1:$ledger" 2>/dev/null || return 1; done
+          }
+          for candidate in $candidates; do
+            if holds "$candidate" && git merge-base --is-ancestor "$candidate" HEAD; then
+              echo "ledger_base=$candidate" >> "$GITHUB_OUTPUT"
+              echo "The bans' ledgers are compared with $candidate"
+              exit 0
+            fi
+          done
+          for candidate in $candidates; do
+            if holds "$candidate"; then
+              joined=$(git merge-base "$candidate" HEAD) || continue
+              if holds "$joined"; then
+                echo "ledger_base=$joined" >> "$GITHUB_OUTPUT"
+                echo "The bans' ledgers are compared with $joined, where $candidate and this push meet"
+                exit 0
+              fi
+            fi
+          done
+          echo "No candidate holds the ledgers: the law takes its own base (the merge base with main; on main, HEAD^1)"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -38,6 +96,14 @@ jobs:
         run: bun run check:ci -- --summarize --continue --concurrency=2
         env:
           VITEST_MAX_WORKERS: 1
+      # The seven laws with a ledger, again, against the base the step above named: in the check above they compared
+      # with their own default (where this commit left main; on main, the commit before), which misses a number raised
+      # in an earlier push whose run did not pass. They take seconds. LEDGER_BASE is given to this step alone.
+      - name: The bans' ledgers against the last passing push
+        if: ${{ !cancelled() && steps.base.outputs.ledger_base != '' }}
+        run: bunx turbo run //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check --continue --concurrency=2
+        env:
+          LEDGER_BASE: ${{ steps.base.outputs.ledger_base }}
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
       # Chrome at this path (CHROME_BIN in actions/runner-images; the runs are on Ubuntu 26.04, whose image lists
       # Google Chrome as 24.04's does). The browser says its version first,

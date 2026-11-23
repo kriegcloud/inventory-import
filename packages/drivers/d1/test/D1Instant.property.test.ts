@@ -5,13 +5,11 @@ import * as Arbitrary from "effect/Arbitrary"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import { D1Instant } from "@beep/d1/D1Instant"
 
 const runs = { arbitrary: { runs: 500 } }
 const bound = S.encodeEffect(D1Instant)
-
-/** SQLite's BINARY collation on ASCII text: by code unit, shorter first on a common prefix. */
-const textOrder = (a: string, b: string): -1 | 0 | 1 => (a < b ? -1 : a > b ? 1 : 0)
 
 describe("a moment as D1 stores it", () => {
   it.effect.prop(
@@ -20,8 +18,8 @@ describe("a moment as D1 stores it", () => {
     ([a, b]) =>
       Effect.gen(function* () {
         const [textA, textB] = [yield* bound(a), yield* bound(b)]
-        const inTime = DateTime.isLessThan(a, b) ? -1 : DateTime.isGreaterThan(a, b) ? 1 : 0
-        expect(textOrder(textA, textB)).toBe(inTime)
+        // SQLite's BINARY collation on ASCII text is the order of code units, shorter first on a common prefix.
+        expect(Str.Order(textA, textB)).toBe(DateTime.Order(a, b))
       }),
     runs
   )

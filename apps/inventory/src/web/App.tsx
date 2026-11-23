@@ -21,7 +21,7 @@ const GridGallery = import.meta.env.DEV ? lazy(() => import("@/pages/GridGallery
 /** The app: the sign-in screen for anyone not signed in, the workspace for a member of an organization. */
 export default function App() {
   const { path } = useAtomValue(location)
-  if (ReviewGallery !== undefined && path.startsWith("/gallery/review")) {
+  if (ReviewGallery !== undefined && Str.startsWith("/gallery/review")(path)) {
     return (
       <Suspense fallback={null}>
         <ReviewGallery />

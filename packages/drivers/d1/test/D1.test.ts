@@ -1,10 +1,13 @@
 // The rules the driver protects: a statement's values pass through its request Schema and its rows through its
-// result Schema, a write that answers rows when none were expected fails, and a batch lands whole or not at all.
+// result Schema, a write that answers rows when none were expected fails, a batch lands whole or not at all, and each
+// answer of a batch is the rows of its own statement decoded by that statement's own result Schema.
 import { describe, expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
+import * as Str from "effect/String"
 import * as SqlSchema from "effect/sql/SqlSchema"
 import { D1, NoRows } from "@beep/d1/D1"
 import { D1Error } from "@beep/d1/D1Error"
@@ -19,14 +22,26 @@ const Database = D1Test.layer(
 )
 
 const NoteId = S.String.check(S.isMinLength(1)).pipe(S.brand("NoteId"))
+// A note's text as a statement binds it: at most 200 characters, so a request can be refused before any SQL runs.
+const Body = S.String.check(S.isMaxLength(200))
 const Note = S.Struct({ id: NoteId, body: S.String, tag: S.String })
+
+/**
+ * What a statement of a drawn batch does: a write that answers nothing, a write that answers the id it wrote, or a read
+ * of how many of the batch's notes there are so far. Each answers through a result Schema of its own.
+ */
+const Step = S.Literals(["write", "returning", "count"])
+type Step = typeof Step.Type
+
+/** The tag the drawn batches write with, so a count reads only their notes, and each run can clear them. */
+const batched = "batched"
 
 layer(Database)("D1", (it) => {
   const sql = SqlClient.SqlClient.pipe(Effect.map((client) => client))
 
   const insert = Effect.map(sql, (client) =>
     D1.statement({
-      Request: S.Struct({ id: NoteId, body: S.String }),
+      Request: S.Struct({ id: NoteId, body: Body }),
       Result: NoRows,
       execute: (r) => client`INSERT INTO note (id, body) VALUES (${r.id}, ${r.body})`
     })
@@ -91,6 +106,55 @@ layer(Database)("D1", (it) => {
       })
     )
 
+    it.effect.prop(
+      "answers each statement of a batch with its own rows, decoded by its own result Schema, in order",
+      [Arbitrary.array(Arbitrary.schema(Step), { minLength: 1, maxLength: 6 })],
+      ([steps]) =>
+        Effect.gen(function* () {
+          const d1 = yield* D1
+          const client = yield* sql
+          yield* client`DELETE FROM note WHERE tag = ${batched}`
+          const write = D1.statement({
+            Request: S.Struct({ id: NoteId }),
+            Result: NoRows,
+            execute: (r) => client`INSERT INTO note (id, body, tag) VALUES (${r.id}, 'Batched', ${batched})`
+          })
+          const returning = D1.statement({
+            Request: S.Struct({ id: NoteId }),
+            Result: S.Array(S.Struct({ id: NoteId })),
+            execute: (r) =>
+              client`INSERT INTO note (id, body, tag) VALUES (${r.id}, 'Batched', ${batched}) RETURNING id`
+          })
+          const count = D1.statement({
+            Request: S.Void,
+            Result: S.Array(S.Struct({ notes: S.Int })),
+            execute: () => client`SELECT count(*) AS notes FROM note WHERE tag = ${batched}`
+          })
+          const idOf = (index: number) => NoteId.make(`batched-${index}`)
+          const queries = A.map(steps, (step: Step, index) =>
+            step === "write"
+              ? write({ id: idOf(index) })
+              : step === "returning"
+                ? returning({ id: idOf(index) })
+                : count(undefined)
+          )
+          const answers = yield* d1.batch(queries)
+          // What each statement answers, from the steps alone: a count sees the writes before it in the batch.
+          const expected = A.map(steps, (step: Step, index) =>
+            step === "write"
+              ? []
+              : step === "returning"
+                ? [{ id: idOf(index) }]
+                : [{ notes: A.filter(A.take(steps, index), (before) => before !== "count").length }]
+          )
+          expect(answers).toEqual(expected)
+          yield* client`DELETE FROM note WHERE tag = ${batched}`
+        }),
+      // Each run is a real batch on a local D1: 30 of them cover the orders of three kinds of statement, and the
+      // timeout leaves room for a machine running every package's tests at once.
+      { timeout: 120_000, arbitrary: { runs: 30 } }
+    )
+
     it.effect("refuses a request its Schema refuses before any SQL runs, naming its place in the batch", () =>
       Effect.gen(function* () {
         const d1 = yield* D1
@@ -98,7 +162,7 @@ layer(Database)("D1", (it) => {
         const error = yield* Effect.flip(
           d1.batch([
             make({ id: NoteId.make("five"), body: "Fifth" }),
-            make({ id: "" as typeof NoteId.Type, body: "x" })
+            make({ id: NoteId.make("six"), body: Str.repeat(201)("x") })
           ])
         )
         expect(S.is(D1Error)(error)).toBe(true)

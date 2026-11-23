@@ -3,7 +3,7 @@
 // The one thing not to break: nothing here says how it is stored. The D1 adapter is in `catalog-host`.
 import * as A from "effect/Array"
 import * as S from "effect/Schema"
-import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
+import { ImportId, ConfirmId, ItemId, type UploadKey } from "@inventory/catalog-contract/Ids"
 import { Instant } from "@inventory/kernel/Text"
 import { StoredItem } from "@inventory/catalog-contract/Item"
 import { SavedDecisions, DecisionDelta } from "@inventory/catalog-contract/Decision"
@@ -30,13 +30,24 @@ import { type CompareAtMatch, ItemsAsRead } from "./Rematch.rules.ts"
 import { Activity } from "@inventory/kernel/Activity"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 
+/**
+ * Where a stored import stands: still open to review, imported by a confirm, or taken back after one. The same list
+ * as the contract's import status, so the stored column and the wire keep one set of words.
+ */
+export const DraftStatus = LiteralKit(["open", "imported", "takenBack"]).annotate({
+  identifier: "DraftStatus",
+  description: "Where a stored import stands: open, imported, or taken back"
+})
+/** The decoded value of `DraftStatus`. */
+export type DraftStatus = typeof DraftStatus.Type
+
 /** An import as stored, without its rows. */
 export const Draft = S.Struct({
   id: ImportId,
   fileName: S.String,
   headJson: S.String,
   rowCount: S.Int,
-  status: S.Literals(["open", "imported", "takenBack"]),
+  status: DraftStatus,
   actorName: S.String,
   createdAt: Instant,
   importedBy: S.OptionFromNullOr(S.String),
@@ -304,7 +315,12 @@ export type ComparedAt = { readonly revision: number; readonly saves: number }
  * What saving the column choices did: saved them, found them already so (nothing written), found the import closed,
  * or found it changing under every one of its `draftTries` tries (`busy`: nothing written).
  */
-export type ChoicesSaved = "saved" | "same" | "closed" | "busy"
+export const ChoicesSaved = LiteralKit(["saved", "same", "closed", "busy"]).annotate({
+  identifier: "ChoicesSaved",
+  description: "What saving the column choices did: saved, already so, the import closed, or always changing"
+})
+/** The decoded value of `ChoicesSaved`. */
+export type ChoicesSaved = typeof ChoicesSaved.Type
 
 /**
  * How many times a request worked out against a draft as read is tried before it gives up with nothing written: a
@@ -340,7 +356,7 @@ export class ImportStore extends Context.Service<
      */
     beginUpload(
       actor: Member,
-      key: string,
+      key: UploadKey,
       head: StagedHead,
       counts: { readonly rowCount: number; readonly chunkCount: number }
     ): Effect.Effect<Result.Result<ImportId, FileProblem>>

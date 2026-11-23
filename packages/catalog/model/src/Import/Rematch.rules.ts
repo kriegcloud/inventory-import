@@ -5,11 +5,13 @@
 // confirm that was on its way, and the two stores agree.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as Struct from "effect/Struct"
 import { ItemId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { type MatchTakeBack, takenBackRowsNamed } from "@inventory/catalog-contract/Import"
 import { type Field, fields, type StagedHead, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -24,7 +26,7 @@ import {
   type StaleAccept,
   StoredChoice,
   storedUndecided,
-  type TakenBackKind
+  TakenBackKind
 } from "@inventory/catalog-contract/Decision"
 import { type ItemFields, skuKey } from "@inventory/catalog-contract/Item"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
@@ -521,6 +523,12 @@ export const stillAsRead =
 /** One question to the file's review, and whether one try of a request found the row's comparison changed. */
 export type Answered = { readonly question: ComparisonQuestion; readonly changed: boolean }
 
+/** Whether two decisions on a row say the same thing, field for field: the one comparison every caller uses. */
+export const sameDecision: {
+  (that: RowDecision): (self: RowDecision) => boolean
+  (self: RowDecision, that: RowDecision): boolean
+} = dual(2, S.toEquivalence(RowDecision))
+
 // The same making of the same decision, asked about the same fields. Not the revision its columns are looked up on: a
 // match judges every stored decision as made on the revision it read, which a save on any other row moves between two
 // tries. A decision made again in between, even to the same choice, was made on what the row compares with by then: it
@@ -530,7 +538,7 @@ const sameQuestion = (a: ComparisonQuestion, b: ComparisonQuestion): boolean =>
   a.decided === b.decided &&
   a.fields.length === b.fields.length &&
   A.every(a.fields, ({ field }, index) => field === b.fields[index]?.field) &&
-  S.toEquivalence(RowDecision)(a.then, b.then)
+  sameDecision(a.then, b.then)
 
 /**
  * The review's answer to one try of a request (a match, a save or a confirm worked out again because something it read
@@ -573,17 +581,16 @@ export const answeredAcrossTries = (input: {
 
 // Which columns a try was asked with: what every field reads, and every move that led there. Never the revisions, which
 // a save on any row moves.
-type ColumnsAsked = {
-  readonly reads: ReadonlyArray<number | null>
-  readonly moves: ReadonlyArray<Pick<ColumnMove, "field" | "was" | "column">>
-}
-const sameColumns = (a: ColumnsAsked, b: ColumnsAsked): boolean =>
-  a.moves.length === b.moves.length &&
-  A.every(a.reads, (column, index) => column === b.reads[index]) &&
-  A.every(a.moves, (move, index) => {
-    const other = b.moves[index]
-    return other !== undefined && move.field === other.field && move.was === other.was && move.column === other.column
+const ColumnsAsked = S.Struct({
+  reads: S.Int.pipe(S.NullOr, S.Array).annotateKey({
+    description: "The column every field reads, in the fields' order"
+  }),
+  moves: S.Array(ColumnMove.mapFields(Struct.pick(["field", "was", "column"]))).annotateKey({
+    description: "Every move that led there: the field, the column it read before and the one it reads now"
   })
+}).annotate({ description: "The columns a try was asked with" })
+type ColumnsAsked = typeof ColumnsAsked.Type
+const sameColumns = S.toEquivalence(ColumnsAsked)
 
 /** A request's earlier tries, held: what they answered, and the columns they were asked with. */
 export type HeldTries = { readonly columns: ColumnsAsked; readonly answered: ReadonlyArray<Answered> }
@@ -644,7 +651,7 @@ const placeInFile = (rowId: string): readonly [number, number] => {
   return found === null ? [Number.MAX_SAFE_INTEGER, 0] : [Number(found[1] ?? "0"), Number(found[2] ?? "0")]
 }
 const fileOrder: Order.Order<string> = Order.mapInput(Order.Tuple([Order.Number, Order.Number]), placeInFile)
-const kindOrder: ReadonlyArray<TakenBackKind> = ["accept", "stored", "twin", "undo"]
+const kindOrder = TakenBackKind.literals
 const indexIn = <A>(list: ReadonlyArray<A>, value: A): number =>
   O.getOrElse(
     A.findFirstIndex(list, (candidate) => candidate === value),
@@ -817,9 +824,8 @@ export const planMatch = Effect.fnUntraced(function* (input: {
     questions.length === 0 ? O.none() : yield* Effect.asSome(input.compare({ choices, moves, questions }))
   const changed = O.match(compared, { onNone: () => [], onSome: (answer) => answer.changed })
   const { applied, notApplied } = withoutStaleDecisions({ choices, moves, madeOn, set: input.decisions, changed })
-  const same = S.toEquivalence(RowDecision)
   const rewrites = R.filter(applied, (decision, rowId) =>
-    O.match(R.get(input.decisions, rowId), { onNone: () => true, onSome: (old) => !same(old, decision) })
+    O.match(R.get(input.decisions, rowId), { onNone: () => true, onSome: (old) => !sameDecision(old, decision) })
   )
   const columnNow = columnsOf({ head: input.head, choices })
   const reads = (moved: Field): boolean => columnNow(moved) !== null

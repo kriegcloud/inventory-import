@@ -1,8 +1,8 @@
 // Stages a table the way the browser does, through the real upload endpoints: begin with the head, send every
 // chunk, finish. Tests that need an import to work on start here, so they exercise the one staging path there is.
 // Each step answers a StagingOutcome; these helpers turn a FileProblem into the test's failure, as the browser does.
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
-import * as MutableRef from "effect/MutableRef"
 import type * as HttpApiClient from "effect/http-api/HttpApiClient"
 import type { Api } from "../../../src/api/v1/Api.ts"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
@@ -10,9 +10,8 @@ import { uploadChunks } from "@inventory/catalog-model/Upload"
 import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 type Client = HttpApiClient.ForApi<typeof Api>
 
-// Each upload a test starts gets its own key, as each file the browser starts to send does.
-const started = MutableRef.make(0)
-const nextKey = Effect.sync(() => UploadKey.make(`test-upload-${MutableRef.incrementAndGet(started)}`))
+// Each upload a test starts gets its own key, a fresh version 4 UUID, as each file the browser starts to send does.
+const nextKey = Effect.sync(() => UploadKey.make(SecureRandom.uuidV4Unsafe()))
 
 /**
  * Begins an upload of `table` and sends no rows. Returns the upload id, the chunks to send and the key it began with;

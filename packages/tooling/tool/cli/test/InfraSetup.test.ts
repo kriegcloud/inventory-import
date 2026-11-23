@@ -70,52 +70,55 @@ const opHeldSaid = "[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, 
 /** A value no line of output and no argument may ever hold. */
 const secret = "sk-live-do-not-print"
 
+// The stand-in's world: what its tools read and change. Four fields are written again by a tool that changes
+// them (a login, a profile, a variable, a list that fails after a while), so they stay writable, and this file is on
+// the readonly law's list until the stand-in keeps them in a reference of its own.
 interface World {
-  terminal: boolean
+  readonly terminal: boolean
   cloudflare: boolean
-  accounts: ReadonlyArray<{ readonly id: string; readonly name: string }>
+  readonly accounts: ReadonlyArray<{ readonly id: string; readonly name: string }>
   /** Each Alchemy profile with what it is connected to, as `profile list` prints it. */
   profiles: Record<string, string>
-  vaults: ReadonlyArray<{ readonly id: string; readonly name: string }>
-  items: Array<{ id: string; title: string; additional_information: string }>
+  readonly vaults: ReadonlyArray<{ readonly id: string; readonly name: string }>
+  readonly items: Array<{ id: string; title: string; additional_information: string }>
   github: O.Option<string>
   /** The id of the account that holds production's zone, when cf can tell. */
-  zone: O.Option<string>
+  readonly zone: O.Option<string>
   /** Whether cf's answer gives the zone's account a name: Cloudflare's published schema makes it optional. */
-  zoneNamed: boolean
+  readonly zoneNamed: boolean
   /** cf's error words when the zone listing fails. */
-  zoneFails: O.Option<string>
+  readonly zoneFails: O.Option<string>
   /** What a failing `op-human vault list` writes, when it fails with no op line of its own. */
-  vaultsFail: O.Option<string>
+  readonly vaultsFail: O.Option<string>
   /** How many `alchemy profile list` calls answer before the listing fails; each call counts. */
   listFailsAfter: number
   /** The account each profile ends up connected to when Alchemy's own login is used. */
-  connects: Record<string, string>
+  readonly connects: Record<string, string>
   /** The account the owner's own token belongs to. */
-  tokenAccount: string
+  readonly tokenAccount: string
   /** Production's sign-up list as GitHub's production environment holds it, when it holds one. */
-  signUpOnGitHub: O.Option<string>
+  readonly signUpOnGitHub: O.Option<string>
   /** The second account's token: whether it verifies, and what it allows (none when it may not say). */
-  token: { active: boolean; allows: O.Option<ReadonlyArray<string>> }
+  readonly token: { active: boolean; allows: O.Option<ReadonlyArray<string>> }
   /** What `op-human run` exits with when 1Password itself does not answer (locked, declined). */
-  opFails: O.Option<number>
+  readonly opFails: O.Option<number>
   /** Part of the `op-human` calls 1Password's app does not answer: each fails with op's own error line. */
-  opDown: O.Option<string>
+  readonly opDown: O.Option<string>
   /** Part of the `op-human` calls 1Password answers and refuses: the reference names no item. */
-  opRefuses: O.Option<string>
+  readonly opRefuses: O.Option<string>
   /** Part of the `op-human` calls 1Password holds back: the app is locked or its prompt was dismissed. */
-  opHeld: O.Option<string>
+  readonly opHeld: O.Option<string>
   /** What a failing `op-human item create` writes. */
-  createFails: O.Option<string>
+  readonly createFails: O.Option<string>
   /** What `cf accounts tokens verify` answers in place of its usual answer: an API error, or something unreadable. */
-  verifyRaw: O.Option<Answer>
+  readonly verifyRaw: O.Option<Answer>
   /** Cloudflare's error code for the previews' workers.dev subdomain; none when the account has one. */
-  subdomainError: O.Option<number>
+  readonly subdomainError: O.Option<number>
   /** His answer to a yes-or-no question. */
-  yes: (question: string) => boolean
+  readonly yes: (question: string) => boolean
   /** What a tool handed the terminal exits with. */
-  exits: (line: string) => number
-  log: Array<string>
+  readonly exits: (line: string) => number
+  readonly log: Array<string>
 }
 
 const world = (over: Partial<World> = {}): World => ({
@@ -1883,6 +1886,17 @@ describe("infra setup: failures named for what failed", () => {
         expect(
           onePasswordFailure(
             "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Benjamin's vault/i/f': authorization timeout"
+          )
+        ).toBe("held")
+        // Nor inside a reference, where an apostrophe may be followed by a space.
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Ops' timeout tokens/i/f': no item matched"
+          )
+        ).toBe("refused")
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Ops' vault/i/f': authorization timeout"
           )
         ).toBe("held")
         // An apostrophe and a space inside a double-quoted name do not end it either.

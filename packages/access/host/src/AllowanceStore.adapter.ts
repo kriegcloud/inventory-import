@@ -5,19 +5,35 @@
  * @packageDocumentation
  */
 import { D1 } from "@beep/d1/D1"
+import { D1Instant } from "@beep/d1/D1Instant"
+import { windowStart } from "@inventory/access-model/AllowanceRules"
 import { AllowanceStore, Reservation } from "@inventory/access-model/AllowanceStore"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as SqlClient from "effect/sql/SqlClient"
+import * as Struct from "effect/Struct"
 
-/** A reservation as the statement binds it: its two moments as the ISO text the `modelCall` table holds. */
-const ReservationRow = S.Struct({
-  ...Reservation.fields,
-  at: S.DateTimeUtcFromString,
-  since: S.DateTimeUtcFromString
-}).annotate({ description: "A reservation as the modelCall statement binds it" })
+const reservationFields = { ...Reservation.fields, at: D1Instant }
+
+/**
+ * A reservation as the statement binds it: its moment, and the start of the window it is counted in, as the ISO text
+ * the `modelCall` table holds. The window is never given: it is worked out from the moment as the row is bound
+ * (`windowStart`), so the statement counts exactly the 24 hours before the call.
+ */
+export const ReservationRow = S.Struct({ ...reservationFields, since: D1Instant })
+  .pipe(
+    S.decodeTo(
+      S.toType(S.Struct(reservationFields)),
+      SchemaTransformation.transform({
+        decode: Struct.omit(["since"]),
+        encode: (reservation) => ({ ...reservation, since: windowStart(reservation.at) })
+      })
+    )
+  )
+  .annotate({ description: "A reservation as the modelCall statement binds it, with the window it is counted in" })
 
 /**
  * `AllowanceStore` over the `modelCall` table.

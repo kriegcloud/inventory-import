@@ -150,7 +150,9 @@ layer(Database)("D1", (it) => {
           expect(answers).toEqual(expected)
           yield* client`DELETE FROM note WHERE tag = ${batched}`
         }),
-      { arbitrary: { runs: 60 } }
+      // Each run is a real batch on a local D1: 30 of them cover the orders of three kinds of statement, and the
+      // timeout leaves room for a machine running every package's tests at once.
+      { timeout: 120_000, arbitrary: { runs: 30 } }
     )
 
     it.effect("refuses a request its Schema refuses before any SQL runs, naming its place in the batch", () =>

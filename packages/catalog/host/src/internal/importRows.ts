@@ -3,9 +3,13 @@
 // `D1Instant`, so `createdAt < before` in SQL is a comparison in time, and every id is the brand the row holds.
 import { D1Instant } from "@beep/d1/D1Instant"
 import { ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
+import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
 import { StagedHead } from "@inventory/catalog-contract/Staged"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as Struct from "effect/Struct"
+import { piece } from "./pieces.ts"
 
 /** The staged file's head, as `importUpload.headJson` and `importDraft.headJson` hold it. */
 export const HeadJson = S.fromJsonString(StagedHead)
@@ -35,3 +39,41 @@ export const UploadInsert = S.Struct({
 export const AbandonedBefore = S.Struct({ org: OrganizationId, before: D1Instant }).annotate({
   description: "The moment before which an organization's unfinished uploads are deleted"
 })
+
+/** The number of a row of the file, from 1: the range `RowId` names. */
+export const RowNumber = S.Int.check(S.isBetween({ minimum: 1, maximum: 9_999_999 })).annotate({
+  description: "The number of a row of the file, from 1"
+})
+
+/** Which item of its row an item is: 0 for a row that is one item, else its part from 1, the range `RowId` names. */
+export const Part = S.Int.check(S.isBetween({ minimum: 0, maximum: 9_999 })).annotate({
+  description: "0 for a row that is one item, else which of its row's items, from 1"
+})
+
+const itemInsertFields = {
+  ...ItemFields.fields,
+  // A replace names its stored item by key, so its rows travel with no id of their own (""): an `ItemId` would
+  // refuse them.
+  id: S.String,
+  rowNumber: RowNumber,
+  part: Part
+}
+
+/**
+ * An item a confirm writes, as the JSON one statement reads with json_each. Its `skuKey` is never given: it is
+ * worked out from the SKU as the row is written, so the unique index compares the key the import compared.
+ */
+export const ItemInsert = S.Struct({ ...itemInsertFields, skuKey: S.String })
+  .pipe(
+    S.decodeTo(
+      S.toType(S.Struct(itemInsertFields)),
+      SchemaTransformation.transform({
+        decode: Struct.omit(["skuKey"]),
+        encode: (item) => ({ ...item, skuKey: skuKey(item) })
+      })
+    )
+  )
+  .annotate({ description: "An item a confirm writes, with the key its SKU is unique by" })
+
+/** The items one confirm statement writes: a JSON array of one item or more, each with its key. */
+export const ItemsPiece = piece(ItemInsert).annotate({ description: "Items a confirm writes, as one bound value" })

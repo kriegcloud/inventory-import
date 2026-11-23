@@ -19,7 +19,8 @@
     "./ModelAllowance": "./src/ModelAllowance.adapter.ts",
     "./AuditLine": "./src/internal/auditLine.ts",
     "./CatalogTest": "./src/CatalogTest.test-layer.ts",
-    "./ImportRows": "./src/internal/importRows.ts"
+    "./ImportRows": "./src/internal/importRows.ts",
+    "./Pieces": "./src/internal/pieces.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

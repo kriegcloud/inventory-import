@@ -2,6 +2,7 @@
 // every one of them, in the form's order, and nothing for a field that is fine.
 import { it } from "@effect/vitest"
 import * as A from "effect/Array"
+import { pipe } from "effect/Function"
 import * as S from "effect/Schema"
 import { expect } from "vitest"
 import { formProblems, problemOf } from "../../src/web/lib/form.ts"
@@ -20,6 +21,9 @@ it.prop(
       cost: checks.cost ?? undefined
     })
     expect(A.map(problems, (problem) => problem.field)).toEqual(A.filter(fields, (field) => checks[field] !== null))
-    for (const field of fields) expect(problemOf(problems, field)).toBe(checks[field] ?? undefined)
+    for (const field of fields) {
+      expect(problemOf(problems, field)).toBe(checks[field] ?? undefined)
+      expect(pipe(problems, problemOf(field))).toBe(checks[field] ?? undefined)
+    }
   }
 )

@@ -111,7 +111,7 @@ describe("laws diagnostics", () => {
         inRepository()
       )
       expect(gone).toContain(
-        `err: packages/x/src/gone.ts  is in ${diagnosticsLedger} but is not there: take its line off, so a new file at its path inherits nothing`
+        `err: packages/x/src/gone.ts  is in ${diagnosticsLedger} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off, so a new file at its path inherits nothing`
       )
     })
   )

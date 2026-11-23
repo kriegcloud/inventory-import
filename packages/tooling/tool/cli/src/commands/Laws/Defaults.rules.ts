@@ -25,8 +25,8 @@
  *
  * Given files, it parses only those and leaves the baseline's comparison to the run over the whole tree: git's lists
  * still cover the tree, but the run takes under half a second, most of it starting bun, so the same law can answer the
- * moment a file is edited (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places said are the ones its
- * committed version does not have, so the line just written is the line named.
+ * moment a file is edited (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places
+ * said are the ones its committed version does not have, so the line just written is the line named.
  *
  * Left alone: the vendored kit and components, `.agents`, the scratchpad and `packages/tooling` (this package reads
  * arguments and files, not the business's data).
@@ -273,8 +273,8 @@ const scopeOf = (listed: ReadonlyArray<string>, vendored: ReadonlyArray<string>)
 /**
  * The files the law read at `commit`, or what git said when it could not list them: every file the commit holds,
  * empty ones too (an empty `vendor.json` still marks a kit), as a difference from the empty tree, which takes the same
- * pathspecs as `git ls-files`. Any code but 0 is a list git could not give, never an empty one. Without colour and
- * with paths from the root, whatever the user's git configuration says.
+ * pathspecs as `git ls-files`. Any code but 0 is a list git could not give, never an empty one. `--name-only` prints
+ * no colour and the run is from the root, so `--no-color` and `--no-relative` only spell that out.
  */
 const readScope = Effect.fn("Defaults.readScope")(function* (commit: string) {
   const repo = yield* Repo
@@ -348,7 +348,7 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
     Said.make({
       said: O.match(R.get(movedTo, file), {
         onNone: () =>
-          `${file}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`,
+          `${file}  is in ${baselineFile} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`,
         onSome: (to) =>
           `${file}  is in ${baselineFile} but was renamed to ${to}: bun run beep laws defaults --write moves its line`
       }),
@@ -521,8 +521,9 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
           DefaultsFinding.cases.Over.make({ file: one.file, kind, now, may, test: isTest(one.file) })
         )
       })
-      // A move whose old name the law lists a file at again lends it nothing, and the reader is told why, while git
-      // still sees the move (once both are committed it sees a new file, and nothing is lent either).
+      // A move whose old name the law lists a file at again lends it nothing, and the reader is told why while git sees
+      // the move (once the file at the old name is staged it sees a changed file and a new one, and lends nothing
+      // either). A moved file with a line of its own is held to that line, and the move is not what it is over.
       const retaken = O.filter(R.get(base.retaken, one.file), () => !R.has(baseline, one.file))
       return O.match(retaken, {
         onNone: () => overs,

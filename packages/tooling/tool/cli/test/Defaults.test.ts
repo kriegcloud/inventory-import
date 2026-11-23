@@ -264,7 +264,7 @@ describe("against main", () => {
           left,
           (line) =>
             line ===
-            `err: ${gone}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+            `err: ${gone}  is in ${baselineFile} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
         ),
         true
       )
@@ -308,7 +308,7 @@ describe("against main", () => {
       strictEqual(
         A.contains(
           declared,
-          `err: ${held}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+          `err: ${held}  is in ${baselineFile} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
         ),
         true
       )
@@ -664,7 +664,7 @@ describe("what git lists", () => {
       strictEqual(
         A.contains(
           said,
-          `err: ${stray}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+          `err: ${stray}  is in ${baselineFile} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
         ),
         true
       )
@@ -694,6 +694,90 @@ describe("what git lists", () => {
       )
       strictEqual(
         A.some(said, (line) => Str.startsWith(`err: ${moved}  holds 2 fallback, and may hold 0`)(line)),
+        true
+      )
+    })
+  )
+})
+
+describe("what git says of a move, and when it cannot say", () => {
+  const moved = "packages/a/src/moved.ts"
+
+  it.effect("follows a rename from a name git quotes", () =>
+    Effect.gen(function* () {
+      const quoted = "packages/a/src/café.ts"
+      const said = yield* inTree(
+        { [quoted]: twoFallbacks, [baselineFile]: baseline({ [quoted]: [2, 0, 0, 0] }) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", quoted, moved])
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [moved]: [2, 0, 0, 0] }))
+          const found = yield* defaults(false, [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      deepStrictEqual(said, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+    })
+  )
+
+  it.effect("does not blame the move for a moved file over a line of its own", () =>
+    Effect.gen(function* () {
+      const three = `${twoFallbacks}export const c = (z?: string) => z ?? ""\n`
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({ [held]: [2, 0, 0, 0] }) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, moved])
+          yield* repo.write(repo.join(repo.root, held), twoFallbacks)
+          yield* repo.write(repo.join(repo.root, moved), three)
+          yield* repo.write(
+            repo.join(repo.root, baselineFile),
+            baseline({ [held]: [2, 0, 0, 0], [moved]: [2, 0, 0, 0] })
+          )
+          const found = yield* defaults(false, [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.some(said, (line) => Str.startsWith(`err: ${moved}  holds 3 fallback, and may hold 2`)(line)),
+        true
+      )
+      strictEqual(
+        A.some(said, (line) => Str.startsWith(`err: ${moved}  was moved from`)(line)),
+        false
+      )
+    })
+  )
+
+  it.effect("refuses to compare when git cannot make the empty tree the base's files are listed from", () =>
+    Effect.gen(function* () {
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({}, ["??"]) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [held]: [2, 0, 0, 0] }))
+          const failing = Repo.of({
+            ...repo,
+            run: Effect.fn("failingHash")(function* (command, args, options) {
+              if (A.contains(args, "hash-object"))
+                return { bytes: new Uint8Array(), stdout: "", stderr: "hash broke", code: 128 }
+              return yield* repo.run(command, args, options)
+            })
+          })
+          const found = yield* Effect.provideService(defaults(false, []), Repo, failing)
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.contains(
+          said,
+          `err: ${baselineFile} could not be compared with main: git could not list the files at the base (hash broke)`
+        ),
         true
       )
     })

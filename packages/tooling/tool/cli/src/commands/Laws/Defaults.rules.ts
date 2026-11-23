@@ -4,28 +4,32 @@
  * fallback written at a call site is a rule nobody can find, and two call sites can disagree about it.
  *
  * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`,
- * `??=`), a comparison with `null` or `undefined`, an Option turned back into a missing value (`getOrUndefined`,
+ * `??=`, `||` and `||=` before a value written out, `getOrElse`), a comparison with `null` or `undefined`, an Option turned back into a missing value (`getOrUndefined`,
  * `getOrNull`), and a trim or a change of case that is not `SchemaGetter`'s or `SchemaTransformation`'s. The law does
  * not judge whether a place is "really" a default: a law that judges is argued with, and one that reads types costs
  * the whole program on every run.
  *
- * The tree had about 2,700 such places when the law was written, so it holds a baseline (`defaults-baseline.json` at
+ * The tree had about 2,000 such places when the law was written (`getOrElse` and `||` were counted a commit later,
+ * with a baseline written anew, since without them a refused `x ?? 0` was written again as `O.getOrElse(x, () => 0)`), so it holds a baseline (`defaults-baseline.json` at
  * the root): for each file, how many of each kind it may hold. A file with more than its baseline fails, and a file
  * the baseline does not name may hold none. A file with fewer never fails: `--write` lowers the baseline to what the
  * tree holds, and never raises it (the first one, with no baseline file yet, records the tree as it stands). So nobody is asked to clean a file to finish other work, nobody can add a place,
- * and the numbers only fall. The law is done when the baseline is empty and is deleted.
+ * and the numbers only fall. A run over the whole tree also holds the baseline against main's, as the bans hold their
+ * ledgers (`internal/ledger.ts`): a file main's does not name, or a count above main's, is refused, so a commit that
+ * raises the baseline beside the code cannot pass. The law is done when the baseline is empty and is deleted.
  *
  * Given files, it reads only those: a few milliseconds, so the same law can answer the moment a file is edited
  * (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places said are the ones its
  * committed version does not have, so the line just written is the line named.
  *
  * Left alone: the vendored kit and components, `.agents`, the scratchpad and `packages/tooling` (this package reads
- * arguments and files, not the business's data; this law's own files hold to it anyway).
+ * arguments and files, not the business's data).
  */
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -33,6 +37,7 @@ import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { DefaultsKind, type DefaultsPlace, readDefaults } from "./internal/defaultsCode.ts"
+import { atBase } from "./internal/ledger.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Defaults.rules")
 
@@ -110,7 +115,14 @@ export const DefaultsFinding = S.TaggedUnion({
   Below: { files: S.Int.pipe(S.annotateKey({ description: "How many files hold fewer places than their baseline" })) },
   Wrote: { files: S.Int.pipe(S.annotateKey({ description: "How many files the baseline names now" })) },
   NoWrite: {},
-  Refused: {},
+  Refused: {
+    broken: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a file holds too many places, or only the baseline or git's list fails" })
+    )
+  },
+  Ledger: {
+    said: S.String.pipe(S.annotateKey({ description: "What the baseline says against main's" }))
+  },
   Unlisted: { why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" })) },
   Unread: {
     file: S.String.pipe(S.annotateKey({ description: "The file the parser refused" })),
@@ -139,7 +151,7 @@ export type DefaultsFinding = typeof DefaultsFinding.Type
 /** What to write instead, for each kind: the line an agent reads the moment it wrote the place. */
 const remedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
-    "a `??` supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters (SF-5)",
+    "a `??`, a `||` before a value, or a getOrElse supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
   absence:
     "a comparison with null or undefined. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
   unwrap:
@@ -150,14 +162,14 @@ const remedy: Readonly<Record<DefaultsKind, string>> = {
 const testRemedy: Readonly<Record<DefaultsKind, string>> = {
   ...remedy,
   fallback:
-    "a `??` in a test hides a value that is missing. Narrow with assertSome, assertDefined or assertSuccess from @effect/vitest/utils, which fail with the value",
+    "a `??` or a getOrElse in a test hides a value that is missing. Narrow with assertSome, assertDefined or assertSuccess from @effect/vitest/utils, which fail with the value",
   absence:
     "a comparison with null or undefined in a test. Narrow with assertSome, assertNone or assertDefined from @effect/vitest/utils"
 }
 
 /** One line of the code at a place: its first line, cut where a longer one would fill the screen. */
 const shown = (code: string): string => {
-  const first = O.getOrElse(A.head(Str.split("\n")(code)), () => "")
+  const first = A.headNonEmpty(Str.split("\n")(code))
   return first.length > 80 ? `${Str.slice(0, 77)(first)}...` : first
 }
 
@@ -179,10 +191,13 @@ export const defaultsSentence: (finding: DefaultsFinding) => Line = DefaultsFind
   Wrote: ({ files }) => out(`defaults:check OK  ${baselineFile} lowered: it names ${files} files`),
   NoWrite: () =>
     err(`--write lowers the baseline for the whole tree and takes no file, and never raises it: nothing was written`),
-  Refused: () =>
-    err(
-      `defaults:check FAIL  code that settles absence, a starting value or a clean-up by itself. A schema settles it, where the value enters (docs/standards/schema-first.md):`
-    ),
+  Refused: ({ broken }) =>
+    broken
+      ? err(
+          `defaults:check FAIL  code that settles absence, a starting value or a clean-up by itself. A schema settles it, where the value enters (docs/standards/schema-first.md):`
+        )
+      : err(`defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`),
+  Ledger: ({ said }) => err(said),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   Unread: ({ file, why }) => err(`${file}  not read: ${why}`),
   Over: ({ file, kind, may, now, test }) =>
@@ -215,6 +230,55 @@ const added = (
 
 const encodeKey = S.encodeEffect(S.fromJsonString(S.String))
 
+const BaselineJson = S.fromJsonString(DefaultsBaseline)
+
+/**
+ * What the baseline says against the files there are and against main's (where this branch left it; on a push, the
+ * commit CI names): each file it names that is not there, so a new file at that path inherits no allowance (unless
+ * `--write` is about to take its line off); each file main's does not name, under the name it had there; and each
+ * count above main's. Main with no baseline yet is not compared.
+ */
+const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBaseline["files"], write: boolean) {
+  const repo = yield* Repo
+  const gone = write
+    ? []
+    : yield* Effect.filter(
+        A.sort(R.keys(now), Order.String),
+        (file) => Effect.map(repo.exists(repo.join(repo.root, file)), (there) => !there),
+        { concurrency: 1 }
+      )
+  const missing = A.map(
+    gone,
+    (file) =>
+      `${file}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+  )
+  const base = yield* atBase(baselineFile)
+  if (O.isSome(base.problem)) return A.append(missing, base.problem.value)
+  if (O.isNone(base.text)) return missing
+  const was = S.decodeOption(BaselineJson)(base.text.value)
+  if (O.isNone(was)) return A.append(missing, `${baselineFile} on main is not a baseline, so it could not be compared`)
+  const moved = A.flatMap(R.toEntries(now), ([file, counts]): ReadonlyArray<string> =>
+    O.match(
+      R.get(
+        was.value.files,
+        O.getOrElse(R.get(base.renamed, file), () => file)
+      ),
+      {
+        onNone: () => [
+          `${file}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`
+        ],
+        onSome: (may) =>
+          A.some(A.zip(counts, may), ([held, mainHolds]) => held > mainHolds)
+            ? [
+                `${file}  is held at [${A.join(A.map(counts, String), ", ")}] in ${baselineFile}, above the [${A.join(A.map(may, String), ", ")}] main holds it to: a number only falls`
+              ]
+            : []
+      }
+    )
+  )
+  return A.appendAll(missing, moved)
+})
+
 /**
  * Checks the files against the baseline, or with `write` lowers the baseline to what the tree holds.
  *
@@ -230,7 +294,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   // A list git could not give is not an empty list: nothing was checked, and the law says so.
   if (listed.code !== 0 || vendored.code !== 0) {
     return A.make<[DefaultsFinding, DefaultsFinding]>(
-      DefaultsFinding.cases.Refused.make({}),
+      DefaultsFinding.cases.Refused.make({ broken: false }),
       DefaultsFinding.cases.Unlisted.make({ why: listed.code !== 0 ? listed.stderr : vendored.stderr })
     )
   }
@@ -253,6 +317,8 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   const baselinePath = repo.join(repo.root, baselineFile)
   const kept = yield* repo.exists(baselinePath)
   const baseline = kept ? (yield* repo.json(DefaultsBaseline)(baselinePath)).files : {}
+  // Given files, the law answers an edit in milliseconds and leaves the baseline to the run over the whole tree.
+  const against = kept && A.isReadonlyArrayEmpty(only) ? yield* againstMain(baseline, write) : []
   const read = yield* Effect.forEach(
     files,
     (file) =>
@@ -297,9 +363,17 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
     }),
     { concurrency: 1 }
   )
-  const failures = A.appendAll(unread, A.flatten(problems))
-  if (A.isArrayNonEmpty(failures)) {
-    return A.prepend<DefaultsFinding, DefaultsFinding>(failures, DefaultsFinding.cases.Refused.make({}))
+  const places = A.flatten(problems)
+  const failures = A.flatten<ReadonlyArray<ReadonlyArray<DefaultsFinding>>>([
+    A.map(against, (said) => DefaultsFinding.cases.Ledger.make({ said })),
+    unread,
+    places
+  ])
+  if (A.isReadonlyArrayNonEmpty(failures)) {
+    return A.prepend<DefaultsFinding, DefaultsFinding>(
+      failures,
+      DefaultsFinding.cases.Refused.make({ broken: A.isReadonlyArrayNonEmpty(places) })
+    )
   }
   const holding = A.filter(counted, (one) => A.some(one.count, (count) => count > 0))
   if (write) {

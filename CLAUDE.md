@@ -236,7 +236,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), the Alchemy packages kept as files against their recorded hashes (`alchemy:check`; needs python3), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and a test of its own, for what is installed, and needed: its test fails with that one patch left out (`patches:check`, `patches:prove`), with every task that runs code waiting until what is installed holds the patches (`patches:installed`; `docs/patches.md`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), the Alchemy packages kept as files against their recorded hashes (`alchemy:check`; needs python3), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no file holding more fallbacks, comparisons with null or undefined or clean-ups outside a schema than its baseline allows, the baseline compared with main's so its numbers only fall (`defaults:check`), no type assertion (`assertions:check`), no Promise (`promises:check`), no `@effect-diagnostics` comment (`diagnostics:check`), every helper that names the value it acts on taking it first and `dual` (`dual:check`), every property `readonly` (`readonly:check`), every file of screens exporting components only (`fast-refresh:check`), each of those six with a ledger of today's files whose numbers only fall, compared with the ledger at the branch's base: where it left main, or on a push the last push whose run passed (`packages/tooling/tool/cli/ledgers/`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and a test of its own, for what is installed, and needed: its test fails with that one patch left out (`patches:check`, `patches:prove`), with every task that runs code waiting until what is installed holds the patches (`patches:installed`; `docs/patches.md`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs), the property that holds the model against the review region (`fold`: a minute and a half), a sample of the model's mutants (`mutants:sample`: under a minute), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in) and the production build. The model's tasks are replayed by turbo until what they read changes |
 | `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, the tasks of `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`.github/workflows/proofs-nightly.yml`; `bun run proofs:nightly` runs the same four tasks by hand with nothing replayed, with two differences: turbo starts the four at once on one machine, so the first mutants share it with the proofs, Verify's search and the fold, where the nightly runs those three in one job and the mutants on runners of their own; and every mutant runs in one task, two at a time, with `row-open` given 50 minutes beside another mutant where the nightly runs it alone with 100: `docs/verify.md`) |
@@ -507,10 +507,24 @@ profile, its copied tests included, with no override.
 
 **What fails the check.** Write to these from the start:
 
-- **Optional properties**: never pass `undefined` for an optional property. Spread it conditionally:
-  `...(x === undefined ? {} : { x })`.
-- **Indexing can miss**: `rows[0]` is `T | undefined`. Handle it.
-- **Conditions are booleans**: `if (name !== "")`, `if (value !== undefined)`, `if (row !== undefined)`. Not
+- **Absence, starting values and clean-ups are a schema's, never the code's** (`docs/standards/schema-first.md`, SF-3
+  to SF-5). A value that may be missing is an `Option`, decoded where it enters (`S.OptionFromOptionalKey`,
+  `S.OptionFromNullOr`, `S.OptionFromNullishOr`); a starting value is on the field (`S.withConstructorDefault`,
+  `S.withDecodingDefaultTypeKey`); a trim or a change of case is a transformation (`S.decodeTo` with
+  `SchemaTransformation` or `SchemaGetter`). A handler gets the type it works with from one decode at its boundary
+  and trusts it after that line. So our own code writes no `??`, no `||` before a value, no `getOrElse`, no comparison with `null` or `undefined`, no
+  `O.getOrUndefined` or `O.getOrNull`, and no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema.
+  `bun run check` counts them in every src and test folder against `defaults-baseline.json` (`defaults:check`): a file
+  may hold what the baseline names for it and no more, a file it does not name holds none, and the numbers only fall
+  (`bun run beep laws defaults --write` lowers them, never raises): over the whole tree the baseline is compared with
+  main's, as the bans' ledgers are, so a count raised or a file added in the same commit is refused. In a Claude Code session the same law reads each
+  file as it is edited and names the new line and what to write (`.claude/hooks/defaults.sh`). An old place in a file
+  you are changing is not yours to clean unless the task says so; a new one is refused.
+- **Optional properties**: never pass `undefined` for an optional property. In our own types there is none: the field
+  is an `Option`. Where another library's API has one, spread it from the Option:
+  `...O.match(x, { onNone: () => ({}), onSome: (x) => ({ x }) })`.
+- **Indexing can miss**: `rows[0]` is `T | undefined`. Take it as an Option: `A.head(rows)`, `A.get(rows, i)`.
+- **Conditions are booleans**: `if (name !== "")`, `if (count > 0)`, `if (O.isSome(row))`. Not
   `if (name)` or `if (row)`: a count of 0 is false.
 - **Every Effect runs**: an Effect that is built and not yielded, returned or assigned is an error (the work never
   happens). `return yield*` a failure; `yield*`, never a bare `yield`.
@@ -552,9 +566,13 @@ profile, its copied tests included, with no override.
 - **Fast by default.** A test that needs sign-in or a real database is slow: name it `*.slow.test.ts`, and write it
   only when the rule cannot be shown another way. `bun run check` runs the fast tests; `bun run check:full` runs all.
 - **Tests run in Node under the same Effect rules.** Read a sample file with
-  `import text from "../../public/samples/items_messy.csv?raw"`. `node:fs` fails `bun run check`; for a binary file (a PDF) make the
-  test file's first line `// @effect-diagnostics nodeBuiltinImport:off`, and return promises, no `async`. Provide
-  layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
+  `import text from "../../public/samples/items_messy.csv?raw"`. `node:fs` fails `bun run check`. A test that
+  reads a binary file (a PDF) is to read it without `node:fs` and without a diagnostics comment; no reader for that is
+  set up yet. The eight test files that read one through `node:fs` today do it under an `@effect-diagnostics` comment
+  held in `packages/tooling/tool/cli/ledgers/diagnostics.json`, and come off as they move. No new such comment is
+  written (`diagnostics:check` refuses one), and a test writes no Promise: for example no `async` function,
+  `await`, `new Promise`, `Promise.*` call or `.then` chain (`promises:check`; a Promise a call hands back without naming one
+  is caught only where its type is read). Provide layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
 
 In `src/web` the same compiler flags apply, but the rules that forbid native array methods, truthiness checks,
 `async` and browser globals are off. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect

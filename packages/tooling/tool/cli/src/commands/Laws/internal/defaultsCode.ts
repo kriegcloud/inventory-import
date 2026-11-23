@@ -1,6 +1,7 @@
 // The places one file settles absence, a starting value or a clean-up in its own code, read from its syntax tree and
 // from nothing else: no types, no flow, no judgement of what the code means. Four things are found, each by how it is
-// written: a fallback (`??`, `??=`), a comparison with `null` or `undefined`, an Option turned back into a missing
+// written: a fallback (`??`, `??=`, `||` and `||=` before a value written out, `getOrElse`),
+// a comparison with `null` or `undefined`, an Option turned back into a missing
 // value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not a schema's own
 // (`SchemaGetter.trim()`, `SchemaTransformation.toLowerCase()`). A pattern over the text would also take the words
 // out of a comment or a string, so the tree is read; the read is one parse and one walk, so a whole repository takes
@@ -67,16 +68,26 @@ const isTypeofMissing = (one: Node, other: Node): boolean =>
   O.exists(text(other, "value"), (value) => value === "undefined")
 
 const comparisons = ["===", "!==", "==", "!="]
+// `x || ""` is `x ?? ""` in older words. Told from a condition (`a || b`) by its right side being a value written out.
+const writtenOut = ["Literal", "TemplateLiteral", "ArrayExpression", "ObjectExpression"]
+const fallbacks = ["getOrElse"]
 const unwraps = ["getOrUndefined", "getOrNull"]
 const cleanUps = ["trim", "trimStart", "trimEnd", "toLowerCase", "toUpperCase"]
 // A schema's own clean-up is where the rule wants it.
 const schemaModules = ["SchemaGetter", "SchemaTransformation"]
 
 const kindOf = (node: Node): O.Option<DefaultsKind> => {
-  const operator = O.getOrElse(text(node, "operator"), () => "")
-  if (node.type === "LogicalExpression" && operator === "??") return O.some("fallback")
-  if (node.type === "AssignmentExpression" && operator === "??=") return O.some("fallback")
-  if (node.type === "BinaryExpression" && A.contains(comparisons, operator)) {
+  const operator = text(node, "operator")
+  const is = (written: string): boolean => O.exists(operator, (own) => own === written)
+  if (node.type === "LogicalExpression" && is("??")) return O.some("fallback")
+  if (node.type === "AssignmentExpression" && is("??=")) return O.some("fallback")
+  if (
+    ((node.type === "LogicalExpression" && is("||")) || (node.type === "AssignmentExpression" && is("||="))) &&
+    O.exists(child(node, "right"), (right) => A.contains(writtenOut, bare(right).type))
+  ) {
+    return O.some("fallback")
+  }
+  if (node.type === "BinaryExpression" && O.exists(operator, (own) => A.contains(comparisons, own))) {
     return O.flatMap(child(node, "left"), (left) =>
       O.flatMap(child(node, "right"), (right) => {
         const one = bare(left)
@@ -90,6 +101,7 @@ const kindOf = (node: Node): O.Option<DefaultsKind> => {
   if (node.type === "MemberExpression" && node["computed"] !== true) {
     return O.flatMap(child(node, "property"), (property) =>
       O.flatMap(text(property, "name"), (name) => {
+        if (A.contains(fallbacks, name)) return O.some<DefaultsKind>("fallback")
         if (A.contains(unwraps, name)) return O.some<DefaultsKind>("unwrap")
         const onSchema = O.exists(child(node, "object"), (object) =>
           A.some(schemaModules, (module) => named(object, module))

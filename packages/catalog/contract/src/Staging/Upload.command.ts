@@ -4,7 +4,7 @@ import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { UploadKey } from "../Catalog.id.ts"
-import { StagedHead, StagedRow } from "./Staged.read.ts"
+import { maxStagedRows, StagedHead, StagedRow } from "./Staged.read.ts"
 
 /** Rows in one piece of an upload, and in one stored chunk of an import: the two are the same chunks. */
 export const chunkRows = 500
@@ -49,8 +49,15 @@ export const UploadStart = S.Struct({
       "is the same upload, not a second one"
   }),
   head: StagedHead,
-  rowCount: S.Int.annotateKey({ description: "Data rows the pieces will carry in all", examples: [13] }),
-  chunkCount: S.Int.annotateKey({ description: "Pieces that will follow, numbered from 0", examples: [1] })
+  rowCount: S.Int.check(S.isBetween({ minimum: 1, maximum: maxStagedRows })).annotateKey({
+    description: `Data rows the pieces will carry in all: 1 to ${maxStagedRows}, the most an import stages`,
+    examples: [13]
+  }),
+  chunkCount: S.Int.check(S.isBetween({ minimum: 1, maximum: maxStagedRows })).annotateKey({
+    description:
+      "Pieces that will follow, numbered from 0: at least one, and never more than there are rows (each piece carries one at least)",
+    examples: [1]
+  })
 }).annotate({
   identifier: "UploadStart",
   description: "The start of an upload: the file without its rows, and how many rows will follow in how many pieces"
@@ -63,7 +70,7 @@ export type UploadStart = typeof UploadStart.Type
  * so a piece whose answer was lost on the network can simply be sent again.
  */
 export const UploadChunk = S.Struct({
-  seq: S.Int.check(S.isGreaterThanOrEqualTo(0)).annotateKey({
+  seq: S.Int.check(S.isBetween({ minimum: 0, maximum: maxStagedRows - 1 })).annotateKey({
     description: "The piece's place in the file, from 0: sending a piece again with the same number stores it once",
     examples: [0]
   }),

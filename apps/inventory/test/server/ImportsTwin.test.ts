@@ -51,6 +51,7 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         const saved = yield* client.imports.decide({
           params,
           payload: {
+            opening: 0,
             madeOn: { "row-55": staged.revision, "row-18": staged.revision },
             set: {
               "row-55": decisionFromFlags({ accepted: ["unitCost"] }),

@@ -72,7 +72,8 @@ const world = (id: ImportId, network: { down: boolean } = { down: false }, reads
         get: () => (reads ? Effect.sync(() => at({ revision: revision.now, decisions: { ...stored } })) : Effect.never),
         decide: (request: { readonly payload: SaveRequest }) =>
           Effect.suspend(() => {
-            const { madeOn: _madeOn, ...delta } = request.payload
+            // What it was made on, and in which opening, is left out: a test of the rows reads the rows.
+            const { madeOn: _madeOn, opening: _opening, ...delta } = request.payload
             saves.push(delta)
             // The server's own failure, as the API says it: the request was fine, so it may pass when sent again.
             if (network.down) return Effect.fail(HttpApiError.InternalServerErrorProblem.make({}))

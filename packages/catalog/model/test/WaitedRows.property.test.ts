@@ -202,6 +202,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
         .decide({
           params,
           payload: {
+            opening: 0,
             madeOn: { [step.row]: now.revision },
             set: { [step.row]: decisionFromFlags(picks[step.pick]) },
             clear: []
@@ -230,6 +231,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
         .decide({
           params,
           payload: {
+            opening: 0,
             madeOn: { [step.row]: screen.revision },
             set: { [step.row]: decision },
             clear: [],

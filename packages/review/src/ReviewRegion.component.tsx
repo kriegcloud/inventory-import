@@ -421,8 +421,8 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       : []),
     { id: "all", label: words.all, n: counts.total }
   ]
-  const lastStep = state.undo[state.undo.length - 1]
-  const nextRedo = state.redo[state.redo.length - 1]
+  const lastStep = A.last(state.undo)
+  const nextRedo = A.last(state.redo)
   const held = counts.needs + counts.cannot + counts.out + counts.stored
 
   const showAll = (
@@ -487,19 +487,25 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const undoButton = readOnly ? null : (
     <>
       <ToolButton
-        label={lastStep === undefined ? "Undo" : `Undo: ${lastStep.label}`}
-        tip={lastStep === undefined ? "Nothing to undo" : `Undo: ${lastStep.label.toLowerCase()} (${undoKeys})`}
+        label={O.match(lastStep, { onNone: () => "Undo", onSome: (step) => `Undo: ${step.label}` })}
+        tip={O.match(lastStep, {
+          onNone: () => "Nothing to undo",
+          onSome: (step) => `Undo: ${step.label.toLowerCase()} (${undoKeys})`
+        })}
         narrow={narrow}
-        disabled={lastStep === undefined}
+        disabled={O.isNone(lastStep)}
         onClick={() => run({ type: "undo" as const })}
       >
         <Undo2Icon aria-hidden />
       </ToolButton>
       <ToolButton
-        label={nextRedo === undefined ? "Redo" : `Redo: ${nextRedo.label}`}
-        tip={nextRedo === undefined ? "Nothing to redo" : `Redo: ${nextRedo.label.toLowerCase()} (${redoKeys})`}
+        label={O.match(nextRedo, { onNone: () => "Redo", onSome: (step) => `Redo: ${step.label}` })}
+        tip={O.match(nextRedo, {
+          onNone: () => "Nothing to redo",
+          onSome: (step) => `Redo: ${step.label.toLowerCase()} (${redoKeys})`
+        })}
         narrow={narrow}
-        disabled={nextRedo === undefined}
+        disabled={O.isNone(nextRedo)}
         onClick={() => run({ type: "redo" as const })}
       >
         <Redo2Icon aria-hidden />
@@ -1043,7 +1049,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                 progress={
                   filter === "cannot"
                     ? { total: counts.blocked, left: counts.blocked }
-                    : { total: opened?.decisions ?? left, left }
+                    : { total: O.match(openedOn, { onNone: () => left, onSome: (on) => on.decisions }), left }
                 }
                 onSplit={(groupId) => setSplit((before) => HashSet.add(before, groupId))}
                 undo={undoButton}

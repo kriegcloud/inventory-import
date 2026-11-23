@@ -28,11 +28,19 @@ export class ColumnNotFound extends S.TaggedError<ColumnNotFound, { readonly bra
   { description: "The column position in a match is not a column of the import's file", httpApiStatus: 404 }
 ) {}
 
-/** The import was already confirmed. A second confirm is refused instead of running again. */
+/**
+ * The import was already confirmed, or a save names another number of confirms than it has had. A second confirm is
+ * refused instead of running again; a save decided in another opening of the import is refused instead of landing in
+ * this one. `reason` says which, in the person's words.
+ */
 export class AlreadyImported extends S.TaggedError<AlreadyImported, { readonly brand: unique symbol }>()(
   "AlreadyImported",
   { reason: reasonForPerson },
-  { description: "The import was already confirmed: nothing was written", httpApiStatus: 409 }
+  {
+    description:
+      "The import was already confirmed, or the save's `opening` differs from the number of times it has been confirmed: nothing was written",
+    httpApiStatus: 409
+  }
 ) {}
 
 /**

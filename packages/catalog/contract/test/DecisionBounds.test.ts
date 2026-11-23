@@ -18,7 +18,7 @@ const confirm = S.decodeUnknownOption(ConfirmRequest)
 
 /** What a save, and a confirm, that says this of its rows is read as saying; none where it is refused. */
 const read = (madeOn: Readonly<Record<string, number>>) => [
-  O.map(save({ madeOn, set: {}, clear: [] }), (request) => request.madeOn),
+  O.map(save({ madeOn, opening: 0, set: {}, clear: [] }), (request) => request.madeOn),
   O.map(confirm({ revision: 1, madeOn, set: {}, clear: [] }), (request) => request.madeOn)
 ]
 const both = <A>(one: A) => [one, one]

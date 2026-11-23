@@ -62,7 +62,7 @@ import { offersSuggestions } from "@inventory/catalog-model/Suggest"
 const whole = new Intl.NumberFormat("en-US")
 
 /** The two cells that hold JSON are fixed in a form of their own, not as raw text in one box. */
-const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
+const cellEditor = (input: { readonly row: ReviewRow; readonly column: string; readonly value: string }) =>
   input.column === "dimensions"
     ? {
         label: "Fix dimensions",
@@ -115,7 +115,10 @@ const recheckOf = perKey((id: ImportId) =>
   Atom.readable((get) =>
     O.map(get(reviewInput(id)), (input) => {
       const check = recheckRow(input)
-      return (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined => {
+      return (asked: {
+        readonly row: ReviewRow
+        readonly cells: Readonly<Record<string, string>>
+      }): Problem | undefined => {
         const problem = check({ id: asked.row.id, values: asked.cells })
         // The check knows the typed values and not the keep-or-replace answer: once that is given, what is still open
         // is what the review of every decision says (the row's own problem).
@@ -146,12 +149,16 @@ const regionGiven = perKey((id: ImportId) =>
  * review of 50,000 rows takes the browser most of a second in one go: the skeleton is drawn first (a deferred value),
  * so the person sees what is coming instead of the last screen standing still.
  */
-export function ReviewStep(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
+export function ReviewStep(props: {
+  readonly view: ImportView
+  readonly table: StagedTable
+  readonly canImport: boolean
+}) {
   const painted = useDeferredValue(true, false)
   return painted ? <ReviewBody {...props} /> : <ReviewSkeleton title={`Review ${props.view.fileName}`} />
 }
 
-function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
+function ReviewBody(props: { readonly view: ImportView; readonly table: StagedTable; readonly canImport: boolean }) {
   const { view, table } = props
   const [local, setLocal] = useAtom(reviewLocal(view.id))
   const happened = useAtomSet(draftEvents(view.id))
@@ -166,7 +173,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // The person picked a file column for a field the headings left without one, from inside the review.
   const matching = useAtomValue(matchColumn).waiting
   const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
-  const match = (pick: { field: Field; column: number }, done?: () => void) => {
+  const match = (pick: { readonly field: Field; readonly column: number }, done?: () => void) => {
     // True between a match made on this screen and the new view it returns, so the update is not announced as
     // someone else's.
     happened(DraftEvent.MatchStarted())
@@ -355,7 +362,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
  * The review with the lines that stand above it, in the step's fixed height: however many lines there are, they scroll
  * in their own part of it and the review takes the rest, so Import never leaves the screen.
  */
-export function AboveReview(props: { lines: ReactNode; children: ReactNode }) {
+export function AboveReview(props: { readonly lines: ReactNode; readonly children: ReactNode }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="max-h-2/5 flex-none overflow-y-auto">{props.lines}</div>
@@ -369,7 +376,7 @@ export function AboveReview(props: { lines: ReactNode; children: ReactNode }) {
  * browser (or, where the browser refused, held by this page only, and said so), not on the server yet. It stays until
  * they are saved; the button sends them now.
  */
-function NotSavedYet(props: { id: ImportId; rows: number; onSaveAgain: () => void }) {
+function NotSavedYet(props: { readonly id: ImportId; readonly rows: number; readonly onSaveAgain: () => void }) {
   const narrow = useAtomValue(isNarrow)
   const notKept = useAtomValue(waitingNotKept(props.id))
   if (props.rows === 0) return null
@@ -415,7 +422,11 @@ const goThere = (line: HTMLElement | null): void => {
  * many at once. Nothing is sent, and nothing is imported, until they do; a press of Import says so and goes to the first
  * line. Only how many there are is read out as it changes.
  */
-function LinesAsking(props: { id: ImportId; canDecide: boolean; onSettle: (picks: ReadonlyArray<LinePick>) => void }) {
+function LinesAsking(props: {
+  readonly id: ImportId
+  readonly canDecide: boolean
+  readonly onSettle: (picks: ReadonlyArray<LinePick>) => void
+}) {
   const narrow = useAtomValue(isNarrow)
   const lines = useAtomValue(reviewLines(props.id))
   const stopped = useAtomValue(importStopped(props.id))
@@ -452,10 +463,10 @@ function LinesAsking(props: { id: ImportId; canDecide: boolean; onSettle: (picks
 
 /** The lines of one kind, the first few of them, with the presses that settle many. */
 function LinesOf(props: {
-  id: ImportId
-  group: LineGroup
-  stopped: number
-  onSettle: (picks: ReadonlyArray<LinePick>) => void
+  readonly id: ImportId
+  readonly group: LineGroup
+  readonly stopped: number
+  readonly onSettle: (picks: ReadonlyArray<LinePick>) => void
 }) {
   const { group, stopped } = props
   const [drawn, draw] = useAtom(linesShownOf(`${props.id}:${group.asked}`))
@@ -514,8 +525,8 @@ function LinesOf(props: {
  * line stays until the person dismisses it, or every row of it was decided again.
  */
 function MatchTakeBacks(props: {
-  taken: ReadonlyArray<{ readonly taken: MatchTakeBack; readonly text: string }>
-  onDismiss: (taken: MatchTakeBack) => void
+  readonly taken: ReadonlyArray<{ readonly taken: MatchTakeBack; readonly text: string }>
+  readonly onDismiss: (taken: MatchTakeBack) => void
 }) {
   const narrow = useAtomValue(isNarrow)
   if (!A.isReadonlyArrayNonEmpty(props.taken)) return null
@@ -553,7 +564,7 @@ function MatchTakeBacks(props: {
  * Said above the review when a confirm was not made because the import had changed on another screen: nothing was
  * imported, the review below already shows the import as it is now, and the person confirms again.
  */
-function NotImportedYet(props: { why: O.Option<HeldBack> }) {
+function NotImportedYet(props: { readonly why: O.Option<HeldBack> }) {
   const narrow = useAtomValue(isNarrow)
   if (O.isNone(props.why)) return null
   return (
@@ -571,7 +582,7 @@ function NotImportedYet(props: { why: O.Option<HeldBack> }) {
  * What the reader could not take at the file's word, said above the table before the person imports: each warning
  * in the sentence the reader wrote, with the cells or rows it names. Nothing here changes a row's outcome.
  */
-function ReaderWarnings(props: { table: Pick<StagedTable, "notes"> }) {
+function ReaderWarnings(props: { readonly table: Pick<StagedTable, "notes"> }) {
   const warnings = readerWarnings(props.table)
   // The same side room the review below takes, from the room the page has (the sidebar is already taken off).
   const narrow = useAtomValue(isNarrow)

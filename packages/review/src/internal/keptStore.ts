@@ -5,6 +5,7 @@
 // is in `refusedKeys`, so that a screen that would say a value is kept can say instead that it is not.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
@@ -18,8 +19,15 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry"
  */
 const lookup = (): Storage | undefined => O.getOrUndefined(O.liftThrowable(() => window.localStorage)())
 
-const refusal = (method: string, key: string, cause: unknown) =>
-  new KeyValueStore.KeyValueStoreError({ key, method, message: `The browser would not ${method} ${key}`, cause })
+/** What a refused call to the browser's storage becomes: the cause first, or the method and key first for a `catch`. */
+const refusal: {
+  (cause: unknown, method: string, key: string): KeyValueStore.KeyValueStoreError
+  (method: string, key: string): (cause: unknown) => KeyValueStore.KeyValueStoreError
+} = dual(
+  3,
+  (cause: unknown, method: string, key: string): KeyValueStore.KeyValueStoreError =>
+    new KeyValueStore.KeyValueStoreError({ key, method, message: `The browser would not ${method} ${key}`, cause })
+)
 
 // A value kept before values were kept as JSON is a bare word ("comfortable"): it is read as that word.
 const bareWord = /^(?!null$|true$|false$)[a-z]+$/
@@ -49,11 +57,11 @@ const store = (registry: AtomRegistry.AtomRegistry) => {
   const reading = <A>(method: string, key: string, read: (kept: Storage) => A, absent: A) =>
     storage === undefined
       ? Effect.succeed(absent)
-      : Effect.try({ try: () => read(storage), catch: (cause) => refusal(method, key, cause) })
+      : Effect.try({ try: () => read(storage), catch: refusal(method, key) })
   const writing = (method: string, key: string, write: (kept: Storage) => void) =>
     (storage === undefined
-      ? Effect.fail(refusal(method, key, "the browser gives no storage"))
-      : Effect.try({ try: () => write(storage), catch: (cause) => refusal(method, key, cause) })
+      ? Effect.fail(refusal("the browser gives no storage", method, key))
+      : Effect.try({ try: () => write(storage), catch: refusal(method, key) })
     ).pipe(
       Effect.tapError(() => known(key, true)),
       Effect.tap(() => known(key, false))

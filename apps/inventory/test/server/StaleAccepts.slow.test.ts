@@ -43,7 +43,7 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
           "row-18": decisionFromFlags({ reverted: ["uom"] })
         }
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: R.map(mine, () => staged.revision), set: mine, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: R.map(mine, () => staged.revision), set: mine, clear: [] } })
           .pipe(marcus)
         expect([saved.changed, saved.notApplied]).toEqual([
           true,
@@ -80,7 +80,7 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
         const again = yield* client.imports
           .decide({
             params,
-            payload: { madeOn: { "row-55": still.revision }, set: { "row-55": mine["row-55"] }, clear: [] }
+            payload: { opening: 0, madeOn: { "row-55": still.revision }, set: { "row-55": mine["row-55"] }, clear: [] }
           })
           .pipe(marcus)
         expect([again.changed, again.notApplied]).toEqual([true, []])

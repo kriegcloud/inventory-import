@@ -88,8 +88,8 @@ const world = (id: ImportId) => {
         decide: (request: { readonly payload: SaveRequest }) =>
           Effect.suspend(() => {
             const answer = Deferred.makeUnsafe<Saved, Refusal>()
-            // What it was made on is kept beside the rows, so a test of the rows reads the rows.
-            const { madeOn, ...delta } = request.payload
+            // What it was made on is kept beside the rows, so a test of the rows reads the rows (the opening too).
+            const { madeOn, opening: _opening, ...delta } = request.payload
             saves.push({ delta, madeOn, answer })
             return Deferred.await(answer)
           })

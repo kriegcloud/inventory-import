@@ -47,6 +47,14 @@ import { notImportedCsv } from "@inventory/catalog-model/NotImported"
 
 type Filter = "all" | RowOutcome["outcome"]
 
+/** The heading over the decisions a confirm went without: those known not saved, and those that may have been. */
+const leftOverTitle = (notSaved: number, maybe: number): string => {
+  const decisions = (n: number) => (n === 1 ? "1 decision of yours" : `${n} decisions of yours`)
+  if (maybe === 0) return `${decisions(notSaved)} ${notSaved === 1 ? "was" : "were"} not part of this import`
+  if (notSaved === 0) return `${decisions(maybe)} may not be part of this import`
+  return `${decisions(notSaved)} ${notSaved === 1 ? "was" : "were"} not part of this import, and ${maybe} more may not be`
+}
+
 const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
   { id: "name", label: "Name", width: 300, cell: (row) => <Text value={row.name} />, sort: (row) => row.name },
   {
@@ -334,30 +342,48 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
       />
       {O.match(O.map(leftOver, leftOverLines), {
         onNone: () => null,
-        onSome: (lines) => (
-          <div className="px-4 pb-3 sm:px-9">
-            <Alert role="alert">
-              <AlertTitle>
-                {lines.length === 1
-                  ? "1 decision of yours was not part of this import"
-                  : `${lines.length} decisions of yours were not part of this import`}
-              </AlertTitle>
-              <AlertDescription>
-                <p>
-                  The import was confirmed before {lines.length === 1 ? "it was" : "they were"} saved, so the rows were
-                  imported as the review stood without {lines.length === 1 ? "it" : "them"}:
-                </p>
-                <ul className="list-disc pl-4">
-                  {A.map(lines, (line) => (
-                    <li key={line.id}>
-                      {line.row}: you {line.decided}
-                    </li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          </div>
-        )
+        onSome: (lines) => {
+          // A decision whose save got no answer may have been saved before the confirm: never said to be not saved.
+          const notSaved = A.filter(lines, (line) => !line.unsure)
+          const maybe = A.filter(lines, (line) => line.unsure)
+          const list = (some: ReadonlyArray<(typeof lines)[number]>) => (
+            <ul className="list-disc pl-4">
+              {A.map(some, (line) => (
+                <li key={line.id}>
+                  {line.row}: you {line.decided}
+                </li>
+              ))}
+            </ul>
+          )
+          return (
+            <div className="px-4 pb-3 sm:px-9">
+              <Alert role="alert">
+                <AlertTitle>{leftOverTitle(notSaved.length, maybe.length)}</AlertTitle>
+                <AlertDescription>
+                  {notSaved.length === 0 ? null : (
+                    <>
+                      <p>
+                        The import was confirmed before {notSaved.length === 1 ? "it was" : "they were"} saved, so the
+                        rows were imported as the review stood without {notSaved.length === 1 ? "it" : "them"}:
+                      </p>
+                      {list(notSaved)}
+                    </>
+                  )}
+                  {maybe.length === 0 ? null : (
+                    <>
+                      <p>
+                        {maybe.length === 1 ? "It was" : "They were"} sent before the import was confirmed, and no
+                        answer came to say whether {maybe.length === 1 ? "it was" : "they were"} saved first: look at{" "}
+                        {maybe.length === 1 ? "that row" : "those rows"} in the table below:
+                      </p>
+                      {list(maybe)}
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )
+        }
       })}
       {changedCount > 0 && !takenBack ? (
         <div className="px-4 pb-3 sm:px-9">

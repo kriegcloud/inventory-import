@@ -38,6 +38,7 @@ import { sayError } from "@inventory/client/SayError"
 import { keptVisibility, TableAssistant } from "./TableAssistant.screen.tsx"
 import { TableSearch } from "@inventory/ui/TableSearch"
 import { catalogKeys } from "./Catalog.keys.ts"
+import { itemFacets } from "./ItemFacets.atoms.ts"
 import { maxSearch, maxSearchWords } from "@inventory/catalog-contract/ItemSearch"
 import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "@inventory/catalog-contract/TableView"
 import { wordsLeftOut } from "@inventory/catalog-model/ItemSearch"
@@ -514,9 +515,6 @@ export const itemsPage = shown(
     { reactivityKeys: catalogKeys.items }
   )
 )
-
-/** What the filters offer (each column's values, the range of numbers) and how many items there are in all. */
-export const itemFacets = catalogApi.query((api) => api.items.facets(), { reactivityKeys: catalogKeys.itemFacets })
 
 type Found = Atom.Success<typeof itemFacets> | undefined
 

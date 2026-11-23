@@ -459,14 +459,31 @@ export type DecidedSince = typeof DecidedSince.Type
 /**
  * What a save sends: the decisions made since the last save, and the revision of the draft they were made on. The
  * difference only, so two screens deciding different rows do not collide; what they were made on, so a decision made
- * before a column it rests on was matched again is not applied; and for rows that waited, what they may be written over.
+ * before a column it rests on was matched again is not applied; how many confirms the import had then (required), so a
+ * press from a screen that is behind a confirm is refused, never applied to the import opened again; and for rows that waited,
+ * what they may be written over.
  */
-export const SaveRequest = S.Struct({ madeOn, over: over.pipe(S.optionalKey), ...DecisionDelta.fields })
+export const SaveRequest = S.Struct({
+  madeOn,
+  over: over.pipe(S.optionalKey),
+  opening: S.Int.check(S.isGreaterThanOrEqualTo(0))
+    .annotate({
+      description:
+        "How many times the import had been confirmed in the picture the screen decided over: the confirms in `ImportView.history` as it read them",
+      examples: [1]
+    })
+    .annotateKey({
+      description:
+        "How many times the import had been confirmed when these decisions were made. Required: a save is written only while the import has been confirmed exactly that many times, so a press made before a confirm is never applied to the import opened again since. When the count differs, nothing is written and the save is refused with 409 `AlreadyImported`",
+      messageMissingKey: "Send `opening`: how many confirms the import's history held when the screen decided."
+    }),
+  ...DecisionDelta.fields
+})
   .check(clearsNoRowItSets)
   .annotate({
     identifier: "SaveRequest",
     description:
-      "A save of decisions: the revision of the draft they were made on, the rows whose decision is new or different, and the rows whose decision was taken back"
+      "A save of decisions: the revision of the draft they were made on, how many times the import had been confirmed then, the rows whose decision is new or different, and the rows whose decision was taken back"
   })
 /** The decoded value of `SaveRequest`. */
 export type SaveRequest = typeof SaveRequest.Type

@@ -8,14 +8,7 @@
 // while it says the same, where upstream had a context. The rule this file protects: the virtualizer is given the same
 // functions from draw to draw, so 50,000 rows scroll as fast as they did.
 import { useAtomValue } from "@effect/atom-react"
-import {
-  type Column,
-  flexRender,
-  type HeaderGroup,
-  type RowData,
-  type Table,
-  type TableState
-} from "@tanstack/react-table"
+import { type Column, flexRender, type HeaderGroup, type RowData, type TableState } from "@tanstack/react-table"
 import { defaultRangeExtractor, type Range, useVirtualizer, type Virtualizer } from "@tanstack/react-virtual"
 import { cn } from "cn"
 import * as Atom from "effect/reactivity/Atom"
@@ -37,7 +30,6 @@ import {
   columnVirtualizerOf,
   emptyKept,
   gridController,
-  gridTableOf,
   type Kept,
   kept,
   rowVirtualizerOf,
@@ -62,9 +54,9 @@ const SCROLL_JUMP_EXIT_ROWS_PER_COMMIT = 2
 
 interface DataGridProps<TData extends RowData>
   extends ReturnType<typeof useDataGrid<TData>>, Omit<ComponentProps<"div">, "dir"> {
-  height?: number
-  stretchColumns?: boolean
-  actionBar?: ReactNode
+  readonly height?: number
+  readonly stretchColumns?: boolean
+  readonly actionBar?: ReactNode
 }
 
 export function DataGrid<TData extends RowData>({
@@ -108,9 +100,9 @@ export function DataGrid<TData extends RowData>({
 }
 
 interface ViewportInsets {
-  start: number
-  end: number
-  headerHeight: number
+  readonly start: number
+  readonly end: number
+  readonly headerHeight: number
 }
 
 const EMPTY_VIEWPORT_INSETS: ViewportInsets = {
@@ -204,17 +196,12 @@ const viewportLayout = Atom.family((grid: string) =>
       if (header) observer.observe(header)
 
       const unsubscribes: Array<() => void> = []
-      const table = getGridTable(registry, grid)
+      const table = registry.get(controller.table)
       if (table) {
         const { columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, sorting } = table.atoms
-        const followed: ReadonlyArray<{ subscribe: (listener: () => void) => { unsubscribe: () => void } }> = [
-          columnFilters,
-          columnOrder,
-          columnPinning,
-          columnSizing,
-          columnVisibility,
-          sorting
-        ]
+        const followed: ReadonlyArray<{
+          readonly subscribe: (listener: () => void) => { readonly unsubscribe: () => void }
+        }> = [columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, sorting]
         for (const atom of followed) {
           const subscription = atom.subscribe(measureVirtualizers)
           unsubscribes.push(() => subscription.unsubscribe())
@@ -246,7 +233,7 @@ const viewportLayout = Atom.family((grid: string) =>
 
     function columnRangeExtractor(range: Range) {
       const indexes = defaultRangeExtractor(range)
-      const table = getGridTable(registry, grid)
+      const table = registry.get(controller.table)
       const activeColumnIds = [table?.getFocusedCell()?.column.id, table?.atoms.editingCell.get()?.columnId]
       const centerColumns = registry.get(centerColumnsOf(grid))
       for (const columnId of activeColumnIds) {
@@ -280,11 +267,6 @@ const viewportLayout = Atom.family((grid: string) =>
     }
   }).pipe(Atom.setIdleTTL(0))
 )
-
-/** The table one grid was first drawn with: its methods and atoms act on the table as it is now. */
-function getGridTable(registry: AtomRegistry.AtomRegistry, grid: string) {
-  return registry.get(gridTableOf(grid)) as Table<DataGridFeatures, RowData> | null
-}
 
 type DataGridViewportProps<TData extends RowData> = Pick<
   DataGridProps<TData>,
@@ -563,11 +545,11 @@ function getColumnsWidth<TData extends RowData>(columns: Column<DataGridFeatures
 }
 
 function getColumnWindowKey(params: {
-  virtualizer: Virtualizer<HTMLDivElement, Element>
-  startCount: number
-  centerCount: number
-  centerStart: number
-  centerEnd: number
+  readonly virtualizer: Virtualizer<HTMLDivElement, Element>
+  readonly startCount: number
+  readonly centerCount: number
+  readonly centerStart: number
+  readonly centerEnd: number
 }) {
   const { virtualizer, startCount, centerCount, centerStart, centerEnd } = params
   const items = virtualizer.getVirtualItems()
@@ -598,7 +580,7 @@ function parseColumnWindowKey(key: string): ColumnWindow | null {
 }
 
 interface DataGridActionBarProps<TData extends RowData> extends Pick<DataGridProps<TData>, "table"> {
-  actionBar: ReactNode
+  readonly actionBar: ReactNode
 }
 
 function DataGridActionBar<TData extends RowData>({ table, actionBar }: DataGridActionBarProps<TData>) {
@@ -611,8 +593,8 @@ function DataGridActionBar<TData extends RowData>({ table, actionBar }: DataGrid
 
 interface DataGridHeaderProps<TData extends RowData>
   extends Pick<DataGridProps<TData>, "table" | "headerRef">, Required<Pick<DataGridProps<TData>, "stretchColumns">> {
-  headerGroups: HeaderGroup<DataGridFeatures, TData>[]
-  columnWindow: ColumnWindow | null
+  readonly headerGroups: ReadonlyArray<HeaderGroup<DataGridFeatures, TData>>
+  readonly columnWindow: ColumnWindow | null
 }
 
 const DataGridHeader = memo(

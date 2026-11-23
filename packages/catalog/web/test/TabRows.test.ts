@@ -452,7 +452,8 @@ describe("two tabs of one person", () => {
       result.open(id)
       yield* settle
       expect(result.registry.get(result.review.rowsLeftOver(id))).toEqual(
-        O.some({ rows: { "row-7": O.some(out) }, beside: {}, theirs: {} })
+        // Sent when the tab closed, with no answer since: it may have been saved before the confirm (`unsure`).
+        O.some({ rows: { "row-7": O.some(out) }, beside: {}, theirs: {}, unsure: { "row-7": [O.some(out)] } })
       )
     })
   )
@@ -847,7 +848,7 @@ describe("an import removed", () => {
       yield* settle
       expect([open.says(), R.keys(entriesOf(id))]).toEqual([
         [
-          "Your decisions on it that were not saved went with it. Row 3: you left out; Row 3: you kept over the other row with its SKU, in another tab of yours; Row 12: you left out."
+          "Your decisions on it that were waiting went with it. Row 3: you left out; Row 3: you kept over the other row with its SKU, in another tab of yours; Row 12: you left out."
         ],
         []
       ])
@@ -873,7 +874,7 @@ describe("an import opened by its address and found removed", () => {
       later.openAddress(id)
       yield* settle
       expect([later.says(), R.keys(entriesOf(id))]).toEqual([
-        ["Your decisions on it that were not saved went with it. Row 12: you left out."],
+        ["Your decisions on it that were waiting went with it. Row 12: you left out."],
         []
       ])
     })

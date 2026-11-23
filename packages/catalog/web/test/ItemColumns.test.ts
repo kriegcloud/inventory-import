@@ -11,7 +11,8 @@ import { vi } from "vitest"
 import { applyColumnConfig } from "@inventory/ui/components/data-table/data-table-config"
 import type { UseDataTableProps } from "@inventory/ui/hooks/use-data-table"
 import type { StoredItem } from "@inventory/catalog-contract/Item"
-import { itemColumns, itemFacets, itemsTableConfig, quickFilterOptions } from "../src/ItemsPage.screen.tsx"
+import { itemFacets } from "../src/ItemFacets.atoms.ts"
+import { itemColumns, itemsTableConfig, quickFilterOptions } from "../src/ItemsPage.screen.tsx"
 import { registryWith } from "./support/catalog.ts"
 
 // The page's module asks how wide the window is when it is first read, and its toasts want a document: a desk-wide

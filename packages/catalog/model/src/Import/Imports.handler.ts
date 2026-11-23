@@ -461,7 +461,7 @@ export const importsEndpoints = Effect.gen(function* () {
   const saveChecked = Effect.fn("imports.saveChecked")(function* (
     actor: Member,
     id: ImportId,
-    payload: Pick<SaveRequest, "madeOn" | "set" | "clear"> & { readonly over: Over },
+    payload: Pick<SaveRequest, "madeOn" | "set" | "clear" | "opening"> & { readonly over: Over },
     latest: number,
     tries: { readonly left: number; readonly overtaken: Overtaken; readonly held: O.Option<HeldTries> }
   ): Effect.fn.Return<
@@ -500,7 +500,9 @@ export const importsEndpoints = Effect.gen(function* () {
       },
       read,
       // Written only while no save has come since what was compared, even one that moved no revision.
-      waiting ? O.some({ revision: draft.revision, saves: stored.saves }) : O.none()
+      waiting ? O.some({ revision: draft.revision, saves: stored.saves }) : O.none(),
+      // And only while the import has been confirmed exactly as many times as when the screen decided over it.
+      O.some(payload.opening)
     )
     const again = (overtaken: Overtaken) =>
       tries.left <= 1
@@ -515,6 +517,7 @@ export const importsEndpoints = Effect.gen(function* () {
           decidedSince
         }),
       closed: () => Effect.fail(closed(draft)),
+      otherOpening: (other) => Effect.fail(otherOpening(draft, payload.opening, other.confirms)),
       rematched: () => again({ ...tries.overtaken, draft: true }),
       moved: () => again({ ...tries.overtaken, draft: true }),
       itemsChanged: () => again({ ...tries.overtaken, items: true })
@@ -605,6 +608,18 @@ export const importsEndpoints = Effect.gen(function* () {
 
   const closed = (draft: Draft) =>
     AlreadyImported.make({ reason: `${draft.fileName} was already imported. Nothing was written a second time.` })
+
+  // A save decided in another opening of the import than it is in (the review model's rule `AnActIsOfThisOpening`).
+  // Confirmed more times since: decided before a confirm and arriving after the import was opened again, so what it
+  // decided was a part of that confirm or not, never of the import as it is now. Confirmed fewer times than the save
+  // names: an opening the import never had, so the words say only that the screen's count is not the import's.
+  const otherOpening = (draft: Draft, opening: number, confirms: number) =>
+    AlreadyImported.make({
+      reason:
+        confirms > opening
+          ? `${draft.fileName} was imported and opened again since this was decided. Nothing of it was written: look at the import as it is now.`
+          : `This was decided over ${draft.fileName} as it has never been: it has been imported ${confirms} ${confirms === 1 ? "time" : "times"}, not ${opening}. Nothing of it was written: look at the import as it is now.`
+    })
 
   const moved = (revision: number) =>
     DraftMoved.make({
@@ -815,11 +830,17 @@ export const importsEndpoints = Effect.gen(function* () {
       const { set, clear } = payload
       const over = overOfSave(payload)
       const madeOn = madeOnRead({ madeOn: payload.madeOn, set, over })
-      return yield* saveChecked(actor, params.id, { madeOn, over, set, clear }, latestNamed(madeOn), {
-        left: draftTries,
-        overtaken: { draft: false, items: false },
-        held: O.none()
-      })
+      return yield* saveChecked(
+        actor,
+        params.id,
+        { madeOn, over, set, clear, opening: payload.opening },
+        latestNamed(madeOn),
+        {
+          left: draftTries,
+          overtaken: { draft: false, items: false },
+          held: O.none()
+        }
+      )
     }),
     commit: Effect.fn("imports.commit")(function* ({
       params,

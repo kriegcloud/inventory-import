@@ -3,10 +3,10 @@
 // upstream kept refs, `useCallback`s and effects. The controller is made once per grid: its handlers are the same
 // functions for the grid's whole life, its window and document listeners go with its finalizer, and the listeners on the
 // grid's element and its subscriptions to the table come and go with that element (the viewport's ref callback). What a
-// handler needs from the last draw (the props, the data, the direction) is the `gridDrawn` atom, written in the draw as
-// TanStack's `useTable` writes the table's options in the draw; upstream's value refs were written after it. The rule
-// this file protects: a handler reads the table, the props and the grid's element as they are now, so every key, every
-// press and where focus lands afterwards are what they were with the hooks.
+// handler needs from the last draw (the props, the data, the direction) is the controller's `drawn` atom, written in the
+// draw as TanStack's `useTable` writes the table's options in the draw; upstream's value refs were written after it.
+// The rule this file protects: a handler reads the table, the props and the grid's element as they are now, so every
+// key, every press and where focus lands afterwards are what they were with the hooks.
 import type { Virtualizer } from "@tanstack/react-virtual"
 
 import { useAtomValue } from "@effect/atom-react"
@@ -24,11 +24,15 @@ import {
   type Updater,
   useTable
 } from "@tanstack/react-table"
+import * as Effect from "effect/Effect"
 import * as Match from "effect/Match"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
+import * as P from "effect/Predicate"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
-// Local change: `Result`, for the `try` statement upstream has here (none in this repository).
+// Local change: adding a row is an Effect, run with `Effect.runFork`, where upstream has an async function with a `try`
+// statement; `Result` reads how the caller's `createRow` went.
 import * as Result from "effect/Result"
 import {
   type ComponentProps,
@@ -65,9 +69,7 @@ import {
   getSelectionEdgePosition,
   renderDefaultCell,
   revokeFileObjectUrls,
-  scrollCellIntoView,
-  // Local change: `settle`, for the `try` statement upstream has here.
-  settle
+  scrollCellIntoView
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 import { atomRegistry } from "@inventory/ui/components/data-table/data-table-state"
 import { useDirection } from "@inventory/ui/components/direction"
@@ -101,25 +103,28 @@ interface GridDrawn<TData extends RowData> {
   readonly dir: Direction
 }
 
-/** A value kept from one draw to the next while what it was made from is the same: a memo's answer, held by its owner. */
-export interface Kept<V> {
-  deps: readonly unknown[] | undefined
-  value: V | undefined
-}
+/**
+ * A value kept from one draw to the next while what it was made from is the same: a memo's answer, held by its owner.
+ * Nothing until the first draw; the slot is the one thing that changes, so it is a `MutableRef`.
+ */
+export type Kept<V> = MutableRef.MutableRef<O.Option<{ readonly deps: ReadonlyArray<unknown>; readonly value: V }>>
 
 export function emptyKept<V>(): Kept<V> {
-  return { deps: undefined, value: undefined }
+  return MutableRef.make(O.none())
 }
 
 /** The value `slot` holds when `deps` are the same as the last time (each compared with `Object.is`), or a new one. */
-export function kept<V>(slot: Kept<V>, deps: readonly unknown[], make: () => V): V {
-  const last = slot.deps
-  if (last !== undefined && last.length === deps.length && last.every((dep, index) => Object.is(dep, deps[index]))) {
-    return slot.value as V
+export function kept<V>(slot: Kept<V>, deps: ReadonlyArray<unknown>, make: () => V): V {
+  const last = MutableRef.get(slot)
+  if (
+    O.isSome(last) &&
+    last.value.deps.length === deps.length &&
+    last.value.deps.every((dep, index) => Object.is(dep, deps[index]))
+  ) {
+    return last.value.value
   }
   const value = make()
-  slot.deps = deps
-  slot.value = value
+  MutableRef.set(slot, O.some({ deps, value }))
   return value
 }
 
@@ -135,15 +140,12 @@ function atomRef<A>(registry: AtomRegistry.AtomRegistry, atom: Atom.Writable<A>)
   }
 }
 
-/** The props, data and direction of the last draw of one grid. */
-const gridDrawn = Atom.family((_grid: string) => Atom.make<unknown>(null))
-
 /** The first table one grid was drawn with (upstream's `tableRef`): its methods act on the table as it is now. */
 export const gridTableOf = Atom.family((_grid: string) => Atom.make<unknown>(null))
 
 /** The data an edit made, until the caller draws the grid with data of its own (upstream's `pendingEdit` state). */
 const pendingEdits = Atom.family((_grid: string) =>
-  Atom.make<{ readonly from: unknown; readonly to: any[] } | null>(null)
+  Atom.make<{ readonly from: unknown; readonly to: ReadonlyArray<any> } | null>(null)
 )
 
 /** A cell to focus once it is drawn. */
@@ -206,18 +208,25 @@ export interface GridController<TData extends RowData> {
   /** Puts the grid's element on screen: its listeners and the table's subscriptions, undone by what it returns. */
   readonly attachGrid: (element: HTMLDivElement) => () => void
   readonly bodyHandlers: ComponentProps<"div">
-  readonly revealCell: (cell: CellPosition, options: { shouldFocus: boolean; shouldScroll: boolean }) => boolean
+  readonly revealCell: (
+    cell: CellPosition,
+    options: { readonly shouldFocus: boolean; readonly shouldScroll: boolean }
+  ) => boolean
   readonly focusCellElement: (cell: CellPosition, shouldScroll?: boolean) => void
   readonly onDataChange: (nextData: TData[], details: DataChangeDetails<TData>) => void
   readonly onRowSelectionChange: (updater: Updater<RowSelectionState>) => void
   readonly onColumnVisibilityChange: (updater: Updater<ColumnVisibilityState>) => void
   readonly onClipboardNotice: (notice: ClipboardNotice) => void
-  readonly onRowAdd: (
-    event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement>
-  ) => Promise<void> | undefined
-  /** Memo slots of the draw: the stable props, the table's options, the column sizes. */
+  /** What the grid was last drawn with: written in the draw, read by the handlers made once. */
+  readonly drawn: Atom.Writable<GridDrawn<TData> | null>
+  /** The first table the grid was drawn with (upstream's `tableRef`): its methods act on the table as it is now. */
+  readonly table: Atom.Writable<Table<DataGridFeatures, TData> | null>
+  /** Adds a row as the caller's `createRow` makes it, and focuses it; a refused row says why. */
+  readonly onRowAdd: (event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement>) => void
+  /** Memo slots of the draw: the stable props, the columns, the table's options, the column sizes. */
   readonly kept: {
-    readonly props: { key: string | undefined; value: object | undefined }
+    readonly props: PropsKept<GridProps<TData>>
+    readonly columns: Kept<ReadonlyArray<ColumnDef<DataGridFeatures, TData>>>
     readonly options: Kept<TableOptions<DataGridFeatures, TData>>
     readonly sizes: Kept<Record<string, number>>
   }
@@ -230,15 +239,19 @@ export const gridController = Atom.family((grid: string) =>
 
 function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomContext): GridController<TData> {
   const registry = get.registry
-  // The values the handlers read stay while the grid is on screen.
-  get.mount(gridDrawn(grid))
+  // The values the handlers read stay while the grid is on screen. What it was drawn with and its table are this
+  // grid's own atoms, typed by its rows; `gridTableOf` holds the table for whoever knows only the grid's id.
+  const drawnAtom = Atom.make<GridDrawn<TData> | null>(null)
+  const tableAtom = Atom.make<Table<DataGridFeatures, TData> | null>(null)
+  get.mount(drawnAtom)
+  get.mount(tableAtom)
   get.mount(gridTableOf(grid))
   get.mount(pendingFocus(grid))
   get.mount(rowVirtualizerOf(grid))
   get.mount(columnVirtualizerOf(grid))
 
-  const drawn = () => registry.get(gridDrawn(grid)) as GridDrawn<TData> | null
-  const tableRef = atomRef(registry, gridTableOf(grid)) as unknown as RefObject<Table<DataGridFeatures, TData> | null>
+  const drawn = () => registry.get(drawnAtom)
+  const tableRef = atomRef(registry, tableAtom)
   const rowVirtualizerRef = atomRef(registry, rowVirtualizerOf(grid))
   const columnVirtualizerRef = atomRef(registry, columnVirtualizerOf(grid))
   const pendingFocusRef = atomRef(registry, pendingFocus(grid))
@@ -272,7 +285,7 @@ function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomC
 
   function revealCell(
     cell: CellPosition,
-    { shouldFocus, shouldScroll }: { shouldFocus: boolean; shouldScroll: boolean }
+    { shouldFocus, shouldScroll }: { readonly shouldFocus: boolean; readonly shouldScroll: boolean }
   ) {
     const currentTable = tableRef.current
     const container = dataGridRef.current
@@ -602,14 +615,17 @@ function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomC
     })
   }
 
-  async function addRow(trigger: CreateRowDetails, columnId: string | undefined) {
+  const addRow = Effect.fnUntraced(function* (trigger: CreateRowDetails, columnId: string | undefined) {
     const { readOnly, createRow } = propsRef.current
     if (readOnly || !createRow) return
 
-    // Local change: `settle` where upstream has a `try` statement; a refused new row says why, as upstream's did.
-    const created = await settle(
-      () => createRow(trigger),
-      (error) => (error instanceof Error ? error.message : "Failed to add row")
+    // Local change: `Effect.try`, and `Effect.tryPromise` when the caller answers later, where upstream has a `try`
+    // statement; a refused new row says why, as upstream's did.
+    const refused = (error: unknown) => (error instanceof Error ? error.message : "Failed to add row")
+    const created = yield* Effect.result(
+      Effect.flatMap(Effect.try({ try: () => createRow(trigger), catch: refused }), (answer) =>
+        P.isPromiseLike(answer) ? Effect.tryPromise({ try: () => answer, catch: refused }) : Effect.succeed(answer)
+      )
     )
     if (Result.isFailure(created)) {
       toast.error(created.failure)
@@ -627,10 +643,10 @@ function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomC
 
     currentTable.clearSelection()
     focusCell(rowId, columnId)
-  }
+  })
 
   function onRowAdd(event?: ReactMouseEvent<HTMLDivElement> | ReactKeyboardEvent<HTMLDivElement>) {
-    return addRow({ reason: "add-row-press", event }, getNavigableColumnIds().find(getIsDataColumnId))
+    Effect.runFork(addRow({ reason: "add-row-press", event }, getNavigableColumnIds().find(getIsDataColumnId)))
   }
 
   function getColumnHeaderTrigger(columnId: string) {
@@ -908,7 +924,7 @@ function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomC
       event.preventDefault()
       const currentColumnId = isUtilityCellFocused ? getNavigableColumnIds()[0] : focusedCell.columnId
 
-      void addRow({ reason: "insert-below", event, afterRowId: focusedCell.rowId }, currentColumnId)
+      Effect.runFork(addRow({ reason: "insert-below", event, afterRowId: focusedCell.rowId }, currentColumnId))
       return
     }
 
@@ -1264,7 +1280,7 @@ function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomC
 
     const unsubscribes: Array<() => void> = []
     if (table) unsubscribes.push(followTable(table))
-    unsubscribes.push(registry.subscribe(gridDrawn(grid), (current) => onDrawn(current as GridDrawn<TData> | null)))
+    unsubscribes.push(registry.subscribe(drawnAtom, (current) => onDrawn(current)))
     onDrawn(drawn())
 
     return () => {
@@ -1645,8 +1661,11 @@ function makeGridController<TData extends RowData>(grid: string, get: Atom.AtomC
     onColumnVisibilityChange,
     onClipboardNotice: (notice) => (propsRef.current.onClipboardNotice ?? toastClipboardNotice)(notice),
     onRowAdd,
+    drawn: drawnAtom,
+    table: tableAtom,
     kept: {
-      props: { key: undefined, value: undefined },
+      props: MutableRef.make(O.none()),
+      columns: emptyKept(),
       options: emptyKept(),
       sizes: emptyKept()
     }
@@ -1662,15 +1681,11 @@ const defaultColumn: Partial<ColumnDef<DataGridFeatures, any>> = {
 // Firefox needs its own layout for pinned columns; the page has a browser, never a server render.
 const isFirefox = typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox")
 
-// The columns with the utility columns' defaults, kept by the columns they were made from.
-const tableColumnsKept = new WeakMap<object, ColumnDef<DataGridFeatures, any>[]>()
-
+/** The columns with the utility columns' defaults (kept by the grid's controller while the columns are the same). */
 function getTableColumns<TData extends RowData>(
   columns: readonly ColumnDef<DataGridFeatures, TData>[]
 ): ColumnDef<DataGridFeatures, TData>[] {
-  const known = tableColumnsKept.get(columns)
-  if (known !== undefined) return known as ColumnDef<DataGridFeatures, TData>[]
-  const made = columns.map((column) =>
+  return columns.map((column) =>
     column.id && UTILITY_COLUMN_IDS.has(column.id)
       ? {
           ...column,
@@ -1679,8 +1694,6 @@ function getTableColumns<TData extends RowData>(
         }
       : column
   )
-  tableColumnsKept.set(columns, made)
-  return made
 }
 
 function useDataGrid<TData extends RowData>({
@@ -1692,20 +1705,16 @@ function useDataGrid<TData extends RowData>({
 }: UseDataGridProps<TData>) {
   const grid = useId()
   const registry = useAtomValue(atomRegistry)
-  const controller = useAtomValue(gridController(grid)) as GridController<TData>
+  const controller: GridController<TData> = useAtomValue(gridController(grid))
   const pendingEdit = useAtomValue(pendingEdits(grid))
-  const data = pendingEdit !== null && pendingEdit.from === dataProp ? (pendingEdit.to as TData[]) : dataProp
+  const data = pendingEdit !== null && pendingEdit.from === dataProp ? pendingEdit.to : dataProp
   const contextDir = useDirection()
   const dir = dirProp ?? contextDir
   // What the handlers read of this draw: written in the draw, as `useTable` below writes the table's options.
-  registry.set(gridDrawn(grid), { props, data: dataProp, columns, dir })
-  const stableProps = getStableProps(
-    controller.kept.props,
-    props,
-    () => (registry.get(gridDrawn(grid)) as GridDrawn<TData> | null)?.props ?? {}
-  )
+  registry.set(controller.drawn, { props, data: dataProp, columns, dir })
+  const stableProps = getStableProps(controller.kept.props, props, () => registry.get(controller.drawn)?.props ?? {})
 
-  const tableColumns = getTableColumns(columns)
+  const tableColumns = kept(controller.kept.columns, [columns], () => getTableColumns(columns))
 
   const enableCellEditing = !props.readOnly && props.enableCellEditing !== false
   const hasRowAdd = !!props.createRow
@@ -1735,7 +1744,8 @@ function useDataGrid<TData extends RowData>({
 
   const table = useTable(tableOptions, selectTableState)
 
-  if (registry.get(gridTableOf(grid)) === null) {
+  if (registry.get(controller.table) === null) {
+    registry.set(controller.table, table)
     registry.set(gridTableOf(grid), table)
   }
 
@@ -1777,6 +1787,9 @@ function useDataGrid<TData extends RowData>({
   }
 }
 
+/** The stable props of the last draw and the key of the props they were made from: nothing before the first draw. */
+type PropsKept<TProps> = MutableRef.MutableRef<O.Option<{ readonly key: string; readonly value: TProps }>>
+
 let nextObjectId = 0
 const objectIds = new WeakMap<object, number>()
 
@@ -1784,11 +1797,7 @@ const objectIds = new WeakMap<object, number>()
  * The props with each function in a wrapper that calls the prop of the last draw, made again only when a prop that is
  * not a function changes (upstream's `useStableProps`, its memo held by the grid's controller).
  */
-function getStableProps<TProps extends object>(
-  slot: { key: string | undefined; value: object | undefined },
-  props: TProps,
-  latest: () => object
-): TProps {
+function getStableProps<TProps extends object>(slot: PropsKept<TProps>, props: TProps, latest: () => object): TProps {
   let propsKey = ""
   for (const [name, value] of Object.entries(props)) {
     let valueKey = `${typeof value}${String(value)}`
@@ -1805,7 +1814,8 @@ function getStableProps<TProps extends object>(
     propsKey += `${name}:${valueKey}\u0000`
   }
 
-  if (slot.key === propsKey && slot.value !== undefined) return slot.value as TProps
+  const last = MutableRef.get(slot)
+  if (O.isSome(last) && last.value.key === propsKey) return last.value.value
 
   const stableProps = { ...props }
   for (const [key, value] of Object.entries(props)) {
@@ -1815,8 +1825,7 @@ function getStableProps<TProps extends object>(
       if (typeof callback === "function") return callback(...args)
     })
   }
-  slot.key = propsKey
-  slot.value = stableProps
+  MutableRef.set(slot, O.some({ key: propsKey, value: stableProps }))
   return stableProps
 }
 

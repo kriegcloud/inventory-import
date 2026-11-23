@@ -43,6 +43,7 @@ layer(TypedApp)("suggestions for an import", (it) => {
         .decide({
           params: { id: staged.id },
           payload: {
+            opening: 0,
             madeOn: { "row-7": view.revision },
             set: { "row-7": decisionFromFlags({ accepted: ["name"] }) },
             clear: []

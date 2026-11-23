@@ -37,8 +37,8 @@ import { ChevronDown, SearchIcon, Check } from "lucide-react"
 type FacetedSelectedValue<Multiple extends boolean> = Multiple extends true ? string[] : string
 
 interface FacetedOption {
-  label: string
-  value: string
+  readonly label: string
+  readonly value: string
 }
 
 const NO_ITEMS: FacetedOption[] = []
@@ -173,11 +173,11 @@ function useFacetedState(name: string) {
 }
 
 interface FacetedProps<Multiple extends boolean = false> extends ComponentProps<typeof Popover> {
-  value?: FacetedSelectedValue<Multiple> | undefined
-  defaultValue?: FacetedSelectedValue<Multiple>
-  onValueChange?: (value: FacetedSelectedValue<Multiple> | undefined) => void
-  items?: FacetedOption[]
-  multiple?: Multiple
+  readonly value?: FacetedSelectedValue<Multiple> | undefined
+  readonly defaultValue?: FacetedSelectedValue<Multiple>
+  readonly onValueChange?: (value: FacetedSelectedValue<Multiple> | undefined) => void
+  readonly items?: FacetedOption[]
+  readonly multiple?: Multiple
 }
 
 function Faceted<Multiple extends boolean = false>({
@@ -253,8 +253,8 @@ function FacetedTrigger({ className, ...props }: ComponentProps<typeof PopoverTr
 }
 
 interface FacetedValueProps {
-  placeholder?: ReactNode
-  children?: ReactNode | ((selected: FacetedOption[]) => ReactNode)
+  readonly placeholder?: ReactNode
+  readonly children?: ReactNode | ((selected: FacetedOption[]) => ReactNode)
 }
 
 function FacetedValue({ placeholder = "Select options...", children }: FacetedValueProps) {
@@ -307,7 +307,7 @@ function FacetedBadgeList({ className, ...props }: ComponentProps<"div">) {
 }
 
 interface FacetedBadgeProps extends ComponentProps<"span"> {
-  asChild?: boolean
+  readonly asChild?: boolean
 }
 
 function FacetedBadge({ className, asChild = false, ...props }: FacetedBadgeProps) {
@@ -351,7 +351,7 @@ function FacetedContent({ className, children, shouldFilter, filter, loop, ...pr
 }
 
 interface FacetedInputProps extends ComponentProps<typeof CommandPrimitive.Input> {
-  variant?: "default" | "line"
+  readonly variant?: "default" | "line"
 }
 
 /**
@@ -461,7 +461,7 @@ function FacetedCommandItem({
 }
 
 interface FacetedItemProps extends ComponentProps<typeof CommandPrimitive.Item> {
-  value: string
+  readonly value: string
 }
 
 function FacetedItem({ value, onSelect, ...props }: FacetedItemProps) {

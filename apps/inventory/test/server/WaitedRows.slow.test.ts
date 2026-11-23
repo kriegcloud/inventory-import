@@ -59,6 +59,8 @@ type Save = {
   readonly set?: Readonly<Record<string, RowDecisionFlags>>
   readonly clear?: ReadonlyArray<string>
   readonly over?: Readonly<Record<string, ReadonlyArray<O.Option<RowDecisionFlags>>>>
+  /** The opening the save was decided in: how many confirms the import had (0, the first, where left out here). */
+  readonly opening?: number
 }
 const request = (save: Save) => {
   const set = flags(save.set ?? {})
@@ -67,7 +69,8 @@ const request = (save: Save) => {
     madeOn: R.fromEntries(A.map([...R.keys(set), ...clear], (row) => [row, save.on] as const)),
     set,
     clear,
-    ...(save.over === undefined ? {} : { over: R.map(save.over, A.map(O.map(decisionFromFlags))) })
+    ...(save.over === undefined ? {} : { over: R.map(save.over, A.map(O.map(decisionFromFlags))) }),
+    opening: O.getOrElse(O.fromUndefinedOr(save.opening), () => 0)
   }
 }
 
@@ -382,7 +385,8 @@ layer(TypedApp)("a row that waited across a match whose take-backs a confirm let
         .commit({ params, payload: { revision: before.revision, madeOn: {}, set: {}, clear: [] } })
         .pipe(marcus)
       yield* client.imports.reopen({ params }).pipe(marcus)
-      const saved = yield* danaSaves(waited)
+      // Sent from a screen that read the import opened again: decided in its second opening.
+      const saved = yield* danaSaves({ ...waited, opening: 1 })
       expect(named(saved.decidedSince)).toEqual([
         ["row-2", some({ edits: { name: "Sack" } })],
         ["row-3", some({ stored: "replace" })]

@@ -5,6 +5,7 @@ import * as A from "effect/Array"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import { useAtom, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
@@ -131,13 +132,22 @@ const nameOf = (view: RowView, first: ReviewColumn | undefined): string => {
 /** One line of context under the name: the columns the caller marked, with their labels; a code in its own face. */
 const contextOf = (view: RowView, columns: ReadonlyArray<ReviewColumn>, skip: string | undefined): ReactNode =>
   columns
-    .filter((column) => column.context === true && column.id !== skip && (view.cells[column.id] ?? "") !== "")
+    .filter(
+      (column) =>
+        column.context === true && column.id !== skip && O.exists(R.get(view.cells, column.id), (text) => text !== "")
+    )
     .slice(0, 3)
     .map((column, at) => (
       <Fragment key={column.id}>
         {at === 0 ? "" : " · "}
         {column.label}{" "}
-        <ColumnText column={column}>{shownWith(column, view.cells[column.id] ?? "", view.cells)}</ColumnText>
+        <ColumnText column={column}>
+          {shownWith(
+            column,
+            O.getOrElse(R.get(view.cells, column.id), () => ""),
+            view.cells
+          )}
+        </ColumnText>
       </Fragment>
     ))
 

@@ -7,11 +7,12 @@
 // search box of the grid it was pressed in. The registry is made as the app's is (`rootRegistry`: an atom nobody reads
 // is dropped 400 ms later), since a plain registry drops it at once and hides a timer left running.
 import { RegistryContext } from "@effect/atom-react"
-import { afterEach, beforeEach, expect, it } from "@effect/vitest"
+import { afterEach, assert, beforeEach, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
-import { createElement } from "react"
+import { createElement, type RefCallback } from "react"
 import { prerender } from "react-dom/static"
 import { vi } from "vitest"
 import { cellChanges } from "@inventory/ui/components/data-grid/data-grid-cell"
@@ -26,6 +27,22 @@ import {
 // The test drives the kit's own debounce, its atoms as the grid does and the hook as a component draws it.
 // oxlint-disable-next-line no-restricted-imports
 import { debouncedFor, latestCallback, useDebouncedCallback } from "@inventory/ui/hooks/use-debounced-callback"
+
+/**
+ * A debounced function as a caller that types text holds it. The kit types its arguments `never[]`, since each caller
+ * has its own; a method's parameters are compared both ways, so the function is taken here as one that takes text.
+ */
+type TextTaker = { send(text: string): void }
+
+/** What `cellChanges` reads of the grid's table: its listeners of one cell. */
+const isGridTable = (table: object): table is Parameters<typeof cellChanges>[0] =>
+  "subscribeCell" in table && typeof table.subscribeCell === "function"
+
+/**
+ * The search box's ref as the test hands it a box: the ref reads only `focus`, and a method's parameters are compared
+ * both ways, so a box with `focus` alone is taken where React would hand the input.
+ */
+type SearchBoxRef = { open(input: { focus(): void } | null): ReturnType<RefCallback<HTMLInputElement>> }
 
 /** A registry as the app makes one (`rootRegistry` in src/web/lib/root.ts). */
 const appRegistry = () => AtomRegistry.make({ defaultIdleTTL: 400 })
@@ -46,12 +63,14 @@ it("a pause runs the callback of the latest draw, through one function while the
   // The first draw.
   registry.set(latestCallback("typed"), { run: (text: string) => calls.push(`first ${text}`) })
   const first = registry.get(debouncedFor("typed"))(300)
-  first("a" as never)
+  const typingFirst: TextTaker = { send: first }
+  typingFirst.send("a")
   // A second draw before the pause ends hands over its own callback.
   registry.set(latestCallback("typed"), { run: (text: string) => calls.push(`second ${text}`) })
   const second = registry.get(debouncedFor("typed"))(300)
   expect(second).toBe(first)
-  second("ab" as never)
+  const typingSecond: TextTaker = { send: second }
+  typingSecond.send("ab")
   vi.advanceTimersByTime(299)
   expect(calls).toEqual([])
   vi.advanceTimersByTime(1)
@@ -74,7 +93,7 @@ it("a pause still waiting when the component leaves never runs", () => {
   expect(calls).toEqual([])
 })
 
-it("the hook, drawn again, hands the pause the callback of its latest draw", () => {
+it.effect("the hook, drawn again, hands the pause the callback of its latest draw", () => {
   // The two draws are a server's (no effect runs), on one registry, so the component keeps its `useId`.
   vi.useRealTimers()
   const registry = appRegistry()
@@ -88,18 +107,20 @@ it("the hook, drawn again, hands the pause the callback of its latest draw", () 
     return null
   }
   const draw = (label: string) =>
-    prerender(createElement(RegistryContext, { value: registry }, createElement(Typing, { label })))
-  return draw("first")
-    .then(() => draw("second"))
-    .then(() => {
-      vi.useFakeTimers()
-      expect(handed.length).toBe(2)
-      handed[1]?.("ab")
-      vi.advanceTimersByTime(299)
-      expect(calls).toEqual([])
-      vi.advanceTimersByTime(1)
-      expect(calls).toEqual(["second ab"])
-    })
+    Effect.promise(() =>
+      prerender(createElement(RegistryContext, { value: registry }, createElement(Typing, { label })))
+    )
+  return Effect.gen(function* () {
+    yield* draw("first")
+    yield* draw("second")
+    vi.useFakeTimers()
+    expect(handed.length).toBe(2)
+    handed[1]?.("ab")
+    vi.advanceTimersByTime(299)
+    expect(calls).toEqual([])
+    vi.advanceTimersByTime(1)
+    expect(calls).toEqual(["second ab"])
+  })
 })
 
 it("a cell's value is followed while the cell is read, and let go when it is not", () => {
@@ -112,7 +133,8 @@ it("a cell's value is followed while the cell is read, and let go when it is not
         listeners.splice(listeners.indexOf(entry), 1)
       }
     }
-  } as unknown as Parameters<typeof cellChanges>[0]
+  }
+  assert(isGridTable(table))
   const registry = AtomRegistry.make()
   const changes = cellChanges(table, "r1", "text")
   const seen: Array<number> = []
@@ -168,11 +190,11 @@ it("with two grids on the page, the search box of the grid Ctrl+F was pressed in
     // Every grid's box opens, in the order given; StrictMode calls each ref twice, with its cleanup between.
     const unmounts = A.map(drawn, (grid) => {
       const unmount = registry.mount(searchInputRef(grid))
-      const ref = registry.get(searchInputRef(grid))
-      const input = { focus: () => focused.push(grid) } as unknown as HTMLInputElement
-      const cleanup = ref(input)
+      const ref: SearchBoxRef = { open: registry.get(searchInputRef(grid)) }
+      const input = { focus: () => focused.push(grid) }
+      const cleanup = ref.open(input)
       if (typeof cleanup === "function") cleanup()
-      ref(input)
+      ref.open(input)
       return unmount
     })
     for (const run of [...frames]) run?.()

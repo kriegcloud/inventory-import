@@ -305,6 +305,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .decide({
             params,
             payload: {
+              opening: 0,
               madeOn: { "row-55": view.revision + 1 },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
@@ -340,6 +341,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .decide({
             params,
             payload: {
+              opening: 0,
               madeOn: { "row-55": view.revision },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
@@ -363,6 +365,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .decide({
             params,
             payload: {
+              opening: 0,
               madeOn: { "row-55": view.revision },
               set: flags({ "row-55": { accepted: ["unitCost"] } }),
               clear: []
@@ -418,7 +421,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           "row-5": { reverted: ["uom"] }
         })
         yield* client.imports
-          .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: R.map(set, () => view.revision), set, clear: [] } })
           .pipe(as("mem_dana"))
         yield* around([
           {
@@ -478,7 +481,12 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         yield* client.imports
           .decide({
             params,
-            payload: { madeOn: { "row-3": view.revision }, set: flags({ "row-3": { stored: "replace" } }), clear: [] }
+            payload: {
+              opening: 0,
+              madeOn: { "row-3": view.revision },
+              set: flags({ "row-3": { stored: "replace" } }),
+              clear: []
+            }
           })
           .pipe(as("mem_marcus"))
         // Once Dana's match has asked the review (the stored item was there), the first import is taken back: no item
@@ -524,7 +532,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         }).pipe(as("mem_marcus"))
         const params = { id: view.id }
         yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Once Dana's match has asked the review, the item is stocked and Marcus leaves row 3 out.
         const stock = client.imports
@@ -581,7 +589,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         }).pipe(as("mem_marcus"))
         const params = { id: view.id }
         yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Once Dana's match has asked the review, Marcus matches the cost to "List cost" and decides the Replace again.
         const theirs = client.imports
@@ -639,7 +647,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         // written, the stocking import is confirmed.
         yield* around([{ before: stock }, {}])
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Two batches: the first found an item it was not judged against, the second is the save worked out again.
         // Only an item changed, not a column: what the first try found stands, and the Replace with it.
@@ -755,7 +763,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         })
         yield* around([{ before: stored }, {}])
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         expect([MutableRef.get(sent), saved.notApplied]).toEqual([2, []])
       })
@@ -826,7 +834,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           {}
         ])
         yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": reopened.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { madeOn: { "row-2": reopened.revision }, opening: 1, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Two batches: the first found the import's created rows otherwise than its judgement read them.
         expect(MutableRef.get(sent)).toBe(2)
@@ -875,7 +883,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           {}
         ])
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { opening: 0, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         expect([MutableRef.get(sent), saved.notApplied]).toEqual([
           2,
@@ -940,6 +948,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
 
   /** Dana's save of row 3's leave-out, which waited over no decision, and of row 4's, which did not wait. */
   const waited = (view: { readonly revision: number }) => ({
+    opening: 0,
     madeOn: { "row-3": view.revision, "row-4": view.revision },
     set: flags({ "row-3": { edits: { name: "Copper Plate" } }, "row-4": { out: true } }),
     clear: [],
@@ -1079,7 +1088,10 @@ layer(App)("a take-back of the import itself between a save's comparison of a ro
       const open = yield* client.imports.reopen({ params }).pipe(as("mem_marcus"))
       const mine = decisionFromFlags({ stored: "replace", edits: { name: "Sack" } })
       yield* client.imports
-        .decide({ params, payload: { madeOn: { "row-2": open.revision }, set: { "row-2": mine }, clear: [] } })
+        .decide({
+          params,
+          payload: { madeOn: { "row-2": open.revision }, opening: 1, set: { "row-2": mine }, clear: [] }
+        })
         .pipe(as("mem_dana"))
       const match = yield* client.imports
         .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
@@ -1092,6 +1104,7 @@ layer(App)("a take-back of the import itself between a save's comparison of a ro
           params,
           payload: {
             madeOn: { "row-2": open.revision },
+            opening: 1,
             set: flags({ "row-2": { out: true } }),
             clear: [],
             over: { "row-2": [O.none(), O.some(mine)] }

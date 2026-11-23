@@ -58,7 +58,7 @@ const OlderHeld = S.Struct({
 
 /**
  * One import's waiting rows as this browser keeps them: what waits (`waits`), the lines, and what was left over
- * (`rows`, `beside`, `theirs`). Read too as an older page of the app kept them: what waited in `rows`, with one revision
+ * (`rows`, `beside`, `theirs`, `unsure`). Read too as an older page of the app kept them: what waited in `rows`, with one revision
  * for all of them or one each (`madeOn`), the values seen apart, and the rows on hold (`held`).
  */
 export const StoredWaiting = S.Struct({
@@ -69,6 +69,8 @@ export const StoredWaiting = S.Struct({
   rows: S.Record(S.String, StoredDecision),
   beside: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
   theirs: S.Record(S.String, StoredDecision).pipe(S.optionalKey),
+  /** Of what was left over, the decisions sent whose fate is not known (`Named.unsure`). */
+  unsure: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
   madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
   seen: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
   held: S.Record(S.String, OlderHeld).pipe(S.optionalKey),
@@ -154,9 +156,20 @@ const olderLine = (input: {
 export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
   O.map(stored, (entry): Waiting => {
     const confirms = O.fromNullishOr(entry.confirms)
+    const sides = R.map(entry.waits ?? {}, sideFrom)
+    const lines = R.map(entry.lines ?? {}, (line): Line => ({
+      sides: A.map(line.sides, sideFrom),
+      theirs: line.theirs === undefined ? O.none() : O.some(line.theirs)
+    }))
     if (entry.leftOver) {
-      const named = { rows: entry.rows, beside: entry.beside ?? {}, theirs: entry.theirs ?? {} }
-      return { rows: {}, lines: {}, confirms, leftOver: O.some(named) }
+      // What was left over in `rows`; beside it, what waited, kept only in the newer keys.
+      const named = {
+        rows: entry.rows,
+        beside: entry.beside ?? {},
+        theirs: entry.theirs ?? {},
+        ...O.match(O.fromUndefinedOr(entry.unsure), { onNone: () => ({}), onSome: (unsure) => ({ unsure }) })
+      }
+      return { rows: sides, lines, confirms, leftOver: O.some(named) }
     }
     const made = entry.madeOn
     const seenOf = (rowId: string): O.Option<Side["seen"]> => R.get(entry.seen ?? {}, rowId)
@@ -171,12 +184,8 @@ export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
     const olderLines = R.map(entry.held ?? {}, (held, rowId) =>
       olderLine({ held, seen: seenOf(rowId), waits: R.has(older, rowId) })
     )
-    const lines = R.map(entry.lines ?? {}, (line): Line => ({
-      sides: A.map(line.sides, sideFrom),
-      theirs: line.theirs === undefined ? O.none() : O.some(line.theirs)
-    }))
     return {
-      rows: { ...older, ...R.map(entry.waits ?? {}, sideFrom) },
+      rows: { ...older, ...sides },
       lines: { ...olderLines, ...lines },
       confirms,
       leftOver: O.none()
@@ -196,17 +205,14 @@ export const toStored: {
     ...O.match(fileName, { onNone: () => ({}), onSome: (name) => ({ fileName: name }) }),
     confirms: O.getOrNull(entry.confirms),
     madeOn: {},
+    waits: R.map(entry.rows, sideTo),
+    lines: R.map(entry.lines, (line) => ({
+      sides: A.map(line.sides, sideTo),
+      ...O.match(line.theirs, { onNone: () => ({}), onSome: (theirs) => ({ theirs }) })
+    })),
     ...O.match(entry.leftOver, {
       onSome: (named) => ({ leftOver: true, ...named }),
-      onNone: () => ({
-        leftOver: false,
-        rows: {},
-        waits: R.map(entry.rows, sideTo),
-        lines: R.map(entry.lines, (line) => ({
-          sides: A.map(line.sides, sideTo),
-          ...O.match(line.theirs, { onNone: () => ({}), onSome: (theirs) => ({ theirs }) })
-        }))
-      })
+      onNone: () => ({ leftOver: false, rows: {} })
     })
   }))
 )

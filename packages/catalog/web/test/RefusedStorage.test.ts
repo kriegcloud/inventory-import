@@ -5,6 +5,7 @@
 // decisions are then said to be held by the page only, never to be kept in this browser.
 import { describe, expect, it } from "@effect/vitest"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Atom from "effect/reactivity/Atom"
 import { vi } from "vitest"
 import {
@@ -93,7 +94,7 @@ const keepDecision = (registry: Registry): void => {
 const keeping = () => {
   const held: Record<string, string> = {}
   return {
-    getItem: (key: string) => held[key] ?? null,
+    getItem: (key: string) => O.match(R.get(held, key), { onNone: () => null, onSome: (value) => value }),
     setItem: (key: string, value: string) => {
       held[key] = value
     },

@@ -15,7 +15,7 @@ import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
-import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, type SaveRequest } from "@inventory/catalog-contract/Decision"
 import { ConfirmId } from "@inventory/catalog-contract/Ids"
 import { AlreadyImported, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
@@ -44,7 +44,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
         const theirs = yield* client.imports
           .decide({
             params,
-            payload: { madeOn: R.map(acceptComma, () => staged.revision), set: acceptComma, clear: [] }
+            payload: { opening: 0, madeOn: R.map(acceptComma, () => staged.revision), set: acceptComma, clear: [] }
           })
           .pipe(dana)
         expect(theirs).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [], decidedSince: [] })
@@ -104,6 +104,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
         .decide({
           params,
           payload: {
+            opening: 0,
             madeOn: { "row-2": staged.revision },
             set: { "row-2": decisionFromFlags({ out: true }) },
             clear: []
@@ -171,6 +172,51 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
       const made = O.getOrThrow(O.getOrThrow(A.head(passed)).success.result)
       expect(made.created).toBe(25)
       expect((yield* client.items.list().pipe(marcus)).length).toBe(before + 25)
+    })
+  )
+})
+
+layer(TypedApp)("a save names the opening its screen decided in", (it) => {
+  it.effect("made in another opening it is refused and writes nothing, an empty or clear-only one too", () =>
+    Effect.gen(function* () {
+      const client = yield* HttpApiTest.groups(Api, ["imports"])
+      const store = yield* ImportStore
+      const marcus = as("mem_marcus")
+      const table = yield* stage(new File([messy], "items_messy.csv"))
+      const staged = yield* upload({ client, table }).pipe(marcus)
+      const params = { id: staged.id }
+      yield* client.imports
+        .commit({ params, payload: { revision: staged.revision, madeOn: {}, set: {}, clear: [] } })
+        .pipe(marcus)
+      const reopened = yield* client.imports.reopen({ params }).pipe(marcus)
+      const madeOn = { "row-55": reopened.revision }
+      const decide = (payload: SaveRequest) => client.imports.decide({ params, payload }).pipe(marcus, Effect.flip)
+      // Decided in the first opening, or naming a confirm the import never had: refused by the D1 store.
+      const below = yield* decide({ madeOn, opening: 0, set: acceptComma, clear: [] })
+      const above = yield* decide({ madeOn, opening: 2, set: acceptComma, clear: [] })
+      expect([S.is(AlreadyImported)(below), S.is(AlreadyImported)(above)]).toEqual([true, true])
+      const after = yield* client.imports.get({ params }).pipe(marcus)
+      expect([after.revision, R.has(after.decisions, "row-55")]).toEqual([reopened.revision, false])
+      // Decided in this opening: written.
+      yield* client.imports
+        .decide({ params, payload: { madeOn, opening: 1, set: acceptComma, clear: [] } })
+        .pipe(marcus)
+      const now = yield* client.imports.get({ params }).pipe(marcus)
+      expect(R.get(now.decisions, "row-55")).toEqual(O.some(acceptComma["row-55"]))
+      // An empty save and a clear of that row, both from the first opening: refused, revision and save count unmoved.
+      const org = OrganizationId.make("org_prairie")
+      const held = yield* store.decisions(org, staged.id)
+      const empty = yield* decide({ madeOn: {}, opening: 0, set: {}, clear: [] })
+      const clearOnly = yield* decide({ madeOn: { "row-55": now.revision }, opening: 0, set: {}, clear: ["row-55"] })
+      const still = yield* client.imports.get({ params }).pipe(marcus)
+      const heldAfter = yield* store.decisions(org, staged.id)
+      expect([
+        S.is(AlreadyImported)(empty),
+        S.is(AlreadyImported)(clearOnly),
+        still.revision,
+        heldAfter.saves,
+        R.get(still.decisions, "row-55")
+      ]).toEqual([true, true, now.revision, held.saves, O.some(acceptComma["row-55"])])
     })
   )
 })

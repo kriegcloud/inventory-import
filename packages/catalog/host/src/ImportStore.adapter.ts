@@ -53,6 +53,7 @@ import {
   nothingInForce,
   decisionsSaved,
   decisionsClosed,
+  decisionsOtherOpening,
   decisionsRematched,
   decisionsMoved,
   decisionsItemsChanged
@@ -557,7 +558,7 @@ export const ImportStoreD1 = Layer.effect(
     //
     // What each statement of those three batches binds, for a file of any length:
     //
-    //   a piece put (putPiece)        6 = write, list, seq, piece, org, import; 7 with the revision it is put at
+    //   a piece put (putPiece)        6 = write, list, seq, piece, org, import; one more each: revision, saves, opening
     //   the guard (itemsAsRead)      20 = items under the keys 5 (org, keys 3, found), each item read 3, created rows
     //                                     counted 3 and each 3, suggestions counted 3 and each 3
     //   openChoices                  22 = the guard 20, org, import
@@ -577,7 +578,13 @@ export const ImportStoreD1 = Layer.effect(
     type ListName = "sets" | "clears" | "keys" | "items" | "created" | "suggestions"
     //
     // A list given a revision is put only while the draft is at it, before anything in the batch moves it: at another
-    // one there is nothing to write from, so nothing of the save is written.
+    // one there is nothing to write from, so nothing of the save is written. One given an opening (how many times the
+    // import had been confirmed when the save was decided) is put only while it has been confirmed that many times.
+    //
+    // How many times the import `importDraft` names has been confirmed: one row in `importBatch` per confirm, kept
+    // when it is taken back. The same count as the confirms in its history.
+    const confirmsOf = sql`(SELECT COUNT(*) FROM importBatch b
+      WHERE b.organizationId = importDraft.organizationId AND b.importId = importDraft.id)`
     const putList = <Value, Wire>(list: ListName, of: S.Codec<Value, Wire>) =>
       D1.statement({
         Request: S.Struct({
@@ -587,12 +594,13 @@ export const ImportStoreD1 = Layer.effect(
           seq: S.Int,
           piece: piece(of),
           expected: S.NullOr(S.Int),
-          expectedSaves: S.NullOr(S.Int)
+          expectedSaves: S.NullOr(S.Int),
+          opening: S.Option(S.Int)
         }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importWriteList (organizationId, importId, writeId, list, seq, piece)
           SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
-          WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}${r.expectedSaves === null ? sql`` : sql` AND saves = ${r.expectedSaves}`}`
+          WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}${r.expectedSaves === null ? sql`` : sql` AND saves = ${r.expectedSaves}`}${O.match(r.opening, { onNone: () => sql``, onSome: (made) => sql` AND ${confirmsOf} = ${made}` })}`
       })
     const putSets = putList("sets", DecisionEntry)
     const putClears = putList("clears", S.String)
@@ -644,11 +652,17 @@ export const ImportStoreD1 = Layer.effect(
       const created = yield* createdReadPieces(read.created)
       const suggestions = yield* textPieces(read.suggestions)
       return [
-        ...A.map(keys, (piece, seq) => putKeys({ ...scope, seq, piece, expected: null, expectedSaves: null })),
-        ...A.map(items, (piece, seq) => putItems({ ...scope, seq, piece, expected: null, expectedSaves: null })),
-        ...A.map(created, (piece, seq) => putCreated({ ...scope, seq, piece, expected: null, expectedSaves: null })),
+        ...A.map(keys, (piece, seq) =>
+          putKeys({ ...scope, seq, piece, expected: null, expectedSaves: null, opening: O.none() })
+        ),
+        ...A.map(items, (piece, seq) =>
+          putItems({ ...scope, seq, piece, expected: null, expectedSaves: null, opening: O.none() })
+        ),
+        ...A.map(created, (piece, seq) =>
+          putCreated({ ...scope, seq, piece, expected: null, expectedSaves: null, opening: O.none() })
+        ),
         ...A.map(suggestions, (piece, seq) =>
-          putSuggestions({ ...scope, seq, piece, expected: null, expectedSaves: null })
+          putSuggestions({ ...scope, seq, piece, expected: null, expectedSaves: null, opening: O.none() })
         )
       ]
     })
@@ -767,13 +781,21 @@ export const ImportStoreD1 = Layer.effect(
       execute: (r) => sql`SELECT revision, saves FROM importDraft
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
+    const openConfirms = D1.statement({
+      Request: Scope,
+      Result: S.Array(S.Struct({ revision: S.Int, saves: S.Int, confirms: S.Int })),
+      execute: (r) => sql`SELECT revision, saves, ${confirmsOf} AS confirms FROM importDraft
+        WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
+    })
 
     // The open draft's revision and choices, and whether the stored items the save's judgement read are still so.
-    const OpenChoices = S.Array(S.Struct({ revision: S.Int, saves: S.Int, choicesJson: S.String, itemsSame: S.Int }))
+    const OpenChoices = S.Array(
+      S.Struct({ revision: S.Int, saves: S.Int, confirms: S.Int, choicesJson: S.String, itemsSame: S.Int })
+    )
     const openChoices = D1.statement({
       Request: S.Struct({ ...Scope.fields, ...ItemsGuard.fields }),
       Result: OpenChoices,
-      execute: (r) => sql`SELECT revision, saves, choicesJson,
+      execute: (r) => sql`SELECT revision, saves, ${confirmsOf} AS confirms, choicesJson,
           CASE WHEN ${itemsAsRead(r.org, r.id, r)} THEN 1 ELSE 0 END AS itemsSame
         FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
@@ -783,7 +805,8 @@ export const ImportStoreD1 = Layer.effect(
       draft: Draft,
       delta: DecisionDelta,
       read: ItemsAsRead = noItemsRead,
-      expected: O.Option<ComparedAt> = O.none()
+      expected: O.Option<ComparedAt> = O.none(),
+      opening: O.Option<number> = O.none()
     ) {
       const at = yield* now
       const org = actor.organizationId
@@ -792,11 +815,20 @@ export const ImportStoreD1 = Layer.effect(
       const cleared = yield* textPieces(delta.clear)
       const movedOn = (draftNow: { readonly revision: number; readonly saves: number }): boolean =>
         O.exists(expected, (compared) => compared.revision !== draftNow.revision || compared.saves !== draftNow.saves)
+      // Confirmed another number of times than in the opening the save was decided in: the import it was decided over
+      // is not this one.
+      const otherOpening = (draftNow: { readonly confirms: number }): boolean =>
+        O.exists(opening, (made) => made !== draftNow.confirms)
       if (sets.length + cleared.length === 0) {
-        const open = yield* run(openRevision({ org, id: draft.id }))
+        const open = yield* run(openConfirms({ org, id: draft.id }))
         return O.match(A.head(open), {
           onNone: () => decisionsClosed,
-          onSome: (row) => (movedOn(row) ? decisionsMoved : decisionsSaved({ revision: row.revision, changed: false }))
+          onSome: (row) =>
+            otherOpening(row)
+              ? decisionsOtherOpening(row.confirms)
+              : movedOn(row)
+                ? decisionsMoved
+                : decisionsSaved({ revision: row.revision, changed: false })
         })
       }
       const write = yield* random.uuidV4()
@@ -805,7 +837,8 @@ export const ImportStoreD1 = Layer.effect(
       const put = {
         ...scope,
         expected: O.getOrNull(O.map(expected, (at) => at.revision)),
-        expectedSaves: O.getOrNull(O.map(expected, (at) => at.saves))
+        expectedSaves: O.getOrNull(O.map(expected, (at) => at.saves)),
+        opening
       }
       const reads = yield* putRead(scope, read)
       // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
@@ -832,13 +865,15 @@ export const ImportStoreD1 = Layer.effect(
       const [before, after] = A.flatten(answers)
       return before === undefined || after === undefined
         ? decisionsClosed
-        : before.choicesJson !== choices
-          ? decisionsRematched
-          : movedOn(before)
-            ? decisionsMoved
-            : before.itemsSame !== 1
-              ? decisionsItemsChanged
-              : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
+        : otherOpening(before)
+          ? decisionsOtherOpening(before.confirms)
+          : before.choicesJson !== choices
+            ? decisionsRematched
+            : movedOn(before)
+              ? decisionsMoved
+              : before.itemsSame !== 1
+                ? decisionsItemsChanged
+                : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
     }, Effect.orDie)
 
     const ReopenRequest = S.Struct({

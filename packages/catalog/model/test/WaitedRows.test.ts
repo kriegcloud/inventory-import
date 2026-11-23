@@ -83,6 +83,8 @@ type Save = {
   readonly set?: Readonly<Record<string, RowDecisionFlags>>
   readonly clear?: ReadonlyArray<string>
   readonly over?: Readonly<Record<string, ReadonlyArray<O.Option<RowDecisionFlags>>>>
+  /** The opening the save was decided in: how many confirms the import had (0, the first, where left out here). */
+  readonly opening?: number
 }
 const request = (save: Save) => {
   const set = flags(save.set ?? {})
@@ -91,7 +93,8 @@ const request = (save: Save) => {
     madeOn: R.fromEntries(A.map([...R.keys(set), ...clear], (row) => [row, save.on] as const)),
     set,
     clear,
-    ...(save.over === undefined ? {} : { over: R.map(save.over, A.map(O.map(decisionFromFlags))) })
+    ...(save.over === undefined ? {} : { over: R.map(save.over, A.map(O.map(decisionFromFlags))) }),
+    opening: O.getOrElse(O.fromUndefinedOr(save.opening), () => 0)
   }
 }
 const people = (imports: Imports, id: ImportId) => {
@@ -655,8 +658,9 @@ describe("a row that waited across a match, and the items since", () => {
     expect(left).toEqual([some({ edits: { name: "Sack" } }), some({ stored: "replace" })])
     return seeded
   })
-  const waitedOver = (seeded: Effect.Success<typeof seededSacks>) =>
+  const waitedOver = (seeded: Effect.Success<typeof seededSacks>, opening: number) =>
     seeded.danaSaves({
+      opening,
       on: seeded.view.revision,
       set: { "row-2": { out: true }, "row-3": { out: true } },
       over: { "row-2": [O.none(), O.some(mine)], "row-3": [O.none(), O.some(both)] }
@@ -665,7 +669,7 @@ describe("a row that waited across a match, and the items since", () => {
   alone("as each match recorded: the Replace taken and the one that stood are both what the match left", () =>
     Effect.gen(function* () {
       const seeded = yield* takenAndStanding
-      const saved = yield* waitedOver(seeded)
+      const saved = yield* waitedOver(seeded, 0)
       expect(saved.decidedSince).toEqual([])
       const now = yield* seeded.stored(["row-2", "row-3"])
       expect(now).toEqual([some({ out: true }), some({ out: true })])
@@ -683,7 +687,8 @@ describe("a row that waited across a match, and the items since", () => {
           .commit({ params, payload: { revision: before.revision, madeOn: {}, set: {}, clear: [] } })
           .pipe(as(marcus))
         yield* imports.reopen({ params }).pipe(as(marcus))
-        const saved = yield* waitedOver(seeded)
+        // Sent from a screen that read the import opened again: decided in its second opening.
+        const saved = yield* waitedOver(seeded, 1)
         expect(named(saved.decidedSince)).toEqual([
           ["row-2", some({ edits: { name: "Sack" } })],
           ["row-3", some({ stored: "replace" })]
@@ -920,13 +925,14 @@ describe("what lands between a save's comparison and its write", () => {
             .commit({ params, payload: { revision: staged.revision, madeOn: {}, set: {}, clear: [] } })
             .pipe(as(marcus))
           const open = yield* plain.reopen({ params }).pipe(as(marcus))
-          yield* danaSaves({ on: open.revision, set: { "row-2": mine } })
+          yield* danaSaves({ on: open.revision, opening: 1, set: { "row-2": mine } })
           yield* matched("unitCost", "Net cost")
           const confirms = (yield* plain.get({ params }).pipe(as(marcus))).takeBack.confirms
           const takeBack = Effect.orDie(plain.takeBack({ params, payload: { confirms } }).pipe(as(marcus)))
           const { imports, tries } = yield* windowed(takeBack, 1)
           const saved = yield* people(imports, params.id).danaSaves({
             on: open.revision,
+            opening: 1,
             set: { "row-2": { out: true } },
             over: { "row-2": [O.none(), O.some(mine)] }
           })

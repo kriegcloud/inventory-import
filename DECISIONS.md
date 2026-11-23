@@ -49,10 +49,29 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       new page, and replace it without a word.
     - Import, while rows wait on lines, first asks "Import 155 items?", and only after that says nothing was imported
       because the rows wait.
-    - A decision of hers that a confirm wrote, whose own save is refused after the import was opened again because
-      somebody changed the row since, comes back to her to pick only if her screen had already read the reopened
-      import when the refusal arrived. If the refusal arrives first, she is told it was not sent and is not offered
-      the pick. The same decision gets one of two outcomes by the order two answers arrive in.
+    - Import in a tab that is behind, after my own other tab confirmed the import and opened it again, says "Someone
+      else changed this import while you were reviewing it", though nobody else did: it was me, in the other tab.
+      Nothing is imported and none of my decisions is written, so only the words are wrong.
+    - A decision of hers made before somebody else's confirm is let go without a word when the import, opened again,
+      holds an equal value that may be hers (a save of it got no answer, or she decided over a colleague's decision
+      that a match can leave equal to hers), and nothing names it when the row is decided otherwise after. The screen
+      cannot tell her save from the colleague's: that needs the review model on the server. Where no save of hers can
+      have written it, it is named.
+    - A decision from another tab of mine, made after the import was confirmed and opened again, and taken up by a tab
+      that has not read the reopened import yet, is sent as if made before the confirm: the server refuses it, and I
+      am told it was not saved, though the other tab's own save may have written it. It can also be named as not part
+      of the import, or let go, when that tab reads the reopened import.
+    - A tab loaded before the server asked every save for the number of confirms it was decided over gets, on its
+      next save, "Opening was not accepted. Check it and try again.", words about a field the person never saw, and
+      every save fails until the page is reloaded. Nothing is written. Answering that save with "the import changed:
+      reload" instead is possible on the server, not built.
+    - After the import is confirmed and opened again, the notice that names a decision a closed tab of mine left
+      (a row I kept in this tab and left out in the other) says "you left out" without "in another tab of yours",
+      when the same notice also names my own decision of that row as one that may have been saved.
+    - The server reads an import's decisions and its history in two steps. A confirm and a reopen by somebody else
+      that land between them give my screen the old decisions with the new number of confirms, and a decision I then
+      make on that picture is written into the import opened again, as if I had made it after the reopen. Not seen
+      happen: it needs both within one read.
   - **For whoever changes the code.** `tags:check`, `refs:check` and `try:check` read a file within a budget and
     refuse one past it in words; a file built to kill the parser behind text their scan misreads still kills the
     check, which then fails (`goals/atoms/PLAN.md` and `docs/standards/no-try.md` name the shapes). `try:check`
@@ -124,6 +143,12 @@ means I chose and the agent recommended the same.
 | A double click on a group's accept | A pointer's second click within 400 ms of a group's accept does nothing; Enter and Space are never held back | I decided, 2026-11-22: one click on "Use components for the 1 ticked" and the cursor sat on "Accept for the 2 ticked" | two clicks 50 ms apart: Needs a decision 24 to 22, one group; Enter twice: 24 to 21, both |
 | The toolbar's icons | Grouped by meaning: history (Undo, Redo, Activity), view (matched columns, row height, the filters), Download, Why flagged | I decided, 2026-11-22 | the groups stand apart, with a rule between |
 | The toolbar and the totals with little room | Folded by the room the page has (the sidebar taken off), never by the window, between groups; Import never leaves the right edge; the totals fold between totals, never inside one | I decided, 2026-11-22: the totals wrapped "… M 33,705, L" then "8,804" at 1,541 px | at 1,541 px with the sidebar open: two lines, Import top right; the totals' second line is "L 8,804" whole |
+| A save made before a confirm, arriving after the import was opened again | The server refuses it and writes nothing; the screen names its rows once, when the refusal comes, and not while its answer is owed | decided by the rule, for me to overrule | a save of row 55 decided in the first opening, sent after a confirm and a reopen: 409, row 55 not written; the same save made in the second opening is written (by test, not seen on screen) |
+| A decision from before a confirm whose save got no answer (lost, or the page loaded again first) | Never said to be not sent: told apart as "may have been saved before the import was confirmed", with a word to look at the row; not sent into the import opened again. On the result it is listed apart, under "no answer came to say whether it was saved first". A save the server refused, and a decision never sent, are said as not sent | decided by the rule, for me to overrule | row a left out, saved, its answer lost, the import confirmed and opened again: "1 decision of yours may have been saved before the import was confirmed" (by test, not seen on screen) |
+| A decision she was told the server refused, when the import is then confirmed or opened again | Named once, by the refusal: its line stays until the row is decided again, dismissed or the import is confirmed (the refusal's words say so), and the close or the reopened import does not name it again | decided by the rule, for me to overrule | row a left out, refused after a confirm and a reopen, then the import read: one notice for row a (by test, not seen on screen) |
+| A press that leaves an undecided row undecided | No decision: nothing sent, nothing named | decided by the rule, for me to overrule | a row shown undecided, pressed to undecided: no save, no notice (by test, not seen on screen) |
+| A decision of hers waits, and the server holds an equal value somebody else may have saved | Never let go on that value: hers is sent, and the server writes it as hers or answers that the row was decided otherwise since, and a line asks; a closed tab's stays on its line | decided by the rule, for me to overrule | row a left out, its save lost, a colleague's left-out read, then the colleague kept it: her left-out is sent, and the line asks "Row a: decided since by someone else or another tab: kept over the other row with its SKU. Yours: left out.", with "Use mine" and "Keep theirs" (by test, not seen on screen) |
+| The browser refuses to keep her waiting decisions | The screen says they could not be kept on this browser and are lost if the page is closed or loaded again before they are sent; it never says they are kept | decided by the rule, for me to overrule | seen on screen with storage refusing and the save failing, "Leave out 2" pressed: the line and the toast said so, and after a reload the two decisions were gone |
 | Confirm, when someone else decided a row this screen has not shown | Refuse, show, confirm again; their decision stands; your screen wins | same, 2026-11-19 | two tabs on items_clean.csv: row 3 left out in one, "Import 25 items" in the other imports nothing, shows 24 and asks again |
 
 **Reference ledger.** My own app stockroom (MIT): `src/domain/Prep.ts`, functions taken and rewritten (`inspect`,

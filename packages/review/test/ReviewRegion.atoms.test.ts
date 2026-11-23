@@ -18,6 +18,7 @@ import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { describe, expect, it, vi } from "vitest"
 import { it as itEffect } from "@effect/vitest"
+import { assertDefined } from "@effect/vitest/utils"
 import * as Clock from "effect/Clock"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
@@ -385,7 +386,8 @@ describe("the review region's atoms", () => {
     const all = at.registry.get(at.regionTable.ordered).length
     const facet = at.registry.get(at.region.facets)[0]
     const option = facet?.options[0]
-    if (facet === undefined || option === undefined) throw new Error("the fixture has no facet")
+    assertDefined(facet)
+    assertDefined(option)
 
     at.region.change(() => ({ facetPicked: { [facet.column.id]: [option.key] } }))
     const shown = at.registry.get(at.regionTable.ordered)
@@ -687,7 +689,8 @@ describe("the review's toolbar: the words beside Undo, the chips and the double 
     expect(labels()).toEqual(["Search: washer", "Category: packaging"])
 
     const [search, category] = at.registry.get(at.region.chips)
-    if (search === undefined || category === undefined) throw new Error("two chips were listed")
+    assertDefined(search)
+    assertDefined(category)
     at.region.clearChip(category)
     expect(labels()).toEqual(["Search: washer"])
     expect(at.registry.get(at.region.ui).facetPicked).toEqual({ category: [] })

@@ -199,10 +199,17 @@ export const tookBack: TookBack = TakenBack.make({})
 export const nothingInForce: TookBack = NothingInForce.make({})
 
 /** What a save of decisions did. */
-export const DecidedKind = LiteralKit(["saved", "closed", "rematched", "moved", "itemsChanged"]).annotate({
+export const DecidedKind = LiteralKit([
+  "saved",
+  "closed",
+  "otherOpening",
+  "rematched",
+  "moved",
+  "itemsChanged"
+]).annotate({
   identifier: "DecidedKind",
   description:
-    "The save was written; or nothing was, because the import was no longer open, because a column was matched again since the choices its decisions were judged against, because the draft moved on from the revision its rows that waited were compared at, or because a stored item that judgement read changed since"
+    "The save was written; or nothing was, because the import was no longer open, because it has been confirmed another number of times than the screen decided over (`opening` differs), because a column was matched again since the choices its decisions were judged against, because the draft moved on from the revision its rows that waited were compared at, or because a stored item that judgement read changed since"
 })
 class DecisionsSaved extends S.Opaque<DecisionsSaved, { readonly brand: unique symbol }>()(
   S.Struct({
@@ -215,6 +222,16 @@ class DecisionsClosed extends S.Opaque<DecisionsClosed, { readonly brand: unique
   S.Struct({ kind: S.tag("closed") }).annotate({
     identifier: "DecisionsClosed",
     description: "The import was no longer open: nothing was saved"
+  })
+) {}
+class DecisionsOtherOpening extends S.Opaque<DecisionsOtherOpening, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("otherOpening"),
+    confirms: S.Int.pipe(S.annotateKey({ description: "How many times the import has been confirmed, as stored" }))
+  }).annotate({
+    identifier: "DecisionsOtherOpening",
+    description:
+      "The import has been confirmed another number of times than in the opening the save's decisions were made in: nothing was saved"
   })
 ) {}
 class DecisionsRematched extends S.Opaque<DecisionsRematched, { readonly brand: unique symbol }>()(
@@ -243,7 +260,14 @@ class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly b
  * with `Decided.match` or its `guards`.
  */
 export const Decided = DecidedKind.mapMembers(() =>
-  Tuple.make(DecisionsSaved, DecisionsClosed, DecisionsRematched, DecisionsMoved, DecisionsItemsChanged)
+  Tuple.make(
+    DecisionsSaved,
+    DecisionsClosed,
+    DecisionsOtherOpening,
+    DecisionsRematched,
+    DecisionsMoved,
+    DecisionsItemsChanged
+  )
 ).pipe(S.annotate({ identifier: "Decided", description: "What a save of decisions did" }), S.toTaggedUnion("kind"))
 /** The decoded value of `Decided`. */
 export type Decided = typeof Decided.Type
@@ -252,6 +276,12 @@ export const decisionsSaved = (saved: { readonly revision: number; readonly chan
   DecisionsSaved.make(saved)
 /** The import was no longer open: nothing was saved. */
 export const decisionsClosed: Decided = DecisionsClosed.make({})
+/**
+ * The import has been confirmed another number of times (`confirms`, as stored) than in the opening the save's decisions
+ * were made in: nothing was saved. More times: a press from a screen that is behind a confirm is never applied to the
+ * import opened since. Fewer: the save names an opening the import never had. The handler words the two apart.
+ */
+export const decisionsOtherOpening = (confirms: number): Decided => DecisionsOtherOpening.make({ confirms })
 /** A column was matched again since the draft was read: nothing was saved. */
 export const decisionsRematched: Decided = DecisionsRematched.make({})
 /** The draft moved on from the revision the save's rows that waited were compared at: nothing was saved. */
@@ -406,16 +436,21 @@ export class ImportStore extends Context.Service<
      * (`itemsChanged`): a Replace or Keep-stored across a re-match was judged against them. `expected` is what the rows
      * that waited were compared at, when the save has any: nothing is saved, and no revision answered, once the draft is
      * at another revision or another save has named a row since (`moved`), an empty delta included. Every row the save
-     * names records who saved it and the revision the save was made on, changed or not. Every check is part of the save's own write, so no match,
-     * no save and no item change can fall between the judgement and the write. `read` defaults to none (`noItemsRead`),
-     * and `expected` to any revision.
+     * names records who saved it and the revision the save was made on, changed or not. `opening` is how many times the
+     * import had been confirmed in the picture the save was decided over: nothing is saved while it has been confirmed
+     * any other number of times (`otherOpening`, with the stored count), so a press made before a confirm never lands in
+     * the import opened again since.
+     * Every check is part of the save's own write, so no match, no save, no confirm and no item change can fall between
+     * the judgement and the write. `read` defaults to none (`noItemsRead`), `expected` to any revision, and `opening`
+     * to any number of confirms.
      */
     decide(
       actor: Member,
       draft: Draft,
       delta: DecisionDelta,
       read?: ItemsAsRead,
-      expected?: O.Option<ComparedAt>
+      expected?: O.Option<ComparedAt>,
+      opening?: O.Option<number>
     ): Effect.Effect<Decided>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>

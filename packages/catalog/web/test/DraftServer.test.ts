@@ -110,6 +110,7 @@ const opened = Effect.gen(function* () {
     sends.length = 0
     const payload = {
       madeOn: send.madeOn,
+      opening: send.opening,
       ...(R.isEmptyReadonlyRecord(send.over) ? {} : { over: send.over }),
       ...send.delta
     }

@@ -75,6 +75,7 @@ import {
   decisionsItemsChanged,
   decisionsMoved,
   decisionsRematched,
+  decisionsOtherOpening,
   decisionsSaved,
   type Draft,
   draftTries,
@@ -1067,7 +1068,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       draft: Draft,
       delta: DecisionDelta,
       read: ItemsAsRead = noItemsRead,
-      expected: O.Option<ComparedAt> = O.none()
+      expected: O.Option<ComparedAt> = O.none(),
+      opening: O.Option<number> = O.none()
     ) {
       const sets = yield* Effect.forEach(
         R.toEntries(delta.set),
@@ -1079,6 +1081,10 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const org = actor.organizationId
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
         if (O.isNone(found) || found.value.draft.status !== "open") return [decisionsClosed, state]
+        // Decided over the import confirmed another number of times (before a confirm since, or never so): nothing is saved.
+        const confirms = A.filter(state.confirms, (row) => row.organizationId === org && row.importId === draft.id)
+        if (O.exists(opening, (made) => made !== confirms.length))
+          return [decisionsOtherOpening(confirms.length), state]
         // Checked against other choices than the draft has now: a match came between, and nothing is saved.
         if (found.value.draft.choicesJson !== draft.choicesJson) return [decisionsRematched, state]
         // Its rows that waited were compared at another revision than the draft is at, or another save has named a row

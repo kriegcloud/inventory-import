@@ -8,6 +8,7 @@
 import { useAtomValue } from "@effect/atom-react"
 import type { ReactTable, RowData } from "@tanstack/react-table"
 import * as O from "effect/Option"
+import * as P from "effect/Predicate"
 import * as Atom from "effect/reactivity/Atom"
 import {
   type ChangeEvent,
@@ -30,8 +31,8 @@ import { Input } from "@inventory/ui/components/input"
 import { ChevronUp, ChevronDown, X } from "lucide-react"
 
 interface DataGridSearchProps<TData extends RowData> {
-  table: ReactTable<DataGridFeatures, TData, unknown>
-  gridId: string
+  readonly table: ReactTable<DataGridFeatures, TData, unknown>
+  readonly gridId: string
 }
 
 /** Whether one grid's search box is in the middle of composing a word. */
@@ -58,8 +59,8 @@ export const searchInputRef = Atom.family((grid: string) =>
       function onEscape(event: KeyboardEvent) {
         if (event.key === "Escape") {
           event.preventDefault()
-          const table = registry.get(gridTableOf(grid)) as { closeSearch: () => void } | null
-          table?.closeSearch()
+          const table = registry.get(gridTableOf(grid))
+          if (P.hasProperty(table, "closeSearch") && P.isFunction(table.closeSearch)) table.closeSearch()
         }
       }
 
@@ -90,10 +91,10 @@ export function DataGridSearch<TData extends RowData>({ table, gridId }: DataGri
 }
 
 interface DataGridSearchContentProps<TData extends RowData> extends DataGridSearchProps<TData> {
-  searchOpen: boolean
-  searchQuery: string
-  matchIndex: number
-  matchCount: number
+  readonly searchOpen: boolean
+  readonly searchQuery: string
+  readonly matchIndex: number
+  readonly matchCount: number
 }
 
 const DataGridSearchContent = memo(DataGridSearchContentImpl, (prev, next) => {

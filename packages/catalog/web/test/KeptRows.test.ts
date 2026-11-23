@@ -21,7 +21,7 @@ import { leavingApp } from "@inventory/ui/Route"
 import { decisionFromFlags, type SaveRequest } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
-import { DraftBusy, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
+import { AlreadyImported, DraftBusy, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import * as S from "effect/Schema"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -104,8 +104,11 @@ vi.mock("sonner", () => ({
   })
 }))
 
-/** How a test fails a save the server took: a refusal, the server's own failure (which may pass), or a busy draft. */
-type SaveFailure = ImportNotFound | HttpApiError.InternalServerErrorProblem | DraftBusy
+/** How a test fails a save the server took: a refusal, the server's own failure (which may pass), a busy draft, or an import confirmed since. */
+type SaveFailure = ImportNotFound | HttpApiError.InternalServerErrorProblem | DraftBusy | AlreadyImported
+
+/** The server's answer to a save decided before the import was confirmed. */
+const closedSince = AlreadyImported.make({ reason: "The import was confirmed since. Nothing was written." })
 
 /** A browser that kept nothing yet: what earlier tests left in its storage is gone. */
 const emptyStorage = (): void => {
@@ -309,6 +312,11 @@ describe("the waiting rows this browser keeps", () => {
       t.registry.set(importView(id), viewAt({ id, revision: 6, status: "imported", decisions: { "row-2": out } }))
       yield* settle
       expect(t.saves.length).toBe(2)
+      // Row 3's save is still out: what became of it is not known, so it is not named yet.
+      expect(t.registry.get(rowsLeftOver(id))).toEqual(O.none())
+      // Refused, as a save decided before the confirm is: named now.
+      yield* Deferred.fail(t.saves[1]!.answer, closedSince)
+      yield* settle
       expect(t.registry.get(rowsLeftOver(id))).toEqual(
         O.some({ rows: { "row-3": O.some(out) }, beside: {}, theirs: {} })
       )
@@ -358,6 +366,10 @@ describe("the question before the page is left", () => {
       yield* settle
       expect(leaving()).toBe(true)
       t.registry.set(importView(id), viewAt({ id, revision: 5, status: "imported" }))
+      yield* settle
+      // The save is out across the confirm: nothing is named until it is answered, and nothing waits to be sent.
+      expect([O.isSome(t.registry.get(rowsLeftOver(id))), leaving()]).toEqual([false, false])
+      yield* Deferred.fail(t.saves[0]!.answer, closedSince)
       yield* settle
       expect([O.isSome(t.registry.get(rowsLeftOver(id))), leaving()]).toEqual([true, false])
       expect(A.length(t.saves)).toBe(1)
@@ -892,7 +904,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         const said = [
           {
             title: "items_messy.csv was removed",
-            text: "Your decisions on it that were not saved went with it. Row 12: you left out; Row 31: you left out."
+            text: "Your decisions on it that were waiting went with it. Row 12: you left out; Row 31: you left out."
           }
         ]
         expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), says(again)]).toEqual([false, false, said])
@@ -973,7 +985,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
           [
             {
               title: "items_messy.csv was removed",
-              text: "Your decisions on it that were not saved went with it. Row 2: you left out; Row 3: you left out."
+              text: "Your decisions on it that were waiting went with it. Row 2: you left out; Row 3: you left out."
             }
           ]
         ])

@@ -68,6 +68,6 @@ export const noticeWords = (notice: Notice): { readonly title: string; readonly 
     },
     Removed: (gone) => ({
       title: `${O.getOrElse(gone.fileName, () => "An import")} was removed`,
-      text: `Your decisions on it that were not saved went with it. ${namedWords({ ...gone, theirs: gone.theirs ?? {} })}.`
+      text: `Your decisions on it that were waiting went with it. ${namedWords({ ...gone, theirs: gone.theirs ?? {} })}.`
     })
   })

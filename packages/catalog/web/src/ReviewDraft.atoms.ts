@@ -234,10 +234,12 @@ const perform = (input: {
     // in on this page), nothing is sent and the rows wait as after a save refused for nobody signed in. While who is
     // signed in is being asked again, the save waits for the answer, and that answer decides.
     // A row that waited names what it may be written over (`over`), and the server says which were decided since.
-    Send: ({ delta, id: sent, madeOn, over }) =>
+    // The save names the opening it was decided in (`opening`): one made before a confirm is refused once the import
+    // is opened again, and the machine names its rows then.
+    Send: ({ delta, id: sent, madeOn, opening, over }) =>
       onceSignedInKnown(registry, () => {
         if (!signedInAs({ registry, owner })) return happened(DraftEvent.SaveSignedOut({ id: sent }))
-        const payload = { madeOn, ...(R.isEmptyReadonlyRecord(over) ? {} : { over }), ...delta }
+        const payload = { madeOn, opening, ...(R.isEmptyReadonlyRecord(over) ? {} : { over }), ...delta }
         void callWrite((api) => api.imports.decide({ params: { id }, payload })).then(
           ({ changed, decidedSince, notApplied, revision }) => {
             answered(registry, id)
@@ -282,7 +284,7 @@ const perform = (input: {
         },
         Refused: ({ reason }) =>
           void toast.error("Your last decision was not saved", {
-            description: `${reason} It is listed above the review until you decide that row again or dismiss it; the review shows what was saved.`
+            description: `${reason} It is listed above the review until you decide that row again or dismiss it, or until the import is confirmed; the review shows what was saved.`
           }),
         DecidedSince: ({ rows }) =>
           void toast.error(rows.length === 1 ? "1 row was decided since" : `${rows.length} rows were decided since`, {
@@ -320,6 +322,20 @@ const perform = (input: {
               duration: Number.POSITIVE_INFINITY,
               closeButton: true,
               description: `The import was confirmed, and opened again, before ${one ? "it was" : "they were"} saved, so ${one ? "it was" : "they were"} not sent: ${namedWords(named)}. The review shows the import as it is now.`
+            }
+          )
+        },
+        // Sent before the confirm, with no answer to say what became of it: never said to be not sent. The person looks.
+        MaybeSaved: (named) => {
+          const one = leftOverLines(named).length === 1
+          void toast.warning(
+            one
+              ? "1 decision of yours may have been saved before the import was confirmed"
+              : `${leftOverLines(named).length} decisions of yours may have been saved before the import was confirmed`,
+            {
+              duration: Number.POSITIVE_INFINITY,
+              closeButton: true,
+              description: `${one ? "It was" : "They were"} sent before the import was confirmed and opened again, and no answer came to say whether ${one ? "it was" : "they were"} saved first, so ${one ? "it was" : "they were"} not sent again: ${namedWords(named)}. Look at ${one ? "that row" : "those rows"} in the review, which shows the import as it is now.`
             }
           )
         }

@@ -67,11 +67,12 @@ import {
   moveCaretToEnd,
   parseLocalDate,
   // Local change: `selectEditableText` is imported where upstream imported `replaceEditableText`.
-  selectEditableText,
-  // Local change: `settle`, for the `try` statements upstream has here (none in this repository).
-  settle
+  selectEditableText
 } from "@inventory/ui/components/data-grid/data-grid-utils"
-// Local change: `Result`, for the same.
+// Local change: an upload and a delete are Effects, run with `Effect.runFork`, where upstream has async functions with
+// `try` statements; `Result` reads how the caller's own upload or delete went.
+import * as Effect from "effect/Effect"
+import * as P from "effect/Predicate"
 import * as Result from "effect/Result"
 import { DataGridCell, setRef, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { Badge } from "@inventory/ui/components/badge"
@@ -123,6 +124,7 @@ export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TDa
   useAtomMount<unknown>(isEditing ? longTextEdit(instance) : nothingKept)
   const initialValue = getTextCellValue(useCellValue(cell))
   const { value, setDraftValue, clearDraft } = useCellDraft({
+    drafts: textDrafts,
     key: initialValue,
     fallback: initialValue,
     enabled: isEditing
@@ -257,6 +259,7 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
   useAtomMount<unknown>(isEditing ? numberCanceling(instance) : nothingKept)
   const initialValue = getNumberCellValue(useCellValue(cell))
   const { value, setDraftValue, clearDraft } = useCellDraft({
+    drafts: textDrafts,
     key: initialValue,
     fallback: String(initialValue ?? ""),
     enabled: isEditing
@@ -484,18 +487,25 @@ export function BooleanCell<TData extends RowData>(props: Omit<DataGridCellProps
 const NO_OPTIONS: ColumnSelectOption[] = []
 const NO_VALUES: never[] = []
 
-// A cell's list worked out from its value, kept while the value is the same array: a draft compares its key with it.
-const cellValuesKept = new WeakMap<object, unknown[]>()
-
-/** `read(value)`, the same array as last time for the same array value, and one empty array for any other value. */
-function getKeptCellValue<T>(value: unknown, read: (value: unknown) => T[]): T[] {
-  if (!Array.isArray(value)) return NO_VALUES
-  const known = cellValuesKept.get(value)
-  if (known !== undefined) return known as T[]
-  const made = read(value)
-  cellValuesKept.set(value, made)
-  return made
+/**
+ * A cell's list worked out from its value by `read`, kept while the value is the same array: a draft compares its key
+ * with it. For the same array value it is the same array as last time, and one empty array for any other value. Each
+ * reader keeps the lists it made, so what it hands back is a list of what it reads.
+ */
+function keptCellValues<T>(read: (value: unknown) => T[]): (value: unknown) => T[] {
+  const made = new WeakMap<object, T[]>()
+  return (value) => {
+    if (!Array.isArray(value)) return NO_VALUES
+    const known = made.get(value)
+    if (known !== undefined) return known
+    const list = read(value)
+    made.set(value, list)
+    return list
+  }
 }
+
+const getKeptOptionsCellValue = keptCellValues(getOptionsCellValue)
+const getKeptFilesCellValue = keptCellValues(getFilesCellValue)
 
 /** The files one file cell on screen is deleting. */
 const fileCellDeleting = Atom.family((_instance: string) =>
@@ -578,7 +588,7 @@ export function MultiSelectCell<TData extends RowData>(props: DataGridCellProps<
   const rowId = cell.row.id
   const columnId = cell.column.id
   const rawValue = useCellValue(cell)
-  const cellValue = getKeptCellValue(rawValue, getOptionsCellValue)
+  const cellValue = getKeptOptionsCellValue(rawValue)
 
   const cellKey = getCellKey(rowId, columnId)
 
@@ -586,12 +596,12 @@ export function MultiSelectCell<TData extends RowData>(props: DataGridCellProps<
     value: selectedValues,
     setDraftValue: setDraftValues,
     clearDraft
-  } = useCellDraft({ key: cellValue, fallback: cellValue })
+  } = useCellDraft({ drafts: valuesDrafts, key: cellValue, fallback: cellValue })
   const {
     value: searchValue,
     setDraftValue: onSearchValueChange,
     clearDraft: clearSearch
-  } = useCellDraft({ key: cellKey, fallback: "" })
+  } = useCellDraft({ drafts: textDrafts, key: cellKey, fallback: "" })
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const options = getColumnVariantOptions(cell.column, "multi-select")?.options ?? NO_OPTIONS
@@ -832,7 +842,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
   const columnId = cell.column.id
   const cellKey = getCellKey(rowId, columnId)
   const rawValue = useCellValue(cell)
-  const cellValue = getKeptCellValue(rawValue, getFilesCellValue)
+  const cellValue = getKeptFilesCellValue(rawValue)
 
   const fileMeta = getColumnVariantOptions(cell.column, "file")
   const maxFileSize = fileMeta?.maxFileSize ?? 10 * 1024 * 1024
@@ -844,7 +854,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
     value: uploadingFiles,
     setDraftValue: setUploadingFiles,
     clearDraft: clearUploadingFiles
-  } = useCellDraft<FileCellData[] | null>({ key: cellKey, fallback: null })
+  } = useCellDraft({ drafts: filesDrafts, key: cellKey, fallback: null })
   const [deleting, setDeleting] = useAtom(fileCellDeleting(useId()))
   const deletingIds = deleting.ids
   const setDeletingIds = (ids: ReadonlySet<string>) => setDeleting({ ids })
@@ -852,7 +862,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
     value: error,
     setDraftValue: setError,
     clearDraft: clearError
-  } = useCellDraft<string | null>({ key: cellValue, fallback: null })
+  } = useCellDraft({ drafts: errorDrafts, key: cellValue, fallback: null })
   // The error's two seconds on screen, cleared when the cell leaves (upstream's timeout ref and unmount effect).
   const errorTimer = useAtomValue(oneTimer(useId()))
 
@@ -868,7 +878,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
     errorTimer.start(clearError, 2000)
   }
 
-  async function addFiles(newFiles: File[]) {
+  const addFiles = Effect.fnUntraced(function* (newFiles: File[]) {
     if (readOnly || isPending || newFiles.length === 0) return
     clearError()
 
@@ -920,19 +930,21 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
     const options = cell.table.options
     const uploadFiles = options.uploadFiles
     if (uploadFiles) {
-      // Local change: `settle` where upstream has a `try` statement; a refused upload says why, as upstream's did.
-      // Called on the options, as upstream called it.
-      const uploaded = await settle(
-        () =>
-          uploadFiles.call(options, {
-            files: accepted.map(({ file }) => file),
-            rowId,
-            columnId
-          }),
-        (error) =>
-          error instanceof Error
-            ? error.message
-            : `Failed to upload ${accepted.length} file${accepted.length !== 1 ? "s" : ""}`
+      // Local change: `Effect.tryPromise` where upstream has a `try` statement; a refused upload says why, as
+      // upstream's did. Called on the options, as upstream called it.
+      const uploaded = yield* Effect.result(
+        Effect.tryPromise({
+          try: () =>
+            uploadFiles.call(options, {
+              files: accepted.map(({ file }) => file),
+              rowId,
+              columnId
+            }),
+          catch: (error) =>
+            error instanceof Error
+              ? error.message
+              : `Failed to upload ${accepted.length} file${accepted.length !== 1 ? "s" : ""}`
+        })
       )
       if (Result.isFailure(uploaded)) {
         toast.error(uploaded.failure)
@@ -949,9 +961,9 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
 
     cell.setValue([...getFilesCellValue(cell.getValue()), ...uploadedFiles.filter((file) => file.url !== undefined)])
     clearUploadingFiles()
-  }
+  })
 
-  async function deleteFiles(fileIds: string[]) {
+  const deleteFiles = Effect.fnUntraced(function* (fileIds: string[]) {
     if (readOnly || isPending) return
     clearError()
 
@@ -964,21 +976,27 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
     const options = cell.table.options
     const deleteFiles = options.deleteFiles
     if (deleteFiles) {
-      // Local change: `settle` where upstream has a `try` statement; a refused delete says why, as upstream's did.
-      // Called on the options, as upstream called it.
-      const deleted = await settle(
-        () =>
-          deleteFiles.call(options, {
-            fileIds: [...idsToDelete],
-            rowId,
-            columnId
+      // Local change: `Effect.try`, and `Effect.tryPromise` when the caller answers later, where upstream has a `try`
+      // statement; a refused delete says why, as upstream's did. Called on the options, as upstream called it.
+      const refused = (error: unknown) =>
+        error instanceof Error
+          ? error.message
+          : filesToDelete.length === 1
+            ? `Failed to delete ${filesToDelete[0]?.name}`
+            : "Failed to delete files"
+      const deleted = yield* Effect.result(
+        Effect.flatMap(
+          Effect.try({
+            try: () =>
+              deleteFiles.call(options, {
+                fileIds: [...idsToDelete],
+                rowId,
+                columnId
+              }),
+            catch: refused
           }),
-        (error) =>
-          error instanceof Error
-            ? error.message
-            : filesToDelete.length === 1
-              ? `Failed to delete ${filesToDelete[0]?.name}`
-              : "Failed to delete files"
+          (answer) => (P.isPromiseLike(answer) ? Effect.tryPromise({ try: () => answer, catch: refused }) : Effect.void)
+        )
       )
       if (Result.isFailure(deleted)) {
         toast.error(deleted.failure)
@@ -989,14 +1007,14 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
 
     cell.setValue(getFilesCellValue(cell.getValue()).filter((file) => !idsToDelete.has(file.id)))
     setDeletingIds(new Set())
-  }
+  })
 
   const containerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropzoneRef = useRef<HTMLDivElement>(null)
 
   function onDropFiles(droppedFiles: File[]) {
-    void addFiles(droppedFiles)
+    Effect.runFork(addFiles(droppedFiles))
   }
 
   const { isDragActive: isDraggingOver, dropTargetProps: cellDropProps } = useFileDropTarget(onDropFiles)
@@ -1015,7 +1033,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
 
   function onFileInputChange(event: ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(event.target.files ?? [])
-    void addFiles(selectedFiles)
+    Effect.runFork(addFiles(selectedFiles))
     event.target.value = ""
   }
 
@@ -1135,7 +1153,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
                     type="button"
                     variant="ghost"
                     className="h-6 text-xs text-muted-foreground"
-                    onClick={() => void deleteFiles(cellValue.map((file) => file.id))}
+                    onClick={() => void Effect.runFork(deleteFiles(cellValue.map((file) => file.id)))}
                     disabled={isPending}
                   >
                     Clear all
@@ -1171,7 +1189,7 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
                           variant="ghost"
                           size="icon"
                           className="size-5 rounded-sm"
-                          onClick={() => void deleteFiles([file.id])}
+                          onClick={() => void Effect.runFork(deleteFiles([file.id]))}
                           disabled={isPending}
                         >
                           <X className="size-3" />
@@ -1370,6 +1388,7 @@ function useEditableText<TData extends RowData>({
   const editor = useAtomValue(isEditing ? textEditors(instance) : noTextEditor)
   const initialValue = getTextCellValue(useCellValue(cell))
   const { value, setDraftValue, clearDraft } = useCellDraft({
+    drafts: textDrafts,
     key: initialValue,
     fallback: initialValue,
     enabled: isEditing
@@ -1465,28 +1484,45 @@ function EditableText({ isEditing, label, text, isTypedOver, className, ...props
 }
 
 interface UseCellDraftOptions<TValue> {
-  key: unknown
-  fallback: TValue
-  enabled?: boolean
+  readonly drafts: CellDrafts<TValue>
+  readonly key: unknown
+  readonly fallback: TValue
+  readonly enabled?: boolean
 }
 
+/** A draft of one cell on screen: the key it was made for and its value, or none. */
+type CellDraft<TValue> = { readonly key: unknown; readonly value: TValue } | null
+
 /**
- * One draft of one cell on screen (each `useCellDraft` its own, made for its `useId`), kept while the draft is in use:
- * a draft that is not (a text cell that is not being edited) reads `noDraft`, so a cell drawn while scrolling makes
- * no atom of its own until it is edited.
+ * The drafts of one kind of value: one draft of one cell on screen (each `useCellDraft` its own, made for its `useId`),
+ * kept while the draft is in use; a draft that is not (a text cell that is not being edited) reads `none`, so a cell
+ * drawn while scrolling makes no atom of its own until it is edited. One set for each kind, so a draft read back is
+ * of the kind written.
  */
-const cellDrafts = Atom.family((_instance: string) =>
-  Atom.make<{ readonly key: unknown; readonly value: unknown } | null>(null)
-)
-const noDraft = Atom.keepAlive(Atom.make<{ readonly key: unknown; readonly value: unknown } | null>(null))
+interface CellDrafts<TValue> {
+  readonly of: (instance: string) => Atom.Writable<CellDraft<TValue>>
+  readonly none: Atom.Writable<CellDraft<TValue>>
+}
+
+function cellDraftsOf<TValue>(): CellDrafts<TValue> {
+  return {
+    of: Atom.family((_instance: string) => Atom.make<CellDraft<TValue>>(null)),
+    none: Atom.keepAlive(Atom.make<CellDraft<TValue>>(null))
+  }
+}
+
+const textDrafts = cellDraftsOf<string>()
+const valuesDrafts = cellDraftsOf<string[]>()
+const filesDrafts = cellDraftsOf<FileCellData[] | null>()
+const errorDrafts = cellDraftsOf<string | null>()
 
 /** What an editor that is not open mounts in place of what it keeps while it is. */
 const nothingKept = Atom.keepAlive(Atom.make(false))
 
-function useCellDraft<TValue>({ key, fallback, enabled = true }: UseCellDraftOptions<TValue>) {
+function useCellDraft<TValue>({ drafts, key, fallback, enabled = true }: UseCellDraftOptions<TValue>) {
   const instance = useId()
-  const [draft, setDraft] = useAtom(enabled ? cellDrafts(instance) : noDraft)
-  const value = enabled && draft !== null && draft.key === key ? (draft.value as TValue) : fallback
+  const [draft, setDraft] = useAtom(enabled ? drafts.of(instance) : drafts.none)
+  const value = enabled && draft !== null && draft.key === key ? draft.value : fallback
 
   function setDraftValue(newValue: TValue) {
     if (!enabled) return

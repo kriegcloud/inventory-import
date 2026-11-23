@@ -13,6 +13,7 @@ import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contr
 import {
   type Draft,
   DraftEffect,
+  Said,
   DraftEvent,
   decisionsIn,
   emptyDraft,
@@ -101,6 +102,7 @@ describe("a row that waited (the server decides whether it may be written)", () 
     const failed = play(at4(), [decide("a", O.some(out)), DraftEvent.SaveFailed({ id: 1 })])
     expect(step(failed.draft, decide("b", O.some(kept))).effects).toEqual([
       DraftEffect.Send({
+        opening: 0,
         id: 2,
         delta: { set: { a: out, b: kept }, clear: [] },
         madeOn: { a: 4, b: 4 },
@@ -211,15 +213,16 @@ describe("one line per row", () => {
     takeUp(entry({ rows: { a: closed(O.some(out), { here: true }) } }))
   ])
 
-  it("follows what the server holds: theirs follows each picture, and a side the server comes to hold goes", () => {
+  it("follows what the server holds: theirs follows each picture, and a side whose value the server comes to hold is sent", () => {
     expect(lineOf(takenUp.draft)).toEqual(
       O.some({ sides: [[O.some(out), false, false]], theirs: O.some(O.some(kept)) })
     )
     const moved = step(takenUp.draft, view(6, { a: acceptedOut }))
     expect(O.map(lineOf(moved.draft), (line) => line.theirs)).toEqual(O.some(acceptedOut).pipe(O.some, O.some))
-    // The server holds the closed tab's: the line goes, and nothing is sent again for it.
+    // The server holds a value equal to the closed tab's, which may be somebody else's: the line goes, and her
+    // decision is sent, for the server to write as hers (or to answer that the row was decided otherwise since).
     const held = step(moved.draft, view(7, { a: out }))
-    expect([lineOf(held.draft), sends(held)]).toEqual([O.none(), []])
+    expect([lineOf(held.draft), A.map(sends(held), (send) => send.delta.set)]).toEqual([O.none(), [{ a: out }]])
   })
 
   it("is named whole when somebody else confirms the import: each side, and theirs", () => {
@@ -246,19 +249,21 @@ describe("one line per row", () => {
         theirs: O.none()
       })
     )
-    const whole = { rows: { a: O.some(kept) }, beside: { a: [O.some(out)] }, theirs: {} }
+    // Its kept was sent and the answer lost: the server may have written it before the confirm (`unsure`).
+    const whole = { rows: { a: O.some(kept) }, beside: { a: [O.some(out)] }, theirs: {}, unsure: { a: [O.some(kept)] } }
     expect(
       step(asks, DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: false, confirms: 1 })).draft.leftOver
     ).toEqual(O.some(whole))
     // Removed: what this browser keeps of it is named, whole.
     expect(O.map(waiting(asks), decisionsIn)).toEqual(O.some(whole))
-    // Confirmed and opened again: said, whole, and not sent into it.
+    // Confirmed and opened again: said, whole, and not sent into it: the left-out as not sent, the kept as one that may
+    // have been saved before the confirm.
     const outlived = step(asks, DraftEvent.ViewArrived({ revision: 6, decisions: {}, open: true, confirms: 1 }))
     expect([
-      A.filter(outlived.effects, DraftEffect.$is("Say")).length,
+      A.map(A.filter(outlived.effects, DraftEffect.$is("Say")), (say) => Said.$is("MaybeSaved")(say.what)),
       A.length(sends(outlived)),
       outlived.draft.lines
-    ]).toEqual([1, 0, {}])
+    ]).toEqual([[false, true], 0, {}])
   })
 
   it("takes up a closed tab's decision of a row that has a line as another side of it", () => {

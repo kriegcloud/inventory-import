@@ -8,7 +8,6 @@
   "packages/review/src/ReviewDraft.rules.ts": 1,
   "packages/review/src/ReviewRegion.atoms.ts": 2,
   "packages/review/src/internal/ReviewGrid.tsx": 1,
-  "packages/review/src/internal/keptStore.ts": 1,
   "packages/ui/src/TableSearch.component.tsx": 1,
   "packages/ui/src/components/data-table/data-table-config.ts": 1,
   "packages/ui/src/components/file-upload.tsx": 1

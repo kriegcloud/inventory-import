@@ -402,6 +402,8 @@ export interface NamedLine {
   readonly id: string
   readonly row: string
   readonly decided: string
+  /** Sent with no answer to say what became of it: it may have been saved before the import was confirmed. */
+  readonly unsure: boolean
 }
 
 /**
@@ -409,7 +411,7 @@ export interface NamedLine {
  * Whatever else of the same row was alive (a closed tab's decision beside this tab's) is a line of its own after it. A
  * row decided since by someone else or another tab says what is saved instead.
  *
- * @example leftOverLines({ rows: { "row-12": O.some(leftOut) }, beside: {}, theirs: {} }) // [{ row: "Row 12", decided: "left out" }]
+ * @example leftOverLines({ rows: { "row-12": O.some(leftOut) }, beside: {}, theirs: {} }) // [{ row: "Row 12", decided: "left out", unsure: false }]
  */
 export const leftOverLines = (named: Named): ReadonlyArray<NamedLine> =>
   A.flatMap(inFileOrder(named.rows), ([id, change]) => {
@@ -418,12 +420,16 @@ export const leftOverLines = (named: Named): ReadonlyArray<NamedLine> =>
       onSome: (theirs) => ` (saved instead: ${decisionWords(theirs)})`
     })
     const beside = O.getOrElse(R.get(named.beside, id), (): Named["beside"][string] => [])
+    // Sent with no answer to say what became of it: each place that shows the line says so in its own words.
+    const unsure = O.getOrElse(O.flatMap(O.fromUndefinedOr(named.unsure), R.get(id)), (): Named["beside"][string] => [])
+    const maybe = (one: O.Option<RowDecision>): boolean => A.some(unsure, (doubt) => sameDecision(doubt, one))
     return [
-      { id, row: rowLabel(id), decided: `${mineWords(change)}${instead}` },
+      { id, row: rowLabel(id), decided: `${mineWords(change)}${instead}`, unsure: maybe(change) },
       ...A.map(beside, (other, at) => ({
         id: `${id}:${at}`,
         row: rowLabel(id),
-        decided: `${mineWords(other)}, in another tab of yours`
+        decided: `${mineWords(other)}, in another tab of yours`,
+        unsure: maybe(other)
       }))
     ]
   })

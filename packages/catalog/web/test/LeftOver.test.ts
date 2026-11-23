@@ -16,20 +16,28 @@ describe("the rows left over", () => {
         },
         beside: { "row-12": [O.some(decisionFromFlags({ stored: "keep" })), O.none()] },
         // What the import held of a row instead, where somebody decided it since.
-        theirs: { "row-7": O.some(decisionFromFlags({ kept: true })) }
+        theirs: { "row-7": O.some(decisionFromFlags({ kept: true })) },
+        // Sent with no answer: the line is marked, and each screen says so in its own words.
+        unsure: { "row-12": [O.some(decisionFromFlags({ stored: "keep" }))] }
       })
     ).toEqual([
-      { id: "row-3", row: "Row 3", decided: "accepted the proposal for Unit cost; typed Name: Steel Tube 1in" },
+      {
+        id: "row-3",
+        row: "Row 3",
+        decided: "accepted the proposal for Unit cost; typed Name: Steel Tube 1in",
+        unsure: false
+      },
       {
         id: "row-7",
         row: "Row 7",
         decided:
-          "replaced the stored item; undid the fix for Unit of measure (saved instead: kept over the other row with its SKU)"
+          "replaced the stored item; undid the fix for Unit of measure (saved instead: kept over the other row with its SKU)",
+        unsure: false
       },
-      { id: "row-12", row: "Row 12", decided: "left out" },
-      { id: "row-12:0", row: "Row 12", decided: "kept the stored item, in another tab of yours" },
-      { id: "row-12:1", row: "Row 12", decided: "took your decision back, in another tab of yours" },
-      { id: "row-55", row: "Row 55", decided: "took your decision back" }
+      { id: "row-12", row: "Row 12", decided: "left out", unsure: false },
+      { id: "row-12:0", row: "Row 12", decided: "kept the stored item, in another tab of yours", unsure: true },
+      { id: "row-12:1", row: "Row 12", decided: "took your decision back, in another tab of yours", unsure: false },
+      { id: "row-55", row: "Row 55", decided: "took your decision back", unsure: false }
     ])
   })
 })

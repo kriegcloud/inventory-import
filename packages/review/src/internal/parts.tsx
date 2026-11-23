@@ -91,28 +91,28 @@ const OverlayScope = ScopedAtom.make(() =>
 )
 
 type OverlayProps = {
-  trigger: ReactNode
-  title: string
+  readonly trigger: ReactNode
+  readonly title: string
   /** For the bottom sheet's hidden description. */
-  about: string
+  readonly about: string
   /** Width only (`w-80`): the popover's look is the design system's. */
-  children: ReactNode | ((close: () => void) => ReactNode)
-  align?: "start" | "center" | "end"
-  side?: "top" | "bottom" | "left" | "right"
-  className?: string
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  readonly children: ReactNode | ((close: () => void) => ReactNode)
+  readonly align?: "start" | "center" | "end"
+  readonly side?: "top" | "bottom" | "left" | "right"
+  readonly className?: string
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean) => void
   /**
    * Also opens when a mouse rests on the trigger (after a short delay) and closes when it leaves both. It stays a
    * popover: a click, Enter or a tap opens it as before and keeps it open, and a screen reader meets it as a dialog.
    * Opened by hover it does not take the focus.
    */
-  hover?: boolean
+  readonly hover?: boolean
   /**
    * Drawn as the hover card is: the bordered card alone, with no arrow and no close button (Escape, a click outside
    * or the pointer leaving closes it). For a card that explains; a panel that holds a form keeps its close button.
    */
-  card?: boolean
+  readonly card?: boolean
 }
 
 /** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
@@ -611,7 +611,9 @@ export function Reason(props: {
         {sourceAndConfidence({ by, confidence: O.getOrUndefined(props.fix.confidence) })}.
       </span>{" "}
       {why.basis}
-      {why.detail === undefined || props.brief === true ? null : ` ${why.detail}`}
+      {props.brief === true
+        ? null
+        : O.match(O.fromUndefinedOr(why.detail), { onNone: () => null, onSome: (detail) => ` ${detail}` })}
     </span>
   )
 }

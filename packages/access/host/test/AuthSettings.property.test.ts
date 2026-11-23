@@ -23,6 +23,35 @@ const Given = S.Union([S.Literal(testAccountPassword), S.String])
 const read = (values: Readonly<Record<string, string>>, production: boolean) =>
   authSettings({ production }).parse(ConfigProvider.fromUnknown(values)).pipe(Effect.result)
 
+/**
+ * An address put together from its parts, each one a way an address can be more than an origin: a scheme that is not
+ * the web's, a user and password, a path, a query, a fragment. The oracle below reads the parts, not the URL parser.
+ */
+const AddressParts = S.Struct({
+  scheme: S.Literals(["http", "https", "file", "ftp", "ws"]),
+  credentials: S.Literals(["", "user@", ":pass@", "user:pass@"]),
+  host: S.Literals(["example.com", "localhost:5173", "inventory.example.workers.dev"]),
+  path: S.Literals(["", "/", "/app", "/a/b"]),
+  query: S.Literals(["", "?next=1"]),
+  fragment: S.Literals(["", "#top"])
+})
+type AddressParts = typeof AddressParts.Type
+
+/** The address as written. */
+const written = (parts: AddressParts): string =>
+  `${parts.scheme}://${parts.credentials}${parts.host}${parts.path}${parts.query}${parts.fragment}`
+
+/** An origin on the web and nothing more: http or https, no user, and no path, query or fragment past the root. */
+const onlyAnOrigin = (parts: AddressParts): boolean =>
+  (parts.scheme === "http" || parts.scheme === "https") &&
+  parts.credentials === "" &&
+  (parts.path === "" || parts.path === "/") &&
+  parts.query === "" &&
+  parts.fragment === ""
+
+/** What follows `data:` in a data address: a media type, then a comma and the data. */
+const DataBody = S.String.check(S.isPattern(/^[a-z/;=]*,[A-Za-z0-9%.]*$/))
+
 describe("the sign-in settings as read", () => {
   it.effect.prop(
     "a stage's password is read only when the repository's password opens nothing with it, and blank is none",
@@ -39,6 +68,28 @@ describe("the sign-in settings as read", () => {
             expect(O.isNone(opened)).toBe(true)
           }
         }
+      }),
+    runs
+  )
+
+  it.effect.prop(
+    "an address with another scheme, a user, a path, a query or a fragment is refused; an origin is read",
+    [Arbitrary.schema(AddressParts), Arbitrary.schema(S.Boolean)],
+    ([parts, production]) =>
+      Effect.gen(function* () {
+        const settings = yield* read({ BETTER_AUTH_URL: written(parts) }, production)
+        expect(Result.isSuccess(settings)).toBe(onlyAnOrigin(parts))
+      }),
+    runs
+  )
+
+  it.effect.prop(
+    "a data: address, whose origin is null, is refused",
+    [Arbitrary.schema(DataBody), Arbitrary.schema(S.Boolean)],
+    ([body, production]) =>
+      Effect.gen(function* () {
+        const settings = yield* read({ BETTER_AUTH_URL: `data:${body}` }, production)
+        expect(Result.isFailure(settings)).toBe(true)
       }),
     runs
   )

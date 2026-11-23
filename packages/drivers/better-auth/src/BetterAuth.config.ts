@@ -24,6 +24,10 @@ const isWebOrigin = (url: URL): boolean =>
  * origin alone and makes cookies Secure exactly when it is `https:`, so anything past the origin would be dropped
  * without a word, and a `file:` or `data:` address has no origin at all ("null"): both are refused.
  *
+ * A deployed stage's address is the Worker's (`BETTER_AUTH_URL`, from the stack's `Cloudflare.Worker.URL`), which
+ * Alchemy writes as a bare origin: `https://` and the first custom domain, or `https://<name>.<subdomain>.workers.dev`,
+ * with no path and no trailing slash. This schema reads it as it is.
+ *
  * @category schemas
  */
 export const PublicUrl = S.URL.check(

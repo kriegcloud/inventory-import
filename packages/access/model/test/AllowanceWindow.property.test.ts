@@ -31,6 +31,22 @@ const aBurst = Arbitrary.filter(Arbitrary.schema(Burst), (burst) =>
   S.is(CallMoment)(DateTime.add(A.headNonEmpty(burst.arrivals).call.at, { milliseconds: 3 * day }))
 )
 
+/** A day full of calls, then two more: one exactly 24 hours after the first, one a millisecond later. */
+const FullDay = S.Struct({
+  limit: Limit,
+  filling: S.NonEmptyArray(Reservation).check(S.isMaxLength(8)),
+  onTheEdge: Reservation,
+  pastIt: Reservation
+})
+const aFullDay = Arbitrary.filter(Arbitrary.schema(FullDay), (full) => {
+  const all = [...full.filling, full.onTheEdge, full.pastIt]
+  return (
+    full.filling.length >= full.limit &&
+    S.is(CallMoment)(DateTime.add(A.headNonEmpty(full.filling).at, { milliseconds: day + 1 })) &&
+    A.dedupe(A.map(all, (call) => call.id)).length === all.length
+  )
+})
+
 /** The taken calls among the first `upTo` that fall in the 24 hours up to `at`. */
 const takenWithin = (
   answers: ReadonlyArray<{ readonly at: number; readonly taken: boolean }>,
@@ -72,5 +88,33 @@ layer(accessMemory())("the allowance's window", (it) => {
         })
       }),
     { arbitrary: { runs: 200 } }
+  )
+
+  it.effect.prop(
+    "the day before a call is the 24 hours up to it: a call taken exactly 24 hours earlier still counts, one a millisecond more does not",
+    [aFullDay],
+    ([full]) =>
+      Effect.gen(function* () {
+        const memory = yield* AccessMemoryRef
+        yield* Ref.update(memory, (state) => ({ ...state, calls: [] }))
+        const store = yield* AllowanceStore
+        const start = A.headNonEmpty(full.filling).at
+        const at = (call: Reservation, after: number) =>
+          Reservation.make({
+            ...call,
+            organization: A.headNonEmpty(full.filling).organization,
+            at: DateTime.add(start, { milliseconds: after }),
+            limit: full.limit
+          })
+        // The limit's calls, all at the first moment: the day before it is full.
+        const filled = yield* Effect.forEach(A.take(full.filling, full.limit), (call) => store.take(at(call, 0)), {
+          concurrency: 1
+        })
+        expect(A.every(filled, (taken) => taken)).toBe(true)
+        const edge = yield* store.take(at(full.onTheEdge, day))
+        const past = yield* store.take(at(full.pastIt, day + 1))
+        expect([edge, past]).toEqual([false, true])
+      }),
+    { arbitrary: { runs: 100 } }
   )
 })

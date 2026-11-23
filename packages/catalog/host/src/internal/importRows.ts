@@ -4,8 +4,9 @@
 import { D1Instant } from "@beep/d1/D1Instant"
 import { ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
-import { RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } from "@inventory/catalog-contract/Import"
+import { DecidedBy, RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } from "@inventory/catalog-contract/Import"
 import { StagedHead } from "@inventory/catalog-contract/Staged"
+import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as O from "effect/Option"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -82,10 +83,11 @@ export const ItemInsert = S.Struct({ ...itemInsertFields, skuKey: S.String })
 export const ItemsPiece = piece(ItemInsert).annotate({ description: "Items a confirm writes, as one bound value" })
 
 /**
- * Why a row was left out or found already there, as stored: words a person can act on, never blank. The result and
- * the download of left-out rows show it as it is.
+ * Why a row was left out or found already there, as a confirm writes it: never empty, as the plan's reason never is,
+ * and at most the 4,000 characters the result reads. It asks no more of a reason than the plan does, so no plan the
+ * review can make is refused at the write; the result and the download of left-out rows show it as it is.
  */
-export const OutcomeReason = S.String.check(S.isMinLength(1), S.isMaxLength(4000), S.isPattern(/\S/)).annotate({
+export const OutcomeReason = S.String.check(S.isMinLength(1), S.isMaxLength(4000)).annotate({
   description: "Why a row was left out or already there, one sentence per problem"
 })
 
@@ -111,15 +113,63 @@ export const OutcomeInsert = S.Union([
 ]).annotate({ description: "The review's verdict on one row, before the confirm knows whether its item landed" })
 
 /**
- * What the confirms did with one item of the file, as `importOutcome` stores it, its part 0 for a row that is one
- * item. A created, replaced or taken-back row stores no reason (`''`) and nobody; the rest as `OutcomeInsert`.
+ * What the outcome rows store for a planned row: the reason of a row that is not written, and who left it out.
+ *
+ * @example outcomeInsertOf(plannedAlready) // { status: "already", reason: "SKU RJS-3545 is already there.", decidedBy: null, ... }
  */
-export const OutcomeRow = S.Union([
-  S.Struct({ ...outcomePlace, outcome: S.Literals(["created", "updated", "takenBack"]), ...noReason }),
-  S.Struct({ ...outcomePlace, outcome: S.Literal("already"), ...alreadyReason }),
-  S.Struct({ ...outcomePlace, outcome: S.Literal("notImported"), ...leftOutByPerson }),
-  S.Struct({ ...outcomePlace, outcome: S.Literal("notImported"), ...leftOutByNobody })
-]).annotate({ description: "What the confirms did with one item of the file, as stored" })
+export const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
+  const at = { rowNumber: row.rowNumber, part: row.part, sku: row.sku, name: row.name }
+  const unsettled = { decidedBy: null, decidedByName: null }
+  return PlannedRow.match(row, {
+    ready: (): typeof OutcomeInsert.Type => ({ ...at, status: "ready", reason: "", ...unsettled }),
+    update: (): typeof OutcomeInsert.Type => ({ ...at, status: "update", reason: "", ...unsettled }),
+    already: (already): typeof OutcomeInsert.Type => ({
+      ...at,
+      status: "already",
+      reason: already.reason,
+      ...unsettled
+    }),
+    notImported: (out): typeof OutcomeInsert.Type =>
+      DecidedBy.match(out.decidedBy, {
+        person: (person): typeof OutcomeInsert.Type => ({
+          ...at,
+          status: "notImported",
+          reason: out.reason,
+          decidedBy: "person",
+          decidedByName: person.name
+        }),
+        nobody: (): typeof OutcomeInsert.Type => ({
+          ...at,
+          status: "notImported",
+          reason: out.reason,
+          decidedBy: "nobody",
+          decidedByName: null
+        })
+      })
+  })
+}
+
+/**
+ * What the confirms did with one item of the file, as `importOutcome` holds it, read as any version of the app wrote
+ * it: the stored row is a boundary. A created, replaced or taken-back row holds no reason (`''`) and nobody; a reason
+ * written before a rule on its form existed reads as it was written, a blank one too; and who decided is read as an
+ * Option, so a row that names a person whose name is not one a person can read (from before names had a rule) says
+ * nobody, as the result always said of it. The strict rules are on what is written (`OutcomeInsert`).
+ */
+export const OutcomeRow = S.Struct({
+  ...outcomePlace,
+  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]),
+  reason: S.String.check(S.isMaxLength(4000)),
+  decidedBy: S.OptionFromNullOr(S.Literals(["person", "nobody"])),
+  decidedByName: S.OptionFromNullOr(S.String)
+}).annotate({ description: "What the confirms did with one item of the file, as stored by any version" })
+
+/** The person a stored row names as having left it out: only when it says a person did, by a name a person can read. */
+const leftOutBy = (row: typeof OutcomeRow.Type): O.Option<DisplayName> =>
+  O.flatMap(
+    O.filter(row.decidedBy, (who) => who === "person"),
+    () => O.flatMap(row.decidedByName, S.decodeOption(DisplayName))
+  )
 
 /** What the result says of one stored outcome row: a person who left it out is named, else nobody decided. */
 export const storedOutcome = (row: typeof OutcomeRow.Type): RowOutcome =>
@@ -131,5 +181,5 @@ export const storedOutcome = (row: typeof OutcomeRow.Type): RowOutcome =>
     name: row.name,
     outcome: row.outcome,
     reason: row.reason,
-    decidedBy: row.decidedBy === "person" ? decidedByPerson(row.decidedByName) : decidedByNobody
+    decidedBy: O.match(leftOutBy(row), { onNone: () => decidedByNobody, onSome: decidedByPerson })
   })

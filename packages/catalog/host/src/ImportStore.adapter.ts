@@ -23,7 +23,6 @@ import { ChangeSource, Confidence, changeToStored, changeFromStored } from "@inv
 import { ImportId, ConfirmId, ItemId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { Instant } from "@inventory/kernel/Text"
 import {
-  DecidedBy,
   PastImport,
   ImportEvent,
   changedItemsShown,
@@ -71,6 +70,7 @@ import {
   ItemsPiece,
   OutcomeInsert,
   OutcomeRow,
+  outcomeInsertOf,
   storedOutcome,
   UploadInsert
 } from "./internal/importRows.ts"
@@ -141,38 +141,6 @@ const itemPieces = jsonPieces({ of: ItemInsert, most: chunkRows })
 const outcomePieces = jsonPieces({ of: OutcomeInsert, most: chunkRows })
 const changePieces = jsonPieces({ of: ChangeInsert, most: chunkRows })
 
-/** What the outcome rows store for a planned row: the reason of a row that is not written, and who left it out. */
-const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
-  const at = { rowNumber: row.rowNumber, part: row.part, sku: row.sku, name: row.name }
-  const unsettled = { decidedBy: null, decidedByName: null }
-  return PlannedRow.match(row, {
-    ready: (): typeof OutcomeInsert.Type => ({ ...at, status: "ready", reason: "", ...unsettled }),
-    update: (): typeof OutcomeInsert.Type => ({ ...at, status: "update", reason: "", ...unsettled }),
-    already: (already): typeof OutcomeInsert.Type => ({
-      ...at,
-      status: "already",
-      reason: already.reason,
-      ...unsettled
-    }),
-    notImported: (out): typeof OutcomeInsert.Type =>
-      DecidedBy.match(out.decidedBy, {
-        person: (person): typeof OutcomeInsert.Type => ({
-          ...at,
-          status: "notImported",
-          reason: out.reason,
-          decidedBy: "person",
-          decidedByName: person.name
-        }),
-        nobody: (): typeof OutcomeInsert.Type => ({
-          ...at,
-          status: "notImported",
-          reason: out.reason,
-          decidedBy: "nobody",
-          decidedByName: null
-        })
-      })
-  })
-}
 /** Decisions as they travel to SQL, in pieces. */
 const decisionPieces = (set: Readonly<Record<string, RowDecision>>) =>
   decisionEntryPieces(A.map(R.toEntries(set), ([rowId, json]) => ({ rowId, json })))

@@ -1,50 +1,91 @@
-// What a confirm stores for each item of the file, and what the result reads back from it. Every row that is left
-// out or already there has a reason a person can act on; only a left-out row says who left it out, and a person is
-// named exactly when one did. A row whose item was written has no reason and nobody who decided it.
+// What a confirm stores for each item of the file, and what the result reads back from it. Every plan the review can
+// make is written: a row that is left out or already there with its reason, only a left-out row saying who left it
+// out, and a row whose item was written with no reason and nobody. What is stored is read back as any version of the
+// app wrote it, so a past import's result and its download of left-out rows still open.
 import { describe, expect, it } from "@effect/vitest"
 import { DecidedBy, outcomeReasonOf, RowOutcome } from "@inventory/catalog-contract/Import"
-import { OutcomeInsert, OutcomeRow, storedOutcome } from "@inventory/catalog-host/ImportRows"
+import {
+  OutcomeInsert,
+  OutcomeRow,
+  outcomeInsertOf,
+  Part,
+  RowNumber,
+  storedOutcome
+} from "@inventory/catalog-host/ImportRows"
+import { PlannedRow } from "@inventory/catalog-model/Confirm"
+import { DisplayName } from "@inventory/kernel/Text"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 
 const runs = { arbitrary: { runs: 300 } }
 
-/** Text a person can read: at least one character that is not a space. */
-const said = (text: unknown): boolean => P.isString(text) && /\S/.test(text)
+/**
+ * A row of `importOutcome` as any version of the app may have written it: the table's own columns and checks, with a
+ * reason of any form, and who decided and their name in any combination the columns allow.
+ */
+const StoredByAnyVersion = S.Struct({
+  rowNumber: RowNumber,
+  part: Part,
+  sku: S.String,
+  name: S.String,
+  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]),
+  reason: S.Union([S.Literal(""), S.Literal("  "), S.String.check(S.isMaxLength(4000))]),
+  decidedBy: S.NullOr(S.Literals(["person", "nobody"])),
+  decidedByName: S.NullOr(S.Union([DisplayName, S.Literal(""), S.Literal(" "), S.String]))
+})
+
+/** A name a person can read, as the result shows one: some character that is not a space, and at most 200. */
+const readable = (name: string | null): name is string => name !== null && Str.trim(name) !== "" && name.length <= 200
 
 describe("the outcome rows a confirm stores", () => {
   it.effect.prop(
-    "a row is written with a reason exactly when it is not written as an item, and a name exactly when a person left it out",
-    [Arbitrary.schema(OutcomeInsert)],
-    ([outcome]) =>
+    "every planned row is written, with a reason exactly when its item is not, and a name exactly when a person left it out",
+    [Arbitrary.schema(PlannedRow)],
+    ([plan]) =>
       Effect.gen(function* () {
-        const row = yield* S.encodeEffect(OutcomeInsert)(outcome)
-        const leftOut = row.status === "notImported"
-        const written = row.status === "ready" || row.status === "update"
-        expect(written ? row.reason === "" : said(row.reason)).toBe(true)
-        expect(row.decidedBy !== null).toBe(leftOut)
-        expect(row.decidedBy === "person" ? said(row.decidedByName) : row.decidedByName === null).toBe(true)
+        const row = yield* S.encodeEffect(OutcomeInsert)(outcomeInsertOf(plan))
+        expect([row.rowNumber, row.part, row.sku, row.name]).toEqual([plan.rowNumber, plan.part, plan.sku, plan.name])
+        PlannedRow.match(plan, {
+          ready: () => expect([row.status, row.reason, row.decidedBy]).toEqual(["ready", "", null]),
+          update: () => expect([row.status, row.reason, row.decidedBy]).toEqual(["update", "", null]),
+          already: (already) =>
+            expect([row.status, row.reason, row.decidedBy]).toEqual(["already", already.reason, null]),
+          notImported: (out) =>
+            expect([row.status, row.reason, row.decidedBy, row.decidedByName]).toEqual([
+              "notImported",
+              out.reason,
+              out.decidedBy.kind,
+              DecidedBy.guards.person(out.decidedBy) ? out.decidedBy.name : null
+            ])
+        })
       }),
     runs
   )
 
   it.effect.prop(
-    "the result reads every stored row left out or already there with a reason, and names who left it out as stored",
-    [Arbitrary.schema(OutcomeRow)],
+    "a stored row of any version is read: its outcome and reason as stored, and a person named only by a name one can read",
+    [Arbitrary.schema(StoredByAnyVersion)],
     ([stored]) =>
       Effect.gen(function* () {
-        const row = yield* S.encodeEffect(OutcomeRow)(stored)
-        const shown = storedOutcome(stored)
-        const reason = outcomeReasonOf(shown)
-        expect(O.isSome(reason) ? said(reason.value) : row.reason === "").toBe(true)
-        expect(RowOutcome.guards.notImported(shown)).toBe(row.decidedBy !== null)
+        const read = yield* S.decodeEffect(OutcomeRow)(stored)
+        const shown = storedOutcome(read)
+        expect([shown.outcome, shown.rowNumber, shown.sku, shown.name]).toEqual([
+          stored.outcome,
+          stored.rowNumber,
+          stored.sku,
+          stored.name
+        ])
+        expect(O.getOrNull(shown.part)).toBe(stored.part === 0 ? null : stored.part)
+        const hasReason = stored.outcome === "already" || stored.outcome === "notImported"
+        expect(O.getOrNull(outcomeReasonOf(shown))).toBe(hasReason ? stored.reason : null)
         if (RowOutcome.guards.notImported(shown)) {
-          // The person the column names is the one the result names, never "nobody" for a person who left it out.
           const named = DecidedBy.guards.person(shown.decidedBy) ? shown.decidedBy.name : null
-          expect(named).toBe(row.decidedBy === "person" ? row.decidedByName : null)
+          expect(named).toBe(
+            stored.decidedBy === "person" && readable(stored.decidedByName) ? stored.decidedByName : null
+          )
         }
       }),
     runs

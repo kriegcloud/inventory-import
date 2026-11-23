@@ -22,6 +22,12 @@ known. It is not for:
 Report the defect upstream as well. A patch here does not replace the report, and its header says where the report
 is.
 
+One patch is of another kind, by Benjamin's decision (2026-11-22: "Teach the prover"): `03-a-schemas-own-guards`
+fixes no wrong answer. The prover of `@alchemy.run/domain` read a case told with `effect/Match` and nothing a schema
+gives for the same question, so the review's model told every case twice. The patch adds a model of each of those
+functions to the prover. Its rules are in "A patch that teaches the prover", below, and the text to send the library's
+authors is [the note on it](upstream-prover-schema-guards.md).
+
 ## Where patches live
 
 Everything is in one workspace, `packages/patches` (`@inventory/patches`):
@@ -31,10 +37,13 @@ packages/patches/
   alchemy-domain/                              one folder for each patched package
     01-computed-instance-id.patch              one file for each defect: a header, then the diff
     02-text-length-in-a-template.patch
+    03-a-schemas-own-guards.patch
   alchemy-domain.patch                         what bun reads: built from the folder, never edited
   test/alchemy-domain/
     01-computed-instance-id/                   each patch's test, and the small code it runs
     02-text-length-in-a-template/
+    03-a-schemas-own-guards/                   with `mutants.json`: the wrong readings its test must notice
+  mutants/run.py                               runs them (below)
 ```
 
 - **One patch, one defect.** bun takes one patch file for a package, so that file is the folder's files one after
@@ -74,6 +83,30 @@ Leaving out all of a package's patches at once would show nothing about any one 
 A later patch that changes the same lines does not apply without the one it was written on. It is then left out
 too, and the test is run once more with only that later patch out, where it has to pass: the failure is then this
 patch's, not the later one's. The line the proof prints says when it did this.
+
+## A patch that teaches the prover
+
+A patch that adds a model of a library's function to the prover is right only if the model is the function: a guard
+read as "the tag matches" where the library checks the whole case would prove rules the real code breaks. So such a
+patch is held to more than its test passing:
+
+- **It answers exactly or not at all.** Where the prover cannot say what the function answers (a schema with a check
+  it does not read, such as a pattern; a value it cannot see into), the model says "not read" and the rule is not
+  proved. It never answers yes for what it did not read. The test has a case for that.
+- **Its test has, for each function, one rule that holds and one broken on purpose.** A model that always said yes
+  would lose the second, one that always said no would lose the first.
+- **Its wrong readings are written down and run.** `mutants.json` beside the test lists them, each one text replaced
+  in one file of the installed package: a guard that reads the tag alone, `isAnyOf` that reads only its first case, a
+  check ignored, a missing field allowed. `bun run --cwd packages/patches mutants` copies the installed package for
+  each, makes the change in the copy and runs the test there, where it has to fail. A mutant the test lets through is
+  a wrong model the test cannot tell from the right one: add the rule that tells them apart. Run it after any change
+  to such a patch or its test (19 mutants, about a minute; needs python3). It is not part of `bun run check`.
+- **The prover's own second opinion stays on.** A proof ends by running the real code on inputs picked for each path
+  and comparing ("Agreed with the real code"): the test asserts that line, and it is what caught the one wrong model
+  this patch had while it was written (a class the prover loads a second time, read as another class).
+
+What the third patch does not do: it reads no pattern. A text held to a pattern (`S.isPattern`) is still a check the
+prover does not read, so a rule cannot be proved from it, and a guard asked of such a schema is "not read".
 
 ## Making a patch
 

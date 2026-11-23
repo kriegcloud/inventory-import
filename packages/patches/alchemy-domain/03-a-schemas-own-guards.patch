@@ -1,0 +1,874 @@
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
+Upstream: not yet reported
+Why: The prover reads a case told with `effect/Match` and nothing a schema gives for the same question: a tagged
+  union's `guards`, `isAnyOf`, `match` and `matchOrElse`, `Schema.is`, `constTrue` and `constFalse` each end a proof
+  with "outside the code the prover reads". So the model told every case twice, once in its schema and once by hand. With this the prover reads them as the library writes them, and where it cannot say
+  exactly what a schema answers (a check it does not read) it says "not read" and proves nothing.
+Remove-when: The library's prover reads these itself. `bun run beep patches prove` then says this patch's test passes
+  without it.
+Test: test/alchemy-domain/03-a-schemas-own-guards/SchemaGuards.test.ts
+
+diff --git a/lib/Prove/internal/Interpreter.js b/lib/Prove/internal/Interpreter.js
+index a27f8eb..d8d609c 100644
+--- a/lib/Prove/internal/Interpreter.js
++++ b/lib/Prove/internal/Interpreter.js
+@@ -7,9 +7,34 @@ const KINDS = ["Event", "Rejection", "Command"];
+ const isDomainClass = (u) => typeof u === "function" &&
+     KINDS.includes(u.kind) &&
+     typeof u.tag === "string";
++/**
++ * Whether two domain classes are one. The source is loaded once for the prover
++ * and once by whoever asked for the proof, so one class can be two objects:
++ * it is then told by its kind, its name and the names of its fields.
++ * `undefined` where that does not settle it.
++ */
++const sameClass = (one, other) => {
++    if (one === other) return true;
++    if (!isDomainClass(other)) return undefined;
++    if (one.kind !== other.kind || one.tag !== other.tag) return false;
++    const mine = Object.keys(one.fields).sort();
++    const theirs = Object.keys(other.fields).sort();
++    return mine.length === theirs.length && mine.every((key, index) => key === theirs[index])
++        ? true
++        : undefined;
++};
+ const isContextTag = (u) => typeof u === "function" &&
+     typeof u.key === "string" &&
+     Symbolic.typeOf(u.schema) !== undefined;
++const isTaggedUnion = (u) => Symbolic.typeOf(u) !== undefined &&
++    typeof u.tag === "string" &&
++    typeof u.cases === "object" &&
++    u.cases !== null &&
++    typeof u.guards === "object" &&
++    typeof u.isAnyOf === "function" &&
++    typeof u.match === "function" &&
++    typeof u.matchOrElse === "function";
++
+ const fromHost = (value, name) => typeof value === "number"
+     ? Value.num(value)
+     : typeof value === "string"
+@@ -306,6 +331,10 @@ export const make = (loader, run) => {
+                 : Effect.succeed(fromTruth(equal));
+         },
+         force: (value) => forced(value),
++        is: (schema, value, site) =>
++            schema._tag === "Host"
++                ? isOf(schema.value, `Schema.is(${schema.name})`, value, site)
++                : fail(site, "calls Schema.is with a schema the prover cannot see"),
+         array: (name, items, fn, initial, site) => arrayMethods[name](items, fn, initial, site),
+     });
+     /** The array methods that take a function. The items are known; what the function gives may not be. */
+@@ -506,6 +535,11 @@ export const make = (loader, run) => {
+                 return found ?? fromHost(value.module.exports[key], key);
+             }
+             case "Host":
++                // `State.guards.Open(state)` and the like: a tagged union's own functions.
++                if (isTaggedUnion(value.value)) {
++                    const own = unionMember(value.value, value.name, key);
++                    if (own) return own;
++                }
+                 // `AccountId.make(text)`: the text, when the schema allows it.
+                 if (key === "make" && Symbolic.typeOf(value.value) !== undefined) {
+                     const ast = Symbolic.typeOf(value.value);
+@@ -538,6 +572,140 @@ export const make = (loader, run) => {
+                 return yield* fail(site, `reads .${key} of ${value._tag === "Null" ? "null" : value._tag === "Undef" ? "undefined" : `a ${value._tag}`}`);
+         }
+     });
++    /** Whether a value is one a schema allows: what `Schema.is` and a tagged union's guard answer. */
++    const isOf = (schema, name, value, site) => {
++        // An event, a rejection or a command is an instance of its class, and nothing else is.
++        if (isDomainClass(schema)) {
++            if (
++                value._tag === "Obj" &&
++                value.brand !== undefined &&
++                KINDS.includes(value.brand.kind)
++            ) {
++                const same = sameClass(schema, value.brand.cls);
++                if (same !== undefined) return Effect.succeed(Value.bool(same));
++            }
++            return isPrimitive(value) ||
++                value._tag === "Term" ||
++                value._tag === "Arr" ||
++                value._tag === "List"
++                ? Effect.succeed(Value.bool(false))
++                : fail(site, `asks ${name} of a value the prover did not see made`);
++        }
++        const ast = Symbolic.typeOf(schema);
++        if (!ast) return fail(site, `asks ${name}, which is not a schema`);
++        const formula = Symbolic.decides(value, ast, current.run);
++        return formula === undefined
++            ? fail(
++                    site,
++                    `asks ${name} of a value, where the prover does not read the schema or the value exactly`,
++                )
++            : Effect.succeed(fromTruth(formula));
++    };
++
++    /** Whether the field a tagged union tells its cases by is `key`, on this path. */
++    const tagIs = Effect.fnUntraced(function* (field, key, site) {
++        // A handler's key is text: a case told by a number is found under the number's text.
++        const equal = same(field._tag === "Num" ? Value.str(String(field.value)) : field, Value.str(key));
++        if (equal === undefined)
++            return yield* fail(site, "matches on a field the prover does not model");
++        return yield* decide(fromTruth(equal), site);
++    });
++
++    /** A tagged union's `guards`, `isAnyOf`, `match` and `matchOrElse`, as the library writes them. */
++    const unionMember = (union, name, key) => {
++        const native = (called, call) => ({
++            _tag: "Native",
++            name: `${name}.${called}`,
++            call,
++        });
++        const tagOf = (input, called, at) =>
++            input?._tag === "Obj" && input.brand?.kind !== "Matcher"
++                ? Effect.succeed(input.fields[union.tag] ?? Value.undef)
++                : fail(at, `asks ${name}.${called} of a value the prover cannot see the ${union.tag} of`);
++        /** The handler of the value's case, or `orElse`: without either, the library calls nothing and throws. */
++        const matching = Effect.fnUntraced(function* (called, input, handlers, orElse, at) {
++            if (!input || handlers?._tag !== "Obj" || handlers.brand !== undefined)
++                return yield* fail(at, `${name}.${called} is called in a way the prover has no model for`);
++            const field = yield* tagOf(input, called, at);
++            for (const [handled, handler] of Object.entries(handlers.fields))
++                if (yield* tagIs(field, handled, at)) return yield* call(handler, [input], at);
++            return orElse
++                ? yield* call(orElse, [input], at)
++                : yield* fail(at, `${name}.${called} meets a value none of its cases takes`);
++        });
++        switch (key) {
++            case "guards":
++                // Each guard is `Schema.is` of its case: the whole case, not its tag alone.
++                return Value.obj(
++                    Object.fromEntries(
++                        Object.keys(union.cases).map((one) => [
++                            one,
++                            native(`guards.${one}`, ([input], at) =>
++                                input
++                                    ? isOf(union.cases[one], `${name}.guards.${one}`, input, at)
++                                    : fail(at, `${name}.guards.${one} is called with nothing`),
++                            ),
++                        ]),
++                    ),
++                );
++            case "isAnyOf":
++                // It reads the tag alone: `keys.includes(value[tag])`.
++                return native("isAnyOf", ([keys], site) => {
++                    const list = keys ? forced(keys) : undefined;
++                    if (list?._tag !== "Arr" || !list.items.every((item) => item._tag === "Str"))
++                        return fail(site, `${name}.isAnyOf is given cases the prover cannot see`);
++                    const wanted = list.items.map((item) => item.value);
++                    return Effect.succeed(
++                        native(
++                            "isAnyOf",
++                            Effect.fnUntraced(function* ([input], at) {
++                                const field = yield* tagOf(input, "isAnyOf", at);
++                                const parts = [];
++                                for (const one of wanted) {
++                                    const equal = same(field, Value.str(one));
++                                    if (equal === undefined)
++                                        return yield* fail(at, "matches on a field the prover does not model");
++                                    parts.push(String(equal));
++                                }
++                                return fromTruth(
++                                    parts.includes("true")
++                                        ? true
++                                        : ((open) =>
++                                                open.length === 0
++                                                    ? false
++                                                    : open.length === 1
++                                                          ? open[0]
++                                                        : `(or ${open.join(" ")})`)(parts.filter((part) => part !== "false")),
++                                );
++                            }),
++                        ),
++                    );
++                });
++            case "match":
++                return native("match", (args, at) =>
++                    args.length === 1
++                        ? Effect.succeed(
++                                native("match", ([input], from) =>
++                                    matching("match", input, args[0], undefined, from),
++                                ),
++                            )
++                        : matching("match", args[0], args[1], undefined, at),
++                );
++            case "matchOrElse":
++                return native("matchOrElse", (args, at) =>
++                    args.length === 2
++                        ? Effect.succeed(
++                                native("matchOrElse", ([input], from) =>
++                                    matching("matchOrElse", input, args[0], args[1], from),
++                                ),
++                            )
++                        : matching("matchOrElse", args[0], args[1], args[2], at),
++                );
++            default:
++                return undefined;
++        }
++    };
++
+     const truthOf = (value, site) => {
+         const t = truth(value);
+         return t === undefined
+diff --git a/lib/Prove/internal/Library.d.ts b/lib/Prove/internal/Library.d.ts
+index f17ecc0..8f5d087 100644
+--- a/lib/Prove/internal/Library.d.ts
++++ b/lib/Prove/internal/Library.d.ts
+@@ -14,6 +14,8 @@ export interface Host {
+     readonly equal: (a: V, b: V, site: Site) => Eval<V>;
+     /** A list with its items, when the value is one. */
+     readonly force: (value: V) => V;
++    /** Whether a value is one a schema allows, as `Schema.is` answers: known, or a condition of the inputs. */
++    readonly is: (schema: V, value: V, site: Site) => Eval<V>;
+     /** An array's method that takes a function, such as `map`. */
+     readonly array: (name: string, items: ReadonlyArray<V>, fn: V, initial: V | undefined, site: Site) => Eval<V>;
+     /** The request contexts provided around the code being run, by tag. */
+diff --git a/lib/Prove/internal/Library.js b/lib/Prove/internal/Library.js
+index 717f411..2a7cda2 100644
+--- a/lib/Prove/internal/Library.js
++++ b/lib/Prove/internal/Library.js
+@@ -395,6 +395,18 @@ export const make = (host) => {
+         ...matchModels,
+         "effect/pipe:": piped,
+         "effect/Function:pipe": piped,
++        // A function of nothing that answers the same each time.
++        "effect/Function:constTrue": () => Effect.succeed(Value.bool(true)),
++        "effect/Function:constFalse": () => Effect.succeed(Value.bool(false)),
++        // `Schema.is(schema)`: a function of a value, which says whether the schema allows it.
++        "effect/Schema:is": ([schema], site) =>
++            schema
++                ? Effect.succeed(
++                        native("Schema.is", ([value], at) =>
++                            value ? host.is(schema, value, at) : wrongArguments(at, "Schema.is"),
++                        ),
++                    )
++                : wrongArguments(site, "Schema.is"),
+         "effect/Option:some": ([value]) => Effect.succeed(Value.some(value ?? Value.undef)),
+         "effect/Option:none": () => Effect.succeed(Value.none),
+         "effect/Option:fromNullishOr": fromNullable(["Null", "Undef"]),
+diff --git a/lib/Prove/internal/Symbolic.d.ts b/lib/Prove/internal/Symbolic.d.ts
+index 7d2552b..77dee03 100644
+--- a/lib/Prove/internal/Symbolic.d.ts
++++ b/lib/Prove/internal/Symbolic.d.ts
+@@ -40,6 +40,16 @@ export declare const assumeFits: (value: V, ast: SchemaAST.AST, run: Run) => boo
+  * a schema, the formula is `true`.
+  */
+ export declare const fits: (value: V, ast: SchemaAST.AST, run?: Run) => string;
++/**
++ * Whether a value is one a schema allows, exactly: what `Schema.is` answers.
++ * `"true"` or `"false"` where it is known, a formula of the inputs where they
++ * decide it, and `undefined` where the prover cannot say exactly: a check it
++ * does not read, a kind of schema it does not model, a value it cannot see
++ * into. Unlike `fits`, it never answers `true` for what it did not read. A
++ * part this path already assumes of an input is true, so asking it of an
++ * input the schema made adds no condition.
++ */
++export declare const decides: (value: V, ast: SchemaAST.AST, run?: Run) => string | undefined;
+ /** A reason a counterexample's input cannot be built as a real value. */
+ export interface Unbuildable {
+     readonly _tag: "Unbuildable";
+diff --git a/lib/Prove/internal/Symbolic.js b/lib/Prove/internal/Symbolic.js
+index 0aae77b..338327e 100644
+--- a/lib/Prove/internal/Symbolic.js
++++ b/lib/Prove/internal/Symbolic.js
+@@ -432,6 +432,167 @@ export const fits = (value, ast, run) => {
+             return "true";
+     }
+ };
++/** Every part holds: `false` when one is known not to, `undefined` when one is not known and none is false. */
++const allKnown = (parts) =>
++  parts.includes("false")
++    ? "false"
++    : parts.includes(undefined)
++      ? undefined
++      : all(parts);
++
++/** One part holds: `true` when one is known to, `undefined` when one is not known and none is true. */
++const anyKnown = (parts) =>
++  parts.includes("true")
++    ? "true"
++    : parts.includes(undefined)
++      ? undefined
++      : any(parts);
++
++/** The values the prover sees into: of any other, what a schema says is not known. */
++const SEEN = [
++  "Num",
++  "Big",
++  "Str",
++  "Bool",
++  "Null",
++  "Undef",
++  "Term",
++  "Obj",
++  "Arr",
++  "List",
++  "Time",
++];
++
++/**
++ * Whether a value is one a schema allows, exactly: what `Schema.is` answers.
++ * `"true"` or `"false"` where it is known, a formula of the inputs where they
++ * decide it, and `undefined` where the prover cannot say exactly: a check it
++ * does not read, a kind of schema it does not model, a value it cannot see
++ * into. Unlike `fits`, it never answers `true` for what it did not read. A
++ * part this path already assumes of an input is true, so asking it of an
++ * input the schema made adds no condition.
++ */
++export const decides = (value, ast, run) => {
++  if (!SEEN.includes(value._tag)) return undefined;
++  const checks = checksOf(ast);
++  const sort = value._tag === "Term" ? value.term.sort : undefined;
++  /** What the checks say of a term, without what this path assumes already. */
++  const checked = (formulas) =>
++    all(formulas.filter((formula) => run?.conditions.includes(formula) !== true));
++  const shape = () => {
++    switch (ast._tag) {
++      case "Unknown":
++      case "Any":
++        return "true";
++      case "Never":
++        return "false";
++      case "String":
++        if (value._tag === "Str") return String(long(checks, value.value.length));
++        return value._tag === "Term" && sort === "String"
++          ? checked(checkFormulas(checks, "String", value.term.text))
++          : "false";
++      case "BigInt":
++        if (value._tag === "Big") return String(passes(checks, value.value));
++        return value._tag === "Term" && value.big === true
++          ? checked(checkFormulas(checks, "Int", value.term.text))
++          : "false";
++      case "Number":
++        // `NaN` and the infinities pass or not by `isFinite`, which is not kept apart.
++        if (value._tag === "Num")
++          return Number.isFinite(value.value) ? String(passes(checks, value.value)) : undefined;
++        if (value._tag !== "Term" || value.big === true || (sort !== "Int" && sort !== "Real"))
++          return "false";
++        // JavaScript rounds a division: what its checks say of it is not what they say of the term.
++        if (value.quotient) return undefined;
++        return checked([
++          ...(checks.integer && sort === "Real" ? [`(is_int ${value.term.text})`] : []),
++          ...checkFormulas(checks, sort, value.term.text),
++        ]);
++      case "Boolean":
++        return String(value._tag === "Bool" || sort === "Bool");
++      case "Null":
++        return String(value._tag === "Null");
++      case "Undefined":
++      case "Void":
++        return String(value._tag === "Undef");
++      case "Literal": {
++        const literal = ast.literal;
++        if (typeof literal === "bigint") {
++          if (value._tag === "Big") return String(value.value === literal);
++          return value._tag === "Term" && value.big === true
++            ? `(= ${value.term.text} ${Smt.big(literal).text})`
++            : "false";
++        }
++        if (value._tag === "Str" || value._tag === "Num" || value._tag === "Bool")
++          return String(value.value === literal);
++        if (value._tag !== "Term" || value.big === true) return "false";
++        const term =
++          typeof literal === "string" && sort === "String"
++            ? Smt.string(literal)
++            : typeof literal === "boolean" && sort === "Bool"
++              ? Smt.bool(literal)
++              : typeof literal === "number" && sort === "Int" && Number.isInteger(literal)
++                ? Smt.int(literal)
++                : typeof literal === "number" && sort === "Real"
++                  ? Smt.real(literal)
++                  : undefined;
++        return term ? `(= ${value.term.text} ${term.text})` : "false";
++      }
++      case "Objects": {
++        if (ast.indexSignatures.length > 0) return undefined;
++        if (value._tag !== "Obj") return "false";
++        if (value.brand?.kind === "Matcher") return undefined;
++        return allKnown(
++          ast.propertySignatures.map((property) => {
++            const field = value.fields[String(property.name)];
++            // A field that is not there fits when it may be left out, or may be `undefined`.
++            return field === undefined
++              ? isOptional(property.type)
++                ? "true"
++                : decides(Value.undef, property.type, run)
++              : decides(field, property.type, run);
++          }),
++        );
++      }
++      case "Arrays": {
++        if (ast.rest.length > 1 || ast.elements.some(isOptional)) return undefined;
++        // A list no code looked at is the one the input held: it fits where it came from.
++        if (value._tag === "List" && value.ast === ast) return "true";
++        if (value._tag === "List" && !run) return undefined;
++        const list = value._tag === "List" && run ? force(value, run) : value;
++        if (list._tag !== "Arr") return "false";
++        if (!long(checks, list.items.length)) return "false";
++        if (list.items.length < ast.elements.length) return "false";
++        if (list.items.length > ast.elements.length && ast.rest.length === 0) return "false";
++        return allKnown(
++          list.items.map((item, index) => {
++            const member = ast.elements[index] ?? ast.rest[0];
++            return member === undefined ? "true" : decides(item, member, run);
++          }),
++        );
++      }
++      case "Union":
++        return anyKnown(ast.types.map((member) => decides(value, member, run)));
++      case "Declaration": {
++        if (isOption(ast) && ast.typeParameters[0]) {
++          const option = Value.optionOf(value);
++          if (!option) return "false";
++          return option._tag === "None" ? "true" : decides(option.value, ast.typeParameters[0], run);
++        }
++        return representationOf(ast.annotations)?.id === "effect/schema/DateTimeUtc" &&
++          value._tag === "Time"
++          ? "true"
++          : undefined;
++      }
++      default:
++        return undefined;
++    }
++  };
++  const shaped = shape();
++  // A value of another shape is refused whatever a check the prover does not read would say.
++  return shaped === "false" ? "false" : checks.unread.length > 0 ? undefined : shaped;
++};
++
+ const isUnbuildable = (u) => typeof u === "object" && u !== null && u._tag === "Unbuildable";
+ const fallback = (sort) => sort === "String" ? "" : sort === "Bool" ? false : 0;
+ /**
+diff --git a/src/Prove/internal/Interpreter.ts b/src/Prove/internal/Interpreter.ts
+index 36b4d8f..5c72285 100644
+--- a/src/Prove/internal/Interpreter.ts
++++ b/src/Prove/internal/Interpreter.ts
+@@ -20,6 +20,23 @@ const isDomainClass = (u: unknown): u is DomainClass =>
+   (KINDS as ReadonlyArray<unknown>).includes((u as { kind?: unknown }).kind) &&
+   typeof (u as { tag?: unknown }).tag === "string";
+ 
++/**
++ * Whether two domain classes are one. The source is loaded once for the prover
++ * and once by whoever asked for the proof, so one class can be two objects:
++ * it is then told by its kind, its name and the names of its fields.
++ * `undefined` where that does not settle it.
++ */
++const sameClass = (one: DomainClass, other: unknown): boolean | undefined => {
++  if (one === other) return true;
++  if (!isDomainClass(other)) return undefined;
++  if (one.kind !== other.kind || one.tag !== other.tag) return false;
++  const mine = Object.keys(one.fields).sort();
++  const theirs = Object.keys(other.fields).sort();
++  return mine.length === theirs.length && mine.every((key, index) => key === theirs[index])
++    ? true
++    : undefined;
++};
++
+ /** A request context: a tag with the schema of what it provides. */
+ interface ContextTag {
+   readonly key: string;
+@@ -31,6 +48,24 @@ const isContextTag = (u: unknown): u is ContextTag =>
+   typeof (u as { key?: unknown }).key === "string" &&
+   Symbolic.typeOf((u as { schema?: unknown }).schema) !== undefined;
+ 
++/** A union with a case for each value of one field: what `Schema.toTaggedUnion` gives. */
++interface TaggedUnion {
++  /** The field the cases are told by. */
++  readonly tag: string;
++  /** The schema of each case, by the field's value. */
++  readonly cases: Readonly<Record<string, unknown>>;
++}
++
++const isTaggedUnion = (u: unknown): u is TaggedUnion =>
++  Symbolic.typeOf(u) !== undefined &&
++  typeof (u as { tag?: unknown }).tag === "string" &&
++  typeof (u as { cases?: unknown }).cases === "object" &&
++  (u as { cases?: unknown }).cases !== null &&
++  typeof (u as { guards?: unknown }).guards === "object" &&
++  typeof (u as { isAnyOf?: unknown }).isAnyOf === "function" &&
++  typeof (u as { match?: unknown }).match === "function" &&
++  typeof (u as { matchOrElse?: unknown }).matchOrElse === "function";
++
+ const fromHost = (value: unknown, name: string): V =>
+   typeof value === "number"
+     ? Value.num(value)
+@@ -389,6 +424,10 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+         : Effect.succeed(fromTruth(equal));
+     },
+     force: (value) => forced(value),
++    is: (schema, value, site) =>
++      schema._tag === "Host"
++        ? isOf(schema.value, `Schema.is(${schema.name})`, value, site)
++        : fail(site, "calls Schema.is with a schema the prover cannot see"),
+     array: (name, items, fn, initial, site) => arrayMethods[name]!(items, fn, initial, site),
+   });
+ 
+@@ -603,6 +642,11 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+         return found ?? fromHost(value.module.exports[key], key);
+       }
+       case "Host":
++        // `State.guards.Open(state)` and the like: a tagged union's own functions.
++        if (isTaggedUnion(value.value)) {
++          const own = unionMember(value.value, value.name, key);
++          if (own) return own;
++        }
+         // `AccountId.make(text)`: the text, when the schema allows it.
+         if (key === "make" && Symbolic.typeOf(value.value) !== undefined) {
+           const ast = Symbolic.typeOf(value.value)!;
+@@ -639,6 +683,150 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+     }
+   });
+ 
++  /** Whether a value is one a schema allows: what `Schema.is` and a tagged union's guard answer. */
++  const isOf = (schema: unknown, name: string, value: V, site: Site): Eval<V> => {
++    // An event, a rejection or a command is an instance of its class, and nothing else is.
++    if (isDomainClass(schema)) {
++      if (
++        value._tag === "Obj" &&
++        value.brand !== undefined &&
++        (KINDS as ReadonlyArray<string>).includes(value.brand.kind)
++      ) {
++        const same = sameClass(schema, value.brand.cls);
++        if (same !== undefined) return Effect.succeed(Value.bool(same));
++      }
++      return isPrimitive(value) ||
++        value._tag === "Term" ||
++        value._tag === "Arr" ||
++        value._tag === "List"
++        ? Effect.succeed(Value.bool(false))
++        : fail(site, `asks ${name} of a value the prover did not see made`);
++    }
++    const ast = Symbolic.typeOf(schema);
++    if (!ast) return fail(site, `asks ${name}, which is not a schema`);
++    const formula = Symbolic.decides(value, ast, current.run);
++    return formula === undefined
++      ? fail(
++          site,
++          `asks ${name} of a value, where the prover does not read the schema or the value exactly`,
++        )
++      : Effect.succeed(fromTruth(formula));
++  };
++
++  /** Whether the field a tagged union tells its cases by is `key`, on this path. */
++  const tagIs: (field: V, key: string, site: Site) => Eval<boolean> = Effect.fnUntraced(function* (
++    field: V,
++    key: string,
++    site: Site,
++  ) {
++    // A handler's key is text: a case told by a number is found under the number's text.
++    const equal = same(field._tag === "Num" ? Value.str(String(field.value)) : field, Value.str(key));
++    if (equal === undefined)
++      return yield* fail(site, "matches on a field the prover does not model");
++    return yield* decide(fromTruth(equal), site);
++  });
++
++  /** A tagged union's `guards`, `isAnyOf`, `match` and `matchOrElse`, as the library writes them. */
++  const unionMember = (union: TaggedUnion, name: string, key: string): V | undefined => {
++    const native = (called: string, call: (args: ReadonlyArray<V>, at: Site) => Eval<V>): V => ({
++      _tag: "Native",
++      name: `${name}.${called}`,
++      call,
++    });
++    const tagOf = (input: V | undefined, called: string, at: Site): Eval<V> =>
++      input?._tag === "Obj" && input.brand?.kind !== "Matcher"
++        ? Effect.succeed(input.fields[union.tag] ?? Value.undef)
++        : fail(at, `asks ${name}.${called} of a value the prover cannot see the ${union.tag} of`);
++    /** The handler of the value's case, or `orElse`: without either, the library calls nothing and throws. */
++    const matching: (
++      called: string,
++      input: V | undefined,
++      handlers: V | undefined,
++      orElse: V | undefined,
++      at: Site,
++    ) => Eval<V> = Effect.fnUntraced(function* (called, input, handlers, orElse, at) {
++      if (!input || handlers?._tag !== "Obj" || handlers.brand !== undefined)
++        return yield* fail(at, `${name}.${called} is called in a way the prover has no model for`);
++      const field = yield* tagOf(input, called, at);
++      for (const [handled, handler] of Object.entries(handlers.fields))
++        if (yield* tagIs(field, handled, at)) return yield* call(handler, [input], at);
++      return orElse
++        ? yield* call(orElse, [input], at)
++        : yield* fail(at, `${name}.${called} meets a value none of its cases takes`);
++    });
++    switch (key) {
++      case "guards":
++        // Each guard is `Schema.is` of its case: the whole case, not its tag alone.
++        return Value.obj(
++          Object.fromEntries(
++            Object.keys(union.cases).map((one) => [
++              one,
++              native(`guards.${one}`, ([input], at) =>
++                input
++                  ? isOf(union.cases[one], `${name}.guards.${one}`, input, at)
++                  : fail(at, `${name}.guards.${one} is called with nothing`),
++              ),
++            ]),
++          ),
++        );
++      case "isAnyOf":
++        // It reads the tag alone: `keys.includes(value[tag])`.
++        return native("isAnyOf", ([keys], site) => {
++          const list = keys ? forced(keys) : undefined;
++          if (list?._tag !== "Arr" || !list.items.every((item) => item._tag === "Str"))
++            return fail(site, `${name}.isAnyOf is given cases the prover cannot see`);
++          const wanted = list.items.map((item) => (item as { readonly value: string }).value);
++          return Effect.succeed(
++            native(
++              "isAnyOf",
++              Effect.fnUntraced(function* ([input]: ReadonlyArray<V>, at: Site) {
++                const field = yield* tagOf(input, "isAnyOf", at);
++                const parts: Array<string> = [];
++                for (const one of wanted) {
++                  const equal = same(field, Value.str(one));
++                  if (equal === undefined)
++                    return yield* fail(at, "matches on a field the prover does not model");
++                  parts.push(String(equal));
++                }
++                return fromTruth(
++                  parts.includes("true")
++                    ? true
++                    : ((open) =>
++                        open.length === 0
++                          ? false
++                          : open.length === 1
++                            ? open[0]!
++                            : `(or ${open.join(" ")})`)(parts.filter((part) => part !== "false")),
++                );
++              }),
++            ),
++          );
++        });
++      case "match":
++        return native("match", (args, at) =>
++          args.length === 1
++            ? Effect.succeed(
++                native("match", ([input], from) =>
++                  matching("match", input, args[0], undefined, from),
++                ),
++              )
++            : matching("match", args[0], args[1], undefined, at),
++        );
++      case "matchOrElse":
++        return native("matchOrElse", (args, at) =>
++          args.length === 2
++            ? Effect.succeed(
++                native("matchOrElse", ([input], from) =>
++                  matching("matchOrElse", input, args[0], args[1], from),
++                ),
++              )
++            : matching("matchOrElse", args[0], args[1], args[2], at),
++        );
++      default:
++        return undefined;
++    }
++  };
++
+   const truthOf: Interpreter["truth"] = (value, site) => {
+     const t = truth(value);
+     return t === undefined
+diff --git a/src/Prove/internal/Library.ts b/src/Prove/internal/Library.ts
+index f653461..85c90f0 100644
+--- a/src/Prove/internal/Library.ts
++++ b/src/Prove/internal/Library.ts
+@@ -17,6 +17,8 @@ export interface Host {
+   readonly equal: (a: V, b: V, site: Site) => Eval<V>;
+   /** A list with its items, when the value is one. */
+   readonly force: (value: V) => V;
++  /** Whether a value is one a schema allows, as `Schema.is` answers: known, or a condition of the inputs. */
++  readonly is: (schema: V, value: V, site: Site) => Eval<V>;
+   /** An array's method that takes a function, such as `map`. */
+   readonly array: (
+     name: string,
+@@ -673,6 +675,18 @@ export const make = (host: Host) => {
+     ...matchModels,
+     "effect/pipe:": piped,
+     "effect/Function:pipe": piped,
++    // A function of nothing that answers the same each time.
++    "effect/Function:constTrue": () => Effect.succeed(Value.bool(true)),
++    "effect/Function:constFalse": () => Effect.succeed(Value.bool(false)),
++    // `Schema.is(schema)`: a function of a value, which says whether the schema allows it.
++    "effect/Schema:is": ([schema], site) =>
++      schema
++        ? Effect.succeed(
++            native("Schema.is", ([value], at) =>
++              value ? host.is(schema, value, at) : wrongArguments(at, "Schema.is"),
++            ),
++          )
++        : wrongArguments(site, "Schema.is"),
+     "effect/Option:some": ([value]) => Effect.succeed(Value.some(value ?? Value.undef)),
+     "effect/Option:none": () => Effect.succeed(Value.none),
+     "effect/Option:fromNullishOr": fromNullable(["Null", "Undef"]),
+diff --git a/src/Prove/internal/Symbolic.ts b/src/Prove/internal/Symbolic.ts
+index 0122b08..1ab50a1 100644
+--- a/src/Prove/internal/Symbolic.ts
++++ b/src/Prove/internal/Symbolic.ts
+@@ -483,6 +483,167 @@ export const fits = (value: V, ast: SchemaAST.AST, run?: Run): string => {
+   }
+ };
+ 
++/** Every part holds: `false` when one is known not to, `undefined` when one is not known and none is false. */
++const allKnown = (parts: ReadonlyArray<string | undefined>): string | undefined =>
++  parts.includes("false")
++    ? "false"
++    : parts.includes(undefined)
++      ? undefined
++      : all(parts as ReadonlyArray<string>);
++
++/** One part holds: `true` when one is known to, `undefined` when one is not known and none is true. */
++const anyKnown = (parts: ReadonlyArray<string | undefined>): string | undefined =>
++  parts.includes("true")
++    ? "true"
++    : parts.includes(undefined)
++      ? undefined
++      : any(parts as ReadonlyArray<string>);
++
++/** The values the prover sees into: of any other, what a schema says is not known. */
++const SEEN: ReadonlyArray<V["_tag"]> = [
++  "Num",
++  "Big",
++  "Str",
++  "Bool",
++  "Null",
++  "Undef",
++  "Term",
++  "Obj",
++  "Arr",
++  "List",
++  "Time",
++];
++
++/**
++ * Whether a value is one a schema allows, exactly: what `Schema.is` answers.
++ * `"true"` or `"false"` where it is known, a formula of the inputs where they
++ * decide it, and `undefined` where the prover cannot say exactly: a check it
++ * does not read, a kind of schema it does not model, a value it cannot see
++ * into. Unlike `fits`, it never answers `true` for what it did not read. A
++ * part this path already assumes of an input is true, so asking it of an
++ * input the schema made adds no condition.
++ */
++export const decides = (value: V, ast: SchemaAST.AST, run?: Run): string | undefined => {
++  if (!SEEN.includes(value._tag)) return undefined;
++  const checks = checksOf(ast);
++  const sort = value._tag === "Term" ? value.term.sort : undefined;
++  /** What the checks say of a term, without what this path assumes already. */
++  const checked = (formulas: ReadonlyArray<string>): string =>
++    all(formulas.filter((formula) => run?.conditions.includes(formula) !== true));
++  const shape = (): string | undefined => {
++    switch (ast._tag) {
++      case "Unknown":
++      case "Any":
++        return "true";
++      case "Never":
++        return "false";
++      case "String":
++        if (value._tag === "Str") return String(long(checks, value.value.length));
++        return value._tag === "Term" && sort === "String"
++          ? checked(checkFormulas(checks, "String", value.term.text))
++          : "false";
++      case "BigInt":
++        if (value._tag === "Big") return String(passes(checks, value.value));
++        return value._tag === "Term" && value.big === true
++          ? checked(checkFormulas(checks, "Int", value.term.text))
++          : "false";
++      case "Number":
++        // `NaN` and the infinities pass or not by `isFinite`, which is not kept apart.
++        if (value._tag === "Num")
++          return Number.isFinite(value.value) ? String(passes(checks, value.value)) : undefined;
++        if (value._tag !== "Term" || value.big === true || (sort !== "Int" && sort !== "Real"))
++          return "false";
++        // JavaScript rounds a division: what its checks say of it is not what they say of the term.
++        if (value.quotient) return undefined;
++        return checked([
++          ...(checks.integer && sort === "Real" ? [`(is_int ${value.term.text})`] : []),
++          ...checkFormulas(checks, sort, value.term.text),
++        ]);
++      case "Boolean":
++        return String(value._tag === "Bool" || sort === "Bool");
++      case "Null":
++        return String(value._tag === "Null");
++      case "Undefined":
++      case "Void":
++        return String(value._tag === "Undef");
++      case "Literal": {
++        const literal: unknown = ast.literal;
++        if (typeof literal === "bigint") {
++          if (value._tag === "Big") return String(value.value === literal);
++          return value._tag === "Term" && value.big === true
++            ? `(= ${value.term.text} ${Smt.big(literal).text})`
++            : "false";
++        }
++        if (value._tag === "Str" || value._tag === "Num" || value._tag === "Bool")
++          return String(value.value === literal);
++        if (value._tag !== "Term" || value.big === true) return "false";
++        const term =
++          typeof literal === "string" && sort === "String"
++            ? Smt.string(literal)
++            : typeof literal === "boolean" && sort === "Bool"
++              ? Smt.bool(literal)
++              : typeof literal === "number" && sort === "Int" && Number.isInteger(literal)
++                ? Smt.int(literal)
++                : typeof literal === "number" && sort === "Real"
++                  ? Smt.real(literal)
++                  : undefined;
++        return term ? `(= ${value.term.text} ${term.text})` : "false";
++      }
++      case "Objects": {
++        if (ast.indexSignatures.length > 0) return undefined;
++        if (value._tag !== "Obj") return "false";
++        if (value.brand?.kind === "Matcher") return undefined;
++        return allKnown(
++          ast.propertySignatures.map((property) => {
++            const field = value.fields[String(property.name)];
++            // A field that is not there fits when it may be left out, or may be `undefined`.
++            return field === undefined
++              ? isOptional(property.type)
++                ? "true"
++                : decides(Value.undef, property.type, run)
++              : decides(field, property.type, run);
++          }),
++        );
++      }
++      case "Arrays": {
++        if (ast.rest.length > 1 || ast.elements.some(isOptional)) return undefined;
++        // A list no code looked at is the one the input held: it fits where it came from.
++        if (value._tag === "List" && value.ast === ast) return "true";
++        if (value._tag === "List" && !run) return undefined;
++        const list = value._tag === "List" && run ? force(value, run) : value;
++        if (list._tag !== "Arr") return "false";
++        if (!long(checks, list.items.length)) return "false";
++        if (list.items.length < ast.elements.length) return "false";
++        if (list.items.length > ast.elements.length && ast.rest.length === 0) return "false";
++        return allKnown(
++          list.items.map((item, index) => {
++            const member = ast.elements[index] ?? ast.rest[0];
++            return member === undefined ? "true" : decides(item, member, run);
++          }),
++        );
++      }
++      case "Union":
++        return anyKnown(ast.types.map((member) => decides(value, member, run)));
++      case "Declaration": {
++        if (isOption(ast) && ast.typeParameters[0]) {
++          const option = Value.optionOf(value);
++          if (!option) return "false";
++          return option._tag === "None" ? "true" : decides(option.value, ast.typeParameters[0], run);
++        }
++        return representationOf(ast.annotations)?.id === "effect/schema/DateTimeUtc" &&
++          value._tag === "Time"
++          ? "true"
++          : undefined;
++      }
++      default:
++        return undefined;
++    }
++  };
++  const shaped = shape();
++  // A value of another shape is refused whatever a check the prover does not read would say.
++  return shaped === "false" ? "false" : checks.unread.length > 0 ? undefined : shaped;
++};
++
+ /** A reason a counterexample's input cannot be built as a real value. */
+ export interface Unbuildable {
+   readonly _tag: "Unbuildable";

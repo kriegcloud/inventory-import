@@ -1,0 +1,138 @@
+{
+  "package": "@alchemy.run/domain",
+  "mutants": [
+    {
+      "key": "guard-tag-only",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "? isOf(union.cases[one], `${name}.guards.${one}`, input, at)",
+      "new": "? Effect.map(tagOf(input, `guards.${one}`, at), (field) => fromTruth(same(field, Value.str(one)) ?? false))",
+      "why": "a guard that reads the tag alone, not the whole case"
+    },
+    {
+      "key": "guard-never",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "? isOf(union.cases[one], `${name}.guards.${one}`, input, at)",
+      "new": "? Effect.succeed(Value.bool(false))",
+      "why": "a guard that never says yes"
+    },
+    {
+      "key": "guard-always",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "? isOf(union.cases[one], `${name}.guards.${one}`, input, at)",
+      "new": "? Effect.succeed(Value.bool(true))",
+      "why": "a guard that always says yes"
+    },
+    {
+      "key": "unread-check-guessed",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "return shaped === \"false\" ? \"false\" : checks.unread.length > 0 ? undefined : shaped;",
+      "new": "return shaped;",
+      "why": "a schema with a check the prover does not read, answered as if it had none"
+    },
+    {
+      "key": "checks-ignored",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "all(formulas.filter((formula) => run?.conditions.includes(formula) !== true));",
+      "new": "\"true\";",
+      "why": "a text or number of the inputs allowed whatever the schema's checks say"
+    },
+    {
+      "key": "missing-field-allowed",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "                : decides(Value.undef, property.type, run)",
+      "new": "                : \"true\"",
+      "why": "a value that leaves out a field the schema needs, allowed"
+    },
+    {
+      "key": "isanyof-always",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "const equal = same(field, Value.str(one));",
+      "new": "const equal = true;",
+      "why": "isAnyOf that says yes to every case"
+    },
+    {
+      "key": "isanyof-never",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "const equal = same(field, Value.str(one));",
+      "new": "const equal = false;",
+      "why": "isAnyOf that says yes to no case"
+    },
+    {
+      "key": "isanyof-first-only",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "const wanted = list.items.map((item) => item.value);",
+      "new": "const wanted = list.items.map((item) => item.value).slice(0, 1);",
+      "why": "isAnyOf that reads only the first case it is given"
+    },
+    {
+      "key": "match-first-handler",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (yield* tagIs(field, handled, at)) return yield* call(handler, [input], at);",
+      "new": "if (true) return yield* call(handler, [input], at);",
+      "why": "match that calls its first handler whatever the case"
+    },
+    {
+      "key": "match-no-handler",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (yield* tagIs(field, handled, at)) return yield* call(handler, [input], at);",
+      "new": "if (false) return yield* call(handler, [input], at);",
+      "why": "match that finds no handler: matchOrElse always takes the other answer"
+    },
+    {
+      "key": "const-true-is-false",
+      "file": "lib/Prove/internal/Library.js",
+      "old": "\"effect/Function:constTrue\": () => Effect.succeed(Value.bool(true)),",
+      "new": "\"effect/Function:constTrue\": () => Effect.succeed(Value.bool(false)),",
+      "why": "constTrue read as no"
+    },
+    {
+      "key": "const-false-is-true",
+      "file": "lib/Prove/internal/Library.js",
+      "old": "\"effect/Function:constFalse\": () => Effect.succeed(Value.bool(false)),",
+      "new": "\"effect/Function:constFalse\": () => Effect.succeed(Value.bool(true)),",
+      "why": "constFalse read as yes"
+    },
+    {
+      "key": "is-class-always",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (same !== undefined) return Effect.succeed(Value.bool(same));",
+      "new": "if (same !== undefined) return Effect.succeed(Value.bool(true));",
+      "why": "Schema.is of an event's class saying yes to another event"
+    },
+    {
+      "key": "is-class-never",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (same !== undefined) return Effect.succeed(Value.bool(same));",
+      "new": "if (same !== undefined) return Effect.succeed(Value.bool(false));",
+      "why": "Schema.is of an event's class saying no to its own event"
+    },
+    {
+      "key": "class-loaded-twice-is-another",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (one.kind !== other.kind || one.tag !== other.tag) return false;",
+      "new": "return false;",
+      "why": "a class the prover loaded a second time read as another class: no guard says yes to a command"
+    },
+    {
+      "key": "class-name-ignored",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (one.kind !== other.kind || one.tag !== other.tag) return false;",
+      "new": "",
+      "why": "two classes told by their fields' names alone, whatever each is called"
+    },
+    {
+      "key": "is-schema-always",
+      "file": "lib/Prove/internal/Library.js",
+      "old": "value ? host.is(schema, value, at) : wrongArguments(at, \"Schema.is\"),",
+      "new": "value ? Effect.succeed(Value.bool(true)) : wrongArguments(at, \"Schema.is\"),",
+      "why": "Schema.is that always says yes"
+    },
+    {
+      "key": "is-schema-never",
+      "file": "lib/Prove/internal/Library.js",
+      "old": "value ? host.is(schema, value, at) : wrongArguments(at, \"Schema.is\"),",
+      "new": "value ? Effect.succeed(Value.bool(false)) : wrongArguments(at, \"Schema.is\"),",
+      "why": "Schema.is that never says yes"
+    }
+  ]
+}

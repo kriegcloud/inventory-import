@@ -211,9 +211,11 @@ const undoneOnly: {
 const isFieldName = S.is(fieldName)
 
 /**
- * The stored flags read once, where an absent flag becomes an empty part: the schema's decode and
- * `decisionFromFlags` both read a decision through it, so the two never disagree. A value typed under a key that
- * names no field is not read, as the decision's record of edits drops it.
+ * The flags read once, where an absent flag becomes an empty part. Flags are the wire's form of a decision, every key
+ * optional, and they reach here from three places: the wire and the store (the schema's decode) and the browser's own
+ * code, which builds a decision in that form (`decisionFromFlags`). This is the one place an absent flag is read;
+ * past it a decision has every part, so the two readers never disagree. A value typed under a key that names no field
+ * is not read, as the decision's record of edits drops it.
  */
 const partsOfFlags = (flags: RowDecisionFlags) => {
   const accepted = flags.accepted ?? []
@@ -293,7 +295,8 @@ export const decisionOf = (parts: Partial<RowDecision> = {}): RowDecision => ({
 export const decisionToFlags = (decision: RowDecision): RowDecisionFlags => flagsOf(decision)
 
 /**
- * The decision the stored flags say: what a test or a caller holding the wire form uses.
+ * The decision the flags say, read as the wire's are (`partsOfFlags`): for the browser's code that builds a decision
+ * in the wire's form, and for tests.
  *
  * @example decisionFromFlags({ out: true, kept: true }).place // { kind: "leftOut", wasKept: true }
  */

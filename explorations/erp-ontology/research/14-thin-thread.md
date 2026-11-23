@@ -311,7 +311,10 @@ fields the sketch omits. Decision 111 accepts the 18 terms as a set and the four
 (decision 101 as amended by decision 107). Role's term names 111; only its exception entry names 97 (6.4).
 
 The value is a literal kept `as const` and checked with `satisfies` against the encoded side of the metamodel's
-`Vocabulary`, as report 05 section 4.7 writes it. It is not built with `Vocabulary.make`. `make` returns the schema's
+`Vocabulary`, as report 05 section 4.7 writes it, with one change. Report 05's `Ratification` is a string that names
+a `rat-` record. In the thread it is `{ decision: <a whole number> }` on every class, property, scheme, concept and
+exception entry (decisions 107 and 111), so a number with no heading decodes and compiles, and only C12 refuses it
+(6.4). Report 05 is not rewritten. It is not built with `Vocabulary.make`. `make` returns the schema's
 declared `Type`, never the type of its argument (`Schema.ts` 240), and the metamodel declares the term tables as
 `S.Record` (report 05 section 4.6), so the keys of a made value are `string`: `keyof typeof vocabulary.schemes` would
 be `string`, and every name type below would accept any text. Both imports in the sketch are type-only, so the file

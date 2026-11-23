@@ -13,8 +13,8 @@ of eighty-five: eighty from reports 04 to 12 and the brief, merged where two rep
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
 the catalog questions. Twenty-three were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 26, 32,
-34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101; a `rat-` record ratifies one term
-proposal, and none is written yet. The gaps
+34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 118. No `rat-` record is written, and the thin thread
+uses none: its terms name the decision that accepted them (decisions 107 and 111). The gaps
 in the numbers below are theirs.
 
 The rows keep their order: what is left of the form of the vocabulary module and its checks (12 to 33), then of the

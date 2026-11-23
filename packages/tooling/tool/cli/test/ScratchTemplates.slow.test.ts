@@ -1,4 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // Every template runs as written: `scratch new` makes an experiment from each, and then the real test runner and
 // the real type-checker, with the Effect diagnostics, pass over all of them. Slow, because it starts both.
 //
@@ -9,10 +8,10 @@
 //
 // What the test runner found is read from its JSON report, never from what it prints: its summary line is coloured
 // on CI (`CI` is set there) and not in a terminal, and a test that read it passed here and failed on GitHub.
-import { existsSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
@@ -41,7 +40,8 @@ const Report = S.Struct({
 const here = new URL("../../../../../", import.meta.url).pathname
 // The Verify template needs the prover, which is installed at the root only once a package asks for it. Until then
 // this test says plainly that it did not run it, and the template is checked by hand.
-const proverInstalled = existsSync(new URL("node_modules/@alchemy.run/domain/package.json", `file://${here}`))
+// Resolved as an import is: the resolver answers where it is, or refuses when nothing is installed.
+const proverInstalled = Result.isSuccess(Result.try(() => import.meta.resolve("@alchemy.run/domain/package.json")))
 const templates = proverInstalled
   ? (["probe", "service", "screen", "verify"] as const)
   : (["probe", "service", "screen"] as const)

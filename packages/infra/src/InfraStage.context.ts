@@ -48,13 +48,16 @@ export class InfraStage extends Context.Service<InfraStage, StagePlan>()($I`Infr
    * Reads Alchemy's stage name and decides its plan. An unknown name, or a personal stage, is a defect: a stack has
    * one failure a person fixes by a setting (a missing variable), and this is not one.
    */
-  static readonly layer = Layer.effect(
-    InfraStage,
-    Effect.gen(function* () {
-      const stage = yield* Alchemy.Stage
-      const plan = yield* Result.match(planFor(stage), { onFailure: Effect.die, onSuccess: Effect.succeed })
-      if (!plan.deployed) return yield* Effect.die(StageNotDeployed.make({ stage }))
-      return plan
-    })
-  )
+  static readonly plan = Effect.gen(function* () {
+    const stage = yield* Alchemy.Stage
+    const plan = yield* Result.match(planFor(stage), { onFailure: Effect.die, onSuccess: Effect.succeed })
+    if (!plan.deployed) return yield* Effect.die(StageNotDeployed.make({ stage }))
+    return plan
+  })
+
+  /** The plan as a layer, for a test that builds it on its own. A stack is given it with `provided`. */
+  static readonly layer = Layer.effect(InfraStage, InfraStage.plan)
+
+  /** Gives a stack's program the plan of the stage it deploys: each stack is an entry point the CLI runs. */
+  static readonly provided = Effect.provideServiceEffect(InfraStage, InfraStage.plan)
 }

@@ -16,11 +16,17 @@ import { parseFailure, type Stopped, Unread, unreadable } from "./budget.ts"
 import { linesOf } from "./lines.ts"
 
 /** A node of the syntax tree. */
-type Node = Readonly<Record<string, unknown>> & { readonly type: string; readonly start: number; readonly end: number }
+export type Node = Readonly<Record<string, unknown>> & {
+  readonly type: string
+  readonly start: number
+  readonly end: number
+}
 
-const isNode = (value: unknown): value is Node =>
+/** Whether a value is a node of the syntax tree. */
+export const isNode = (value: unknown): value is Node =>
   P.isObject(value) && P.isString(value["type"]) && P.isNumber(value["start"]) && P.isNumber(value["end"])
-const children = (node: Node): ReadonlyArray<Node> =>
+/** A node's children, each node of its fields, its parent left out. */
+export const children = (node: Node): ReadonlyArray<Node> =>
   A.flatMap(R.toEntries(node), ([key, value]) =>
     key === "parent" ? [] : A.isArray(value) ? A.filter(value, isNode) : isNode(value) ? [value] : []
   )
@@ -349,13 +355,14 @@ const scanned = (code: string): ReadonlyArray<Statement> => {
 }
 
 /** What the parser makes of one module: its tree, its comments, and where it failed, if it did. */
-interface Parsed {
+export interface Parsed {
   readonly program: O.Option<Node>
   readonly comments: ReadonlyArray<unknown>
   readonly failed: O.Option<Stopped>
 }
 
-const parsedAs = (file: string, source: string): Parsed => {
+/** One module parsed: its tree, its comments, and where the parser failed, if it did. */
+export const parsedAs = ({ file, source }: { readonly file: string; readonly source: string }): Parsed => {
   const result = parseSync(file, source)
   const program: unknown = result.program
   const tree = O.liftPredicate(program, isNode)
@@ -392,7 +399,7 @@ export const readTry = (input: { readonly file: string; readonly source: string 
   })
   const refused = unreadable(source)
   if (refused !== undefined) return unreadAt(refused)
-  const whole = parsedAs(file, source)
+  const whole = parsedAs({ file, source })
   if (O.isSome(whole.failed)) return unreadAt(whole.failed.value)
   // The parser gives a program for any text; were it ever to give none, the file is refused, not passed.
   if (O.isNone(whole.program)) return unreadAt({ at: 0, unread: Unread.Unparsed({ message: "no program" }) })
@@ -409,10 +416,10 @@ export const readTry = (input: { readonly file: string; readonly source: string 
       const deep = unreadable(example.code)
       if (deep !== undefined) return unreadAt(deep, lineOf(deep.at))
       // An example is a module of TypeScript, or of TSX when it writes an element; one that is neither is scanned.
-      const asTs = parsedAs("example.ts", example.code)
+      const asTs = parsedAs({ file: "example.ts", source: example.code })
       const module = O.isNone(asTs.failed)
         ? O.some(asTs)
-        : O.liftPredicate(parsedAs("example.tsx", example.code), (read) => O.isNone(read.failed))
+        : O.liftPredicate(parsedAs({ file: "example.tsx", source: example.code }), (read) => O.isNone(read.failed))
       const statements = O.match(
         O.flatMap(module, (read) => read.program),
         {

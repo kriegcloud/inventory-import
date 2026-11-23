@@ -3,21 +3,25 @@
  * never by the code that uses it (Benjamin's standing rule; `docs/standards/schema-first.md`, SF-3 to SF-5). A
  * fallback written at a call site is a rule nobody can find, and two call sites can disagree about it.
  *
- * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`,
- * `??=`, `||` and `||=` before a value written out, `getOrElse`), a comparison with `null` or `undefined`, an Option turned back into a missing value (`getOrUndefined`,
- * `getOrNull`), and a trim or a change of case that is not `SchemaGetter`'s or `SchemaTransformation`'s. The law does
- * not judge whether a place is "really" a default: a law that judges is argued with, and one that reads types costs
- * the whole program on every run.
+ * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`, `??=`,
+ * `||` and `||=` before a value written out, `getOrElse`), a comparison with `null` or `undefined`, an Option turned
+ * back into a missing value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not
+ * `SchemaGetter`'s or `SchemaTransformation`'s. The law does not judge whether a place is "really" a default: a law
+ * that judges is argued with, and one that reads types costs the whole program on every run.
  *
- * The tree had about 2,000 such places when the law was written (`getOrElse` and `||` were counted a commit later,
- * with a baseline written anew, since without them a refused `x ?? 0` was written again as `O.getOrElse(x, () => 0)`), so it holds a baseline (`defaults-baseline.json` at
- * the root): for each file, how many of each kind it may hold. A file with more than its baseline fails, and a file
- * the baseline does not name may hold none. A file with fewer never fails: `--write` lowers the baseline to what the
- * tree holds, and never raises it (the first one, with no baseline file yet, records the tree as it stands, and so
- * does the first after the reader counts more: the baseline says in `reads` what it was written for). So nobody is asked to clean a file to finish other work, nobody can add a place,
+ * The tree had about 2,000 such places when the law was written (`getOrElse` and `||` were counted a commit later, with
+ * a baseline written anew, since without them a refused `x ?? 0` was written again as `O.getOrElse(x, () => 0)`), so it
+ * holds a baseline (`defaults-baseline.json` at the root): for each file, how many of each kind it may hold. A file
+ * with more than its baseline fails, and a file the baseline does not name may hold none. A file with fewer never
+ * fails: `--write` lowers the baseline to what the tree holds, and never raises it (the first one, with no baseline
+ * file yet, records the tree as it stands, and so does the first after the reader counts more: the baseline says in
+ * `reads` what it was written for). So nobody is asked to clean a file to finish other work, nobody can add a place,
  * and the numbers only fall. A run over the whole tree also holds the baseline against main's, as the bans hold their
  * ledgers (`internal/ledger.ts`): a file main's does not name, or a count above main's, is refused, so a commit that
- * raises the baseline beside the code cannot pass. The law is done when the baseline is empty and is deleted.
+ * raises the baseline beside the code cannot pass. Main's baseline written for a reader that counted less says nothing
+ * of what this one counts, so then each line is held to what this reader finds in the file's code on main instead:
+ * code nobody changed passes, and a place written since is still refused. The law is done when the baseline is empty
+ * and is deleted.
  *
  * Given files, it reads only those: a few milliseconds, so the same law can answer the moment a file is edited
  * (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places said are the ones its
@@ -29,16 +33,18 @@
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { DefaultsKind, type DefaultsPlace, readDefaults, whatIsCounted } from "./internal/defaultsCode.ts"
-import { atBase } from "./internal/ledger.ts"
+import { type AtBase, atBase } from "./internal/ledger.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Defaults.rules")
 
@@ -131,7 +137,10 @@ export const DefaultsFinding = S.TaggedUnion({
     )
   },
   Ledger: {
-    said: S.String.pipe(S.annotateKey({ description: "What the baseline says against main's" }))
+    said: S.String.pipe(S.annotateKey({ description: "What the baseline says against the files and against main's" })),
+    grew: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a count rose or a file was added, which is code that breaks the rule" })
+    )
   },
   Unlisted: { why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" })) },
   Unread: {
@@ -243,52 +252,152 @@ const encodeKey = S.encodeEffect(S.fromJsonString(S.String))
 const BaselineJson = S.fromJsonString(DefaultsBaseline)
 
 /**
- * What the baseline says against the files there are and against main's (where this branch left it; on a push, the
- * commit CI names): each file it names that is not there, so a new file at that path inherits no allowance (unless
- * `--write` is about to take its line off); each file main's does not name, under the name it had there; and each
- * count above main's. Main with no baseline yet is not compared, and neither is one written for what the reader
- * counted before it counted more: its numbers are of fewer things, so they say nothing of these.
+ * The files the law reads, from git's list of own code and its list of the kit's `vendor.json` files (each NUL
+ * separated): not a declaration file, and not inside a package the kit is copied into (it keeps beep-effect's code as
+ * it is).
  */
-const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBaseline["files"], write: boolean) {
+const scopeOf = (listed: ReadonlyArray<string>, vendored: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const kit = A.map(A.filter(vendored, Str.isNonEmpty), (file) =>
+    Str.slice(0, file.length - "vendor.json".length)(file)
+  )
+  return A.dedupe(
+    A.filter(
+      listed,
+      (file) =>
+        Str.isNonEmpty(file) && !Str.endsWith(".d.ts")(file) && !A.some(kit, (folder) => Str.startsWith(folder)(file))
+    )
+  )
+}
+
+/**
+ * The files the law read at `commit`, or what git said when it could not list them. `git grep` answers 1 when no file
+ * matches, an empty list; any other code is a list it could not give, never an empty one.
+ */
+const readScope = Effect.fn("Defaults.readScope")(function* (commit: string) {
   const repo = yield* Repo
-  const gone = write
+  const listedAt = (pathspec: ReadonlyArray<string>) =>
+    Effect.map(
+      repo.run("git", ["grep", "-l", "-z", "-e", "", commit, "--", ...pathspec], { cwd: repo.root }),
+      (answer): Result.Result<ReadonlyArray<string>, string> =>
+        answer.code === 0 || answer.code === 1
+          ? Result.succeed(A.map(Str.split("\0")(answer.stdout), Str.slice(commit.length + 1)))
+          : Result.fail(answer.stderr)
+    )
+  const listed = yield* listedAt(ownCode)
+  const vendored = yield* listedAt([":(glob)packages/**/vendor.json"])
+  return Result.all([listed, vendored]).pipe(Result.map(([own, kit]) => scopeOf(own, kit)))
+})
+
+/** One thing the baseline says against the files or main's, and whether it is code that breaks the rule. */
+const Said = DefaultsFinding.cases.Ledger
+
+/**
+ * What the baseline says against the files there are and against main's (`base`: where this branch left it; on a
+ * push, the commit CI names): each file it names that is not there, so a new file at that path inherits no allowance
+ * (unless `--write` is about to take its line off, or move it to the file it was renamed to); each file main's does
+ * not name, under the name it had there; and each count above main's. Main with no baseline yet is not compared.
+ *
+ * Main's baseline written for what the reader counted before it counted more (its `reads`) holds numbers of fewer
+ * things, so its lines say nothing of these. Then each line is held instead to what this reader finds in the file as
+ * it stood at the base, kind by kind: code nobody changed passes, and a place written since is refused, in the same
+ * push that widens the reader.
+ */
+const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
+  readonly now: DefaultsBaseline["files"]
+  readonly write: boolean
+  readonly base: AtBase
+  readonly inScope: ReadonlyArray<string>
+}) {
+  const repo = yield* Repo
+  const { base, now } = input
+  const gone = input.write
     ? []
     : yield* Effect.filter(
         A.sort(R.keys(now), Order.String),
         (file) => Effect.map(repo.exists(repo.join(repo.root, file)), (there) => !there),
         { concurrency: 1 }
       )
-  const missing = A.map(
-    gone,
-    (file) =>
-      `${file}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+  // A line whose file moved to one the law reads goes with it at the next `--write`; one moved out of what the law
+  // reads (a declaration file, the kit) is only taken off.
+  const movedTo = R.fromEntries(
+    A.filterMap(R.toEntries(base.renamed), ([to, from]) =>
+      A.contains(input.inScope, to) ? Result.succeed([from, to] as const) : Result.failVoid
+    )
   )
-  const base = yield* atBase(baselineFile)
-  if (O.isSome(base.problem)) return A.append(missing, base.problem.value)
+  const missing = A.map(gone, (file) =>
+    Said.make({
+      said: O.match(R.get(movedTo, file), {
+        onNone: () =>
+          `${file}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`,
+        onSome: (to) =>
+          `${file}  is in ${baselineFile} but was renamed to ${to}: bun run beep laws defaults --write moves its line`
+      }),
+      grew: false
+    })
+  )
+  if (O.isSome(base.problem)) return A.append(missing, Said.make({ said: base.problem.value, grew: false }))
   if (O.isNone(base.text)) return missing
   const was = S.decodeOption(BaselineJson)(base.text.value)
-  if (O.isNone(was)) return A.append(missing, `${baselineFile} on main is not a baseline, so it could not be compared`)
-  if (!readsAsNow(was.value.reads)) return missing
-  const moved = A.flatMap(R.toEntries(now), ([file, counts]): ReadonlyArray<string> =>
-    O.match(
-      R.get(
-        was.value.files,
-        O.getOrElse(R.get(base.renamed, file), () => file)
-      ),
-      {
+  if (O.isNone(was)) {
+    return A.append(
+      missing,
+      Said.make({ said: `${baselineFile} on main is not a baseline, so it could not be compared`, grew: false })
+    )
+  }
+  const sameReader = readsAsNow(was.value.reads)
+  // With another reader, only a file the law read at the base is held to what it held there: one that came in from
+  // the kit, the registry's components or the tooling holds places nobody counted, and is new to the law.
+  const scopeThere = sameReader || O.isNone(base.commit) ? Result.succeed([]) : yield* readScope(base.commit.value)
+  if (Result.isFailure(scopeThere)) {
+    return A.append(
+      missing,
+      Said.make({
+        said: `${baselineFile} could not be compared with main: git could not list the files at the base (${scopeThere.failure})`,
+        grew: false
+      })
+    )
+  }
+  // What a file held on main: its line in main's baseline, or with another reader what this one finds in it there.
+  const heldThere = Effect.fn("Defaults.heldThere")(function* (old: string) {
+    if (sameReader) return R.get(was.value.files, old)
+    if (O.isNone(base.commit) || !A.contains(scopeThere.success, old)) return O.none<Held>()
+    const shown = yield* repo.run("git", ["show", `${base.commit.value}:${old}`], { cwd: repo.root })
+    return shown.code === 0 ? O.some(countOf(readDefaults({ file: old, source: shown.stdout }).found)) : O.none<Held>()
+  })
+  const told = (counts: Held) => `[${A.join(A.map(counts, String), ", ")}]`
+  const compared = yield* Effect.forEach(
+    R.toEntries(now),
+    Effect.fnUntraced(function* ([file, counts]) {
+      // A file renamed since then is held at what main held it under its old name.
+      const there = yield* heldThere(O.getOrElse(R.get(base.renamed, file), () => file))
+      return O.match(there, {
         onNone: () => [
-          `${file}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`
+          Said.make({
+            said: O.match(R.get(base.retaken, file), {
+              onNone: () =>
+                `${file}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`,
+              onSome: (old) =>
+                `${file}  is in ${baselineFile} but not on main: it was moved from ${old}, and the file at ${old} now keeps that line, so this one starts from nothing. Fix the file instead`
+            }),
+            grew: true
+          })
         ],
         onSome: (may) =>
           A.some(A.zip(counts, may), ([held, mainHolds]) => held > mainHolds)
             ? [
-                `${file}  is held at [${A.join(A.map(counts, String), ", ")}] in ${baselineFile}, above the [${A.join(A.map(may, String), ", ")}] main holds it to: a number only falls`
+                Said.make({
+                  said: sameReader
+                    ? `${file}  is held at ${told(counts)} in ${baselineFile}, above the ${told(may)} main holds it to: a number only falls`
+                    : `${file}  is held at ${told(counts)} in ${baselineFile}, above the ${told(may)} this reader finds in it on main (main's baseline counts less, so the file is held to its code there): a number only falls`,
+                  grew: true
+                })
               ]
             : []
-      }
-    )
+      })
+    }),
+    { concurrency: 1 }
   )
-  return A.appendAll(missing, moved)
+  return A.appendAll(missing, A.flatten(compared))
 })
 
 /**
@@ -300,7 +409,7 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBa
 export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean, only: ReadonlyArray<string>) {
   const repo = yield* Repo
   const git = (pathspec: ReadonlyArray<string>) =>
-    repo.run("git", ["ls-files", "--cached", "--others", "--exclude-standard", ...pathspec], { cwd: repo.root })
+    repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", ...pathspec], { cwd: repo.root })
   const listed = yield* git(["--", ...ownCode])
   const vendored = yield* git(["--", ":(glob)packages/**/vendor.json"])
   // A list git could not give is not an empty list: nothing was checked, and the law says so.
@@ -311,21 +420,11 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
     )
   }
   if (write && A.isReadonlyArrayNonEmpty(only)) return A.of<DefaultsFinding>(DefaultsFinding.cases.NoWrite.make({}))
-  // A package the kit is copied into keeps beep-effect's code as it is: its folder, from the root, with a slash.
-  const kit = A.map(
-    A.filter(Str.split("\n")(vendored.stdout), (file) => file !== ""),
-    (file) => Str.slice(0, file.length - "vendor.json".length)(file)
-  )
-  const inScope = A.dedupe(
-    A.filter(
-      Str.split("\n")(listed.stdout),
-      (file) => file !== "" && !Str.endsWith(".d.ts")(file) && !A.some(kit, (folder) => Str.startsWith(folder)(file))
-    )
-  )
+  const inScope = scopeOf(Str.split("\0")(listed.stdout), Str.split("\0")(vendored.stdout))
   // A named file is read as the caller wrote it: from the root, from the folder the command runs in, or in full.
   const asked = A.map(only, (file) => repo.relative(repo.root, repo.resolve(repo.cwd, file)))
-  const wanted = A.isReadonlyArrayNonEmpty(asked) ? A.filter(inScope, (file) => A.contains(asked, file)) : inScope
-  const files = yield* Effect.filter(wanted, (file) => repo.exists(repo.join(repo.root, file)), { concurrency: 1 })
+  const present = yield* Effect.filter(inScope, (file) => repo.exists(repo.join(repo.root, file)), { concurrency: 1 })
+  const files = A.isReadonlyArrayNonEmpty(asked) ? A.filter(present, (file) => A.contains(asked, file)) : present
   const baselinePath = repo.join(repo.root, baselineFile)
   const kept = yield* repo.exists(baselinePath)
   const stored = kept ? yield* Effect.asSome(repo.json(DefaultsBaseline)(baselinePath)) : O.none()
@@ -333,16 +432,24 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   // A baseline written before the reader counted more holds numbers of fewer things: every file would be over it for
   // code nobody touched. `--write` records the tree anew, as it does with no baseline, and until then the run says so.
   const stale = O.exists(stored, (one) => !readsAsNow(one.reads))
+  // The base is read once: the whole tree's run holds the baseline against it, and every run follows a file renamed
+  // since, so a file moved with `git mv` keeps its line's allowance and `--write` moves the line.
+  const base: AtBase = kept
+    ? yield* atBase(baselineFile, present)
+    : { problem: O.none(), text: O.none(), renamed: {}, retaken: {}, commit: O.none() }
   // Given files, the law answers an edit in milliseconds and leaves the baseline to the run over the whole tree.
-  const against =
+  const against: ReadonlyArray<typeof Said.Type> =
     !kept || A.isReadonlyArrayNonEmpty(only)
       ? []
       : !stale
-        ? yield* againstMain(baseline, write)
+        ? yield* againstMain({ now: baseline, write, base, inScope })
         : write
           ? []
           : [
-              `${baselineFile} was written before the law counted what it counts now (${A.join(whatIsCounted, ", ")}): bun run beep laws defaults --write records the tree anew`
+              Said.make({
+                said: `${baselineFile} was written before the law counted what it counts now (${A.join(whatIsCounted, ", ")}): bun run beep laws defaults --write records the tree anew`,
+                grew: false
+              })
             ]
   const read = yield* Effect.forEach(
     files,
@@ -359,7 +466,14 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   const counted = A.map(read, (one) => ({
     ...one,
     count: countOf(one.found),
-    may: O.getOrElse(R.get(baseline, one.file), () => none)
+    // A file the baseline names holds to its line; a renamed one to its old name's (atBase keeps only a move whose old
+    // name the law lists no file at); any other may hold none.
+    may: O.match(
+      O.orElse(R.get(baseline, one.file), () =>
+        O.flatMap(R.get(base.renamed, one.file), (was) => R.get(baseline, was))
+      ),
+      { onNone: () => none, onSome: identity }
+    )
   }))
   // The first `--write`, with no baseline file yet, records the tree as it stands: nothing can be over nothing kept.
   const starting = write && (!kept || stale)
@@ -389,15 +503,13 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
     { concurrency: 1 }
   )
   const places = A.flatten(problems)
-  const failures = A.flatten<ReadonlyArray<ReadonlyArray<DefaultsFinding>>>([
-    A.map(against, (said) => DefaultsFinding.cases.Ledger.make({ said })),
-    unread,
-    places
-  ])
+  const failures = A.flatten<ReadonlyArray<ReadonlyArray<DefaultsFinding>>>([against, unread, places])
   if (A.isReadonlyArrayNonEmpty(failures)) {
     return A.prepend<DefaultsFinding, DefaultsFinding>(
       failures,
-      DefaultsFinding.cases.Refused.make({ broken: A.isReadonlyArrayNonEmpty(places) })
+      DefaultsFinding.cases.Refused.make({
+        broken: A.isReadonlyArrayNonEmpty(places) || A.some(against, (one) => one.grew)
+      })
     )
   }
   const holding = A.filter(counted, (one) => A.some(one.count, (count) => count > 0))

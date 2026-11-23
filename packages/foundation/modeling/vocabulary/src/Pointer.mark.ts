@@ -421,7 +421,15 @@ export const readKeyMark = (ast: SchemaAST.AST): MarkReading => readStore(ast.co
  */
 const classConstructorKey = "~constructor"
 
-const fieldsOf = (ast: SchemaAST.AST): O.Option<ReadonlyArray<SchemaAST.PropertySignature>> => {
+/**
+ * The fields the reader reads a schema's marks from, in declaration order: a struct's own, or those of the struct a
+ * class (`S.Class`, `Model.Class`, an `S.Opaque` is a struct) is declared over; none for any other schema, even a
+ * declaration over a struct such as `S.Option(Book)`. A gate that needs a field's node as well as its mark reads the
+ * fields here, so it and `readMarks` agree on what a record's fields are.
+ *
+ * @example O.map(fieldsOf(Book.ast), A.map((field) => field.name)) // Some(["id", "title", ...])
+ */
+export const fieldsOf = (ast: SchemaAST.AST): O.Option<ReadonlyArray<SchemaAST.PropertySignature>> => {
   if (SchemaAST.isObjects(ast)) {
     return O.some(ast.propertySignatures)
   }

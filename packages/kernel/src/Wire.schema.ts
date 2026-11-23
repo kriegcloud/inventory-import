@@ -12,6 +12,11 @@ import * as SchemaTransformation from "effect/SchemaTransformation"
  * a key annotation put on `S.OptionFromNullOr` itself reaches the decoder (a missing key is said in its words) but
  * not the generated OpenAPI document, whose property is the wire side; this puts the same words on both.
  *
+ * It takes a key's annotations, a description required: the whole object is put on the field, last, so a mark spread
+ * into it (`...noTerm("deferred", "party")`) is where a reader of key annotations finds it; only the description is
+ * copied to the wire side. `Key<never>` accepts any key annotation but `default` and `examples`, which would have to
+ * be values of the field's decoded type.
+ *
  * **Example** (A person's email, absent for a member with no account)
  *
  * ```ts
@@ -25,7 +30,7 @@ import * as SchemaTransformation from "effect/SchemaTransformation"
  * @category combinators
  */
 export const nullAsNone =
-  (key: { readonly description: string; readonly messageMissingKey?: string }) =>
+  (key: S.Annotations.Key<never> & { readonly description: string }) =>
   <Value extends S.Top>(schema: Value) => {
     const decoded = schema.pipe(S.toType, S.Option)
     return S.NullOr(schema)

@@ -10,12 +10,15 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "check": "tsrs -p tsconfig.test.json",
-    "lint": "oxlint --quiet test",
+    "check": "tsrs -p tsconfig.test.json && tsrs -p tsconfig.json",
+    "lint": "oxlint --quiet src test",
     "test": "vitest run"
   },
   "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
     "@beep/vocabulary": "workspace:*",
+    "@inventory/access-contract": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "effect": "catalog:"
   },

@@ -10,6 +10,7 @@ import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { personName } from "../internal/Described.ts"
 import { ItemId } from "../Catalog.id.ts"
@@ -51,6 +52,27 @@ export const maxDescriptionLength = 32_767
 /** The longest name an item may have, after trimming. */
 export const maxNameLength = 120
 
+// A cost drawn for a test is built from its whole dollars and its ten-thousandths, so every draw is a cost: a decimal
+// drawn at random and then checked would almost never have four decimals or fewer, and the draw would run out.
+const CostParts = S.Struct({
+  dollars: S.Int.check(S.isBetween({ minimum: 0, maximum: 999_999_999_999 })),
+  tenThousandths: S.Int.check(S.isBetween({ minimum: 0, maximum: 9_999 }))
+})
+const isCost = (input: unknown): input is BigDecimal.BigDecimal =>
+  BigDecimal.isBigDecimal(input) && decimalPattern.test(BigDecimal.format(input))
+const Cost = S.declare(isCost, {
+  identifier: "Cost",
+  description: "A cost in US dollars, exact",
+  expected: "a cost of 0 or more with up to 4 decimals and 12 whole digits",
+  toCodecArbitrary: () =>
+    S.link<BigDecimal.BigDecimal>()(CostParts, {
+      decode: SchemaGetter.transform((parts: typeof CostParts.Type) =>
+        BigDecimal.normalize(BigDecimal.make(BigInt(parts.dollars) * 10_000n + BigInt(parts.tenThousandths), 4))
+      ),
+      encode: SchemaGetter.forbiddenEncoding
+    })
+})
+
 /**
  * A cost in US dollars: a decimal in code, exact, and its shortest digits on the wire and in the database ("12.5",
  * never "12.50"), so two costs that are equal are stored as the same text. Never negative, at most four decimals and
@@ -62,11 +84,7 @@ export const UnitCost = S.String.check(S.isPattern(decimalPattern))
   .annotate({ examples: ["12.33"] })
   .pipe(
     S.decodeTo(
-      S.BigDecimal.check(
-        S.makeFilter((cost: BigDecimal.BigDecimal) => decimalPattern.test(BigDecimal.format(cost)), {
-          expected: "a cost of 0 or more with up to 4 decimals and 12 whole digits"
-        })
-      ),
+      Cost,
       SchemaTransformation.transform({
         decode: (digits: string) => BigDecimal.fromStringUnsafe(digits),
         encode: (cost: BigDecimal.BigDecimal) => BigDecimal.format(cost)
@@ -100,8 +118,18 @@ function isCalendarDay(text: string): boolean {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
   return parts !== null && O.isSome(isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) }))
 }
+// A day on the calendar as one pattern: the 31-day months, the 30-day months, February to the 28th, and the 29th of
+// February in a leap year (every fourth year, a century only when it divides by 400). The pattern is what a test draws
+// from, so every drawn day is a day; the check below is the import's own reading (`isoDate`), which decides.
+const yearDigits = "[1-9][0-9]{3}"
+const leapYear = "([1-9][0-9](0[48]|[2468][048]|[13579][26])|([2468][048]|[13579][26])00)"
+/** A year-month-day that is on the calendar, from year 1000 to 9999: what `isoDate` accepts, as a pattern. */
+export const calendarDayPattern = new RegExp(
+  `^(${yearDigits}-((0[13578]|1[02])-(0[1-9]|[12][0-9]|3[01])|(0[469]|11)-(0[1-9]|[12][0-9]|30)|02-(0[1-9]|1[0-9]|2[0-8]))` +
+    `|${leapYear}-02-29)$`
+)
 const IsoDate = S.String.check(
-  S.isPattern(/^\d{4}-\d{2}-\d{2}$/),
+  S.isPattern(calendarDayPattern, { expected: "a day on the calendar, written year-month-day" }),
   S.makeFilter((text: string) => isCalendarDay(text), {
     expected: "a day on the calendar, written year-month-day"
   })

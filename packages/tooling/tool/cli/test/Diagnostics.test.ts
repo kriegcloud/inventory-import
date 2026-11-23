@@ -192,7 +192,7 @@ describe("laws diagnostics", () => {
       // The same whether the new file is untracked (git sees a rename, and the law says so) or both are committed (git
       // sees a change of the old file and a new one).
       const notTwice = `err: ${moved}  is in ${diagnosticsLedger} but not on main:`
-      const retaken = `${notTwice} it was moved from ${listed}, and the file at ${listed} now keeps that number, so this one starts from nothing. Fix the file instead`
+      const retaken = `${notTwice} it was moved from ${listed}, and a file is at ${listed} again, which keeps what main held there, so this one starts from nothing. Fix the file instead`
       for (const committed of [false, true]) {
         const both = yield* inTree(
           held,

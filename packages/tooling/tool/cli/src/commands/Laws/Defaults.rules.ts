@@ -23,8 +23,9 @@
  * code nobody changed passes, and a place written since is still refused. The law is done when the baseline is empty
  * and is deleted.
  *
- * Given files, it reads only those: a few milliseconds, so the same law can answer the moment a file is edited
- * (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places said are the ones its
+ * Given files, it parses only those and leaves the baseline's comparison to the run over the whole tree: git's lists
+ * still cover the tree, but the run takes under half a second, most of it starting bun, so the same law can answer the
+ * moment a file is edited (`.claude/hooks/defaults.sh`) as well as before a commit. Where a file is over, the places said are the ones its
  * committed version does not have, so the line just written is the line named.
  *
  * Left alone: the vendored kit and components, `.agents`, the scratchpad and `packages/tooling` (this package reads
@@ -270,18 +271,38 @@ const scopeOf = (listed: ReadonlyArray<string>, vendored: ReadonlyArray<string>)
 }
 
 /**
- * The files the law read at `commit`, or what git said when it could not list them. `git grep` answers 1 when no file
- * matches, an empty list; any other code is a list it could not give, never an empty one.
+ * The files the law read at `commit`, or what git said when it could not list them: every file the commit holds,
+ * empty ones too (an empty `vendor.json` still marks a kit), as a difference from the empty tree, which takes the same
+ * pathspecs as `git ls-files`. Any code but 0 is a list git could not give, never an empty one. Without colour and
+ * with paths from the root, whatever the user's git configuration says.
  */
 const readScope = Effect.fn("Defaults.readScope")(function* (commit: string) {
   const repo = yield* Repo
+  const empty = yield* repo.run("git", ["hash-object", "-t", "tree", "--stdin"], { cwd: repo.root, stdin: "" })
+  if (empty.code !== 0) {
+    const unlisted: Result.Result<ReadonlyArray<string>, string> = Result.fail(empty.stderr)
+    return unlisted
+  }
   const listedAt = (pathspec: ReadonlyArray<string>) =>
     Effect.map(
-      repo.run("git", ["grep", "-l", "-z", "-e", "", commit, "--", ...pathspec], { cwd: repo.root }),
+      repo.run(
+        "git",
+        [
+          "diff",
+          "--name-only",
+          "-z",
+          "--no-renames",
+          "--no-color",
+          "--no-relative",
+          Str.trim(empty.stdout),
+          commit,
+          "--",
+          ...pathspec
+        ],
+        { cwd: repo.root }
+      ),
       (answer): Result.Result<ReadonlyArray<string>, string> =>
-        answer.code === 0 || answer.code === 1
-          ? Result.succeed(A.map(Str.split("\0")(answer.stdout), Str.slice(commit.length + 1)))
-          : Result.fail(answer.stderr)
+        answer.code === 0 ? Result.succeed(Str.split("\0")(answer.stdout)) : Result.fail(answer.stderr)
     )
   const listed = yield* listedAt(ownCode)
   const vendored = yield* listedAt([":(glob)packages/**/vendor.json"])
@@ -307,16 +328,15 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
   readonly write: boolean
   readonly base: AtBase
   readonly inScope: ReadonlyArray<string>
+  readonly present: ReadonlyArray<string>
 }) {
   const repo = yield* Repo
   const { base, now } = input
+  // Gone is what the law's list does not hold, as the rename credit reads it: a stray file git ignores at that path is
+  // no file of the law's, here and in CI alike.
   const gone = input.write
     ? []
-    : yield* Effect.filter(
-        A.sort(R.keys(now), Order.String),
-        (file) => Effect.map(repo.exists(repo.join(repo.root, file)), (there) => !there),
-        { concurrency: 1 }
-      )
+    : A.filter(A.sort(R.keys(now), Order.String), (file) => !A.contains(input.present, file))
   // A line whose file moved to one the law reads goes with it at the next `--write`; one moved out of what the law
   // reads (a declaration file, the kit) is only taken off.
   const movedTo = R.fromEntries(
@@ -328,7 +348,7 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
     Said.make({
       said: O.match(R.get(movedTo, file), {
         onNone: () =>
-          `${file}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`,
+          `${file}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`,
         onSome: (to) =>
           `${file}  is in ${baselineFile} but was renamed to ${to}: bun run beep laws defaults --write moves its line`
       }),
@@ -347,7 +367,9 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
   const sameReader = readsAsNow(was.value.reads)
   // With another reader, only a file the law read at the base is held to what it held there: one that came in from
   // the kit, the registry's components or the tooling holds places nobody counted, and is new to the law.
-  const scopeThere = sameReader || O.isNone(base.commit) ? Result.succeed([]) : yield* readScope(base.commit.value)
+  const scopeThere: Result.Result<ReadonlyArray<string>, string> = sameReader || O.isNone(base.commit)
+    ? Result.succeed([])
+    : yield* readScope(base.commit.value)
   if (Result.isFailure(scopeThere)) {
     return A.append(
       missing,
@@ -377,7 +399,7 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
               onNone: () =>
                 `${file}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`,
               onSome: (old) =>
-                `${file}  is in ${baselineFile} but not on main: it was moved from ${old}, and the file at ${old} now keeps that line, so this one starts from nothing. Fix the file instead`
+                `${file}  is in ${baselineFile} but not on main: it was moved from ${old}, and a file is at ${old} again, which keeps what main held there, so this one starts from nothing. Fix the file instead`
             }),
             grew: true
           })
@@ -437,12 +459,12 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   const base: AtBase = kept
     ? yield* atBase(baselineFile, present)
     : { problem: O.none(), text: O.none(), renamed: {}, retaken: {}, commit: O.none() }
-  // Given files, the law answers an edit in milliseconds and leaves the baseline to the run over the whole tree.
+  // Given files, the law leaves the baseline to the run over the whole tree.
   const against: ReadonlyArray<typeof Said.Type> =
     !kept || A.isReadonlyArrayNonEmpty(only)
       ? []
       : !stale
-        ? yield* againstMain({ now: baseline, write, base, inScope })
+        ? yield* againstMain({ now: baseline, write, base, inScope, present })
         : write
           ? []
           : [
@@ -484,7 +506,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
       // What the file held when it was last committed says which places are new; a file never committed has none.
       const committed = yield* repo.run("git", ["show", `HEAD:${one.file}`], { cwd: repo.root })
       const before = committed.code === 0 ? readDefaults({ file: one.file, source: committed.stdout }).found : []
-      return A.flatMap(A.zip(kinds, A.zip(one.count, one.may)), ([kind, [now, may]]) => {
+      const overs = A.flatMap(A.zip(kinds, A.zip(one.count, one.may)), ([kind, [now, may]]) => {
         if (now <= may) return []
         const ofKind = A.filter(one.found, (place) => place.kind === kind)
         const fresh = added(
@@ -498,6 +520,20 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
           ),
           DefaultsFinding.cases.Over.make({ file: one.file, kind, now, may, test: isTest(one.file) })
         )
+      })
+      // A move whose old name the law lists a file at again lends it nothing, and the reader is told why, while git
+      // still sees the move (once both are committed it sees a new file, and nothing is lent either).
+      const retaken = O.filter(R.get(base.retaken, one.file), () => !R.has(baseline, one.file))
+      return O.match(retaken, {
+        onNone: () => overs,
+        onSome: (old) =>
+          A.prepend<DefaultsFinding, DefaultsFinding>(
+            overs,
+            Said.make({
+              said: `${one.file}  was moved from ${old}, and a file is at ${old} again, which keeps that name's line, so this one may hold none`,
+              grew: false
+            })
+          )
       })
     }),
     { concurrency: 1 }

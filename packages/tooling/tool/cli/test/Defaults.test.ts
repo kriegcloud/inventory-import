@@ -264,7 +264,7 @@ describe("against main", () => {
           left,
           (line) =>
             line ===
-            `err: ${gone}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+            `err: ${gone}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
         ),
         true
       )
@@ -308,7 +308,7 @@ describe("against main", () => {
       strictEqual(
         A.contains(
           declared,
-          `err: ${held}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+          `err: ${held}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
         ),
         true
       )
@@ -368,7 +368,7 @@ describe("against main", () => {
       strictEqual(
         A.contains(
           inTheTree,
-          `${notTwice} it was moved from ${held}, and the file at ${held} now keeps that line, so this one starts from nothing. Fix the file instead`
+          `${notTwice} it was moved from ${held}, and a file is at ${held} again, which keeps what main held there, so this one starts from nothing. Fix the file instead`
         ),
         true
       )
@@ -572,12 +572,12 @@ describe("main's baseline written for a reader that counted less", () => {
           const repo = yield* Repo
           yield* onMain()
           yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [held]: [2, 0, 0, 0] }))
-          // git grep answers 2 or more when it could not search: a list it could not give, never an empty one.
+          // git answers a code other than 0 when it could not list them: a list it could not give, never an empty one.
           const failing = Repo.of({
             ...repo,
             run: Effect.fn("failingGrep")(function* (command, args, options) {
-              if (A.contains(args, "grep"))
-                return { bytes: new Uint8Array(), stdout: "", stderr: "grep broke", code: 2 }
+              if (A.contains(args, "--no-renames"))
+                return { bytes: new Uint8Array(), stdout: "", stderr: "diff broke", code: 2 }
               return yield* repo.run(command, args, options)
             })
           })
@@ -588,8 +588,112 @@ describe("main's baseline written for a reader that counted less", () => {
       strictEqual(
         A.contains(
           said,
-          `err: ${baselineFile} could not be compared with main: git could not list the files at the base (grep broke)`
+          `err: ${baselineFile} could not be compared with main: git could not list the files at the base (diff broke)`
         ),
+        true
+      )
+    })
+  )
+})
+
+describe("what git lists", () => {
+  // A path git would quote (a letter outside ASCII) is read only when git is asked for its lists split by NUL.
+  const quoted = "packages/a/src/café.ts"
+
+  it.effect("reads a file whose name git quotes", () =>
+    Effect.gen(function* () {
+      const said = yield* inTree({ [baselineFile]: baseline({}) }, run(false, [], { [quoted]: twoFallbacks }))
+      strictEqual(
+        A.some(said, (line) => Str.startsWith(`err: ${quoted}  holds 2 fallback, and may hold 0`)(line)),
+        true
+      )
+    })
+  )
+
+  it.effect("credits a file whose name git quotes from main's code, whatever colour git is told to print in", () =>
+    Effect.gen(function* () {
+      const said = yield* inTree(
+        { [quoted]: twoFallbacks, [baselineFile]: baseline({}, ["??"]) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["config", "color.ui", "always"])
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [quoted]: [2, 0, 0, 0] }))
+          const found = yield* defaults(false, [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      deepStrictEqual(said, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+    })
+  )
+
+  it.effect("takes an empty vendor.json at the base as a kit the law did not read", () =>
+    Effect.gen(function* () {
+      const kept = "packages/k/src/kept.ts"
+      const said = yield* inTree(
+        { "packages/k/vendor.json": "", [kept]: twoFallbacks, [baselineFile]: baseline({}, ["??"]) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          // The folder stops being a kit: its code comes into the law's reach, and owes what it holds.
+          yield* repo.run("git", ["rm", "-q", "packages/k/vendor.json"])
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [kept]: [2, 0, 0, 0] }))
+          const found = yield* defaults(false, [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.contains(
+          said,
+          `err: ${kept}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`
+        ),
+        true
+      )
+    })
+  )
+
+  it.effect("takes a line off for a file git ignores, as CI would, though one is on the disk", () =>
+    Effect.gen(function* () {
+      const stray = "packages/a/src/stray.ts"
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({ [held]: [2, 0, 0, 0], [stray]: [1, 0, 0, 0] }) },
+        run(false, [], { ".gitignore": `${stray}\n`, [stray]: `export const a = (x?: number) => x ?? 0\n` })
+      )
+      strictEqual(
+        A.contains(
+          said,
+          `err: ${stray}  is in ${baselineFile} but is not a file the law reads: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+        ),
+        true
+      )
+    })
+  )
+
+  it.effect("names the move when a moved file is over because a file is at its old name again", () =>
+    Effect.gen(function* () {
+      const moved = "packages/a/src/moved.ts"
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({ [held]: [2, 0, 0, 0] }) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, moved])
+          yield* repo.write(repo.join(repo.root, held), twoFallbacks)
+          const found = yield* defaults(false, [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.contains(
+          said,
+          `err: ${moved}  was moved from ${held}, and a file is at ${held} again, which keeps that name's line, so this one may hold none`
+        ),
+        true
+      )
+      strictEqual(
+        A.some(said, (line) => Str.startsWith(`err: ${moved}  holds 2 fallback, and may hold 0`)(line)),
         true
       )
     })

@@ -21,7 +21,9 @@
 // A file git sees renamed since the base is held at its old name's number: git sees a rename once both paths are
 // staged (`git mv`, or `git add` of both), so an unstaged one reads as a file removed and one added. A file deleted and
 // made again at the same path in one change is the same path to git, and keeps that path's number. A move lends its
-// number only while nothing is at the old name: a file there keeps it, so the two do not hold it twice.
+// number only while the law lists no file at the old name: a file there keeps what the old name held, so the two do
+// not hold it twice. The law names the move while git sees one (before both files are committed); once both are, git
+// sees a changed file and a new one, and the moved file is refused as any new file is.
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -34,6 +36,7 @@ import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
+import type { RepoError } from "../../../Cli.errors.ts"
 import { Repo } from "../../../Repo.service.ts"
 
 /** Each listed file, from the root, with the number of places in it that break the rule. */
@@ -236,51 +239,57 @@ export interface AtBase {
  *
  * @category rules
  */
-export const atBase = Effect.fn("ledger.atBase")(function* (path: string, listed: ReadonlyArray<string>) {
-  const repo = yield* Repo
-  const problem = (said: string): AtBase => ({
-    problem: O.some(said),
-    text: O.none(),
-    renamed: {},
-    retaken: {},
-    commit: O.none()
+export const atBase: {
+  (listed: ReadonlyArray<string>): (path: string) => Effect.Effect<AtBase, RepoError, Repo>
+  (path: string, listed: ReadonlyArray<string>): Effect.Effect<AtBase, RepoError, Repo>
+} = dual(
+  2,
+  Effect.fn("ledger.atBase")(function* (path: string, listed: ReadonlyArray<string>) {
+    const repo = yield* Repo
+    const problem = (said: string): AtBase => ({
+      problem: O.some(said),
+      text: O.none(),
+      renamed: {},
+      retaken: {},
+      commit: O.none()
+    })
+    const main = yield* mainCommit()
+    if (O.isNone(main)) {
+      return problem(
+        `${path} could not be compared with main: neither origin/main nor main is here. Fetch it (git fetch origin main), so a number that rose is seen`
+      )
+    }
+    const shallow = yield* repo.run("git", ["rev-parse", "--is-shallow-repository"])
+    if (Str.trim(shallow.stdout) === "true") {
+      return problem(
+        `${path} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
+      )
+    }
+    const unfit = yield* pushBaseProblem(path)
+    if (O.isSome(unfit)) return problem(unfit.value)
+    const base = yield* baseCommit(main.value)
+    // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
+    if (O.isNone(base)) {
+      return { problem: O.none(), text: O.none(), renamed: {}, retaken: {}, commit: O.none() } satisfies AtBase
+    }
+    const shown = yield* repo.run("git", ["show", `${base.value}:${path}`])
+    // A move lends its old name's number only while nothing is at the old name: a file there (new, or the old one kept)
+    // keeps that number, so the moved file does not borrow it too. git's answer differs by tree (a move with a new file
+    // at the old name is a rename while the new file is untracked, and a change of the old file once both are
+    // committed), so the rename is checked against the files the law lists, and both trees hold the moved file to
+    // nothing. The law's list, not the disk: a stray file git ignores, or the old name of a move that only changed case
+    // on a disk that ignores case, is no file of the law's and takes nothing.
+    const found = yield* renamedSince(base.value)
+    const isRetaken = (was: string) => A.contains(listed, was)
+    return {
+      problem: O.none(),
+      text: shown.code === 0 ? O.some(shown.stdout) : O.none(),
+      renamed: R.filter(found, (was) => !isRetaken(was)),
+      retaken: R.filter(found, isRetaken),
+      commit: base
+    } satisfies AtBase
   })
-  const main = yield* mainCommit()
-  if (O.isNone(main)) {
-    return problem(
-      `${path} could not be compared with main: neither origin/main nor main is here. Fetch it (git fetch origin main), so a number that rose is seen`
-    )
-  }
-  const shallow = yield* repo.run("git", ["rev-parse", "--is-shallow-repository"])
-  if (Str.trim(shallow.stdout) === "true") {
-    return problem(
-      `${path} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
-    )
-  }
-  const unfit = yield* pushBaseProblem(path)
-  if (O.isSome(unfit)) return problem(unfit.value)
-  const base = yield* baseCommit(main.value)
-  // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
-  if (O.isNone(base)) {
-    return { problem: O.none(), text: O.none(), renamed: {}, retaken: {}, commit: O.none() } satisfies AtBase
-  }
-  const shown = yield* repo.run("git", ["show", `${base.value}:${path}`])
-  // A move lends its old name's number only while nothing is at the old name: a file there (new, or the old one kept)
-  // keeps that number, so the moved file does not borrow it too. git's answer differs by tree (a move with a new file
-  // at the old name is a rename while the new file is untracked, and a change of the old file once both are
-  // committed), so the rename is checked against the files the law lists, and both trees hold the moved file to
-  // nothing. The law's list, not the disk: a stray file git ignores, or the old name of a move that only changed case
-  // on a disk that ignores case, is no file of the law's and takes nothing.
-  const found = yield* renamedSince(base.value)
-  const isRetaken = (was: string) => A.contains(listed, was)
-  return {
-    problem: O.none(),
-    text: shown.code === 0 ? O.some(shown.stdout) : O.none(),
-    renamed: R.filter(found, (was) => !isRetaken(was)),
-    retaken: R.filter(found, isRetaken),
-    commit: base
-  } satisfies AtBase
-})
+)
 
 /**
  * What the ledger at `path`, as it is now (`now`), says against the files there are and against the same ledger at
@@ -314,7 +323,7 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
         O.match(R.get(base.retaken, file), {
           onNone: () => `${file}  is in ${input.path} but not on main: a ledger only loses files. Fix the file instead`,
           onSome: (old) =>
-            `${file}  is in ${input.path} but not on main: it was moved from ${old}, and the file at ${old} now keeps that number, so this one starts from nothing. Fix the file instead`
+            `${file}  is in ${input.path} but not on main: it was moved from ${old}, and a file is at ${old} again, which keeps what main held there, so this one starts from nothing. Fix the file instead`
         })
       ],
       onSome: (held) =>

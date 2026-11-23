@@ -80,14 +80,14 @@ const headerOf = (vocabulary: Vocabulary, sources: string): readonly [string, st
 /**
  * The IRI of the OWL document: the namespace without its final slash, so its version IRI begins with the namespace.
  *
- * @example ontologyIri(vocabulary) // "https://example.org/inventory-import/ontology"
+ * @example ontologyIri(vocabulary) // the base, then "/ontology"
  */
 export const ontologyIri = (vocabulary: Vocabulary): Iri => Str.slice(0, -1)(vocabulary.namespace)
 
 /**
  * The IRI of the SKOS document.
  *
- * @example taxonomyIri(vocabulary) // "https://example.org/inventory-import/taxonomy"
+ * @example taxonomyIri(vocabulary) // the base, then "/taxonomy"
  */
 export const taxonomyIri = (vocabulary: Vocabulary): Iri => `${vocabulary.base}/taxonomy`
 

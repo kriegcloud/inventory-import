@@ -21,7 +21,7 @@ passing and a commit; the app is never broken between steps.
 | 6 | The lift, `graphOf` and `threadGraph` (4), in memory | The seventeen triples of 4.4, asserted on the value `threadGraph()` returns || done |
 | 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | done |
 | 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | done |
-| 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | todo |
+| 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | done |
 | 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | todo |
 | 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` | todo |
 | 12 | The walk of each planted mistake through all nine gates (6.11), with the new fixtures of bans 2 and 5 added to it | Each row of SPEC's ban table names a test or a run that exists | todo |
@@ -43,7 +43,7 @@ here when it is.
 | Whether `config-sync` accepts the new package and the new root task (section 10, "Turbo and the sync commands"); the inputs the existing source-law tasks declare | 3, 9 | The package is accepted: `config-sync` wrote its three scripts and the reference in the root `tsconfig.json`, and `config-sync:check` agrees. It has no `src` yet, so no `tsconfig.json`; step 5 adds both. The new root task is step 9's |
 | The marks on a `Model.Class` and `fieldEvolve`'s types (3.5); whether the spread in the compile-only file keeps literal types; P12's element field name | 5 | Partly, in step 1 on a local `Model.Class`: the class pointer is read, `fieldEvolve` with a hoisted mark compiles, the marks reach every variant. Step 5: they hold on the real `Activity` (`packages/kernel/test/ActivityMarks.types.ts` compiles, the spread keeps the literal types); `nullAsNone` now takes a key's annotations with its description, body unchanged; P12's element is the array node's one `rest` member, compared by identity with the variant's node |
 | Whether N3.js and Oxigraph run under this repository's Vitest and Effect rules (decision 26) | 7, 8 | Both do. N3.js 2.13 parses under Vitest on Node with its typings one major behind; only `Parser` is used, behind `Effect.try`. Oxigraph 0.5.13 loads its WebAssembly at import with no setup, takes the graph as N-Triples and answers a SELECT as an array of maps; the one call that throws is behind `Effect.try` in `test/support/ask.ts`. Neither needed a diagnostic turned off |
-| `import type` erasure, and how gate 7's rule 7 resolves `paths` and `imports` aliases from text, without the compiler | 9 | |
+| `import type` erasure, and how gate 7's rule 7 resolves `paths` and `imports` aliases from text, without the compiler | 9 | Checked in the law's test, on text: a whole-statement `import type` or `export type` passes; `import { type X }` is refused, because `verbatimModuleSyntax` keeps the statement and the module is loaded. A specifier is resolved to files through a relative path, a package's `exports`, the nearest `package.json`'s `imports` and each `tsconfig*.json`'s `paths` (with `baseUrl`, and through `extends` to a configuration of any name in the repository), each with a test; a `types` condition is not the file loaded, and a `?raw` suffix names the same file. A dynamic import is read where its module is a text, a constant, a sum or a template of those. Not resolved: a dynamic import whose module is worked out at run time, a plain `require()` call, and files ending `.mts`, `.cts` or `.js` (the repository has none in a workspace). A module that re-exports the vocabulary is refused where it re-exports, not where it is imported |
 | gist itself: the parents of `LivingThing`, `TemporalRelation` and `Assignment`, the three disjoint pairs and that there is no other, and the version IRI. Report 11 read them; the pinned gist file was never opened. Bans 1 and 2 rest on them | 7, 10 | Step 7: the version IRI is `gistCore14.1.0` by decision 122, not read from a file. The rest waits for step 10 |
 | ROBOT's flags, where the jar is kept, how the script reads Java's major version, and whether a merged file with undeclared fixture individuals passes the OWL 2 DL profile check (five fixtures now) | 10 | |
 | Whether ROBOT reports ban 2's two fixtures inconsistent and its near miss consistent | 10 | |
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 8 are done; step 9 starts on Benjamin's word.
+None. Steps 1 to 9 are done; step 10 starts on Benjamin's word.
 
 ## Choices made
 
@@ -200,6 +200,41 @@ Where the design left a choice open, or the code showed it could not be followed
   both type patterns deleted), the hand-written part held to section 5.2's five triples, M5's file sorted as the
   question is and its rows compared whatever their order, and two assertions that could not fail replaced or
   removed. Step 13's reviewers read the step again.
+- **Gate 7 is `bun run beep laws ontology-terms`** (`Laws/OntologyTerms.rules.ts`, its reader of the syntax tree in
+  `Laws/internal/ontologyTermsCode.ts`), the root task `ontology-terms:check` in the three checks. It reads every
+  code file git would commit except `.agents`, the scratchpad and its own source and test, which hold the texts it
+  refuses. Rules 1b and 3 read a workspace's `src` only: a test builds marks no generated file is made from.
+- **Rule 1 is "the enrolled declaration carries a helper's call"**, in the declaration itself or in a constant of
+  the same file it reads (a mark hoisted as `Activity`'s are). An enrolled name the file does not declare, a file
+  git does not list and a list that cannot be read are each refused; the last stops the law, since with no list
+  rule 1 would pass every record.
+- **Rule 6 is narrower than "any object key named `term`, `path` or `noTerm`"**, which refused rule tables, error
+  fields named `path` and the vendored identity kit. It refuses the three keys in the argument of a call whose
+  name begins `annot`, in the annotations a class takes when the value has a mark's shape, and anywhere an object
+  has the helper's own shape (a `term` with a colon, a `path` of steps, a `noTerm` with a reason). A constant
+  named or spread in an annotation is read as the annotation's own object, and a key between square brackets as
+  the text it reads as. Not read for it: the module that returns a mark (`Pointer.mark.ts`; section 6.7 names it
+  `Pointer.ts`), that package's tests, which hand its reader marks no helper would make, and each vendored kit
+  package. Not found: a class's annotations whose value under one of the three keys is no string, list or
+  object written out, since a field there is a schema under the same shape.
+- **A helper is one imported from the module that makes the five** (`packages/kernel/src/Terms.pointer.ts`, found
+  by resolving the import as rule 7 does), so a function named `noTerm` from elsewhere neither marks a record nor
+  is refused. Rule 3 also refuses a helper taken out of its namespace, read by a quoted name or re-exported under
+  another name, and a second maker (`pointerFor`, `pathFor`, `noTermFor`) outside that module: section 6.7 does
+  not name makers, and without it a second set of helpers would take any argument.
+- **Rule 7 moved the kernel's `Terms.test.ts` into the ontology package**: the test reads the vocabulary's value,
+  and only `packages/ontology` may import it. The kernel's own files are held to the rule too.
+- **Two comments in `Project.ts` no longer write the base IRI** (rule 5 reads comments as well as code).
+- **The task's inputs are every `.json`**, not only the configurations by name: the law reads `vendor.json` and
+  whatever a `tsconfig` extends.
+- **Step 9 was built by the orchestrator and read twice by Grok 4.7**, each time asked to write a tree the law
+  passes and should not; Opus, Cursor's Opus seat and Codex were out of quota. The first reading found ten things
+  and the second eight, all fixed with a test each: a key between square brackets, a mark built in a constant,
+  in brackets, under `satisfies` or in a function, a helper reached by destructuring or a quoted name, dynamic
+  imports that are not one string, a `?raw` suffix, `extends`, a `types` condition taken for the file loaded, an
+  exemption wider than the one module, `typeof` a helper refused, a `vendor.json` above the packages, an
+  unrelated function of a helper's name, and data handed to a curried function refused. The second reading's
+  fixes were not read a third time. Step 13's reviewers read the step again.
 
 ## Closing note
 

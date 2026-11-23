@@ -257,6 +257,26 @@
       ],
       "outputs": []
     },
+    // The vocabulary's marks and its one value are used as report 14 section 6.7 says (`beep laws ontology-terms`,
+    // gate 7): every code file git would commit is an input, with what says where an import leads (every
+    // `package.json` and tsconfig), the enrolment list, `.gitignore`, `bun.lock` (the parser's version) and the law's
+    // own source. Left out as for `try:check`: what the law does not read, and what is installed or built.
+    "//#ontology-terms:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mjs}",
+        "**/package.json",
+        "**/*.json",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // No `try` statement is written (`beep laws try`), in the code or in a doc comment's example, read from each file's
     // own syntax tree: every code file git would commit is an input, in a folder nobody listed too (`.claude` and
     // `.codex` among them), with `.gitignore`, `bun.lock` (the parser's version) and the law's own source. Left out

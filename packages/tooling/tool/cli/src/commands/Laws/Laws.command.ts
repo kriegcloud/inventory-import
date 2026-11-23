@@ -14,6 +14,7 @@ import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
+import { ontologyTerms, ontologyTermsSentence } from "./OntologyTerms.rules.ts"
 import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
@@ -43,6 +44,15 @@ export const deprecatedApisCommand = Command.make("deprecated-apis", {}, () =>
 /** `laws keys`: no key-shaped string in any file git would commit. */
 export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(), emit(keysSentence))).pipe(
   Command.withDescription("No key-shaped string is in any file git would commit")
+)
+
+/** `laws ontology-terms`: the vocabulary's marks are typed helpers' and only the ontology package loads its value. */
+export const ontologyTermsCommand = Command.make("ontology-terms", {}, () =>
+  Effect.flatMap(ontologyTerms(), emit(ontologyTermsSentence))
+).pipe(
+  Command.withDescription(
+    "Every mark on a record is a typed helper's, where a gate reads it, and only the ontology package loads the vocabulary"
+  )
 )
 
 /** `laws private-paths`: no home path or private folder named in the scratchpad. */
@@ -96,6 +106,7 @@ export const lawsCommand = Command.make("laws").pipe(
     effectImportsCommand,
     exportsCommand,
     keysCommand,
+    ontologyTermsCommand,
     privatePathsCommand,
     refCallbacksCommand,
     screensCommand,

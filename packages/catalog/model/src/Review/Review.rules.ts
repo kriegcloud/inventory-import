@@ -1293,9 +1293,14 @@ export const review = (input: {
     const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
     const replace = differs && StoredChoice.guards.replace(decision.stored)
-    // What the person did to this row stands: a row they typed a value on, or chose to replace the stored item
-    // with, is not put away as already there because a cell of it stopped reading. It waits and shows that cell.
-    const theirs = !R.isEmptyRecord(decision.edits) || StoredChoice.guards.replace(decision.stored)
+    // What the person did to this row stands: a row they typed a value on, accepted a proposal on, or chose to
+    // replace the stored item with, is not put away as already there because a cell of it does not read. It waits
+    // and shows that cell. An accepted proposal counts as a typed value does: the same SKU reached either way gives
+    // the same outcome.
+    const theirs =
+      !R.isEmptyRecord(decision.edits) ||
+      A.isReadonlyArrayNonEmpty(decision.accepted) ||
+      StoredChoice.guards.replace(decision.stored)
     const already =
       mine ||
       (O.isSome(storedItem) &&

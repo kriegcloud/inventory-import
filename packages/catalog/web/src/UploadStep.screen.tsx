@@ -181,12 +181,11 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
         <ItemTitle className="max-w-full">
           <span className="truncate">{view.fileName}</span>
         </ItemTitle>
+        {/* Two descriptions, the same on a desk and a phone: what is left to do, then who loaded it and when. The
+            first wraps where the card is narrow, so both of its counts are read on a phone; the second stays one
+            line, since a wrapping one ended in a dot or split a name. A viewer is not told the rows need them. */}
+        <ItemDescription>{leftToDecide(view.progress)}</ItemDescription>
         <ItemDescription>
-          {/* Two lines of their own, the same on a desk and a phone: what is left to do, then who loaded it and
-              when. One wrapping line ended in a dot or split a name. A viewer is not told the rows need them. */}
-          <span className="block truncate" title={leftToDecide(view.progress)}>
-            {leftToDecide(view.progress)}
-          </span>
           <span className="block truncate" title={when(view.createdAt)}>
             {view.startedBy} · {whenShort(view.createdAt)}
           </span>

@@ -5,7 +5,7 @@ import { D1Instant } from "@beep/d1/D1Instant"
 import { ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
 import { DecidedBy, RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } from "@inventory/catalog-contract/Import"
-import { StagedHead } from "@inventory/catalog-contract/Staged"
+import { StagedHeadJson } from "@inventory/catalog-contract/Staged"
 import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as O from "effect/Option"
@@ -14,9 +14,6 @@ import * as S from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Struct from "effect/Struct"
 import { piece } from "./pieces.ts"
-
-/** The staged file's head, as `importUpload.headJson` and `importDraft.headJson` hold it. */
-export const HeadJson = S.fromJsonString(StagedHead)
 
 /** Who is acting and where: every write is scoped to the actor's organization and names them in the audit line. */
 export const Acting = { org: OrganizationId, actor: MemberId, name: S.String }
@@ -30,7 +27,7 @@ export const UploadInsert = S.Struct({
   id: ImportId,
   key: UploadKey,
   fileName: S.String,
-  headJson: HeadJson,
+  headJson: StagedHeadJson,
   rowCount: S.Int,
   chunkCount: S.Int,
   at: D1Instant

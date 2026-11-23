@@ -19,7 +19,7 @@ import * as SqlClient from "effect/sql/SqlClient"
 import { decisionFromFlags, type RowDecision } from "@inventory/catalog-contract/Decision"
 import { ConfirmId, ImportId, ItemId } from "@inventory/catalog-contract/Ids"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { maxStagedRows, StagedHead } from "@inventory/catalog-contract/Staged"
+import { maxStagedRows, StagedHead, StagedHeadJson } from "@inventory/catalog-contract/Staged"
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
@@ -96,7 +96,7 @@ const head: StagedHead = {
 const choices: ReadonlyArray<MappingChoice> = [{ field: "unitCost", column: listCost, by: "person", at: 1 }]
 const moves: ReadonlyArray<ColumnMove> = [{ field: "unitCost", at: 1, was: unitCost, column: listCost }]
 const Stored = S.Struct({
-  head: S.fromJsonString(StagedHead),
+  head: StagedHeadJson,
   choices: MappingChoice.pipe(S.Array, S.fromJsonString),
   moves: ColumnMove.pipe(S.Array, S.fromJsonString)
 })

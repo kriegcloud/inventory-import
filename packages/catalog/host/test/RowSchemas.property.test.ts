@@ -1,10 +1,11 @@
 // Every row schema of the import's store generates only rows it accepts (docs/standards/schema-first.md, SF-7): what a
-// property draws from one of them is a row the store could be handed. ItemInsert and ItemsPiece are not here: the
-// contract's UnitCost draws almost no cost its own check keeps, so their arbitrary runs out (named in the report).
+// property draws from one of them is a row the store could be handed. The staged file's head is kept as the
+// contract's `StagedHeadJson` writes it.
 import { describe, expect, it } from "@effect/vitest"
 import {
   AbandonedBefore,
-  HeadJson,
+  ItemInsert,
+  ItemsPiece,
   OutcomeInsert,
   OutcomeReason,
   OutcomeRow,
@@ -12,6 +13,7 @@ import {
   RowNumber,
   UploadInsert
 } from "@inventory/catalog-host/ImportRows"
+import { StagedHeadJson } from "@inventory/catalog-contract/Staged"
 import * as Arbitrary from "effect/Arbitrary"
 import * as S from "effect/Schema"
 
@@ -36,5 +38,7 @@ describe("every row schema generates only valid values", () => {
   generatesOnlyValid("OutcomeReason", OutcomeReason)
   generatesOnlyValid("OutcomeInsert", OutcomeInsert)
   generatesOnlyValid("OutcomeRow", OutcomeRow)
-  generatesOnlyValid("HeadJson", HeadJson)
+  generatesOnlyValid("ItemInsert", ItemInsert)
+  generatesOnlyValid("ItemsPiece", ItemsPiece)
+  generatesOnlyValid("StagedHeadJson", StagedHeadJson)
 })

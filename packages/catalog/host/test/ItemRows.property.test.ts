@@ -16,9 +16,7 @@ import * as Str from "effect/String"
 
 const runs = { arbitrary: { runs: 200 } }
 
-// An item drawn on its wire side and decoded through `ItemInsert`: the contract's `UnitCost` draws any decimal on its
-// decoded side and discards nearly all of them, so `ItemInsert`'s own decoded side cannot be drawn directly.
-const anItem = Arbitrary.filterMap(ItemInsert.pipe(S.toEncoded, Arbitrary.schema), S.decodeResult(ItemInsert))
+const anItem = Arbitrary.schema(ItemInsert)
 
 /** A row as the item table holds one: a SKU, the key it is compared by, and a count on hand. */
 const TableRow = S.Struct({

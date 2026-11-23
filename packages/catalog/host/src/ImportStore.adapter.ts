@@ -16,7 +16,7 @@ import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 import * as S from "effect/Schema"
-import { StagedHead, StagedRow, Field } from "@inventory/catalog-contract/Staged"
+import { StagedHead, StagedHeadJson, StagedRow, Field } from "@inventory/catalog-contract/Staged"
 import { RowDecision, DecisionDelta } from "@inventory/catalog-contract/Decision"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
@@ -66,7 +66,6 @@ import { jsonPieces, piece } from "./internal/pieces.ts"
 import {
   AbandonedBefore,
   Acting,
-  HeadJson,
   ItemInsert,
   ItemsPiece,
   OutcomeInsert,
@@ -361,7 +360,7 @@ export const ImportStoreD1 = Layer.effect(
       const uploadKey = yield* S.decodeEffect(UploadKey)(key).pipe(Effect.orDie)
       const at = yield* now
       const before = DateTime.subtract(at, { minutes: abandonedAfterMinutes })
-      const headJson = yield* S.encodeEffect(HeadJson)(head).pipe(Effect.orDie)
+      const headJson = yield* S.encodeEffect(StagedHeadJson)(head).pipe(Effect.orDie)
       // D1 refuses a value over 2 MB. Say so in words before it does.
       if (headJson.length > maxChunkChars) {
         return Result.fail(fileProblem.tooLong({ fileName: head.fileName, part: "headings" }))
@@ -493,7 +492,7 @@ export const ImportStoreD1 = Layer.effect(
     // -- The staged file and its draft ---------------------------------------------------------------------
 
     const table = Effect.fn("Imports.table")(function* (organizationId: OrganizationId, draft: Draft) {
-      const head = yield* S.decodeEffect(HeadJson)(draft.headJson)
+      const head = yield* S.decodeEffect(StagedHeadJson)(draft.headJson)
       const chunks = yield* findChunks({ org: organizationId, id: draft.id })
       const rows = yield* Effect.forEach(chunks, (chunk) => S.decodeEffect(RowsJson)(chunk.rowsJson), {
         concurrency: 1
@@ -1044,7 +1043,7 @@ export const ImportStoreD1 = Layer.effect(
           if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
             return "same" as const
           }
-          const head = yield* S.decodeEffect(HeadJson)(current.headJson)
+          const head = yield* S.decodeEffect(StagedHeadJson)(current.headJson)
           const stored = yield* decisions(org, draft.id)
           const kept = yield* takenBack(current)
           const plan = yield* planMatch({

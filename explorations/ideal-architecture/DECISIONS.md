@@ -1886,6 +1886,8 @@ Answer: I chose each; the agent recommended the same each time.
   Rejected: a session for each package; Codex lanes from the start; no sweep, the ratchet only.
 
 Not decided: whether a cell reader's fallbacks and absence checks are exempt too. `CellReading.rules.ts` holds 12
-and 14, and the law still counts them. Reverse: take a file off `exemptions`, or the `AssignmentPattern` line out of
-`internal/defaultsCode.ts`, and run `bun run beep laws defaults --write` (the baseline's `reads` lets it be written
-anew).
+and 14, and the law still counts them. Reverse, for parameter defaults: take the `AssignmentPattern` line out of
+`internal/defaultsCode.ts` and its name out of `whatIsCounted`, then run `bun run beep laws defaults --write` (the
+baseline's `reads` no longer matches, so it is written anew). Reverse, for an exemption: taking a file off
+`exemptions` counts its places again, and the baseline does not rise to hold them, so they move onto a schema in the
+same commit. That is what the reversal means: those cells no longer keep their reader.

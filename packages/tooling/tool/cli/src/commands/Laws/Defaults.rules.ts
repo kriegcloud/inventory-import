@@ -378,10 +378,11 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (
   const isExempt = (file: string, kind: DefaultsKind): boolean =>
     A.some(exempt, (one) => one.file === file && A.contains(one.kinds, kind))
   // An exemption outlives its file only by mistake, and a new file at that path would inherit it.
+  // Held against the files that are there, not git's list: a file deleted and not yet staged is still in the index.
   const orphaned = A.isReadonlyArrayNonEmpty(only)
     ? []
     : A.map(
-        A.filter(exempt, (one) => !A.contains(inScope, one.file)),
+        A.filter(exempt, (one) => !A.contains(files, one.file)),
         (one) =>
           `${one.file}  is named in the law's exemptions but is not a file the law reads: take it off the list (Defaults.rules.ts)`
       )

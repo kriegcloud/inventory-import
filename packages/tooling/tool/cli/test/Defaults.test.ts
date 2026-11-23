@@ -266,6 +266,21 @@ describe("the exemptions", () => {
           `err: defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`,
           "err: packages/a/src/gone.ts  is named in the law's exemptions but is not a file the law reads: take it off the list (Defaults.rules.ts)"
         ])
+        // Deleted and not staged: git's index still lists the file, and the exemption is an orphan all the same.
+        const deleted = yield* inTree(
+          tree,
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* onMain()
+            yield* repo.run("rm", [reader], { cwd: repo.root })
+            const found = yield* defaults(true, [], exempt)
+            return printed(render(defaultsSentence)(found))
+          })
+        )
+        strictEqual(
+          A.some(deleted, (line) => Str.startsWith(`err: ${reader}  is named in the law's exemptions`)(line)),
+          true
+        )
         const oneFile = yield* inTree(tree, run(false, ["packages/a/src/other.ts"], {}, gone))
         deepStrictEqual(oneFile, [
           "out: defaults:check OK  1 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"

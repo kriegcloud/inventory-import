@@ -1,5 +1,6 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as BigDecimal from "effect/BigDecimal"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
@@ -226,15 +227,25 @@ type Range = ItemFacetsShape["unitCost"]
 const isFacetsWire = S.is(ItemFacetsWire)
 
 /** True when the list counts every one of `total` items once, each value once. */
-const countsAll = (listed: Listed, total: number): boolean =>
-  A.reduce(listed, 0, (n, entry) => n + entry.count) === total &&
-  A.dedupe(A.map(listed, (entry) => entry.value)).length === listed.length
+const countsAll: {
+  (total: number): (listed: Listed) => boolean
+  (listed: Listed, total: number): boolean
+} = dual(
+  2,
+  (listed: Listed, total: number): boolean =>
+    A.reduce(listed, 0, (n, entry) => n + entry.count) === total &&
+    A.dedupe(A.map(listed, (entry) => entry.value)).length === listed.length
+)
 
 /** True when the range has both ends exactly when there are items, the lowest first. */
-const spans = (ends: Range, total: number): boolean =>
+const spans: {
+  (total: number): (ends: Range) => boolean
+  (ends: Range, total: number): boolean
+} = dual(2, (ends: Range, total: number): boolean =>
   O.isSome(ends.min) && O.isSome(ends.max)
     ? total > 0 && ends.min.value <= ends.max.value
     : O.isNone(ends.min) && O.isNone(ends.max) && total === 0
+)
 
 /** True when the facets are what some list of items would give: every count adds up, every range in order. */
 const describesItems = (facets: ItemFacetsShape): boolean =>
@@ -258,11 +269,16 @@ const FacetItems = S.Array(
 )
 type FacetItem = (typeof FacetItems.Type)[number]
 
-const countsOf = (items: ReadonlyArray<FacetItem>, valueOf: (item: FacetItem) => string): Listed =>
+/** Each value the items have, with how many have it: a value no item has is not listed. */
+const countsOf: {
+  (valueOf: (item: FacetItem) => string): (items: ReadonlyArray<FacetItem>) => Listed
+  (items: ReadonlyArray<FacetItem>, valueOf: (item: FacetItem) => string): Listed
+} = dual(2, (items: ReadonlyArray<FacetItem>, valueOf: (item: FacetItem) => string): Listed =>
   A.map(A.dedupe(A.map(items, valueOf)), (value) => ({
     value,
     count: A.filter(items, (item) => valueOf(item) === value).length
   }))
+)
 
 const rangeOf = (ends: ReadonlyArray<number>): Range => {
   const sorted = A.sort(ends, Order.Number)

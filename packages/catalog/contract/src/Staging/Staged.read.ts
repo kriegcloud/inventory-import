@@ -53,6 +53,40 @@ export const requiredFields: ReadonlyArray<Field> = ["sku", "name", "category", 
 
 const bounded = (max: number) => S.String.check(S.isMaxLength(max))
 
+/**
+ * The most rows one import stages. Past it the person is asked to split the file. Measured on a local D1
+ * (`SCALE=50000 bun run test test/server/Scale.http.test.ts`): 50,000 rows stage in 6 to 16 s, review in 0.7 s
+ * and confirm in about 11 s, in 200 statements of two bound values each. Larger files were not measured.
+ */
+export const maxStagedRows = 50000
+
+/**
+ * The most columns a staged file may have. A wider file is refused before anything is sent (`stagingProblem`), so a
+ * staged row never has more cells than this, nor a staged head more columns.
+ */
+export const maxColumns = 200
+
+/** Excel's last column, XFD, from 0: a column's place in a file is never past it. */
+export const lastColumnIndex = 16_383
+
+/**
+ * The highest row number a row id can carry (`row-9999999`): a staged row numbered past it could not be named by
+ * the review, so it is refused as the request it is instead of failing the review later.
+ */
+export const maxRowNumber = 9_999_999
+
+/**
+ * A row of the file as Excel numbers it: from 1, and no higher than a row id can carry. Row 0 does not exist in a
+ * spreadsheet, and a row id of it would be refused (`RowId`), so it is refused here.
+ */
+export const RowNumber = S.Int.check(S.isBetween({ minimum: 1, maximum: maxRowNumber })).annotate({
+  identifier: "RowNumber",
+  description: "A row of the file as Excel numbers it: from 1",
+  examples: [7]
+})
+/** The decoded value of `RowNumber`: a row of the file as Excel numbers it. */
+export type RowNumber = typeof RowNumber.Type
+
 /** One cell as the reader found it: `text` with nothing coerced, and `shown` when Excel displays it differently. */
 export const StagedCell = S.Struct({
   text: bounded(32767).annotateKey({ description: "The cell's value as text, nothing coerced", examples: ["120"] }),
@@ -72,16 +106,24 @@ export type StagedCell = typeof StagedCell.Type
  * the identity of each item the row holds (`rowId`). Never offset to tell a row's items apart.
  */
 export const StagedRow = S.Struct({
-  rowNumber: S.Int.annotateKey({ description: "The row number Excel shows, so 'row 56' on a screen is findable" }),
-  cells: S.Array(StagedCell).annotateKey({ description: "The row's cells, in the order of the file's columns" })
+  rowNumber: RowNumber.annotateKey({ description: "The row number Excel shows, so 'row 56' on a screen is findable" }),
+  cells: S.Array(StagedCell)
+    .check(S.isMaxLength(maxColumns))
+    .annotateKey({ description: `The row's cells, in the order of the file's columns: at most ${maxColumns}` })
 }).annotate({ identifier: "StagedRow", description: "One data row of the file" })
 /** The decoded value of `StagedRow`: one data row of the file. */
 export type StagedRow = typeof StagedRow.Type
 
 /** A column of the file: its position, Excel's letter and the heading as shown. */
 export const StagedColumn = S.Struct({
-  index: S.Int.annotateKey({ description: "The column's position in the file, from 0", examples: [3] }),
-  letter: bounded(8).annotateKey({ description: "The column's letter in Excel: A, B, AA", examples: ["D"] }),
+  index: S.Int.check(S.isBetween({ minimum: 0, maximum: lastColumnIndex })).annotateKey({
+    description: "The column's position in the file, from 0; never past Excel's last column, XFD",
+    examples: [3]
+  }),
+  letter: S.String.check(S.isPattern(/^[A-Z]{1,3}$/)).annotateKey({
+    description: "The column's letter in Excel: A, B, AA, one to three capitals",
+    examples: ["D"]
+  }),
   label: bounded(32767).annotateKey({ description: "The heading as the file shows it", examples: ["Unit"] })
 }).annotate({
   identifier: "StagedColumn",
@@ -92,10 +134,16 @@ export type StagedColumn = typeof StagedColumn.Type
 
 /** Something the reader did, skipped or noticed, as the sentence it wrote. */
 export const StagedNote = S.Struct({
-  kind: bounded(40).annotateKey({ description: "What kind of note it is, as the reader names it" }),
+  kind: S.String.check(S.isPattern(/^[a-z][A-Za-z0-9]{0,39}$/)).annotateKey({
+    description:
+      "What kind of note it is, as the reader names it: one word in camel case (blankRows). Not a closed list, so a note a later reader writes still stages",
+    examples: ["blankRows"]
+  }),
   level: S.Literals(["info", "warning"]).annotateKey({ description: "warning: something the person should look at" }),
-  message: bounded(4000).annotateKey({ description: "The sentence the reader wrote" }),
-  rows: S.Array(S.Int).annotateKey({
+  message: S.String.check(S.isMinLength(1), S.isMaxLength(4000)).annotateKey({
+    description: "The sentence the reader wrote: never empty"
+  }),
+  rows: S.Array(RowNumber).check(S.isMaxLength(maxRowNumber)).annotateKey({
     description: "The rows of the file it is about, as Excel numbers them; empty when it is about the whole file"
   })
 }).annotate({
@@ -113,12 +161,16 @@ export const StagedTable = S.Struct({
   fileName: bounded(255).annotateKey({ description: "The file's name as it was chosen", examples: ["items.csv"] }),
   kind: S.Literals(["csv", "xlsx"]).annotateKey({ description: "What kind of file it was read as" }),
   sheet: bounded(200).pipe(nullAsNone({ description: "The sheet the table came from; null for a CSV" })),
-  headerRowNumber: S.Int.annotateKey({
+  headerRowNumber: RowNumber.annotateKey({
     description: "The row the headings are on, as Excel numbers it",
     examples: [1]
   }),
-  columns: S.Array(StagedColumn).annotateKey({ description: "The file's columns, in order" }),
-  rows: S.Array(StagedRow).annotateKey({ description: "The data rows, in file order" }),
+  columns: S.Array(StagedColumn)
+    .check(S.isMinLength(1), S.isMaxLength(maxColumns))
+    .annotateKey({ description: `The file's columns, in order: one to ${maxColumns}` }),
+  rows: S.Array(StagedRow)
+    .check(S.isMaxLength(maxStagedRows))
+    .annotateKey({ description: `The data rows, in file order: at most ${maxStagedRows}` }),
   notes: S.Array(StagedNote).annotateKey({ description: "What the reader did, skipped or noticed" })
 }).annotate({
   identifier: "StagedTable",
@@ -140,10 +192,3 @@ export const StagedHead = S.Struct(headFields).annotate({
 })
 /** The decoded value of `StagedHead`: a staged file without its rows. */
 export type StagedHead = typeof StagedHead.Type
-
-/**
- * The most rows one import stages. Past it the person is asked to split the file. Measured on a local D1
- * (`SCALE=50000 bun run test test/server/Scale.http.test.ts`): 50,000 rows stage in 6 to 16 s, review in 0.7 s
- * and confirm in about 11 s, in 200 statements of two bound values each. Larger files were not measured.
- */
-export const maxStagedRows = 50000

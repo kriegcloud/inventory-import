@@ -57,7 +57,17 @@ const UploadStartWire = S.Struct({
     description: `Pieces that will follow, numbered from 0: each carries one row at least and ${chunkRows} at most, so never more pieces than rows, nor fewer than the rows need`,
     examples: [1]
   })
-})
+}).check(
+  // Named on `chunkCount`, so the 400 says which field: the pieces are what cannot carry the rows.
+  S.makeFilter((start) =>
+    piecesCarry(start)
+      ? true
+      : {
+          path: ["chunkCount"],
+          issue: `${start.chunkCount} pieces cannot carry ${start.rowCount} rows: each carries one row at least and ${chunkRows} at most`
+        }
+  )
+)
 type UploadStartShape = typeof UploadStartWire.Type
 
 const isStartWire = S.is(UploadStartWire)

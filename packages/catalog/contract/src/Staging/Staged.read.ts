@@ -71,8 +71,9 @@ export const maxColumns = 200
 export const lastColumnIndex = MAX_COLUMN
 
 /**
- * The most notes a staged file may carry. A reader writes a few notes about the file and at most one for each number
- * format it could not show, and a workbook holds about 250 formats, so this is far past any file and still a bound.
+ * The most notes a staged file may carry. A reader writes a few notes about the file and one for each number format
+ * it could not show, which a workbook built to do so can have thousands of: staging keeps the first notes and says in
+ * one more how many it did not keep (`stageTable`), so a file is never refused for its notes.
  */
 export const maxNotes = 1000
 
@@ -150,8 +151,11 @@ export const StagedNote = S.Struct({
   message: S.String.check(S.isMinLength(1), S.isMaxLength(4000)).annotateKey({
     description: "The sentence the reader wrote: never empty"
   }),
-  rows: S.Array(RowNumber).check(S.isMaxLength(maxStagedRows)).annotateKey({
-    description: "The rows of the file it is about, as Excel numbers them; empty when it is about the whole file"
+  // A note names rows of the file, not only rows of data: blank rows, a second table, a merge down the sheet. Each is
+  // named once, so the list is never longer than a file can number rows, however few of them are data.
+  rows: S.Array(RowNumber).check(S.isMaxLength(maxRowNumber)).annotateKey({
+    description:
+      "The rows of the file it is about, each once, as Excel numbers them, data or not; empty when it is about the whole file"
   })
 }).annotate({
   identifier: "StagedNote",

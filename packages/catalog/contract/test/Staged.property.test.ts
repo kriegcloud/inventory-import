@@ -4,7 +4,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { rowId } from "@inventory/catalog-contract/Decision"
 import {
-  lastColumnIndex,
   maxColumns,
   maxNotes,
   maxStagedRows,
@@ -13,10 +12,11 @@ import {
   StagedRow
 } from "@inventory/catalog-contract/Staged"
 import { chunkRows, UploadChunk, UploadStart } from "@inventory/catalog-contract/Upload"
-import { MAX_COLUMN } from "@beep/xlsx/XlsxAddress"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
+import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import * as SchemaIssue from "effect/SchemaIssue"
 
 const runs = { arbitrary: { runs: 200 } }
 
@@ -60,10 +60,10 @@ describe("a staged head", () => {
       expect(head.columns.length).toBeGreaterThanOrEqual(1)
       expect(head.columns.length).toBeLessThanOrEqual(maxColumns)
       for (const column of head.columns) {
-        // XFD, Excel's last column as the workbook reader bounds it; its letters are one to three capitals.
+        // XFD, Excel's last column, is index 16,383 (Excel's own limit, written out); its letters are one to three
+        // capitals.
         expect(column.index).toBeGreaterThanOrEqual(0)
-        expect(column.index).toBeLessThanOrEqual(lastColumnIndex)
-        expect(lastColumnIndex).toBe(MAX_COLUMN)
+        expect(column.index).toBeLessThanOrEqual(16_383)
         expect(column.letter).toMatch(/^[A-Z]{1,3}$/)
       }
     },
@@ -85,17 +85,17 @@ describe("a staged head", () => {
 
 describe("a staged head's notes", () => {
   it.prop(
-    "are refused past the most a file may carry, and a note naming more rows than an import stages is refused",
+    "are refused past the most a file may carry, and a note may name every row of a sheet, data or not",
     [Arbitrary.schema(StagedHead), Arbitrary.schema(StagedNote)],
     ([head, note]) => {
       const notes = A.makeBy(maxNotes - head.notes.length + 1, () => note)
       expect(S.is(StagedHead)({ ...head, notes: [...head.notes, ...notes] })).toBe(false)
-      // The rows of the file, numbered from 1, one more than an import stages.
-      const rows = A.makeBy(maxStagedRows + 1, (n) => n + 1)
-      expect(S.is(StagedNote)({ ...note, rows })).toBe(false)
-      expect(S.is(StagedNote)({ ...note, rows: A.take(rows, maxStagedRows) })).toBe(true)
+      // A label merged down a whole worksheet: 1,048,576 rows, Excel's last, far more than an import stages.
+      const sheet = A.makeBy(1_048_576, (n) => n + 1)
+      expect(sheet.length).toBeGreaterThan(maxStagedRows)
+      expect(S.is(StagedNote)({ ...note, rows: sheet })).toBe(true)
     },
-    { arbitrary: { runs: 20 } }
+    { arbitrary: { runs: 5 } }
   )
 })
 
@@ -121,6 +121,19 @@ describe("the start of an upload", () => {
       const fewest = Math.ceil(start.rowCount / chunkRows)
       if (fewest > 1) expect(S.is(UploadStart)({ ...start, chunkCount: fewest - 1 })).toBe(false)
     },
+    runs
+  )
+
+  it.effect.prop(
+    "says which field is wrong when its pieces cannot carry its rows: the number of pieces",
+    [Arbitrary.schema(UploadStart)],
+    ([start]) =>
+      Effect.gen(function* () {
+        const wire = yield* S.encodeEffect(UploadStart)(start)
+        const refused = yield* Effect.flip(S.decodeEffect(UploadStart)({ ...wire, chunkCount: wire.rowCount + 1 }))
+        const issues = SchemaIssue.makeFormatterStandardSchemaV1()(refused.issue).issues
+        expect(A.map(issues, (issue) => issue.path)).toEqual([["chunkCount"]])
+      }),
     runs
   )
 

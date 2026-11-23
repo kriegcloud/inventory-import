@@ -5,7 +5,7 @@
  * what Excel displays when that differs.
  */
 import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
-import { StagedTable, maxColumns, maxStagedRows } from "@inventory/catalog-contract/Staged"
+import { StagedTable, maxColumns, maxNotes, maxStagedRows } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
 import * as O from "effect/Option"
@@ -29,13 +29,32 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
           : { text: cell.text, shown: cell.shown }
       )
     })),
-    notes: A.map(table.notes, (note) => ({
-      kind: note.kind,
-      level: note.level,
-      message: note.message,
-      rows: note.rows
-    }))
+    notes: keptNotes(table.notes)
   }
+}
+
+/**
+ * The reader's notes as staged: all of them when they fit `maxNotes`, else the first ones and one more that says how
+ * many were not kept, so a workbook with thousands of number formats is still staged, and says so.
+ *
+ * @example keptNotes(notes).length // at most maxNotes
+ */
+const keptNotes = (notes: SpreadsheetTable["notes"]): StagedTable["notes"] => {
+  const staged = A.map(notes, (note) => ({
+    kind: note.kind,
+    level: note.level,
+    message: note.message,
+    rows: note.rows
+  }))
+  if (staged.length <= maxNotes) return staged
+  const kept = A.take(staged, maxNotes - 1)
+  const left = staged.length - kept.length
+  return A.append(kept, {
+    kind: "notesNotKept",
+    level: "info",
+    message: `${left} more notes about how the file was read were not kept.`,
+    rows: []
+  })
 }
 
 /**

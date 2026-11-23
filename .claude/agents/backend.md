@@ -36,7 +36,7 @@ Write these correctly the first time. Each one costs a fix cycle.
    column, `S.OptionFromOptionalKey` for a payload key), a starting value is on the field
    (`S.withConstructorDefault`, `S.withDecodingDefaultTypeKey`), a trim or a change of case is a transformation
    (`S.decodeTo` with `SchemaTransformation` or `SchemaGetter`). A handler decodes once at its boundary and trusts the
-   type after that line. No `??`, no `=== undefined`, no `=== null`, no `O.getOrUndefined`, no `Str.trim` or
+   type after that line. No `??`, no `|| ""`, no `O.getOrElse`, no `=== undefined`, no `=== null`, no `O.getOrUndefined`, no `Str.trim` or
    `.toLowerCase()` outside a schema: `defaults:check` refuses a new one, and the edit hook says so at once with the
    line. An old one in a file you are changing is not yours to clean unless the brief says so.
 4. **Optional properties and indexing.** Never pass `undefined`: our own fields are Options; for another library's

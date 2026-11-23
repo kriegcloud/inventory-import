@@ -4,12 +4,13 @@
  * fallback written at a call site is a rule nobody can find, and two call sites can disagree about it.
  *
  * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`,
- * `??=`), a comparison with `null` or `undefined`, an Option turned back into a missing value (`getOrUndefined`,
+ * `??=`, `||` and `||=` before a value written out, `getOrElse`), a comparison with `null` or `undefined`, an Option turned back into a missing value (`getOrUndefined`,
  * `getOrNull`), and a trim or a change of case that is not `SchemaGetter`'s or `SchemaTransformation`'s. The law does
  * not judge whether a place is "really" a default: a law that judges is argued with, and one that reads types costs
  * the whole program on every run.
  *
- * The tree had about 2,700 such places when the law was written, so it holds a baseline (`defaults-baseline.json` at
+ * The tree had about 2,000 such places when the law was written (`getOrElse` and `||` were counted a commit later,
+ * with a baseline written anew, since without them a refused `x ?? 0` was written again as `O.getOrElse(x, () => 0)`), so it holds a baseline (`defaults-baseline.json` at
  * the root): for each file, how many of each kind it may hold. A file with more than its baseline fails, and a file
  * the baseline does not name may hold none. A file with fewer never fails: `--write` lowers the baseline to what the
  * tree holds, and never raises it (the first one, with no baseline file yet, records the tree as it stands). So nobody is asked to clean a file to finish other work, nobody can add a place,
@@ -20,7 +21,7 @@
  * committed version does not have, so the line just written is the line named.
  *
  * Left alone: the vendored kit and components, `.agents`, the scratchpad and `packages/tooling` (this package reads
- * arguments and files, not the business's data; this law's own files hold to it anyway).
+ * arguments and files, not the business's data).
  */
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
@@ -139,7 +140,7 @@ export type DefaultsFinding = typeof DefaultsFinding.Type
 /** What to write instead, for each kind: the line an agent reads the moment it wrote the place. */
 const remedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
-    "a `??` supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters (SF-5)",
+    "a `??`, a `||` before a value, or a getOrElse supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
   absence:
     "a comparison with null or undefined. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
   unwrap:
@@ -150,14 +151,14 @@ const remedy: Readonly<Record<DefaultsKind, string>> = {
 const testRemedy: Readonly<Record<DefaultsKind, string>> = {
   ...remedy,
   fallback:
-    "a `??` in a test hides a value that is missing. Narrow with assertSome, assertDefined or assertSuccess from @effect/vitest/utils, which fail with the value",
+    "a `??` or a getOrElse in a test hides a value that is missing. Narrow with assertSome, assertDefined or assertSuccess from @effect/vitest/utils, which fail with the value",
   absence:
     "a comparison with null or undefined in a test. Narrow with assertSome, assertNone or assertDefined from @effect/vitest/utils"
 }
 
 /** One line of the code at a place: its first line, cut where a longer one would fill the screen. */
 const shown = (code: string): string => {
-  const first = O.getOrElse(A.head(Str.split("\n")(code)), () => "")
+  const first = A.headNonEmpty(Str.split("\n")(code))
   return first.length > 80 ? `${Str.slice(0, 77)(first)}...` : first
 }
 

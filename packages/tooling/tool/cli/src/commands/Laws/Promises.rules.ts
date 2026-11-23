@@ -85,7 +85,7 @@ export const promisesLeftOut: ReadonlyArray<string> = [".agents/", `${scratchpad
  * Promise and name its type. Every other use of a Promise there is refused as anywhere else.
  */
 export const promiseEntryPoints: Readonly<Record<string, string>> = {
-  "apps/inventory/src/server/App.ts": "the Worker's exported fetch, which Cloudflare calls and awaits",
+  "apps/inventory/src/server/worker.ts": "the Worker's exported fetch, which Cloudflare calls and awaits",
   "apps/inventory/src/web/main.tsx": "the browser's root, which starts the app"
 }
 

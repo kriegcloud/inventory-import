@@ -577,7 +577,7 @@ describe("main's baseline written for a reader that counted less", () => {
             ...repo,
             run: Effect.fn("failingGrep")(function* (command, args, options) {
               if (A.contains(args, "--no-renames"))
-                return { bytes: new Uint8Array(), stdout: "", stderr: "diff broke", code: 2 }
+                return { bytes: new Uint8Array(), stdout: "", stderr: "diff broke\n", code: 2 }
               return yield* repo.run(command, args, options)
             })
           })
@@ -765,7 +765,7 @@ describe("what git says of a move, and when it cannot say", () => {
             ...repo,
             run: Effect.fn("failingHash")(function* (command, args, options) {
               if (A.contains(args, "hash-object"))
-                return { bytes: new Uint8Array(), stdout: "", stderr: "hash broke", code: 128 }
+                return { bytes: new Uint8Array(), stdout: "", stderr: "hash broke\n", code: 128 }
               return yield* repo.run(command, args, options)
             })
           })

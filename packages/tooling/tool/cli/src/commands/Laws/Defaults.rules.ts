@@ -280,7 +280,7 @@ const readScope = Effect.fn("Defaults.readScope")(function* (commit: string) {
   const repo = yield* Repo
   const empty = yield* repo.run("git", ["hash-object", "-t", "tree", "--stdin"], { cwd: repo.root, stdin: "" })
   if (empty.code !== 0) {
-    const unlisted: Result.Result<ReadonlyArray<string>, string> = Result.fail(empty.stderr)
+    const unlisted: Result.Result<ReadonlyArray<string>, string> = Result.fail(Str.trim(empty.stderr))
     return unlisted
   }
   const listedAt = (pathspec: ReadonlyArray<string>) =>
@@ -302,7 +302,7 @@ const readScope = Effect.fn("Defaults.readScope")(function* (commit: string) {
         { cwd: repo.root }
       ),
       (answer): Result.Result<ReadonlyArray<string>, string> =>
-        answer.code === 0 ? Result.succeed(Str.split("\0")(answer.stdout)) : Result.fail(answer.stderr)
+        answer.code === 0 ? Result.succeed(Str.split("\0")(answer.stdout)) : Result.fail(Str.trim(answer.stderr))
     )
   const listed = yield* listedAt(ownCode)
   const vendored = yield* listedAt([":(glob)packages/**/vendor.json"])
@@ -438,7 +438,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   if (listed.code !== 0 || vendored.code !== 0) {
     return A.make<[DefaultsFinding, DefaultsFinding]>(
       DefaultsFinding.cases.Refused.make({ broken: false }),
-      DefaultsFinding.cases.Unlisted.make({ why: listed.code !== 0 ? listed.stderr : vendored.stderr })
+      DefaultsFinding.cases.Unlisted.make({ why: Str.trim(listed.code !== 0 ? listed.stderr : vendored.stderr) })
     )
   }
   if (write && A.isReadonlyArrayNonEmpty(only)) return A.of<DefaultsFinding>(DefaultsFinding.cases.NoWrite.make({}))
@@ -522,7 +522,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
         )
       })
       // A move whose old name the law lists a file at again lends it nothing, and the reader is told why while git sees
-      // the move (once the file at the old name is staged it sees a changed file and a new one, and lends nothing
+      // the move (once the file at the old name is staged it sees no move but a new file, and lends nothing
       // either). A moved file with a line of its own is held to that line, and the move is not what it is over.
       const retaken = O.filter(R.get(base.retaken, one.file), () => !R.has(baseline, one.file))
       return O.match(retaken, {

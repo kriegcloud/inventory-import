@@ -23,7 +23,8 @@
 // made again at the same path in one change is the same path to git, and keeps that path's number. A move lends its
 // number only while the law lists no file at the old name: a file there keeps what the old name held, so the two do
 // not hold it twice. The law names the move while git sees one: once the file at the old name is staged (or
-// committed), git sees a changed file and a new one, and the moved file is refused as any new file is.
+// committed), git sees no move but a new file, beside the old name changed or, when the file there is the base's own,
+// unchanged; and the moved file is refused as any new file is.
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -303,12 +304,22 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
   readonly now: Ledger
   readonly files: ReadonlyArray<string>
 }) {
+  const base = yield* atBase(input.path, input.files)
+  // A line whose file git sees moved to one the law reads goes with it: the moved file is held to it by its old name.
+  const movedTo = R.fromEntries(
+    A.filterMap(R.toEntries(base.renamed), ([to, from]) =>
+      A.contains(input.files, to) ? Result.succeed([from, to] as const) : Result.failVoid
+    )
+  )
   const missing = A.map(
     A.filter(ledgerFiles(input.now), (file) => !A.contains(input.files, file)),
     (file) =>
-      `${file}  is in ${input.path} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off, so a new file at its path inherits nothing`
+      O.match(R.get(movedTo, file), {
+        onNone: () =>
+          `${file}  is in ${input.path} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off, so a new file at its path inherits nothing`,
+        onSome: (to) => `${file}  is in ${input.path} but was moved to ${to}: move its line to ${to}`
+      })
   )
-  const base = yield* atBase(input.path, input.files)
   if (O.isSome(base.problem)) return A.append(missing, base.problem.value)
   // A base with no such ledger yet: the first one comes in whole, and nothing is compared.
   if (O.isNone(base.text)) return missing

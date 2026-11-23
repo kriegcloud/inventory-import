@@ -188,6 +188,21 @@ describe("laws diagnostics", () => {
         })
       )
       expect(renamed).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+      // A move whose line was left at the old name is told the move, and the line to write, as a case-only one is.
+      for (const to of [moved, "packages/x/src/Listed.ts"]) {
+        const lineLeft = yield* inTree(
+          held,
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* onMain()
+            yield* repo.run("git", ["mv", listed, to])
+            return yield* run
+          })
+        )
+        expect(lineLeft).toContain(
+          `err: ${listed}  is in ${diagnosticsLedger} but was moved to ${to}: move its line to ${to}`
+        )
+      }
       // A move with a new file at the old name lends nothing: the new file keeps the number, so the moved one is new.
       // The same whether the new file is untracked (git sees a rename, and the law says so) or both are committed (git
       // sees a change of the old file and a new one).

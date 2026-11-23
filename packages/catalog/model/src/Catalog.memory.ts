@@ -36,7 +36,13 @@ import {
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { type Field, StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
+import {
+  type Field,
+  type StagedHead,
+  StagedHeadJson,
+  type StagedRow,
+  type StagedTable
+} from "@inventory/catalog-contract/Staged"
 import { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, type MemberId, type OrganizationId } from "@inventory/kernel/Ids"
@@ -251,7 +257,6 @@ export class CatalogMemoryRef extends Context.Service<CatalogMemoryRef, Ref.Ref<
 
 // -- Small helpers ----------------------------------------------------------------------------------------------
 
-const HeadJson = S.fromJsonString(StagedHead)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
@@ -953,7 +958,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const made = yield* random.uuidV4()
       const now = yield* DateTime.now
       const before = DateTime.subtract(now, { minutes: abandonedAfterMinutes })
-      const headJson = yield* S.encodeEffect(HeadJson)(head)
+      const headJson = yield* S.encodeEffect(StagedHeadJson)(head)
       const id = yield* Ref.modify(ref, (state): readonly [ImportId, CatalogState] => {
         // An upload left unfinished for an hour is gone before the next one of its organization starts.
         const kept = A.filter(
@@ -1146,7 +1151,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
           return O.some<ChoicesSaved>("same")
         }
-        const head = yield* S.decodeEffect(HeadJson)(entry.draft.headJson)
+        const head = yield* S.decodeEffect(StagedHeadJson)(entry.draft.headJson)
         const moves = yield* S.decodeEffect(MovesJson)(entry.draft.movesJson)
         const plan = yield* planMatch({
           head,
@@ -1572,7 +1577,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       }),
       table: Effect.fnUntraced(function* (organizationId: OrganizationId, draft: Draft) {
         const state = yield* Ref.get(ref)
-        const head = yield* S.decodeEffect(HeadJson)(draft.headJson)
+        const head = yield* S.decodeEffect(StagedHeadJson)(draft.headJson)
         const table: StagedTable = {
           ...head,
           rows: O.match(A.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {

@@ -33,7 +33,14 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as DateTime from "effect/DateTime"
 import { ItemsOfRow } from "../Review/ItemsOfRow.context.ts"
 import { Member } from "@inventory/kernel/Member"
-import { StagedTable, StagedHead, Field, fieldLabels, fields } from "@inventory/catalog-contract/Staged"
+import {
+  StagedTable,
+  type StagedHead,
+  StagedHeadJson,
+  Field,
+  fieldLabels,
+  fields
+} from "@inventory/catalog-contract/Staged"
 import { type ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import {
   SavedDecisions,
@@ -261,7 +268,7 @@ export const importsEndpoints = Effect.gen(function* () {
       compared(actor, draft, asked, known)
 
   // The file's head as staged: its columns, with no row read.
-  const headOf = (draft: Draft) => S.decodeEffect(S.fromJsonString(StagedHead))(draft.headJson).pipe(Effect.orDie)
+  const headOf = (draft: Draft) => S.decodeEffect(StagedHeadJson)(draft.headJson).pipe(Effect.orDie)
 
   // A match's question to the review, held across the store's tries of the one match: an answer a later try gives only
   // because an item, a created row or a suggestion changed in between never adds a take-back (`answeredAcrossTries`).
@@ -677,7 +684,7 @@ export const importsEndpoints = Effect.gen(function* () {
       const finished = yield* imports.find(actor.organizationId, params.id)
       if (O.isSome(finished)) return yield* Effect.map(viewOf(actor, finished.value), Result.succeed)
       const upload = yield* findUpload(actor, params.id)
-      const head = yield* S.decodeEffect(S.fromJsonString(StagedHead))(upload.headJson).pipe(Effect.orDie)
+      const head = yield* S.decodeEffect(StagedHeadJson)(upload.headJson).pipe(Effect.orDie)
       const chunks = yield* imports.uploadChunks(actor, upload)
       const table: StagedTable = { ...head, rows: A.flatMap(chunks, (chunk) => chunk.rows) }
       const problem = O.orElse(

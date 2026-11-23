@@ -21,7 +21,7 @@ would be in this app, how to check it, and where it was read. The design, with t
 
 ## How to read it
 
-Start with [the brief](BRIEF.md): the design, the saving of review decisions modelled first, one table of every
+For the brief on one page, read [the summary](SUMMARY.md). Start with [the brief](BRIEF.md): the design, the saving of review decisions modelled first, one table of every
 concept with its instance, its move and its check, and the decisions in the order they must be asked. The research
 under it:
 

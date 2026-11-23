@@ -1,10 +1,13 @@
 // What the Items filters offer is counted over every item of the organization, and every item has a category, a unit,
 // and both switches: so each list's counts add up to the items, a value no item has is left out, and a range is there
 // exactly when there are items, lowest first. Facets are generated from the schema, then broken one rule at a time;
-// each broken copy must be refused, so every rule of the check is seen to hold on its own. The values a list may offer
-// are read from the item's own lists, not from the facets' pattern.
+// each broken copy must be refused, so every rule of the check is seen to hold on its own. Three rules no copy can
+// break alone, since others imply them: a list's length (each value is listed once), a whole total (the counts are
+// whole and add up to it) and a count's top (the counts add up to the total, which has its own). They stay in the
+// schema for the API's document and for what it generates. The values a list may offer are read from the item's own
+// lists, not from the facets' pattern.
 import { describe, expect, it } from "@effect/vitest"
-import { categories, uoms } from "@inventory/catalog-contract/Item"
+import { categories, maxCount, uoms } from "@inventory/catalog-contract/Item"
 import { ItemFacets } from "@inventory/catalog-contract/ItemQuery"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
@@ -102,6 +105,46 @@ describe("what the Items filters offer", () => {
       }
     },
     runs
+  )
+
+  it.prop(
+    "is refused when a range's top is past the most a stock number may be, or a unit cost past a trillion dollars",
+    [Arbitrary.schema(ItemFacets), Arbitrary.schema(Fraction)],
+    ([facets, fraction]) => {
+      // The tops: a stock number at most `maxCount`; a cost has twelve dollar digits at most, so no range reaches past
+      // a trillion dollars.
+      const past: Readonly<Record<RangeName, number>> = { quantityOnHand: maxCount + 1, unitCost: 1e12 + fraction }
+      for (const name of rangeNames) {
+        const { min } = facets[name]
+        if (O.isSome(min)) expect(accepted({ ...facets, [name]: { min, max: O.some(past[name]) } })).toBe(false)
+      }
+    },
+    runs
+  )
+
+  it.prop(
+    "is refused when it counts more items than a stock number may be, though every list adds up",
+    [Arbitrary.schema(ItemFacets)],
+    ([facets]) => {
+      // Each list counts the items under two of its values, so every count stays within a stock number's bound.
+      const counted = (total: number): ItemFacets => {
+        const split = (values: ReadonlyArray<string>): Listed =>
+          A.zipWith(A.take(values, 2), [total - 1, 1], (value, count) => ({ value, count }))
+        return {
+          ...facets,
+          total,
+          category: split(valuesOf.category),
+          uom: split(valuesOf.uom),
+          isActive: split(valuesOf.isActive),
+          lotTracked: split(valuesOf.lotTracked),
+          quantityOnHand: { min: O.some(0), max: O.some(0) },
+          unitCost: { min: O.some(0), max: O.some(0) }
+        }
+      }
+      expect(accepted(counted(maxCount))).toBe(true)
+      expect(accepted(counted(maxCount + 1))).toBe(false)
+    },
+    { arbitrary: { runs: 5 } }
   )
 
   it.prop(

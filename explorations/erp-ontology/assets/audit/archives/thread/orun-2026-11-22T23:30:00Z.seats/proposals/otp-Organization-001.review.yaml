@@ -1,0 +1,43 @@
+target: "otp:Organization:001"
+target_sha256: "efa9b0c50bd54a60cef1e1012673d18a16d51b73dc18a51019763fd427d1787f"
+chain_sha256: "de20ec2b2db73d2c214c77cde27954a37ed2bba5731be8d7d7f669fa119847cb"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed. gist:Organization is a non-asserted mapping only, so no parent rigidity, identity, unity, or dependence is compared. The missing identity-supplying ancestor is charged on the identity surface."
+revision_requests:
+  - "Drop semantic_support_for otp:Member:001 and otp:inTenant:001, or show a decision CQ that is unanswerable without the organized-body class. CQ-P06 and CQ-P09 are answered with Tenant as the workspace holder. Counterparties in po:a9f7e334db4f are not asked."
+  - "Do not propose Organization as a rigid sortal while supplies_identity is unresolved and no parent supplies identity. po:715824f4fc19 decides a successor company and founding, not reorganization."
+attacks:
+  - surface: warrant
+    rule: support-not-necessary
+    counterexample: "Organization's warrant is only semantic support for Member and inTenant. CQ-P06 asks for the members of this organization and which role each holds; its sample binds a tenant and a member, and a Tenant individual plus membershipIn answers it. CQ-P09 asks whether a record belongs to no organization, to two, or to another organization's record; its required classes are Tenant, Member, and AuditEntry, and inTenant's object is the holding tenant. po:a9f7e334db4f also covers a company the tenant buys from, sells to, ships with, or has goods made by, which neither question asks. po:020743f3cadf says no thread record holds the body. The body class is not necessary for either decision term."
+    outcome: landed
+  - surface: identity
+    rule: sortal-no-identity-ancestor
+    counterexample: "Acme keeps workspace W and replaces every founder and its purpose, or reorganizes without a new registration. po:715824f4fc19 says a successor company is a new Organization even when it keeps the workspace, and an unregistered body is told apart by its founding. It does not say whether this Acme continued. parents is empty and supplies_identity is unresolved, so no ancestor, itself included, supplies a criterion. carries_identity true has nothing settled to carry. Proposing a rigid class in that state is the blocked sortal. Workspace retention is correctly refused as identity; that refusal is not itself a supplying criterion."
+    outcome: landed
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Successor company NewAcme keeps workspace W. If Organization denoted W, or denoted the imported source record that W still points at, NewAcme would be the same organization. po:715824f4fc19 says it is not, and po:79e6720f1b1d says the imported row is a SourceRecord of the body, not the body. A pure workspace-key or same-record twin makes the fact false, which is what a discriminator must do. A new legal-entity table that allocates a new key on succession is the domain referent stored as rows, not the implementation-only alternative the hypothesis names. The attack does not land."
+    outcome: survived
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "The card's reidentification_key is empty, and the proposal says names, records, and OrganizationId never supply body identity. The technical key is not the asserted criterion."
+    outcome: survived
+rival_models_still_viable:
+  - "Organizational collective with membership-based unity"
+  - "Institutional organized body with legally constituted continuity and varying members"
+evidence:
+  - "CQ-P06"
+  - "CQ-P09"
+  - "po:sha256:a9f7e334db4f34fc0728f5c7109c7a1280d0cc01ba2037a45aeb86b7224f197c"
+  - "po:sha256:020743f3cadf0467e6f94f024b74d06b24fc542c5381f072586777707b229f1a"
+  - "po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f"
+  - "po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c"

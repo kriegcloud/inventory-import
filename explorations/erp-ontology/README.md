@@ -37,6 +37,7 @@ when the slice that needs it is specified. Gate 10 remains open (pending Q27).
 | [12 Projection and checks](research/12-projection-and-checks.md) | The projector's mapping from every term-model construct to OWL, SKOS and SHACL, its determinism rules, and the twelve gates of decision 6 with what each catches. |
 | [13 Term index](research/13-term-index.md) | Terms and properties across the nine designs, with counts, the collisions resolved and the Sutton-only or later terms not proposed. Which properties get a local name remains open (pending Q19). |
 | [14 The thin thread](research/14-thin-thread.md) | The terms and records (sections 2 and 3), how the member's role answers the question (4 and 5), and how to check and package the result (6 to 8). |
+| [15 What the foundational audit of the thread found](research/15-audit-findings.md) | The auditor's two runs, what its adversary landed, why the audit is advisory (decision 107) and five design points still to rule on. |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).

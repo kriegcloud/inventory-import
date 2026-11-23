@@ -562,3 +562,17 @@ the same.
 - Rationale: the stored rows can answer what an entry says; they cannot answer what happened.
 - Reverse: keep the first wording and add a term for the change the entry is about, after deciding how fine-grained
   one change is.
+
+### 107. What the foundational audit of the thread counts for (2026-11-22)
+
+The auditor ran twice on the thread's terms and its adversary failed every proposal both times (18, then 15). In the
+second run 13 of 15 failed on one point: no quoted fact shows a term is more than a well-commented stored row, and
+nothing in this application's code or documents can show otherwise. I chose to treat the audit as advisory: both runs
+are kept as findings ([report 15](research/15-audit-findings.md)), no third run is made, and the thread's 18 terms
+are settled by my rulings in this file, not by the auditor's `rat-` records. This amends decisions 32 and 101 for the
+thread: a thread term names the decision of this file that accepted it. The agent recommended the same.
+
+- Rationale: the thread's terms are commitments I made about what the application means, not discoveries from its
+  code; the audit cannot certify that kind of term, and its other findings are still worth having.
+- Reverse: take the adversary's cuts (no Grant class, no Organization class) and rerun, or run a third round on the
+  merged branch; either reopens decisions 34, 40 and 102.

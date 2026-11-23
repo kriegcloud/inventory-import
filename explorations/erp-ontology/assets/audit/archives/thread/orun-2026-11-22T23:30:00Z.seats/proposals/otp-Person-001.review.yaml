@@ -1,0 +1,48 @@
+target: "otp:Person:001"
+target_sha256: "d0ae07821fd60021540cdbb571986dba20b80cafcc2dbe46597b07fbc4ee16b9"
+chain_sha256: "92db6bf62b803d26d4f32293c8dd4ba0ac6985f1a7de6a5a32c377370396aeca"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Stop classifying Person as a rigid kind under gist:Person while the definition, taken from po:6978a469f8c2, is a human a tenant deals with. Ravi removed from every workspace and no longer a contact leaves that extension and remains the same human (po:409cfb4d8ae1). Either drop the relational restriction from the class, or model the restriction as a role and do not assert rigid kind subsumption."
+  - "Replace the null discriminator. A Person row that two member rows point at, whose key is not an account or member id, and which is not deleted when a deceased flag is set, makes po:409cfb4d8ae1 true and is still a record."
+attacks:
+  - surface: taxonomy
+    rule: role-as-kind
+    counterexample: "Ravi is one human (po:409cfb4d8ae1). He is removed from every workspace and is not a contact at any organization. po:6978a469f8c2 defines the class as a human a tenant deals with, as a member or as a contact, so Ravi leaves the extension while the same human persists. A rigid subclass of gist:Person cannot be exited. The edge asserts that rigid kind subsumption anyway. No valid subsumption was the alternative: it does not win, because a human still falls under a human-living-or-dead parent during the interval the tenant deals with him. The defect is classifying that interval-bound class as rigid. Dependence none contradicts the same relational definition. gist:Person is not the anti-rigid parent; the child is the anti-rigid class."
+    outcome: landed
+  - surface: taxonomy
+    rule: anti-rigid superclass with rigid subclass
+    counterexample: "The proposed parent is gist:Person, described here as a human living or dead, not as a role. Nothing in the cited observations makes the parent anti-rigid. The blocked anti-rigid-superclass pattern is not shown."
+    outcome: survived
+  - surface: taxonomy
+    rule: conflicting supplied identity criteria in one taxonomy
+    counterexample: "The justification says the ancestry reaches gist:PhysicalIdentifiableItem, which would supply a second identity if that ancestor's criterion were physical continuity ending at death, against po:409cfb4d8ae1's post-death sameness. No observation in this closure states that ancestor's criterion. The conflict is not shown. It would be settled by the gist projection's identity criterion for gist:Person and gist:PhysicalIdentifiableItem."
+    outcome: survived
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "One human has two Member records; one membership is removed and both account details change. po:409cfb4d8ae1 says that is still one Person, and an account or member id never identifies the person. The criterion is the human, including the stipulated post-death continuation, not a key. A bad clerical merge of two humans would mis-apply the criterion; it would not be what the criterion says. The attack does not land."
+    outcome: survived
+  - surface: warrant
+    rule: support-not-necessary
+    counterexample: "Person is semantic support for otp:Member:001 only. CQ-P06's sample is one human with two memberships, and its decision is whether a person may be offered an action in one organization and nowhere else. po:0fd580baa7d4 says two Member records did not say they were one human. Without Person, Member cannot keep those two authorizations on one bearer. The support is necessary. Not a listing, not a self-reference, not a chain through another support term."
+    outcome: survived
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Table Person has row P. Member rows test_RaviWorks and test_RaviSecond both store person_id P. P's key is neither an account id nor a member id. A deceased flag does not delete P. po:409cfb4d8ae1 — two records of the same human are one Person, an account or member id never identifies that person, and the human persists after death — is true of this schema. The hypothesis alternative (an account or membership record) is a narrower null and is rejected, but the stated null is implementation-artifact-only, and this Person table is that artifact. po:54da2f53fbca says no current thread record holds the human; that is a snapshot of the thread, not a fact the table lacks."
+    outcome: landed
+rival_models_still_viable: []
+evidence:
+  - "po:sha256:6978a469f8c2d0ff495c6dad024e4ea8420d2032a4f4f22db396decff519d8bb"
+  - "po:sha256:409cfb4d8ae1c4cf7180ff65594c3914c5b37da84b47ac137190b65e159c21ef"
+  - "po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62"
+  - "po:sha256:54da2f53fbca640bc6194127d5133624bf87036f456e144813d9a91362920579"
+  - "po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c"
+  - "CQ-P06"

@@ -1,0 +1,46 @@
+target: "otp:Grant:001"
+target_sha256: "31b4d21617b2c3e19ade4e66c6252434f308ac9a8ef8c6c7b1acadba2c95cd4d"
+chain_sha256: "3b5f4e3e529d0a524ada21794689d42baebcc81be7424847b7176906d7cf2bd2"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed. gist:Assignment is a non-asserted mapping only, so no parent rigidity, identity, unity, or dependence is in play. The missing identity-supplying ancestor is charged on the identity surface."
+revision_requests:
+  - "Stop citing CQ-P11 as a warrant for a Grant class. The natural-language question asks at which scope each member holds which role. An unreified member-role-scope assertion answers it, and that rival is still viable. Either have the steward retire that rival, or warrant only the relation the question needs."
+  - "Replace the null discriminator. po:c4054ec5a4fd and po:4ddf67948771 already read member.role as one organization-scoped grant and state that no grant row exists. A member row plus that constant makes the quoted assignment prose true. Cite a fact that arrangement lacks."
+  - "Do not propose Grant as a rigid relator until some ancestor, itself included, supplies identity. The lifted IRI <member IRI>/role does not decide viewer, then admin, then viewer."
+attacks:
+  - surface: warrant
+    rule: cq-does-not-require-term
+    counterexample: "Member M has role admin and the thread's only extent is organization. CQ-P11 asks at which scope M holds which role. The answer (admin, organization) is fixed by po:c4054ec5a4fd without a Grant individual. CQ-P11's must_fail and SPARQL mention Grant because the drafted graph stores scope on a grant node; po:773104c28ed4 says CQ-P06 was already answerable from the member's role, and the new question still does not require reification once scope is a constant or a triple on M. The viable unreified rival answers the same natural-language question. A SPARQL listing is not a requirement."
+    outcome: landed
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "M.role is admin. po:559ba5ec7c7d calls that an assignment of one role to one member at one scope, made by someone allowed to assign it, and po:4ddf67948771 says there is no grant row: the node IRI is manufactured as <member IRI>/role. That derived node is the implementation artifact named in the hypothesis alternative, and the discriminator's \"even though no grant row exists\" is true of it. Organization-wide versus a narrower extent is a constant (organization) on the same node, not a fact the node lacks."
+    outcome: landed
+  - surface: identity
+    rule: sortal-no-identity-ancestor
+    counterexample: "At t1, t2, and t3, M.role is viewer, then admin, then viewer. All three snapshots share the IRI <M>/role (po:4ddf67948771, po:a189eb95f95d). No parent supplies identity, and the card's supplies_identity is unresolved, so nothing decides one continuing relator versus three episodes. Proposing a rigid unity relator in that state is a sortal with no identity-supplying ancestor, itself included. The IRI is a projection address, which the card already refuses as the criterion."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "The proposal's closed identity value is unresolved and the text says the member-plus-role-field convention is only the lifted projection. It does not assert that technical key as domain identity. The sortal defect is the admission of the class, not a hidden key-as-identity claim."
+    outcome: survived
+rival_models_still_viable:
+  - "Continuing authorization relator whose level may change"
+  - "Distinct grant episodes each created by an assignment act"
+  - "Current contextual role assertion without separately persisting grant individual"
+evidence:
+  - "CQ-P11"
+  - "CQ-P06"
+  - "po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5"
+  - "po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9"
+  - "po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8"
+  - "po:sha256:a189eb95f95d457aa06a751fa0eeeb541f07eecb66ad261d9ac709c5bd4b03ca"
+  - "po:sha256:773104c28ed467a30f132e112bcb7ae328f88cde089c66e73c56e487d48b30f8"

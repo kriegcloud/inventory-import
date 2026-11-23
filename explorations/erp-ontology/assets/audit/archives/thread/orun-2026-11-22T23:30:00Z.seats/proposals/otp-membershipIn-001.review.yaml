@@ -1,0 +1,37 @@
+target: "otp:membershipIn:001"
+target_sha256: "b7d5eed5641ba6dda837e8cd88df119addef2697bdc7fc15cd802ba9b0a1ae05"
+chain_sha256: "6a32a94cabb539ca9abcca390a7776b4a02b9ca55ec3471f63b70f6aeafa496a"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed for this object property, so superclass rigidity, identity, unity, and dependence checks have no edge to apply to."
+revision_requests:
+  - "The Member warrant can stay: CQ-P06 needs the tenant end of a membership. The null discriminator cannot. po:8b535e25c8a2 and the Member row's organizationId (so:ef1f0d4ea98a) already state which workspace the authorization is in. Cite a fact that column lacks, or do not claim the implementation-only null is rejected."
+attacks:
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Member row M carries organizationId T and is the authorization po:8b535e25c8a2 limits to the interval from creation until removal. The joined discriminator says a display or session record has neither that relation nor that interval. M is the member row, which is the implementation artifact, and organizationId is already the tenant end. An object property membershipIn to a Tenant node restates the column. The discriminator stays true of the row."
+    outcome: landed
+  - surface: warrant
+    rule: support-not-necessary
+    counterexample: "membershipIn is semantic support for otp:Member:001, a decision term for CQ-P06 (\"members of this organization\"). Two memberships of one human in two tenants are not distinguished by the human or by an unscoped role. The tenant end is necessary for that decision term. This attack does not land. The failure is the discriminator inherited from dh:workspace-membership:001."
+    outcome: survived
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "Remove M and later recreate access for the same human in T, reusing MemberId. The proposal mints no property individual and says the retained handle does not prove one continuing membership. Relational equality of endpoints is not asserted as a sortal criterion for a new relator."
+    outcome: survived
+rival_models_still_viable:
+  - "Membership relator with creation/removal episodes"
+  - "Anti-rigid member role of the human, with the continuing human supplying identity"
+  - "Retained membership information object documenting an ended relation"
+evidence:
+  - "CQ-P06"
+  - "po:sha256:8b535e25c8a2cc2dfb8d33ef90801cd51458c927d540c9ccbe11aff2918848c2"
+  - "so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb"
+  - "po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863"

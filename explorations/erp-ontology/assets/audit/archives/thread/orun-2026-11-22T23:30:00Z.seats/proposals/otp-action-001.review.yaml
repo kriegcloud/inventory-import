@@ -1,0 +1,41 @@
+target: "otp:action:001"
+target_sha256: "d604a8cb9833315e816aee05cb9459e6e9b87c8e82c7049c24670985684ecb60"
+chain_sha256: "fbafeeff807ca8df5e349550fb1657a654b9e7758696cde8d9adaae13992ceac"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed, so there is no superclass whose rigidity, identity criterion, unity, or dependence can be compared, and no parent role over a rigid child. action is a data property, not a sortal class."
+revision_requests:
+  - "Replace the null discriminator. po:982423dfeb61 and po:160303617dee are already true of an Activity.action string field: the words are what a person reads, and the entry is not the change. A fact that remains true of that field does not reject implementation-only."
+  - "Do not join a card with carries_identity true while an edit of the wording is unresolved between state-change and replacement. Set carries false or unresolved until an amendment example decides, and do not treat the entry handle plus the action field as identity."
+attacks:
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Activity row E for tenant T stores action \"Imported items\". That string is the human-readable report po:982423dfeb61 describes, and po:160303617dee already says the entry is about a change and is not the change. A pure string column on the audit row makes both sentences true and is not the executed act. The discriminator therefore does not go false in the implementation-only world it had to rule out."
+    outcome: landed
+  - surface: identity
+    rule: carries-unsettled-identity
+    counterexample: "Edit E's action from \"Imported items\" to \"Imported 11 items\" under the same entry handle. The entry-bound-occurrence rival keeps one content individual and changes its state; the reusable-wording rival replaces it. ic:audit-action-content:001 leaves that choice unresolved, yet ontoclean.carries_identity is true. Carrying identity asserts a sameness criterion the edit does not have. The handle-plus-field key is not that criterion: two entries that both say \"Imported items\" stay different occurrences, which the card already grants."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "E1 and E2 both store \"Imported items\" for different purported changes. String equality is not used as identity, and the proposal does not assert the technical key as the criterion. This attack does not show a false identity claim beyond the carries bit already landed."
+    outcome: survived
+  - surface: warrant
+    rule: listing-cq-warrant
+    counterexample: "CQ-P10 asks what each audit entry says was done, not merely to list the word action. Dropping the action-description term leaves that column unanswerable; a member link and a writing time do not state the wording. The question is should_have and the natural language requires the term."
+    outcome: survived
+rival_models_still_viable:
+  - "Entry-bound content occurrence, distinct even where strings match"
+  - "Repeatable linguistic content shared by multiple inscriptions"
+evidence:
+  - "po:sha256:982423dfeb614079c6304825f455f5ba08b8fd862df43b6693e53fec3fec3048"
+  - "po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053"
+  - "po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b"
+  - "CQ-P10"

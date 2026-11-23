@@ -1,0 +1,43 @@
+target: "otp:Member:001"
+target_sha256: "f2e09e088cd761b3f264d46b93d1cc74e58f4cefae37104415a674fb1a7df49b"
+chain_sha256: "0d302bf3c3bbcfe32e2f7d887d4462faad67ecaa17e0396b6f8d5d6b4f3a4731"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed. gist:TemporalRelation is a non-asserted mapping only, so no parent rigidity, identity, unity, or dependence is compared. The missing identity-supplying ancestor is charged on the identity surface."
+revision_requests:
+  - "Replace the null discriminator. po:8b535e25c8a2's creation-until-removal authorization, and a Member row that is not the human (so:ef1f0d4ea98a, po:0fd580baa7d4), are already true of the member record. A display-name twin is the wrong null; the hypothesis alternative is the member row itself."
+  - "Do not propose Member as a rigid relator until some ancestor, itself included, supplies identity. po:d81d11ca9403's tenant plus MemberId, kept after removal, does not decide remove-and-rejoin."
+attacks:
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Row M in tenant T is created, authorizes action, and is removed, matching po:8b535e25c8a2. so:ef1f0d4ea98a is that row: id, role, organizationId, and a name that is not the id. po:0fd580baa7d4 adds a separate person link precisely because two such rows do not say they are one human. The discriminator says a display or session record lacks the interval and the human/membership split. The member row is not a display record; it is the implementation artifact, and both quoted facts are true of it. The pure-DTO twin therefore keeps the discriminator true."
+    outcome: landed
+  - surface: identity
+    rule: sortal-no-identity-ancestor
+    counterexample: "M for human H in tenant T is removed. Later a row with the same MemberId is created for H in T. po:d81d11ca9403 says the criterion written down is MemberId within the tenant, kept after removal. The card says that handle does not decide one continuing establishment versus two, and parents is empty, so no ancestor supplies a criterion that does. Rigidity plus unity with supplies_identity unresolved is a sortal with no identity-supplying ancestor, itself included. The handle is not being mistaken for the criterion; the class is proposed without one."
+    outcome: landed
+  - surface: warrant
+    rule: listing-cq-warrant
+    counterexample: "CQ-P06 asks who the members of this organization are and which role each holds. The sample answer is one human, test_Ravi, with two members, test_RaviWorks and test_RaviSecond. Person or an unscoped role does not distinguish those two workspace authorizations. The natural-language question requires the membership individual. required_classes listing Member is not the warrant."
+    outcome: survived
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "The proposal says tenant plus MemberId identifies the retained projection, not a proved persisting authorization, and refuses the person-tenant pair as a settled criterion. The technical key is not asserted as identity."
+    outcome: survived
+rival_models_still_viable:
+  - "Membership relator with creation/removal episodes"
+  - "Anti-rigid member role of the human, with the continuing human supplying identity"
+  - "Retained membership information object documenting an ended relation"
+evidence:
+  - "po:sha256:8b535e25c8a2cc2dfb8d33ef90801cd51458c927d540c9ccbe11aff2918848c2"
+  - "so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb"
+  - "po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62"
+  - "po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863"
+  - "CQ-P06"

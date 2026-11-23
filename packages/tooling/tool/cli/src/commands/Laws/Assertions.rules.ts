@@ -37,7 +37,7 @@ export const assertionsConfig = ".oxlintrc.assertions.json"
  * How long each list of `assertionsConfig` may be, in the order its overrides stand: beep-effect's vendored kit, the
  * registry's components, and everyone else's files. Each only falls: lower it when a list shrinks.
  */
-export const assertionCeilings: ReadonlyArray<number> = [23, 33, 64]
+export const assertionCeilings: ReadonlyArray<number> = [23, 33, 60]
 
 const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
 const leftOut = [".agents/", ".codex/", `${scratchpadFolder}/`, "vendor/"]
@@ -54,10 +54,7 @@ export const assertionCounts: Ledger = {
   "apps/inventory/test/web/session.test.ts": 3,
   "apps/inventory/test/web/workspace.test.ts": 1,
   "apps/inventory/vite.config.ts": 2,
-  "packages/access/contract/test/AccessContract.test.ts": 2,
   "packages/access/web/src/People.screen.tsx": 2,
-  "packages/catalog/contract/src/Suggestion/Suggestion.read.ts": 2,
-  "packages/catalog/contract/test/CatalogContract.test.ts": 2,
   "packages/catalog/model/src/Catalog.memory.ts": 1,
   "packages/catalog/model/src/Review/CellReading.rules.ts": 2,
   "packages/catalog/model/src/Review/Review.rules.ts": 3,
@@ -121,7 +118,6 @@ export const assertionCounts: Ledger = {
   "packages/foundation/modeling/xlsx/src/internal/trusted.ts": 1,
   "packages/foundation/modeling/xlsx/test/XlsxSchemas.property.test.ts": 2,
   "packages/foundation/modeling/xlsx/test/oracle.property.test.ts": 3,
-  "packages/kernel/test/Kernel.property.test.ts": 2,
   "packages/review/src/ReviewRegion.atoms.ts": 1,
   "packages/review/src/ReviewRegion.component.tsx": 5,
   "packages/review/test/Review.test.ts": 1,
@@ -171,7 +167,7 @@ export const assertionCounts: Ledger = {
  * for another changes the number, and the law refuses the list until it is recorded again. Recorded only when files
  * came off.
  */
-export const assertionsHeld: ReadonlyArray<number> = [153817800, -322494103, 118790471]
+export const assertionsHeld: ReadonlyArray<number> = [153817800, -322494103, -948430337]
 
 /** An override that turns the rule off for the files it lists, and nothing else. */
 const Override = S.Struct({

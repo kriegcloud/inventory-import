@@ -1,4 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // The app as the tests run it. Two storages: `TestDatabase`, a real D1 database in local workerd with the real
 // migrations (slow: name the file `*.slow.test.ts`), and the in-memory services in `inMemory`, for rules that live in
 // the handlers and middleware (fast). Settings come from a ConfigProvider, the same way the Worker gets them. Sign-in

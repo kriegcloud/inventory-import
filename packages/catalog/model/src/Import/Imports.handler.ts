@@ -61,7 +61,7 @@ import {
 } from "@inventory/catalog-contract/ImportRejection"
 import { UploadStart, UploadChunk, uploadDiscard } from "@inventory/catalog-contract/Upload"
 import { requireRole, CurrentActor } from "@inventory/kernel/Actor"
-import { fitsChunks, chunkProblem } from "../Staging/Upload.rules.ts"
+import { chunkProblem } from "../Staging/Upload.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
 import * as S from "effect/Schema"
@@ -647,10 +647,8 @@ export const importsEndpoints = Effect.gen(function* () {
       const { key, head, rowCount, chunkCount } = payload
       // A problem with the file is the answer, as data (200): the screen says what is wrong and what to do.
       const problem = stagingProblem({ fileName: head.fileName, rowCount, columnCount: head.columns.length })
-      if (problem !== null) return Result.fail(problem)
-      if (!fitsChunks({ rowCount, chunkCount })) {
-        return Result.fail(fileProblem.incomplete({ fileName: head.fileName, how: "unsent" }))
-      }
+      if (O.isSome(problem)) return Result.fail(problem.value)
+      // Pieces that cannot carry the rows never reach here: `UploadStart` refuses that start when it is decoded.
       const begun = yield* imports.beginUpload(actor, key, head, { rowCount, chunkCount })
       return Result.map(begun, (id) => ({ id }))
     }),
@@ -682,14 +680,16 @@ export const importsEndpoints = Effect.gen(function* () {
       const head = yield* S.decodeEffect(S.fromJsonString(StagedHead))(upload.headJson).pipe(Effect.orDie)
       const chunks = yield* imports.uploadChunks(actor, upload)
       const table: StagedTable = { ...head, rows: A.flatMap(chunks, (chunk) => chunk.rows) }
-      const problem =
+      const problem = O.orElse(
         chunkProblem({
           fileName: upload.fileName,
           rowCount: upload.rowCount,
           chunkCount: upload.chunkCount,
           chunks
-        }) ?? stagingProblem({ fileName: head.fileName, rowCount: table.rows.length, columnCount: head.columns.length })
-      if (problem !== null) return Result.fail(problem)
+        }),
+        () => stagingProblem({ fileName: head.fileName, rowCount: table.rows.length, columnCount: head.columns.length })
+      )
+      if (O.isSome(problem)) return Result.fail(problem.value)
       const start = review({
         table,
         choices: [],

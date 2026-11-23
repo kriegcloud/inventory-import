@@ -171,7 +171,9 @@ export const NoteKind = S.Literals([
   "delimiter",
   "notUtf8",
   "strayQuote",
-  "wrongExtension"
+  "wrongExtension",
+  // Written when a file is staged, not by the reader: more notes than a staged file keeps (`stageTable`).
+  "notesNotKept"
 ]).annotate({ description: "What a Note is about, so the screen can group or filter notes." })
 /** One of the `NoteKind` names. */
 export type NoteKind = typeof NoteKind.Type

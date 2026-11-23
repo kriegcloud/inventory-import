@@ -48,7 +48,7 @@ const read = ({ file, sheet }: ReadRequest) =>
         rowCount: rows.length,
         columnCount: head.columns.length
       })
-      if (problem !== null) return refuse(problem)
+      if (O.isSome(problem)) return refuse(problem.value)
       const chunks = uploadChunks({ rows })
       // The server refuses a chunk or a head over this size with the same words; saying it here sends nothing.
       if (stringify(head).length > maxChunkChars) {

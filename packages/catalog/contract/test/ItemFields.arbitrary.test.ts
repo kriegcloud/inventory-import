@@ -49,6 +49,26 @@ const DayParts = S.Struct({
   day: S.Int.check(S.isBetween({ minimum: 1, maximum: 31 }))
 })
 
+// The 29th of February is a day in a year that divides by 4, except a century that does not divide by 400. A year drawn
+// from 1000 to 9999 is a century one time in a hundred, so these years are drawn on purpose: a century, a year that
+// divides by 400, one that divides by 4, and any year.
+const LeapYears = S.Struct({
+  century: S.Int.check(S.isBetween({ minimum: 10, maximum: 99 })),
+  fourCenturies: S.Int.check(S.isBetween({ minimum: 3, maximum: 24 })),
+  fourYears: S.Int.check(S.isBetween({ minimum: 250, maximum: 2499 })),
+  year: DayParts.fields.year
+})
+
+/** Whether the pattern accepts a day exactly when the clock's calendar has it and the import's reading does. */
+const agrees = (parts: typeof DayParts.Type): void => {
+  const text = `${parts.year}-${twoDigits(`${parts.month}`)}-${twoDigits(`${parts.day}`)}`
+  // The clock's calendar rolls the 31st of April over into May: the day it lands on is the day only on the calendar.
+  const landsOn = DateTime.getPartUtc(DateTime.makeUnsafe(parts), "day")
+  expect(calendarDayPattern.test(text)).toBe(landsOn === parts.day)
+  // The import reads a file's dates with `isoDate`: an edit may store a day exactly when a file may.
+  expect(calendarDayPattern.test(text)).toBe(O.isSome(isoDate(parts)))
+}
+
 const schemas: Readonly<Record<string, S.Codec<unknown, unknown>>> = {
   UnitCost,
   Vendor,
@@ -69,15 +89,21 @@ describe("an item's values", () => {
   it.prop(
     "the calendar's pattern accepts a day exactly when the clock's calendar has it, as the import's reading does",
     [Arbitrary.schema(DayParts)],
-    ([parts]) => {
-      const text = `${parts.year}-${twoDigits(`${parts.month}`)}-${twoDigits(`${parts.day}`)}`
-      // The clock's calendar rolls the 31st of April over into May: the day it lands on is the day only on the calendar.
-      const landsOn = DateTime.getPartUtc(DateTime.makeUnsafe(parts), "day")
-      expect(calendarDayPattern.test(text)).toBe(landsOn === parts.day)
-      // The import reads a file's dates with `isoDate`: an edit may store a day exactly when a file may.
-      expect(calendarDayPattern.test(text)).toBe(O.isSome(isoDate(parts)))
-    },
+    ([parts]) => agrees(parts),
     { arbitrary: { runs: 2000 } }
+  )
+
+  it.prop(
+    "the calendar's pattern has the 29th of February in a century only when it divides by 400, and in every fourth year",
+    [Arbitrary.schema(LeapYears)],
+    ([drawn]) => {
+      const years = [100 * drawn.century, 400 * drawn.fourCenturies, 4 * drawn.fourYears, drawn.year]
+      for (const year of years) agrees({ year, month: 2, day: 29 })
+      // A century is a leap year exactly when it divides by 400: 2000 is, 1900 is not.
+      expect(calendarDayPattern.test(`${100 * drawn.century}-02-29`)).toBe(drawn.century % 4 === 0)
+      expect(calendarDayPattern.test(`${400 * drawn.fourCenturies}-02-29`)).toBe(true)
+    },
+    { arbitrary: { runs: 300 } }
   )
 
   it.effect("a drawn cost is never negative, with at most four decimals and twelve whole digits", () =>

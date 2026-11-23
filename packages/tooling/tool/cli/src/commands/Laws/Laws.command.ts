@@ -8,13 +8,15 @@ import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
-import { assertions, assertionsSentence, recordedHolds } from "./Assertions.rules.ts"
+import { assertions, assertionsLedger, assertionsSentence } from "./Assertions.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
+import { defaults, defaultsSentence } from "./Defaults.rules.ts"
 import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
 import { diagnostics, diagnosticsSentence } from "./Diagnostics.rules.ts"
 import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
+import { fastRefresh, fastRefreshSentence } from "./FastRefresh.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
 import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { promises, promiseSentence } from "./Promises.rules.ts"
@@ -75,7 +77,7 @@ export const tryCommand = Command.make("try", {}, () => Effect.flatMap(tryStatem
 
 /** `laws assertions`: the type-assertion ban's lists only shrink, and no comment turns its rule off. */
 export const assertionsCommand = Command.make("assertions", {}, () =>
-  Effect.flatMap(assertions(recordedHolds), emit(assertionsSentence))
+  Effect.flatMap(assertions(assertionsLedger), emit(assertionsSentence))
 ).pipe(Command.withDescription("The type-assertion ban's lists only shrink, and no comment turns its rule off"))
 
 /** `laws promises`: no Promise is written, but in what its three lists name. */
@@ -100,6 +102,11 @@ export const readonlyCommand = Command.make("readonly", {}, () =>
   Effect.flatMap(readonlyProperties, emit(readonlySentence))
 ).pipe(Command.withDescription("Every property of an object type or an interface is readonly, but in the files listed"))
 
+/** `laws fast-refresh`: every file of screens exports components only, but in the files its ledger names. */
+export const fastRefreshCommand = Command.make("fast-refresh", {}, () =>
+  Effect.flatMap(fastRefresh(), emit(fastRefreshSentence))
+).pipe(Command.withDescription("Every file of screens exports components only, so fast refresh keeps its state"))
+
 const write = Flag.Boolean("write").pipe(
   Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
   Flag.withDefault(false)
@@ -118,17 +125,38 @@ export const effectImportsCommand = Command.make("effect-imports", { write, chec
   Effect.flatMap(effectImports(flags.write, flags.files), emit(effectImportsSentence))
 ).pipe(Command.withDescription("Every Effect import comes from its module's own path under its one name"))
 
+/**
+ * `beep-cli laws defaults [--write] [file...]`: no file holds more fallbacks, comparisons with null or undefined,
+ * Options turned back into missing values, or clean-ups outside a schema than the baseline allows. Given files it
+ * reads only those, which is how an edit is answered at once.
+ */
+export const defaultsCommand = Command.make(
+  "defaults",
+  {
+    write: Flag.Boolean("write").pipe(
+      Flag.withDescription("Lower the baseline to what the tree holds; it is never raised"),
+      Flag.withDefault(false)
+    ),
+    files
+  },
+  (flags) => Effect.flatMap(defaults(flags.write, flags.files), emit(defaultsSentence))
+).pipe(
+  Command.withDescription("Absence, starting values and clean-ups are a schema's: no file holds more than its baseline")
+)
+
 /** The `laws` group. */
 export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
   Command.withSubcommands([
     assertionsCommand,
     boundariesCommand,
+    defaultsCommand,
     deprecatedApisCommand,
     diagnosticsCommand,
     dualCommand,
     effectImportsCommand,
     exportsCommand,
+    fastRefreshCommand,
     keysCommand,
     privatePathsCommand,
     promisesCommand,

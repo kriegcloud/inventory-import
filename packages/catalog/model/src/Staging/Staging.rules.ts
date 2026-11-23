@@ -36,8 +36,8 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
 /**
  * The reader's notes as staged: all of them when they fit `maxNotes`. Past it, they are kept in three tiers, each in
  * the reader's order: the warnings (a total row, a second table, a hidden sheet; the review reads the total row's),
- * then the information notes on how the sheet was laid out (rows above the heading, blank rows), then those on a
- * number format Excel shows another way, which a workbook can have thousands of. One more note says how many were not
+ * then every information note but the number-format ones (rows above the heading, blank rows, how dates or spaces
+ * were read), then the notes on a number format Excel shows another way, which a workbook can have thousands of. One more note says how many were not
  * kept. It is a warning when a warning was among them, so the person is shown it on the Review step; else it is
  * information, as the notes it counts were.
  *

@@ -6,8 +6,8 @@
  *
  * - each file an override of that configuration names still holds an assertion (read from its syntax tree), so a file
  *   whose last one is gone comes off its list;
- * - no list is longer than its ceiling (`assertionCeilings`), and a ceiling above its list is lowered, so a list only
- *   shrinks;
+ * - each listed file is held at its number of assertions in `ledgers/assertions.json`, which only falls, against the
+ *   files there are and against main (`internal/ledger.ts`), and the overrides name the files the ledger names;
  * - no comment turns the rule off (`oxlint-disable` or `eslint-disable` naming it), in any code file git would commit.
  *
  * @packageDocumentation
@@ -17,6 +17,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
@@ -24,8 +25,7 @@ import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { blankComments } from "../../Sync.rules.ts"
 import { silencings } from "./internal/directives.ts"
-import { heldAs } from "./internal/held.ts"
-import { type Ledger, standingOf, standingWords } from "./internal/ledger.ts"
+import { ledgerAgainst, ledgersFolder, readLedger, standingOf, standingWords } from "./internal/ledger.ts"
 import { children, isNode, type Node, parsedAs } from "./internal/tryCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Assertions.rules")
@@ -33,137 +33,8 @@ const $I = $RepoCliId.create("commands/Laws/Assertions.rules")
 /** The configuration oxlint runs the ban with, from the root. */
 export const assertionsConfig = ".oxlintrc.assertions.json"
 
-/**
- * How long each list of `assertionsConfig` may be, in the order its overrides stand: beep-effect's vendored kit, the
- * registry's components, and everyone else's files. Each only falls: lower it when a list shrinks.
- */
-export const assertionCeilings: ReadonlyArray<number> = [23, 33, 56]
-
 const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
 const leftOut = [".agents/", ".codex/", `${scratchpadFolder}/`, "vendor/"]
-
-/** Each listed file with its number of assertions today, which only falls. */
-export const assertionCounts: Ledger = {
-  "apps/inventory/src/api/v1/Document.ts": 3,
-  "apps/inventory/src/web/lib/form.ts": 1,
-  "apps/inventory/src/web/pages/ReviewGallery.tsx": 1,
-  "apps/inventory/src/web/pages/gallery/JobsReview.tsx": 2,
-  "apps/inventory/test/server/Telemetry.test.ts": 2,
-  "apps/inventory/test/server/WriteLimits.slow.test.ts": 2,
-  "apps/inventory/test/server/support/app.ts": 1,
-  "apps/inventory/test/web/session.test.ts": 3,
-  "apps/inventory/test/web/workspace.test.ts": 1,
-  "apps/inventory/vite.config.ts": 2,
-  "packages/access/web/src/People.screen.tsx": 2,
-  "packages/catalog/web/src/ItemsPage.screen.tsx": 5,
-  "packages/catalog/web/src/TableAssistant.screen.tsx": 2,
-  "packages/catalog/web/src/internal/CellForms.tsx": 2,
-  "packages/catalog/web/src/internal/cellDrafts.ts": 1,
-  "packages/catalog/web/src/internal/itemText.ts": 1,
-  "packages/catalog/web/test/ConfirmDraft.test.ts": 4,
-  "packages/catalog/web/test/DraftLines.test.ts": 1,
-  "packages/catalog/web/test/DraftPicks.test.ts": 1,
-  "packages/catalog/web/test/DraftRegion.test.ts": 3,
-  "packages/catalog/web/test/DraftServer.test.ts": 1,
-  "packages/catalog/web/test/ItemEditor.test.ts": 8,
-  "packages/catalog/web/test/KeptRows.test.ts": 1,
-  "packages/catalog/web/test/RemoveImport.test.ts": 1,
-  "packages/catalog/web/test/ResultRows.test.ts": 1,
-  "packages/catalog/web/test/ReviewDraft.test.ts": 7,
-  "packages/catalog/web/test/TabRows.test.ts": 20,
-  "packages/catalog/web/test/TakenBackWords.test.ts": 1,
-  "packages/catalog/web/test/UploadOwner.test.ts": 6,
-  "packages/catalog/web/test/csvDifferential.test.ts": 1,
-  "packages/catalog/web/test/readerWarnings.test.ts": 1,
-  "packages/catalog/web/test/support/catalog.ts": 6,
-  "packages/catalog/web/test/support/draftWorld.ts": 1,
-  "packages/catalog/web/test/xlsxParity.test.ts": 1,
-  "packages/client/src/Api.atoms.ts": 2,
-  "packages/client/src/ApiRuntime.runtime.ts": 2,
-  "packages/drivers/better-auth/test/BetterAuth.test.ts": 2,
-  "packages/drivers/d1/src/D1.service.ts": 4,
-  "packages/drivers/d1/test/D1.test.ts": 1,
-  "packages/drivers/d1/test/D1Schemas.property.test.ts": 2,
-  "packages/drivers/openrouter/test/OpenRouterSchemas.property.test.ts": 2,
-  "packages/foundation/modeling/csv/src/Csv.codec.ts": 9,
-  "packages/foundation/modeling/csv/test/CsvSchemas.property.test.ts": 2,
-  "packages/foundation/modeling/csv/test/oracle.property.test.ts": 1,
-  "packages/foundation/modeling/identity/src/Curie.ts": 1,
-  "packages/foundation/modeling/identity/src/Fibered.ts": 6,
-  "packages/foundation/modeling/identity/src/Id.ts": 22,
-  "packages/foundation/modeling/identity/src/internal/schemaStatics.ts": 1,
-  "packages/foundation/modeling/identity/test/Identity.test.ts": 5,
-  "packages/foundation/modeling/identity/test/OntologyEntrypoints.test.ts": 2,
-  "packages/foundation/modeling/identity/test/PnLocal.test.ts": 1,
-  "packages/foundation/modeling/identity/test/TemplateGuards.test.ts": 2,
-  "packages/foundation/modeling/schema/src/LiteralKit/LiteralKit.schema.ts": 14,
-  "packages/foundation/modeling/schema/src/LiteralKit/internal/builders.ts": 10,
-  "packages/foundation/modeling/schema/src/SchemaUtils/internal/staticDescriptors.ts": 1,
-  "packages/foundation/modeling/schema/src/SchemaUtils/withStatics.ts": 1,
-  "packages/foundation/modeling/schema/test/LiteralKit.test.ts": 16,
-  "packages/foundation/modeling/utils/src/FileSystem.ts": 1,
-  "packages/foundation/modeling/utils/src/GlobalValue.ts": 1,
-  "packages/foundation/modeling/utils/src/Option.ts": 1,
-  "packages/foundation/modeling/utils/src/Predicate.ts": 2,
-  "packages/foundation/modeling/utils/src/Random.ts": 2,
-  "packages/foundation/modeling/utils/src/Struct.ts": 6,
-  "packages/foundation/modeling/utils/src/internal/StructPath.ts": 1,
-  "packages/foundation/modeling/utils/test/Array.test.ts": 8,
-  "packages/foundation/modeling/utils/test/Option.test.ts": 3,
-  "packages/foundation/modeling/utils/test/Struct.test.ts": 9,
-  "packages/foundation/modeling/xlsx/src/internal/trusted.ts": 1,
-  "packages/foundation/modeling/xlsx/test/XlsxSchemas.property.test.ts": 2,
-  "packages/foundation/modeling/xlsx/test/oracle.property.test.ts": 3,
-  "packages/review/src/ReviewRegion.atoms.ts": 1,
-  "packages/review/src/ReviewRegion.component.tsx": 5,
-  "packages/review/test/Review.test.ts": 1,
-  "packages/review/test/ReviewDecision.property.test.ts": 2,
-  "packages/review/test/ReviewRegion.atoms.test.ts": 11,
-  "packages/review/test/SavedProgress.test.ts": 1,
-  "packages/review/test/fixtures/fabrication.ts": 1,
-  "packages/ui/src/ListTable.component.tsx": 7,
-  "packages/ui/src/TableSearch.component.tsx": 1,
-  "packages/ui/src/components/action-bar.tsx": 2,
-  "packages/ui/src/components/chart.tsx": 8,
-  "packages/ui/src/components/data-grid/data-grid-cell.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-column-header.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-context-menu.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-data-cell.tsx": 2,
-  "packages/ui/src/components/data-grid/data-grid-features.ts": 7,
-  "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-row-models.ts": 16,
-  "packages/ui/src/components/data-grid/data-grid-row.tsx": 2,
-  "packages/ui/src/components/data-grid/data-grid-search.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-utils.ts": 3,
-  "packages/ui/src/components/data-grid/data-grid.tsx": 1,
-  "packages/ui/src/components/data-grid/use-data-grid.ts": 1,
-  "packages/ui/src/components/data-table/data-table-config.ts": 4,
-  "packages/ui/src/components/data-table/data-table-features.ts": 1,
-  "packages/ui/src/components/data-table/data-table-filters.ts": 2,
-  "packages/ui/src/components/data-table/data-table-records.tsx": 2,
-  "packages/ui/src/components/data-table/data-table-state.ts": 10,
-  "packages/ui/src/components/data-table/data-table-toolbar.tsx": 4,
-  "packages/ui/src/components/data-table/data-table-utils.ts": 2,
-  "packages/ui/src/components/data-table/data-table.tsx": 2,
-  "packages/ui/src/components/faceted.tsx": 1,
-  "packages/ui/src/components/form.tsx": 2,
-  "packages/ui/src/components/input-group.tsx": 1,
-  "packages/ui/src/components/sidebar.tsx": 3,
-  "packages/ui/src/components/sonner.tsx": 2,
-  "packages/ui/src/components/sortable.tsx": 3,
-  "packages/ui/src/components/stepper.tsx": 2,
-  "packages/ui/src/components/sticky-table.tsx": 1,
-  "packages/ui/src/components/toggle-group.tsx": 1,
-  "packages/ui/src/components/tour.tsx": 15,
-  "packages/ui/src/hooks/use-data-table.ts": 1
-}
-
-/**
- * What each list is held by, from its contents (`internal/held.ts`), in the order the overrides stand: a file swapped
- * for another changes the number, and the law refuses the list until it is recorded again. Recorded only when files
- * came off.
- */
-export const assertionsHeld: ReadonlyArray<number> = [153817800, -322494103, -671703815]
 
 /** An override that turns the rule off for the files it lists, and nothing else. */
 const Override = S.Struct({
@@ -272,20 +143,8 @@ export const AssertionsFinding = S.TaggedUnion({
       S.annotateKey({ description: "A listed file with no number held, or a number for no listed file" })
     )
   },
-  Grown: {
-    list: S.Int.pipe(S.annotateKey({ description: "Which list, from 1, in the order the overrides stand" })),
-    length: S.Int.pipe(S.annotateKey({ description: "How many files it names" })),
-    ceiling: S.Int.pipe(S.annotateKey({ description: "How many it may name" }))
-  },
-  Shrunk: {
-    list: S.Int.pipe(S.annotateKey({ description: "Which list, from 1" })),
-    length: S.Int.pipe(S.annotateKey({ description: "How many files it names" })),
-    ceiling: S.Int.pipe(S.annotateKey({ description: "The ceiling still written for it" }))
-  },
-  Changed: {
-    list: S.Int.pipe(S.annotateKey({ description: "Which list, from 1" })),
-    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
-    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
+  Ledger: {
+    said: S.String.pipe(S.annotateKey({ description: "What the ledger says against the files and against main" }))
   },
   Silenced: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line of the comment, as file:line" })),
@@ -317,43 +176,23 @@ export const assertionsSentence: (finding: AssertionsFinding) => Line = Assertio
   Standing: ({ file, words }) => err(`  ${file}  ${words}`),
   Uncounted: ({ file }) =>
     err(
-      `  ${file}  is in one of the lists of ${assertionsConfig} or in assertionCounts but not both: the two name the same files`
+      `  ${file}  is in one of the lists of ${assertionsConfig} or in its ledger but not both: the two name the same files`
     ),
-  Grown: ({ ceiling, length, list }) =>
-    err(
-      `  list ${list} names ${length} files, past its ceiling of ${ceiling}: a list only shrinks. Fix the code instead`
-    ),
-  Shrunk: ({ ceiling, length, list }) =>
-    err(`  list ${list} names ${length} files: lower its ceiling from ${ceiling} to ${length} in assertionCeilings`),
-  Changed: ({ held, list, now }) =>
-    err(
-      `  list ${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} in assertionsHeld; never add one`
-    ),
+  Ledger: ({ said }) => err(`  ${said}`),
   Silenced: ({ directive, place }) =>
     err(`  ${place}  a comment that turns the type-assertion rule off (${directive}): no comment does. Remove it`)
 })
 
+/** The ledger's file, from the root. */
+export const assertionsLedger = `${ledgersFolder}/assertions.json`
+
 /**
- * Reads the configuration's lists and every code file git would commit, holding each list to `holds`.
+ * Reads the configuration's lists and every code file git would commit, holding each listed file to the ledger at
+ * `ledgerPath` (`assertionsLedger`; a test hands its own).
  *
  * @category rules
  */
-/** What the lists are held to: each one's ceiling and the number its contents give, in the order they stand. */
-export interface AssertionHolds {
-  readonly ceilings: ReadonlyArray<number>
-  readonly held: ReadonlyArray<number>
-  /** Each listed file with its number of assertions, which only falls (`internal/ledger.ts`). */
-  readonly counts: Ledger
-}
-
-/** The holds this repository records. */
-export const recordedHolds: AssertionHolds = {
-  ceilings: assertionCeilings,
-  held: assertionsHeld,
-  counts: assertionCounts
-}
-
-export const assertions = Effect.fn("Assertions.assertions")(function* (holds: AssertionHolds) {
+export const assertions = Effect.fn("Assertions.assertions")(function* (ledgerPath: string) {
   const repo = yield* Repo
   const refused = (problems: ReadonlyArray<AssertionsFinding>) =>
     A.prepend<AssertionsFinding, AssertionsFinding>(problems, AssertionsFinding.cases.Refused.make({}))
@@ -366,22 +205,9 @@ export const assertions = Effect.fn("Assertions.assertions")(function* (holds: A
       })
     ])
   }
+  const ledger = yield* readLedger(ledgerPath)
+  if (Result.isFailure(ledger)) return refused([AssertionsFinding.cases.Ledger.make({ said: ledger.failure })])
   const lists = A.map(config.value.overrides, (override) => override.files)
-  const lengths = A.flatMap(
-    A.zip(lists, A.zip(holds.ceilings, holds.held)),
-    ([files, [ceiling, held]], index): ReadonlyArray<AssertionsFinding> => {
-      const list = index + 1
-      const now = heldAs(files)
-      const changed = now === held ? [] : [AssertionsFinding.cases.Changed.make({ list, held, now })]
-      if (files.length > ceiling) {
-        return [AssertionsFinding.cases.Grown.make({ list, length: files.length, ceiling }), ...changed]
-      }
-      if (files.length < ceiling) {
-        return [AssertionsFinding.cases.Shrunk.make({ list, length: files.length, ceiling }), ...changed]
-      }
-      return changed
-    }
-  )
   const listed = A.flatten(lists)
   // Each listed file at its number of assertions, which only falls; a file in one of the two and not the other is
   // refused, since then nothing holds it.
@@ -390,10 +216,10 @@ export const assertions = Effect.fn("Assertions.assertions")(function* (holds: A
     Effect.fnUntraced(function* (file) {
       const path = repo.join(repo.root, file)
       const now = (yield* repo.exists(path)) ? countAssertions({ file, source: yield* repo.text(path) }) : 0
-      return O.match(standingOf(holds.counts, { file, now }), {
+      return O.match(standingOf(ledger.success, { file, now }), {
         onNone: () => A.of<AssertionsFinding>(AssertionsFinding.cases.Uncounted.make({ file })),
         onSome: (standing) =>
-          O.match(standingWords(standing, "assertionCounts"), {
+          O.match(standingWords(standing, ledgerPath), {
             onNone: () => A.empty<AssertionsFinding>(),
             onSome: (words) => A.of<AssertionsFinding>(AssertionsFinding.cases.Standing.make({ file, words }))
           })
@@ -402,7 +228,7 @@ export const assertions = Effect.fn("Assertions.assertions")(function* (holds: A
     { concurrency: 1 }
   )
   const counted = A.map(
-    A.filter(R.keys(holds.counts), (file) => !A.contains(listed, file)),
+    A.filter(R.keys(ledger.success), (file) => !A.contains(listed, file)),
     (file) => AssertionsFinding.cases.Uncounted.make({ file })
   )
   const git = yield* repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--deduplicate"])
@@ -429,8 +255,9 @@ export const assertions = Effect.fn("Assertions.assertions")(function* (holds: A
       ),
     { concurrency: 1 }
   )
+  const against = yield* ledgerAgainst({ path: ledgerPath, now: ledger.success, files: code })
   const problems = A.flatten<ReadonlyArray<ReadonlyArray<AssertionsFinding>>>([
-    lengths,
+    A.map(against, (said) => AssertionsFinding.cases.Ledger.make({ said })),
     A.flatten(standings),
     counted,
     A.flatten(silenced)

@@ -12,7 +12,8 @@
  *
  * Not read, each by name: `.agents/`, `vendor/` and `docs/`, as Benjamin's rule has it; and `scratchpad/`, whose own
  * check (`scratch:check`) refuses every directive.
- * `diagnosticsListed` names the files that hold one today, each with how many, which only falls (`internal/ledger.ts`).
+ * `ledgers/diagnostics.json` names the files that hold one today, each with how many, which only falls, held against
+ * the files there are and against main (`internal/ledger.ts`).
  * A listed file with none left is refused
  * until its line is taken off, and `test/Diagnostics.test.ts` holds the list at its length.
  *
@@ -22,14 +23,13 @@ import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
-import { heldAs } from "./internal/held.ts"
-import { type Ledger, standingOf, standingWords } from "./internal/ledger.ts"
+import { ledgerAgainst, ledgersFolder, readLedger, standingOf, standingWords } from "./internal/ledger.ts"
 import { linesOf } from "./internal/lines.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Diagnostics.rules")
@@ -39,44 +39,6 @@ const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSom
 
 /** What is not read, each from the root, a folder with its closing slash. */
 export const diagnosticsLeftOut: ReadonlyArray<string> = [".agents/", "vendor/", "docs/", `${scratchpadFolder}/`]
-
-/**
- * The files that hold a directive today: this list may only shrink. Its owner takes a file off when its last
- * directive is gone, and the law refuses a listed file that has none left. `packages/infra/src/OpReferences.secrets.ts`
- * stays until Alchemy types a secrets layer's failure: its `SecretsLayer` is `Layer<never, unknown, …>`, so the fix
- * goes there first. The decide files of `packages/catalog/model` and of `packages/patches/test` came off when the prover
- * came to read `.make` (decision 33 reversed, 2026-11-22). No file is excepted for its name.
- */
-export const diagnosticsListed: Ledger = {
-  "apps/inventory/test/server/AuthIndexes.test.ts": 1,
-  "apps/inventory/test/server/AuthSchema.test.ts": 1,
-  "apps/inventory/test/server/Pwned.test.ts": 1,
-  "apps/inventory/test/server/QueryPlans.test.ts": 1,
-  "apps/inventory/test/server/Telemetry.slow.test.ts": 1,
-  "apps/inventory/test/server/Telemetry.test.ts": 1,
-  "apps/inventory/test/server/support/app.ts": 1,
-  "apps/inventory/test/server/support/files.ts": 1,
-  "apps/inventory/test/web/samples.test.ts": 1,
-  "apps/inventory/test/web/traceContext.test.ts": 1,
-  "apps/inventory/vite.config.ts": 1,
-  "packages/catalog/web/test/DraftPicks.test.ts": 1,
-  "packages/catalog/web/test/ItemEditor.test.ts": 1,
-  "packages/catalog/web/test/KeptRows.test.ts": 1,
-  "packages/catalog/web/test/TakenBackWords.test.ts": 1,
-  "packages/catalog/web/test/csvDifferential.test.ts": 1,
-  "packages/catalog/web/test/readSpreadsheet.test.ts": 1,
-  "packages/catalog/web/test/reviewHonesty.test.ts": 1,
-  "packages/catalog/web/test/reviewParity.test.ts": 1,
-  "packages/catalog/web/test/support/files.ts": 1,
-  "packages/catalog/web/test/xlsxParity.test.ts": 1,
-  "packages/infra/src/OpReferences.secrets.ts": 1
-}
-
-/**
- * What the list is held by, from its contents (`internal/held.ts`): a file swapped for another changes the number, and
- * the law refuses the list until it is recorded again. Recorded only when files came off.
- */
-export const diagnosticsHeld = -525162974
 
 const isLeftOut = (file: string): boolean => A.some(diagnosticsLeftOut, (path) => Str.startsWith(path)(file))
 
@@ -90,15 +52,17 @@ const directive = /@effect-diagnostics(?:-next-line)?\s+[A-Za-z*]+:(?:off|error|
  */
 export const directiveLines = (text: string): ReadonlyArray<number> => {
   const lineAt = linesOf(text)
-  return A.dedupe(
-    A.map(A.fromIterable(Str.matchAll(directive)(text)), (found) =>
-      lineAt(O.getOrElse(O.fromUndefinedOr(found.index), () => 0))
-    )
+  // One line for each directive, so two on one line count as two: the ledger counts places, not lines.
+  return A.map(A.fromIterable(Str.matchAll(directive)(text)), (found) =>
+    lineAt(O.getOrElse(O.fromUndefinedOr(found.index), () => 0))
   )
 }
 
+/** The ledger's file, from the root. */
+export const diagnosticsLedger = `${ledgersFolder}/diagnostics.json`
+
 /** The paths not read, as the output names them each time. */
-const notRead = `${A.join(diagnosticsLeftOut, ", ")} are not read; ${R.size(diagnosticsListed)} files are listed`
+const notRead = `${A.join(diagnosticsLeftOut, ", ")} are not read; the files in ${diagnosticsLedger} are listed`
 
 /**
  * What `laws diagnostics` finds: nothing, or a refusal and each directive; a listed file with none left.
@@ -107,7 +71,11 @@ const notRead = `${A.join(diagnosticsLeftOut, ", ")} are not read; ${R.size(diag
  */
 export const DiagnosticsFinding = S.TaggedUnion({
   Clean: {},
-  Refused: {},
+  Refused: {
+    directive: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a directive is among what is refused, or only the ledger" })
+    )
+  },
   Unlisted: {
     why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" }))
   },
@@ -118,10 +86,8 @@ export const DiagnosticsFinding = S.TaggedUnion({
     file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of directives moved" })),
     words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
-  Changed: {
-    list: S.String.pipe(S.annotateKey({ description: "The list whose files are not the ones it is held by" })),
-    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
-    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
+  Ledger: {
+    said: S.String.pipe(S.annotateKey({ description: "What the ledger says against the files and against main" }))
   }
 }).pipe(
   $I.annoteSchema("DiagnosticsFinding", {
@@ -143,17 +109,16 @@ export type DiagnosticsFinding = typeof DiagnosticsFinding.Type
  */
 export const diagnosticsSentence: (finding: DiagnosticsFinding) => Line = DiagnosticsFinding.match({
   Clean: () => out(`diagnostics:check OK  no @effect-diagnostics directive is written (${notRead})`),
-  Refused: () =>
-    err(
-      `diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off. Change the code until it holds (${notRead}):`
-    ),
+  Refused: ({ directive }) =>
+    directive
+      ? err(
+          `diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off. Change the code until it holds (${notRead}):`
+        )
+      : err(`diagnostics:check FAIL  its ledger does not hold (${notRead}):`),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   At: ({ place }) => err(`${place}  an @effect-diagnostics directive: remove it and write the code the rule asks for`),
   Standing: ({ file, words }) => err(`${file}  ${words}`),
-  Changed: ({ held, list, now }) =>
-    err(
-      `${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
-    )
+  Ledger: ({ said }) => err(said)
 })
 
 /**
@@ -163,6 +128,13 @@ export const diagnosticsSentence: (finding: DiagnosticsFinding) => Line = Diagno
  */
 export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
   const repo = yield* Repo
+  const ledger = yield* readLedger(diagnosticsLedger)
+  if (Result.isFailure(ledger)) {
+    return A.make<[DiagnosticsFinding, DiagnosticsFinding]>(
+      DiagnosticsFinding.cases.Refused.make({ directive: false }),
+      DiagnosticsFinding.cases.Ledger.make({ said: ledger.failure })
+    )
+  }
   const listed = yield* repo.run("git", [
     "ls-files",
     "-z",
@@ -173,7 +145,7 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
   ])
   if (listed.code !== 0) {
     return A.make<[DiagnosticsFinding, DiagnosticsFinding]>(
-      DiagnosticsFinding.cases.Refused.make({}),
+      DiagnosticsFinding.cases.Refused.make({ directive: false }),
       DiagnosticsFinding.cases.Unlisted.make({ why: Str.trim(listed.stderr) })
     )
   }
@@ -187,24 +159,28 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
     (file) =>
       Effect.map(repo.text(repo.join(repo.root, file)), (text): ReadonlyArray<DiagnosticsFinding> => {
         const lines = directiveLines(text)
-        const standing = standingOf(diagnosticsListed, { file, now: A.length(lines) })
+        const standing = standingOf(ledger.success, { file, now: A.length(lines) })
         if (O.isSome(standing)) {
-          return O.match(standingWords(standing.value, "diagnosticsListed"), {
+          return O.match(standingWords(standing.value, diagnosticsLedger), {
             onNone: () => [],
             onSome: (words) => A.of(DiagnosticsFinding.cases.Standing.make({ file, words }))
           })
         }
-        return A.map(lines, (line) => DiagnosticsFinding.cases.At.make({ place: `${file}:${line}` }))
+        return A.map(A.dedupe(lines), (line) => DiagnosticsFinding.cases.At.make({ place: `${file}:${line}` }))
       }),
     { concurrency: 1 }
   )
-  const now = heldAs(R.keys(diagnosticsListed))
-  const changed =
-    now === diagnosticsHeld
-      ? []
-      : [DiagnosticsFinding.cases.Changed.make({ list: "diagnosticsListed", held: diagnosticsHeld, now })]
-  const problems = A.appendAll(changed, A.flatten(found))
+  const against = yield* ledgerAgainst({ path: diagnosticsLedger, now: ledger.success, files })
+  const problems = A.appendAll(
+    A.map(against, (said) => DiagnosticsFinding.cases.Ledger.make({ said })),
+    A.flatten(found)
+  )
   return A.isArrayNonEmpty(problems)
-    ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(problems, DiagnosticsFinding.cases.Refused.make({}))
+    ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(
+        problems,
+        DiagnosticsFinding.cases.Refused.make({
+          directive: A.some(problems, (problem) => !DiagnosticsFinding.guards.Ledger(problem))
+        })
+      )
     : A.of<DiagnosticsFinding>(DiagnosticsFinding.cases.Clean.make({}))
 })

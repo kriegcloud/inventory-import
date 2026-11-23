@@ -1,29 +1,29 @@
 // A law in the shape of the bans that came with a list of today's files: every code file git would commit is read,
 // but the folders it leaves out; each place it refuses is said with what to write instead; a listed file is passed
-// at the number of places it breaks the rule, which may only fall (`ledger.ts`); and the list's files are held by a
-// number read from their names (`held.ts`), a guard for the review rather than for the code, since the number sits
-// beside the list and changes in the same commit. The bans differ in what they read and in their words, which a `ListedSpec` gives.
+// at the number of places it breaks the rule, which may only fall, against the files there are and against main
+// (`ledger.ts`). The bans differ in what they read and in their words, which a `ListedSpec` gives.
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
-import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../../Repo.service.ts"
 import { err, type Line, out } from "../../../Report.schema.ts"
 import { type Stopped, Unread, unreadable, unreadSentence } from "./budget.ts"
-import { heldAs } from "./held.ts"
-import { type Ledger, standingOf, standingWords } from "./ledger.ts"
+import { hashedKitFiles } from "./kit.ts"
+import { ledgerAgainst, readLedger, standingOf, standingWords } from "./ledger.ts"
 import { linesOf } from "./lines.ts"
 import { type Node, parsedAs } from "./tryCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/internal/listed")
 
-/** What one file gives a law: the lines that break its rule, or where and why it was not read. */
+/** What one file gives a law: the line of each place that breaks its rule, or where and why it was not read. */
 export interface ListedRead {
+  /** One line for each place, so a line with two places is said twice: the ledger counts places, not lines. */
   readonly found: ReadonlyArray<number>
   readonly unread: O.Option<{ readonly line: number; readonly unread: Unread }>
 }
@@ -36,13 +36,12 @@ export interface ListedSpec {
   readonly rule: string
   /** What a place breaks and what to write instead, as the line for it says. */
   readonly instead: string
-  /** The list's name, as the law's source declares it. */
-  readonly listName: string
-  readonly listed: Ledger
-  /** The number the list is held by (`held.ts`). */
-  readonly held: number
+  /** The ledger's file, from the root (`ledger.ts`). */
+  readonly ledger: string
   /** The paths not read, from the root, a folder with its closing slash. */
   readonly leftOut: ReadonlyArray<string>
+  /** Whether the files beep-effect's kit holds by their hashes are not read either (`kit.ts`). */
+  readonly leavesHashedKit: boolean
   /** The offsets in a file's tree that break the rule. */
   readonly offsets: (program: Node) => ReadonlyArray<number>
 }
@@ -54,7 +53,11 @@ export interface ListedSpec {
  */
 export const ListedFinding = S.TaggedUnion({
   Clean: {},
-  Refused: {},
+  Refused: {
+    broken: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a place breaks the rule, or only the ledger or what it reads fails" })
+    )
+  },
   Unlisted: {
     why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" }))
   },
@@ -65,9 +68,8 @@ export const ListedFinding = S.TaggedUnion({
     file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of places moved" })),
     words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
-  Changed: {
-    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
-    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
+  Ledger: {
+    said: S.String.pipe(S.annotateKey({ description: "What the ledger says against the files and against main" }))
   },
   Unread: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line the law stopped at, as file:line" })),
@@ -106,7 +108,7 @@ export const readListed: {
   return O.match(whole.program, {
     onNone: () => unreadAt({ at: 0, unread: Unread.Unparsed({ message: "no program" }) }),
     onSome: (program): ListedRead => ({
-      found: A.sort(A.dedupe(A.map(offsets(program), lineAt)), Order.Number),
+      found: A.sort(A.map(offsets(program), lineAt), Order.Number),
       unread: O.none()
     })
   })
@@ -118,17 +120,17 @@ export const readListed: {
  * @category rendering
  */
 export const listedSentence = (spec: ListedSpec): ((finding: ListedFinding) => Line) => {
-  const notRead = `${A.join(spec.leftOut, ", ")} are not read; ${R.size(spec.listed)} files are listed`
+  const notRead = `${A.join(spec.leftOut, ", ")}${spec.leavesHashedKit ? " and the kit's hashed files" : ""} are not read; the files in ${spec.ledger} are listed`
   return ListedFinding.match({
     Clean: () => out(`${spec.check} OK  ${spec.rule} (${notRead})`),
-    Refused: () => err(`${spec.check} FAIL  not ${spec.rule}. Write what each line says instead (${notRead}):`),
+    Refused: ({ broken }) =>
+      broken
+        ? err(`${spec.check} FAIL  not ${spec.rule}. Write what each line says instead (${notRead}):`)
+        : err(`${spec.check} FAIL  its ledger, or what it reads, does not hold (${notRead}):`),
     Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
     At: ({ place }) => err(`${place}  ${spec.instead}`),
     Standing: ({ file, words }) => err(`${file}  ${words}`),
-    Changed: ({ held, now }) =>
-      err(
-        `${spec.listName} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
-      ),
+    Ledger: ({ said }) => err(said),
     Unread: ({ place, why }) => err(`${place}  ${why}`)
   })
 }
@@ -140,17 +142,20 @@ export const listedSentence = (spec: ListedSpec): ((finding: ListedFinding) => L
  */
 export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSpec) {
   const repo = yield* Repo
-  const git = yield* repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--deduplicate"])
-  if (git.code !== 0) {
-    return A.make<[ListedFinding, ListedFinding]>(
-      ListedFinding.cases.Refused.make({}),
-      ListedFinding.cases.Unlisted.make({ why: Str.trim(git.stderr) })
+  const refused = (problems: ReadonlyArray<ListedFinding>) =>
+    A.prepend<ListedFinding, ListedFinding>(
+      problems,
+      ListedFinding.cases.Refused.make({ broken: A.some(problems, (problem) => !ListedFinding.guards.Ledger(problem)) })
     )
-  }
+  const ledger = yield* readLedger(spec.ledger)
+  if (Result.isFailure(ledger)) return refused([ListedFinding.cases.Ledger.make({ said: ledger.failure })])
+  const git = yield* repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--deduplicate"])
+  if (git.code !== 0) return refused([ListedFinding.cases.Unlisted.make({ why: Str.trim(git.stderr) })])
+  const hashed = spec.leavesHashedKit ? yield* hashedKitFiles() : []
   const files = yield* Effect.filter(
     A.filter(
       Str.split("\0")(git.stdout),
-      (file) => isCode(file) && !A.some(spec.leftOut, (path) => Str.startsWith(path)(file))
+      (file) => isCode(file) && !A.some(spec.leftOut, (path) => Str.startsWith(path)(file)) && !A.contains(hashed, file)
     ),
     (file) => repo.exists(repo.join(repo.root, file)),
     { concurrency: 1 }
@@ -168,10 +173,11 @@ export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSp
             })
           )
         }
-        return O.match(standingOf(spec.listed, { file, now: A.length(read.found) }), {
-          onNone: () => A.map(read.found, (line) => ListedFinding.cases.At.make({ place: `${file}:${line}` })),
+        return O.match(standingOf(ledger.success, { file, now: A.length(read.found) }), {
+          onNone: () =>
+            A.map(A.dedupe(read.found), (line) => ListedFinding.cases.At.make({ place: `${file}:${line}` })),
           onSome: (standing) =>
-            O.match(standingWords(standing, spec.listName), {
+            O.match(standingWords(standing, spec.ledger), {
               onNone: () => [],
               onSome: (words) => A.of(ListedFinding.cases.Standing.make({ file, words }))
             })
@@ -179,10 +185,12 @@ export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSp
       }),
     { concurrency: 1 }
   )
-  const now = heldAs(R.keys(spec.listed))
-  const changed = now === spec.held ? [] : [ListedFinding.cases.Changed.make({ held: spec.held, now })]
-  const problems = A.appendAll(changed, A.flatten(found))
+  const against = yield* ledgerAgainst({ path: spec.ledger, now: ledger.success, files })
+  const problems = A.appendAll(
+    A.map(against, (said) => ListedFinding.cases.Ledger.make({ said })),
+    A.flatten(found)
+  )
   return A.isReadonlyArrayNonEmpty(problems)
-    ? A.prepend<ListedFinding, ListedFinding>(problems, ListedFinding.cases.Refused.make({}))
+    ? refused(problems)
     : A.of<ListedFinding>(ListedFinding.cases.Clean.make({}))
 })

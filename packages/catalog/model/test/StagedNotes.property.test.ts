@@ -1,6 +1,7 @@
 // A workbook can make the reader write thousands of notes (one for each number format Excel shows another way), and an
-// upload sends at most `maxNotes`: so staging keeps every note when they fit, and past it the warnings first, then the
-// notes on how the sheet was laid out, then the number-format notes, and says in one more how many it did not keep, as
+// upload sends at most `maxNotes`: so staging keeps every note when they fit, and past it the warnings first, then
+// every other information note (called layout notes here: rows above the heading, blank rows), then the number-format
+// notes, and says in one more how many it did not keep, as
 // a warning when a warning was among them, so the Review step shows it. What it stages is a table the staged schemas
 // accept and an upload may send.
 //
@@ -17,7 +18,6 @@ import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 
 const LayoutKind = NoteKind.check(
   S.makeFilter((kind: string) => kind !== "formatNotShown", { expected: "a kind of note other than a number format's" })
@@ -29,7 +29,9 @@ const Aim = S.Literals(["anywhere", "atTheFilesBound", "oneTierAtTheFilesBound",
 const Count = S.Int.check(S.isBetween({ minimum: 0, maximum: 2 * maxNotes }))
 const Shift = S.Int.check(S.isBetween({ minimum: -1, maximum: 1 }))
 
-type Counts = { readonly warning: number; readonly layout: number; readonly format: number }
+// How many notes of each tier a file has.
+const Counts = S.Struct({ warning: Count, layout: Count, format: Count })
+type Counts = typeof Counts.Type
 
 /** How many notes of each tier the file has, from the draw. */
 const countsOf = (aim: typeof Aim.Type, drawn: Counts, shift: number, only: typeof Tier.Type): Counts => {
@@ -74,7 +76,7 @@ describe("a staged file's notes", () => {
       Arbitrary.schema(Message),
       Arbitrary.schema(StagedNote.fields.rows),
       Arbitrary.schema(Aim),
-      Arbitrary.schema(S.Struct({ warning: Count, layout: Count, format: Count })),
+      Arbitrary.schema(Counts),
       Arbitrary.schema(Shift),
       Arbitrary.schema(Tier)
     ],
@@ -126,8 +128,11 @@ describe("a staged file's notes", () => {
         ["notesNotKept", warningsLeft > 0 ? "warning" : "info"]
       ])
       for (const note of summary) {
-        expect(Str.startsWith(`${read.length - room} more notes`)(note.message)).toBe(true)
-        expect(Str.includes(`${warningsLeft} of them warnings`)(note.message)).toBe(warningsLeft > 0)
+        // The two numbers it says, read out of its sentence: the notes not kept, and the warnings among them.
+        const said = (pattern: RegExp) =>
+          O.map(O.fromNullishOr(pattern.exec(note.message)), (found) => Number(found[1]))
+        expect(said(/^(\d+) more notes/)).toEqual(O.some(read.length - room))
+        expect(said(/, (\d+) of them warnings:/)).toEqual(warningsLeft > 0 ? O.some(warningsLeft) : O.none())
       }
     },
     { arbitrary: { runs: 80 } }

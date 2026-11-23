@@ -3,24 +3,20 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as R from "effect/Record"
 import * as Str from "effect/String"
-import { heldAs } from "../src/commands/Laws/internal/held.ts"
 import { listedLaw, listedSentence, readListed } from "../src/commands/Laws/internal/listed.ts"
 import { helpersNotDual, mutableProperties } from "../src/commands/Laws/internal/shapesCode.ts"
 import {
   dualHelpers,
-  dualListed,
   dualSentence,
   dualSpec,
-  readonlyListed,
   readonlyProperties,
   readonlySentence,
   readonlySpec
 } from "../src/commands/Laws/Shapes.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
-import { inTree, printed } from "./support/tree.ts"
+import { inTree, json, onMain, printed } from "./support/tree.ts"
 
 const lines = (source: string, offsets: typeof helpersNotDual) => readListed({ file: "a.tsx", source }, offsets).found
 
@@ -50,9 +46,14 @@ declare global { interface Window { mutable: string } }
 declare module "some-library" { interface Options { set: boolean } }
 `
 
+// The law, in a repository whose main holds what `inTree` wrote, with an empty ledger for each law unless the tree has
+// its own.
 const inRepository = Effect.fn("inRepository")(function* (law: typeof dualHelpers, sentence: typeof dualSentence) {
   const repo = yield* Repo
-  yield* repo.run("git", ["init", "-q"])
+  for (const ledger of [dualSpec.ledger, readonlySpec.ledger]) {
+    if (!(yield* repo.exists(repo.join(repo.root, ledger)))) yield* repo.write(repo.join(repo.root, ledger), json({}))
+  }
+  yield* onMain()
   const found = yield* law
   return printed(render(sentence)(found))
 })
@@ -63,23 +64,26 @@ describe("laws dual and readonly", () => {
   })
 
   it("reads a property that is not readonly, and not one in another library's augmented types", () => {
-    expect(lines(shapes, mutableProperties)).toEqual([1, 2])
+    // Each place is said: line 2 holds three (c, nested and f).
+    expect(lines(shapes, mutableProperties)).toEqual([1, 2, 2, 2])
     // An index signature, a class's field, a mapped type, a mutable array in a property, and a namespace of our own;
     // not a local list a function fills.
-    expect(lines(wider, mutableProperties)).toEqual([1, 2, 3, 5, 7])
-    // A mutable array behind an alias, a mutable tuple, globalThis.Array, a parameter property, an accessor and an
-    // abstract field; a readonly tuple and a readonly parameter property pass.
+    expect(lines(wider, mutableProperties)).toEqual([1, 2, 3, 5, 5, 7])
+    // A mutable array behind an alias, a mutable tuple, globalThis.Array, a parameter property and an abstract field;
+    // a readonly tuple, a readonly parameter property, an accessor (which cannot be readonly) and a tuple in a
+    // conditional type's test pass.
     const more = `export type Rows = number[]
 export type Pair = { readonly p: [number, string]; readonly q: readonly [number, string] }
 export type G = { readonly g: globalThis.Array<number> }
 export class D { constructor(private n: number, private readonly m: number) {} }
 export class E { accessor f = 1 }
 export abstract class F { abstract h: number }
+export type IsNever<T> = [T] extends [never] ? true : false
 `
-    expect(lines(more, mutableProperties)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(lines(more, mutableProperties)).toEqual([1, 2, 3, 4, 6])
   })
 
-  it("reads Effect.fn helpers, methods and dual's own order, and does not count a this parameter", () => {
+  it("reads Effect.fn helpers and dual's own order; not a library's methods, a typed const or a this parameter", () => {
     const more = `import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 export const told = Effect.fn("told")(function* (method: string, cause: unknown) { return [method, cause] })
@@ -88,8 +92,28 @@ export class G { refusal(method: string, cause: unknown) { return [method, cause
 export const wrong = dual(2, (that: string, self: string) => that + self)
 export const right = dual(2, (self: string, that: string) => self + that)
 export function bound(this: Window, input: string) { return input }
+export const reducer: (state: number, input: number) => number = (state, input) => state + input
 `
-    expect(lines(more, helpersNotDual)).toEqual([3, 4, 5, 6])
+    // The object's and the class's methods, and the typed const, have an order a library's type sets.
+    expect(lines(more, helpersNotDual)).toEqual([3, 6])
+    // A dual typed as the house writes one is read for its order; so are an arrow under satisfies and an unnamed
+    // Effect.fn.
+    const typed = `import { dual } from "effect/Function"
+import * as Effect from "effect/Effect"
+export const a: { (x: number): (self: string) => string; (that: number, self: string): string } = dual(2, (that: number, self: string) => self + that)
+export const b = ((n: number, cause: unknown) => [n, cause]) satisfies (n: number, c: unknown) => unknown
+export const c = Effect.fn(function* (n: number, self: string) { return self })
+export const d: { (that: number): (self: string) => string; (self: string, that: number): string } = dual(2, (self: string, that: number) => self + that)
+`
+    expect(lines(typed, helpersNotDual)).toEqual([3, 4, 5])
+    // Another object's fn is a library's callback; a dual over Effect.fn is read for its order.
+    const libraries = `import { dual } from "effect/Function"
+import * as Effect from "effect/Effect"
+export const a = Atom.fn((input: string, get: unknown) => input)
+export const b = dual(2, Effect.fn("b")(function* (that: number, self: string) { return self }))
+export const c = vi.fn((n: number, cause: unknown) => cause)
+`
+    expect(lines(libraries, helpersNotDual)).toEqual([4])
   })
 
   it.effect("refuses each place in a file no list names, and holds a listed file at its number of places", () =>
@@ -98,7 +122,7 @@ export function bound(this: Window, input: string) { return input }
       expect(said).toContain(`err: packages/x/src/a.ts:2  ${dualSpec.instead}`)
       // A spec of the readonly law with a ledger of its own: one file held at two places.
       const listed = "packages/x/src/listed.ts"
-      const spec = { ...readonlySpec, listed: { [listed]: 2 }, held: heldAs([listed]) }
+      const spec = { ...readonlySpec, ledger: "packages/x/ledger.json" }
       const law = listedLaw(spec)
       const sentence = listedSentence(spec)
       const mutable = (count: number) =>
@@ -106,30 +130,56 @@ export function bound(this: Window, input: string) { return input }
           A.makeBy(count, (i) => `export type A${i} = { a: number }\n`),
           ""
         )
-      const got1 = yield* inTree({ [listed]: mutable(2) }, inRepository(law, sentence))
+      const got1 = yield* inTree(
+        { "packages/x/ledger.json": json({ [listed]: 2 }), [listed]: mutable(2) },
+        inRepository(law, sentence)
+      )
 
       expect(got1).toEqual([expect.stringContaining("out: readonly:check OK")])
-      const got2 = yield* inTree({ [listed]: mutable(3) }, inRepository(law, sentence))
+      const got2 = yield* inTree(
+        { "packages/x/ledger.json": json({ [listed]: 2 }), [listed]: mutable(3) },
+        inRepository(law, sentence)
+      )
 
       expect(got2).toContain(
-        `err: ${listed}  breaks the rule in 3 places, more than the 2 readonlyListed holds it to: a listed file may only lose places. Fix the new ones`
+        `err: ${listed}  breaks the rule in 3 places, more than the 2 packages/x/ledger.json holds it to: a listed file may only lose places. Fix the new ones`
       )
-      const got3 = yield* inTree({ [listed]: mutable(1) }, inRepository(law, sentence))
+      const got3 = yield* inTree(
+        { "packages/x/ledger.json": json({ [listed]: 2 }), [listed]: mutable(1) },
+        inRepository(law, sentence)
+      )
 
       expect(got3).toContain(
-        `err: ${listed}  breaks the rule in 1 places, fewer than the 2 readonlyListed holds it to: lower its number to 1`
+        `err: ${listed}  breaks the rule in 1 places, fewer than the 2 packages/x/ledger.json holds it to: lower its number to 1`
       )
-      const got4 = yield* inTree({ [listed]: "export type A = { readonly a: 1 }\n" }, inRepository(law, sentence))
+      const got4 = yield* inTree(
+        { "packages/x/ledger.json": json({ [listed]: 2 }), [listed]: "export type A = { readonly a: 1 }\n" },
+        inRepository(law, sentence)
+      )
 
       expect(got4).toContain(
-        `err: ${listed}  is listed in readonlyListed but breaks the rule no more: take its line off`
+        `err: ${listed}  is listed in packages/x/ledger.json but breaks the rule no more: take its line off`
       )
-      // The ui package's components are read; only code another check holds to its source is not.
+      // A ledger that names a file not there fails on the ledger alone, and its heading says so.
+      const gone = yield* inTree(
+        { "packages/x/ledger.json": json({ "packages/x/src/gone.ts": 1 }) },
+        inRepository(law, sentence)
+      )
+      expect(gone[0]).toBe(
+        `err: readonly:check FAIL  its ledger, or what it reads, does not hold (.agents/, .codex/, scratchpad/, vendor/ and the kit's hashed files are not read; the files in packages/x/ledger.json are listed):`
+      )
+      // The ui package's components are read; only code another check holds to its source is not: the files a kit
+      // manifest hashes. Its local files are read.
       const read = yield* inTree(
         {
           "packages/ui/src/hooks/use-x.ts": shapes,
           "vendor/a.ts": shapes,
-          "packages/foundation/modeling/utils/src/a.ts": shapes
+          "packages/foundation/modeling/utils/vendor.json": json({
+            files: [{ path: "src/a.ts", sha256: "0" }],
+            local: ["test/support/fc.ts"]
+          }),
+          "packages/foundation/modeling/utils/src/a.ts": shapes,
+          "packages/foundation/modeling/utils/test/support/fc.ts": shapes
         },
         inRepository(readonlyProperties, readonlySentence)
       )
@@ -137,13 +187,11 @@ export function bound(this: Window, input: string) { return input }
       expect(
         A.filter(
           read,
-          (line) => Str.startsWith("err: vendor/")(line) || Str.startsWith("err: packages/foundation/")(line)
+          (line) =>
+            Str.startsWith("err: vendor/")(line) || Str.startsWith("err: packages/foundation/modeling/utils/src/")(line)
         )
       ).toEqual([])
+      expect(read).toContain("err: packages/foundation/modeling/utils/test/support/fc.ts:1  " + readonlySpec.instead)
     })
   )
-
-  it("the lists are held by their names too, a guard the review sees", () => {
-    expect([heldAs(R.keys(dualListed)), heldAs(R.keys(readonlyListed))]).toEqual([dualSpec.held, readonlySpec.held])
-  })
 })

@@ -8,6 +8,7 @@ import { ConfirmPlan, confirmPlan, maxReason, PlannedRow } from "@inventory/cata
 import { ConfirmWrite } from "@inventory/catalog-model/ImportStore"
 import { review } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -79,7 +80,9 @@ describe("a plan a confirm can be handed", () => {
     [ConfirmPlan],
     ([plan]) => {
       const said = A.filter(plan.rows, PlannedRow.isAnyOf(["notImported", "already"]))
-      expect(A.filter(said, (row) => Str.trim(row.reason) === "" || row.reason.length > maxReason)).toEqual([])
+      expect(A.filter(said, (row) => O.isNone(Str.match(/\S/)(row.reason)) || row.reason.length > maxReason)).toEqual(
+        []
+      )
     }
   )
 

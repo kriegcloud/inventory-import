@@ -1,9 +1,9 @@
 // What holds a ban's list of today's files: each file with the number of places in it that break the rule, kept in a
 // JSON file of its own under `packages/tooling/tool/cli/ledgers/`. The number may only fall, and that is held by the
-// code, not by a review: a file that gains a place is refused, so no new one goes in under a file already listed; a file
-// that loses one is refused until its number is lowered, so it cannot gain it back later; a file at none comes off; an
-// entry for a file that is not there is refused; and the ledger itself is compared with the same file at its base, so
-// a number that rose or a file added is refused, whatever the same commit wrote.
+// code, not by a review: a file that gains a place is refused, so no new one goes in under a file already listed; a
+// file that loses one is refused until its number is lowered, so it cannot gain it back later; a file at none comes
+// off; an entry for a file that is not there is refused; and the ledger itself is compared with the same file at its
+// base, so a number that rose or a file added is refused, whatever the same commit wrote.
 //
 // The base is where this branch left `main` (the merge base of HEAD and `origin/main`, else `main`). In CI's run for a
 // push, a step of its own runs the laws again with the commit CI names in `LEDGER_BASE` (ci.yml): the last commit
@@ -11,15 +11,17 @@
 // every ledger and HEAD holds it; failing that, where such a candidate and HEAD meet (their merge base, after a force
 // push), when that holds every ledger; with none, it names no base and the law takes its own. Only that step sees
 // `LEDGER_BASE`: the laws' tests build repositories that do not hold the commit (their vitest configs clear it). On
-// the branch `main` with no `LEDGER_BASE`, the base is `origin/main` when HEAD is ahead of it, else the commit before
-// HEAD. A `LEDGER_BASE` that is not fetched or not in HEAD's history is refused: CI only names one it checked, so it
-// is one set by hand, and is not taken in silence. "" reads as unset. A shallow checkout is refused, since its base
-// may be missing and the comparison would pass in silence. On a branch whose base has no such ledger yet, nothing is
-// compared.
+// the branch `main` with no `LEDGER_BASE`, the base is `origin/main` when HEAD is ahead of it, the commit before HEAD
+// (HEAD^1) only when HEAD is `origin/main` itself, and otherwise their merge base. A `LEDGER_BASE` that is not fetched
+// or not in HEAD's history is refused: CI only names one it checked, so it is one set by hand, and is not taken in
+// silence. "" reads as unset. A shallow checkout is refused, since its base may be missing and the comparison would
+// pass in silence. A ledger its base does not hold (a ban that lands in this change) comes in whole: nothing is
+// compared for it.
 //
 // A file git sees renamed since the base is held at its old name's number: git sees a rename once both paths are
 // staged (`git mv`, or `git add` of both), so an unstaged one reads as a file removed and one added. A file deleted and
-// made again at the same path in one change is the same path to git, and keeps that path's number.
+// made again at the same path in one change is the same path to git, and keeps that path's number. A move lends its
+// number only while nothing is at the old name: a file there keeps it, so the two do not hold it twice.
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -155,10 +157,9 @@ const baseCommit = Effect.fn("ledger.baseCommit")(function* (main: string) {
 })
 
 /**
- * The commit CI names for a push (`LEDGER_BASE`: the last commit of the branch whose run passed, else on main the
- * push's `before`, each only when it holds every ledger and HEAD holds it; else where such a candidate and HEAD meet;
- * see the head of this file); none in a pull request's run, locally, for a push that made the branch (all zeros), or
- * when it is "".
+ * The commit CI names for a push (`LEDGER_BASE`: the last passing push, else on main the push's `before`, or where
+ * one of them and HEAD meet; see the head of this file); none in a pull request's run, locally, for a push that made
+ * the branch (all zeros), or when it is "".
  */
 const pushBase = Effect.fn("ledger.pushBase")(function* () {
   const named = yield* Config.String("LEDGER_BASE")
@@ -218,18 +219,32 @@ export interface AtBase {
   readonly text: O.Option<string>
   /** Each file renamed since the base, by its name now, with the name it had there. */
   readonly renamed: Readonly<Record<string, string>>
+  /**
+   * Each file moved since the base whose old name a file the law lists holds again, by its name now, with that old
+   * name: the file at the old name keeps its number, so the moved one starts from nothing.
+   */
+  readonly retaken: Readonly<Record<string, string>>
+  /** The base commit itself, when there is one, so a law can read other files as they stood there. */
+  readonly commit: O.Option<string>
 }
 
 /**
  * The file at `path` as it stood at this branch's base (where it left main; on a push, the commit CI names), with
  * what was renamed since: the part of a ledger's comparison that does not depend on its shape, for a law that keeps a
- * list of its own kind (`Defaults.rules.ts`).
+ * list of its own kind (`Defaults.rules.ts`). `listed` is the files the law reads now: a move whose old name is one of
+ * them is no rename here.
  *
  * @category rules
  */
-export const atBase = Effect.fn("ledger.atBase")(function* (path: string) {
+export const atBase = Effect.fn("ledger.atBase")(function* (path: string, listed: ReadonlyArray<string>) {
   const repo = yield* Repo
-  const problem = (said: string): AtBase => ({ problem: O.some(said), text: O.none(), renamed: {} })
+  const problem = (said: string): AtBase => ({
+    problem: O.some(said),
+    text: O.none(),
+    renamed: {},
+    retaken: {},
+    commit: O.none()
+  })
   const main = yield* mainCommit()
   if (O.isNone(main)) {
     return problem(
@@ -246,13 +261,24 @@ export const atBase = Effect.fn("ledger.atBase")(function* (path: string) {
   if (O.isSome(unfit)) return problem(unfit.value)
   const base = yield* baseCommit(main.value)
   // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
-  if (O.isNone(base)) return { problem: O.none(), text: O.none(), renamed: {} } satisfies AtBase
+  if (O.isNone(base)) {
+    return { problem: O.none(), text: O.none(), renamed: {}, retaken: {}, commit: O.none() } satisfies AtBase
+  }
   const shown = yield* repo.run("git", ["show", `${base.value}:${path}`])
-  const renamed = yield* renamedSince(base.value)
+  // A move lends its old name's number only while nothing is at the old name: a file there (new, or the old one kept)
+  // keeps that number, so the moved file does not borrow it too. git's answer differs by tree (a move with a new file
+  // at the old name is a rename while the new file is untracked, and a change of the old file once both are
+  // committed), so the rename is checked against the files the law lists, and both trees hold the moved file to
+  // nothing. The law's list, not the disk: a stray file git ignores, or the old name of a move that only changed case
+  // on a disk that ignores case, is no file of the law's and takes nothing.
+  const found = yield* renamedSince(base.value)
+  const isRetaken = (was: string) => A.contains(listed, was)
   return {
     problem: O.none(),
     text: shown.code === 0 ? O.some(shown.stdout) : O.none(),
-    renamed
+    renamed: R.filter(found, (was) => !isRetaken(was)),
+    retaken: R.filter(found, isRetaken),
+    commit: base
   } satisfies AtBase
 })
 
@@ -273,7 +299,7 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
     (file) =>
       `${file}  is in ${input.path} but is not there: take its line off, so a new file at its path inherits nothing`
   )
-  const base = yield* atBase(input.path)
+  const base = yield* atBase(input.path, input.files)
   if (O.isSome(base.problem)) return A.append(missing, base.problem.value)
   // A base with no such ledger yet: the first one comes in whole, and nothing is compared.
   if (O.isNone(base.text)) return missing
@@ -284,7 +310,13 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
     // A file renamed since then is held at what main held it under its old name.
     const was = O.getOrElse(R.get(base.renamed, file), () => file)
     return O.match(R.get(before.value, was), {
-      onNone: () => [`${file}  is in ${input.path} but not on main: a ledger only loses files. Fix the file instead`],
+      onNone: () => [
+        O.match(R.get(base.retaken, file), {
+          onNone: () => `${file}  is in ${input.path} but not on main: a ledger only loses files. Fix the file instead`,
+          onSome: (old) =>
+            `${file}  is in ${input.path} but not on main: it was moved from ${old}, and the file at ${old} now keeps that number, so this one starts from nothing. Fix the file instead`
+        })
+      ],
       onSome: (held) =>
         now > held
           ? [`${file}  is held at ${now} in ${input.path}, above the ${held} main holds it to: a number only falls`]

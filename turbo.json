@@ -141,6 +141,24 @@
       ],
       "outputs": []
     },
+    // Absence, starting values and clean-ups are a schema's (`beep laws defaults`): no file holds more fallbacks,
+    // comparisons with null or undefined, Options turned back into missing values, or clean-ups outside a schema than
+    // `defaults-baseline.json` allows it. The baseline only falls.
+    "//#defaults:check": {
+      "inputs": [
+        "apps/*/src/**/*.{ts,tsx}",
+        "apps/*/test/**/*.{ts,tsx}",
+        "packages/**/src/**/*.{ts,tsx}",
+        "packages/**/test/**/*.{ts,tsx}",
+        "packages/client/**/*.{ts,tsx}",
+        "packages/review/**/*.{ts,tsx}",
+        "packages/ui/**/*.{ts,tsx}",
+        "packages/**/vendor.json",
+        "defaults-baseline.json",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // No `_tag` is told apart or built by hand in our own code and every test (`beep laws tags`), with no file
     // excepted: a count per file would let one hand-written tag be swapped for another.
     "//#tags:check": {

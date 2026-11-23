@@ -8,12 +8,12 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Sixty-three questions are open: 12, 17 to 19, 24, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92. They are what is left
+Sixty-two questions are open: 12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92. They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
-the catalog questions. Twenty-two were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 23, 25, 26, 32,
-34, 38 to 41, 43 and 46. They are under Answered with four new ones, 93 to 96; a `rat-` record ratifies one term
+the catalog questions. Twenty-three were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 26, 32,
+34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101; a `rat-` record ratifies one term
 proposal, and none is written yet. The gaps
 in the numbers below are theirs.
 
@@ -37,7 +37,6 @@ none of these rows; slice 1, the party slice, follows it.
 | 17 | Are concept schemes and concepts also typed by gist? | (a) SKOS only, no `gist:ControlledVocabulary` or `gist:Category` typing; the classification properties still sit under `gist:isCategorizedBy` (decision 16); a concept that is also a unit or a dimension is typed by its class (decision 61); (b) all three typings (10's first answer); (c) units and dimensions only | (a) | 05 projects a scheme to `skos:ConceptScheme` only and 11 takes neither gist class; the typing answers no question and would put every concept under gist's `Category` disjointness | The gist parent column of 10's scheme rows | 10 Q3, 11 table A, 05 section 2 |
 | 18 | Which values does the kind tag take? | (a) kind, subkind, role, phase, relator, event, information, category, value, on classes only; (b) with role mixin; (c) also on properties | (a) | Decision 3 makes the account roles flags, and decision 34 has since put them on the tenant's `SourceRecord`, not on the organization; either way nothing bears a role mixin yet; a property's category is its domain and range | 05's `KindTag`, V16, V17 | 05 Q12 |
 | 19 | Do the metamodel's facts (kind tag, identity criterion, scope, ratification) reach the Turtle? | (a) No: they stay in the module, gate 4 reads them, and no metamodel IRI is minted; (b) the tag only, as `inv:termCategory` with a concept of a `TermCategoryScheme` (12's first answer); (c) all, under a second placeholder namespace | (a) | Nothing outside the repository reads them; gate 4 checks tags against axioms in TypeScript; (b) can be added later as a minor version | 12's `termCategory` row, not minted under (a) | 05 Q1, 12 Q5 |
-| 24 | Which version scheme, and where does the version come from? | (a) A semantic version string in the module, `0.x` until published; a change's bump follows its effect, not its kind: a change after which data or a query answer that conformed before no longer does (a new disjoint group with an instance on both sides, a re-parenting that removes an expected answer) is breaking, whatever 05's table calls its kind; how a breaking change is numbered before publication is not settled, since a major bump leaves `0.x` and staying on `0.x` gives it no major; (b) a date string; (c) the package's version | (a) | Never the clock (decision 6's byte-compare); the package version moves with code that leaves the terms alone | The header and version IRIs | 05 Q5, 12 Q13 |
 | 27 | How does a competency question reach an inferred type? | (a) Each query walks `rdf:type/rdfs:subClassOf*` itself and runs in `check` with no reasoner; the reasoner is its own gate; (b) each runs over a reasoned copy merged with its fixture | (a) | Decision 6 runs the reasoner in `check:full` only; (a) keeps the suite in the fast loop | Every drafted query; 12's gates 8 and 10; under the recommended (a) gate 10 has no question to run | 04 Q5 |
 | 28 | How do the alignment triples sit beside the OWL the reasoner reads? | (a) A separate generated alignment file that declares the five `skos:*Match` predicates annotation properties and is never in the reasoner's closure, which holds the OWL file and each fixture only (no SKOS, no alignments); (b) the same declarations inside the OWL file (11's first answer); (c) SKOS semantics, `exactMatch` transitive | (a) | Both seeds isolate alignments, so no target's meaning reaches the reasoner; SKOS concepts would be punned individuals in the closure | 12's four files and gate 9's inputs; 11's rule text | 11 Q8, 12 Q15 |
 | 29 | How is a term of a standard with no RDF namespace (Sutton, ISA-95, B2MML) cited? | (a) A named external term (the standard, the term's name as written, a public document), emitted only as an SSSOM row and a header note, never as a `skos:*Match` triple; (b) a local IRI per external term; (c) the documentation URL as the object | (a) | Decision 7 forbids minting under Sutton's name, and (b) is that under another host; (c) makes a web page stand for a concept | 05's `NamedExternalTerm`; 44 rows of 11 | 05 Q11, 11 Q6 |
@@ -103,8 +102,9 @@ How the open ones are taken (my ruling, 2026-11-22): each open decision is put t
 being specified, with a concrete record in front of me. Until then its recommendation is the agent's and not mine, and
 nothing is built on it. The thin thread of decision 8 waits on none of them.
 
-Decisions 8 to 11, 13 to 16, 20 to 23, 25, 26, 32, 34, 38 to 41, 43 and 46 were answered on 2026-11-22 after the
-review panel and left the Open table, with four new ones, 93 to 96. Where a report disagrees with an entry below, the
+Decisions 8 to 11, 13 to 16, 20 to 26, 32, 34, 38 to 41, 43 and 46 were answered on 2026-11-22 after the
+review panel and left the Open table, with nine new ones, 93 to 101. Later entries amend earlier ones where they say
+so: 94 to 101 widen the thread that 8 and 93 describe, and report 14 holds the thread as it now stands. Where a report disagrees with an entry below, the
 entry wins.
 
 ### 2. Which artifact is the source of truth (2026-11-22)
@@ -301,6 +301,8 @@ each typed so that only a term of the right kind compiles, with an augmentation 
 - Rationale: a misspelt or wrong-kind pointer is a type error, where a plain annotation key on `effect/Schema`
   compiles when misspelt.
 - Reverse: write the same annotation by hand; the helpers are a thin layer over it.
+- Correction (2026-11-22): in report 05's design `aboutPath` writes a `path` annotation, not `term`; the other three
+  write `term`. That is the design I accepted.
 
 ### 32. What records that I accepted a term (2026-11-22)
 
@@ -342,13 +344,14 @@ recommended the same.
 
 ### 93. How the Member record's copied fields are pointed in the thin thread (2026-11-22)
 
-A question the review panel raised: the `Member` record carries the person's name, the organization's name and the
-sign-in email, none of them a fact about the membership. I chose `noTerm` with the reason screen for those fields in
+A question the review panel raised: the `Member` record carries the person's name and the organization's name,
+neither of them a fact about the membership. (The question as put to me also named a sign-in email; the kernel's
+`Member` has no such field, so this answer covers the two names.) I chose `noTerm` with the reason screen for those fields in
 the thin thread; only the role field is lifted, to its `Grant` (decision 40). The party slice adds their paths, the
-name through the person and the email through the sign-in account. The agent recommended the same.
+person's name through the person and the organization's name through the tenant. The agent recommended the same.
 
 - Rationale: the thread stays at four terms and the graph says nothing false about a membership.
-- Reverse: bring `Person` and `SignInAccount` into the thread and write each field as a path.
+- Reverse: write each field as a path in the thread (decision 94 already brings `Person` in).
 
 ### 11. Which properties carry a term's label and definition (2026-11-22)
 
@@ -440,4 +443,66 @@ that needs them. The agent recommended the same.
 
 - Rationale: the lifted grant says what decision 40 said, and adding scopes later changes no existing grant.
 - Reverse: drop `grantScope` from the thread; when scopes arrive every existing grant is given the organization scope.
+
+### 97. A class with no gist parent (2026-11-22)
+
+A question the second review raised: `Role` ships in the thread with no gist parent (decisions 13 and 41), and the
+term model let only a category class be parentless, so gate 4 would have rejected it. I chose a stated exception: a
+class may have no gist parent when it gives its reason, in a short committed list the gate compares against, each
+entry ratified by me. `Role`'s reason: its individuals are the concepts of `MemberRoleScheme`, and `gist:Permission`
+fits once `permits` exists. The agent recommended the same.
+
+- Rationale: nothing false is asserted meanwhile, and the exceptions are few and in one visible place.
+- Reverse: admit `gist:Permission` and put `Role` under it; the list loses the entry.
+
+### 98. Which fields of the audit record get terms in the thread (2026-11-22)
+
+A question the second review raised under decision 22: the `Activity` record's fields had no properties in the thread.
+I chose four: `recordedActor` (to the `Member`), `action`, `recordedAt` and `inTenant`. The copied actor name and the
+detail sentence are `noTerm`, reason screen. The agent field waits for `AgentRun` in the party slice and is marked
+`noTerm` with a sixth reason, deferred, which names the slice that will place it; this adds one value to decision 21's
+closed list. The agent recommended the same.
+
+- Rationale: the thread's sentence, who did what, when and in which tenant, is then wholly in the graph.
+- Reverse: mark `action` and the time `noTerm`, reason deferred; the two links stay.
+
+### 99. How records are enrolled for gates 5 and 7 (2026-11-22)
+
+A question the second review raised under decision 95: the enrolled folders also hold records whose terms are not in
+the thread. I chose enrolment by record: a named list, which for the thread is the kernel's `Member`, `Role` and
+`Activity` and the access contract's records that are views of them; each later slice adds its records. This replaces
+decision 95's "the access contract and the four kernel records". The agent recommended the same.
+
+- Rationale: no record carries a placeholder mark for a term that does not exist yet.
+- Reverse: enrol whole folders and mark every unplaced schema `noTerm`, reason deferred.
+
+### 24. The version scheme (2026-11-22)
+
+I chose a semantic version string written in the module, never taken from the clock. Before publication it stays
+`0.y`: any change advances `y`, and a change after which data or an answer that held before no longer holds is
+recorded as breaking in the release notes. `1.0` is the first published namespace, when decision 7's placeholder is
+replaced. The agent recommended the same.
+
+- Rationale: the byte-compare forbids the clock, and the package version moves with code that leaves the terms alone.
+- Reverse: write a date string in the same header field.
+
+### 100. The People page's record in the thread (2026-11-22)
+
+A question report 14 raised under decision 99: the People page's `Person` record is a view of a membership and is
+enrolled, but its `email` and `joinedAt` fields have terms only in the party slice. I chose `noTerm`, reason deferred,
+naming the party slice, for both. The agent recommended the same.
+
+- Rationale: the record's role and member fields are checked from the first day, and the email is the sign-in
+  identity, not a copy for the screen, so it must not be marked as never getting a term.
+- Reverse: take the record off the thread's list; the party slice enrols it.
+
+### 101. Whether each concept needs its own ratification (2026-11-22)
+
+A question report 14 raised under decision 32. I chose that the ruling on a scheme covers the concepts listed in the
+proposal I see; a concept added later to a ratified scheme is a proposal of its own. The thread therefore needs 18
+rulings: seven classes, nine properties and two schemes. The agent recommended the same.
+
+- Rationale: viewer, editor and admin are the record's three existing codes; ruling on each would ask one thing
+  three times.
+- Reverse: write a `rat-` record per concept; the terms do not change.
 

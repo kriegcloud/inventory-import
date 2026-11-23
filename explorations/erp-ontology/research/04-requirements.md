@@ -68,18 +68,8 @@ use case they serve in their Source column through the same source.
 
 ### In scope
 
-The thin thread comes first (decision 8) and answers CQ-P06 alone. `Tenant` is a role class under `Organization`, keyed
-by `OrganizationId`; `membershipIn` links a `Member` to a `Tenant` (decision 38). `Person` falls under `gist:Person`
-(decision 94). The thread also takes `Role`, `Grant`, `MemberRoleScheme`, `GrantScopeKindScheme` and `AuditEntry`
-(alternative label "Activity", decision 46) through the vocabulary module, typed record pointers and generated OWL
-and SKOS. It admits only the gist parents those terms need and their named ancestors (decisions 13 and 14).
-Every field of a pointed record carries a pointer or `noTerm` with a reason. Its SHACL shape is closed (decision 22).
-
-The thread builds gates 1 to 9 and must show each failing once on a planted mistake. Gates 5 and 7 cover only the
-access contract and the four kernel records (decision 95). N3.js re-parses the Turtle, Oxigraph runs CQ-P06
-(decision 26), and ROBOT/HermiT runs the reasoner check (decision 25). Gate 11 adds shacl-engine with the stored
-sample; gate 12 waits for the alignment slice. Gate 10 belongs to open decision 27. Slice 1, the party slice,
-follows the thread.
+The thin thread comes first (decision 8) and answers CQ-P06 alone. [Report 14, section 1](14-thin-thread.md#1-scope)
+sets its scope. Slice 1, the party slice, follows it.
 
 - The terms the repository's records stand for today: item, vendor offer, unit, money, lifecycle, tracking flag, the
   import and its rows, outcomes, value changes, proposals and decisions, organization, member, role, audit entry.
@@ -134,21 +124,11 @@ a described fixture is a variant fixture and a changed reading is a mutant query
 | CQ-P03 | Which people are contacts at an organization, for which purpose (billing, shipping, receiving), and is a person who is a contact at two organizations one person? | `Person`, `Organization`, `ContactAssignment`, `ContactPoint`, `servesPurpose` (06), `ContactPurposeScheme` (10), `SourceRecord`, `recordOf`, `sourceSystem`, `sourceType`, `sourceId` (here) | enumerative | Add a second `recordOf` person to one source record (tenant, system, type, opaque id): one violation. The same id "001" in another system on a record about another person: zero. Equal ids never join people; that takes CQ-P04's decision. Variant fixture: one person uses the same contact point for billing at A and receiving at B. Expect only those two rows. Read the purpose and contact point from each assignment; joining on the person or point alone mixes the accounts | Decisions 39 and 43; report 01 section 3; Sutton public: accounts "have associated contacts" (quoted in report 01) | should |
 | CQ-P04 † | Which two source records a tenant holds were decided to be about one party, by whom, when, and on what evidence? | `IdentityDecision`, `decidesOn`, `identityOutcome`, `decidedBy`, `citesEvidence`, `Member`, `inTenant` (06), `eventTime` (09), `IdentityOutcomeScheme` (10) | enumerative | Variant fixture: neither a shared name nor a reversed decision returns a pair. Decisions about another tenant's own records of those parties neither appear nor hide this tenant's decision. Add `owl:sameAs` and remove the decision: CQ-P04 loses its row and CQ-P05 answers true | Report 01 section 3; the architecture seed 4.2 ("store the match evidence, reviewer, confidence"); profile rule "no `owl:sameAs`" | must (decision 34) |
 | CQ-P05 | Does any party, item or record stand in `owl:sameAs` with another? | no term: `owl:sameAs` itself, read by the ASK in section 4 | constraint | Add one `owl:sameAs` triple between two fixture organizations: the ASK answers true. With distinct source records and only the shared name "Acme Industrial", the ASK answers false. Whether an identity criterion rests on a name or a SKU is CQ-I08, which gate 4 answers over the module | Profile rules; report 02 (planned `laws ontology-terms` rule); `docs/glossary.md` ("Supplier: matched by name") | must |
-| CQ-P06 | Who are the members of this organization and which role does each hold? | `Tenant`, `Member`, `membershipIn`, `membershipOf`, `Person`, `Grant`, `grantedTo`, `grantsRole`, `grantScope`, `Role` (06), `MemberRoleScheme`, `GrantScopeKindScheme` (10) | enumerative | Select the organization's members and read their lifted roles through an OPTIONAL grant (decision 40). Remove `grantsRole` from Ravi's admin grant: the member remains but the expected role is missing; the companion query finds one non-removed member without a grant carrying a role. The role shape is a separate slice-2 SHACL check over lifted stored records, not gate 8 | `packages/access/contract/src/People/Person.read.ts`; `packages/kernel/src/Role.schema.ts` | must |
-| CQ-P07 | Does every tenant keep at least one admin who is not removed? | `Tenant`, `Member`, `membershipIn`, `grantedTo`, `grantsRole`, `removedAt` (06), `MemberRoleScheme` (10) | constraint | Start from each Tenant, never from memberships. Variant fixtures: a tenant whose only admin is removed and a tenant with no members each give one violation. A non-tenant vendor with no members (`test_FlourMill`) gives none. Companion: a tenant has a non-removed admin from the scalar-role lift below | `CLAUDE.md` ("the organization always keeps an admin"); the Alchemy brief (`Organization`, `Member` aggregates) | must |
+| CQ-P06 | Who are the members of this organization and which role does each hold? | [Report 14, section 5.1](14-thin-thread.md#51-cq-p06) | enumerative | [Report 14, section 5.4](14-thin-thread.md#54-the-must-fail-cases) | `packages/access/contract/src/People/Person.read.ts`; `packages/kernel/src/Role.schema.ts` | must |
+| CQ-P07 | Does every tenant keep at least one admin who is not removed? | `Tenant`, `Member`, `membershipIn`, `grantedTo`, `grantsRole`, `removedAt` (06), `MemberRoleScheme` (10) | constraint | Start from each Tenant, never from memberships. Variant fixtures: a tenant whose only admin is removed and a tenant with no members each give one violation. A non-tenant vendor with no members (`test_FlourMill`) gives none. Companion: a tenant has a non-removed admin from the role lift in [report 14, section 4.2](14-thin-thread.md#42-what-the-lift-does-with-one-member) | `CLAUDE.md` ("the organization always keeps an admin"); the Alchemy brief (`Organization`, `Member` aggregates) | must |
 | CQ-P08 † | Who may see the stock held at one site? | `Grant`, `grantedTo`, `grantScope`, `Member`, `membershipIn` (06), `GrantScopeKindScheme` (10), `atLocation`, `Site`, `Location`, `hasParentLocation` (08), `startedAt`, `endedAt` (09) | reachability | Mutant queries: walking down admits a bin grant; an optional location admits an unlocated grant; ignoring the period admits `test_Noor` and `test_Ada`. A tenant grant covers the site. Vocabulary variant, gate 4: organization-only scope cannot express the site grant | Report 01 section 3 (a grant is a role at a scope; Siebel access control); Sutton public: custom roles and location permissions, October and November 2026 releases (via both seeds) | should (pending Q8, Q9) |
-| CQ-P09 | Does any record belong to no organization, or to two, or point at a record of another organization? | `inTenant` (06) on every tenant-held class | constraint | Slice 1: remove a party record's only `inTenant` or add a second: one violation in either case. Warehouse variant fixture: a stock position whose item is in the second organization gives one violation | `CLAUDE.md` ("Every table that holds customer data has `organizationId`"); `apps/inventory/test/` `Tenancy.slow.test.ts` (named in `CLAUDE.md`) | must |
-| CQ-P10 | Who did each recorded act, did an agent act for them, and is a removed member still named on what they did? | `AuditEntry`, `recordedActor`, `actingAgentName`, `AgentRun`, `actsFor`, `Member`, `removedAt` (06), `RowDecision`, `ImportConfirmation`, `performedBy` (09) | enumerative | Variant fixture: a decision whose member was removed must still return that member; an agent act must name the person it acted for, and fails if it names only the agent | `packages/kernel/src/Activity.schema.ts` (`agent`); `docs/auth.md` ("Agents act for a person"); the `member` table's comment in `apps/inventory/migrations/0001_init.sql`; the architecture seed 5.7 (suspension keeps attribution) | should |
-
-In CQ-P06's fixture, `test_RaviWorks` and `test_RaviSecond` each link by `membershipOf` to the same `Person`,
-`test_Ravi` (decision 94). Ask for `test_ExampleWorks`: expect only (`test_RaviWorks`, `inv:MemberRoleScheme-admin`).
-Ask for `test_SecondOrg`: expect only (`test_RaviSecond`, `inv:MemberRoleScheme-viewer`). Each record's role field
-becomes one `Grant`: `grantedTo` names the membership, `grantsRole` the role (decision 40), and `grantScope` the one
-concept in `GrantScopeKindScheme`, `organization` (decision 96). `MemberRoleScheme` contains `viewer`, `editor` and
-`admin`. Each concept is a `Role` individual at the same IRI, identified only by scheme and notation. `Role` has no
-gist parent and the thread has no `permits` (decision 41). Neither a name nor an email supplies a path: the person's
-name, organization's name and sign-in email are `noTerm` with reason `screen` (decision 93). Put `grantsRole` directly on the member instead and CQ-P06
-loses the expected role. Slice 1 reuses the lift for CQ-P07; that misplaced link leaves the tenant without its admin.
+| CQ-P09 | Does any record belong to no organization, or to two, or point at a record of another organization? | The tenant link of each tenant-held record: `membershipIn` for a membership, `inTenant` for an audit entry ([report 14, section 2.2](14-thin-thread.md#22-properties)) | constraint | Slice 1: remove a party record's only `inTenant` or add a second: one violation in either case. Warehouse variant fixture: a stock position whose item is in the second organization gives one violation | `CLAUDE.md` ("Every table that holds customer data has `organizationId`"); `apps/inventory/test/` `Tenancy.slow.test.ts` (named in `CLAUDE.md`) | must |
+| CQ-P10 | Who did each recorded act, did an agent act for them, and is a removed member still named on what they did? | An audit entry names the member who acted; decision 98 defers the agent field to the party slice ([report 14, section 3.5](14-thin-thread.md#35-activity-packageskernelsrcactivityschemats-marks-on-a-modelclass)). `AgentRun`, `actsFor`, `removedAt` (06), `RowDecision`, `ImportConfirmation`, `performedBy` (09) | enumerative | Variant fixture: a decision whose member was removed must still return that member; an agent act must name the person it acted for, and fails if it names only the agent | `packages/kernel/src/Activity.schema.ts` (`agent`); `docs/auth.md` ("Agents act for a person"); the `member` table's comment in `apps/inventory/migrations/0001_init.sql`; the architecture seed 5.7 (suspension keeps attribution) | should |
 
 ### 3.2 Catalog
 
@@ -239,11 +219,11 @@ for 12 to carry as a contract and for Benjamin to confirm:
 
 ## 4. Drafted queries for the ten hardest
 
-Each query is drafted, not run, and a sketch, not code. Keys from other documents are guesses. Every fixture is a
-named `test_` graph that would sit under `explorations/erp-ontology/assets/`; none is written yet. A constraint
-query passes with zero rows only beside its companion query, which shows the fixture holds the rule's antecedent.
-CQ-P06 is written in the thin thread; slice 1 writes CQ-P02, P03 and P07. None of those four queries is drafted here. Literal `example.org` prefixes illustrate
-today's binding. Executable queries and fixtures take the local binding from the module.
+These queries are sketches, not code. Their base IRI is `https://example.org/inventory-import/`, not the `inv:`
+namespace, which names vocabulary terms. A relative IRI in angle brackets names a fixture individual under `<base>/fixture/<ClassKey>/<name>` ([report 14, section 4.1](14-thin-thread.md#41-iris-of-data)).
+A constraint query passes with zero rows only beside its companion query, which shows the fixture holds the rule's
+antecedent. [Report 14, section 5](14-thin-thread.md#5-the-question) specifies CQ-P06. Slice 1 writes CQ-P02, P03
+and P07. Executable queries and fixtures take the base from the module.
 
 ### CQ-P01: an organization that is both customer and vendor
 
@@ -258,7 +238,7 @@ record would wrongly return `test_SharedCo` (decision 34).
 PREFIX inv: <https://example.org/inventory-import/ontology/>
 # CQ-P01. Drafted, not run; sketch, not code.
 SELECT DISTINCT ?org WHERE {
-  VALUES ?tenant { inv:test_ExampleWorks }
+  VALUES ?tenant { <fixture/Tenant/test_ExampleWorks> }
   ?record a inv:SourceRecord ; inv:inTenant ?tenant ; inv:recordOf ?org ; inv:isCustomer true ; inv:isVendor true .
   ?org a inv:Organization .
 }
@@ -280,7 +260,7 @@ PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 # CQ-P04. Drafted, not run; sketch, not code. The latest decision of this tenant about a pair is the one in force.
 SELECT ?a ?b ?decider ?at ?evidence WHERE {
-  VALUES ?tenant { inv:test_ExampleWorks }
+  VALUES ?tenant { <fixture/Tenant/test_ExampleWorks> }
   ?decision a inv:IdentityDecision ; inv:inTenant ?tenant ;
             inv:decidesOn ?a , ?b ;
             inv:identityOutcome ?outcome ;
@@ -324,7 +304,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 # CQ-P08. Drafted, not run; sketch, not code. A grant covers its location and everything beneath it (pending Q8).
 # The scope kind is stated on the grant (06's grantScope); a location grant names its place with 08's atLocation.
 SELECT DISTINCT ?member WHERE {
-  VALUES (?site ?now) { (inv:test_SiteNorth "2026-11-01T12:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>) }
+  VALUES (?site ?now) { (<fixture/Site/test_SiteNorth> "2026-11-01T12:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>) }
   ?site inv:inTenant ?org .
   ?member a inv:Member ;
           inv:membershipIn ?org .
@@ -390,8 +370,8 @@ PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 # CQ-W03. Each kind uses the latest item-level position of one basis at each location that states that kind.
 SELECT ?kind ?unit (SUM(?value) AS ?quantity) WHERE {
-  VALUES (?tenant ?item ?site ?basisCode) { (inv:test_ExampleWorks inv:test_ItemFlour inv:test_SiteNorth "book") }
-  VALUES ?location { inv:test_BinN1 inv:test_BinN2 inv:test_SiteNorth }
+  VALUES (?tenant ?item ?site ?basisCode) { (<fixture/Tenant/test_ExampleWorks> <fixture/ItemSpecification/test_ItemFlour> <fixture/Site/test_SiteNorth> "book") }
+  VALUES ?location { <fixture/Bin/test_BinN1> <fixture/Bin/test_BinN2> <fixture/Site/test_SiteNorth> }
   ?basis skos:inScheme inv:PositionBasisScheme ; skos:notation ?basisCode .
   ?position a inv:StockPosition ; inv:inTenant ?tenant ; inv:positionBasis ?basis ;
             inv:forItem ?item ; inv:atLocation ?location ; inv:asOf ?at ; inv:hasMeasure ?measure .
@@ -427,7 +407,7 @@ PREFIX inv: <https://example.org/inventory-import/ontology/>
 SELECT ?lot ?unit (SUM(?signed) AS ?quantity) WHERE {
   {
     SELECT DISTINCT ?shippedAt ?pallet WHERE {
-      VALUES ?shipment { inv:test_Shipment1 }
+      VALUES ?shipment { <fixture/Shipment/test_Shipment1> }
       ?shipment inv:eventTime ?shippedAt ;
                 inv:observes ?line .
       ?line inv:involvesLogisticUnit ?pallet .
@@ -475,7 +455,7 @@ PREFIX inv: <https://example.org/inventory-import/ontology/>
 # CQ-E01. Drafted, not run; sketch, not code. Lot to lot through transformations only; a pallet joins a lot to a
 # shipment while CQ-W07's replay leaves a positive quantity of the lot on the pallet at shipment time.
 SELECT DISTINCT ?lot ?shipment ?customer WHERE {
-  VALUES ?questioned { inv:test_LotA }
+  VALUES ?questioned { <fixture/MaterialLot/test_LotA> }
   ?questioned inv:inTenant ?org ;
               (^inv:forLot/^inv:consumes/inv:produces/inv:forLot)* ?lot .
   ?lot inv:inTenant ?org .
@@ -522,7 +502,7 @@ and that order's counterparty (09). Must fail: with `test_T1`'s `consumes` line 
 PREFIX inv: <https://example.org/inventory-import/ontology/>
 # CQ-E02. Drafted, not run; sketch, not code. One or more steps back through transformations.
 SELECT DISTINCT ?inputLot ?receipt ?vendor WHERE {
-  VALUES ?finished { inv:test_LotG }
+  VALUES ?finished { <fixture/MaterialLot/test_LotG> }
   ?finished inv:inTenant ?org ;
             (^inv:forLot/^inv:produces/inv:consumes/inv:forLot)+ ?inputLot .
   ?inputLot inv:inTenant ?org .
@@ -704,7 +684,7 @@ report has them:
 | resultItem | result item | The item record a row outcome created, updated or found already there. | RowOutcome (09) | ItemSpecification (07) | `Import.read.ts` (`RowCreated`, `RowUpdated`, `RowAlready`); 09's `writesItem` joins a confirm to an item, not a row to one |
 | leftOutReason | left-out reason | The sentence, naming the column and the value, that says why a row was not imported. | RowOutcome (09) | datatype from the record field | `CLAUDE.md` ("Every row that is left out has a reason") |
 | recordedFromRow | recorded from row | The file row whose confirmation first created an item record. | ItemSpecification (07) | FileRow (09) | the `item` table (`importId`, `sourceRow`, `sourcePart`) |
-| recordOf | record of | The party, item or other thing a source record was captured about. | SourceRecord | none declared: any referent a tenant holds (kept broad) | The architecture seed 4.2; decision 34; CQ-P01 and CQ-I10 follow this link. Slice 1 admits `gist:isAbout` as its parent: `SourceRecord` falls under `gist:Content`. The projection copies no gist domain or range (decisions 13 and 16) |
+| recordOf | record of | The party, item or other thing a source record was captured about. | SourceRecord | A party in slice 1 (pending decision 12); CQ-I10 later needs other referents too | Decision 34; CQ-P01 and CQ-I10. The term model requires a named class or scheme as range ([report 14, section 6.4](14-thin-thread.md#64-gate-4-vocabulary-coherence), C8). Check both domain and range before admitting `gist:isAbout` as parent (decision 16) |
 | sourceSystem | source system | The external system a source record was read from. | SourceRecord | datatype from the record field | The architecture seed 4.2 |
 | sourceType | source type | The record type the external system gives a source record. | SourceRecord | datatype from the record field | The architecture seed 4.2 |
 | sourceId | source id | The opaque id the external system gives a source record, kept exactly as written. | SourceRecord | datatype from the record field | The architecture seed 4.2 |
@@ -722,7 +702,7 @@ fixture, closure contract or violation query must exist for the question to be t
 | CQ-P03 | 06 | 10 (contact purposes), 05 (identity of a person), 11 (Sutton Contact, `org:Membership`, FIBO Contact and schema.org `ContactPoint` alignment rows) |
 | CQ-P04 | 06 | 10 (identity verdicts), 12 |
 | CQ-P05 | 05 term model (identity criteria) | 11 (no `owl:sameAs` in alignments), 12 (`laws ontology-terms`) |
-| CQ-P06 | 06 (thin thread) | 10 (member roles and organization scope), 12 (role lift and one person in two tenants) |
+| CQ-P06 | [14, section 5](14-thin-thread.md#5-the-question) | 14, section 4 (where the answer comes from) |
 | CQ-P07 | 06 | 12 |
 | CQ-P08 | 06 | 08 (location hierarchy), 12 |
 | CQ-P09 | 06 | 05 (tenancy on every record term), 12 |

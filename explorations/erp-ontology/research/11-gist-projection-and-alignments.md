@@ -1,7 +1,7 @@
 ---
 type: Research
 title: The gist projection and the alignments
-description: Which gist 14.1.0 names the vocabulary takes and leaves, and the alignment rows to other vocabularies.
+description: Which gist 14.1.0 names the vocabulary takes and leaves, and the alignment rows to other vocabularies. The thin thread's gist names follow report 14.
 ---
 
 # The gist projection and the alignments
@@ -12,9 +12,12 @@ alignment rows from `inv:` terms to other vocabularies. Every subject below is a
 round, written as its likely Key (04 requirements, 05 term-model, 06 party-and-access, 07 catalog-and-value,
 08 warehouse-and-stock, 09 commitment-and-event, 10 taxonomies, 12 projection-and-checks). Where that document chooses
 another Key or another parent, its choice wins and the row here follows it: on 2026-11-22 every subject and placement
-below was matched to the owners' keys (report 13). Answered choices are decisions 13, 14, 15 and 16 (this report's Q3,
-Q4, Q1 and Q2), and 8, 34, 38, 39, 40, 41, 43, 46, 93, 94 and 96 where they change a parent, a flag, an alignment or
-what the thin thread admits. Open choices stay
+below was matched to the owners' keys (report 13). The thin thread is specified in
+[report 14](14-thin-thread.md). Where this file and that report disagree about the thread, report 14 holds; what this
+file says about later slices stays. Answered choices are decisions 13, 14, 15 and 16 (this report's Q3,
+Q4, Q1 and Q2), and 8, 34, 38, 39, 40, 41, 43, 46, 93, 94, 96 and 97 where they change a parent, a flag, an alignment or
+what the thin thread admits. Decisions 24, 98, 99, 100 and 101 are answered too, and are cited where a row touches a
+version, a mark, an enrolment or a scheme's concepts. Open choices stay
 numbered decisions in [DECISIONS.md](../DECISIONS.md), mapped from each remaining Qn under "Questions for Benjamin".
 
 The vocabulary module, the projector and the generated Turtle do not exist. TypeScript and Turtle below are sketches,
@@ -76,60 +79,69 @@ These are facts for the owners of `_shared/`, not edits made here:
 ### The rules
 
 1. **Names and links only.** The projection copies a gist class's IRI, `skos:prefLabel`, `skos:definition` (decision 11)
-   and its named gist parents, and a gist property's IRI, label, definition and named parent property (decision 16). It
+   and its named gist parents, and a gist property's IRI, label, definition and named parent property (decision 16).
+   The thin thread does not copy those labels or definitions, and it takes no gist property: [report 14](14-thin-thread.md)
+   section 2.5 writes each gist class it admits as `owl:Class` with its `rdfs:subClassOf` link and nothing else, and
+   section 2.2 states that no property has a super-property. The projection
    copies no `owl:equivalentClass`, no restriction, no `owl:inverseOf` (gist has 18, all inside restrictions), no property
    characteristic and no `rdfs:domain` or `rdfs:range`. An `inv:` property may be a sub-property of a gist property only
    where its own domain and range fall under that gist property's (decision 16). gist's `owl:disjointWith` is copied only
    for pairs whose two classes the projection has already admitted, and the set grows as classes are admitted (decision
-   15). Section D's 24 pairs are that set for the whole design of reports 04 to 12.
+   15). Section D's 24 pairs are that set for the whole design (decision 15, the design of reports 04 to 12). The thread
+   copies three of them (report 14, section 2.1).
 2. **The original IRIs stay.** A projected class is `gist:Organization`, not a local copy. Our terms are
    `rdfs:subClassOf` it in the vocabulary module, and the generated OWL declares only the projected names, so the
    reasoner never loads gist whole. This is the architecture seed's resolution (its section 4.3) and follows decision 4.
 3. **Closed upward** (decision 14). A projected class brings each named gist ancestor it has, as names and links only,
    so no generated `rdfs:subClassOf` points at an undeclared class. Under decision 13 an ancestor enters with the gist
-   name that needs it, not before. Ancestors taken only for this are marked "link".
+   name that needs it, not before. Ancestors taken only for this are marked "link". Where gist states a parent as a
+   named operand of an `owl:equivalentClass` intersection, the projection writes that operand as a plain
+   `rdfs:subClassOf` and copies nothing else of the intersection (report 14, section 2.5 follows this for the thread).
+   A parent stated only inside an `rdfs:subClassOf` intersection is still a parent, as the
+   `gist:GeoRegion` note above says.
 4. **One gist parent per local top class** (`gist-categories.md`). A local class with two plausible gist parents is a
-   question for its owner document, not a second link.
+   question for its owner document, not a second link. A class may have no gist parent when its reason is on a short
+   committed list the gate compares against (decision 97). The thread's one entry is `Role` (report 14, section 2.1).
 5. **Only what a record, a seed or a public Sutton document needs, and only in the slice that builds the term**
    (decision 13). Each row says which. A gist name is added to `gist-categories.md` when that slice admits it. Not all
-   of table B at once. The thin thread (decision 8) is the first deliverable, before the party slice. Its terms are
-   `Organization`, `Tenant` (a role class under `Organization`; `membershipIn` ranges over it, decision 38), `Person`
-   (under `gist:Person`, one link `membershipOf` from `Member` to the person, no name or email paths, decisions 93 and
-   94), `Member`, `Role` (no gist parent, and no `permits`, decisions 13 and 41), `Grant` (`grantedTo`, `grantsRole`,
-   `grantScope`), `AuditEntry` (alternative label "Activity", decision 46; the page and the record keep their name),
-   and the schemes `MemberRoleScheme` (viewer, editor, admin) and `GrantScopeKindScheme` (the one concept organization,
-   decision 96). Their gist parents and those parents' ancestors come with them (decisions 13 and 14). The gist classes
+   of table B at once. The thin thread's terms, properties, marks, lift and question are
+   [report 14](14-thin-thread.md), section 2 and the sections it points at. The gist classes that deliverable admits
    are `gist:Organization`, `gist:Person`, `gist:LivingThing`, `gist:PhysicalIdentifiableItem`, `gist:Content`,
-   `gist:TemporalRelation` and `gist:Assignment`. `LivingThing` and `PhysicalIdentifiableItem` enter only as ancestors
-   of `Person`. `Assignment`'s parent is `TemporalRelation`, which `Member` already needs. `Tenant` adds no gist class.
+   `gist:TemporalRelation` and `gist:Assignment` (report 14, section 2.5). `LivingThing` and
+   `PhysicalIdentifiableItem` enter only as ancestors of `Person`. `Assignment`'s parent is `TemporalRelation`, which
+   `Member` already needs. `Tenant` adds no gist class. `Role` has no gist parent (decision 97), and `gist:Permission`
+   waits until `permits` exists (decisions 13 and 41). No gist property is taken in the thread (report 14, section 2.2).
 6. **A parent is `rdfs:subClassOf` and nothing else.** No other vocabulary is ever a parent (decision 4); see (b).
 
-This value is the `gist` field of 05's `Vocabulary` (section 4.6), whose type is this `GistProjection`. The projector
-reads that field from its one vocabulary input (`project`'s `vocabulary`, report 12). It is not a side list outside
-`project()`'s input. Sketch, not code:
+The thin thread's gist value is the `gist` field of the vocabulary module ([report 14](14-thin-thread.md), section 2.6).
+The projector reads that field from its one vocabulary input. It is not a side list outside that input. Later slices add
+classes and properties from the tables below. The "link" mark in those tables is not a field of the thread's value: an
+ancestor is a class on the list (report 14, section 2.5). Sketch of the thread's value, not code:
 
 ```ts
-// sketch, not code: Vocabulary.gist in 05 section 4.6, the value project() reads
-export const GistProjection = {
-  source: { release: "14.1.0", file: "ontologies/gistCore.ttl", sha256: "0d8230f3...cce08b1" },
-  // thin thread (decisions 8, 13, 14 and 94): these seven classes, and no gist property. The property pair shows the shape only.
+// sketch, not code: the thin thread's gist field (report 14, section 2.6)
+export const gist = {
+  version: "14.1.0",
+  namespace: "https://w3id.org/semanticarts/ns/ontology/gist/",
   classes: {
-    Organization: { parents: [] },
-    Person: { parents: ["LivingThing"] },
-    LivingThing: { parents: ["PhysicalIdentifiableItem"], link: true },
-    PhysicalIdentifiableItem: { parents: [], link: true },
-    Content: { parents: [] },
-    TemporalRelation: { parents: [] },
-    Assignment: { parents: ["TemporalRelation"] },
+    Organization: {},
+    Person: { parent: "LivingThing" },
+    LivingThing: { parent: "PhysicalIdentifiableItem" },
+    PhysicalIdentifiableItem: {},
+    Content: {},
+    TemporalRelation: {},
+    Assignment: { parent: "TemporalRelation" },
   },
-  properties: { hasParty: { parent: "hasParticipant" }, hasParticipant: { parent: null, link: true } },
-  disjoint: [
+  disjointPairs: [
     ["Organization", "Content"],
     ["Organization", "PhysicalIdentifiableItem"],
     ["PhysicalIdentifiableItem", "Content"],
-  ], // decision 15: three pairs in the thin thread; 24 for the whole design
+  ],
 } as const
 ```
+
+That `version` is gist's release. The ontology's own version is a semantic version string written in the module, never
+taken from the clock: `0.1.0` for the thread, staying `0.y` until publication (decision 24; report 14, section 8).
 
 ### A. Classes `gist-categories.md` lists
 
@@ -141,12 +153,12 @@ term under it, and decision 13 admits the gist name when the slice that builds t
 | gist class | gist parent (14.1.0) | Status | Why the projection needs it | `inv:` terms under it (owner) |
 | --- | --- | --- | --- | --- |
 | `gist:Organization` | none | thin thread | Decision 3, amended by 34: a Sutton Account is the organization itself. Decision 38: `Tenant` is a role class under `Organization`, keyed by the organization id (`packages/kernel/src/Member.schema.ts`, `organizationId`); `membershipIn` ranges over `Tenant`. Customer and vendor flags are not on this class | `Organization` (06, thin thread). `Tenant` specializes `Organization`, not this gist class (decision 38) |
-| `gist:Person` | `gist:LivingThing` | thin thread | Decision 94: the human a membership links to, in the thin thread, by `membershipOf`, with no name or email paths (decision 93). A contact at another organization waits for the party slice. `packages/access/contract/src/People/Person.read.ts` is a membership view; its pointer is `inv:Member`, not evidence for typing that record `gist:Person` | `Person` (06, thin thread) |
+| `gist:Person` | `gist:LivingThing` | thin thread | Decision 94: the human a membership links to, in the thin thread. The link and the fixture are report 14, sections 2.2 and 5. A contact at another organization waits for the party slice. The People page's record is a view of a membership, enrolled as `inv:Member` (decision 99; report 14, section 3.6), not evidence for typing that record `gist:Person`. Its `email` and `joinedAt` are `noTerm`, reason deferred, naming the party slice (decision 100) | `Person` (06, thin thread) |
 | `gist:LivingThing` | `gist:PhysicalIdentifiableItem` | link (decision 14), thin thread | Person's parent; enters with `Person` in the thin thread (decisions 14 and 94) | none |
 | `gist:PhysicalIdentifiableItem` | none | thin thread | Enters with `Person` as an ancestor (decisions 14 and 94). Countable physical things, apart from their records, come later (report 01 section 1) | `SerialUnit`, `Container`, `LogisticUnit` (08). `Person` is under `gist:Person`, not directly under this class |
 | `gist:Equipment` | `gist:PhysicalIdentifiableItem` | taken | A machine is not a work center or a bin (architecture seed section 5.4) | `Machine` (08, Sutton only) |
 | `gist:PhysicalSubstance` | none | taken | An amount of material (250 kg of flour), the mass reading of a lot | `MaterialLot`, `InventoryLabel` (08, pending decisions 70 and 71) |
-| `gist:Intention` | none | taken | Parent of Agreement, Commitment and Specification; also the domain of 09's `lineOf` and `counterparty`. `gist:Permission` brings it as an ancestor only if the party slice takes `permits` (decisions 13 and 41); `gist:Restriction` only if a slice takes `QualityHold` (decision 77, open) | none directly: `QualityHold` sits under `gist:Restriction` (table B, pending decision 77) |
+| `gist:Intention` | none | taken | Parent of Agreement, Commitment and Specification; also the domain of 09's `lineOf` and `counterparty`. `gist:Permission` brings it as an ancestor only if the party slice takes `permits` (decisions 13 and 41). The thread does not: `Role` is decision 97's exception. `gist:Restriction` only if a slice takes `QualityHold` (decision 77, open) | none directly: `QualityHold` sits under `gist:Restriction` (table B, pending decision 77) |
 | `gist:Agreement` | `gist:Intention` | taken | An order accepted by both parties binds two (`gist-categories.md` leaves the stage of an order to Benjamin) | `SalesOrder`, `PurchaseOrder` (09, pending decision 80) |
 | `gist:Commitment` | `gist:Intention` | taken | Orders, reservations: a promise by one party (architecture seed section 2.1: an order is not its execution) | `ManufacturingOrder`, `WorkOrder`, `TransferOrder`, `CommitmentLine` (09); `InventoryReservation` (08) |
 | `gist:ContingentObligation` | `gist:Commitment` | link (decision 14) | Offer's parent; enters with `Offer`, not in the thin thread | none |
@@ -159,10 +171,10 @@ term under it, and decision 13 admits the gist name when the slice that builds t
 | `gist:Transaction` | `gist:Event` | taken | A receipt and a shipment move goods between parties | `Receipt`, `Shipment` (09) |
 | `gist:Determination` | `gist:Event` | taken | An event that settles a result: a count, an inspection, two records found to be one party | `StockCount` (08), `QualityInspection` (09); `IdentityDecision` (06) |
 | `gist:GeoLocation` | none | taken (pending Q5) | gist 14.1.0 has no place-of-business class; a site, a warehouse and a bin are places | `Location` (08), and `Site`, `Warehouse`, `Bin` through it |
-| `gist:Content` | none | thin thread | Records as against their referents (report 01 section 1). The thread uses it for `AuditEntry` only (alternative label "Activity", decision 46; the page and the record keep their name). The Member record's name, organization name and sign-in email are `noTerm` with reason screen in the thread, not content of the membership (decision 93) | `AuditEntry` (06, thin thread, from `packages/kernel/src/Activity.schema.ts`); later: `SignInAccount` (06); `StockPosition` (08); `RowOutcome`, `ValueChange`, `FileRow` (09); `BomExpansion`, `CostObservation` (07); `SourceRecord` (04); `InventoryMeasure` (08, pending decision 74) |
+| `gist:Content` | none | thin thread | Records as against their referents (report 01 section 1). The thread uses it for `AuditEntry` only (alternative label "Activity", decision 46; the page and the record keep their name; field marks in report 14, section 3.5, decision 98). The kernel `Member`'s two copied names are `noTerm`, reason screen, and that record has no email field (report 14, section 3.3; decision 93) | `AuditEntry` (06, thin thread, from `packages/kernel/src/Activity.schema.ts`); later: `SignInAccount` (06); `StockPosition` (08); `RowOutcome`, `ValueChange`, `FileRow` (09); `BomExpansion`, `CostObservation` (07); `SourceRecord` (04); `InventoryMeasure` (08, pending decision 74) |
 | `gist:Address` | `gist:Content` | link (decision 14) | Parent of the two address classes; enters with them in the party slice, not in the thin thread | none |
 | `gist:PhysicalAddress` | `gist:Address` | taken | A ship-to or billing address is not the customer (report 01 section 3) | `PostalAddress` (06) |
-| `gist:ElectronicAddress` | `gist:Address` | taken | A contact email, and in the party slice the sign-in email (`AccountEmail` in `packages/access/contract/src/Session/SessionState.read.ts`). In the thin thread that email on the Member record is `noTerm` with reason screen (decision 93), so this class is not admitted there | `ContactPoint` (06) |
+| `gist:ElectronicAddress` | `gist:Address` | taken | A contact email, and in the party slice the sign-in email (`AccountEmail` in `packages/access/contract/src/Session/SessionState.read.ts`). Not admitted in the thin thread: the kernel `Member` has no email field (report 14, section 3.3), and the People page's `email` is `noTerm`, reason deferred, naming the party slice (decision 100) | `ContactPoint` (06) |
 | `gist:ID` | `gist:Content` | taken | Identifiers are not identity (architecture seed section 4.2): SKU, vendor SKU, lot code, label ID | `PartyIdentifier` (06); `ItemIdentifier` (07); `TrackingCode` (08) |
 | `gist:Magnitude` | none | taken | A quantity is a number with its unit (glossary, "Quantity with its unit") | `QuantityValue`, `MoneyAmount` (07) |
 | `gist:ReferenceValue` | `gist:Magnitude` | not taken | A reorder point is set, not measured, but 07 has no term for its value: `reorderPoint` points at a `QuantityValue`; one line to add if a term is made | none |
@@ -183,8 +195,8 @@ term under it, and decision 13 admits the gist name when the slice that builds t
 Decision 13 admits a gist name only when a term in the slice being built needs it, and the name is added to
 `gist-categories.md` then. Not all twelve rows at once. From this table the thin thread admits `gist:TemporalRelation`
 and `gist:Assignment`. It also admits table A's `gist:Organization`, `gist:Person`, `gist:LivingThing`,
-`gist:PhysicalIdentifiableItem` and `gist:Content` (decisions 14 and 94). It does not admit `gist:Permission`
-(decisions 13 and 41). The other rows wait for the slice that
+`gist:PhysicalIdentifiableItem` and `gist:Content` (decisions 14 and 94; report 14, section 2.5). It does not admit
+`gist:Permission` (decisions 13, 41 and 97). The other rows wait for the slice that
 builds their term. Decision 13 does not decide 67 or 77. The last column is when the name is admitted, not a fallback
 for a refused block.
 
@@ -193,10 +205,10 @@ for a refused block.
 | `gist:Template` | none | link: TaskTemplate's parent (decision 14) | none | with `gist:TaskTemplate`, when the catalog slice builds `Routing` |
 | `gist:TaskTemplate` | `gist:Template` | The architecture seed places routing templates here; gist's note: a task links to its template by `gist:isBasedOn`. `gist:TaskTemplate` is not a `gist:Specification`, so 07 defines these as templates and its version, output and sequence properties declare no domain | `Routing`, `RoutingRevision`, `OperationDefinition` (07) | the catalog slice that builds those terms. Not the thin thread |
 | `gist:Task` | `gist:Event` | Work proposed, planned, underway or done; the seed's `OperationExecution`; Sutton's work orders, one per routing step [S-mo] | `OperationExecution` (09); `WorkOrder` only under decision 80's other answers (pending decision 80) | the slice that builds `OperationExecution`. Not the thin thread |
-| `gist:Permission` | `gist:Intention` | "A description of things one is permitted to do" | `Permission`, `PortalAccess` (06), and `Role` only once it carries `permits` | the party slice, not the thin thread. The thread ships `Role` with no gist parent and no `permits` (decisions 13 and 41). `Role`'s one identity criterion is the concept's: its scheme and its notation |
+| `gist:Permission` | `gist:Intention` | "A description of things one is permitted to do" | `Permission`, `PortalAccess` (06), and `Role` only once it carries `permits` | the party slice, not the thin thread. The thread ships `Role` with no gist parent (decision 97) and no `permits` (decisions 13 and 41). The exception's reason and the list are report 14, section 2.1 |
 | `gist:Restriction` | `gist:Intention` | "A description of things one is prevented from doing": a quality hold keeps stock from being used (08); defined through `gist:prevents`, which 14.1.0 deprecates for `gist:prohibits`, and the projection copies the name and parent only | `QualityHold` (08, pending decision 77) | only if the slice that builds `QualityHold` takes it. Decision 13 does not decide 77 |
-| `gist:TemporalRelation` | none | A relationship existing for a period: a person's membership of a `Tenant` (`membershipIn` ranges over that role class, decision 38); also Assignment's parent | `Member` (06, thin thread), linked to one `Person` by `membershipOf` (decision 94) | the thin thread (decisions 8 and 13) |
-| `gist:Assignment` | `gist:TemporalRelation` | A relationship between an assignee, what is assigned and who assigned it, for a period | `Grant` (06, thin thread): `grantedTo`, `grantsRole` and `grantScope` (decision 96), at the one scope organization. `ContactAssignment` (06) uses the same parent in the party slice (decisions 39 and 43), not in the thread | the thin thread, for `Grant` (decisions 8 and 13). Its ancestor `TemporalRelation` is already admitted for `Member` (decision 14) |
+| `gist:TemporalRelation` | none | A relationship existing for a period: a person's membership of a `Tenant` (`membershipIn` ranges over that role class, decision 38); also Assignment's parent | `Member` (06, thin thread; report 14, section 2.1) | the thin thread (decisions 8 and 13) |
+| `gist:Assignment` | `gist:TemporalRelation` | A relationship between an assignee, what is assigned and who assigned it, for a period | `Grant` (06, thin thread; report 14, section 2.1). `ContactAssignment` (06) uses the same parent in the party slice (decisions 39 and 43), not in the thread | the thin thread, for `Grant` (decisions 8 and 13). Its ancestor `TemporalRelation` is already admitted for `Member` (decision 14) |
 | `gist:PhysicalEvent` | `gist:Event` | An event at a place: the EPCIS views have a read point and a business location | `TransformationEvent`, `AggregationEvent`, `DisaggregationEvent`, `ObjectObservation` (09) | the slice that builds those events. Not the thin thread |
 | `gist:ContentExpression` | `gist:Content` | link: FormattedContent's parent (decision 14) | none | with `gist:FormattedContent` |
 | `gist:FormattedContent` | `gist:ContentExpression` | Content encoded in a format: the uploaded .csv or .xlsx (`packages/catalog/contract/src/Staging/Staged.read.ts`) | `StagedFile` (09) | the slice that builds `StagedFile`. Not the thin thread |
@@ -245,7 +257,7 @@ a reasoner check); a label record typed as the lot it describes; a quantity type
 an organization typed as content, a record typed as an organization, a person typed as an organization, and a person
 typed as a record: `Organization` with `Content`, and `PhysicalIdentifiableItem` (Person's ancestor) with both
 `Organization` and `Content` (decisions 15 and 94). The organization-and-content pair is the one decision 34 relies on,
-and `SourceRecord` itself is the party slice, not the thread. What the 24 do not catch: `gist:Event` is disjoint with
+and `SourceRecord` itself is the party slice, not the thread. The thread states no pair between `inv:` classes, so the person-and-organization check is the copied gist pair only (report 14, sections 2.1 and 6.9). What the 24 do not catch: `gist:Event` is disjoint with
 neither `gist:Content` nor `gist:Intention`, and `gist:GeoLocation` with nothing, so a record typed as its event, an
 order typed as its execution, or a bin typed as its operator passes unless the vocabulary module states that
 disjointness itself (05's and 12's call).
@@ -256,7 +268,8 @@ gist properties a term document may put its own properties under (`rdfs:subPrope
 gist states no domain or range on most of them; the projection copies none (decision 16). An `inv:` property is a
 sub-property of a gist one only where its own domain and range fall under the gist property's. Properties in
 `gist-categories.md`'s list are marked "listed". A name that list does not have is admitted when the slice that uses
-it is built (decision 13), not as a block. None of the unlisted properties below is in the thin thread.
+it is built (decision 13), not as a block. No gist property, listed or not, is taken in the thin thread (report 14,
+section 2.2).
 
 | gist property | gist parent | In the list | Why | `inv:` properties under it, or used for (owner) |
 | --- | --- | --- | --- | --- |
@@ -283,15 +296,15 @@ it is built (decision 13), not as a block. None of the unlisted properties below
 | `gist:isProducedBy` | none | decision 13, with the commitment slice | An output lot to the transformation that made it | (09) |
 | `gist:requires` | none | decision 13, with the catalog slice | A BOM line to its component | (07) |
 | `gist:precedes` | none | decision 13, with the catalog slice | Routing step order | (07) |
-| `gist:name`, `gist:description` | none | `name` listed; `description` with the catalog slice (decision 13) | An item's name and description (`Item.read.ts`), an organization's name | not linked: 06 uses `gist:name` itself, not a second `inv:name`, and 07's item name is that property. 07's `description` states no parent, so this row does not put it under `gist:description`. In the thin thread the Member record's person name, organization name and sign-in email are `noTerm` with reason screen (decision 93): those fields are not `gist:name`, and only the role field is lifted, to its `Grant` (decision 40). Every field of a pointed record carries a pointer or `noTerm` with a reason, and the shapes are closed (decision 22). Decision 94 puts `Person` in the thread by `membershipOf`, with no name or email path, so the name stays out. The party slice adds the name through the person and the email through the sign-in account |
+| `gist:name`, `gist:description` | none | `name` listed; `description` with the catalog slice (decision 13) | An item's name and description (`Item.read.ts`), an organization's name | not linked: 06 uses `gist:name` itself, not a second `inv:name`, and 07's item name is that property. 07's `description` states no parent, so this row does not put it under `gist:description`. In the thin thread the kernel `Member`'s `name` and `organizationName` are `noTerm`, reason screen, and are not `gist:name` (decision 93); that record has no email field (report 14, section 3.3). The role lift is report 14, section 4 (decision 40). Every field of a pointed record carries a pointer or `noTerm` with a reason (decision 22); deferred, naming the slice, is a sixth reason (decision 98). Decision 94's `membershipOf` carries no name path. The People page's `email` and `joinedAt` are `noTerm`, reason deferred, naming the party slice (decision 100). The party slice adds the person's name through the person and the organization's name through the tenant |
 | `gist:atDateTime` | none | decision 13, with the commitment slice | When an event occurred (EPCIS `eventTime`) | 09's `eventTime` is `rdfs:subPropertyOf` `gist:atDateTime` (decisions 16 and 13). A parent link in this projection, not a mapping |
 | `gist:startDateTime`, `gist:endDateTime` | `gist:atDateTime` | decision 13, with `gist:atDateTime`; link (decision 14) | link | none |
 | `gist:plannedStartDateTime`, `gist:actualStartDateTime` | `gist:startDateTime` | listed | Planned and actual start | (09) |
 | `gist:plannedEndDateTime`, `gist:actualEndDateTime` | `gist:endDateTime` | decision 13, with the commitment slice | Planned and actual end | (09) |
-| `gist:isRecordedAt` | `gist:atDateTime` | decision 13, with the commitment slice | When a record was written, apart from when the event happened (EPCIS `recordTime`) | 09's `recordTime` is `rdfs:subPropertyOf` `gist:isRecordedAt` (decisions 16 and 13). A parent link in this projection, not a mapping |
+| `gist:isRecordedAt` | `gist:atDateTime` | decision 13, with the commitment slice | When a record was written, apart from when the event happened (EPCIS `recordTime`). Not the thread's `recordedAt`, which has no gist parent (decision 98; report 14, section 2.2) | 09's `recordTime` is `rdfs:subPropertyOf` `gist:isRecordedAt` (decisions 16 and 13). A parent link in this projection, not a mapping |
 | `gist:sequence` | none | decision 13, with the slice that builds the line or the routing | A line's position in an order or a routing | (09, 07) |
-| `gist:allows` | none | not in the thin thread (decisions 13 and 41) | What a role permits, once `permits` exists | (06). The thread ships `Role` without `permits`, so this property waits for the party slice |
-| `gist:isAssignmentOf`, `gist:isAssignmentTo` | none | decision 13, with the party slice | A membership's person and organization. `Person` is in the thin thread (decision 94): `membershipOf` links `Member` to the person, with no name or email paths (decision 93), and `membershipIn` ranges over `Tenant` (decision 38). Those two links are 06's properties, not these gist properties, so these stay with the party slice | (06) |
+| `gist:allows` | none | not in the thin thread (decisions 13, 41 and 97) | What a role permits, once `permits` exists | (06). The thread ships `Role` without `permits` and without this parent (decision 97; report 14, section 2.1), so this property waits for the party slice |
+| `gist:isAssignmentOf`, `gist:isAssignmentTo` | none | decision 13, with the party slice | A membership's person and organization. Not the thin thread's properties: `membershipOf` and `membershipIn` are 06's own (decisions 94 and 38; report 14, section 2.2). The kernel `Member` has no email field (report 14, section 3.3). These gist properties stay with the party slice | (06) |
 
 Not taken, with the reason: `gist:hasBroader`, `gist:hasDirectBroader`, `gist:hasUniqueBroader`,
 `gist:hasNavigationalParent` (SKOS `broader` does it, in 10); `gist:owns` and `gist:uniqueText` (listed in
@@ -321,7 +334,7 @@ Each was searched for as a subject in gistCore.ttl and found absent.
 | --- | --- | --- |
 | `Party` | Nothing: no common parent of `gist:Person` and `gist:Organization` (Person is under PhysicalIdentifiableItem, Organization has no parent, and with Q1 they are disjoint). A local `Party` would have "none: gist has no party class" as its gist parent | 06 |
 | `Agent`, `SoftwareAgent` (the assistant acting for a person, `AgentRun.schema.ts`) | Nothing. `prov:SoftwareAgent` is an alignment target only | 06 |
-| `Role`, `Position` | Nothing as a class. `gist:Permission` fits a role (table B) but is not admitted in the thin thread: `Role` has no gist parent there and no `permits` (decisions 13 and 41). One identity criterion, the concept's: its scheme and its notation. The individuals are 10's `MemberRoleScheme` concepts (viewer, editor, admin) under the same IRI | 06, 10 |
+| `Role`, `Position` | Nothing as a class. `gist:Permission` fits a role (table B) but is not admitted in the thin thread: `Role` has no gist parent there (decision 97) and no `permits` (decisions 13 and 41). The exception is report 14, section 2.1. The individuals are 10's `MemberRoleScheme` concepts under the same IRI (decision 41). Decision 101: the ruling on that scheme covers the concepts its proposal lists | 06, 10 |
 | `Place`, `Location`, `Site`, `Facility`, `Warehouse` | `gist:GeoLocation` (pending Q5); `gist:Building` is deprecated | 08, Q5 |
 | `Lot`, `Batch` | `gist:PhysicalSubstance` or `gist:Collection` | 08 |
 | `Order`, `OrderLine`, `Obligation` | `gist:Commitment` (a line is a commitment too); `gist:Agreement` | 09 |
@@ -339,6 +352,8 @@ Each was searched for as a subject in gistCore.ttl and found absent.
 ## (b) The alignments
 
 ### The rules
+
+The thin thread ships no alignment and no SSSOM file (report 14, sections 1.3 and 1.4). The rows below are later slices.
 
 - **The predicates.** `skos:exactMatch`, `skos:closeMatch`, `skos:broadMatch`, `skos:narrowMatch`, `skos:relatedMatch`,
   read from the subject: `A skos:broadMatch B` says B is broader than A. A class's gist parent is `rdfs:subClassOf` and
@@ -411,7 +426,7 @@ Confidence is the designer's estimate that a reviewer keeps the row as written, 
 | `inv:Organization` | `skos:closeMatch` | `prov:Organization` | A social or legal institution, a `prov:Agent`: used when an organization is the agent of an import | fetched [PROV] | 0.7 |
 | `inv:Organization` | `skos:closeMatch` | `gs1:Organization` | GS1's is identified by a GLN; no record here has one | fetched [GS1] | 0.5 |
 | `inv:Organization` | `skos:relatedMatch` | Sutton "Account" (pending Q6) | Sutton's Account is the organization (decisions 3 and 34); what a tenant imports is 04's `SourceRecord` of it, linked by `recordOf`. The customer and vendor flags sit on that record, and CQ-P01 reads them there, not on the shared organization. Different categories, so related, not close. The Sutton target stays the Account | fetched [S-accounts] | 0.7 |
-| `inv:Person` | `rdfs:subClassOf` | `gist:Person` | A human being who is or was alive. In the thin thread (decision 94), reached by `membershipOf`, with no name or email paths (decision 93). Ancestors `gist:LivingThing` and `gist:PhysicalIdentifiableItem` come with it (decision 14) | fetched [gist] | 0.95 |
+| `inv:Person` | `rdfs:subClassOf` | `gist:Person` | A human being who is or was alive. In the thin thread (decision 94). The link is report 14, section 2.2. Ancestors `gist:LivingThing` and `gist:PhysicalIdentifiableItem` come with it (decision 14; report 14, section 2.5) | fetched [gist] | 0.95 |
 | `inv:Person` | `skos:broadMatch` | `schema:Person` | schema.org's includes fictional and undead persons | fetched [SDO] | 0.8 |
 | `inv:Person` | `skos:closeMatch` | `prov:Person` | A person as an agent | fetched [PROV] | 0.8 |
 | `inv:Person` | `skos:closeMatch` | `iof-constr:Person` | An organism of the species; a BFO object | fetched [IOF] | 0.8 |
@@ -430,15 +445,15 @@ Confidence is the designer's estimate that a reviewer keeps the row as written, 
 | `inv:PartyIdentifier` | `skos:broadMatch` | `cmns-id:Identifier` | Commons' identifier of anything | fetched [CMNS] | 0.7 |
 | `inv:PartyIdentifier` | `skos:narrowMatch` | `iof-constr:OrganizationIdentifier` | IOF's identifies organizations only; ours also persons | fetched [IOF] | 0.7 |
 | `inv:PartyIdentifier` | `skos:relatedMatch` | `schema:PropertyValue` | schema.org writes a scheme-qualified identifier as a property value | fetched [SDO] | 0.4 |
-| `inv:Member` | `rdfs:subClassOf` | `gist:TemporalRelation` | Thin thread (decisions 8 and 13): a person's membership of a `Tenant` for a period. `membershipIn` ranges over `Tenant` (decision 38) and `membershipOf` links the one person (decision 94). The role is on `Grant`, not on this class (`Member.schema.ts`). Every field of the pointed record carries a pointer or `noTerm` with a reason (decision 22): the name, organization name and sign-in email are `noTerm` with reason screen (decision 93), and the role field is lifted | fetched [gist] | 0.6 |
-| `inv:Member` | `skos:closeMatch` | `org:Membership` | Member supplies the relationship between one `Person` and one `Tenant` (decisions 94 and 38). `Grant` supplies role and scope (decisions 40 and 96). `member.role` (`Member.schema.ts`) is one grant at organization scope, not a second direct ontology role. ORG's Membership is an agent, an organization and a role | fetched [ORG] | 0.8 |
+| `inv:Member` | `rdfs:subClassOf` | `gist:TemporalRelation` | Thin thread (decisions 8 and 13): a person's membership of a `Tenant` for a period. `membershipIn` ranges over `Tenant` (decision 38). The link to the person, the lift of the role and the field marks are report 14, sections 2.2, 3.3 and 4. The kernel record has no email field; its two copied names are `noTerm`, reason screen (decision 93; report 14, section 3.3) | fetched [gist] | 0.6 |
+| `inv:Member` | `skos:closeMatch` | `org:Membership` | Member supplies the relationship between one `Person` and one `Tenant` (decisions 94 and 38). `Grant` supplies role and scope (decisions 40 and 96; report 14, section 4). ORG's Membership is an agent, an organization and a role | fetched [ORG] | 0.8 |
 | `inv:Member` | `skos:closeMatch` | `cmns-org:Membership` | A situation in which an organization has a member | fetched [CMNS] | 0.6 |
-| `inv:Grant` | `rdfs:subClassOf` | `gist:Assignment` | Thin thread (decisions 8, 13, 40 and 96): an assignee (the member), the role assigned, and the scope. The thread's `Grant` carries `grantedTo`, `grantsRole` and `grantScope`. `GrantScopeKindScheme` has the one concept organization; other scopes wait for the slice that needs them. The lift is from `member.role` to this grant | fetched [gist] | 0.6 |
-| `inv:Permission`, `inv:PortalAccess` | `rdfs:subClassOf` | `gist:Permission` | Party slice, not the thin thread (decisions 13 and 41): descriptions of what one may do. `Role` has no gist parent in the thread and no `permits`; its one identity criterion is the concept's scheme and notation | fetched [gist] | 0.6 |
-| `inv:Grant` | `skos:relatedMatch` | `org:Membership` | `Grant` supplies the role and the scope, which may be narrower than an organization (a site, a field) (decision 40). The thin thread ships only the organization concept of `GrantScopeKindScheme` (decision 96). `member.role` is evidence for this grant, not a second role triple on Member | fetched [ORG] | 0.5 |
+| `inv:Grant` | `rdfs:subClassOf` | `gist:Assignment` | Thin thread (decisions 8 and 13): parent of `Grant`. The grant's properties, the one scope concept and the lift are report 14, sections 2.2 and 4 (decisions 40 and 96) | fetched [gist] | 0.6 |
+| `inv:Permission`, `inv:PortalAccess` | `rdfs:subClassOf` | `gist:Permission` | Party slice, not the thin thread (decisions 13, 41 and 97): descriptions of what one may do. `Role` is on the committed no-parent list until `permits` exists (report 14, section 2.1) | fetched [gist] | 0.6 |
+| `inv:Grant` | `skos:relatedMatch` | `org:Membership` | `Grant` supplies the role and the scope, which may be narrower than an organization (a site, a field) (decision 40). The thread's one scope concept and the lift are report 14, sections 2.4 and 4 (decision 96). `member.role` is evidence for this grant, not a second role triple on Member | fetched [ORG] | 0.5 |
 | `inv:IdentityDecision` | `rdfs:subClassOf` | `gist:Determination` | An event that settles a result: two records are, or are not, one party | fetched [gist] | 0.8 |
 | `inv:IdentityDecision` | `skos:broadMatch` | `prov:Activity` | A decision occurs over time and generates a record | fetched [PROV] | 0.6 |
-| `inv:AuditEntry` | `rdfs:subClassOf` | `gist:Content` | `Activity.schema.ts`: one line of the audit trail, a record of an act, not the act. The key is `AuditEntry`; "Activity" is an alternative label (decision 46). The page and the record keep their name | fetched [gist] | 0.8 |
+| `inv:AuditEntry` | `rdfs:subClassOf` | `gist:Content` | `Activity.schema.ts`: one line of the audit trail, a record of an act, not the act. The key is `AuditEntry`; "Activity" is an alternative label (decision 46). The page and the record keep their name. Field marks are report 14, section 3.5 (decision 98) | fetched [gist] | 0.8 |
 | `inv:AuditEntry` | `skos:broadMatch` | `prov:Entity` | A record is an entity; the act it records is a `prov:Activity`, which is why the key is not `Activity` (decision 46) | fetched [PROV] | 0.6 |
 
 No row for the role flags `isCustomer` and `isVendor` (nor the two decision 89 holds back): a boolean property has no
@@ -672,7 +687,8 @@ Q5 is decision 68, Q6 is 29, Q7 is 30, Q8 is 28. Each of those is still open.
   FIBO "Contact" row names no class IRI: those files were not re-opened for one.
 - The thin thread's disjointness was not run in a reasoner. Of the 24 pairs, three have both sides among the seven gist
   classes the thread admits: `gist:Organization` with `gist:Content`, `gist:Organization` with
-  `gist:PhysicalIdentifiableItem`, and `gist:PhysicalIdentifiableItem` with `gist:Content`.
+  `gist:PhysicalIdentifiableItem`, and `gist:PhysicalIdentifiableItem` with `gist:Content`. Report 14, section 2.1,
+  takes those three and no pair between `inv:` classes, and did not reopen the gist file (its section 10).
 - The QUDT units and quantity kinds files were searched for a handful of names only; no each or box unit was found
   under the names tried, which does not prove none exists under another name.
 - The schema.org `http` file was not compared with the `https` one.

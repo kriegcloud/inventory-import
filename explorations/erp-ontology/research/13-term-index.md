@@ -1,7 +1,7 @@
 ---
 type: Research
 title: Term index
-description: Every key of reports 04 to 12 after reconciliation, with its owner, tag, gist parent and status.
+description: Every key of reports 04 to 12 after reconciliation, and the three audit properties report 14 holds, with its owner, tag, gist parent and status.
 ---
 
 # Term index
@@ -15,12 +15,18 @@ the home of each row and this index is a view of them.
 
 Benjamin answered nineteen decisions the same day: 8 to 11, 13 to 16, 20, 21, 23, 25, 32, 34, 39, 40, 41 and 43, and a
 new one, 93. He then answered seven more: 22, 26, 38 and 46, and three new ones the carried-through reports raised, 94
-to 96. This index is revised to those answers (section "The thin thread and the slices"). 63 stay open: 12, 17 to
-19, 24, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92. By his ruling each is put to him when the slice that needs it
+to 96. He then answered six more: 24, and five the second review and report 14 raised, 97 to 101. This index is
+revised to those answers (section "The thin thread and the slices"). 62 stay open: 12, 17 to
+19, 27 to 31, 33, 35 to 37, 42, 44, 45 and 47 to 92. By his ruling each is put to him when the slice that needs it
 is specified, its recommendation is the agent's until then, and nothing is built on it.
 
+[Report 14](14-thin-thread.md) is the one specification of the thin thread. Where this index and report 14 differ
+about the thread, report 14 holds. This index stays the view of every key, for the thread and the later slices.
+
 Nothing here is built. No term is ratified: decision 32 makes the name of a `rat-` record the mark of a ratified term,
-and no `rat-` record exists, so every row is a proposal for the foundational auditor and Benjamin.
+and no `rat-` record exists, so every row is a proposal for the foundational auditor and Benjamin. The ruling on a
+scheme covers the concepts its proposal lists (decision 101), so the thread needs 18 rulings: seven classes, nine
+properties and two schemes (report 14 section 1.5).
 
 ## How the index was made
 
@@ -32,9 +38,12 @@ defined twice, and no key used both as a term and as a property. After a sceptic
 and 269 property rows, each equal to a row below in key, owner and tag. A later review of the packet removed two of
 those property rows by hand, `decidedAt` and `recordedAt` (section "Collisions resolved"), which left 267. Decisions 39
 and 43 then changed the tables by hand: one term row came in, `ContactAssignment`, and three property rows,
-`contactPerson`, `contactAccount` and `assignmentPoint`, and the property row `isContactOf` went out. The tables below
-have 165 term rows and 269 property rows.
-The property table includes `termCategory`, which decision 19 (a) does not mint, so the minted count under that answer is 268. Report 05's metamodel entries are listed apart
+`contactPerson`, `contactAccount` and `assignmentPoint`, and the property row `isContactOf` went out, which left 269.
+Decision 98 then changed the audit entry's rows by hand: `action` and `recordedAt` came in, both with the domain
+`AuditEntry` (report 14 section 2.2), and four went out, `auditAction`, which `action` replaces, and `actorNameThen`,
+`auditDetail` and `actingAgentName`, whose fields are marked `noTerm` (report 14 section 3.5). The tables below
+have 165 term rows and 267 property rows.
+The property table includes `termCategory`, which decision 19 (a) does not mint, so the minted count under that answer is 266. Report 05's metamodel entries are listed apart
 (they mint no IRI under decision 19's recommended answer). "Entry" says whether a row is an OWL class, a concept
 scheme or a concept; "gist parent" is shortened to the class, or to the local parent for a subclass; "Owner" is the
 report that holds the row. A gist parent says "(pending)" for one of two reasons: its gist name is not yet admitted,
@@ -140,7 +149,7 @@ decision. A parent with no mark is in `gist-categories.md` already or is admitte
 | OperationDefinition | class | kind | `gist:TaskTemplate` (pending) | 07 | catalog | Sutton only |
 | OperationExecution | class | event | `gist:Task` (pending) | 09 | execution | Sutton only |
 | OrderLifecycleScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
-| Organization | class | kind | `gist:Organization` | 06 | party and access | Sutton only |
+| Organization | class | kind | `gist:Organization` | 06 | party and access | Sutton only (an account's record; the thin thread takes the class as `Tenant`'s parent, and no thread record holds it: report 14 section 2.1) |
 | PackagingUnit | class | subkind | `UnitOfMeasure` (pending) | 07 | catalog | in the repository today |
 | Party | class | category | none (pending) | 06 | party and access | later |
 | PartyIdentifier | class | information | `gist:ID` | 06 | party and access | later |
@@ -173,7 +182,7 @@ decision. A parent with no mark is in `gist-categories.md` already or is admitte
 | ReceivingRejection | class | event | `gist:Event` | 09 | execution | Sutton only |
 | ReceivingRejectReasonScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | ReviewOutcomeScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
-| Role | class | information | none in the thin thread; `gist:Permission` waits for slice 1 (decisions 13 and 41) | 06 | party and access | in the repository today (the thin thread: viewer, editor and admin, each a concept of `MemberRoleScheme` and under the same IRI an individual of `Role`, decision 41); Sutton only (custom roles) |
+| Role | class | information | none in the thin thread, a stated exception (decision 97); `gist:Permission` waits for slice 1 (decisions 13 and 41) | 06 | party and access | in the repository today (the thin thread: viewer, editor and admin, each a concept of `MemberRoleScheme` and under the same IRI an individual of `Role`, decision 41); Sutton only (custom roles) |
 | Routing | class | kind | `gist:TaskTemplate` (pending) | 07 | catalog | Sutton only |
 | RoutingRevision | class | kind | `gist:TaskTemplate` (pending) | 07 | catalog | Sutton only |
 | RowDecision | class | event | `gist:Event` | 09 | import | in the repository today |
@@ -247,8 +256,9 @@ in their Tag column):
 
 Every class's tag is one 05's rule V25 admits for the gist class it reaches (checked by a script over the table
 above, before Benjamin's answers). Two rows changed since, by hand: `ContactAssignment` is a relator under
-`gist:Assignment`, as `Grant` is, and `Role` reaches no gist class in the thin thread, so V25 has nothing to test on it
-until `gist:Permission` is admitted. The six relators are `Member` (gist's temporal relation), `Grant` and
+`gist:Assignment`, as `Grant` is, and `Role` reaches no gist class in the thin thread. V25 as written let only a
+category class be parentless and would have rejected it. Decision 97 allows it as a stated exception on a committed
+list, and for the thread report 14's rule C4 replaces V25 (section 6.4). The six relators are `Member` (gist's temporal relation), `Grant` and
 `ContactAssignment` (assignments), `InventoryReservation` (a commitment) and `VendorItem` and `PriceListEntry` (offers,
 which gist makes contingent commitments).
 
@@ -263,12 +273,17 @@ Properties by owner:
 | Owner | Properties |
 | --- | --- |
 | 04 requirements | 8 |
-| 06 party and access | 62 |
+| 06 party and access | 57 |
 | 07 catalog and value | 76 |
 | 08 warehouse and stock | 32 |
 | 09 commitment and event | 83 |
 | 10 taxonomies | 7 |
 | 12 projection and checks | 1 |
+| 14 the thin thread | 3 |
+
+Report 14's three are the audit entry's `action`, `recordedAt` and `recordedActor`, whose rows report 06 no longer
+holds (decision 98). The thread's other six properties keep their owner, and report 14 section 2.2 holds the wording
+the thread ships for all nine.
 
 ## Properties
 
@@ -276,8 +291,14 @@ Domain and range are shortened: "none declared" where the row keeps them broad, 
 gives the datatype, "concept of" a scheme where the values are concepts. One direction each; no inverse is defined.
 "Super-property" is the gist property a row sits under, as decision 16 allows: our property's own domain and range
 fall under the gist property's, and gist's domain and range are never copied. A row with no fifth cell states
-none. `recordedActor`'s range is pending decision 44: the thin thread and slice 1 emit `Member`, because `PortalAccess` is not proposed,
-and widening the range is decision 44, which under report 05's version rules is a bump once instances exist.
+none. `recordedActor`'s range is `Member` in the thin thread (decision 98; report 14 section 2.2). Slice 1 emits `Member` too, because `PortalAccess` is not proposed,
+and widening the range is open decision 44, a change that under decision 24 advances the version.
+The audit entry has four properties, `recordedActor`, `action`, `recordedAt` and `inTenant` (decision 98). Its copied
+actor name and its detail sentence are `noTerm`, reason screen, and its agent field is `noTerm`, reason deferred,
+until the party slice places it with `AgentRun`, so none of the three has a row. `recordedAt` is not 09's
+`recordTime`, whose domain is `gist:Event`: an audit entry is a record, not an event (report 14 section 3.5).
+`membershipOf` is filled by the fixture only in the thread, since no record holds a human's id (report 14 section
+3.3).
 These answers changed rows here. The customer and vendor flags sit on the tenant's `SourceRecord` (decision 34), and
 the two properties that compare records for identity point at a `SourceRecord` too. A contact is a
 `ContactAssignment` with `contactPerson`, `contactAccount`, `assignmentPoint` and `servesPurpose`; `isContactOf` is
@@ -290,8 +311,7 @@ not a row (decisions 39 and 43). `membershipIn` points at the `Tenant`, in the t
 | accountEmail | 06 | `SignInAccount` | datatype |
 | accountOf | 06 | `SignInAccount` | `Person` |
 | accountStatus | 06 | `Organization` | concept of `AccountStatusScheme` |
-| actingAgentName | 06 | `AuditEntry` | datatype |
-| actorNameThen | 06 | `AuditEntry` | datatype |
+| action | 14 | `AuditEntry` | datatype, stated `xsd:string` (decision 98) |
 | actsFor | 06 | `AgentRun` | `Member` |
 | addressLines | 06 | `PostalAddress` | datatype |
 | adjustmentReason | 08 | `InventoryAdjustment` | concept of `AdjustmentReasonScheme` |
@@ -307,8 +327,6 @@ not a row (decisions 39 and 43). `membershipIn` points at the `Tenant`, in the t
 | atLocation | 08 | none declared | `Location` |
 | attemptedAt | 09 | `AccountingSyncRecord` | datatype |
 | atWorkCenter | 07 | none declared | `WorkCenter` |
-| auditAction | 06 | `AuditEntry` | datatype |
-| auditDetail | 06 | `AuditEntry` | datatype |
 | availabilityRule | 08 | `InventoryMeasure` | datatype |
 | baseUnit | 07 | `ItemSpecification` | `UnitOfMeasure` |
 | billsOrder | 09 | `SupplierBill` | `PurchaseOrder` |
@@ -480,7 +498,8 @@ not a row (decisions 39 and 43). `membershipIn` points at the `Tenant`, in the t
 | quantityPer | 07 | `BomLine` | `QuantityValue` |
 | questionsLot | 09 | `RecallCase` | `MaterialLot` |
 | raisedFor | 09 | `gist:Intention` | `CommitmentLine` |
-| recordedActor | 06 | `AuditEntry` | `Member` (pending decision 44) |
+| recordedActor | 14 | `AuditEntry` | `Member` (decision 98; widening it is pending decision 44) |
+| recordedAt | 14 | `AuditEntry` | datatype, stated `xsd:dateTime` (decision 98) |
 | recordedBy | 09 | none declared | `gist:Event` |
 | recordedFromRow | 04 | `ItemSpecification` | `FileRow` |
 | recordOf | 04 | `SourceRecord` | none declared |
@@ -564,11 +583,19 @@ not a row (decisions 39 and 43). `membershipIn` points at the `Tenant`, in the t
 metamodel, none an IRI under decision 19's recommended answer. Five were added on 2026-11-22 so the model can hold every
 row above (05, section 10).
 
+For the thread, report 14 says where these live and what shape they take (sections 2.6, 3.2 and 7.1). Four points
+correct what the entries were taken to mean. `NoTermReason` has six values, not five: decision 98 added deferred,
+which names the slice that will place the field. The type of a `LiftPath` cannot name this repository's terms in the
+foundation package, which may not import the kernel: the foundation package's maker is generic in the three name
+types and the kernel binds it (sections 3.2 and 7.2). A `ParentLink` may say none with a reason, for a class on the
+exception list (decision 97; section 6.4). The version a `VocabularyVersion` holds is a semantic version string
+written in the module, `0.y` before publication and never taken from the clock (decision 24; section 8).
+
 ## Collisions resolved
 
 Each row names what collided, which key or report stands now, and where the edit was made. A choice that was not a
 matter of one report's own rule became a decision instead, and the row names it. Of the decisions named below, 10, 13,
-16, 21, 23 and 41 are answered and their rows state the answer. Every other one is open: its row states the agent's
+16, 21, 23, 41 and 98 are answered and their rows state the answer. Every other one is open: its row states the agent's
 recommendation, which the reports carry as a pending design and nothing is built on.
 
 | What collided | Now | Edited |
@@ -588,7 +615,7 @@ recommendation, which the reports carry as a pending design and nothing is built
 | `atWorkCenter` in 07 and 09 | 07's, domain none declared | 09 row removed |
 | `endedAt` in 06 and 09; 06's `grantedAt` beside 09's `startedAt` | 09's, domain admits a `Grant` and excludes a `Member`, which keeps `joinedAt` and `removedAt` as its one interval | 06 rows removed |
 | 06's `decidedAt` beside 09's `eventTime`: an `IdentityDecision` is a `gist:Determination`, which is an event | 09's `eventTime`; the decided-at field points at it | 06 row removed |
-| 06's `recordedAt` beside 09's `recordTime`, both labelled "recorded at" | 09's `recordTime`; the audit entry's written-at field points at it | 06 row removed |
+| 06's `recordedAt` beside 09's `recordTime`, both labelled "recorded at" | 09's `recordTime` for an event. Decision 98 then brought `recordedAt` back for the audit entry alone, with the domain `AuditEntry`: the entry's written-at field points at it, never at `recordTime`, whose domain is `gist:Event` (report 14 sections 2.2 and 3.5). Both are still labelled "recorded at" | 06 row removed; the row here is report 14's |
 | 09's `validUntil` beside 07's `effectiveUntil` for a quote | 07's | 09 row removed |
 | 06's `displayName` beside `name` used by 04 and 07 | `name`, 06's, domain none declared | 06 |
 | `description` (07, said to be 05's) and `hasQuantity` (09, said to be 07's), defined nowhere; 04's `quantity`; 08's `reservedQuantity`, `movedQuantity`, `adjustmentQuantity` | both added to 07; `hasQuantity` serves all | 07, 08, 04 |
@@ -608,7 +635,7 @@ recommendation, which the reports carry as a pending design and nothing is built
 | `ModelCallPurpose`: a scheme for 06, a code list with no scheme for 10 | a scheme | 10 |
 | Concept IRI as `ItemRoleScheme/buy` (05) or `ItemRole-buy` (10) | `inv:ItemRoleScheme-buy` (decision 10) | 05, 10 |
 | Disjointness written as `owl:AllDisjointClasses` (05) or pairwise (12) | pairwise, no blank node | 05 |
-| `notATerm` (05) beside `noTerm` with a closed list (12) | `noTerm` (decision 21) | 05 |
+| `notATerm` (05) beside `noTerm` with a closed list (12) | `noTerm` (decision 21), its closed list six reasons long since decision 98 added deferred | 05 |
 | A scheme value lifted as a notation literal (12) or a concept IRI (04, 05, 10) | the concept IRI (decision 23) | 12 |
 | The kind tag kept in the module (05) or emitted as `inv:termCategory` (12) | kept in the module (decision 19) | 12 |
 | Alignment triples in the OWL file (11) or a separate file (12) | separate (decision 28) | 11 |
@@ -687,36 +714,37 @@ purpose and the contact point from the assignment (decisions 39 and 43). The lis
 
 ## The thin thread and the slices (decision 8)
 
-The thin thread is the first deliverable. Slice 1 stays the party slice and follows it; no slice is renumbered.
+The thin thread is the first deliverable, and [report 14](14-thin-thread.md) is its one specification. This section
+says only which rows of this index the thread takes; everything else about the thread is in report 14, at the
+sections named. Slice 1 stays the party slice and follows it; no slice is renumbered.
 
-The thread takes nine rows of this index: the classes `Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`
-and `AuditEntry`, and the schemes `MemberRoleScheme` (viewer, editor, admin) and `GrantScopeKindScheme` (the one
-concept organization). `Tenant` is a role class under `Organization`, and `membershipIn` ranges over it (decision 38).
-`Person` is there so the fixture can say two memberships are one human: one link from `Member` to the person,
-`membershipOf` in the table above, and no name or email paths (decision 94). `Grant` is there for one lift: the
-record's role field is read as one grant at organization scope (decision 40), with `grantedTo`, `grantsRole` and
-`grantScope` (decision 96); other scopes are added by the slice that needs them. The audit term's key is `AuditEntry`,
-with "Activity" as an alternative label (decision 46). The gist names the thread admits are the parents of those rows,
-`gist:Organization`, `gist:Person`, `gist:TemporalRelation`, `gist:Assignment` and `gist:Content`, each with its named
-gist ancestors as names and links only (decisions 13 and 14), and the `owl:disjointWith` pairs gist states between
-them (decision 15). `Role` has no gist parent in the thread, ships without `permits` and has one identity criterion,
-the concept's scheme and notation (decision 41). A role is written `inv:MemberRoleScheme-admin` (decision 10), and
-labels and definitions are `skos:prefLabel` and `skos:definition` (decision 11).
+The thread takes nine term rows of this index: the classes `Organization`, `Tenant`, `Person`, `Member`, `Role`,
+`Grant` and `AuditEntry`, and the schemes `MemberRoleScheme` (viewer, editor, admin) and `GrantScopeKindScheme` (the
+one concept organization). It takes nine property rows: `membershipOf`, `membershipIn`, `grantedTo`, `grantsRole`,
+`grantScope`, `recordedActor`, `action`, `recordedAt` and `inTenant` (decisions 96 and 98). Their labels, definitions,
+tags, parents and identity criteria as the thread ships them are report 14 sections 2.1 to 2.4, and where a row here
+is shorter or differs, that text holds. `Grant` has one identity criterion there, the member and the field it is read
+from, and no pair is stated between `inv:` classes (section 2.1). `Role` has no gist parent, by the stated exception
+of decision 97, and ships without `permits` (decision 41). The gist names the thread admits are seven classes, five
+parents and the two ancestors `gist:LivingThing` and `gist:PhysicalIdentifiableItem`, with the three
+`owl:disjointWith` pairs gist states between them (decisions 13 to 15; section 2.5).
 
-Every field of a record that points at a term carries a pointer or `noTerm` with a reason (decision 22). On the
-`Member` record the person's name, the organization's name and the sign-in email are marked `noTerm` with the reason
-screen (decisions 21 and 93), so the thread uses neither `name` nor `accountEmail`. Slice 1 adds their paths, the name
-through `Person` and the email through `SignInAccount`.
+The marks on the records are report 14 section 3. Records are enrolled by name, not by folder (decision 99): the
+kernel's `Member`, `Role` and `Activity`, and the access contract's `Person` and `AuditTrail` (sections 3.6 and 3.7).
+Every field of an enrolled record is placed (decision 22). The `Member` record has five fields and no email: its two
+copied names are `noTerm`, reason screen (decision 93; section 3.3), so the thread uses no `name`. The email and the
+joining date are on the People page's `Person` record, which is a view of a membership, and both are `noTerm`, reason
+deferred, naming the party slice (decision 100; section 3.6), so the thread uses neither `accountEmail` nor
+`joinedAt`. Slice 1 places them, the email through `SignInAccount` and `joinedAt` on `Member`, with the name through
+`Person` and the audit entry's agent field through `AgentRun` (decision 98).
 
-The thread answers one question, 04's CQ-P06: who belongs to this organization and with which role, on a fixture
-where one person is an admin in one organization and a viewer in another. It builds gates 1 to 9, every gate that
-needs no stored row (decision 95): the byte-compare (1), the re-parse (2), forbidden constructs and the namespace
-guard (3), vocabulary coherence (4), record pointers on the AST (5), the type-check (6), `laws ontology-terms` (7), the
-question suite (8) and the reasoner (9, decision 25). Gates 5 and 7 are enrolled on the access contract and the four
-kernel records only. Each gate is shown failing once on a planted mistake. Gate 11, SHACL over the stored sample, and
-gate 12, the alignment check, wait for their slices, and gate 10 is open decision 27's. The thread runs N3.js for the
-re-parse and Oxigraph for SPARQL; shacl-engine is added with the SHACL slice (decision 26). The thread waits on none of
-the 63 open decisions.
+The one lift, of `Member.role` to a `Grant`, is section 4. The one question, 04's CQ-P06, with its query, fixture,
+expected rows and must-fail cases, is section 5. Gates 1 to 9 (decision 95), each with its rules and its one planted
+mistake, and the turbo inputs, are section 6; gates 11 and 12 wait for their slices and gate 10 is open decision
+27's. The packages and the rows in `laws boundaries` are section 7. The version is `0.1.0`, a string written in the
+module (decision 24), and the header of each generated file is section 8. What the thread still owes from Benjamin,
+the reasoner download and the 18 `rat-` records (decisions 25 and 101), is section 1.5. The thread waits on none of
+the 62 open decisions (section 1.4).
 
 Slice 1 brings what the thread leaves out: `SourceRecord` with `recordOf` and the customer and vendor flags,
 which CQ-P01 reads on the tenant's record (decision 34), `ContactAssignment` with its purpose and contact point
@@ -786,6 +814,12 @@ repository. What changed, with the decision that now holds the choice:
   status totals, 65 not proposed). The rows changed here (`Tenant`, `Person`, `Grant`, `GrantScopeKindScheme`,
   `membershipIn`) were read against the answers in DECISIONS.md, not against report 06, which was being revised at the
   same time.
+- After his six further answers (24 and 97 to 101) and report 14, by hand and by search, with no script run: no term
+  row came in or went out and no term row's tag or status word changed (165 term rows, the status totals, 65 not
+  proposed). The property rows changed as the section "How the index was made" says: four out, two in, 267 left, the
+  owners' counts summing to it. The thread's nine term rows and nine property rows were read against report 14
+  sections 2.1 to 2.3, and the audit entry's rows against report 06 as it stood during its own revision, where no row
+  for `auditAction`, `actorNameThen`, `auditDetail`, `actingAgentName` or `recordedActor` was found.
 
 ## Not checked
 

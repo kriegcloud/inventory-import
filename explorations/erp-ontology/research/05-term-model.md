@@ -20,31 +20,24 @@ model. Report 06 owns that class. This metamodel holds it as an ordinary class t
 table. Items and values are report 07's (`ItemSpecification`, `QuantityValue`), stock report 08's, commitments and
 events report 09's, the schemes' contents report 10's (`ItemRoleScheme`), the gist names a slice admits and the
 alignment rows' contents report 11's, the projector and the checks that run the rules below report 12's, and the
-competency questions report 04's. Their terms appear here by the keys report 13 settled.
+competency questions report 04's. Their terms appear here by the keys report 13 settled. The thin thread's
+own specification is report 14. Where this report and report 14 disagree about the thread, report 14 holds.
 
-The thin thread is the first deliverable (decision 8). It has seven classes and two schemes. The classes are
-`Organization`, `Tenant` (a role class under `Organization`, keyed by `OrganizationId`; `membershipIn` ranges over
-it, decision 38), `Person` (under `gist:Person`, with one link from `Member` to the person and no name or email
-paths, decisions 93 and 94), `Member`, `Role` (no gist parent and no `permits`, decisions 13 and 41), `Grant`
-(`grantedTo`, `grantsRole` and `grantScope`, decisions 40 and 96) and `AuditEntry`, whose alternative label is
-"Activity" (the page and the record keep their name, decision 46). The schemes are `MemberRoleScheme` (viewer,
-editor and admin) and `GrantScopeKindScheme` (the one concept organization, decision 96). Their gist parents, and
-those parents' ancestors, come with them (decisions 13 and 14). It answers one question, who belongs to this
-organization and with which role, on a fixture where one person is an admin in one organization and a viewer in
-another. It builds gates 1 to 9: byte-compare (1), re-parse (2), forbidden constructs and the namespace guard (3),
-vocabulary coherence (4), record pointers on the AST (5), the type-check (6), `laws ontology-terms` (7), the
-question suite (8) and the reasoner (9). Gates 5 and 7 are enrolled on the access contract and the four kernel
-records only (`Member`, `Role`, `Activity` and `AgentRun`; decision 95). Each of those gates is shown failing once
-on a planted mistake. Gates 11 and 12 wait for their slices, and gate 10 is open decision 27's. The engines in the
-thread are N3.js for the re-parse and Oxigraph for SPARQL; shacl-engine is added with the SHACL slice (decision
-26). Every field of a pointed record carries a pointer or `noTerm` with a reason, and the SHACL shapes are closed
-(decision 22). The thread waits on no open decision. Slice 1 stays the party slice and follows the thread. This
+The thin thread is the first deliverable (decision 8). This report does not restate its terms, properties, record
+marks, enrolment, lift, fixture, question, must-fail cases, gates, planted mistakes, law rules, package rows or
+version header: those are report 14. What this metamodel must hold for it is a class that may have no gist parent
+when the reason is on a committed list (decision 97), a sixth `noTerm` reason, deferred, that names a slice
+(decision 98), enrolment by named record rather than by folder (decision 99), the People page record's `email` and
+`joinedAt` deferred to the party slice (decision 100), a scheme's ruling covering the concepts in that proposal, so
+the thread needs 18 rulings (decision 101), and a version string that stays `0.y` before publication (decision 24).
+The thread waits on no open decision. Gates 11 and 12 wait for their slices, gate 10 is open decision 27's, and the
+thread does not build SHACL (report 14 section 1.3). Slice 1 stays the party slice and follows the thread. This
 report does not renumber slices.
 
 On 2026-11-22 the model was widened so it can hold every row 04 and 06 to 12 wrote (section 10 lists what each
 needed), and its open questions moved to the packet's [DECISIONS.md](../DECISIONS.md) ("Questions for Benjamin" maps
-each Qn to its decision number). The same day's answers are applied in this revision, including decisions 22, 26, 38, 46 and 94 to 96, which settle
-the thin thread.
+each Qn to its decision number). The same day's answers are applied in this revision, including decisions 22, 24, 26,
+38, 46 and 94 to 101. Report 14 is the specification of the thin thread.
 
 Inputs: the project profile, the packet's decisions 1 to 7, reports 01 and 02, `gist-categories.md`,
 `naming-conventions.md`, `anti-patterns.md` and `foundational-analysis.md`, the architecture seed (its sections on
@@ -81,29 +74,29 @@ of the terms table is the schema's name in the module; it would become an IRI lo
 | ClassTerm | Class term | A Term that names one OWL class and gives it exactly one parent link, a kind tag and an identity criterion. | information | none: projects to `owl:Class` (pending Q1) | its key within the Vocabulary's namespace | report 02; project profile, decision 2 | later |
 | ObjectPropertyTerm | Object property term | A Term that names a relation, stated in one direction only, from instances of one class to instances of a class or to concepts of one scheme. It may name one property it sits under (`subPropertyOf`): a projected gist property or a local property (decision 16). Absent, it emits no parent. The link is allowed only where its own domain and range fall under the gist property's, and that gist domain and range are not copied. | information | none: projects to `owl:ObjectProperty` (pending Q1) | its key | report 02 ("Object property domain and range"); project profile (no `owl:inverseOf`) | later |
 | DatatypePropertyTerm | Datatype property term | A Term that names an attribute of instances of one class, whose literal datatype is read from the record fields that fill it. It may name one property it sits under, the same optional `subPropertyOf` as an object property (decision 16). | information | none: projects to `owl:DatatypeProperty` (pending Q1) | its key | report 02 ("A datatype property's range is read from the field that fills it") | later |
-| ConceptScheme | Concept scheme | A Term that names one closed code list: an ordered, non-empty list of Concepts whose notations a record stores. | information | none: projects to `skos:ConceptScheme`; a code list is never a class (`gist-categories.md`, step 8) | its key | report 02; the architecture seed, section 6 | later |
+| ConceptScheme | Concept scheme | A Term that names one closed code list: a non-empty record of Concepts, keyed by notation, in the order a screen lists them. The notation is the key, not a second field (report 14 section 2.6). | information | none: projects to `skos:ConceptScheme`; a code list is never a class (`gist-categories.md`, step 8) | its key | report 02; the architecture seed, section 6 | later |
 | Concept | Concept | A Term held inside one ConceptScheme that gives one code its notation, label, definition, at most one broader code of the same scheme, and, where the code is also a thing a class counts, that class and its links to concepts of other schemes. | information | none: projects to `skos:Concept`, an individual, also typed by its class when it has one | its scheme's key and its notation (decision 10: the IRI is that scheme key, a hyphen and the notation) | the architecture seed, section 6; the API design report, section 5 (the notation binds the enum string) | later |
 | DisjointGroup | Disjoint group | A Vocabulary entry that lists two or more ClassTerms of which no instance can belong to two at once. | information | none: projects to pairwise `owl:disjointWith` | the set of its member keys, in any order | the architecture seed (`owl:AllDisjointClasses` over the item definitions); project profile (disjointness is the module's) | later |
 | AlignmentRow | Alignment row | A Vocabulary entry that records one reviewed correspondence from a local Term to a term of another vocabulary, with its predicate, source, confidence and ratification. | information | none: projects to one SKOS mapping triple; an alignment is never a parent | its subject, predicate and object together | report 02 (beep-effect's `ConceptAlignment`, "take"); the architecture seed (`MappingAssertion`, the correspondence register) | later |
 | AlignmentPredicate | Alignment predicate | A value from the closed list of SKOS mapping relations an AlignmentRow may state. | value | none: a code of the metamodel | the literal | project profile ("`skos:*Match` predicates only") | later |
 | KindTag | Kind tag | A value from a closed list that records which ontological category the instances of a ClassTerm fall under. | value | none: a code of the metamodel | the literal | project profile ("kind or role tag"); `foundational-analysis.md` | later (pending Q12) |
-| ParentLink | Parent link | A value that gives a ClassTerm its one identity-bearing parent: a projected gist class, a local ClassTerm, or no parent with the reason. | value | none: a code of the metamodel | its contents | `gist-categories.md` ("Every local top class has one parent") | later (pending Q8) |
+| ParentLink | Parent link | A value that gives a ClassTerm its one identity-bearing parent: a projected gist class, a local ClassTerm, or no parent with the reason. A `none` parent is allowed only when the class is on the committed exception list with that same reason (decision 97). | value | none: a code of the metamodel | its contents | `gist-categories.md` ("Every local top class has one parent"); decision 97 | later (decision 97). A second parent stays pending decision 12 |
 | CategoryParent | Category parent | A value that names a local ClassTerm tagged category under which a ClassTerm also falls, beside its one parent link, without taking an identity from it. | value | none: a code of the metamodel | the key it names | NEW: 06's `Party` sits over `Person` and `Organization`, which keep their gist parents (pending Q8) | later (pending Q8) |
 | ClassTarget | Class target | A value that names the class whose instances a property relates: a local ClassTerm, a projected gist class, or none declared with the reason. | value | none: a code of the metamodel | its contents | NEW: 06 to 10 write domains of all three kinds (`gist:Intention`, `gist:Event`, "none declared: shared by several records") | later |
 | RangeTarget | Range target | A value that names what an object property's values are: instances of a class target, or concepts of one or more named schemes. | value | none: a code of the metamodel | its contents | NEW: 09's `hasReason` and 10's `lifecycleState` range over concepts of several schemes | later |
-| LiftPath | Lift path | A value, carried by a field's term pointer, that says how one flat field becomes a small graph: the properties walked in order, each forward or reversed, the class of each node passed, and the values fixed on it. | value | none: a code of the metamodel | its steps | NEW: 07 and 08 point fields at paths (`sku` through `identifiedBy` to `identifierText` with the kind `sku`; `vendors` through the reverse of `offeredItem`; `quantityOnHand` to an `InventoryMeasure`). Decision 20 adopts the path. The thin thread's one path is `Member.role` to `Grant`, and that `Grant` carries `grantScope` (decisions 40 and 96). The link from `Member` to `Person` is not a path (decision 94). | later (decision 20) |
-| NoTermReason | No-term reason | A value from a closed list that says why an exported record schema, or one of its fields, stands for no term: transport, request, screen, error or bookkeeping. | value | none: a code of the metamodel | the literal | report 12 (its Q8, the closed list); decision 21. Decision 22: every field of a record that points at a term carries a pointer or `noTerm` with a reason. Decision 93 uses `screen` on the `Member` record's copied name and email fields in the thin thread. | later |
+| LiftPath | Lift path | A value, carried by a field's term pointer, that says how one flat field becomes a small graph: the properties walked in order, each forward or reversed, the class of each node passed, and the values fixed on it. | value | none: a code of the metamodel | its steps | NEW: 07 and 08 point fields at paths (`sku` through `identifiedBy` to `identifierText` with the kind `sku`; `vendors` through the reverse of `offeredItem`; `quantityOnHand` to an `InventoryMeasure`). Decision 20 adopts the path. The thin thread's one path is report 14 section 4. The link from `Member` to `Person` is not a path (decision 94). | later (decision 20) |
+| NoTermReason | No-term reason | A value from a closed list that says why an exported record schema, or one of its fields, stands for no term: transport, request, screen, error, bookkeeping, or deferred. Deferred names the slice that will place the field (decision 98). The annotation holds the reason, and for deferred the slice as well, not a bare string (report 14 section 3.2). | value | none: a code of the metamodel | the reason, and the slice when deferred | report 12 (its Q8, the five); decision 21, widened by decision 98. Decision 22: every field of a record that points at a term carries a pointer or `noTerm` with a reason. Decision 93 uses `screen` on `Member`'s two copied names; the kernel `Member` has no email field (report 14 section 3.3). The thread's other marks are report 14 section 3. | later |
 | IdentityCriterion | Identity criterion | A value that says what makes two instances of a ClassTerm the same one, that it is inherited from the parent, that it does not apply, or that it is open and names the question. | value | none: a code of the metamodel | its contents | project profile (identity card, `unresolved`); report 01, section 3 | later |
 | Deprecation | Deprecation | A value that marks a Term as retired from a given version, with the Term that replaces it or the reason none does. | value | none: a code of the metamodel | its contents | the architecture seed, section 4.2 ("Deprecate a term when its meaning is replaced"); `naming-conventions.md` | later (pending Q4) |
 | TermSource | Term source | A value that names where a Term's meaning comes from. Foundation holds the shape: a seed, a repository file, a public document, a named standard, or a new need with its reason. The inventory module closes the seed names, the standard names and the Sutton case. | value | none: a code of the metamodel | its contents | this packet's term-table rule (the Source column); 06 and 11 cite W3C ORG, schema.org, IBM MDM, EPCIS and QUDT pages they fetched | later |
 | TermScope | Term scope | A non-empty set of scope tokens, not one exclusive choice. `repository` means a TermBinding names the term, and a TermBinding is a schema pointer, not a SQL table. `sutton` and `later` may be members as well, and a missing binding implies neither. Foundation holds the set; the inventory module closes the tokens to those three. | value | none: a code of the metamodel | the set of tokens | NEW: turns the Status column of every term table into a fact a check can compare with the bindings | later |
-| Ratification | Ratification | A value that names the ratification record in which the steward accepted a Term or an AlignmentRow. The module holds ratified entries only, and the value is that `rat-` record's name (decision 32). | value | none: a code of the metamodel | the record's name | project profile ("A ratification is Benjamin's answer, scribed in a `rat-` file"); decision 32. The answers dated 2026-11-22 are the first that need those records. | later (decision 32) |
+| Ratification | Ratification | A value that names the ratification record in which the steward accepted a Term or an AlignmentRow. The module holds ratified entries only, and the value is that `rat-` record's name (decision 32). A scheme's record covers the concepts listed in the proposal the steward saw; a concept added later is its own proposal (decision 101). The thread therefore needs 18 rulings: seven classes, nine properties and two schemes, not one record per concept. | value | none: a code of the metamodel | the record's name | project profile ("A ratification is Benjamin's answer, scribed in a `rat-` file"); decisions 32 and 101. The answers dated 2026-11-22 are the first that need those records. | later (decisions 32 and 101) |
 | PrefixEntry | Prefix entry | The use of one prefix already in the one `VocabShape` registry: local, projected from gist, or cited by alignment only. The prefix is a bounded token. The namespace IRI is not stored again here; it lives once on that registry, and it is an absolute IRI. | information | none: `@prefix` lines and Curie types are generated from that one registry | its prefix | `packages/foundation/modeling/identity/src/Vocab.ts` (`VocabEntry`); `.agents/skills/_shared/namespaces.json` | in the repository today (as `VocabEntry`, without the use) |
 | NamedExternalTerm | Named external term | A value that cites a term of a standard with no RDF namespace by the standard's name, the term's name and a public document. Foundation names a standard; the inventory module closes the standard names. | value | none: has no IRI to project | its standard and term name | project profile (no prefix for ISA-95 or Sutton; how a Sutton term is cited is open) | later (pending Q11) |
 | TermPointer | Term pointer | A value carried in the annotations of a record schema or of one of its fields that names, by a CURIE the type-check knows, the one Term the record or field stands for. The helpers are `aboutClass`, `aboutProperty`, `aboutScheme` and `aboutPath` (decision 20). | value | none: never projected as a triple; read by the projector and the checks | its CURIE | report 02 (`term` annotation typed by `Curie<V>`); decision 20 | later (decision 20) |
 | TermBinding | Term binding | A derived pair of one Term and one record schema or field whose TermPointer names it, computed from the contract packages and never written by hand. | information | none: never projected; the projector's join | its Term key with the record's identifier and field path | NEW: the one place where "one term, several records" and "a term with no record" are both visible | later |
-| VocabularyVersion | Vocabulary version | A value that numbers one state of a Vocabulary as major, minor and patch, written in the module and never read from the clock. | value | none: a code of the metamodel | its three numbers | project profile (the header's version "never the clock"); decision 6 (byte-compare) | later (pending Q5) |
-| GistProjection | Gist projection | The gist classes the slice being built needs, each with its label, definition and named gist ancestors as names and links only (decisions 13 and 14). A name nothing in that slice uses is not admitted, so report 11's table B is not taken whole. The taken gist properties, each with its named parent and never its domain or range (decision 16). The disjoint pairs gist states between classes already admitted, and no others (decision 15). The whole design of reports 04 to 12 is 24 pairs. The thin thread copies only the pairs among the classes it admits. It also holds the pinned release and its sha256. | information | none: metamodel element. For the thin thread, `Person` is under `gist:Person` (decision 94), `Member` and `Grant` under `TemporalRelation` and `Assignment` (decision 13), and `Organization` and `AuditEntry` bring the gist parents report 11 gives them (decision 46). `Tenant`'s parent is the local class `Organization` (decision 38). `Role` has no gist parent and ships without `permits`, so `Permission` waits (decisions 13 and 41). Each admitted class brings its named ancestors (decision 14). | the pinned release | report 11 section (a); decisions 13 to 16 | later (decisions 13 to 16) |
+| VocabularyVersion | Vocabulary version | A semantic version string written in the module and never read from the clock (decision 24). Before publication it stays `0.y`: any change advances `y`, and the third number stays 0. `1.0` is the first published namespace. | value | none: a code of the metamodel | its three numbers | project profile (the header's version "never the clock"); decisions 6 and 24. The thread's header is report 14 section 8. | later (decision 24) |
+| GistProjection | Gist projection | The gist classes the slice being built needs, each with its label, definition and named gist ancestors as names and links only (decisions 13 and 14). A name nothing in that slice uses is not admitted, so report 11's table B is not taken whole. The taken gist properties, each with its named parent and never its domain or range (decision 16). The disjoint pairs gist states between classes already admitted, and no others (decision 15). The whole design of reports 04 to 12 is 24 pairs. Which pairs and which gist names the thin thread admits are report 14 section 2.5. `Role` has no gist parent, on the exception list (decision 97, report 14 section 2.1). It also holds the pinned release and its sha256. | information | none: metamodel element. The thread's gist parents, ancestors and the `Role` exception are report 14 sections 2.1 and 2.5, not restated here. | the pinned release | report 11 section (a); decisions 13 to 16 and 97 | later (decisions 13 to 16, 97) |
 
 ## 3. Properties of the metamodel
 
@@ -131,8 +124,8 @@ holds it.
 | datatype | datatype | The literal datatype of a datatype property: read from the leaf of every field that fills it, or stated in the module when the property's fields have different leaves that each convert to it without loss, or while no field fills it. | DatatypePropertyTerm | datatype from the record field (derived, or stated) | report 02; 07 (`numericValue` is filled by integers and by floats; "no record yet: an exact decimal") |
 | subPropertyOf | sub-property of | The one property this property sits under, when it has one: a projected gist property the slice has admitted, or a local property. Absent, nothing is emitted. It is `rdfs:subPropertyOf` (decision 16). An `inv:` property may sit under a gist property only where its own domain and range fall under that gist property's. The projection never copies the gist property's domain or range. | ObjectPropertyTerm or DatatypePropertyTerm | a projected gist property or a local property key | decision 16 |
 | gist | gist projection | The projected gist classes, properties and copied disjoint pairs this vocabulary cites. The shape is foundation's. The inventory module admits a gist name only when a term in the slice being built needs it, and then its ancestors (decisions 13 and 14). | Vocabulary | GistProjection | report 11 section (a); decisions 13 to 16 |
-| concept | concept | A Concept a ConceptScheme holds, in the order a screen lists them. | ConceptScheme | Concept | the architecture seed, section 6 |
-| notation | notation | The code a record stores for a Concept, unique in its scheme and never changed. | Concept | datatype from the record field (`Notation`) | the API design report, section 5 |
+| concept | concept | A Concept a ConceptScheme holds, keyed by its notation, in the order a screen lists them (report 14 section 2.6). | ConceptScheme | Concept | the architecture seed, section 6 |
+| notation | notation | The code a record stores for a Concept, unique in its scheme and never changed. It is the concept's key in the scheme, not a field beside it (report 14 section 2.6). | Concept | datatype from the record field (`Notation`), as the key | the API design report, section 5 |
 | alsoInstanceOf | also instance of | The class of which a Concept is also an individual, such as a unit of measure, a member role, or `gist:Aspect`. Viewer, editor and admin are concepts of `MemberRoleScheme` and, under the same IRI, individuals of `Role`. That individual has one identity criterion, the concept's: its scheme and its notation (decision 41). Units stay open (pending decision 61). | Concept | a local ClassTerm or a projected gist class | NEW: 07, 06 and 10. Decision 41 for `Role`. Units pending decision 61. |
 | conceptLinks | concept links | Values of object properties that a Concept holds as an individual of its class, each naming a concept of another scheme. | Concept | Concept | NEW: 10's `hasDimension` from a unit to its measurement dimension |
 | closed | closed | Whether a scheme lists every value a record of this repository may hold, so an unknown value goes to a person. | ConceptScheme | datatype from the record field (`S.Boolean`) | 10, rule 5 |
@@ -146,12 +139,12 @@ holds it.
 | since | deprecated since | The version from which a Term is deprecated. | Deprecation | VocabularyVersion | NEW: a deprecation must say when, and the clock is not allowed |
 | reason | reason | Why a Term is retired, required when nothing replaces it. | Deprecation | datatype from the record field (`Definition`) | `naming-conventions.md` ("status note") |
 | term | term | The Term a record schema or a field stands for. | TermPointer | Term | report 02 |
-| path | path | The lift path a field's value follows into the graph, when it is not the value of one property of the record's subject. One field may carry several paths when it fans out (`dimensions`). | TermPointer | LiftPath, or a non-empty list of them | NEW: 07, 08; decision 20. The thin thread lifts only `Member.role`, to a `Grant` that carries `grantScope` (decisions 8, 40 and 96). The link from `Member` to `Person` is not a lift (decision 94). |
-| noTerm | no term | The reason an exported record schema, or one field of it, stands for no term. | TermPointer | NoTermReason | report 12; decision 21. On a field, decisions 22 and 93. |
+| path | path | The lift path a field's value follows into the graph, when it is not the value of one property of the record's subject. One field may carry several paths when it fans out (`dimensions`). | TermPointer | LiftPath, or a non-empty list of them | NEW: 07, 08; decision 20. The thin thread's one lift is report 14 section 4. The link from `Member` to `Person` is not a lift (decision 94). |
+| noTerm | no term | The reason an exported record schema, or one field of it, stands for no term. Deferred also names the slice (decision 98). | TermPointer | NoTermReason | report 12; decisions 21 and 98. On a field, decisions 22, 93 and 100. |
 | storedForm | stored form | Whether this record is the one stored form of its class. At most one record of a class may set it, and the projector targets only that record. Shown on `StoredItem` only as the illustration of decision 48(a), not as a choice. | TermPointer | datatype from the record field (optional `S.Boolean`) | NEW (pending decision 48) |
 | record | record | The identifier of the record schema, with the field path for a field, that carries a TermPointer. | TermBinding | datatype from the record field (derived from the schema's `identifier` annotation) | NEW: names the record side of a binding |
 | namespace | namespace | The IRI every local key is appended to, derived from the one project base. Foundation checks that it is an absolute IRI. The inventory module, before publication, still requires the placeholder host. | Vocabulary | datatype from the record field (`Namespace`) | decision 7; naming-conventions.md |
-| version | version | The VocabularyVersion a Vocabulary is at. | Vocabulary | VocabularyVersion | project profile (pending Q5) |
+| version | version | The VocabularyVersion a Vocabulary is at. | Vocabulary | VocabularyVersion | decision 24. The thread's header is report 14 section 8. |
 | prefix | prefix | The short name a CURIE starts with: a bounded token. Its namespace IRI is not stored on this entry. | PrefixEntry | datatype from the record field (`Prefix`) | `Vocab.ts` (`VocabShape` keys) |
 | prefixUse | use | Whether a prefix's terms are local, projected from gist, or alignment-only. Recorded beside the one registry, not in a second entry that stores the IRI again. | PrefixEntry | datatype from the record field (`PrefixUse`) | decision 4 (gist is the only parent) |
 
@@ -159,11 +152,11 @@ What each field becomes in the generated Turtle (the projector is report 12's; t
 
 | Field | Emitted as | Never emitted |
 | --- | --- | --- |
-| `Vocabulary.namespace`, `version` | the `owl:Ontology` header with `owl:versionIRI` and `owl:versionInfo` (pending Q5) | a clock date, `prov:generatedAtTime` |
+| `Vocabulary.namespace`, `version` | the `owl:Ontology` header with `owl:versionIRI` and `owl:versionInfo` (decision 24). The thread's bytes are report 14 section 8 | a clock date, `prov:generatedAtTime` |
 | `ClassTerm` | `inv:K a owl:Class` | |
 | `prefLabel`, `definition` | `skos:prefLabel "…"@en`, `skos:definition "…"@en` (decision 11) | `rdfs:label`. The reverse of decision 11 would write it with the same text. It is not written. |
 | `altLabel`, `scopeNote` | `skos:altLabel`, `skos:scopeNote` | |
-| `parent`, `categoryParents` | `rdfs:subClassOf` the gist class or the local class, one triple each; nothing for a `none` link | the reason, which stays in the module |
+| `parent`, `categoryParents` | `rdfs:subClassOf` the gist class or the local class, one triple each; nothing for a `none` link. Decision 97 checks a `none` link against the committed exception list (report 14 section 6.4) | the reason, which stays in the module |
 | `kindTag`, `identity`, `source`, `scope`, `ratification` | nothing under Q1's recommended answer (they would need annotation properties with IRIs; report 12's `inv:termCategory` is the other answer) | |
 | `DisjointGroup` | `owl:disjointWith` once per unordered pair of its members (report 12, section 5, rules 9 and 10: no blank node but a list) | `owl:AllDisjointClasses`, which needs a blank subject |
 | `ObjectPropertyTerm` | `owl:ObjectProperty`, `rdfs:domain` and `rdfs:range` when declared (a local or gist class; a scheme range writes no `rdfs:range`, and the record's SHACL `sh:in` lists the concept IRIs, decision 23, as 10 section 6 and 12 say) | `owl:inverseOf`, any characteristic; a domain or range written "none declared" |
@@ -300,21 +293,17 @@ The same form gives the targets a property names (sketch, not code):
 // CategoryParent: a ClassKey whose entry is tagged "category" (rule V21)
 // TermRef:      class { key: ClassKey } | property { key: PropertyKey } | scheme { key: SchemeKey }
 //               | concept { scheme: SchemeKey, notation: Notation }
-//   The concept case is Curie<InvConceptVocab> (inv:<SchemeKey>-<notation>). It is not a class,
-//   property or scheme key. AlignmentRow.subject and a lift path's concept fixed value use it.
+//   The concept case is a concept CURIE (inv:<SchemeKey>-<notation>). It is not a class,
+//   property or scheme key. The kernel supplies that name type. Foundation does not name the
+//   inventory registries (report 14 sections 3.2 and 7.2).
 //
-// LiftPath: a non-empty list of steps. aboutPath, beside aboutClass, returns { readonly path }, not { readonly term }.
-// Step: { property, reverse?, node?, iterate?, fixed?, valueMap?, fromSibling?, fromContext? }
-//   iterate: one node per array element, named by list position (decision 10).
-//   valueMap: a boolean or a tag literal to a named concept of the property's range scheme.
-//   fromSibling: a value taken from a sibling field.
-//   fromContext: "tenant" | "confirmation" | "instant".
-// fixed is a list of { property, value }. value is FixedValue, checked against that property's range:
-//   concept { curie: Curie<InvConceptVocab> }
-//   individual { curie }     // a named individual of the range class (decision 88's currency)
-//   literal { value }        // a datatype literal, such as minorUnitScale's integer
-//   ref { ref }              // the tenant, a sibling field, the confirmation, or its instant
-// One field may carry several paths when it fans out (dimensions).
+// The thread's lift path is report 14 sections 3.2 and 4.3. pathFor is generic in the class, property
+// and concept name types. A path is a node step, then one value step that names a property and no node.
+// fixed on the node step is { property, concept }. Later slices, not that helper, add iterate (one node
+// per array element, named by list position, decision 10), valueMap, fromSibling, fromContext
+// ("tenant" | "confirmation" | "instant"), and a fixed value that is a named individual (decision 88's
+// currency), a datatype literal (minorUnitScale's integer) or a ref. One field may carry several paths
+// when it fans out (dimensions). Those four constructs were not tried.
 ```
 
 ### 4.2 The common fields, ClassTerm and DisjointGroup
@@ -417,16 +406,17 @@ allows it. `subPropertyOf` is optional. A property with no parent emits none. An
 taken gist property only where its own domain and range fall under that gist property's (decision 16). The projection
 copies the gist property's named parent and never its domain or range. A field whose
 value is a notation of a scheme fills an object property with a scheme range: the record stores `"buy"`, the
-projector writes the concept's IRI (decision 23). That replaces report 02's separate `references` annotation for id fields too: an
-id field fills an object property, and the property already holds its range.
+projector writes the concept's IRI (decision 23). A field that names another record fills an object property, and the
+property already holds its range. The subject's own id does not: it carries `aboutClass` of the record's class and writes
+no triple (report 14 section 3.1). Report 02's separate `references` annotation is not used.
 
 ### 4.4 ConceptScheme and Concept
 
 ```ts
 // sketch, not code: packages/foundation/modeling/vocabulary/src/Scheme.schema.ts
+// The notation is the key of ConceptScheme.concepts, not a field here (report 14 section 2.6).
 export class Concept extends S.Opaque<Concept, { readonly brand: unique symbol }>()(
   S.Struct({
-    notation: Notation.pipe(S.annotateKey({ description: "The code a record stores; never changes" })),
     ...termFields,
     broader: Notation.pipe(
       S.annotateKey({ description: "The concept of the same scheme this one narrows" }),
@@ -450,16 +440,19 @@ export class ConceptScheme extends S.Opaque<ConceptScheme, { readonly brand: uni
   S.Struct({
     ...termFields,
     closed: S.Boolean.pipe(S.annotateKey({ description: "Every value a record here may hold is listed" })),
-    concepts: S.NonEmptyArray(Concept).pipe(
-      S.annotateKey({ description: "Its codes, in the order a screen lists them" })
+    concepts: S.Record(Notation, Concept).pipe(
+      S.annotateKey({ description: "Its codes, keyed by notation, in the order a screen lists them" })
     )
   }).pipe($I.annoteSchema("ConceptScheme", { description: "One closed code list" }))
 ) {}
 ```
 
-`broader` names a notation of the same scheme, never another scheme's concept: a cross-scheme link is an alignment
-row or a property, not a hierarchy. A source system's spelling ("each" for `EA`) is not an `altLabel`: reading it is a
-record rule of the import (decision 2), and an `altLabel` is a name people use.
+`broader` names a notation key of the same scheme, never another scheme's concept: a cross-scheme link is an alignment
+row or a property, not a hierarchy. An empty concepts record fails V3. A source system's spelling ("each" for `EA`) is
+not an `altLabel`: reading it is a record rule of the import (decision 2), and an `altLabel` is a name people use. A
+concept listed in the proposal a scheme's ruling covers names that scheme's `rat-` record, not one of its own
+(decision 101). A concept added later to a ratified scheme is a proposal of its own. The thread's 18 rulings are seven
+classes, nine properties and two schemes.
 
 ### 4.5 AlignmentRow
 
@@ -510,14 +503,12 @@ export const InventoryNamespace = Namespace.check(
 //   properties: { parent }, disjoint: pairs gist states between classes already admitted }
 // properties.parent is the named rdfs:subPropertyOf. Domain and range are not stored (decision 16).
 // classes.parents includes named ancestors, as names and links only (decision 14).
-// The thin thread admits gist:Person (decision 94), TemporalRelation and Assignment, and the gist parents
-// of Organization and AuditEntry (decision 46). Each brings its ancestors (decisions 13 and 14). Tenant's
-// parent is the local class Organization (decision 38). Role has no gist parent. Permission waits (decisions 13 and 41).
+// Which gist names the thin thread admits, and Role's missing parent, are report 14 sections 2.1 and 2.5 (decision 97).
 
 export class Vocabulary extends S.Opaque<Vocabulary, { readonly brand: unique symbol }>()(
   S.Struct({
     namespace: Namespace.pipe(S.annotateKey({ description: "Foundation shape. The inventory module decodes with InventoryNamespace" })),
-    version: S.SemVerFromString.pipe(S.annotateKey({ description: "The version, written by hand (pending Q5)" })),
+    version: S.SemVerFromString.pipe(S.annotateKey({ description: "The version, written by hand (decision 24): 0.y.0 before publication" })),
     gist: GistProjection.pipe(S.annotateKey({ description: "Gist names the slice needs, their ancestors, and the disjoint pairs among them (decisions 13 to 16)" })),
     prefixes: S.Array(PrefixEntry).pipe(S.annotateKey({ description: "The use of each prefix, beside the one registry; the IRI is not stored again" })),
     classes: S.Record(ClassKey, ClassTerm).pipe(S.annotateKey({ description: "The classes, by key" })),
@@ -545,13 +536,14 @@ against the schema's encoded side. It is decoded in a test, not built with `.mak
 decoded type and its keys widen to `string`.
 
 ```ts
-// sketch, not code: packages/kernel/src/internal/terms/Terms.vocab.ts (decision 9, public entry ./Terms)
+// sketch, not code: packages/kernel/src/Terms.vocab.ts (decision 9, public entry ./Terms; report 14 section 2.6)
 import type { CoreVocab, Curie } from "@beep/identity/Vocab"
 
-export const namespace = "https://example.org/inventory-import/ontology/" as const   // decision 10; host stays the placeholder (decision 7)
+const base = "https://example.org/inventory-import" // the one literal (report 14 sections 2.6 and 6.7, rule 5)
+export const namespace = `${base}/ontology/` // decision 10; the host stays the placeholder (decision 7)
 
 export const classes = defineClasses({
-  Organization: {                                         // report 06's term, shown only for the form. In the thin thread (decision 8).
+  Organization: {                                         // report 06's term, shown only for the form. A thread class; no enrolled record points at it (report 14 section 2.1).
     prefLabel: "Organization",
     definition: "…",
     parent: { kind: "gist", term: "gist:Organization" },  // the form. The thread admits the parent report 11 gives Organization (decisions 8 and 13)
@@ -559,7 +551,7 @@ export const classes = defineClasses({
     identity: { kind: "stated", criterion: "The organization itself, the real body, not a tenant's record of it.", restsOn: [] },
     // Decision 34. The tenant's SourceRecord is a different class, reidentified by tenant, source system, source type and exact source id.
     source: { kind: "repository", path: "explorations/erp-ontology/research/01-starting-model.md" },
-    scope: ["repository"],                                  // once the thread's pointer names it (V15)
+    scope: ["repository"],                                  // the form. The thread has no pointer yet, so this is not a thread binding (V15, report 14 section 2.1)
     ratification: "rat-organization"                        // the rat- record's name (decision 32); the form only
   }
 })
@@ -569,11 +561,16 @@ export const objectProperties = defineProperties<ClassKey, SchemeKey>()({ /* dom
 export const datatypeProperties = defineProperties<ClassKey, SchemeKey>()({ /* same key pattern as object properties */ })
 export type PropertyKey = (keyof typeof objectProperties | keyof typeof datatypeProperties) & string
 export const schemes = defineSchemes({
-  MemberRoleScheme: { /* viewer, editor, admin: the thin thread, decision 41 */ },
-  GrantScopeKindScheme: { /* the one concept organization: the thin thread, decision 96 */ }
+  // Concepts are keyed by notation. Labels and definitions are report 14 section 2.4, not restated here.
+  MemberRoleScheme: { concepts: { viewer: {}, editor: {}, admin: {} } },
+  GrantScopeKindScheme: { concepts: { organization: {} } }
 })
 export type SchemeKey = keyof typeof schemes & string
-export type ConceptName = `${SchemeKey}-${string}` // each scheme's own notations; not tried under tsrs
+type Schemes = typeof schemes
+/** Derived from the notation keys, so a misspelt notation does not compile (report 14 section 2.6). Not `${SchemeKey}-${string}`. */
+export type ConceptName = {
+  [S in keyof Schemes & string]: `${S}-${keyof Schemes[S]["concepts"] & string}`
+}[keyof Schemes & string]
 
 /** One stored registry, one IRI. The four Curie views below are slices of it (`{ iri, terms }`), not four copies
  *  of the namespace and not a second list of hand-written keys. Concept names are in `concepts`, or a concept CURIE
@@ -610,9 +607,13 @@ of the ones before, with the same rule also held at run time by `violations`. Ne
 `Curie<V>` in `Vocab.ts` reads only `V[Prefix]["terms"][number]`, a union, so the registry's `terms` need not be a
 tuple; `R.keys` is typed `Array<K & string>`, which keeps the union. `@prefix` lines and those Curie types are generated
 from this one registry. A prefix's use (local, gist or alignment) sits beside it. `mergeVocab` replaces a whole prefix
-of the base, so it is used only when the prefix is new, not to recopy `owl` or `xsd`. `CoreVocab` has no `xsd` or `gist`
-prefix and no `owl:disjointWith`, `owl:AllDisjointClasses`, `owl:members` or `owl:versionIRI`: those terms are added to
-the one vendored term list, in one place. `CoreVocab` also writes `https://schema.org/` where `namespaces.json` writes
+of the base, so an extension's entry replaces the vendored entry of the same prefix. `CoreVocab` has no `xsd` or `gist`
+prefix and no `owl:disjointWith` or `owl:versionIRI`. The vendored file is not edited: `vendor:check` would fail, and
+its first line says not to (report 14 section 7.3). `@beep/vocabulary` builds its own registry with `mergeVocab`,
+adding `disjointWith` and `versionIRI` on `owl` and an `xsd` prefix whose terms, for the thread, are `string` and
+`dateTime` (report 14 section 7.3). A later slice that emits another leaf adds it there.
+`owl:AllDisjointClasses` and `owl:members` are not added. Gist names stay in the kernel module, not in that registry.
+`CoreVocab` also writes `https://schema.org/` where `namespaces.json` writes
 `http://schema.org/`; report 11 picks one. Prefixes are unique, namespace IRIs are unique, exactly one prefix has use
 `local`, and that prefix's IRI equals `Vocabulary.namespace` (V8). A duplicate, or a local prefix that points elsewhere,
 fails `violations`.
@@ -631,18 +632,27 @@ export const pointerFor =
   <const V extends VocabShape>() =>
   <const C extends Curie<V>>(term: C): { readonly term: C } => ({ term })
 
-/** A lift path. Returns `{ path }`, not `{ term }` (decision 20 includes this helper). */
-export const aboutPath = (path: LiftPath): { readonly path: LiftPath } => ({ path })
+/** Generic in the three name types. Foundation does not import the kernel (report 14 sections 3.2 and 7.2). */
+export const pathFor = <C extends string, P extends string, K extends string>() =>
+  <const Path extends LiftPath<C, P, K>>(path: Path): { readonly path: Path } => ({ path })
 
-/** A stated absence. Decision 21. A field may carry it (decision 93). */
-export const noTerm = (reason: NoTermReason): { readonly noTerm: NoTermReason } => ({ noTerm: reason })
+/** Decision 21, plus deferred (decision 98). The value is an object, so deferred can name its slice. */
+export type NoTermReason = "transport" | "request" | "screen" | "error" | "bookkeeping"
+export const noTermFor = <Slice extends string>(): {
+  (reason: NoTermReason): { readonly noTerm: { readonly reason: NoTermReason } }
+  (reason: "deferred", slice: Slice): { readonly noTerm: { readonly reason: "deferred"; readonly slice: Slice } }
+} => /* ... */
 
-// sketch, not code: packages/kernel/src/Terms.pointer.ts, public entry ./TermsPointer
-// Types only. Runtime construction imports neither the inventory value nor a barrel that loads it.
-import type { InvClassVocab, InvPropertyVocab, InvSchemeVocab, InvConceptVocab } from "./internal/terms/Terms.vocab.ts"
-export const aboutClass = pointerFor<InvClassVocab>()        // on a record schema
+// sketch, not code: packages/kernel/src/Terms.pointer.ts, public entry ./TermsPointer (report 14 section 3.2)
+// The kernel binds the name types. Runtime construction imports neither the inventory value nor a barrel that loads it.
+import { noTermFor, pathFor, pointerFor } from "@beep/vocabulary/Pointer"
+import type { Curie } from "@beep/identity/Vocab"
+import type { InvClassVocab, InvConceptCurie, InvPropertyVocab, InvSchemeVocab } from "./Terms.vocab.ts"
+export const aboutClass = pointerFor<InvClassVocab>()        // a record, and the one field that is the subject's id
 export const aboutProperty = pointerFor<InvPropertyVocab>()  // on a field
 export const aboutScheme = pointerFor<InvSchemeVocab>()      // on a Literals schema: the scheme, not the class
+export const aboutPath = pathFor<Curie<InvClassVocab>, Curie<InvPropertyVocab>, InvConceptCurie>()
+export const noTerm = noTermFor<"party">()                   // the thread's one slice name; later slices add theirs
 
 // sketch, not code: in a contract package
 export const StoredItem = S.Struct({ /* … */ }).annotate({
@@ -656,16 +666,19 @@ export const StoredItem = S.Struct({ /* … */ }).annotate({
 // The same known property CURIE written by hand into the annotation, with no helper, is the projector's negative case.
 ```
 
-Two slots. A Literals schema carries `aboutScheme` of its scheme: `Role` carries `aboutScheme("inv:MemberRoleScheme")`,
-and `Uom` carries `aboutScheme("inv:UnitOfMeasureCodeScheme")`. The field carries `aboutProperty` of the property, which
-may be class-ranged. `aboutProperty("inv:baseUnit")` on `uom` is that property pointer, not the scheme pointer.
+Two slots, and the subject's id. A Literals schema carries `aboutScheme` of its scheme: `Role` carries
+`aboutScheme("inv:MemberRoleScheme")`, and `Uom` carries `aboutScheme("inv:UnitOfMeasureCodeScheme")`. The field
+carries `aboutProperty` of the property, which may be class-ranged. `aboutProperty("inv:baseUnit")` on `uom` is that
+property pointer, not the scheme pointer. The one field that is the subject's id carries `aboutClass` of the record's
+own class, in the key annotations, and writes no triple (report 14 section 3.1). The six positions are that section's.
 
 Why a helper and not a declaration that adds `term` to Effect's `Annotations` interface: that interface has the index
 signature `readonly [x: string]: unknown` (`Schema.ts`, `Annotations.Annotations`), so a misspelt annotation name
 (`trem`) would still compile, and a module augmentation is one type for the whole program, which every package sees.
 The helper writes the name itself and is typed per position. Decision 20 also augments `@alchemy.run/domain`'s
 `Annotations` with that same `term` annotation. The augmentation is not Effect's `Annotations` interface, and it does
-not replace the helpers. At run time the projector reads the annotation with
+not replace the helpers. The thread does not write it: no enrolled record is an Alchemy block (report 14 section 1.3).
+The slice that enrols the first block does. At run time the projector reads the annotation with
 `S.resolveAnnotations` or `S.resolveAnnotationsKey`, gets `unknown`, and decodes it with the registry for that position
 (class, property or scheme), or checks the resolved term's kind after decoding. `makeCurieFromIri` on one combined
 registry is not the twin of that kind check: it fails only with "Unknown CURIE", so a known property CURIE written by
@@ -679,41 +692,23 @@ with the wrapper's own key annotations (`SchemaAST.ts` 4546-4555). This is the o
 (description first): the description still goes first or inside the wrapper, the pointer last.
 
 A record that stands for no term says so rather than leaving it out: `noTerm("transport")` for a transport payload
-such as `UploadChunk` (report 01's representation layer), with the reason from report 12's closed list (transport,
-request, screen, error, bookkeeping; decision 21), so a forgotten pointer can be told from a stated absence. Decision 22 requires every field of a record that points
-at a term to carry a pointer or `noTerm` with a reason, and the SHACL shapes are closed. The thread's gates 5 and 7
-are enrolled on the access contract and the four kernel records only (`Member`, `Role`, `Activity` and `AgentRun`;
-decision 95). A catalog declaration, and a kernel schema outside those four, is not a missing pointer. The terms
-placed there are `Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`, `AuditEntry` (decision 46),
-`MemberRoleScheme` and `GrantScopeKindScheme` (decision 96). `Role` is a Literals schema, so its pointer is
-`aboutScheme("inv:MemberRoleScheme")`, which a class-annotation scan does not see. The `Member` record stands for
-the membership. Its copied fields, the person's name, the organization's name and the sign-in email, are `noTerm`
-with reason `screen` (decision 93). Only `role` is lifted, to its `Grant`, and that grant carries `grantScope`
-(decisions 40 and 96). `organizationId` fills `membershipIn`, whose range is `Tenant` (decision 38). The link from
-`Member` to `Person` is not a name or email path (decision 94). The party slice follows and adds the name path
-through the person and the email path through the sign-in account.
+such as `UploadChunk` (report 01's representation layer), with the reason from the closed list (transport, request,
+screen, error, bookkeeping, or deferred with its slice; decisions 21 and 98), so a forgotten pointer can be told from
+a stated absence. Decision 22 requires every field of a record that points at a term to carry a pointer or `noTerm`
+with a reason. The SHACL shapes are closed when that slice is built; the thread does not build SHACL (report 14
+section 1.3). Enrolment is a named list of records (decision 99), not the access contract as a folder and not four
+kernel records. The thread's list and each field's mark are report 14 sections 3.6 and 3.7. The kernel `Member` has
+no email field; its two copied names are `noTerm` with reason `screen` (decision 93, report 14 section 3.3). The
+People page record's `email` and `joinedAt` are `noTerm`, reason deferred, naming the party slice (decision 100). A
+schema not on the list is not a missing pointer. How a mark sits on a `Model.Class`, including `Activity`, is report
+14 section 3.5.
 
 A field whose value is not one property of its record's subject carries a lift path. The record's subject and the
-subject reached before the last step are different. The thin thread's one lift is `Member.role` (decisions 8, 40 and 96).
-Catalog and stock use the same steps later (sketch, not code):
+subject reached before the last step are different. The thin thread's one lift, `Member.role`, is report 14 section 4.
+Its value step names no node. Catalog and stock use further steps later (sketch, not code). The `value: { kind }`
+form below is that later extension, not the thread's `{ property, concept }` (report 14 section 4.3):
 
 ```ts
-// Thin thread. The record subject is Member. The subject before the last step is Grant (decisions 40 and 96).
-// grantsRole is class-ranged over Role. The role concepts are also Role individuals (decision 41), so this is not a scheme leaf.
-// The thread ships Role without permits, so this path has no permits step (decisions 13 and 41).
-// The Grant carries grantScope, fixed to the one concept organization of GrantScopeKindScheme (decision 96).
-role: RoleLiterals.pipe(S.annotateKey({ ...aboutPath([
-  { property: "inv:grantedTo", reverse: true, node: "inv:Grant",
-    fixed: [{ property: "inv:grantScope", value: { kind: "concept", curie: "inv:GrantScopeKindScheme-organization" } }] },
-  { property: "inv:grantsRole", node: "inv:Role" }
-]) }))
-// Decision 38: membershipIn ranges over Tenant, not over every Organization.
-organizationId: OrganizationId.pipe(S.annotateKey({ ...aboutProperty("inv:membershipIn") }))
-// Decision 94: one link from Member to Person. It is not a path, and the name and email fields stay noTerm (decision 93).
-// Decision 93, thin thread: copied fields are not facts about the membership.
-personName: PersonName.pipe(S.annotateKey({ ...noTerm("screen") }))
-organizationName: OrganizationName.pipe(S.annotateKey({ ...noTerm("screen") }))
-email: Email.pipe(S.annotateKey({ ...noTerm("screen") }))
 // Later slices, not the thread. The party slice writes the email path through SignInAccount. It is not drawn here.
 sku: Sku.pipe(S.annotateKey({ ...aboutPath([
   { property: "inv:identifiedBy", node: "inv:ItemIdentifier",
@@ -729,9 +724,11 @@ vendors: Vendors.pipe(S.annotateKey({ ...aboutPath([
 uom: Uom.pipe(S.annotateKey({ ...aboutProperty("inv:baseUnit") })) // property pointer; the Literals schema has aboutScheme
 ```
 
-A step's `node` names the class of the node it reaches. `fixed` is a concept CURIE (`inv:<SchemeKey>-<notation>`, a
-term of `InvConceptVocab`, not a class, property or scheme key), a named individual of the range class, a datatype
-literal, or a reference to the tenant or a sibling field, checked against that property's range. `issuedBy` may be the
+For a later slice, a step's `node` names the class of the node it reaches. `fixed` is a concept CURIE
+(`inv:<SchemeKey>-<notation>`, a term of the kernel's concept registry, not a class, property or scheme key), a named
+individual of the range class, a datatype literal, or a reference to the tenant or a sibling field, checked against
+that property's range. The thread's fixed entry is `{ property, concept }` and its value step names no node (report
+14 section 4.3). `issuedBy` may be the
 tenant (range `Organization`). `minorUnitScale` may be an integer. A value map sends a boolean or a tag literal to a
 named concept of the range scheme (`lotTracked`, stocking). A sibling field supplies the unit of `quantityOnHand`,
 `reorderPoint` and `unitCost` (from `uom`) and of the three dimensions (from `Dimensions.unit`). The lift's context
@@ -744,41 +741,43 @@ context, fan-out) were not tried.
 
 None of these checks is built. "Type-check" means the repository's `tsrs` run in `bun run check`; "decode" the fast
 test that decodes the module through `Vocabulary`; "rules" the `violations` function in that test; "projector" and
-"laws" are report 12's.
+"laws" are report 12's. Where a row gives a gate number for the thin thread, report 14 section 6 is the one to follow.
 
 | # | Rule | Checked by | Fails as |
 | --- | --- | --- | --- |
-| V1 | Every ClassTerm has a `prefLabel`, a `definition` and one `parent`; a `none` parent carries a reason | type-check (required fields), decode | a missing-key error naming the class |
+| V1 | Every ClassTerm has a `prefLabel`, a `definition` and one `parent`; a `none` parent carries a reason, and V25 checks that reason against the exception list (decision 97) | type-check (required fields), decode | a missing-key error naming the class |
 | V2 | Following live `local` parents and category parents from any class ends at a `gist` or `none` parent, with no cycle and no missing key (`Graph.directed`, `Graph.isAcyclic`, `Graph.findCycle` from `effect/Graph`). Under decision 33(a), which is open, a retained historical entry is not a live parent: a live parent or category parent whose target has retired is retargeted or removed. A historical replacement edge is not a parent | rules | the cycle or the missing key |
-| V3 | Keys are unique within a kind by the object literal (a duplicate property is a compile error), and no key appears in two of the four tables (classes, schemes, objectProperties, datatypeProperties), checked by `violations`. A class key may itself end in `Scheme`, and the two property tables share one key pattern, so the patterns do not prevent a collision. A property key is lowerCamel and so differs from a class or scheme key. Notations are unique within their scheme. Negative examples: `MemberRoleScheme` as both a class and a scheme, and one key in both property tables (one IRI declared `owl:ObjectProperty` and `owl:DatatypeProperty`, outside OWL 2 DL) | type-check, decode, rules | the duplicate |
+| V3 | Keys are unique within a kind by the object literal (a duplicate property is a compile error), and no key appears in two of the four tables (classes, schemes, objectProperties, datatypeProperties), checked by `violations`. A class key may itself end in `Scheme`, and the two property tables share one key pattern, so the patterns do not prevent a collision. A property key is lowerCamel and so differs from a class or scheme key. Notations are unique within their scheme because a concept is keyed by its notation, and an empty concepts record fails (report 14 section 2.6). Negative examples: `MemberRoleScheme` as both a class and a scheme, and one key in both property tables (one IRI declared `owl:ObjectProperty` and `owl:DatatypeProperty`, outside OWL 2 DL) | type-check, decode, rules | the duplicate, or the empty scheme |
 | V4 | Keys and notations match their patterns, and no property key is an RDF keyword. A negative fixture with an otherwise valid, unreferenced class under a wrongly cased key (`partyRecord`) must fail the decode | decode | an unexpected-key error naming the key (the strict decode); the pattern is not named |
 | V5 | No inverse: the metamodel has no field for one, and the generated Turtle contains no `owl:inverseOf`; two object properties whose domain and range are swapped are listed for review, not failed | type-check (no field), projector (text check), rules (review list) | the property pair |
 | V6 | No identity by mapping: the predicate list has no `owl:sameAs` or `owl:equivalentClass`; two local terms may not both `exactMatch` one external term, since that states they are one | type-check, rules | the two subjects and the object |
 | V7 | `broader` names a notation of the same scheme, and the `broader` links of a scheme form no cycle | rules | the scheme and the cycle |
 | V8 | An alignment row's subject resolves to a local term; its CURIE object's prefix is in the one registry and its use is gist or alignment, never the local namespace; a gist object is not also its subject's gist parent; no two rows share subject, predicate and object. Prefixes are unique, namespace IRIs are unique, there is exactly one prefix whose use is local, and that prefix's IRI equals `Vocabulary.namespace`. A prefix is a bounded token and its IRI is an absolute IRI. A duplicate, or a local prefix that points elsewhere, fails `violations` | type-check (prefix in the template literal type), rules | the row |
-| V9 | A pointer resolves to a term of the kind its position needs: a record to a class, a field to a property, a Literals schema (on the AST: a `Union` whose members are all `Literal`; the check reads the members' `literal` values) to a scheme. The projector decodes with the registry for that position, or checks the resolved term's kind after decoding. `makeCurieFromIri` on one combined registry is not that check: a known property CURIE written by hand on a record would decode there. A field marked `noTerm` is not a property pointer (decision 93) | type-check (`aboutClass`, `aboutProperty`, `aboutScheme`), projector (the registry for that position) | the record and the CURIE, including that known property |
-| V10 | Every exported schema of an enrolled set carries a pointer or a stated `noTerm`, and every field of a record that points at a term carries a pointer or `noTerm` with a reason (decision 22). For the thin thread that set is the access contract and the four kernel records only (`Member`, `Role`, `Activity`, `AgentRun`; gates 5 and 7, decision 95). The terms placed there are `Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`, `AuditEntry` (decision 46), `MemberRoleScheme` and `GrantScopeKindScheme` (decision 96). `Member`'s copied name and email fields are `noTerm` with reason `screen` (decision 93). A catalog declaration, and a kernel schema outside those four, is not a missing pointer | laws (report 12's `laws ontology-terms`) | the schema's identifier |
+| V9 | A pointer resolves to a term of the kind its position needs: a record to a class, a Literals schema (on the AST: a `Union` whose members are all `Literal`; the check reads the members' `literal` values) to a scheme, and a field to a property, except the one field that is the subject's id, which names the record's own class and writes no triple (report 14 section 3.1). The projector decodes with the registry for that position, or checks the resolved term's kind after decoding. `makeCurieFromIri` on one combined registry is not that check: a known property CURIE written by hand on a record would decode there. A field marked `noTerm` or `path` is not a property pointer | type-check (`aboutClass`, `aboutProperty`, `aboutScheme`, `aboutPath`), projector (the registry for that position) | the record and the CURIE, including that known property |
+| V10 | Every exported schema of an enrolled set carries a pointer or a stated `noTerm`, and every field of a record that points at a term carries a pointer or `noTerm` with a reason (decision 22). Enrolment is a named list of records (decision 99), not a folder and not four kernel records. The thread's list and each field's mark are report 14 sections 3.6 and 3.7. The kernel `Member` has no email field; its two copied names are `noTerm` with reason `screen` (decision 93, report 14 section 3.3). The People page record's `email` and `joinedAt` are `noTerm`, reason deferred, naming the party slice (decision 100). A schema not on the list is not a missing pointer | laws (report 12's `laws ontology-terms`; the thread's gate 7 is report 14 section 6.7) | the schema's identifier |
 | V11 | Datatype compatibility uses the type side and the numeric checks, as report 12 section 1.2: `isInt` is `xsd:integer`, a number that is not `isInt` is `xsd:double`, and representation id `effect/schema/BigDecimal` is `xsd:decimal`. The encoded side is used for lexical form and constraints (pattern, length), not for the datatype. `UnitCost`'s type side is `BigDecimal` even though the wire leaf is string. An integer and a float filling one property still need the stated `xsd:decimal` conversion of decision 50 (an integer as its digits; a float as its shortest round-trip digits; a decimal digits string to `xsd:integer` minor units by `digitsAtScale(n)`, decision 59). Checks such as patterns may differ | projector | the property and the two fields with their leaves |
-| V12 | A field that carries `aboutScheme` is checked whether or not the filled property's range is a scheme. It is a Literals schema (on the AST: a `Union` whose members are all `Literal`; the check reads the members' `literal` values) each of whose literals is a notation of that scheme; a field may allow a subset (section 7). A missing scheme notation is an error only when the binding is declared to cover the whole scheme, and then the two sets are equal. The failure names the field and each literal that is not a notation, not an unused scheme concept. A field with a value map need not be a Literals schema. When the filled property is class-ranged, each of those notations is also a concept whose `alsoInstanceOf` resolves to that class or a subclass (`baseUnit` and `unit` over `UnitOfMeasure`; `grantsRole` and `maxRole` over `Role`). Those properties keep their class ranges. A retired notation may stay in the decoding literals so a stored code still reads (decision 33, open); that is not a live assignment. A schema annotation that names a retired term is a different case (V14) | gate 4 (report 12), over the bindings | the field and each literal that is not a notation of the scheme |
+| V12 | A field that carries `aboutScheme` is checked whether or not the filled property's range is a scheme. It is a Literals schema (on the AST: a `Union` whose members are all `Literal`; the check reads the members' `literal` values) each of whose literals is a notation of that scheme; a field may allow a subset (section 7). A missing scheme notation is an error only when the binding is declared to cover the whole scheme, and then the two sets are equal. The failure names the field and each literal that is not a notation, not an unused scheme concept. A field with a value map need not be a Literals schema. When the filled property is class-ranged, each of those notations is also a concept whose `alsoInstanceOf` resolves to that class or a subclass (`baseUnit` and `unit` over `UnitOfMeasure`; `grantsRole` and `maxRole` over `Role`). Those properties keep their class ranges. A retired notation may stay in the decoding literals so a stored code still reads (decision 33, open); that is not a live assignment. A schema annotation that names a retired term is a different case (V14) | in the thread, gate 5 rule P8 (report 14 section 6.5); report 12 had numbered this gate 4 | the field and each literal that is not a notation of the scheme |
 | V13 | A direct `aboutProperty` field is checked only when that property's domain is a declared local or gist class, and then the record's `aboutClass` must name that domain or a subclass of it. A property whose domain is the `none` case is not checked here; the record's own shape says where it may sit. A field whose pointer is a lift path is not checked here; V23 checks the path. The record's subject and the subject reached before the path's last step differ: `Member.role` is stored on a member and fills `grantsRole` only after a reversed step to `Grant` | projector | the field, its record's class and the domain |
 | V14 | `replacedBy` names the immediate same-metatype successor at retirement. The successor exists, and replacement edges form no cycle; the check does not require each target to stay live. Following the chain to a live term is not the same case as a retirement with a reason and no successor. A deprecated term keeps its label and definition. `since` is not later than the module's version. A term with no replacement has a reason. No pointer names a deprecated term. A historical notation that still resolves through a live scheme or property is not that pointer. Under decision 33(a), which is open, a live parent, category parent, domain, range or active disjointness reference to a retired term is retargeted or removed; a historical replacement edge is not such a dependency | rules, projector | the term |
-| V15 | A term's `scope` is a non-empty set. In the inventory profile the only tokens are `repository`, `sutton` and `later`. `repository` is a member if and only if at least one TermBinding names that term. A TermBinding is a schema pointer, not a SQL table. `sutton` and `later` are independent, and a missing binding does not imply them. Scope is compared with the active slice's bindings, not with every schema the vocabulary will one day cover. The thin thread's bindings are the records and fields it places: `Organization`, `Tenant` (decision 38), `Person` (decision 94), `Member`, `Role` by `aboutScheme("inv:MemberRoleScheme")`, the `role` path to `Grant` with `grantScope` (decisions 40 and 96), `GrantScopeKindScheme` and `AuditEntry` (decision 46). `Member`'s copied name and email fields are `noTerm`, not bindings (decision 93). The link to the person is a binding, and a name or email path is not (decision 94). A catalog declaration, and a kernel schema outside the four records decision 95 enrols, is not a missing pointer | rules, given the bindings | the term and its bindings |
+| V15 | A term's `scope` is a non-empty set. In the inventory profile the only tokens are `repository`, `sutton` and `later`. `repository` is a member if and only if at least one TermBinding names that term. A TermBinding is a schema pointer, not a SQL table. `sutton` and `later` are independent, and a missing binding does not imply them. Scope is compared with the active slice's bindings, not with every schema the vocabulary will one day cover. Which of the thin thread's terms a schema pointer names is report 14 section 3. A class no enrolled record points at is not a `repository` binding. `membershipOf`, the link from a member to the person, has no record field: it is fixture evidence, not a binding (report 14 sections 3.3 and 6.5, rule P11). The kernel `Member` has no email field, and its two copied names are `noTerm`, not bindings (decision 93). A schema outside the named list (decision 99) is not a missing pointer | rules, given the bindings | the term and its bindings |
 | V16 | A disjoint group has two or more members, each a class whose tag is rigid (kind, subkind, relator, event, information, value), none an ancestor of another, and no two groups list the same members | rules | the group |
-| V17 | Tag and identity agree: kind, relator, event, information and value carry `stated` or `unresolved`; subkind and phase carry `inherited`; a role whose parent link is a local class carries `inherited` (the bearer's criterion); a role with no local parent, and every category, carry `notApplicable`. `Tenant` is the inherited case, and the thread ships it under `Organization`, keyed by `OrganizationId` (decision 38). `Role` is the exception decision 41 states: its individuals are the concepts of `MemberRoleScheme` under the same IRI, and that individual has one identity criterion, the concept's, its scheme and its notation. That criterion is `stated` on `Role`. It is not the bearer's and it is not `notApplicable`. The thin thread ships `Role` without `permits` | rules | the class |
+| V17 | Tag and identity agree: kind, relator, event, information and value carry `stated` or `unresolved`; subkind and phase carry `inherited`; a role whose parent link is a local class carries `inherited` (the bearer's criterion); a role with no local parent, and every category, carry `notApplicable`. `Tenant` is the inherited case, and the thread ships it under `Organization`, keyed by `OrganizationId` (decision 38). `Role` is the exception decision 41 states: its individuals are the concepts of `MemberRoleScheme` under the same IRI, and that individual has one identity criterion, the concept's, its scheme and its notation. That criterion is `stated` on `Role`. It is not the bearer's and it is not `notApplicable`. The thin thread ships `Role` without `permits`. Its lack of a gist parent is decision 97, checked by V25, and is not an identity exception | rules | the class |
 | V18 | On a `stated` criterion, and on `unresolved.question` and `unresolved.reidentifiedBy`, a `restsOn` that names `name`, `identifierText`, `identifierKey`, `email` or `accountEmail` fails, and a sentence that mentions a SKU, a name or an email is listed for review (project profile; 04's CQ-I08; the brief's no-go). Writing the criterion only under `unresolved` does not escape the check. A class under `gist:ID` may rest on `identifierText` or `identifierKey` when the criterion also includes the issuer and the kind or the scheme (`ItemIdentifier`, `TrackingCode`, `PartyIdentifier`). The thing the identifier refers to may not (`ItemSpecification`, `Person`, `Organization`, lots, labels) | rules (a failure on `restsOn`; a review list on the sentence, since a word match cannot judge meaning) | the class and the property or sentence |
 | V19 | A definition does not contain its own label, and no two classes or two schemes share a label | rules (review list) | the term |
 | V20 | Foundation checks that a namespace is an absolute IRI. The inventory module derives the term namespace from one configured project base and, before publication, still requires the host `https://example.org/` (`InventoryNamespace`, decision 7). External vocabulary namespaces stay on their own prefixes. No IRI is minted under Sutton's domain or a customer's subdomain. Changing the host guard is an inventory-module change, not a foundation edit | decode (inventory `InventoryNamespace`), projector | the IRI |
 | V21 | A category parent is a local class tagged `category`; a category class names no identity (`notApplicable`), is in no disjoint group, and is never a class's `parent` link (pending Q8) | rules | the class |
 | V22 | A concept's `alsoInstanceOf` names a local class or a projected gist class (`InstanceClass`: `ClassTarget`'s `local` and `gist` cases, not `none`). A local target is allowed when its tag is kind, value or information, or when its tag is subkind and following local parents reaches a class with one of those tags (`PackagingUnit` under `UnitOfMeasure`). A gist target is allowed when the slice has admitted it (`gist:Aspect` only once a term needs it, decision 13, not the whole of report 11's table B). The check reads the resolved class, not only the immediate tag. Concepts of `MemberRoleScheme` are individuals of `Role` even if `Role`'s tag is `role` (decision 41). This does not answer decision 61. Each `links` entry names an object property whose domain covers that resolved class, local or gist, and whose range is the scheme of the linked concept | rules | the concept and the link |
-| V23 | Each step of a lift path names an existing property. A forward step's domain covers the node it leaves and a reversed step's range does. The node a step leaves is not always the record's subject. A path may end on a class node when nested fields carry their own paths (`vendors` ends on `VendorItem`). The last step is a datatype property, or an object property with a scheme range, only when the field's own value is that leaf. A class-ranged last step is allowed when each notation is a concept whose `alsoInstanceOf` resolves to that class or a subclass (`grantsRole` and `maxRole` over `Role`; `baseUnit` and `unit` over `UnitOfMeasure`); V12 checks the notations. A `fixed` value is a concept CURIE of the range scheme (`inv:<SchemeKey>-<notation>`, a term of `InvConceptVocab`, not a class, property or scheme key), a named individual of the range class (the currency of decision 88), a datatype literal (`minorUnitScale` as an integer), or a reference to the tenant or a sibling field (`issuedBy` as the tenant, range `Organization`), checked against that property's range. A value map sends a boolean or a tag literal to a named concept of the range scheme (`lotTracked`, stocking). A value may come from a sibling field (the unit of `quantityOnHand`, `reorderPoint` and `unitCost` from `uom`; the three dimensions from `Dimensions.unit`) or from the lift's context (tenant, confirmation, its instant). One field may fan out to several paths (`dimensions`). The thin thread's one lift is that case, not a conditional reading (decisions 8, 40 and 96): `Member.role` reverses `grantedTo` onto `Grant`, fixes `grantScope` to `inv:GrantScopeKindScheme-organization`, then follows `grantsRole`. There is no `permits` step in the thread (decision 41). `Member`'s copied name and email fields are `noTerm` with reason `screen` and are not paths (decision 93). The link from `Member` to `Person` is not a path (decision 94) | type-check (property CURIEs by `InvPropertyVocab`, node classes by `InvClassVocab`, a `fixed` concept by `InvConceptVocab`), projector (domain and range cover, the last step's kind) | the record, the field and the step |
+| V23 | Each step of a lift path names an existing property. A forward step's domain covers the node it leaves and a reversed step's range does. The node a step leaves is not always the record's subject. A path may end on a class node when nested fields carry their own paths (`vendors` ends on `VendorItem`). The last step is a datatype property, or an object property with a scheme range, only when the field's own value is that leaf. A class-ranged last step is allowed when each notation is a concept whose `alsoInstanceOf` resolves to that class or a subclass (`grantsRole` and `maxRole` over `Role`; `baseUnit` and `unit` over `UnitOfMeasure`); V12 checks the notations. A `fixed` value is a concept CURIE of the range scheme (`inv:<SchemeKey>-<notation>`, a term of `InvConceptVocab`, not a class, property or scheme key), a named individual of the range class (the currency of decision 88), a datatype literal (`minorUnitScale` as an integer), or a reference to the tenant or a sibling field (`issuedBy` as the tenant, range `Organization`), checked against that property's range. A value map sends a boolean or a tag literal to a named concept of the range scheme (`lotTracked`, stocking). A value may come from a sibling field (the unit of `quantityOnHand`, `reorderPoint` and `unitCost` from `uom`; the three dimensions from `Dimensions.unit`) or from the lift's context (tenant, confirmation, its instant). One field may fan out to several paths (`dimensions`). The thin thread's one lift is report 14 section 4, not a conditional reading: one node step, then a value step that names no node, with `fixed` as `{ property, concept }`. A second node on `grantsRole` is not that path. There is no `permits` step in the thread (decision 41). `Member`'s two copied names are `noTerm` with reason `screen` and are not paths (decision 93); the record has no email field (report 14 section 3.3). The link from `Member` to `Person` is not a path and not a field binding (decision 94, report 14 section 3.3) | type-check (the kernel's registries, report 14 section 3.2), projector (domain and range cover, the last step's kind) | the record, the field and the step |
 | V24 | A stated `datatype` on a property that a field fills agrees with V11; a stated datatype that every field now matches exactly is listed for removal | rules (review list) | the property |
-| V25 | A class's tag is one the gist class it first reaches admits: `gist:Event` and its subclasses, event; `gist:Content` and its subclasses, information; `gist:Magnitude`, value; `gist:TemporalRelation` and `gist:Assignment`, relator; `gist:Commitment`, `gist:Agreement` and `gist:Offer`, relator or kind; `gist:Specification`, `gist:CatalogItem`, `gist:TaskTemplate`, `gist:Permission` and `gist:Restriction`, kind or information; any other gist class, kind; a `none` parent, category. A subkind, role or phase is checked through its local parent | rules | the class, its tag and the gist class |
-| V26 | Every gist parent on a class, every `ClassTarget` of kind gist and every gist `subPropertyOf` names a gist entry the slice has admitted (decision 13), not a name from report 11's table B that nothing in the slice uses. A gist property parent is one report 11's section E names and that a taken property needs. Admitting a class admits its named gist ancestors, as names and links only (decision 14). A local `subPropertyOf` names a local property key. Each copied disjoint pair names two admitted classes, and only pairs gist states between those classes are copied (decision 15). The whole design of reports 04 to 12 is 24 such pairs. The thin thread copies only the pairs among the classes it admits. A sub-property is emitted only when its domain and range fall under the gist property's domain and range (decision 16). Those gist domain and range axioms are read from the pinned release and are not copied. A property with no parent emits none. The thin thread admits `gist:Person` (decision 94), `TemporalRelation` and `Assignment`, and the gist parents report 11 gives `Organization` and `AuditEntry` (decision 46), each with its named ancestors (decisions 13 and 14). `Tenant` is under the local class `Organization` (decision 38). It does not admit `gist:Permission`, and it does not parent `Role` under anything, because `Role` has no gist parent and ships without `permits` (decisions 13 and 41) | rules | the property or class, and the missing gist entry |
+| V25 | A class's tag is one the gist class it first reaches admits: `gist:Event` and its subclasses, event; `gist:Content` and its subclasses, information; `gist:Magnitude`, value; `gist:TemporalRelation` and `gist:Assignment`, relator; `gist:Commitment`, `gist:Agreement` and `gist:Offer`, relator or kind; `gist:Specification`, `gist:CatalogItem`, `gist:TaskTemplate`, `gist:Permission` and `gist:Restriction`, kind or information; any other gist class, kind. A subkind, role or phase is checked through its local parent. A `none` parent is not tagged category by this rule. It is allowed only when the class is on the committed exception list with the same reason text (decision 97). The thread's list and `Role` are report 14 section 6.4 rule C4, which replaces the old "none means category" reading for the thread. Category classes stay pending decision 12, and this rule does not admit them | rules | the class, its tag and the gist class, or the class missing from the list |
+| V26 | Every gist parent on a class, every `ClassTarget` of kind gist and every gist `subPropertyOf` names a gist entry the slice has admitted (decision 13), not a name from report 11's table B that nothing in the slice uses. A gist property parent is one report 11's section E names and that a taken property needs. Admitting a class admits its named gist ancestors, as names and links only (decision 14). A local `subPropertyOf` names a local property key. Each copied disjoint pair names two admitted classes, and only pairs gist states between those classes are copied (decision 15). The whole design of reports 04 to 12 is 24 such pairs. Which gist names and which pairs the thin thread admits, including that `Role` has no gist parent and `gist:Permission` is not admitted (decisions 41 and 97), are report 14 sections 2.1 and 2.5. A sub-property is emitted only when its domain and range fall under the gist property's domain and range (decision 16). Those gist domain and range axioms are read from the pinned release and are not copied. A property with no parent emits none | rules | the property or class, and the missing gist entry |
 
 V19 is a review list, and V18 is one for its sentence part, because a word match cannot tell a circular definition
 from a quoted one; the rest fail the check. V25 was added on 2026-11-22 after a review found relator tags on
 descriptions and content (07's `BomLine`, 06's `PortalAccess`, 09's `LineAllocation`) that no other rule caught.
-V26 holds the gist projection and `subPropertyOf` together. Decisions 13 to 16 are answered. A gist name is admitted
+V26 holds the gist projection and `subPropertyOf` together. The clause that made a `none` parent a category is
+withdrawn: decision 97 allows it only on the committed exception list (report 14 section 6.4). Decisions 13 to 16 are
+answered. A gist name is admitted
 when a term in the slice needs it (13), its named ancestors come with it as names and links only (14), disjointness is
 the pairs gist states between admitted classes and no others (15), and a sub-property link copies no gist domain or
 range (16). There are twenty-six rules, V1 to V26.
@@ -826,7 +825,8 @@ used to store is decision 33, which is open, and is not a live assignment.
 export const ItemRole = LiteralKit(["buy", "make", "sell"]).pipe(
   S.annotate({ ...aboutScheme("inv:ItemRoleScheme") })
 )
-// gate 4 (V12): each of ItemRole's literals is a notation of inv:ItemRoleScheme; "steal" fails as the field and that
+// In the thread this is gate 5 rule P8 (report 14 section 6.5), the check V12 describes. Each of ItemRole's
+// literals is a notation of inv:ItemRoleScheme; "steal" fails as the field and that
 // literal, not as an unused scheme concept. ItemRole is not declared to be the whole scheme, so a notation the field
 // leaves out is not a failure. A new concept changes no record until the record schema adds it.
 ```
@@ -866,7 +866,8 @@ Keys and local names:
 - A scheme key ends in `Scheme` (`ItemRoleScheme`), as both seeds write it; report 02's sketch wrote `inv:ItemRole`.
   A record's Literals schema may still be called `ItemRole` in code.
 - No key is an RDF keyword (`domain`, `range`, `label`, `type`), per `naming-conventions.md`.
-- A label is written by hand, sentence case as the module writes it ("Item roles"), and may change in a patch; a key
+- A label is written by hand, sentence case as the module writes it ("Item roles"), and may change without a new key.
+  Before publication that change still advances `y` (decision 24); it is not a patch bump. A key
   never changes. A notation is the stored value and never changes either; a label correction is compatible, a change
   of meaning is a new term and a deprecation (the architecture seed, section 6). A rename creates a new identifier and
   leaves the original retired. Report 12's historical inventory comparison detects a disappearance against the previous
@@ -874,10 +875,12 @@ Keys and local names:
 
 IRIs (decision 10):
 
-- One configured project base is written once, and the term namespace is derived from it. The placeholder is
-  `https://example.org/inventory-import/ontology/`, which `namespaces.json` gives (decision 7). The host restriction is
-  the inventory module's prepublication guard (V20), not a foundation rule. External vocabulary namespaces stay on
-  their own prefixes. Nothing is minted under Sutton's domain or a customer's subdomain.
+- One configured project base is written once, as the one literal `https://example.org/inventory-import`, and the term
+  namespace, the document IRIs and the data and fixture layers are derived from it (report 14 section 2.6). Gate 7's
+  rule 5 allows that literal in `packages/kernel/src/Terms.vocab.ts` only (report 14 section 6.7). The derived
+  placeholder namespace is `https://example.org/inventory-import/ontology/`, which `namespaces.json` gives (decision 7).
+  The host restriction is the inventory module's prepublication guard (V20), not a foundation rule. External vocabulary
+  namespaces stay on their own prefixes. Nothing is minted under Sutton's domain or a customer's subdomain.
 - Classes, properties and schemes sit directly under it: `inv:Organization`, `inv:isCustomer`, `inv:MemberRoleScheme`.
 - A concept is its scheme's key, a hyphen and its notation, under the same namespace:
   `inv:MemberRoleScheme-admin`, `https://example.org/inventory-import/ontology/MemberRoleScheme-admin` (decision 10).
@@ -889,18 +892,18 @@ IRIs (decision 10):
 - The ontology IRI is the namespace without its last `/`; its version IRI appends the version
   (`…/ontology/0.1.0`), as the architecture seed does.
 
-Versions (pending Q5): the module states its version as a literal, and the header reads it from there, never from the
-clock, so the byte-compare of decision 6 holds. The proposal: semantic versions, `0.x` until something is published.
-Classify a bump by what already conforming data and already answered questions do, not by the kind of edit. A patch
-changes wording only (a label, a definition, a scope note, an alternative label) or adds an alignment row. Adding a
-term or a concept that no existing data must already satisfy is a minor. Adding a disjoint group is not always a minor:
-an individual that is already both of the new members stops conforming, and that is major. Deprecating a term is not
-always a minor either. Reparenting, or no longer emitting a retired parent's axiom, can remove a competency-question
-answer the previous release gave; when the answer is lost, that is major. Narrowing a domain or a range, or changing
-the namespace, is major. Do not give every disjoint addition, every retirement or every reparent the same bump. A key
-and a stored notation never change in place. A major number is not permission to rewrite one. Meaning is never changed
-in place. Whether a check refuses a change to the generated Turtle with no change of version is report 12's; release
-notes are the curator's.
+Versions (decision 24): the module states its version as a semantic version string, and the header reads it from
+there, never from the clock, so the byte-compare of decision 6 holds. Before publication it stays `0.y`: any change
+advances `y`, and the third number stays 0. The thread's version is `0.1.0`; its header lines are report 14 section 8,
+not restated here. `1.0` is the first published namespace, when decision 7's placeholder is replaced. A change after
+which data or an answer that held before no longer holds is recorded as breaking in the release notes. What counts as
+that: an individual that is already both members of a new disjoint group stops conforming; reparenting, or no longer
+emitting a retired parent's axiom, can remove an answer the previous release gave; narrowing a domain or a range, or
+changing the namespace, does too. A wording change does not, but before publication it still advances `y`. Do not give
+every disjoint addition, every retirement or every reparent the same note. A key and a stored notation never change in
+place. A major number is not permission to rewrite one. Meaning is never changed in place. Whether a check refuses a
+change to the generated Turtle with no change of version is report 12's; the thread does not build that check (report
+14 section 8). Release notes are the curator's.
 
 Deprecation (pending Q4): a deprecated entry stays in the module for good. `replacedBy` is the immediate successor of
 the same metatype at the moment of retirement. The check requires that successor to exist and the replacement edges to
@@ -928,6 +931,10 @@ pointer helpers, importing the registry as types only). The projector and the ge
 its row in `laws boundaries`. The writer belongs to the ontology workspace, and no product import is added to the
 repository CLI. File names take a role suffix outside `internal/`
 (decision "file naming" of the ideal-architecture exploration); `.vocab.ts` and `.pointer.ts` would be new suffixes.
+The thread's packages, entries and the two boundary lines are report 14 sections 7.1 and 7.2: nothing imports
+`@inventory/ontology`, and that package may import the kernel and a context's contract. `@beep/vocabulary` does not
+import the kernel. The vendored `Vocab.ts` is not edited (report 14 section 7.3). The repository CLI still does not
+import the vocabulary.
 
 ## 10. What the term documents needed that this model first lacked
 
@@ -944,10 +951,11 @@ Read from 04 and 06 to 12 on 2026-11-22; each is now a field, a value or a rule 
 | A code that is also an individual of a class | 07 and 10 (units), 06 and 10 (member roles) | `alsoInstanceOf`, V22. `Role` is decided (decision 41). Units stay pending decision 61. |
 | A fact on a concept that points at another scheme | 10 (`hasDimension: count` on a unit) | `links`, V22 |
 | Whether a scheme is closed | 10 (rule 5) | `ConceptScheme.closed` |
-| A flat field that becomes a node or a path | 07 (`sku`, `unitCost`, `vendors`), 08 (`quantityOnHand`); the thin thread lifts only `Member.role` to a `Grant` that carries `grantScope` (decisions 8, 40 and 96); the link to `Person` is not a path (decision 94) | `TermPointer.path`, `LiftPath`, V23, including a value map, a sibling value, a context value and a fan-out |
-| A record with no term, and why | 12 (`noTerm`, closed list); decision 93 on three fields of `Member`; decision 22 on every field of a pointed record | `NoTermReason`, including reason `screen` on a field |
+| A flat field that becomes a node or a path | 07 (`sku`, `unitCost`, `vendors`), 08 (`quantityOnHand`); the thin thread's one path is report 14 section 4, and it does not use the four later constructs | `TermPointer.path`, `LiftPath`, V23. A value map, a sibling value, a context value and a fan-out are for later slices |
+| A record with no term, and why | 12 (`noTerm`, closed list); decision 93 on `Member`'s two copied names; decision 98 adds deferred; decision 22 on every field of a pointed record | `NoTermReason`, six reasons, the annotation an object so deferred can name its slice |
 | A source that is a published standard, or Sutton as a seed cites it | 06, 09, 11 | `TermSource` |
 | Disjointness written without a blank node | 12 (section 5, rules 9 and 10) | `DisjointGroup` emitted pairwise |
+| A class with no gist parent that is not a category | decision 97 (`Role`) | V25's exception list. The old "none means category" reading is withdrawn |
 
 Not taken into the model: 12's `inv:termCategory` (the other answer of Q1, decision 19), and a tag on properties
 (Q12's option C).
@@ -956,10 +964,13 @@ Not taken into the model: 12's `inv:termCategory` (the other answer of Q1, decis
 
 Moved on 2026-11-22 to the packet's [DECISIONS.md](../DECISIONS.md), "Open", merged with the other reports'
 questions. A "(pending Qn)" mark in this report means: Q1 is decision 19, Q2 is 10, Q3 is 11, Q4 is 33, Q5 is 24,
-Q6 is 20, Q7 is 9, Q8 is 12, Q9 is 31, Q10 is 32, Q11 is 29, Q12 is 18, Q13 is 33. Q2, Q3, Q6, Q7 and Q10 were
-answered the same day (decisions 10, 11, 20, 9 and 32), and those pending marks are gone. Decisions 22, 26, 38, 46
-and 94 to 96 are decided too; this report never marked them pending. The marks that remain are open. An open
-recommendation is the agent's, and nothing is built on it. The thin thread waits on none of them.
+Q6 is 20, Q7 is 9, Q8 is 12, Q9 is 31, Q10 is 32, Q11 is 29, Q12 is 18, Q13 is 33. Q2, Q3, Q5, Q6, Q7 and Q10 were
+answered (decisions 10, 11, 24, 20, 9 and 32), and those pending marks are gone. Decisions 22, 26, 38, 46 and 94 to
+101 are decided too. Decision 97 is a parentless class with its reason on a committed list. Decision 98 adds the
+`noTerm` reason deferred. Decision 99 enrols by named record. Decision 100 marks the People page record's `email`
+and `joinedAt` deferred to the party slice. Decision 101 covers a scheme's concepts with that scheme's ruling, so the
+thread needs 18 rulings. The marks that remain are open. An open recommendation is the agent's, and nothing is built
+on it. The thin thread waits on none of them.
 
 ## Not checked
 
@@ -973,8 +984,9 @@ recommendation is the agent's, and nothing is built on it. The thin thread waits
   against an N3 parser. Decision 26 chooses N3.js for the re-parse and Oxigraph for SPARQL in the thread, and shacl-engine with the SHACL slice; none of that was run here. Whether `annotateKey` on a field that already has a pointer keeps it was read in the source
   (`SchemaAST.ts` 4546-4555: a later `annotateKey` merges), not run. The strict decode's behaviour on the nested
   `Concept.links` record was read in the source, not run. The four lift constructs (value map, sibling value, context
-  value, fan-out) were not tried. The per-kind registries and the template-literal concept union were not tried under
-  `tsrs`.
+  value, fan-out) were not tried. The per-kind registries were not tried under `tsrs`. The loose concept name
+  `${SchemeKey}-${string}` is withdrawn; the type derived from notation keys (report 14 section 2.6) was not tried
+  under `tsrs` either.
 - `tsrs` (TypeScript 7.1 beta) inference of `const` type parameters and `satisfies` was assumed from TypeScript 5.
 - Report 02's beep-effect paths (`VocabularySeed`, `ConceptAlignment`) were not opened here.
 - The seed reports were read in their sections on namespaces, gist, taxonomy governance, the core header, the
@@ -982,5 +994,7 @@ recommendation is the agent's, and nothing is built on it. The thin thread waits
   report. The API design report's claim that gist renamed `CatalogItem` and deleted `Magnitude` disagrees with
   `gist-categories.md`, which found both in 14.1.0; this report follows `gist-categories.md` and did not re-check.
 - The other designers' reports (04, 06 to 12) did not exist when this was first written; the keys used here were
-  matched to them on 2026-11-22 (report 13). The fields added in section 10 were not compiled either.
-- `bun run docs:check` passed before this revision (92 files under `explorations/` then). This revision was not run through it, and nothing else was run.
+  matched to them on 2026-11-22 (report 13). Report 14 is the thin thread's specification and was read for this
+  revision; the thread was not re-derived past what that report states. The fields added in section 10 were not
+  compiled either.
+- `bun run docs:check` passed before this revision (92 files under `explorations/` then). This revision was not run through it, and nothing else was run. Report 14 exists now; that file count was not rechecked.

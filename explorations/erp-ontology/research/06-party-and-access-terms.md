@@ -10,19 +10,9 @@ The [decisions](../DECISIONS.md) settle the choices cited below. A term enters t
 `rat-` record of Benjamin's answer (decision 32). A pending choice goes to Benjamin with a concrete record when its
 slice is specified. Nothing is built on the recommendation before then.
 
-The thin thread comes first (decision 8): `Organization`, `Tenant`, `Person`, `Member`, `Role`, the `Grant` lifted
-from `member.role`, and `AuditEntry` (alternative label "Activity", decision 46). Their gist parents and those
-parents' ancestors come with them (decisions 13 and 14). `MemberRoleScheme` has viewer, editor and admin;
-`GrantScopeKindScheme` starts with organization (decision 96). The fixture links two memberships to one `Person`
-by `membershipOf`, with no name or email paths (decisions 93 and 94). Its one question is who belongs to this
-tenant and with which role. One tenant must return admin, the other viewer, each for its own membership only.
-
-Decision 95 puts gates 1 to 9 in the thread: byte-compare, re-parse, forbidden constructs and the namespace guard,
-vocabulary coherence, record pointers on the AST, type-check, `laws ontology-terms`, the question suite and the
-reasoner. Gates 5 and 7 cover only the access contract and the four kernel records. Each of the nine gates must
-fail once on a planted mistake. N3.js re-parses the output and Oxigraph runs the queries (decision 26). Gate 10 is
-open (decision 27). Gate 11 waits for the SHACL slice and uses shacl-engine; gate 12 waits for the alignment slice.
-No open decision blocks the thread. Slice 1, the party slice, follows.
+[Report 14](14-thin-thread.md) specifies the thin thread: sections 2 and 3 give its terms and record marks,
+sections 4 and 5 its lift and membership question, and section 6 its gates. The party slice follows it (decision 8).
+Under decision 101, a scheme's ruling covers the concepts listed in its proposal. A concept added later needs its own ruling (report 14 section 1.5).
 
 The section "Questions for Benjamin" maps each Qn to its decision. Keys were matched against 04, 05 and 07 to 12 on
 2026-11-22 (report 13): where two reports named one relation, one key now stands, and its row says whose it is.
@@ -36,7 +26,7 @@ competency-question suite. The code below is a sketch, not code.
   `SourceRecord`, not the body. There is no trading-relationship relator or role class for accounts.
 - Decision 4: gist is the only parent; W3C ORG, FIBO, schema.org, IBM's and Salesforce's models are comparisons and
   alignment candidates only (alignment rows belong to report 11).
-- Decision 7: `inv:` is a placeholder under `example.org`.
+- Decisions 7 and 24: `inv:` stays under `example.org` until publication at `1.0`. Before then each change advances `y` in the module's `0.y.0` version, never the clock. A change that invalidates earlier data or answers is recorded as breaking (report 14 section 8).
 - Report rules (report 01 and 02, carried by the project profile): no `owl:sameAs`, no `owl:inverseOf`, identity
   never from a SKU or a name, Turtle always generated.
 - Report 01 section 5 where the two seeds disagree. On parties they do not disagree: the API design report has no
@@ -104,7 +94,7 @@ Where a local class has a parent, its gist parent is given where it exists in `g
   (`PartyIdentifier` under `gist:ID`)
 - `ContactPoint` under `gist:ElectronicAddress`; `PostalAddress` under `gist:PhysicalAddress`
 - `Member` under `gist:TemporalRelation`; `Grant` under `gist:Assignment`. Admit a gist name to the profile when the slice needs it, with its named ancestors (decisions 13 and 14).
-- `Role` has no gist parent and no `permits` in the thin thread; `Permission` and its gist parent wait for Slice 1 (decision 41).
+- `Role` has no gist parent: its individuals are the role concepts, and `gist:Permission` fits once `permits` exists. Decision 97 requires a stated reason on the committed list of exceptions Benjamin ratifies (report 14 sections 2.1 and 6.4). `Permission` waits for Slice 1 (decision 41).
 - `ContactAssignment` relates a person to an account, a purpose and a contact point (decisions 39 and 43).
 - `IdentityDecision` under `gist:Determination`; `AgentRun` and `ModelCall` under `gist:Event`
 
@@ -168,7 +158,7 @@ Report 11 restores four alignment rows: Sutton's Contact, `org:Membership`, FIBO
 | Member | Member | A relationship between one person and one tenant that lets the person act in the tenant's workspace from the day it is made until it is removed. | relator | gist:TemporalRelation (thin thread, decision 13) | the opaque `MemberId` in its tenant, kept after removal. The membership relates to a person with or without an account; its id does not identify that person across memberships | `packages/kernel/src/Member.schema.ts`; migration `member` table (`removedAt`); `explorations/alchemy-domain/DECISIONS.md` decision 20; W3C ORG `org:Membership` (fetched) | in the repository today |
 | Role | Role | A named level of access a grant gives a member, such as viewer, editor or admin. | information | no gist parent in the thin thread (decisions 13 and 41) | one criterion: the concept's scheme and notation. A custom role is another individual, not another class | `packages/kernel/src/Role.schema.ts`; Sutton public (Admin, Manager, Operator, custom roles) | thin thread (fixed roles); Sutton only (custom roles) |
 | Permission | Permission | A description of one kind of action its holder may take in one area of the app, such as running the shipping flow or deleting a pack container. | information | gist:Permission (not in the thin thread, decisions 13 and 41) | the app area and the action, as the app names them | Sutton public (permissions grouped by app area; API token permissions); the API design report (governance row) | Sutton only |
-| Grant | Grant | An assignment of one role to one member at one scope (the whole tenant, one site or one field), made by a member allowed to make it. | relator | gist:Assignment (decision 13) | its own id; the thin thread derives one organization-wide grant from the membership's role field, not a stored `GrantId` (decisions 10 and 40) | report 01 section 3; the architecture seed (`core:PermissionGrant`, "effective tenant/location/field authorization"); Sutton public (site pickers per assigned location); Oracle Siebel positions (fetched) | thin thread (organization scope); Sutton only (site scope); later (field scope) |
+| Grant | Grant | An assignment of one role to one member at one scope (the whole tenant, one site or one field), made by a member allowed to make it. | relator | gist:Assignment (decision 13) | the membership and the field the grant is read from. There is no grant id. Replacing this criterion with a stored id would be a breaking change under decision 24 (report 14 sections 2.1 and 8) | report 01 section 3; the architecture seed (`core:PermissionGrant`, "effective tenant/location/field authorization"); Sutton public (site pickers per assigned location); Oracle Siebel positions (fetched) | thin thread (organization scope); Sutton only (site scope); later (field scope) |
 | PortalAccess | Portal access | A permission a tenant gives one account organization to see its own records, and to request orders, through one link and the modules switched on for it. | information | gist:Permission (not in the thin thread, decisions 13 and 41) | its own id; each link issued is a new one (Sutton makes a new link on reactivation); the link's secret is never a term value | decision 3 ("portal access sit on the organization"); Sutton public (portals article) | Sutton only (pending Q11) |
 | ContactAssignment | Contact assignment | A relationship naming one person to reach at one account for a stated purpose using a particular contact point. | relator | gist:Assignment | the assignment, not the person or the email address alone | decisions 39 and 43; Sutton public (contacts) | Slice 1 |
 | ContactPoint | Contact point | An electronic address, an email address or a telephone number, at which a party is reached. | information | gist:ElectronicAddress | its own record id within the tenant; two parties with one email have two contact points | report 01; schema.org `ContactPoint` (fetched); Sutton public (contact emails receive order emails) | Sutton only |
@@ -212,10 +202,11 @@ only while a relation holds).
 
 ## Properties
 
-One direction only; the other way is a SPARQL `^p` path. Domain and range are broad inference facts in the
-vocabulary module; required, cardinality, datatype and allowed values are the record schema's, projected to SHACL.
-Where no record schema exists yet, the range is provisional and moves to the record schema once one exists; which
-context's contract package owns that record is Q10.
+One direction only; the other way is a SPARQL `^p` path. A property's domain and range, including a datatype
+property's datatype, belong in the vocabulary. The record sets its cardinality and the values its field admits.
+“Datatype from the record field” means the field is the evidence for that choice, not a substitute for it. An object
+property needs a class or scheme as its range before it enters the module (report 14 section 6.4, C8). Which
+context's contract package owns a new record is Q10.
 
 | Key | Label | Definition | Domain | Range | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -261,7 +252,7 @@ context's contract package owns that record is Q10.
 | decidesOn | decides on | Links an identity decision to one of the two source records it compares. | IdentityDecision | SourceRecord | report 01 |
 | identityOutcome | identity outcome | What the decision found: the two records denote one party, or two. | IdentityDecision | a concept of the `IdentityOutcomeScheme` scheme (10) | IBM MDM (fetched: "collapse" and "persistence"); report 01 |
 | decidedBy | decided by | Links an identity decision to the member who made it. | IdentityDecision | Member | report 01 ("who decided"); `docs/auth.md` ("compares ids") |
-| supersedes | supersedes | Links a record to an earlier one of the same kind about the same thing that it replaces, the earlier being kept. | none declared: an identity decision here, a cost observation in 07 (kept broad) | none declared: a record of the same kind as its subject (kept broad) | NEW: a decision is replaced, never edited, so the trail keeps both |
+| supersedes | supersedes | Links a record to an earlier one of the same kind about the same thing that it replaces, the earlier being kept. | none declared: an identity decision here, a cost observation in 07 (kept broad) | not yet placed: needs a class covering both kinds of record before admission (report 14 section 6.4, C8) | NEW: a decision is replaced, never edited, so the trail keeps both |
 | resolves | resolves | Links an identity decision to the suspicion it settles. | IdentityDecision | SuspectedDuplicate | IBM MDM (fetched: stewards review suspects) |
 | citesEvidence | cites evidence | Links a suspicion or a decision to a piece of evidence it rests on. | none: SuspectedDuplicate and IdentityDecision (kept broad) | IdentityEvidence | the architecture seed section 4.2 |
 | evidenceKind | evidence kind | What kind of likeness or difference a piece of evidence states. | IdentityEvidence | a concept of `EvidenceKindScheme` (10); property and scheme withheld from slice 1. CQ-P04 needs `evidenceText`, not a classification | IBM MDM (fetched: name, address and identification are the default critical data) |
@@ -273,11 +264,6 @@ context's contract package owns that record is Q10.
 | actsFor | acts for | Links an agent run to the member it acts for, whose organization scopes everything it does. | AgentRun | Member | `packages/kernel/src/Agent.context.ts`; `docs/auth.md` |
 | agentName | agent name | The agent's name as people read it in the activity list, such as "Table assistant". | AgentRun | datatype from the record field | `packages/kernel/src/AgentRun.schema.ts` (`agent`) |
 | maxRole | max role | The highest role an agent run may act with, whatever the role of the member it acts for. | AgentRun | Role | `packages/kernel/src/AgentRun.schema.ts` (`maxRole`) |
-| recordedActor | recorded actor | Links an audit entry to the member who made the change. | AuditEntry | Member pending decision 44; its recommendation would name a portal access instead for a portal act. `PortalAccess` is not proposed for slice 1 | `Activity.actorId`; migration `activity` foreign key |
-| actorNameThen | actor name then | The acting member's name as it was when the entry was written, for the screen, never an id. | AuditEntry | datatype from the record field | `Activity.actorName` |
-| auditAction | audit action | What was done, in a few words a person reads, such as "Imported items". | AuditEntry | datatype from the record field | `Activity.action` |
-| auditDetail | audit detail | What the change was done to and what came of it, in a sentence. | AuditEntry | datatype from the record field | `Activity.detail` |
-| actingAgentName | acting agent name | The name of the agent that made the change for the member, when one did. | AuditEntry | datatype from the record field | `Activity.agent`; `docs/auth.md` ("every activity line written inside a run carries `agent`") |
 | callPurpose | call purpose | What a model call is for: reading a table request, checking the key, or suggesting fixes for an import. | ModelCall | a concept of the `ModelCallPurposeScheme` scheme (10) | `ModelCallPurpose`; migration `modelCall.kind` |
 | calledFor | called for | Links a model call to the member whose action asked for it. | ModelCall | Member | migration `modelCall.actorId` |
 | calledAt | called at | When the call was taken from the allowance. | ModelCall | datatype from the record field | migration `modelCall.createdAt` |
@@ -296,8 +282,9 @@ record is 04's `SourceRecord`, keyed by tenant, source system, source type and e
 A location-scoped grant names its place with 08's `atLocation` (any location, so a grant at a bin is sayable, as 04's
 CQ-P08 fixture needs), not a site-only `atSite`. A grant's period is 09's `startedAt` and `endedAt`, whose domain now
 admits a grant. Neither applies to `Member`: its interval is `joinedAt` to `removedAt`. An `IdentityDecision` uses
-09's `eventTime`; “decided at” is its field label. An `AuditEntry` is a record of an act: `Activity.createdAt` uses
-09's `recordTime`, when the entry was written, not when the act occurred.
+09's `eventTime`; “decided at” is its field label. An `AuditEntry` is a record, not an event. Decision 98 gives it
+`recordedAt` (when it was written), `action`, `inTenant` and `recordedActor` (a `Member`). The actor of a portal
+request is still pending decision 44. Report 14 sections 2.2 and 3.5 give the properties and their fields.
 
 ## SKOS schemes this area needs
 
@@ -317,18 +304,17 @@ and `sh:in` lists the concepts the field admits, not every concept in the scheme
 | PortalModuleScheme | items, salesOrders, shipments, manufacturingOrders | Sutton public (portals article) |
 | ModelCallPurposeScheme | view, check, suggest | `packages/access/contract/src/Allowance/ModelAllowance.gateway.ts` |
 
-Every scheme key ends in `Scheme` (05's rule V3) and 10 holds its concepts. The three app roles (viewer, editor, admin)
-resolve by notation to concepts of 10's `MemberRoleScheme`. Each concept is also an individual of `Role` under the same IRI
-(decision 41), kept out of the T-box (anti-pattern 11). V12 checks each admitted code, not that a field admits the whole scheme.
+Every scheme key ends in `Scheme`. Report 14 sections 2.3 and 2.4 specify the thread's schemes and role individuals;
+report 10 covers the later concepts. A field need not admit the whole scheme (decision 23).
 
 ## Axiom plan
 
-The table distinguishes the decisions from the proposed axioms.
+The table distinguishes the decisions from proposed axioms for later slices. The thread states only the disjoint pairs copied from gist, none between local classes (report 14 section 2.1).
 
 | Axiom | Why |
 | --- | --- |
 | `Person` and `Organization` subclasses of `Party` (pending Q2) | both are agents the same properties apply to |
-| `Person disjointWith Organization` | rigid sibling kinds; gist 14.1.0 does not state it (its `gist:Organization` is disjoint only with physical items, substances, schema metadata and units) |
+| `Person` and `Organization` are disjoint by inheritance | `gist:PhysicalIdentifiableItem`, an ancestor of `Person`, is disjoint with `gist:Organization`; no local pair is needed (report 14 section 6.9) |
 | `Tenant subClassOf Organization` (decision 38) | a role under its bearer kind (OntoClean allows it); never disjoint with anything |
 | No disjointness among the role flags, and none between `Tenant` and an account organization | roles overlap: a co-packer is a customer and a vendor at once |
 | `ContactPoint disjointWith PostalAddress` | inherited from the disjoint gist parents once both are admitted (decision 15) |
@@ -345,35 +331,31 @@ foundational analysis's "negative inference requires declared closure").
 
 ## How the repository's records point at these terms
 
-Decision 20 uses typed helpers for the `term` annotation. Every field of a pointed record carries a pointer or `noTerm` with a reason
-from decision 21's list. The SHACL shapes are closed (decision 22). The table describes the party slice unless it says thin thread. No pointer is built yet.
+Decision 99 enrols named records, not folders. Report 14 section 3 specifies their marks, including `path` for a lift
+and `noTerm` with a named later slice for a deferred field (decisions 20 and 98). The table describes what the party
+slice adds or uses. Its SHACL shapes are closed (decision 22). No pointer is built yet.
 
 | Record or table | Term | Note |
 | --- | --- | --- |
-| `Member` (`packages/kernel/src/Member.schema.ts`); `member` table | inv:Member | `id` identifies the membership in `organizationId`; that organization id supplies the tenant for `membershipIn`. In the thin thread, `organizationName`, `name` and the sign-in `email` are `noTerm(screen)` (decision 93). In Slice 1, `organizationName` follows `membershipIn/gist:name`; `email` follows the sign-in account path below; `name` follows `membershipOf/gist:name` only with separate human identity evidence. `role` uses the role binding below. The table is stored evidence, not a schema pointer. |
-| `Person` (`packages/access/contract/src/People/Person.read.ts`) | inv:Member | `memberId` identifies the membership in the request's tenant. `joinedAt`, when known, is its own property. `name` needs the same human link as above; `role` uses the same role binding. A present `email` follows `membershipOf/^accountOf/accountEmail` only with the human and that account identified; an absent email emits nothing. |
-| `Membership` (`Session/SessionState.read.ts`) | `noTerm(screen)` | the test-account menu gives `organizationName` and `role`, but no member id, person or organization id. Neither field identifies a subject for a lift. |
-| `OrganizationChoice` (`Session/SessionState.read.ts`) | inv:Tenant | |
+| `Member` (`packages/kernel/src/Member.schema.ts`); `member` table | inv:Member | In Slice 1, `organizationName` follows `membershipIn/gist:name`; `name` follows `membershipOf/gist:name` only with separate human identity evidence. The kernel record has neither an email nor a person id (report 14 section 3.3). The table is stored evidence, not a schema pointer. |
+| `Person` (`packages/access/contract/src/People/Person.read.ts`) | inv:Member | `memberId` identifies the membership in the request's tenant. Decision 100 defers `email` and `joinedAt` to the party slice (report 14 section 3.6). Then `joinedAt`, when known, belongs to the membership; `name` needs separate human identity evidence. A present `email` follows `membershipOf/^accountOf/accountEmail` only with the human and that account identified; an absent email emits nothing. |
+| `Membership` (`Session/SessionState.read.ts`) | none | The test-account menu has no member id. It is not enrolled and carries no mark (report 14 section 3.6). |
+| `OrganizationChoice` (`Session/SessionState.read.ts`) | inv:Tenant in the party slice | A view of a tenant, not of a membership. It carries no thread mark (report 14 section 3.6). |
 | `OrganizationId`, `MemberId`, `UserId` (`packages/kernel/src/Ids.id.ts`) | the identity keys of Tenant, Member and SignInAccount | ids are keys, not `PartyIdentifier` instances |
 | `AccountEmail` | inv:accountEmail | property of `SignInAccount` only, never of the member |
 | `Role` (`packages/kernel/src/Role.schema.ts`) | `aboutScheme(inv:MemberRoleScheme)` | the three fixed codes bind the scheme, not the `Role` class that `grantsRole` and `maxRole` range over. Each lifted concept is also a `Role` individual (decision 41) |
 | `AgentRun` (`packages/kernel/src/AgentRun.schema.ts`) | inv:AgentRun | |
-| `Activity` (`packages/kernel/src/Activity.schema.ts`); one `activity` row | inv:AuditEntry | one entry (decision 46) |
-| `AuditTrail` | `noTerm(transport)` | the page's collection response contains zero to 500 entries; each element retains `Activity`'s pointer |
+| `Activity` (`packages/kernel/src/Activity.schema.ts`); one `activity` row | inv:AuditEntry | The copied actor name and detail are for the screen. The agent field is deferred to `AgentRun` in the party slice (decision 98; report 14 section 3.5). |
+| `AuditTrail` | collection, no mark of its own | Its element is `Activity.json`. The variant carries the fields' marks, not the class pointer (report 14 sections 3.5 and 3.6). |
 | `ModelCallPurpose` | `aboutScheme(inv:ModelCallPurposeScheme)` | the literals bind the scheme |
 | one `modelCall` row | inv:ModelCall | `kind` denotes `callPurpose`; the table is evidence, not a schema binding |
 | `AddPerson`, `ChangeRole`, `AddPersonProblem`, `PersonNotFound`, `LastAdmin` | none: commands and refusals, not terms | an Alchemy `Command` or `Rejection` carries the term of what it acts on |
 | `SessionState`, `TestAccount`, `SignUpOffer`, `SignInFeatures`; `session`, `account`, `verification`, `rateLimit`, `invitation` tables | none | sign-in mechanisms, not business referents (anti-pattern 14) |
 | `Vendor` inside an item (`packages/catalog/contract/src/Item/Item.read.ts`) | report 07's term for an item's vendor line | `vendorName` is a name, never a party's identity; linking it to an `Organization` record is a person's choice, not a match by name (`docs/glossary.md`, "Supplier") |
 
-Both Member views lift `role` by `^grantedTo/grantsRole` (decision 40). The grant IRI is derived from the
-membership IRI and the role field path (decision 10). `grantedTo` names the membership, `grantsRole` names the role individual,
-and `grantScope` names the organization concept in `GrantScopeKindScheme` (decision 96). Neither view supplies a stored grant id, grantor or grant time. This is the thin
-thread's only lift; the copied display fields emit no triples (decision 93).
-
-Direct `grantsRole` and `accountEmail` bindings on `Member` fail V13. A direct `name` on either name field would
-name the membership, not the person or tenant. Without separately identified intermediate nodes, leave the display
-field `noTerm(screen)`; a name or email never mints a party.
+Both membership views mark `role` the same way; the thread lifts only the kernel `Member` (report 14 sections 3.6
+and 4). Neither view supplies a grantor or a grant time. A copied name names the person or tenant, not the membership.
+A name or email never mints a party.
 
 ## What the terms must answer
 
@@ -387,14 +369,12 @@ For report 04 to turn into competency questions; each is a need, not a numbered 
 - Which suspected duplicates are still open (`suspects`, `resolves`; needs the closure note above).
 - May member M change items at site S on day D (`Grant`, `grantsRole`, `grantScope`, `atLocation`, `startedAt`,
   `endedAt`, `permits`, `includesRole`).
-- Which changes did an agent make for member M, and with what cap (`AuditEntry`, `actingAgentName`, `AgentRun`,
-  `maxRole`).
+- Which changes did an agent make for member M, and with what cap (`AuditEntry`, `AgentRun`, `actsFor`, `maxRole`)? The party slice must relate the entry to the run; a display name does not identify a run.
 - Which accounts can see their records through a portal, and which modules (`PortalAccess`, `portalFor`,
   `opensModule`).
 - How many model calls a tenant made in the last 24 hours, and for what (`ModelCall`, `callPurpose`, `calledAt`).
 
-The messy sample stores items only, with vendors as names inside each item. The thin thread uses decision 8's
-two-membership fixture. Named `test_` fixtures for the wider party questions are a proposal (pending decision 36).
+The messy sample stores items only, with vendors as names inside each item. Report 14 section 5 specifies the thread's fixture. Named `test_` fixtures for the wider party questions are a proposal (pending decision 36).
 
 ## Comparison with published party models
 
@@ -418,35 +398,15 @@ and records schema.org as a broader match.
 
 ## A sketch of the vocabulary entries
 
-Sketch, not code: a few of this document's rows in 05's shapes (section 4.7: `defineClasses`, a `parent` link,
-`categoryParents`, a `DisjointGroup`, an alignment row with a named object). Definitions are as in the tables above.
+Sketch, not code: a party-slice property and a proposed alignment in report 05's shapes. Report 14 section 2.6 gives the thread's module. The sketch does not assume a category parent (pending Q2).
 
 ```ts
 // sketch, not code
-export const classes = defineClasses({
-  Party: { prefLabel: "Party", definition: "…", tag: "category", identity: { kind: "notApplicable" },
-    parent: { kind: "none", reason: "gist 14.1.0 has no party class; a category over Person and Organization" } },
-  Organization: { prefLabel: "Organization", definition: "…", tag: "kind",
-    parent: { kind: "gist", term: "gist:Organization" }, categoryParents: ["Party"],
-    identity: { kind: "stated", criterion: "the organized body, not a tenant's record of it", restsOn: [] } },
-  Tenant: { prefLabel: "Tenant", definition: "…", tag: "role", identity: { kind: "inherited" },
-    parent: { kind: "local", key: "Organization" } },
-  Member: { prefLabel: "Member", definition: "…", tag: "relator", // thin thread, decision 13
-    parent: { kind: "gist", term: "gist:TemporalRelation" },
-    identity: { kind: "stated", criterion: "the opaque MemberId in tenant context, whether or not the member has a sign-in account",
-      restsOn: [] } },
-})
-export const disjointGroups = [{ members: ["Person", "Organization"], ratification: "rat-…" }]
 export const alignments = [{ subject: { kind: "class", key: "Organization" }, predicate: "relatedMatch",
   object: { kind: "named", standard: "Sutton", name: "Account", document: "Accounts and contacts key features" } }]
 export const objectProperties = defineProperties<ClassKey, SchemeKey>()({
   decidesOn: { domain: { kind: "local", key: "IdentityDecision" }, range: { kind: "local", key: "SourceRecord" } },
-  membershipIn: { domain: { kind: "local", key: "Member" }, range: { kind: "local", key: "Tenant" } },
 })
-// no datatype: the field that fills it gives it
-export const datatypeProperties = { isVendor: { domain: { kind: "local", key: "SourceRecord" } } }
-// a record field points at its property with 05's helper (section 4.8), and keeps its own rules:
-// isVendor: S.Boolean.pipe(S.annotateKey({ ...aboutProperty("inv:isVendor"), description: "Sells to us." }))
 ```
 
 Every entry also carries its `source`, `scope` and `ratification`, left out above. Sutton publishes no namespace, so
@@ -466,7 +426,7 @@ the sketch proposes a named external term rather than a CURIE (pending decision 
 | 8 | Orphan class | `Party` as a category is pending Q2. `Member` and `Grant` bring their gist parents into the thin thread; `gist:Permission` waits for Slice 1 (decisions 13 and 41) |
 | 9 | Polysemy | the code's `People/Person` denotes a member; the code's `Activity` would collide with `prov:Activity` (an event), so the key is `AuditEntry` and "Activity" is its alternative label (decision 46); `SignInAccount` avoids `gist:Account` and Sutton's Account |
 | 10 | Domain and range overcommitment | `inTenant` and `citesEvidence` keep no narrow domain; `servesPurpose` describes the contact assignment; ranges are the broadest local class that fits |
-| 11 | Individuals in the T-box | the three app roles go in a reference module |
+| 11 | Individuals in the T-box | each app role is an individual, not a class (report 14 section 2.4) |
 | 12 | Negation | none in the T-box; the "open suspicion" query needs a closure contract |
 | 13 | False is-a from OO | none: no `*Manager` or `*Service` class; the allowance gateway is not a term |
 | 14 | System blueprint | sessions, test accounts, rate limits and Better Auth's tables are left out |

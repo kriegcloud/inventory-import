@@ -9,7 +9,7 @@ description: The projector's inputs, mapping rules and determinism, and the gate
 Design only: nothing here is built. No projector, no generated file, no gate and no reasoner exists today
 (`project-profile.md`, "What exists"); every gate below would report "not built". TypeScript and Turtle in this
 document are sketches, not code. Inputs are decisions 2, 5, 6 and 7, the decisions answered on 2026-11-22 (8 to 11,
-13 to 16, 20 to 23, 25, 26, 32, 34, 38 to 41, 43, 46 and 93 to 96), reports 01 and 02, the architecture seed, the API
+13 to 16, 20 to 26, 32, 34, 38 to 41, 43, 46 and 93 to 101), reports 01, 02 and 14, the architecture seed, the API
 design report (where they disagree, report 01 section 5 is followed), the contract packages, the alchemy-domain packet
 and Effect 4.1.5 as installed. Modelling choices that are Benjamin's are rows in "Questions for Benjamin"; rows that
 rest on one still open are marked "(pending Qn)"; the questions are now numbered decisions in
@@ -17,11 +17,13 @@ rest on one still open are marked "(pending Qn)"; the questions are now numbered
 slice that needs it, and nothing is built on its recommendation until then. The keys were matched with 04 to 11 on
 2026-11-22 (report 13), and section 3.1 was added then so this mapping covers every construct of 05's term model.
 
-The first deliverable is the thin thread (decision 8): `Organization`, `Tenant` (a role class under `Organization`,
-decision 38), `Person` (decision 94), `Member`, `Role`, `Grant` for the role lift, `AuditEntry` (decision 46), their
-gist parents and ancestors (decisions 13 and 14), and the schemes `MemberRoleScheme` and `GrantScopeKindScheme`
-(decision 96), carried through the module, the pointers, the OWL and SKOS files and gates 1 to 9 (decision 95;
-section 6). It waits on no open decision. Slice 1, the party slice, follows it.
+The first deliverable is the thin thread (decision 8). Its one specification is
+[report 14](14-thin-thread.md), written against the repository's real code: seven classes, nine properties, two
+schemes and four concepts (14 section 2), the marks on five enrolled records (14 section 3), one lift (14 section 4),
+one question (14 section 5), gates 1 to 9 with one planted mistake each (14 section 6), the packages (14 section 7)
+and the version header (14 section 8). This report keeps the general projection and the gates for every slice; where
+it and report 14 differ about the thread, report 14 holds. The thread waits on no open decision. Slice 1, the party
+slice, follows it.
 
 ## 1. What goes in and what comes out
 
@@ -35,10 +37,10 @@ Two inputs, both TypeScript values in memory, read by one pure function:
    the copied disjoint pairs; decision 13 admits a gist name only when a term of the slice being built needs it). Its
    entry shape is 05's (`Vocabulary`, `ClassTerm`, `ObjectPropertyTerm`, `DatatypePropertyTerm`, `ConceptScheme`,
    `DisjointGroup`, `AlignmentRow`); this document only reads it.
-2. The record schemas that carry a term pointer: every exported Effect Schema of an enrolled folder or file (section
-   6, Enrolment): a contract package's `src`, and in the kernel's `packages/kernel/src` the four files where
-   `Member`, `Role`, `Activity` and `AgentRun` live. The thin thread enrols the access contract's `src` and those four files,
-   and no catalog folder (decision 95). The two contract packages (`packages/catalog/contract/src`,
+2. The record schemas that carry a term pointer: the Effect Schemas named on the enrolment list (section 6,
+   Enrolment), which is a list of records, never of folders (decision 99). The thin thread enrols five: the kernel's
+   `Member`, `Role` and `Activity` and the access contract's `Person` and `AuditTrail`, and no catalog record (14
+   sections 3.6 and 3.7). Each later slice adds its records. The two contract packages (`packages/catalog/contract/src`,
    `packages/access/contract/src`) hold about 150 exported values, counted by a grep for `export const|class` with a
    capital name, not each checked to be a schema. The Alchemy domain blocks (section 7) come later. The projector
    reads their AST.
@@ -57,13 +59,13 @@ What the Effect 4.1.5 AST gives the projector (all paths under `node_modules/eff
 | --- | --- | --- |
 | The node kinds | `SchemaAST.ts:54-75` | Declaration, Null, Undefined, Void, Never, Unknown, Any, String, Number, Boolean, BigInt, Symbol, Literal, UniqueSymbol, ObjectKeyword, Enum, TemplateLiteral, Arrays, Objects, Union, Suspend |
 | What every node carries | `SchemaAST.ts:686-694` | `annotations`, `checks`, `encoding`, `context` |
-| A field's own annotations and whether it may be left out | `SchemaAST.ts:626-631` (`Context`), `SchemaAST.ts:4692-4694` (`isOptional`) | `annotateKey` lands in `context.annotations`; `isOptional` reads `context.isOptional`. The pointer is read from the outer node's `context.annotations` only; 05 section 4.8 requires it to be the last step of the field's pipe, after `nullAsNone`, `absentAsNone` or `OptionFromOptionalKey` |
+| A field's own annotations and whether it may be left out | `SchemaAST.ts:626-631` (`Context`), `SchemaAST.ts:4692-4694` (`isOptional`) | `annotateKey` lands in `context.annotations`; `isOptional` reads `context.isOptional`. A field's mark is read from the outer node's `context.annotations` only; 05 section 4.8 requires it to be the last step of the field's pipe, after `nullAsNone`, `absentAsNone` or `OptionFromOptionalKey`. A record's own pointer, and a `Literals` schema's scheme pointer, is a schema annotation in the other store, read with `S.resolveAnnotations`; a `Model.Class` field built as a `Field` takes its mark on each variant (14 sections 3.1 and 3.5) |
 | The way to the encoded side | `SchemaAST.ts:425-430` (`Link`), `SchemaAST.ts:476` (`Encoding`), `SchemaAST.ts:4752` (`toType`), `SchemaAST.ts:4801` (`toEncoded`) | a chain of links whose last `to` is the wire form |
 | Fields, lists, choices, literals | `SchemaAST.ts:2838-2842` (`Objects`), `2670-2673` (`PropertySignature`), `2316-2321` (`Arrays`: `elements`, `rest`), `3717-3721` (`Union`), `1767-1769` (`Literal`) | name and type per field; tuple elements against a rest element |
 | Opaque types | `SchemaAST.ts:745-760` (`Declaration`); `Schema.ts:10964-10984` (`BigDecimal`, representation id `effect/schema/BigDecimal`) | a declaration is told by its `representation.id` |
 | Checks | `SchemaAST.ts:4118-4128` (`Filter`), `4193-4203` (`FilterGroup`) | each check's `annotations.representation` is `{ id, payload }`. A `FilterGroup` is walked into its member checks; the group has no id of its own |
 | A check's identity | `SchemaAST.ts:4352-4374` (`isPattern`: payload `source`, `flags`), `Schema.ts:8026-8048` (`isInt`), `Schema.ts:7806-7817` (`isGreaterThan`), `Schema.ts:8548-8576` (`isMinLength`, one id for strings and lists) | the projector maps by id, never by the `expected` text |
-| Open annotations | `Schema.ts:19313-19315` (`readonly [x: string]: unknown`), `19286-19300` (augmentation example), `19364-19369` (`Key`), `19410` (`identifier`), `19527-19528` (a filter's `representation`) | a `term` key needs no change to Effect; typing it needs an augmentation |
+| Open annotations | `Schema.ts:19313-19315` (`readonly [x: string]: unknown`), `19286-19300` (augmentation example), `19364-19369` (`Key`), `19410` (`identifier`), `19527-19528` (a filter's `representation`) | the `term`, `path` and `noTerm` keys need no change to Effect and no augmentation of `effect/Schema`; the typed helpers carry the typing (decision 20; 14 section 3.2) |
 | Resolvers | `SchemaAST.ts:5172` (`resolve`), `5203` (`resolveIdentifier`), `5229` (`resolveDescription`) | |
 | Brands | `Schema.ts:5371-5374` (`make(schema.ast, ...)`: the AST is unchanged); `SchemaRepresentation.ts:2628` ("distinctions such as those added by `Schema.brand` are absent from the AST") | an `ItemId` field is a plain UUID string to the projector |
 | A portable form | `SchemaRepresentation.ts:2637` (`toRepresentation`, the encoded side), `554-559` (`Filter`), `463-469` (`PropertySignature`) | the same facts as JSON; a check made by `makeFilter` without `representation` carries none |
@@ -88,7 +90,9 @@ reads the type side's declaration for the datatype. `UnitCost` is then a string 
 
 Four generated files, each committed with a GENERATED header and byte-compared (decision 6). Decision 9 puts the
 projector and the generated files in a new package, `@inventory/ontology`; the folder and file names inside it are
-this report's. The thin thread writes the first two files only (decision 8); the SHACL file comes with the slice that
+this report's. Of these four the thin thread writes the first two only (decision 8), and beside them one generated
+file this table does not hold: the graph of its one question, `packages/ontology/generated/fixtures/CQ-P06.graph.ttl`,
+written by the same writer and byte-compared (14 sections 1.1 and 4.4). The SHACL file comes with the slice that
 lifts stored rows and the alignment file with the slice that writes alignments.
 
 | File (decision 9) | Holds | Read by |
@@ -165,10 +169,12 @@ IRIs the projector mints that are not terms (they name documents and shapes, not
 | `https://example.org/inventory-import/ontology` with `owl:versionIRI .../ontology/<version>` | the OWL document | an `owl:Ontology` individual |
 | `.../taxonomy`, `.../shapes`, `.../alignments`, each with a version IRI | the other three documents | the same |
 | `https://example.org/inventory-import/shape/<Record>`, `.../shape/<Record>-<field>`, `.../shape/<Record>-<field>-Node` and `.../shape/<Record>-<field>-<Member>` | a node shape, its property shapes, a nested record's node shape, a union member's node shape | SHACL individuals; named so no blank node is written |
-| `https://example.org/inventory-import/data/<organizationId>/<TermKey>/<id>` | a lifted stored row, in tests only | A-box; never written to a generated file |
-| `<parent IRI>/<field path>`, and `<parent IRI>/<field path>/<index>` for a member of a list (`.../item/<id>/vendors/0`, `.../item/<id>/sku`, `.../item/<id>/unitCost`) | a node a lift path creates: an item's `ItemIdentifier`, each `VendorItem`, the `CostObservation` and `MoneyAmount` of `unitCost`, a dimension's `QuantityValue`, a reported position's `InventoryMeasure` | A-box, in tests only. Positional on purpose: the record gives these values no id of their own, so the field path and the list index are the only stable name. Reordering a list renames its members, and the byte-compare never sees it because no generated file holds data; two equal list members stay two nodes, as two file rows that look alike stay two records (`CLAUDE.md`) |
+| `https://example.org/inventory-import/data/<organizationId>/<TermKey>/<id>` | a node lifted from a record: a stored row, in tests only, or one of the thread's two decoded `Member` values | A-box; a stored row is never written to a generated file. The thread's graph file holds its two lifted members (14 sections 4.1 and 4.4) |
+| `https://example.org/inventory-import/fixture/<TermKey>/<name>` | an individual only a fixture names (the thread's `test_Ravi`) | A-box; a person belongs to no tenant, so it is not under `data/<organizationId>/` (decision 34; 14 section 4.1) |
+| `<parent IRI>/<field path>`, and `<parent IRI>/<field path>/<index>` for a member of a list (`.../item/<id>/vendors/0`, `.../item/<id>/sku`, `.../item/<id>/unitCost`) | a node a lift path creates: an item's `ItemIdentifier`, each `VendorItem`, the `CostObservation` and `MoneyAmount` of `unitCost`, a dimension's `QuantityValue`, a reported position's `InventoryMeasure` | A-box, in tests only. Positional on purpose: the record gives these values no id of their own, so the field path and the list index are the only stable name. Reordering a list renames its members, and the byte-compare never sees it because no generated file holds a list member (the thread's graph file holds one created node per member, `<member IRI>/role`, and no list; 14 section 4.1); two equal list members stay two nodes, as two file rows that look alike stay two records (`CLAUDE.md`) |
 
-The four families (terms, the documents with their version IRIs, shapes, test data) are derived from one base value in
+The four families (terms, the documents with their version IRIs, shapes, test data in its `data/` and `fixture/`
+layers) are derived from one base value in
 the vocabulary module, `https://example.org/inventory-import` today, each by its own suffix; none is made by appending
 to `.../ontology/`. A cutover rehearsal is one fast test: it projects on a different test base and checks that every
 term, document, version, shape and test-data IRI moved with it, that no IRI of the old base is left, and that the
@@ -182,11 +188,11 @@ write both with `@en`.
 
 | Source construct | Triples | File | Rule |
 | --- | --- | --- | --- |
-| The module's version | `<ontology> a owl:Ontology ; owl:versionIRI <ontology/V> ; owl:versionInfo "V" ; dcterms:source <gist 14.1.0 version IRI>` | owl | V is a string constant in the module, never the clock (pending Q13). No `owl:imports`: gist is projected into the file, not imported (the architecture seed does the same) |
+| The module's version | `<ontology> a owl:Ontology ; owl:versionIRI <ontology/V> ; owl:versionInfo "V" ; dcterms:source <gist 14.1.0 version IRI>` | owl | V is a semantic version string written in the module, never the clock; before publication it stays `0.y`, and the thread's is `0.1.0` (decision 24; 14 section 8). No `owl:imports`: gist is projected into the file, not imported (the architecture seed does the same) |
 | Annotation properties used | `skos:prefLabel a owl:AnnotationProperty` (and `skos:definition`, `skos:altLabel`, `skos:scopeNote`, `skos:historyNote`, `dcterms:source`, the replacement property of Q14; `inv:termCategory` only under decision 19's other answer) | owl | Declared, so the file is in the OWL 2 DL profile without importing SKOS (the seed keeps the SKOS schema out of its closure) |
 | Class entry | `inv:K a owl:Class ; skos:prefLabel "L"@en ; skos:definition "D"@en` plus `skos:altLabel` and `skos:scopeNote` when given | owl | One prefLabel and one definition per language; missing either refuses the projection |
-| Parent | `inv:K rdfs:subClassOf <P>` | owl | P is a local key or a projected gist class (decision 4). An IOF, ISA-95, schema.org or other external parent refuses. A local class whose identity-bearing parent chain reaches neither a projected gist class nor a `none` link with a reason refuses (orphan). A `none` link writes no `rdfs:subClassOf` and is allowed only for a class tagged category (05's V1, V2, V25; 06's `Party`). The chain is walked on the links that are emitted: a retired class emits no parent (deprecated term, below), so a live class whose parent is retired has no emitted path and refuses |
-| Projected gist class | `gist:X a owl:Class ; rdfs:subClassOf gist:Y` only where both are projected; gist's copied pairs as `gist:X owl:disjointWith gist:Y` (decision 15: the pairs gist states between the classes taken and no others; 24 for the whole design of reports 04 to 12, fewer while fewer classes are admitted) | owl | Read from the vocabulary's gist projection (classes, parents, properties, disjoint pairs); 11 owns the list the names come from. A gist class is in the projection only once a term of the slice being built needs it (decision 13), and its named gist ancestors enter with it (decision 14); for the thin thread that is the parents 11 gives `Organization`, `Person`, `Member`, `Grant` and `AuditEntry` (`gist:Person`, `TemporalRelation` and `Assignment` among them, decision 94); `Tenant`'s parent is the local `Organization` (decision 38), `Role` has no gist parent, and there is no `Permission` (decision 41). The rule writes names, subclass links and the copied pairs only, the named operand of an `owl:equivalentClass` written as a plain parent (`gist-categories.md`) |
+| Parent | `inv:K rdfs:subClassOf <P>` | owl | P is a local key or a projected gist class (decision 4). An IOF, ISA-95, schema.org or other external parent refuses. A local class whose identity-bearing parent chain reaches neither a projected gist class nor a `none` link with a reason refuses (orphan). A `none` link writes no `rdfs:subClassOf` and is allowed for a class on the committed exception list, which gives its reason and is ratified by Benjamin (decision 97; in the thread `Role` alone, 14 section 6.4, rule C4, which replaces 05's V25 there), and for a class tagged category if decision 12, which is open, admits category classes (05's V1 and V2; 06's `Party`). The chain is walked on the links that are emitted: a retired class emits no parent (deprecated term, below), so a live class whose parent is retired has no emitted path and refuses |
+| Projected gist class | `gist:X a owl:Class ; rdfs:subClassOf gist:Y` only where both are projected; gist's copied pairs as `gist:X owl:disjointWith gist:Y` (decision 15: the pairs gist states between the classes taken and no others; 24 for the whole design of reports 04 to 12, fewer while fewer classes are admitted) | owl | Read from the vocabulary's gist projection (classes, parents, properties, disjoint pairs); 11 owns the list the names come from. A gist class is in the projection only once a term of the slice being built needs it (decision 13), and its named gist ancestors enter with it (decision 14); the thin thread admits seven gist classes, five parents and two ancestors, with three copied pairs (14 sections 2.1 and 2.5). The rule writes names, subclass links and the copied pairs only, the named operand of an `owl:equivalentClass` written as a plain parent (`gist-categories.md`) |
 | Projected gist property | `gist:p a owl:ObjectProperty` (or `owl:DatatypeProperty`) and its named `rdfs:subPropertyOf` where both are projected; never its domain or range | owl | Read from the vocabulary's gist projection; 11 section E owns the list the names come from; a property is taken only when a term of the slice being built needs it (decisions 13 and 16) |
 | Sub-property link (a property's gist parent) | `inv:p rdfs:subPropertyOf gist:q`, with `gist:q` declared by the row above | owl | Only where the vocabulary entry states it, for an object or a datatype property (decision 16). Refuses when the entry's domain or range does not fall under the gist property's own, or when `gist:q` is not projected. Written in the OWL file, never in the alignment file |
 | Disjointness | `inv:A owl:disjointWith inv:B`, once per unordered pair, subject the smaller IRI | owl | Never `owl:AllDisjointClasses` (it needs a list, so a blank node); pairwise is in OWL 2 EL, RL and DL alike |
@@ -215,7 +221,7 @@ above or below place it, or that it reaches no generated file.
 | `ClassTerm` with `prefLabel`, `altLabels`, `definition`, `scopeNote` | `owl:Class` and its annotations | owl | section 3, class entry |
 | `ParentLink` (`gist` or `local`) | one `rdfs:subClassOf` | owl | section 3, parent |
 | `Vocabulary`'s gist projection (the names of 11's list admitted so far, with their ancestors, as data) | the gist class and property declarations, their named `rdfs:subClassOf` and `rdfs:subPropertyOf`, the copied `owl:disjointWith` pairs | owl | section 3, projected gist class and projected gist property; decisions 13 to 16 |
-| `ParentLink` (`none` with a reason) | nothing; the reason stays in the module | | gate 4 accepts it for a category-tagged class and lists it |
+| `ParentLink` (`none` with a reason) | nothing; the reason stays in the module | | gate 4 accepts it for a class on the exception list (decision 97) and compares the two; a category-tagged class is decision 12's, which is open |
 | `categoryParents` | one more `rdfs:subClassOf` per category class | owl | section 3, parent; gate 4 checks 05's V21 |
 | `kindTag`, `identity`, `source`, `scope`, `ratification` | nothing under decision 19's recommended answer | | gate 4 reads them in the module |
 | `DisjointGroup` | `owl:disjointWith` once per unordered pair | owl | section 3, disjointness; section 5, rule 10 |
@@ -227,15 +233,15 @@ above or below place it, or that it reaches no generated file.
 | `DatatypePropertyTerm.datatype` (stated) | `rdfs:range` that xsd type; each field's literal converted to it | owl, shacl | section 5, rule 8; 05's V11 |
 | `ConceptScheme` (`closed` included) | `skos:ConceptScheme`; `closed` emits nothing | skos | section 3, concept scheme |
 | `Concept` with `notation`, `broader` | `skos:Concept`, `skos:inScheme`, `skos:notation`, `skos:broader` or `skos:topConceptOf` | skos | section 3 |
-| `Concept.alsoInstanceOf` | `<concept> a owl:NamedIndividual , <the class's IRI>` in the OWL file, beside `a skos:Concept` in the SKOS file | owl, skos | a local class as `inv:K`, a projected gist class as `gist:X` (the dimension concepts are `gist:Aspect`). The concept is the individual, so one IRI is a concept and an individual and never a class. The thin thread's case is decision 41: viewer, editor and admin are concepts of `MemberRoleScheme` and, under the same IRIs, individuals of `Role`, each with one identity criterion, the concept's scheme and notation. The typing goes in the OWL file because the SKOS file stays out of the reasoner's closure (pending decision 28): only there do `Currency`/`UnitOfMeasure` disjointness (pending decision 62) and gist's `gist:Aspect` pairs meet these individuals |
+| `Concept.alsoInstanceOf` | `<concept> a owl:NamedIndividual , <the class's IRI>` in the OWL file, beside `a skos:Concept` in the SKOS file | owl, skos | a local class as `inv:K`, a projected gist class as `gist:X` (the dimension concepts are `gist:Aspect`). The concept is the individual, so one IRI is a concept and an individual and never a class. The thin thread's case is decision 41: viewer, editor and admin are concepts of `MemberRoleScheme` and, under the same IRIs, individuals of `Role`, each with one identity criterion, the concept's scheme and notation (14 section 2.4, which also declares a concept with no `alsoInstanceOf` as `owl:NamedIndividual` with no class when a graph the reasoner reads uses it as an object: the thread's scope concept). The typing goes in the OWL file because the SKOS file stays out of the reasoner's closure (pending decision 28): only there do `Currency`/`UnitOfMeasure` disjointness (pending decision 62) and gist's `gist:Aspect` pairs meet these individuals |
 | `Concept.links` | one triple per link, from the concept to the linked concept (`hasDimension`), in the OWL file beside the typing above | owl | 05's V22 |
 | `AlignmentRow` with a CURIE object | one `skos:*Match` triple | align | section 3; 11's rules |
 | `AlignmentRow` with a named object (`NamedExternalTerm`) | a header line "not projected: name only", and a row of the generated SSSOM | align | section 3, last row; decision 29 |
 | `AlignmentRow.justification`, `confidence` | nothing in Turtle; columns of the generated SSSOM | | 11 |
 | `Deprecation` (`replacedBy`, `since`, `reason`) | `owl:deprecated true`, the replacement property, `skos:historyNote` with the version; no logical axioms. `replacedBy` is written as the immediate edge, never rewritten when the replacement is itself retired | owl; skos for a concept or scheme | section 3, deprecated term and retired concept or scheme; decision 33 |
 | `TermPointer.term` on a record or a field | a node shape or a property shape | shacl | section 4 |
-| `TermPointer.path` (`LiftPath`) | a property shape on the first step with nested node shapes | shacl | section 4, lift path row |
-| `TermPointer.noTerm` (`NoTermReason`) | nothing | | gate 5 and the law's rule 1 accept it; the reason is one of transport, request, screen, error, bookkeeping (decision 21) |
+| `TermPointer.path` (`LiftPath`), its own annotation key, `path`, apart from `term` (decision 20 as corrected; 14 section 3.1) | a property shape on the first step with nested node shapes | shacl | section 4, lift path row |
+| `TermPointer.noTerm` (`NoTermReason`) | nothing | | gate 5 and the law's rule 1 accept it; the reason is one of six: transport, request, screen, error, bookkeeping (decision 21) and deferred, which names the slice that will place the field (decision 98; 14 section 3.1) |
 | `TermBinding` | nothing: the projector's join | | gate 5 |
 
 ## 4. Mapping rules: record schemas to SHACL
@@ -248,7 +254,7 @@ gets no item shape. Shapes are SHACL 1.0 Core only: both seeds keep SHACL 1.2 dr
 | AST construct | Shape triples | Rule |
 | --- | --- | --- |
 | Record (`Objects`) with `term` naming a class | `shape:R a sh:NodeShape ; sh:name "R" ; sh:description "<description>"@en` and `sh:targetClass <term>` on the one stored record (pending Q10) | `sh:closed true ; sh:ignoredProperties ( rdf:type )` on every node shape (decision 22): every field of a pointed record carries a pointer or `noTerm` with a reason, and a `noTerm` field lifts to nothing. A property the lift supplies from context and no field holds (`inTenant`) gets its own property shape on the stored record's node shape, min and max count 1, by a rule named "context properties", so the closed shape accepts it and tenancy is validated |
-| Record with `term` naming a property, or a field with `term` naming a class | none | refused: a record is a thing, a field is a relation |
+| Record with `term` naming a property, or a field with `term` naming a class other than its record's own | none | refused: a record is a thing, a field is a relation. A field whose `term` is its record's own class is the subject's id (14 section 3.1; the id row below) |
 | Field with `term` naming a property | `shape:R-f a sh:PropertyShape ; sh:path <term>` and `shape:R sh:property shape:R-f` | Description from the key's `description`; `messageMissingKey` becomes `sh:message` |
 | Scalar field (not `Arrays`) neither optional (`context.isOptional`) nor `NullOr` nor `UndefinedOr` | `sh:minCount 1` | A required key is not a required value: a required list may be empty (the `Arrays` row) |
 | Optional key, `nullAsNone`, `absentAsNone` | no `sh:minCount` | In RDF "null" is the absence of a triple |
@@ -264,7 +270,7 @@ gets no item shape. Shapes are SHACL 1.0 Core only: both seeds keep SHACL 1.2 dr
 | Money (07's `unitCost`, lifted to a `CostObservation` and its `MoneyAmount`) | under decision 59's (a), the lift's last step `minorUnits` with `sh:datatype xsd:integer`, its literal the field's digits at the field's scale ("12.3300" at scale 4 is 123300), a conversion 05's V11 names (`digitsAtScale`), plus `minorUnitScale` fixed at the field's scale; under 59's (c), an `xsd:decimal` amount holding the digits | one rule, never both. The digits are read from the `BigDecimal` string, never a float. The currency is decision 88's (a rule of the item record, never a field's description text), never folded into the number |
 | Type side `DateTimeUtc`, or `format: "date-time"` | `sh:datatype xsd:dateTime ; sh:pattern "Z$"` | UTC is stated, as the record writes `DateTime.formatIso` |
 | `format: "date"` | `sh:datatype xsd:date` | `IsoDate` carries no format today, so it projects as `xsd:string` with its pattern (Q16) |
-| `Union` whose members are all `Literal` nodes (what `S.Literals` and `LiteralKit` build; `Schema.ts:5092-5096`) | `sh:in ( "a" "b" ... )` in member order, each literal typed as its value | This row wins over "`Union` of scalars"; the literals are read from the members' `literal` values in member order. A `LiteralKit` schema is this same node; the kernel's `Role` is the thin thread's case and `ModelCallPurpose` slice 1's; `hasRole`'s rank of the roles is the record's and no part of the scheme. A field whose term is a scheme lifts each of its own literals to its concept IRI and gets `sh:in ( inv:S-a inv:S-b ... )` with `sh:nodeKind sh:IRI`: the list holds only the codes this field decodes, in the field's declared order, never every code of the scheme (decision 23: the record keeps storing the notation and the projector lifts it to the concept's IRI). Gate 4 requires each literal to be a notation of the scheme (05's V12); a subset is allowed (05 section 7), since the record owns which codes a field allows (decision 2). `Uom` (five of the unit scheme's seven notations) and `Dimensions.unit` (`cm` and `in`) are proper subsets and pass; a literal the scheme does not hold fails. A literal whose concept is retired still lifts and resolves under decision 33 (a) (pending Q14); which codes a command may newly assign is that command's own schema, not this row |
+| `Union` whose members are all `Literal` nodes (what `S.Literals` and `LiteralKit` build; `Schema.ts:5092-5096`) | `sh:in ( "a" "b" ... )` in member order, each literal typed as its value | This row wins over "`Union` of scalars"; the literals are read from the members' `literal` values in member order. A `LiteralKit` schema is this same node; the kernel's `Role` is the thin thread's case and `ModelCallPurpose` slice 1's; `hasRole`'s rank of the roles is the record's and no part of the scheme. A field whose term is a scheme lifts each of its own literals to its concept IRI and gets `sh:in ( inv:S-a inv:S-b ... )` with `sh:nodeKind sh:IRI`: the list holds only the codes this field decodes, in the field's declared order, never every code of the scheme (decision 23: the record keeps storing the notation and the projector lifts it to the concept's IRI). Gate 5 requires each literal to be a notation of the scheme (05's V12; 14 section 6.5, rule P8: gate 4 reads no record); a subset is allowed (05 section 7), since the record owns which codes a field allows (decision 2). `Uom` (five of the unit scheme's seven notations) and `Dimensions.unit` (`cm` and `in`) are proper subsets and pass; a literal the scheme does not hold fails. A literal whose concept is retired still lifts and resolves under decision 33 (a) (pending Q14); which codes a command may newly assign is that command's own schema, not this row |
 | One `Literal` | `sh:hasValue` | a union's tag (`kind: "active"`) |
 | `Enum` | `sh:in` of its values | |
 | `TemplateLiteral` | `sh:pattern` of the template | |
@@ -272,14 +278,14 @@ gets no item shape. Shapes are SHACL 1.0 Core only: both seeds keep SHACL 1.2 dr
 | `isMinCodePoints`, `isMaxCodePoints` | `sh:minLength`, `sh:maxLength` | exact: SHACL counts characters |
 | `isMinLength(n)`, `isMaxLength(n)` on a string | `sh:minLength ceil(n/2)`, `sh:maxLength n` | Effect counts UTF-16 units, SHACL characters; these bounds never refuse what Effect accepts (Effect's JSON Schema does the same, `Schema.ts:8550`) |
 | `isGreaterThan`, `isGreaterThanOrEqualTo`, `isLessThan`, `isLessThanOrEqualTo`, `isBetween` (number, BigInt, BigDecimal) | `sh:minExclusive`, `sh:minInclusive`, `sh:maxExclusive`, `sh:maxInclusive` | bound typed with the field's datatype: `quantityOnHand` gets `"0"^^xsd:integer` and `"999999999999"^^xsd:integer` |
-| `isUUID` on a field the record names as its subject (decision 10) | none on a property; the focus node's IRI is minted from it | an id is the node, not a value of it |
+| A field marked as its record's subject id: its `term` is the record's own class (decision 10; 14 section 3.1) | none on a property; the focus node's IRI is minted from it | an id is the node, not a value of it. It is told by the mark, never by `isUUID` or any shape of the value: `MemberId` and `OrganizationId` are `IdText`, not UUIDs (`packages/kernel/src/Ids.id.ts`; 14 section 3.1). Exactly one such field in a record that points at a class |
 | A field with `term` naming an object property | `sh:class <range of the term> ; sh:nodeKind sh:IRI` | the range is the vocabulary's; the AST has no brand to say it |
 | A field that fills a datatype property whose vocabulary entry states a datatype | `sh:datatype` the stated type, whatever the leaf rows above give | the literal is converted to it (section 5, rule 8; 05's V11): `quantityOnHand` (`S.Int`) filling 07's `numericValue` (stated `xsd:decimal`, decision 50) gets `sh:datatype xsd:decimal`, never `xsd:integer`, since `sh:datatype` compares the literal's datatype IRI exactly |
 | Nested `Objects` under an object property (`dimensions`, `vendors`) | `sh:node shape:R-f-Node`, that node shape built by the same rules | nested shapes are named by path, never by the nested schema's bare identifier (`Active` would collide across records) |
 | `Union` of records (`Stocking`) | `sh:xone ( shape:R-f-Active shape:R-f-Inactive shape:R-f-Discontinued )` | each member a node shape with its tag as `sh:hasValue`. Where the union's pointer maps its tag to a scheme concept (07's `stocking`), the tag lifts to that concept on the stated property of the same subject (`lifecycleState`), member fields lift as their own properties of that subject (`discontinuedOn`), and `sh:xone` lists one node shape per member, applied to the same focus node, each with `sh:hasValue` the concept IRI. The nested-node form with a literal tag stays for a union with no such pointer |
 | `Union` of scalars, not all `Literal` | `sh:or` of datatype constraints | |
 | `Suspend` (recursion) | none | refused: SHACL 1.0 leaves recursive shapes undefined |
-| A field whose pointer carries a lift path (05's `TermPointer.path`) | `sh:path` the first step (`[ sh:inversePath p ]` for a reversed step), `sh:node shape:R-f-Node`, that node shape holding `sh:class` of the step's node class, one `sh:hasValue` property shape per `fixed` value, and the field's own constraints on the last step | each step must pass 05's V23 as rewritten: the last step is a datatype property, a scheme-ranged object property, or a class node whose nested fields supply the node's own properties; a `fixed` value is a concept CURIE, a datatype literal, the tenant or a sibling field, each checked against the fixed property's range. The `vendors` path in the sketch below (one reversed `offeredItem` step ending at a `VendorItem` node filled by the member's fields) satisfies it. A path of more than one step nests one node shape per step, named by path as above. The thin thread has one lift path: the `Member` record's role field becomes one `Grant`, linked by `grantedTo` to the membership, by `grantsRole` to the role's concept and by `grantScope` to the fixed concept `inv:GrantScopeKindScheme-organization` (decisions 40 and 96; 06). The record's other copied fields, the person's name, the organization's name and the sign-in email, take `noTerm` with the reason screen in the thread and carry no path (decision 93). Slice 1 adds their paths and the pointer on the access contract's `Person` record (the term `Person` is in the thread already, decision 94): the name through the person and the email through the sign-in account, each path reusing the one identified node of that person or account, never a new node per display field |
+| A field whose pointer carries a lift path (05's `TermPointer.path`) | `sh:path` the first step (`[ sh:inversePath p ]` for a reversed step), `sh:node shape:R-f-Node`, that node shape holding `sh:class` of the step's node class, one `sh:hasValue` property shape per `fixed` value, and the field's own constraints on the last step | each step must pass 05's V23 as rewritten: the last step is a datatype property, a scheme-ranged object property, a class-ranged object property fed by a `Literals` field whose scheme's concepts, for every literal the field allows, state `alsoInstanceOf` that class (14 section 4.3, case (c); the object is the concept's IRI), or a class node whose nested fields supply the node's own properties; a `fixed` value is a concept CURIE, a datatype literal, the tenant or a sibling field, each checked against the fixed property's range. The `vendors` path in the sketch below (one reversed `offeredItem` step ending at a `VendorItem` node filled by the member's fields) satisfies it. A path of more than one node step nests one node shape per step, named by path as above; the thread's projector refuses such a path, since no thread field needs a second created node (14 section 4.3). The thin thread has one lift path, `Member.role` to one `Grant`, and it is the case (c) above: its steps, its six triples per member and the rule are 14 sections 3.3 and 4. The thread writes no SHACL, so this row makes no shape from it until the SHACL slice. `Member` has five fields and holds no email and no person id; its two copied names, `name` and `organizationName`, take `noTerm` with the reason screen in the thread and carry no path (decision 93; 14 section 3.3). The access contract's `Person` record is enrolled in the thread as a view of a membership, pointing at `inv:Member`, with the same role path, and its `email` and `joinedAt` are `noTerm`, reason deferred, naming the party slice (decisions 99 and 100; 14 section 3.6). Slice 1 replaces those marks with paths: the name through the person and the email through the sign-in account, each path reusing the one identified node of that person or account, never a new node per display field |
 | Declaration not in this table (`Option`, `Redacted`, `File`, our own) | none | refused, naming record and field |
 | A check on a whole record, `makeFilter` without representation, `isMultipleOf`, `isUnique`, `isUniqueKey` | none | written in the file header as "not projected", one line each |
 | `examples`, `default`, `readOnly`, `writeOnly`, `title` | none | not data constraints |
@@ -309,8 +315,11 @@ shape:StoredItem-vendors a sh:PropertyShape ;
 
 ### 4.1 The lift (tests only)
 
-The lift turns stored rows into the data graph gate 11 validates. It runs in the slow test only and writes no
-generated file. Its input is three things: the organization's id, the confirmation that created the rows, and each row
+This section is the lift of stored rows. The lift function itself is a thread deliverable: `lift(record, value)`
+reads a record's marks and returns triples, and the thread runs it on two decoded `Member` values to build the graph
+of its one question, which `bun run ontology:write` writes as a generated file (14 section 4). What follows is its
+later use. The lift turns stored rows into the data graph gate 11 validates. On stored rows it runs in the slow test
+only and writes no generated file. Its input is three things: the organization's id, the confirmation that created the rows, and each row
 encoded by `StoredItem`. `StoredItem` holds neither the organization nor the confirmation
 (`packages/catalog/contract/src/Item/Item.read.ts`), so the slow test supplies both from the import it ran. Each item
 node is typed with the class the stored record's pointer names (`inv:InventoryItemSpecification`). Paths, properties
@@ -338,9 +347,11 @@ While a field's lift waits on terms a later slice brings (`quantityOnHand` under
 08's), the test lists that field as not validated.
 
 The access records have lift paths too (section 4, lift path row): `Member`'s role lift in the thin thread, the rest
-of `Member` and `Person` in slice 1. No stored access row is lifted in the thread or in slice 1. The thread's role
-lift is held by the fixture of its one question (gate 8) and by the pointer gates (5 and 7, decision 95), which hold
-slice 1's paths too. Both are a different check from this slow test.
+of `Member` and `Person` in slice 1. No stored access row is lifted in the thread or in slice 1, but the thread's
+role lift does run: the `inv:Member` and `inv:Grant` triples of its question's graph come from the lift of two
+decoded `Member` values and from nowhere else, with two guards and five must-fail cases that keep a hand-written
+`Grant` from answering (14 sections 4.4 and 5.4; gate 8). The pointer gates (5 and 7, decision 95) hold the marks,
+and slice 1's paths too. Both are a different check from this slow test.
 
 ## 5. Determinism: what makes a byte-compare mean something
 
@@ -352,28 +363,32 @@ after a dependency upgrade that changes no meaning.
 2. UTF-8 without a byte-order mark, LF line ends, one final LF, no trailing space, every text NFC-normalized.
 3. A fixed header: `# GENERATED by bun run ontology:write from <repository-relative module path>. Do not edit.`,
    the version, then the "not projected" lines sorted. No date, time, user, host, absolute path or git commit: a commit
-   hash would change on the commit that adds it.
+   hash would change on the commit that adds it. The thread's files open with exactly two comment lines, this one
+   and `# inventory-import ontology 0.1.0`; its graph file names its two sources in the first (14 section 8).
 4. Prefixes: only those used, sorted by prefix, taken from one table in the vocabulary module. Never `@base`. A
    local name that is not a valid Turtle local name is written as a full IRI in angle brackets. 05 says a prefix
    entry's prefix and its IRI are each unique; the writer refuses a prefix table that fails that rule, and never
    emits two `@prefix` lines for one prefix.
-5. Subjects in fixed sections (in the OWL file: header, annotation property declarations, classes, object
-   properties, datatype properties, gist projection, then named individuals (concepts with `alsoInstanceOf`) and
-   their links; in the SKOS file schemes then concepts; in the SHACL file node shapes then property shapes; in the
+5. Subjects in fixed sections (in the OWL file, in 14 section 6.1's order: header, annotation property
+   declarations, gist classes, local classes, object properties, datatype properties, a projected gist property
+   among those of its kind, then named individuals (concepts with `alsoInstanceOf`, and a concept declared for a
+   graph, section 3.1) and their links; in the SKOS file the header, schemes then concepts; in the SHACL file node shapes then property shapes; in the
    alignment file header, annotation property declarations, then match triples by subject), and within a section
    sorted by full IRI in code-point order, never `localeCompare`, which depends on ICU and the locale.
 6. Predicates per subject in one fixed table per file. OWL: `rdf:type`, `owl:versionIRI`, `owl:versionInfo`,
    `dcterms:source`, `skos:prefLabel`, `skos:altLabel`, `skos:definition`, `skos:scopeNote`, `rdfs:subClassOf`,
    `rdfs:subPropertyOf`, `owl:disjointWith`, `rdfs:domain`, `rdfs:range`, `inv:termCategory`, `owl:deprecated`, the
    replacement property, `skos:historyNote` and, for concept individuals, the object properties named by
-   `Concept.links`. SKOS: `rdf:type`, `skos:prefLabel`, `skos:altLabel`, `skos:definition`, `skos:inScheme`,
+   `Concept.links`. SKOS: `rdf:type`, `owl:versionIRI`, `owl:versionInfo`, `skos:prefLabel`, `skos:altLabel`, `skos:definition`, `skos:inScheme`,
    `skos:notation`, `skos:broader`, `skos:topConceptOf` and, for a retired concept or scheme, `owl:deprecated`, the
    replacement property and `skos:historyNote`. Alignment: `rdf:type` and the five `skos:*Match`. SHACL:
    `sh:targetClass`, `sh:path`, `sh:datatype`, `sh:class`, `sh:node`, `sh:nodeKind`, `sh:minCount`, `sh:maxCount`,
    the four bounds, `sh:minLength`, `sh:maxLength`, `sh:pattern`, `sh:flags`, `sh:in`, `sh:hasValue`, `sh:xone`,
    `sh:or`, `sh:closed`, `sh:ignoredProperties`, `sh:property`, `sh:name`, `sh:description`, `sh:message`, with
    `rdf:type` and, inside an inline path, `sh:inversePath`. A predicate not in its file's table refuses the
-   projection, so a new one is a reviewed change.
+   projection, so a new one is a reviewed change. Each file has a second list, apart from this table: the allowed
+   objects of `rdf:type`. The thread's two lists per file, for its three files, are 14 section 6.3; they are the
+   part of these tables the thread uses, and the graph file's are the vocabulary's own properties and classes.
 7. Several objects of one predicate sorted by their N-Triples form, one per line.
 8. One escaping function for strings (`\\`, `\"`, `\n`, `\r`, `\t`, other control characters as `\uXXXX`); never
    long strings in triple quotes. Numbers typed and written by one function per datatype: `xsd:integer` with no sign
@@ -390,10 +405,11 @@ after a dependency upgrade that changes no meaning.
    literal union's members, of a union's members), and the one-predicate path `[ sh:inversePath p ]` of a reversed lift step,
    written inline where it is used.
 10. Disjointness pairwise, once per pair (section 3), so no list is needed in OWL.
-11. The version from the module's constant only (pending Q13); never `Clock`, `Date`, git or `package.json` read at
+11. The version from the module's constant only (decision 24); never `Clock`, `Date`, git or `package.json` read at
     run time.
 12. Effect's `HashMap` and `HashSet` iterate in hash order, which is not an order: every collection becomes a sorted
-    array before writing. Records are discovered from module exports and sorted by package path, then export name.
+    array before writing. Records are taken from the enrolment list (decision 99), never discovered from a folder's
+    exports, and sorted by file path, then export name.
 13. Graph identity checked beside the bytes: the re-parse's sorted N-Triples, with list nodes named by their
     position, equal the projector's own triple list. Bytes catch formatting drift; this catches a writer that drops or
     adds a triple while staying stable.
@@ -408,47 +424,41 @@ gates are added where their cost fits.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Byte-compare | `check` (fast test of the ontology package, turbo `test`) | `project` in memory; each file's bytes equal the committed file, and the SSSOM table once it is written | a hand edit; a vocabulary or record change not regenerated; a non-deterministic projector | someone adds `inv:Pallet a owl:Class` to `inventory.owl.ttl` by hand |
 | 2 | Re-parse | `check` | N3.js parses each file; triple count and graph identity (rule 13) equal the projector's | invalid Turtle; an escaping bug; a writer that loses a triple | a definition with a double quote written unescaped |
-| 3 | Forbidden constructs and namespace | `check` (fast test, and law rules 4 and 5 below) | every predicate and every `rdf:type` object of each generated file is in that file's table (section 5, rule 6), so none of `owl:inverseOf`, `owl:sameAs`, `owl:equivalentClass`, `owl:imports`, `owl:hasKey`, `owl:Restriction` and the cardinality predicates, `owl:AllDisjointClasses`, `skos:narrower` or `skos:hasTopConcept` can appear; no `rdfs:subClassOf` object outside `inv:` and the projected gist classes; every minted IRI (term, document and version, shape) under the `example.org` placeholder and derived from the module's one base (section 2) | a projector change or a vocabulary row that breaks decisions 4 and 7 or report 01's and 02's rules | an `iof-core:` parent given to an item class; a `skos:narrower` written beside `skos:broader` |
-| 4 | Vocabulary coherence | `check` (fast test, TypeScript) | every local class reaches a projected gist class or ends at a `none` link with a reason on a category-tagged class; the classes ending at `none` are listed and compared with a committed list, so a new one is a reviewed change. The walk is made on the hierarchy that is emitted, the live classes with their documented `none` waivers: a retired class emits no parent and need not have one, and a live class whose only path runs through a retired class fails. No subclass cycle; no class with two disjoint ancestors; category tags agree with axioms (section 3) and each tag is one 05's V25 admits for the gist class the class reaches; category parents are category-tagged classes (05's V21); no identity criterion rests on a name or a SKU (05's V18; 04's CQ-I08); one prefLabel and definition `@en`, no empty text; SKOS notation unique per scheme, `skos:broader` acyclic and inside one scheme; every literal of a record field that points at a scheme is a notation of that scheme, a subset allowed, so the check is membership of the codes the field decodes and never equality with the taxonomy (05's V12; decision 23); a concept's `alsoInstanceOf` and `links` pass 05's V22, and such an individual states one identity criterion, the concept's scheme and notation (decision 41); every `ratification` names a `rat-` record in the list of existing records the test imports (decision 32: the module holds ratified entries only); a vocabulary-variant must-fail case a question assigns to this gate (section 6.3) fails it | unsatisfiable classes from named subclass links and disjointness, orphans, role-as-kind by tag, a field's literals drifting from its scheme | `MaterialLot` placed under two classes 08 declares disjoint; `Organization` retired with its annotations updated while `Tenant` still names it as parent, which fails here even though the ontology stays consistent |
-| 5 | Record pointers on the AST | `check` (fast test) | every exported schema of an enrolled folder (Enrolment, below) resolves `term` or `noTerm` (decision 21) on its AST, and each record the slice requires a pointer on resolves `term`, never `noTerm`; every field of a pointed record does (decision 22), lift paths included (the thread's role lift and the slice 1 access fields, section 4), and `Member`'s name, organization name and email fields resolve `noTerm` with the reason screen until slice 1 gives them paths (decision 93); a field's term is a property, a record's a class; no current schema annotation points at a deprecated term (a stored value is not read here); one datatype per datatype property. For a domain block, once blocks are enrolled, the block's static annotations are read where the AST carries none (section 7) | a helper that drops an annotation; a pointer written before an Option wrapper (it resolves to nothing, so the field fails as unpointed); a datatype clash; a record whose annotation points at a retired term | `Vendor.isPreferred` (a boolean) pointed at the date property `inv:discontinuedOn`; in the thin thread, `Role`'s pointer removed with the catalog untouched |
+| 3 | Forbidden constructs and namespace | `check` (fast test; law rules 4 and 5 below hold the same for code files) | on the parsed triples, never on text: every predicate of each generated file is in that file's table and every `rdf:type` object in that file's own list of allowed types (section 5, rule 6; 14 section 6.3), so none of `owl:inverseOf`, `owl:sameAs`, `owl:equivalentClass`, `owl:imports`, `owl:hasKey`, `owl:Restriction` and the cardinality predicates, `owl:AllDisjointClasses`, `skos:narrower` or `skos:hasTopConcept` can appear; no `rdfs:subClassOf` object outside `inv:` and the projected gist classes; every minted IRI (term, document and version, shape) under the `example.org` placeholder and derived from the module's one base (section 2) | a projector change or a vocabulary row that breaks decisions 4 and 7 or report 01's and 02's rules | an `iof-core:` parent given to an item class; a `skos:narrower` written beside `skos:broader` |
+| 4 | Vocabulary coherence | `check` (fast test, TypeScript) | a pure function over the vocabulary value, the exception list and the `rat-` records; it reads no record (14 section 6.4, whose rules C1 to C13 are the thread's). Every local class reaches a projected gist class or ends at a `none` link with a reason; the classes ending at `none` must be exactly the entries of the committed exception list, with the same reason, each entry ratified by Benjamin (decision 97; `Role` alone in the thread), so a new one is a reviewed change; a category-tagged class ending at `none` waits on decision 12, which is open. The walk is made on the hierarchy that is emitted, the live classes with their documented `none` waivers: a retired class emits no parent and need not have one, and a live class whose only path runs through a retired class fails. No subclass cycle; no class with two disjoint ancestors; category tags agree with axioms (section 3) and each tag is one 05's V25 admits for the gist class the class reaches; category parents are category-tagged classes (05's V21); no identity criterion rests on a name or a SKU (05's V18; 04's CQ-I08); one prefLabel and definition `@en`, no empty text; SKOS notation unique per scheme, `skos:broader` acyclic and inside one scheme; a concept's `alsoInstanceOf` and `links` pass 05's V22, and such an individual states one identity criterion, the concept's scheme and notation (decision 41); every `ratification`, and every exception entry's, names a `rat-` record that exists and reads accept (decision 32: the module holds ratified entries only), a concept naming its scheme's record when the scheme's proposal listed it (decision 101: 18 records for the thread); the version has the form decision 24 gives it; a vocabulary-variant must-fail case a question assigns to this gate (section 6.3) fails it | unsatisfiable classes from named subclass links and disjointness, orphans, role-as-kind by tag, a parentless class nobody allowed | `Grant` given a `none` parent with no entry on the exception list (the thread's planted mistake, 14 section 6.4); `MaterialLot` placed under two classes 08 declares disjoint, which needs a second parent and so a category parent (decision 12, open): a class has one `parent`, and the thread cannot write this case; `Organization` retired with its annotations updated while `Tenant` still names it as parent, which fails here even though the ontology stays consistent |
+| 5 | Record pointers on the AST | `check` (fast test) | every `record` and `scheme` entry of the enrolment list (Enrolment, below; decision 99) resolves `term` in its schema annotations, never `noTerm`, and a `collection` entry carries no mark and is checked against the record it is a collection of; every field of a pointed record resolves exactly one of `term`, `path` and `noTerm` in its key annotations (decisions 21 and 22), lift paths included (the thread's role lift and the slice 1 access fields, section 4), and `Member`'s two copied names resolve `noTerm` with the reason screen until slice 1 gives them paths (decision 93); a record's term is a class, a field's a property, or the record's own class on the one field that is the subject's id; every literal of a schema or field that points at a scheme is a notation of that scheme, a subset allowed, so the check is membership of the codes the field decodes and never equality with the taxonomy (05's V12; decision 23); every field of each variant of a `Model.Class` carries its class field's mark. The thread's rules are P1 to P12 of 14 section 6.5. No current schema annotation points at a deprecated term (a stored value is not read here); one datatype per datatype property. For a domain block, once blocks are enrolled, the block's static annotations are read where the AST carries none (section 7) | a helper that drops an annotation; a pointer written before an Option wrapper (it resolves to nothing, so the field fails as unpointed); a datatype clash; a field's literals drifting from its scheme; a record whose annotation points at a retired term | `Vendor.isPreferred` (a boolean) pointed at the date property `inv:discontinuedOn`; in the thin thread, a copy of `Member` whose `name` field carries no mark (14 section 6.5) |
 | 6 | Type-check | `check` (`tsc`, `Curie<V>`) | under decision 20 the argument of a pointer helper must be a CURIE of the vocabulary (report 02; 05). A raw `term` property is not held by the type-check, since Effect's annotations accept any string key (`Schema.ts:19313-19315`): that is gate 7's. A domain block's `term` is typed by the augmentation of section 7 | a term that does not exist | `aboutClass("inv:Organisation")` |
-| 7 | `laws ontology-terms` | `check` (root script, section 6.4) | static scan of the declarations in enrolled folders, independent of gate 5's runtime read | a new export with no pointer at all; a raw `term` property or an untyped lookalike of a helper (decision 20) | a new `CarrierAccount` schema exported with no `term`; a raw `term: "inv:Organisation"` |
-| 8 | CQ suite, no reasoning | `check` (fast test) | each CQ's query over OWL plus SKOS plus its fixture; rows equal the expected rows; each CQ also run on each of its must-fail cases, in the forms of section 6.3. The loader and the query keep the tenant of a fact that holds relative to a tenant (section 6.3) | a renamed or re-parented term that a question still names; a constraint that passes on empty data; a customer flag on one tenant's record of an organization joined with a vendor flag on another tenant's record of it (decision 34) | renaming `inv:isVendor` while CQ queries still use it: zero rows, fail |
-| 9 | Reasoner | `check:full` and `check:ci` (package turbo task `reason`; ROBOT with HermiT, decision 25) | OWL 2 DL profile validation of the OWL file; consistency and unsatisfiable classes of the OWL file alone, then of OWL plus each CQ fixture; and each vocabulary-variant must-fail case a question names (section 6.3) must be reported inconsistent. In the thin thread the negative case is a variant class placed under both `Person` and `Organization`, which must be reported unsatisfiable by the copied gist pair (decisions 15 and 94). From the slice that brings an event class, beside the consistent vocabulary, one negative fixture types a single node as both an `AuditEntry` and an event class and must be reported inconsistent, by the module's own disjoint pairs (06), which must then hold one for the two: the copied gist pairs give no disjointness of event and content (11) | a profile violation; an inconsistency that needs instances (domain or range typing meeting disjointness; a concept typed by `alsoInstanceOf` whose links or class meet a disjointness); for the compatibility review of a release, previously valid fixture data that a change makes inconsistent | a fixture `test_Acme inv:baseUnit ...` whose domain types an organization as an item specification, which gist's `Organization` and `Intention` disjointness forbids (decision 15) |
+| 7 | `laws ontology-terms` | `check` (root script, section 6.4) | static scan of the declarations on the enrolment list and of every code file's helper calls, independent of gate 5's runtime read | an enrolled export with no helper call; a helper call on a declaration that is not enrolled, a mark no gate checks; a raw `term`, `path` or `noTerm` key or an untyped lookalike of a helper (decision 20) | an enrolled `CarrierAccount` schema whose helper call is deleted; a raw `term: "inv:Member"`, spelt right, which gates 5 and 6 accept (the thread's planted mistake, 14 section 6.7) |
+| 8 | CQ suite, no reasoning | `check` (fast test) | each CQ's query over OWL plus SKOS plus its fixture (the thread's one question reads asserted types only and runs over its graph alone, 14 section 6.8); rows equal the expected rows; each CQ also run on each of its must-fail cases, in the forms of section 6.3. The loader and the query keep the tenant of a fact that holds relative to a tenant (section 6.3) | a renamed or re-parented term that a question still names; a constraint that passes on empty data; a customer flag on one tenant's record of an organization joined with a vendor flag on another tenant's record of it (decision 34) | renaming `inv:isVendor` while CQ queries still use it: zero rows, fail |
+| 9 | Reasoner | `check:full` (package turbo task `reason`; ROBOT with HermiT, decision 25); whether `check:ci` runs it too is part of Benjamin's approval of the download (14 sections 1.5 and 9.2) | OWL 2 DL profile validation of the OWL file; consistency and unsatisfiable classes of the OWL file alone, then of OWL plus each CQ fixture; and each vocabulary-variant must-fail case a question names (section 6.3) must be reported inconsistent. In the thin thread the negative case is one fixture triple that types the fixture's person as an `inv:Tenant`, which must be reported inconsistent: the pair `gist:Organization` and `gist:PhysicalIdentifiableItem` is copied, and `Person` reaches the second through the ancestors decision 14 admits; no `Person` and `Organization` pair is copied, and no local pair is in the thread (decisions 14, 15 and 94; 14 sections 2.1 and 6.9). From the slice that brings an event class, beside the consistent vocabulary, one negative fixture types a single node as both an `AuditEntry` and an event class and must be reported inconsistent, by the module's own disjoint pairs (06), which must then hold one for the two: the copied gist pairs give no disjointness of event and content (11) | a profile violation; an inconsistency that needs instances (domain or range typing meeting disjointness; a concept typed by `alsoInstanceOf` whose links or class meet a disjointness); for the compatibility review of a release, previously valid fixture data that a change makes inconsistent | a fixture `test_Acme inv:baseUnit ...` whose domain types an organization as an item specification, which gist's `Organization` and `Intention` disjointness forbids (decision 15) |
 | 10 | CQ suite, reasoned | `check:full` | Only under decision 27 (b). Under the recommended (a) no manifest names a reasoning step, this gate has nothing to run and is not built, and a re-parented class is a zero-row failure of gate 8. Under (b): CQs whose manifest names a reasoning step, run over the reasoner's inferred output; an expected answer lost after a change is evidence for the compatibility review of a release | a missing subclass path a question depends on | a class re-parented so it no longer falls under the class a question counts |
-| 11 | SHACL over the stored messy sample | slow test in the app (`apps/inventory/test/server/*.slow.test.ts`, run by `test:slow` in `check:full`); it cannot live in the ontology package, since a package never reaches into `apps/` (`laws boundaries`). The app imports the ontology package's shapes, lift and engines; the boundary row is decision 9's | a fresh D1; `items_messy.csv` imported through Confirm (155 items, as `test/server/Imports.slow.test.ts:69-78` already checks); the rows read back through the item store, encoded by `StoredItem`, lifted (pending Q11) by the lift of section 4.1, from the organization, the confirmation and each encoded row; each item node typed with the class the stored record's pointer names (`inv:InventoryItemSpecification`), so the 155 focus nodes do not depend on subclass triples in the data graph; validated: conforms, and exactly 155 focus nodes (non-vacuous); then each projected constraint broken once in an in-memory copy must give a violation, among them a fourth otherwise valid vendor (`sh:maxCount 3`), while an item with no vendors and no tags conforms. While a field's lift waits on terms a later slice brings (`quantityOnHand` under decision 76), the test lists that field as not validated; when it is lifted, one lifted quantity is compared with its stored value | shapes stricter than real data; shapes looser than the schema; a target that selects nothing; a required list wrongly given `sh:minCount 1` (an item with no vendors) | the projector maps `S.Int` to `xsd:string`, or writes the unlifted cost digits ("35.82") as the `minorUnits` literal, or types `minorUnits` `xsd:double`: a violation on every item that has a cost. The recommended lift of decision 59 (a), the digits at the field's scale as `xsd:integer`, conforms |
+| 11 | SHACL over the stored messy sample | slow test in the app (`apps/inventory/test/server/*.slow.test.ts`, run by `test:slow` in `check:full`); it cannot live in the ontology package, since a package never reaches into `apps/` (`laws boundaries`). The app would import the ontology package's shapes, lift and engines, which the thread's boundary row refuses: `allowed` in `laws boundaries` reads `devDependencies` too and has no notion of a test import, so nothing may import `@inventory/ontology` (14 section 7.2). The SHACL slice settles it, by a test-only row in the law or by another home for the test; it is not the thread's | a fresh D1; `items_messy.csv` imported through Confirm (155 items, as `test/server/Imports.slow.test.ts:69-78` already checks); the rows read back through the item store, encoded by `StoredItem`, lifted (pending Q11) by the lift of section 4.1, from the organization, the confirmation and each encoded row; each item node typed with the class the stored record's pointer names (`inv:InventoryItemSpecification`), so the 155 focus nodes do not depend on subclass triples in the data graph; validated: conforms, and exactly 155 focus nodes (non-vacuous); then each projected constraint broken once in an in-memory copy must give a violation, among them a fourth otherwise valid vendor (`sh:maxCount 3`), while an item with no vendors and no tags conforms. While a field's lift waits on terms a later slice brings (`quantityOnHand` under decision 76), the test lists that field as not validated; when it is lifted, one lifted quantity is compared with its stored value | shapes stricter than real data; shapes looser than the schema; a target that selects nothing; a required list wrongly given `sh:minCount 1` (an item with no vendors) | the projector maps `S.Int` to `xsd:string`, or writes the unlifted cost digits ("35.82") as the `minorUnits` literal, or types `minorUnits` `xsd:double`: a violation on every item that has a cost. The recommended lift of decision 59 (a), the digits at the field's scale as `xsd:integer`, conforms |
 | 12 | Alignment file | `check` (fast test), from the slice that writes the alignment file | every target's namespace is in the prefix table; only `skos:*Match`; every subject is a live `inv:` term; and the SSSOM table once it is written | an alignment to a retired term; an unknown prefix | a row aligning a deprecated class |
 
-Enrolment. Gate 5, gate 7 and the projector's discovery of bindings read one cumulative list of enrolled folders and
-files, and nothing outside it. Under decisions 8 and 95 the thin thread comes first and enrols
-`packages/access/contract/src` and, in `packages/kernel/src`, four files (`Member.schema.ts`, `Role.schema.ts`,
-`Activity.schema.ts`, `AgentRun.schema.ts`). It puts typed pointers on three kernel records, `Member`, `Role` and
-`Activity` (the last at `AuditEntry`, decision 46), with `Member`'s role field lifted to a `Grant` (decisions 40 and
-96) and its name, organization name and email fields `noTerm`, reason screen (decision 93); `noTerm` does not satisfy
-the check on those three records. Every other schema of the enrolled set is placed in the thread too, with a pointer
-or with `noTerm` and a reason from decision 21's closed list (decision 22), `Membership` among them (a test-account
-row of organization name and role with no member id, reason screen). Four records wait for pointers at slice 1's
-terms: the kernel's `AgentRun` and the access contract's `Person`, `OrganizationChoice` and `ModelCallPurpose`. From
-slice 1 those four and the thread's three must carry a pointer: `noTerm` does not satisfy the check on those seven.
-How each of the four is placed in the thread, before its pointer is written, decision 95 does not state; it is
-settled when the thread is specified. Slice 1 keeps the thread's enrolment. This list is the first coverage of gates
-5 and 7, which start in the thread. The kernel's other exports and every
-catalog declaration are out of scope, which is not an exemption: they are reported as "not enrolled", never failed
-and never given `noTerm`. Slice 2 adds the catalog contract's item folders; slice 3 adds the rest of the catalog
-contract, the import's declarations; the model's blocks are enrolled only at the separate alchemy-domain milestone
-(section 6.4, rule 2). The list is one value in the place decision 9 gives the projector, read by gate 5 as a value
-and by the law as a source file it inspects. It only grows. The negative check of the thread: removing `Role`'s pointer
-fails gates 5 and 7 with the catalog untouched.
+Enrolment. Gate 5, gate 7 and the projector's discovery of bindings read one cumulative list of enrolled records,
+and nothing outside it. Enrolment is by record, never by folder (decision 99, which replaces decision 95's "the
+access contract and the four kernel records"). Under decisions 8 and 95 the thin thread comes first and enrols five:
+the kernel's `Member`, `Role` and `Activity` (the last at `AuditEntry`, decision 46) and the access contract's two
+views of them, `Person` (a record of `inv:Member`, decision 100) and `AuditTrail` (a collection of `Activity.json`).
+Which contract exports are views, every mark on every field of the five, and how a mark sits on a `Model.Class`, are
+14 sections 3.3 to 3.6; `noTerm` does not satisfy the check on a record itself. An export that is not enrolled
+carries no mark at all, `noTerm` included: `AgentRun`, `Membership`, `OrganizationChoice`, `ModelCallPurpose`, the
+kernel's other exports and every catalog declaration are reported as "not enrolled", never failed and never given
+a placeholder mark for a term that does not exist yet. That is not an exemption: the slice that owns a record's term
+enrols it. Slice 1 keeps the thread's five, adds its own records and replaces the thread's deferred marks
+(`Activity.agent`, `Person.email`, `Person.joinedAt`; decisions 98 and 100). This list is the first coverage of
+gates 5 and 7, which start in the thread. Slice 2 adds the catalog contract's item records; slice 3 adds the rest of
+the catalog contract's, the import's declarations; the model's blocks are enrolled only at the separate
+alchemy-domain milestone (section 6.4, rule 2). The list is one committed file, `packages/ontology/enrolment.json`,
+which the law reads as text, beside `packages/ontology/src/Enrolled.ts`, which maps each entry to its schema value
+for gate 5; gate 5's first check is that the two name the same set (14 section 3.7). It only grows.
 
 The thin thread's gates (decisions 8 and 95). The thread builds every gate that needs no stored row: gates 1 to 8 in
-`check`, gate 8 with its one question (section 6.3) and gates 5 and 7 enrolled as above, and gate 9 in `check:full`
-and `check:ci`. Each is shown failing once on a planted mistake, then put right: a hand edit of the generated OWL
-file (gate 1); a label with an unescaped double quote, written by a writer variant in the test (gate 2); a stray
-`owl:sameAs`, written by a writer variant in the test (gate 3); a role literal that is no notation of
-`MemberRoleScheme`, or a term naming no `rat-` record (gate 4); `Role`'s pointer removed (gates 5 and 7); a misspelt
-term in a pointer helper (gate 6); the grant's link to its role removed from the fixture (gate 8); a variant class
-placed under both `Person` and `Organization`, reasoned without gate 4 (gate 9; decisions 15 and 94). Gates 11 and
-12 wait for their slices, and gate 10 is decision 27's, which is open.
+`check`, gate 8 with its one question (section 6.3) and gates 5 and 7 enrolled as above, and gate 9 in `check:full`.
+Each of the nine has one committed test that plants one mistake and asserts that the gate reports it, so "shown
+failing once" is a permanent test. Where each gate runs, what it reads, the rules it runs in the thread and its
+planted mistake, chosen so that no other gate sees it, are 14 sections 6.1 to 6.9, which replace the list this
+paragraph held. Gates 11 and 12 wait for their slices, and gate 10 is decision 27's, which is open.
 
 Stored rows are never changed to reach a must-fail case: the mutation is made to the lifted graph in memory, so the
 D1 database holds only what a real import wrote (`CLAUDE.md`, "Look at it").
@@ -477,11 +487,12 @@ check, and it stays right when restrictions or unions are added later.
 Decided (decision 25): ROBOT with HermiT in `check:full`, for the OWL 2 DL profile check and consistency, with gate 4
 in `check`. `reason` is a package task of the ontology package,
 never a `//#` root task (config-sync puts every root task in `bun run check`, which must not need Java). It is named
-in the root `check:full` and `check:ci` scripts, so CI's main job runs it on every pull request, with a pinned Java
-set up in that job and the jar fetched by the script that checks its SHA-256 and keeps it outside the repository.
+in the root `check:full` script. If `check:ci` names it too, CI's main job runs it on every pull request, with a
+pinned Java set up in that job and the jar fetched by the script that checks its SHA-256 and keeps it outside the
+repository; that is not decided, since CI would fetch the same jar (14 sections 1.5 and 9.2).
 When Java or the jar is missing the task fails with the command to run; it never passes by skipping. The Java pin and
 the jar download are still Benjamin's to approve, with the file, its source and its size named first; nothing is
-fetched until then.
+fetched until then. The task's two runs in the thread, its inputs and its pin file are 14 sections 6.9 and 6.10.
 
 ### 6.2 Parser, SPARQL and SHACL engines for Vitest on Node (Q3)
 
@@ -506,10 +517,15 @@ shacl-engine is added with the SHACL slice.
 04 writes the questions (`assets/requirements/competency-questions.yaml`); this is the form the runner reads, decoded
 by a Schema in the test.
 
-The fixtures, queries, expected rows and the manifest stay under `explorations/erp-ontology/assets/requirements/`.
-The ontology package's own `turbo.json` names `$TURBO_ROOT$/explorations/erp-ontology/assets/**` as an input of
-`test` and of `reason`, as `packages/catalog/model/turbo.json` names what its proofs read; without it a changed
-fixture replays a cached pass. That is the cache contract of gates 8 to 10: each task's hash covers the manifest and
+The thread keeps its one question inside the ontology package (`packages/ontology/fixtures/cq/`: the query, the
+hand-written fixture and the member rows), so the package's own files cover them and no `assets/**` input is named.
+Its `turbo.json` names one input outside the package for `test`, the `rat-` records under
+`explorations/erp-ontology/assets/audit/*/governance/ratifications/**`, and gives `reason` its own list of
+committed files (14 section 6.10). For the later questions, the fixtures, queries, expected rows and the manifest
+stay under `explorations/erp-ontology/assets/requirements/` unless their slice moves them into the package as the
+thread did; while they stay, the package's `turbo.json` names that folder as an input of `test` and of `reason`, as
+`packages/catalog/model/turbo.json` names what its proofs read; without it a changed fixture replays a cached pass.
+That is the cache contract of gates 8 to 10: each task's hash covers the manifest and
 every file it names that the runner consumes, the queries, the fixtures of the passing run and of each must-fail
 case, the expected answers and the antecedent queries. For gate 9 it covers which fixtures are chosen and their
 bytes, beside the OWL file and the reasoner's own inputs, so a changed fixture never replays an earlier consistency
@@ -561,30 +577,34 @@ before the query. The two-tenant must-fail case gives one organization a custome
 vendor flag on the other tenant's record, and must return no row.
 
 The thin thread's one question (decision 8; 04's CQ-P06): who belongs to this organization and with which role. Its
-fixture has two `Tenant` nodes and one `Person` node who is an admin in one and a viewer in the other, as two `Member`
-nodes, each linked to that person and, by `membershipIn`, to its tenant (decisions 38 and 94), and each with one
-`Grant` to a role concept of `MemberRoleScheme` whose `grantScope` is the concept organization of
-`GrantScopeKindScheme` (decisions 40, 41 and 96). Asked for the first organization the expected row is that member with `inv:MemberRoleScheme-admin` only; asked
-for the second, the other member with `inv:MemberRoleScheme-viewer` only. The fixture holds no name and no email
-(decision 93), and no contact: a `ContactAssignment` with its purpose and contact point is slice 1's (decisions 39 and
-43), where the same rule holds, that a purpose at one account is never reported at another.
+query, its fixture of two tenants and one person with two memberships, the two expected rows and the five must-fail
+cases are 14 section 5. The graph is seventeen triples: five hand-written, for what no record holds, and twelve
+lifted from two `Member` rows (14 section 4.4). The suite compares the whole result, and the answer for one
+organization is the rows with that tenant. The thread reads no manifest; the form above is for the later questions.
+The graph holds no name and no email (decision 93), and no contact: a `ContactAssignment` with its purpose and
+contact point is slice 1's (decisions 39 and 43), where the same rule holds, that a purpose at one account is never
+reported at another.
 
 ### 6.4 The `laws ontology-terms` rule
 
-A new command of `@beep/repo-cli`, `bun run beep laws ontology-terms`, with a root script `ontology-terms:check` in
-`bun run check`, written like the other laws (oxc syntax tree, files git would commit, the scratchpad left out, a
-refusal at the line with the line to write). The folders it scans are source paths, files the CLI reads as text; the
-CLI imports neither the kernel nor a contract package and needs no boundary exception for them. Rules 1 to 3 follow
-decision 20, the typed helpers. The command is part of the thin thread (decision 95), on the thread's enrolment.
+A new command of `@beep/repo-cli`, `bun run beep laws ontology-terms`, with a root task `//#ontology-terms:check` in
+all three checks, written like the other laws (oxc syntax tree, files git would commit, the scratchpad left out, a
+refusal at the line with the line to write). What it scans are source paths, files the CLI reads as text, and
+`packages/ontology/enrolment.json`; the CLI imports neither the kernel nor a contract package and needs no boundary
+exception for them. Rules 1 to 3 follow decision 20, the typed helpers. The command is part of the thin thread
+(decision 95), on the thread's enrolment. Which rules run in the thread, and the three rules 14 adds to the five
+below (1b, 6 and 7), are 14 section 6.7.
 
-1. Every exported declaration in an enrolled folder (section 6, Enrolment) whose value is a schema (a call chain from
-   `S.` or `Schema.`, a `LiteralKit(...)` call such as `Role`, a wrapped declaration, or a class extending one)
-   carries a pointer or `noTerm` (decision 21) in its own `.annotate`, `.pipe(S.annotate` or class annotations. A pointer is
-   the spread of the imported helper that fits the position (`aboutClass` on a record, `aboutProperty`, `aboutScheme`
-   or `aboutPath` on a field, the scheme and lift-path forms included). A raw `term` property, or a local function
-   that only looks like a helper, is refused. The records that must be pointed (Enrolment: three in the thread, seven from
-   slice 1) are refused with `noTerm`; a field of one may take it, as `Member`'s name and email fields do until their paths are written
-   (decision 93). In `packages/kernel/src` only the four enrolled files are read; the vocabulary module, the pointer
+1. Every export on the enrolment list (section 6, Enrolment; decision 99) whose value is a schema (a call chain from
+   `S.` or `Schema.`, a `LiteralKit(...)` call such as `Role`, a wrapped declaration, a class extending one, or
+   `class X extends Model.Class<X>("X")(fields, annotations)` with the helper in the second argument) carries a
+   helper call in its own declaration; a `collection` entry is exempt. A pointer is
+   the spread of the imported helper that fits the position (`aboutClass` on a record and on the field that is its
+   subject's id, `aboutScheme` on a `Literals` schema, `aboutProperty` or `aboutPath` on a field). A raw `term`,
+   `path` or `noTerm` key, or a local function that only looks like a helper, is refused. An enrolled record is
+   refused with `noTerm`; a field of one may take it, as `Member`'s two copied names do until their paths are written
+   (decision 93). A helper call in a declaration that is not enrolled is refused too (14's rule 1b). In
+   `packages/kernel/src` only the enrolled declarations are read; the vocabulary module, the pointer
    helpers and the context and middleware files are not record schemas and are not read.
 2. Every `Domain.Event`, `Rejection`, `Command`, `Aggregate`, `Decision`, `View`, `Projection`, `Query` and `Stream`
    declared in `packages/*/model/src` carries `term` or `noTerm` in its last argument (section 7). A block's
@@ -594,13 +614,16 @@ decision 20, the typed helpers. The command is part of the thin thread (decision
    already declare events and rejections with no term, are not scanned.
 3. A helper's term arguments are string literals, so the type-check holds them to `Curie<V>`; a computed value is
    refused.
-4. No code file and no generated ontology file contains `owl:inverseOf`, `owl:sameAs`, `owl:equivalentClass`,
-   `owl:imports`, `owl:hasKey`, `skos:narrower` or `skos:hasTopConcept`, outside this law's own source and its tests,
-   and outside the competency-question suite's query and fixture files, where CQ-P05's ASK names `owl:sameAs` and
-   its must-fail fixture states one such triple.
+4. No code file (`.ts`, `.tsx` or `.mjs` that git would commit) contains `owl:inverseOf`, `owl:sameAs`,
+   `owl:equivalentClass`, `owl:imports`, `owl:hasKey`, `skos:narrower` or `skos:hasTopConcept`, as a CURIE or as a
+   full IRI, outside this law's own source and its tests. It scans code files only: the generated Turtle is gate 3's,
+   on parsed triples, and the suite's query and fixture files are not code files, so CQ-P05's ASK may name
+   `owl:sameAs` and its must-fail fixture may state one such triple, and gate 3's planted mistake, a Turtle fixture,
+   does not trip this rule (14 sections 6.3 and 6.7).
 5. Every namespace written in the vocabulary module is the `example.org` placeholder or an external prefix of the
    namespace table; none names Sutton. The module writes the placeholder once, as the one base every IRI family is
-   derived from (section 2).
+   derived from (section 2), and the literal appears in no other code file: in the thread that one file is
+   `packages/kernel/src/Terms.vocab.ts` (14 sections 2.6 and 6.7).
 
 Not its job: whether a term exists (gate 6), whether a field's pointer survives helpers (gate 5), whether the pointer
 is the right term (nobody's but the reviewer's).
@@ -655,16 +678,18 @@ list of contract ASTs supplies a block's binding. None of this is built before t
 6.4, rule 2).
 
 Typing needs an augmentation of `@alchemy.run/domain`, whose `Annotations` interface has no index signature, before
-any block carries a term. Decision 20 chose both parts: contract schemas use 05's typed helpers (`aboutClass`,
-`aboutProperty`, `aboutScheme`, `aboutPath`), which write one `term` annotation, and `@alchemy.run/domain`'s
-`Annotations` is augmented. `effect/Schema` is not augmented:
+any block carries a term. Decision 20 chose both parts: contract schemas use the typed helpers, bound in the kernel
+from generic makers in `@beep/vocabulary` (14 section 3.2): `aboutClass`, `aboutProperty` and `aboutScheme` write the
+annotation key `term`, `aboutPath` writes `path` and `noTerm` writes `noTerm` (14 section 3.1); and
+`@alchemy.run/domain`'s `Annotations` is augmented. The thread enrols no block, so it does not write the
+augmentation; the slice that enrols the first block does (14 section 1.3). `effect/Schema` is not augmented:
 
 ```ts
 // sketch, not code
 declare module "@alchemy.run/domain" {
   interface Annotations {
-    readonly term?: Curie<typeof InventoryVocabulary>
-    readonly noTerm?: NoTermReason // decision 21's closed list
+    readonly term?: Curie<InvClassVocab> // one registry per kind of term (14 section 2.6); which a block uses is 09's
+    readonly noTerm?: NoTermReason // decision 21's closed list; decision 98's deferred carries its slice
   }
 }
 ```
@@ -681,10 +706,12 @@ Moved on 2026-11-22 to the packet's [DECISIONS.md](../DECISIONS.md), merged with
 mapping: Q1 is decision 9, Q2 is 25, Q3 is 26, Q4 is 11, Q5 is 19, Q6 is 50, Q7 is 22, Q8 is 21, Q9 is 10, Q10 is
 48, Q11 is 49, Q12 is 23, Q13 is 24, Q14 is 33, Q15 is 28, Q16 is 51.
 
-Eight of the sixteen were answered on 2026-11-22 and are cited above by decision number: Q1 (9), Q2 (25), Q3 (26), Q4
-(11), Q7 (22), Q8 (21), Q9 (10) and Q12 (23). Eight are open and keep their "(pending Qn)" marks: Q5 (19), Q6 (50),
-Q10 (48), Q11 (49), Q13 (24), Q14 (33), Q15 (28) and Q16 (51). Each is put to Benjamin with the slice that needs it;
-the thin thread waits on none of them.
+Nine of the sixteen were answered on 2026-11-22 and are cited above by decision number: Q1 (9), Q2 (25), Q3 (26), Q4
+(11), Q7 (22), Q8 (21), Q9 (10), Q12 (23) and Q13 (24). Seven are open and keep their "(pending Qn)" marks: Q5 (19),
+Q6 (50), Q10 (48), Q11 (49), Q14 (33), Q15 (28) and Q16 (51). Each is put to Benjamin with the slice that needs it;
+the thin thread waits on none of them. Decisions 97 to 101, answered the same day, came from the second review and
+from report 14 and have no Qn here: 97 is cited at the parent rule and gate 4, 98 at the `noTerm` reasons, 99 at
+Enrolment, 100 at the lift path row and 101 at gate 4.
 
 ## Not checked
 
@@ -704,5 +731,7 @@ the thin thread waits on none of them.
 - The contract export count (about 150) is a grep, not a list of schemas.
 - 04 to 11 were being written at the same time and were not read by this report's author; the keys were matched with
   them on 2026-11-22 (report 13), and section 3.1 was added from 05 as it stands after that date. No rule here was run.
+- The edits of 2026-11-22 that make this report defer to report 14 took report 14's statements about the code as
+  written there; no file it names was reopened for this report, and what report 14 did not check is its section 10.
 - The beep-effect fold's `xsd:integer` mapping is report 02's finding, not opened again.
 - No public Sutton document was read for this report; no Sutton fact is used beyond report 01's.

@@ -10,18 +10,17 @@ This is a design to argue with where a decision is still open, and a decided des
 conceptualizer's step for code lists: which SKOS concept schemes the vocabulary module holds, what each concept means,
 and which record field takes its allowed values from which scheme. Two schemes are in the thin thread:
 `MemberRoleScheme` (viewer, editor and admin; decisions 8 and 41) and `GrantScopeKindScheme` with the one concept
-organization (decision 96). The terms with them are `Organization`, `Tenant` (a role class under `Organization`, keyed
-by `OrganizationId`; `membershipIn` ranges over it, decision 38), `Person` (under `gist:Person`, one link from `Member`
-to the person, no name or email paths, decision 94), `Member`, `Role` (no gist parent, no `permits`), `Grant`
-(`grantedTo`, `grantsRole`, `grantScope`) and `AuditEntry` (alternative label "Activity", decision 46). Their gist
-parents and those parents' ancestors come with them (decisions 13 and 14). The thread answers one question: who belongs
-to this organization and with which role, on a fixture where one person is an admin in one organization and a viewer in
-another. The other schemes stay proposals for the slice that needs them. Slice 1, the
-party slice, follows the thread and is not the first deliverable. No scheme has a `rat-` record yet: decision 32 says
-the module holds ratified entries only, and the answers of 2026-11-22 are the first that need those records. Except
-where an answered decision below says otherwise, a row is still a proposal that goes through the foundational auditor
-and Benjamin before the architect writes it into the vocabulary module (which is not built). TypeScript and Turtle
-below are sketches, not code.
+organization (decision 96). The thread's classes, properties, record marks, enrolment, lift, fixture, question and
+gates are report 14, sections 2 to 6; this file does not restate them. `Role`, the class whose individuals are
+`MemberRoleScheme`'s concepts, has no gist parent: decision 97's stated exception, because those individuals are the
+concepts and `gist:Permission` fits once `permits` exists. The other schemes stay proposals for the slice that needs
+them. Slice 1, the party slice, follows the thread and is not the first deliverable. No scheme has a `rat-` record
+yet. Decision 32 says the module holds ratified entries only, and the answers of 2026-11-22 are the first that need
+those records. Decision 101: the ruling on a scheme covers the concepts listed in the proposal, and a concept added
+later is a proposal of its own, so the thread's two schemes are two of its 18 rulings (seven classes, nine properties
+and two schemes), not a ruling for each concept. Except where an answered decision below says otherwise, a row is
+still a proposal that goes through the foundational auditor and Benjamin before the architect writes it into the
+vocabulary module (which is not built). TypeScript and Turtle below are sketches, not code.
 
 Inputs: the project profile and the packet's `DECISIONS.md`; reports 01 and 02; the shared gist, naming, anti-pattern
 and foundational files; the two seed reports ("the architecture seed" and "the API design report"); the catalog and
@@ -73,9 +72,9 @@ scheme for the item, party and tracking codes of 06, 07 and 08), `QualityResult`
 name, since `QualityResult` is 09's class), and the schemes 06, 08 and 09 named without concepts were added (sections
 4.29 to 4.31). Open choices are numbered decisions in [DECISIONS.md](../DECISIONS.md), mapped from each Qn here under
 "Questions for Benjamin". Of the schemes in the table, `MemberRoleScheme` and `GrantScopeKindScheme` are in the thin
-thread. `MemberRoleScheme` ships viewer, editor and admin (decisions 8 and 41). `GrantScopeKindScheme` ships the one
-concept organization (decision 96); location and field wait for the slice that needs them. Every other scheme waits
-for the slice that needs it.
+thread (report 14 sections 2.3 and 2.4). `MemberRoleScheme` ships viewer, editor and admin (decisions 8 and 41).
+`GrantScopeKindScheme` ships the one concept organization and is not closed (decision 96); location and field wait
+for the slice that needs them. Every other scheme waits for the slice that needs it.
 
 | Key | Label | Definition | Tag | gist parent | Identity | Source | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -87,7 +86,7 @@ for the slice that needs it.
 | MeasurementDimensionScheme | Measurement dimension | A controlled vocabulary of the kinds of amount a unit measures, such as count, mass, length and volume. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | NEW: a unit's dimension decides which conversions need an item factor (docs/glossary.md "Conversion factor"; the architecture seed 7.3) | later |
 | ContactPurposeScheme | Contact purpose | A controlled vocabulary of the purpose a contact assignment carries for one person at one account, such as billing, shipping or receiving. The purpose does not sit on the contact point alone (decisions 39 and 43). | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3 | later |
 | IdentifierKindScheme | Identifier kind | A controlled vocabulary of the systems that issue identifiers, each saying who assigns the identifier's text and what it identifies. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3; Item.read.ts (`sku`, `vendorSku`); docs/glossary.md "Barcode"; the architecture seed 7.1 | in the repository today (two concepts) |
-| GrantScopeKindScheme | Grant scope kind | A controlled vocabulary of the extents a grant of access covers: a whole organization, one location, or one field. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3; the architecture seed 5.7 | in the repository today (one concept) |
+| GrantScopeKindScheme | Grant scope kind | A controlled vocabulary of the extents a grant of access covers: a whole organization, one location, or one field. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | report 01 section 3; the architecture seed 5.7 | thin thread (one concept; no record field) |
 | MemberRoleScheme | Member role | A controlled vocabulary of the access levels a member holds in an organization, ranked by what each may do. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | packages/kernel/src/Role.schema.ts (`Role`) | in the repository today |
 | ReviewOutcomeScheme | Review outcome | A controlled vocabulary of where a row of an imported file stands before the confirm, which add up to the rows reviewed. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | packages/catalog/model/src/Review/Review.rules.ts (`RowOutcome`); packages/review/src/ReviewWords.words.ts | in the repository today |
 | ImportResultOutcomeScheme | Import result outcome | A controlled vocabulary of what a confirmed import did with each row, read back from what is stored. | information | none: a `skos:ConceptScheme`, not an OWL class (pending Q3) | its key | packages/catalog/contract/src/Import/Import.read.ts (`OutcomeKind`); packages/catalog/web/src/internal/format.tsx (`importWords`) | in the repository today |
@@ -353,13 +352,12 @@ them apart.
 ### 4.11 GrantScopeKindScheme (Grant scope kind)
 
 - Applies: one per grant.
-- Closed: no. For the thread, the scheme ships the one concept `organization` (decision 96). `location` and `field`
-  are added by the slice that needs them, and adding a scope changes no existing grant.
+- Closed: no. The thread ships the one concept `organization` (decision 96; report 14 section 2.3). `location` and
+  `field` are added by the slice that needs them, and adding a scope changes no existing grant.
 - Concepts are categories of a grant's scope. Only `organization` is in the thread.
-- Record field: none today. Decision 40: `Grant` is its own relator, linking a member, a role and a scope, and
-  today's `member.role` is one grant at organization scope, the notation `organization`. Decision 96: the thin thread's
-  `Grant` carries `grantScope` to that concept. A location grant names its place with 08's `atLocation` (pending
-  decision 42).
+- Record field: none. Today's `member.role` is one grant at organization scope (decision 40), and the thread's lift
+  writes the notation `organization` as a fixed value of `grantScope` (decision 96). The property and the path are
+  report 14 sections 2.2 and 4. A location grant names its place with 08's `atLocation` (pending decision 42).
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -371,26 +369,30 @@ The architecture seed's app visibility is left out: it says app visibility canno
 
 ### 4.12 MemberRoleScheme (Member role)
 
-This scheme is in the thin thread (decisions 8 and 41).
+This scheme is in the thin thread (decisions 8 and 41). Its concepts, the role field's mark, the lift and the fixture
+are report 14, sections 2.4, 3.3, 3.4, 4 and 5.
 
 - Applies: one role per grant. Today's `member.role` is one grant at organization scope (decision 40), and the thread's
-  `Grant` carries `grantScope` for that scope (decision 96). The thread's fixture is one person who is an admin in one
-  organization and a viewer in another. Decision 94: `Person` is in the thread, under `gist:Person`, with one link from
-  `Member` to the person and no name or email paths, so those two memberships are one human.
-- Closed: yes for the thread. The three notations below are the whole scheme as the thread ships it, and the record's
-  `Role` literals are those three.
+  grant states that scope (decision 96; report 14 section 4).
+- Closed: yes for the thread. The three notations below are the whole scheme as it ships, and the record's `Role`
+  literals are those three (report 14 section 2.3).
 - Concepts are roles a member holds. They are ranked (an editor may do what a viewer may), and the rank is a rule in
-  `hasRole`, not `skos:broader`: an editor is not a kind of viewer.
+  `hasRole`, not `skos:broader`: an editor is not a kind of viewer (report 14 section 2.3).
 - Decision 41: viewer, editor and admin are concepts of this scheme and, under the same IRI, individuals of `Role`.
   Such an individual has one identity criterion, the concept's: its scheme and its notation (rule 4). A tenant's
   custom role is another individual, and another concept of this scheme, not a second class; it is not in the thread.
-  The thin thread ships `Role` without `permits`, so `Permission` waits for the party slice.
-- Record field: `Role` in packages/kernel/src/Role.schema.ts, used by `Person.read.ts`, `People.command.ts`
-  (`AddPerson`, `ChangeRole`) and `SessionState.read.ts`. Decision 22: every field of a record that points at a term
-  carries a pointer or `noTerm` with a reason, and the SHACL shapes are closed. Decision 93: in the thin thread the
-  Member record's copied name and email fields are `noTerm` with reason screen (decision 21's list); only the role
-  field is lifted, to its `Grant` (decision 40). Role.schema.ts remains the source of viewer, editor and admin. While
-  the scheme lists only those three, its notations equal that list. `hasRole`'s rank is not copied into the scheme.
+  `Role` has no gist parent (decision 97): a stated exception, because its individuals are these concepts and
+  `gist:Permission` fits once `permits` exists. The thread ships `Role` without `permits`, so `Permission` waits for
+  the party slice.
+- Record field: the kernel's `Role` (`packages/kernel/src/Role.schema.ts`), the source of viewer, editor and admin.
+  `Member.role` and the People page's `Person.role` take it, and `AddPerson`, `ChangeRole` and the session records
+  carry a `Role` value too. Of the records the thread enrols, the scheme schema, the kernel's `Member` and that
+  `Person` are the ones that carry this scheme; `AddPerson`, `ChangeRole` and the session records are not enrolled
+  (decision 99; report 14 sections 3.4, 3.6 and 3.7). The kernel's `Member` has no email field. Its copied `name` and
+  `organizationName` are `noTerm`, reason screen, and the party slice adds their paths (decision 93). The People
+  page's `email` and `joinedAt` are `noTerm`, reason deferred, naming the party slice (decision 100). Deferred is the
+  sixth `noTerm` reason (decision 98). While the scheme lists only those three, its notations equal the record's
+  literals. `hasRole`'s rank is not copied into the scheme.
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -809,7 +811,7 @@ EvidenceKindScheme (several per decision or suspicion; closed: no):
 | sharedContactPoint | Shared contact point | none | none | An evidence kind in which both source records hold one email address or telephone number. | 06; decision 34 |
 | statementByParty | Statement by the party | none | none | An evidence kind in which a party said the two source records are, or are not, records of one company. | 06 (NEW); decision 34 |
 
-MembershipStatusScheme (one per membership; closed: yes). A Sutton note until a status column exists: the `member` table has no status column, and removal in this repository is `removedAt`, not one of these values:
+MembershipStatusScheme (one per membership; closed: yes). A Sutton note until a status exists on a record. The kernel's `Member` has no status field and no `removedAt` field (report 14 section 3.3); `removedAt` is not a thread term (report 14 section 1.3). None of these notations is read from that record:
 
 | Notation | prefLabel | altLabels | broader | Definition | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -909,8 +911,9 @@ the field's own literals, each of those notations one of the scheme's, and the f
 has. OWL states no range (anti-pattern 10). A sub-property link to `gist:isCategorizedBy` is not written. Decision 16
 allows an `inv:` property to be a sub-property of a gist property only where its own domain and range fall under that
 gist property's, and these rows state no OWL range. Decision 13 admits a gist name only when a term in the slice
-being built needs it, and the thin thread does not need `gist:isCategorizedBy`. Whether schemes and concepts are also
-gist-typed, and whether the link is added then, stays open (pending Q3, decision 17). One direction only.
+being built needs it, and the thin thread does not need `gist:isCategorizedBy` (report 14 section 2.5). Whether
+schemes and concepts are also gist-typed, and whether the link is added then, stays open (pending Q3, decision 17).
+One direction only.
 
 | Key | Label | Definition | Domain | Range | Source |
 | --- | --- | --- | --- | --- | --- |
@@ -936,7 +939,7 @@ key for every lifecycle; 07's and 09's rows of the same key point to it.
 ## 7. How it looks in the vocabulary module (sketch, not code)
 
 ```ts
-// sketch, not code: one scheme in 05's shapes (section 4.4), shortened: `source`, `scope` and `ratification` are required on the scheme and on every concept (05's `termFields`). They are written out on the scheme and on `EA`; the ratification name is a placeholder, not a ratified record. They are left out of the other concepts, and "..." stands for a full definition of 12 characters or more. This block as written does not decode.
+// sketch, not code: one scheme in 05's shapes (section 4.4), shortened: `source`, `scope` and `ratification` are required on the scheme (05's `termFields`). Decision 101: a concept listed in the proposal names the scheme's `rat-` record, not a record of its own; a concept added later is its own proposal. The name is written on the scheme and on `EA` as that same placeholder, not a ratified record. It is left off the other concepts, and "..." stands for a full definition of 12 characters or more. This block as written does not decode.
 export const schemes = defineSchemes({
   UnitOfMeasureCodeScheme: {
     prefLabel: "Unit of measure code",
@@ -964,7 +967,7 @@ export const schemes = defineSchemes({
 export const Uom = S.Literals(["EA", "BX", "KG", "M", "L"]).pipe(
   S.annotate({ ...aboutScheme("inv:UnitOfMeasureCodeScheme") })
 )
-// gate 4 (05's V12), decision 23: the record stores the notation and the projector lifts it to the concept IRI. `sh:in` lists the concept IRIs of the field's own literals, not the equality of tagged-class keys (rule 1). For Uom those are inv:UnitOfMeasureCodeScheme-EA, -BX, -KG, -M and -L. For Dimensions.unit, -cm and -in. An unknown notation fails. aboutScheme is decision 20's helper.
+// Decision 23: the record stores the notation and the projector lifts it to the concept IRI. The check that every literal is a notation of the scheme is gate 5 (report 14 section 6.5, rule P8), not gate 4, which reads no record (report 14 section 6). `sh:in` lists the concept IRIs of the field's own literals when the SHACL slice comes, not the equality of tagged-class keys (rule 1). For Uom those are inv:UnitOfMeasureCodeScheme-EA, -BX, -KG, -M and -L. For Dimensions.unit, -cm and -in. An unknown notation fails. aboutScheme is decision 20's helper, bound in the kernel (report 14 section 3.2).
 ```
 
 ```turtle
@@ -984,7 +987,7 @@ inv:QualityDispositionScheme-rejected skos:broader inv:QualityDispositionScheme-
 | 6 Quality-as-class, enum-is-taxonomy | Every code list here is a candidate | SKOS schemes; item kind is classes only under section 4.2's recommendation (pending Q6) |
 | 9 Polysemy | The seed's disposition scheme mixes decisions with observations; Sutton's label status mixes lifecycle with disposition; the seed's valuation scheme mixes basis with flow; two `RowStatus` notation sets | Split (pending Q8); `CostBasisScheme` with broader links; one notation set (4.13) |
 | State-is-kind | Item, label, order and import states | Concepts on `lifecycleState`; no state subclass. `machineState` is not proposed (4.31) |
-| Role-is-kind | Item roles, party roles, member roles | Item roles are concepts. Customer and vendor are flags on the tenant's SourceRecord (decisions 3 and 34), not classes. Member roles are concepts of MemberRoleScheme and, under the same IRI, individuals of Role, not subclasses (decision 41). Role has no permits in the thin thread. No disjointness between the item roles |
+| Role-is-kind | Item roles, party roles, member roles | Item roles are concepts. Customer and vendor are flags on the tenant's SourceRecord (decisions 3 and 34), not classes. Member roles are concepts of MemberRoleScheme and, under the same IRI, individuals of Role, not subclasses (decision 41). Role has no gist parent (decision 97) and no permits in the thin thread. No disjointness between the item roles |
 | Hierarchy for overlap | The API design report's inventory states under In stock | No broader; inclusion as scope notes (4.21) |
 | 10 Domain/range overcommitment | Concept-valued properties | No OWL range; SHACL from the record |
 | 13 False is-a | MemberRoleScheme rank, BX and EA | Rank is a rule in `hasRole`; a pack size is an item conversion |
@@ -1001,14 +1004,17 @@ questions. Q1 (decision 10) and Q2 (decision 23) were answered on 2026-11-22 and
 
 - No term here has a `rat-` record yet (decision 32), and none has been through the foundational auditor.
   `MemberRoleScheme`'s place in the thin thread is decided (decisions 8 and 41), and `GrantScopeKindScheme` ships there
-  with the one concept organization (decision 96). The other schemes are still a proposal list for the auditor, not a
-  conceptual model. The conceptualizer's input rule says it should work from
+  with the one concept organization (decision 96). Decision 101: those two schemes are two of the thread's 18 rulings,
+  and each ruling covers the concepts listed in its proposal; the records are not written. The other schemes are still
+  a proposal list for the auditor, not a conceptual model. The conceptualizer's input rule says it should work from
   ratified terms only.
 - Nothing was built or run: no vocabulary module, projector, Turtle, SHACL, check or competency question.
   `bun run docs:check` passed on the file before this revision (2026-11-22); it was not run again on the text above.
   That check reads frontmatter, not content.
-- The other eight documents (04 to 09, 11, 12) were being written at the same time and were not read by this
-  report's author; the keys were matched with them on 2026-11-22 (report 13), which renamed every scheme key, added
+- Report 14 is the specification of the thin thread. It was read for this revision; where this file describes the
+  thread, it points there. The other eight documents (04 to 09, 11, 12) were being written at the same time and were
+  not read by this report's author; the keys were matched with them on 2026-11-22 (report 13), which renamed every
+  scheme key, added
   thirteen schemes from 06, 08 and 09, and dropped eighteen property rows whose keys the term documents own. The
   concepts added in 4.29 to 4.31 were not checked against any Sutton page beyond what 06, 08 and 09 cite.
 - Sutton's public pages were read through a fetch that returned a summary, not the page text: the items, tracking,

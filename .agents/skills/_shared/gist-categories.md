@@ -20,9 +20,8 @@ How to place a class of this repository's ERP ontology under the gist projection
 
 ## What the projection takes, and what it leaves
 
-The projection takes gist's names and subclass links only (a proposal, not a recorded decision: whether gist's
-`owl:disjointWith` axioms are copied is open, `project-profile.md`): each gist class our classes need, with the gist
-parent it has. The list of projected terms lives in the vocabulary module, which is not built yet; until then a proposed
+A gist class enters when a term needs it (decision 13). Its named gist ancestors come with it as names and subclass
+links only (decision 14). Our terms use `skos:prefLabel` and `skos:definition` in English (`@en`, decision 11). The list of projected terms lives in the vocabulary module, which is not built yet; until then a proposed
 list is a TypeScript sketch in a research report.
 
 gist often states a parent inside an `owl:equivalentClass` intersection rather than as `rdfs:subClassOf`
@@ -34,19 +33,23 @@ gist also uses axioms the project does not copy:
 - `owl:equivalentClass` definitions and the restrictions inside them (`gist:Offer` requires planned start and end
   datetimes, a giver, something offered and something asked in return);
 - `owl:inverseOf` (18 uses in 14.1.0, all inside restrictions); this repository uses no `owl:inverseOf`;
-- `owl:disjointWith` between its top classes (for example `gist:Organization` is disjoint with
-  `gist:PhysicalIdentifiableItem`, `gist:PhysicalSubstance` and `gist:UnitOfMeasure`);
 - functional, transitive and symmetric property characteristics.
 
-So a clash gist would catch (an organization typed as a magnitude) is caught here only by disjointness the
-vocabulary module states itself. Whether to copy any of gist's disjointness is Benjamin's question, not a default.
+The projection copies exactly the `owl:disjointWith` pairs gist states between classes it takes (decision 15).
+The thin thread has three: `gist:Organization` and `gist:Content`, `gist:Organization` and
+`gist:PhysicalIdentifiableItem`, and `gist:PhysicalIdentifiableItem` and `gist:Content`.
 
 ## The classes this ERP needs
 
+Decision 13 admits the seven gist classes in bold for the thin thread (report 14, section 2.5).
+
 | Need | gist class | gist parent (14.1.0) | What it is in gist | Example here |
 | --- | --- | --- | --- | --- |
-| Person | `gist:Person` | `gist:LivingThing` | A human being, living or dead | A signed-in member, a contact at a vendor |
-| Organization | `gist:Organization` | none | A structured body formed for goals; may have no members | A Sutton Account, with role flags (decision 3) |
+| Person | **`gist:Person`** | `gist:LivingThing` | A human being, living or dead | A signed-in member, a contact at a vendor |
+| Living thing | **`gist:LivingThing`** | `gist:PhysicalIdentifiableItem` | An organism | Ancestor of `gist:Person` |
+| Organization | **`gist:Organization`** | none | A structured body formed for goals; may have no members | A Sutton Account, with role flags (decision 3) |
+| Membership | **`gist:TemporalRelation`** | none | A relationship that holds for a time | `Member` links a person to a tenant |
+| Grant | **`gist:Assignment`** | `gist:TemporalRelation` | A relationship made by assigning something | `Grant` assigns a role to a member at a scope |
 | Agreement | `gist:Agreement` | `gist:Intention` | An arrangement where two or more parties commit to each other | A signed supply agreement |
 | Contract | `gist:Contract` | `gist:Agreement` | An agreement enforceable by law | A purchase contract |
 | Commitment | `gist:Commitment` | `gist:Intention` | A promise by one party to others | A promised delivery date |
@@ -56,7 +59,7 @@ vocabulary module states itself. Whether to copy any of gist's disjointness is B
 | Catalog item | `gist:CatalogItem` | `gist:Specification` | A description of a product or service precise enough to tell whether delivery discharged the obligation | An item a buyer pays for |
 | Product specification | `gist:ProductSpecification` | `gist:CatalogItem` | A description of something that can be warehoused or stored and delivered | The item master record |
 | Service specification | `gist:ServiceSpecification` | `gist:CatalogItem` | A description of something done for a person or organization | Freight, a repair |
-| Physical thing (countable) | `gist:PhysicalIdentifiableItem` | none | A discrete physical object; count nouns | A serialized unit, a pallet |
+| Physical thing (countable) | **`gist:PhysicalIdentifiableItem`** | none | A discrete physical object; count nouns | A serialized unit, a pallet |
 | Physical amount (mass) | `gist:PhysicalSubstance` | none | An undifferentiated amount of material; mass nouns | 250 kg of flour in a bin |
 | Equipment | `gist:Equipment` | `gist:PhysicalIdentifiableItem` | Human-made tangible property used to do a task, other than land or buildings | A forklift, a filler |
 | Place on earth | `gist:GeoLocation`, `gist:GeoRegion`, `gist:GeoPoint` | `gist:GeoLocation`: none; `gist:GeoRegion` and `gist:GeoPoint`: `gist:GeoLocation` | A location with the earth as frame; a bounded region; a point by latitude and longitude | A site's area, a dock's coordinates |
@@ -75,7 +78,7 @@ vocabulary module states itself. Whether to copy any of gist's disjointness is B
 | Tag | `gist:Tag` | `gist:Category` | A user-made folksonomy term | A label a person typed |
 | Controlled vocabulary | `gist:ControlledVocabulary` | `gist:Collection` | A managed collection of terms | A code list kept by a team |
 | Identifier | `gist:ID` | `gist:Content` | Content that uniquely identifies something | A SKU, a vendor's account number |
-| Information | `gist:Content`, `gist:Text` | none; `gist:ContentExpression` | Information in a medium; written characters | An imported file, a note |
+| Information | **`gist:Content`**, `gist:Text` | none; `gist:ContentExpression` | Information in a medium; written characters | An imported file, a note |
 
 The "example here" column is a placement to test, not a decision: a parent for a term of this repository is
 proposed in a research report and decided by Benjamin.
@@ -86,7 +89,9 @@ Properties gist offers for these classes (all exist in 14.1.0 as named): `gist:h
 `gist:hasMagnitude`, `gist:numericValue`, `gist:hasUnitOfMeasure`, `gist:hasAspect`, `gist:isCategorizedBy`,
 `gist:hasBroader`, `gist:isIdentifiedBy`, `gist:idText`, `gist:uniqueText`, `gist:isAllocatedBy`, `gist:name`,
 `gist:plannedStartDateTime`, `gist:actualStartDateTime`. Use one direction of each; gist itself defines no
-`gist:hasPart`, and none is added here.
+`gist:hasPart`, and none is added here. The thin thread takes no gist property. When a slice takes one, copy its named
+`rdfs:subPropertyOf` links, never its domain or range. Put an `inv:` property under it only if the local property's
+domain and range fall under the gist property's (decision 16).
 
 ## Decision procedure
 
@@ -135,7 +140,7 @@ the candidates and why each fails, and put it to Benjamin as a question.
 | Available, Committed and Reserved as one enum | They overlap (project-profile.md) | Separate measures; their gist placement is a question for Benjamin |
 | A warehouse under `gist:Building` or `gist:Landmark` | Both are deprecated in 14.1.0 (as are `gist:Language`, `gist:SchemaMetaData` and `gist:prevents`) | Ask Benjamin; 14.1.0 has no place-of-business class |
 | Naming `gist:Place`, `gist:Agent`, `gist:Party`, `gist:Product`, `gist:Obligation`, `gist:Location`, `gist:Identifier`, `gist:Quantity`, `gist:Unit` or `gist:hasPart` | None of them exists in 14.1.0 | The table above; check every name in the release file |
-| Copying a gist `equivalentClass`, restriction or inverse into the vocabulary module | The projection takes names and subclass links only | A plain parent link |
+| Copying a gist `equivalentClass`, restriction or inverse into the vocabulary module | The projection copies named parent links, not gist's definitions or restrictions | A plain parent link |
 | An IOF, ISA-95, schema.org, W3C ORG, FIBO or EPCIS class as a parent | Decision 4: they are alignments only | A `skos:closeMatch` or `skos:broadMatch` alignment row in the vocabulary module |
 | A code list as subclasses | Enum-is-taxonomy (`foundational-analysis.md`) | A SKOS scheme in the vocabulary module |
 

@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: active
 stage: shape
-next: Take the thin thread to Benjamin for brief review. None of the 63 open decisions blocks it.
+next: Take the thin thread to Benjamin for brief review. None of the 62 open decisions blocks it.
 goals: []
 ---
 
@@ -13,27 +13,13 @@ goals: []
 The question: what are the things an operations ERP and WMS like Sutton deals in, how do they relate, and how does
 this repository's domain model point at them?
 
-The thin thread is the first deliverable (decision 8). Slice 1, the party slice, follows it. Benjamin will take each
-of the 63 open decisions with a concrete record when the slice that needs it is specified.
+The thin thread is the first deliverable (decision 8). It answers one question: who belongs to this organization and
+with which role? [Report 14](research/14-thin-thread.md) is its one specification. Section 1.1 says what counts as
+done, section 5 gives the question and its expected answer, and section 1.5 names what still needs Benjamin's approval.
+Nothing is built yet.
 
-The thread answers one question: who belongs to this organization and with which role? The fixture has one person
-who is an admin in one organization and a viewer in another. Each `Member` links to the same `Person` under
-`gist:Person`, with no name or email paths (decision 94). Its `membershipIn` points to a `Tenant`, the role class
-under `Organization` keyed by `OrganizationId` (decision 38). The thread takes the gist parents of its terms and
-their named ancestors (decisions 13 and 14).
-
-`Role` has no gist parent. Each role shares its IRI with a `MemberRoleScheme` concept (viewer, editor or admin),
-identified by scheme and notation. `permits` waits for the party slice (decision 41). The `Grant` lifted from the
-member record links to the member by `grantedTo`, the role by `grantsRole` and the one `GrantScopeKindScheme`
-concept, organization, by `grantScope` (decisions 40 and 96). The audit record's key is `AuditEntry`, with “Activity”
-as an alternative label (decision 46).
-
-Every field of a record that points at a term carries a pointer or `noTerm` with a reason (decision 22). The member's
-copied names and sign-in email use `noTerm` with reason `screen` (decision 93). The thread carries the pointers
-through to generated OWL and SKOS. It builds gates 1 to 9 and shows each failing once on a planted mistake. Gates 5
-and 7 cover only the access contract and the four kernel records (decision 95). N3.js re-parses the output and
-Oxigraph runs the SPARQL queries (decision 26). Gate 10 remains open (pending Q27). The stored-sample SHACL check
-(11) and the alignment check (12) wait for their slices. The SHACL slice adds shacl-engine for the closed shapes.
+Slice 1, the party slice, follows the thread. Benjamin will take each of the 62 open decisions with a concrete record
+when the slice that needs it is specified. Gate 10 remains open (pending Q27).
 
 | Report | Headline |
 | --- | --- |
@@ -50,6 +36,7 @@ Oxigraph runs the SPARQL queries (decision 26). Gate 10 remains open (pending Q2
 | [11 The gist projection and alignments](research/11-gist-projection-and-alignments.md) | A gist 14.1.0 name enters when a slice needs it. Only stated disjointness pairs between admitted classes enter (24 across the full design, decisions 13 to 15). The four contact alignment rows return (decisions 39 and 43). |
 | [12 Projection and checks](research/12-projection-and-checks.md) | The projector's mapping from every term-model construct to OWL, SKOS and SHACL, its determinism rules, and the twelve gates of decision 6 with what each catches. |
 | [13 Term index](research/13-term-index.md) | Terms and properties across the nine designs, with counts, the collisions resolved and the Sutton-only or later terms not proposed. Which properties get a local name remains open (pending Q19). |
+| [14 The thin thread](research/14-thin-thread.md) | The terms and records (sections 2 and 3), how the member's role answers the question (4 and 5), and how to check and package the result (6 to 8). |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).
@@ -77,4 +64,7 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-22: Benjamin answered nineteen decisions, including the new decision 93, and chose the thin thread before
   the party slice. The [decision log](DECISIONS.md) records the answers.
 - 2026-11-22: seven more answers (22, 26, 38, 46 and 94 to 96) settled the thread's terms, field pointers, engines
-  and gates. None of the 63 open decisions blocks the thread.
+  and gates.
+- 2026-11-22: decisions 24 and 97 to 101 settled versioning, the exception for a class with no gist parent, the audit
+  fields, which records are enrolled, which People fields wait for the party slice, and what a scheme ruling covers.
+  [Report 14](research/14-thin-thread.md) brings those answers together in sections 8, 2.1, 3 and 1.5.

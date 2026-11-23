@@ -12,10 +12,11 @@ entries only. The conceptualizer skill works on ratified terms only, so every ro
 `ontology-foundational-auditor` and for Benjamin, and every edge, disjointness and domain or range is `proposed`.
 Nothing in this document is built.
 
-These terms are not in the thin thread (decision 8). That thread is Organization, Member, Role, Grant for the role
-lift, the audit entry, their gist parents and ancestors, and MemberRoleScheme. A gist name this document uses is
-admitted when the slice that builds the term needs it (decision 13), not in the thread, and its named gist ancestors
-enter with it (decision 14). Open decisions stay open and are put to Benjamin with the slice that needs them.
+These terms are not in the thin thread (decision 8). The thread's terms, properties and schemes are report 14,
+sections 1.2 and 2, which this document follows for the thread. `Role` has no gist parent there (decision 97). A gist
+name this document uses is admitted when the slice that builds the term needs it (decision 13), not in the thread,
+and its named gist ancestors enter with it (decision 14). Open decisions stay open and are put to Benjamin with the
+slice that needs them.
 
 Inputs: the packet's decisions and reports 01 and 02; the skills' `_shared` files; the architecture seed and the API
 design report (where they disagree, report 01 section 5 is followed); the catalog and access contracts; the import's
@@ -43,7 +44,8 @@ other eight documents (listed again at the end of each table that uses them):
 The keys were matched with the other eight documents on 2026-11-22 (report 13). Where two documents named one thing,
 one key stands and the row that lost says whose it is; open choices are numbered decisions in
 [DECISIONS.md](../DECISIONS.md), mapped from each Qn here under "Questions for Benjamin". `Machine` is 08's and
-`WorkCenter` is 07's; every scheme named here is 10's, under 10's key.
+`WorkCenter` is 07's; every scheme named here is 10's, under 10's key. Report 14 specifies the thin thread; it is not
+one of those eight.
 
 ## The shape in one picture
 
@@ -135,8 +137,9 @@ and the properties they share have the broad domain `gist:Event`. Every class un
 report 13).
 
 `gist:Task` and `gist:PhysicalEvent` are the parents report 11 names for `OperationExecution` and for the four
-physical events. Decision 13 admits each when the slice that builds the term needs it, not in the thin thread. This
-document no longer keeps `gist:Event` as a stand-in. Named gist ancestors enter with the parent (decision 14).
+physical events. Decision 13 admits each when the slice that builds the term needs it, not in the thin thread. The
+gist names the thread admits are report 14, section 2.5. This document no longer keeps `gist:Event` as a stand-in.
+Named gist ancestors enter with the parent (decision 14).
 
 `EventLine` carries the "lines" of every event: what a receipt brought in, what a shipment carried, what a
 transformation consumed and produced, what a pack put in a pallet. Its role is the property that joins it to its event
@@ -188,13 +191,14 @@ These are grounded in what the repository has today: the catalog contract (`Impo
 `Staging/FileProblem.read.ts`, `Catalog.contract.ts`), the Alchemy blocks merged into
 `packages/catalog/model/src` (`Import/Import.aggregate.ts`, `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`) and the
 root `DECISIONS.md`. Whether they belong in the ontology at all is Q7 (decision 52), which is open. They are designed
-here under the agent's recommendation, not a decision, and they are not in the thin thread. Nothing is built on that
-recommendation until the slice that needs them is specified.
+here under the agent's recommendation, not a decision, and they are not in the thin thread (report 14, section 1.3).
+Nothing is built on that recommendation until the slice that needs them is specified.
 
 Each class is a referent, not a record. The import is what the operations admin does; `ImportView`, `ImportResult` and
-`RowDecisionFlags` are records of it. Records name their term through one `term` annotation, written by the typed
-helpers (decision 20). `StagedFile` is under `gist:FormattedContent`, the parent report 11 names. Decision 13 admits
-that name when the slice that builds `StagedFile` needs it, not in the thin thread, and this document no longer falls
+`RowDecisionFlags` are records of it. Records name their class through the `term` annotation the typed helpers write
+(decision 20 as corrected: `aboutPath` writes `path`, and `noTerm` writes its own key; report 14, section 3.1).
+`StagedFile` is under `gist:FormattedContent`, the parent report 11 names. Decision 13 admits that name when the slice
+that builds `StagedFile` needs it, not in the thin thread (report 14, section 2.5), and this document no longer falls
 back to `gist:Content`.
 
 | Key | Label | Definition | Tag | gist parent | Identity | Source | Status |
@@ -275,9 +279,9 @@ lifecycle phase is 10's `lifecycleState`, one property for orders, imports, item
 | `businessStep` | business step | Relates an event to the step of a business process it belongs to. | `gist:Event` | `skos:Concept` (`BusinessStepScheme`) | the architecture seed (`businessStep`); EPCIS `bizStep` |
 | `resultingDisposition` | disposition after | Relates an event to the disposition the stock it involves has afterwards. | `gist:Event` | `skos:Concept` (10's `QualityDispositionScheme`) | the architecture seed (`disposition`); EPCIS `disposition` |
 | `eventTime` | happened at | Gives the instant an event happened, with its time zone. | `gist:Event` | datatype from the record field | the architecture seed (`eventTime`); EPCIS `eventTime` |
-| `recordTime` | recorded at | Gives the instant a system recorded an event or wrote an audit entry, not when the act happened. | `gist:Event` or `AuditEntry` (06) | datatype from the record field | the architecture seed (`recordTime`); EPCIS `recordTime`; a sub-property of `gist:isRecordedAt` only where its domain and range fall under that property's (decision 16; report 11 proposes the link) |
-| `startedAt` | started at | Gives the inclusive start of an event that lasts, or of a `Grant` (decision 40), not of a `Member`. | a lasting `gist:Event` or `Grant` (06), not `Member` | datatype from the record field | the architecture seed (`startTime`) |
-| `endedAt` | ended at | Gives the exclusive end of an event that lasts, or of a `Grant` (decision 40), not of a `Member`; absent while it has not ended. | a lasting `gist:Event` or `Grant` (06), not `Member` | datatype from the record field | the architecture seed (`endTime`; "absent for an open interval") |
+| `recordTime` | recorded at | Gives the instant a system recorded an execution event, not when the act happened. An audit entry's recorded time is the thread's `recordedAt`, domain `AuditEntry` (decision 98; report 14, section 2.2), not this property. | `gist:Event` | datatype from the record field | the architecture seed (`recordTime`); EPCIS `recordTime`; a sub-property of `gist:isRecordedAt` only where its domain and range fall under that property's (decision 16; report 11 proposes the link) |
+| `startedAt` | started at | Gives the inclusive start of an event that lasts, or of a `Grant` (decision 40), not of a `Member`. Not a thread property (report 14, section 2.2). | a lasting `gist:Event` or `Grant` (06), not `Member` | datatype from the record field | the architecture seed (`startTime`) |
+| `endedAt` | ended at | Gives the exclusive end of an event that lasts, or of a `Grant` (decision 40), not of a `Member`; absent while it has not ended. Not a thread property, as `startedAt`. | a lasting `gist:Event` or `Grant` (06), not `Member` | datatype from the record field | the architecture seed (`endTime`; "absent for an open interval") |
 | `correctsEvent` | corrects | Relates an event to an earlier event it corrects, which is kept as it was recorded. | `gist:Event` | `gist:Event` | the architecture seed 7.1 (`correctsEvent`; not an EPCIS `errorDeclaration` by itself) |
 | `performedBy` | by | Relates an event to the member, person or organization that did it or answers for it. | `gist:Event` | none declared: a `Member` (06) for an act in the app, a person or an organization for an act outside it; each record's SHACL says which (pending decision 91) | the architecture seed (`performedBy`); CLAUDE.md "People are told apart by id" |
 | `carriedBy` | carrier | Relates a receipt or a shipment to the organization that carried the goods. | `gist:Transaction` | `Organization` (06) | decisions 3 and 34: the carrier is the organization; no carrier flag is stated while decision 89 is open; public Sutton shipping document (bills of lading) |
@@ -487,13 +491,13 @@ All `proposed`. The vocabulary module holds them; the architect formalizes them.
 
 - Subsumption: as the tables' gist parent column, and the six line subkinds under `CommitmentLine`. A gist parent is
   admitted when the slice that builds the term needs it (decision 13), and its named gist ancestors enter with it as
-  names and links only (decision 14). None of them is in the thin thread.
+  names and links only (decision 14). None of them is in the thin thread (report 14, section 1.3).
 - Disjointness, each as one all-disjoint set: the six commitment kinds; the six line subkinds; `Receipt` and
   `Shipment`; the local classes directly under `gist:Event` (`EventLine`, `ReceivingRejection`, `HoldPlacement`,
   `HoldRelease`, `RecallCase`, and the import's eleven events), with
   `OperationExecution` (under `gist:Task`) and the four under `gist:PhysicalEvent` when their slice admits those
-  parents (decision 13), not in the thin thread; `Putaway` and `Pick` as subkinds of 08's `StockMovement` (pending
-  decision 79); the local classes under `gist:Content` (`QualityResult`, `Invoice`, `SupplierBill`,
+  parents (decision 13), not in the thin thread (report 14, section 2.5); `Putaway` and `Pick` as subkinds of 08's
+  `StockMovement` (pending decision 79); the local classes under `gist:Content` (`QualityResult`, `Invoice`, `SupplierBill`,
   `AccountingSyncRecord`, `FileRow`, `FileProblem`, `ValueProposal`, `RowOutcome`, `ValueChange`). `StagedFile` is
   under `gist:FormattedContent`, admitted with its slice (decision 13), so it is not in that Content set.
   The projection copies the `owl:disjointWith` pairs gist states between classes it has admitted, and no others
@@ -545,8 +549,9 @@ is the agent's, and nothing here is built on it.
   conceptualizer skill's input rule is not met, so this is a candidate design.
 - The gist release file was not opened; every gist name is from `gist-categories.md`. `gist:Intention` is named there
   only as a parent of other classes, and `gist:Task` not at all. Decision 13 adds a gist name to that profile when the
-  slice that needs it is specified, so `gist:Task`, `gist:PhysicalEvent` and `gist:FormattedContent` are not admitted
-  with the thin thread. Because the gist file was not opened, decision 16's domain and range test is not done for
+  slice that needs it is specified, so `gist:Task`, `gist:PhysicalEvent` and `gist:FormattedContent` are not among the
+  gist names the thread admits (report 14, section 2.5). Because the gist file was not opened, decision 16's domain
+  and range test is not done for
   `occursAt` under `gist:occursIn` or `recordTime` under `gist:isRecordedAt`.
 - The EPCIS and CBV names were read through a fetch that listed them, not byte-compared, and EPCIS 2.0.1 was not
   read. The CBV definitions of `storing` and `stocking` were not read, so the putaway crosswalk is a candidate.
@@ -560,7 +565,8 @@ is the agent's, and nothing here is built on it.
   assistant contracts, and the which-rejection-for-which-command pairing in the model files.
 - The other eight documents were being written at the same time and were not read by this report's author; the keys
   were matched with them on 2026-11-22 (report 13), which folded this document's scheme rows into 10, moved
-  `QualityHold` to 08, and replaced eleven of its property keys with the owners' keys.
+  `QualityHold` to 08, and replaced eleven of its property keys with the owners' keys. Report 14, the thread's
+  specification, was read for this revision and is not one of those eight.
 - The architecture seed's ontology, taxonomy and shapes were read as class and property lists; its fixtures and
   scripts were not read or run, and the API design report was read for its class tables, schemes and contexts only.
 - Nothing was loaded into a reasoner or a SHACL engine; there is nothing to load yet.

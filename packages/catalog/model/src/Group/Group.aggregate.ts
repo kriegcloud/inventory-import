@@ -5,11 +5,11 @@
 // instance holds that reading. The one thing not to break: a group taken back gives no row anything again, and stays
 // taken back ("Undecided: Ana took it back").
 //
-// Verify reads this file's code, not only its types. It reads a case told with `effect/Match` and a state built by its
-// case's own `make` with the status written out; it does not read a schema's `guards` or `match`. So the guards below
-// are written with Match, and every `make` of a state names its status.
+// Verify reads this file's code, not only its types. A case is told by its schema's own guard (`GroupState.guards`), which
+// the prover reads through the repository's patch to it (docs/patches.md): the union is exported, because the prover
+// takes a schema from what the file exports. It reads a state built by its case's own `make` with the status written
+// out, so every `make` of a state names its status.
 import * as Domain from "@alchemy.run/domain"
-import * as Match from "effect/Match"
 import * as S from "effect/Schema"
 import { Change, Patch, Rows, Step } from "../Review/Change.schema.ts"
 
@@ -72,16 +72,12 @@ export type GroupState = typeof GroupState.Type
 /** A group act that was decided, in force or taken back. */
 export type DecidedGroup = typeof GroupState.cases.Decided.Type
 
-const yes = (): boolean => true
-const no = (): boolean => false
-const byStatus = Match.discriminatorsExhaustive("status")
-
-/** True for a step no group act was decided under. */
-export const isUntouchedGroup = (group: GroupState): group is typeof GroupState.cases.Untouched.Type =>
-  Match.value(group).pipe(byStatus({ Untouched: yes, Decided: no }))
-/** True for a group act that was decided, whether it is in force or was taken back. */
-export const isDecidedGroup = (group: GroupState): group is DecidedGroup =>
-  Match.value(group).pipe(byStatus({ Untouched: no, Decided: yes }))
+/** An event a group act folds, told by its `_tag`. */
+export const GroupEvent = S.Union([GroupDecided, GroupUndone])
+  .annotate({ description: "An event an act on a group of rows folds: the act, or its undo" })
+  .pipe(S.toTaggedUnion("_tag"))
+/** The decoded value of `GroupEvent`. */
+export type GroupEvent = typeof GroupEvent.Type
 
 /**
  * One act on a group of rows. It has no command of its own, so the rules about who may change a group are rules of
@@ -97,38 +93,39 @@ export class Group extends Domain.Aggregate(
       // That its number is one its import gave, and that its undo comes after it, need the import: they are rules
       // over every import and group in the model, searched and not proved.
       // The count is its sender's word: the model reads no row out of a group's rows, so nothing ties it to them.
-      AGroupSaysAtLeastOneRow: (s) => !isDecidedGroup(s) || s.count >= 1
+      AGroupSaysAtLeastOneRow: (s) => !GroupState.guards.Decided(s) || s.count >= 1
     },
     transitions: {
       // What a group decided never changes: its rows, what it does to them, its number, whose it is.
       AGroupKeepsItsRows: ({ before, after }) =>
-        !isDecidedGroup(before) || !isDecidedGroup(after) || after.rows === before.rows,
+        !GroupState.guards.Decided(before) || !GroupState.guards.Decided(after) || after.rows === before.rows,
       AGroupKeepsItsCount: ({ before, after }) =>
-        !isDecidedGroup(before) || !isDecidedGroup(after) || after.count === before.count,
+        !GroupState.guards.Decided(before) || !GroupState.guards.Decided(after) || after.count === before.count,
       AGroupKeepsItsPatch: ({ before, after }) =>
-        !isDecidedGroup(before) || !isDecidedGroup(after) || after.patch === before.patch,
+        !GroupState.guards.Decided(before) || !GroupState.guards.Decided(after) || after.patch === before.patch,
       AGroupKeepsItsNumber: ({ before, after }) =>
-        !isDecidedGroup(before) || !isDecidedGroup(after) || after.change === before.change,
+        !GroupState.guards.Decided(before) || !GroupState.guards.Decided(after) || after.change === before.change,
       AGroupKeepsWhatWasUnderIt: ({ before, after }) =>
-        !isDecidedGroup(before) || !isDecidedGroup(after) || after.under === before.under,
+        !GroupState.guards.Decided(before) || !GroupState.guards.Decided(after) || after.under === before.under,
       AGroupKeepsItsMaker: ({ before, after }) =>
-        !isDecidedGroup(before) || !isDecidedGroup(after) || after.by === before.by,
-      ADecidedGroupStaysDecided: ({ before, after }) => !isDecidedGroup(before) || isDecidedGroup(after),
+        !GroupState.guards.Decided(before) || !GroupState.guards.Decided(after) || after.by === before.by,
+      ADecidedGroupStaysDecided: ({ before, after }) =>
+        !GroupState.guards.Decided(before) || GroupState.guards.Decided(after),
       // A group taken back stays so.
       AGroupTakenBackStaysTakenBack: ({ before, after }) =>
-        !isDecidedGroup(before) ||
-        !isDecidedGroup(after) ||
+        !GroupState.guards.Decided(before) ||
+        !GroupState.guards.Decided(after) ||
         before.undoneAt === 0 ||
         after.undoneAt === before.undoneAt,
       AGroupNeverChangesImportOrOrganization: ({ before, after }) =>
-        isUntouchedGroup(before) ||
-        isUntouchedGroup(after) ||
+        GroupState.guards.Untouched(before) ||
+        GroupState.guards.Untouched(after) ||
         (before.organizationId === after.organizationId && before.importId === after.importId)
     },
     events: [GroupDecided, GroupUndone],
     evolve: {
       GroupDecided: (s, e) =>
-        isUntouchedGroup(s)
+        GroupState.guards.Untouched(s)
           ? GroupState.cases.Decided.make({
               status: "Decided",
               importId: e.importId,
@@ -145,7 +142,7 @@ export class Group extends Domain.Aggregate(
               under: e.under
             })
           : s,
-      GroupUndone: (s, e) => (isDecidedGroup(s) ? { ...s, undoneAt: e.change } : s)
+      GroupUndone: (s, e) => (GroupState.guards.Decided(s) ? { ...s, undoneAt: e.change } : s)
     }
   },
   { description: "One act on a group of rows: its rows, what it does to each, whose it is, and when it was taken back" }

@@ -10,32 +10,29 @@
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Match from "effect/Match"
 import * as S from "effect/Schema"
 import { CurrentActor, Session } from "../Actor/Actor.context.ts"
 import {
   ActCounted,
   ConfirmedSince,
   Import,
-  isOpen,
+  ImportState,
   MatchedSince,
   NotOpen,
-  NotPermitted
+  NotPermitted,
+  ImportEvent
 } from "../Import/Import.aggregate.ts"
 import {
   CUT,
-  isDecided,
-  isUndecided,
-  isUntouched,
   letGo,
   Level,
   MOST_BELOW,
   noLevel,
   Row,
-  type RowState,
   seal,
   sizesAreTrue,
-  StepUndone
+  StepUndone,
+  RowState
 } from "../Row/Row.aggregate.ts"
 import { Change, ImportKey, RowKey, Step } from "./Change.schema.ts"
 import { GroupedAfter, GroupedSince, UndoneSince } from "./Deciding.decision.ts"
@@ -116,12 +113,6 @@ const tookThisUndo = (act: {
   readonly by: string
 }): boolean => act.row.undone.change === act.undo && act.row.undone.step === act.step && act.row.undone.by === act.by
 
-type UndoingEvent = StepUndone | ActCounted
-const yes = (): boolean => true
-const no = (): boolean => false
-const isActCounted = (event: UndoingEvent): event is ActCounted =>
-  Match.value(event).pipe(Match.tag("ActCounted", yes), Match.orElse(no))
-
 /** The undo of one act: read from the import and the row, recorded on both or on neither. */
 export class Undoing extends Domain.Decision(
   UndoRowStep,
@@ -130,12 +121,12 @@ export class Undoing extends Domain.Decision(
     keyOf: (cmd: UndoRowStep) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
     decide: Effect.fn("Undoing.decide")(function* ({ life, row }, cmd) {
       const actor = yield* CurrentActor
-      if (!isOpen(life.state)) return yield* new NotOpen({})
+      if (!ImportState.guards.Open(life.state)) return yield* new NotOpen({})
       if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
         return yield* new NotPermitted({})
       }
       if (
-        !isUntouched(row.state) &&
+        !RowState.guards.Untouched(row.state) &&
         (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
       ) {
         return yield* new NotPermitted({})
@@ -156,7 +147,7 @@ export class Undoing extends Domain.Decision(
         if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
         return yield* new GroupedSince({})
       }
-      if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
+      if (!RowState.guards.Decided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
         if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
         return yield* new NotYourStep({})
       }
@@ -211,20 +202,21 @@ export class Undoing extends Domain.Decision(
         before,
         command
       }) {
-        if (!isOpen(before.life) || !isDecided(before.row)) return false
+        if (!ImportState.guards.Open(before.life) || !RowState.guards.Decided(before.row)) return false
         const actor = yield* CurrentActor
         return before.row.change === command.undo && actor.memberId === before.row.by
       }),
-      AnUndoIsOfThisOpening: ({ before, command }) => isOpen(before.life) && command.opening === before.life.confirms,
+      AnUndoIsOfThisOpening: ({ before, command }) =>
+        ImportState.guards.Open(before.life) && command.opening === before.life.confirms,
       // A row's undo is made on a screen that has the import's last act on a group.
       ARowsUndoSawTheLastGroupAct: ({ before, command }) =>
-        isOpen(before.life) && command.sawGroup === before.life.lastGroup,
+        ImportState.guards.Open(before.life) && command.sawGroup === before.life.lastGroup,
       // And on one that has the row's last undo: the change it took back names it.
       AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo: ({ before, command }) =>
         command.sawUndone === before.row.undone.change,
       // And on the import's matching now.
       AnUndoIsMadeOnTheMatchingNow: ({ before, command }) =>
-        isOpen(before.life) && command.madeOn === before.life.matching,
+        ImportState.guards.Open(before.life) && command.madeOn === before.life.matching,
       // A decision a later group in force covers is not taken back from under it. Whether one covers the row is its
       // sender's word, from a screen that has every group act: the model keeps no reading of a group's rows, so this
       // rule says only that an undo taken is one whose sender said none does.
@@ -232,64 +224,67 @@ export class Undoing extends Domain.Decision(
       // The row keeps which undo it took: the change taken back, the step it was pressed in, and who pressed. The
       // same undo sent again is known by these three, so each is what the act itself said.
       TheRowKeepsWhichChangeWasTakenBack: ({ after, command }) =>
-        !isUntouched(after.row) && after.row.undone.change === command.undo,
+        !RowState.guards.Untouched(after.row) && after.row.undone.change === command.undo,
       AndTheStepItWasPressedIn: ({ after, command }) =>
-        !isUntouched(after.row) && after.row.undone.step === command.step,
+        !RowState.guards.Untouched(after.row) && after.row.undone.step === command.step,
       AndWhoPressed: Effect.fn("Undoing.AndWhoPressed")(function* ({ after }) {
-        if (isUntouched(after.row)) return false
+        if (RowState.guards.Untouched(after.row)) return false
         const actor = yield* CurrentActor
         return after.row.undone.by === actor.memberId
       }),
       // It is an undo of a row of the import it names: the row's key is built from the import's id and the row's, and
       // two pairs can build the same key.
       AnUndoIsOfARowOfTheImportItNames: ({ before, command }) =>
-        isUntouched(before.row) || before.row.importId === command.importId,
+        RowState.guards.Untouched(before.row) || before.row.importId === command.importId,
       // It stops where the history was let go: a level that was let go is no decision to put back.
-      AnUndoStopsWhereTheHistoryWasLetGo: ({ before }) => !isDecided(before.row) || before.row.under.change !== -1,
+      AnUndoStopsWhereTheHistoryWasLetGo: ({ before }) =>
+        !RowState.guards.Decided(before.row) || before.row.under.change !== -1,
       // It does not reach past a confirm that stands.
       AnUndoDoesNotReachPastAConfirm: ({ before }) =>
-        isOpen(before.life) && isDecided(before.row) && before.row.change > before.life.confirmedAt,
+        ImportState.guards.Open(before.life) &&
+        RowState.guards.Decided(before.row) &&
+        before.row.change > before.life.confirmedAt,
       // An undo puts back exactly the decision under the one taken back, another person's included.
       AnUndoLeavesADecisionWhenOneWasUnder: ({ before, after }) =>
-        !isDecided(before.row) || before.row.under.change === 0 || isDecided(after.row),
+        !RowState.guards.Decided(before.row) || before.row.under.change === 0 || RowState.guards.Decided(after.row),
       AndNoneWhenNoneWas: ({ before, after }) =>
-        !isDecided(before.row) || before.row.under.change !== 0 || isUndecided(after.row),
+        !RowState.guards.Decided(before.row) || before.row.under.change !== 0 || RowState.guards.Undecided(after.row),
       AnUndoPutsBackTheDecisionThatWasThere: ({ before, after }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         before.row.under.change === 0 ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.change === before.row.under.change,
       AsTheirsWhoMadeIt: ({ before, after }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         before.row.under.change === 0 ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.by === before.row.under.by,
       WithItsTextAsItWas: ({ before, after }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         before.row.under.change === 0 ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.flags === before.row.under.flags,
       OnItsMatchingAsItWas: ({ before, after }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         before.row.under.change === 0 ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.madeOn === before.row.under.madeOn,
       UnderItsStepAsItWas: ({ before, after }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         before.row.under.change === 0 ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.step === before.row.under.step,
       // Nothing lies below a decision that had nothing more kept under it.
       NothingIsBelowWhatWasTheLastKept: ({ before, after }) =>
-        !isDecided(before.row) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(before.row) ||
+        !RowState.guards.Decided(after.row) ||
         (before.row.below !== "" && before.row.below !== CUT) ||
         after.row.below === "",
       // What lies under it afterwards seals to exactly the text the row held: nothing its sender wrote can stand there.
       WhatLiesUnderIsWhatWasRecorded: ({ before, after }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         before.row.under.change === 0 ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         (before.row.below === ""
           ? after.row.under.change === 0
           : before.row.below === CUT
@@ -297,30 +292,42 @@ export class Undoing extends Domain.Decision(
             : seal({ level: after.row.under, below: after.row.below }) === before.row.below),
       // The import's event says what the row now holds, and whose it is.
       TheImportsEventSaysWhichDecisionTheRowHolds: ({ after, events }) =>
-        A.every(events, (e) => !isActCounted(e) || e.holds === (isDecided(after.row) ? after.row.change : 0)),
+        A.every(
+          events,
+          (e) =>
+            !ImportEvent.guards.ActCounted(e) || e.holds === (RowState.guards.Decided(after.row) ? after.row.change : 0)
+        ),
       TheImportsEventSaysWhose: ({ after, events }) =>
-        A.every(events, (e) => !isActCounted(e) || !isDecided(after.row) || e.by === after.row.by),
+        A.every(
+          events,
+          (e) => !ImportEvent.guards.ActCounted(e) || !RowState.guards.Decided(after.row) || e.by === after.row.by
+        ),
       TheImportsEventSaysItsText: ({ after, events }) =>
-        A.every(events, (e) => !isActCounted(e) || !isDecided(after.row) || e.flags === after.row.flags),
+        A.every(
+          events,
+          (e) => !ImportEvent.guards.ActCounted(e) || !RowState.guards.Decided(after.row) || e.flags === after.row.flags
+        ),
       TheImportsEventSaysWhoActed: Effect.fn("Undoing.TheImportsEventSaysWhoActed")(function* ({ events }) {
         const actor = yield* CurrentActor
-        return A.every(events, (e) => !isActCounted(e) || e.actor === actor.memberId)
+        return A.every(events, (e) => !ImportEvent.guards.ActCounted(e) || e.actor === actor.memberId)
       }),
       AnUndoIsNumbered: ({ before, after }) =>
-        isOpen(before.life) && isOpen(after.life) && after.life.changes === before.life.changes + 1,
+        ImportState.guards.Open(before.life) &&
+        ImportState.guards.Open(after.life) &&
+        after.life.changes === before.life.changes + 1,
       // Who may change a row. The row has no command of its own, so these are rules of the decisions that record on it.
       NobodyClearsAnotherPersonsDecision: Effect.fn("Undoing.NobodyClearsAnotherPersonsDecision")(function* ({
         before,
         after
       }) {
-        if (!isDecided(before.row) || isDecided(after.row)) return true
+        if (!RowState.guards.Decided(before.row) || RowState.guards.Decided(after.row)) return true
         const actor = yield* CurrentActor
         return actor.memberId === before.row.by
       }),
       OnlyItsOwnOrganizationChangesTheRow: Effect.fn("Undoing.OnlyItsOwnOrganizationChangesTheRow")(function* ({
         before
       }) {
-        if (isUntouched(before.row)) return true
+        if (RowState.guards.Untouched(before.row)) return true
         const actor = yield* CurrentActor
         return actor.organizationId === before.row.organizationId
       }),

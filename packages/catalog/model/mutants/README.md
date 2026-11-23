@@ -3,7 +3,7 @@
 What the proofs and the stories of the review are worth is measured by breaking the model on purpose and seeing
 whether anything notices. A **mutant** is one change to the model's source, made in a copy of the package:
 
-- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 93 of them;
+- **check**: one check of a `decide` removed (`if (!ImportState.guards.Open(s)) return yield* new NotOpen({})` goes), 93 of them;
 - **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 80;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 

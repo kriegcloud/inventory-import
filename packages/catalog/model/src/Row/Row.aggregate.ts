@@ -5,11 +5,11 @@
 // 2026-11-22: "Every step, sealed history"). The one thing not to break: `seal` writes the sizes of a level's texts
 // before the texts, so two different levels never seal to the same text.
 //
-// Verify reads this file's code, not only its types. It reads a case told with `effect/Match` and a state built by its
-// case's own `make` with the status written out; it does not read a schema's `guards` or `match`. So the guards below
-// are written with Match, and every `make` of a state names its status.
+// Verify reads this file's code, not only its types. A case is told by its schema's own guard (`RowState.guards`), which
+// the prover reads through the repository's patch to it (docs/patches.md): the union is exported, because the prover
+// takes a schema from what the file exports. It reads a state built by its case's own `make` with the status written
+// out, so every `make` of a state names its status.
 import * as Domain from "@alchemy.run/domain"
-import * as Match from "effect/Match"
 import * as S from "effect/Schema"
 import { Change, Flags, Step } from "../Review/Change.schema.ts"
 
@@ -161,19 +161,12 @@ export type RowState = typeof RowState.Type
 /** A row that holds a decision. */
 export type DecidedRow = typeof RowState.cases.Decided.Type
 
-const yes = (): boolean => true
-const no = (): boolean => false
-const byStatus = Match.discriminatorsExhaustive("status")
-
-/** True for a row no act has reached. */
-export const isUntouched = (row: RowState): row is typeof RowState.cases.Untouched.Type =>
-  Match.value(row).pipe(byStatus({ Untouched: yes, Undecided: no, Decided: no }))
-/** True for a row whose decisions were all taken back. */
-export const isUndecided = (row: RowState): row is typeof RowState.cases.Undecided.Type =>
-  Match.value(row).pipe(byStatus({ Untouched: no, Undecided: yes, Decided: no }))
-/** True for a row that holds a decision. */
-export const isDecided = (row: RowState): row is DecidedRow =>
-  Match.value(row).pipe(byStatus({ Untouched: no, Undecided: no, Decided: yes }))
+/** An event a row folds, told by its `_tag`. */
+export const RowEvent = S.Union([RowDecided, StepUndone])
+  .annotate({ description: "An event a row folds: a decision, or its undo" })
+  .pipe(S.toTaggedUnion("_tag"))
+/** The decoded value of `RowEvent`. */
+export type RowEvent = typeof RowEvent.Type
 
 /**
  * A decision's text with the matching it was made on, as one text: the matching's number ends at the first colon, so
@@ -195,7 +188,8 @@ export const leavesAsItIs = (act: {
   readonly row: RowState
   readonly flags: string
   readonly madeOn: number
-}): boolean => (isDecided(act.row) ? onItsMatching(act.row) === onItsMatching(act) : act.flags === NO_DECISION)
+}): boolean =>
+  RowState.guards.Decided(act.row) ? onItsMatching(act.row) === onItsMatching(act) : act.flags === NO_DECISION
 
 /**
  * One row of one import's review: its decision, the one under it, and the rest sealed. It has no command of its own,
@@ -210,18 +204,18 @@ export class Row extends Domain.Aggregate(
     initial: RowState.cases.Untouched.make({ status: "Untouched", undone: noUndo }),
     invariants: {
       // The sizes kept beside the decision under the current one are its texts' own: one comparison a rule.
-      TheSizeOfByIsTrue: (s) => !isDecided(s) || s.under.bySize === s.under.by.length,
-      TheSizeOfStepIsTrue: (s) => !isDecided(s) || s.under.stepSize === s.under.step.length,
-      TheSizeOfFlagsIsTrue: (s) => !isDecided(s) || s.under.flagsSize === s.under.flags.length,
-      TheSizeOfLabelIsTrue: (s) => !isDecided(s) || s.under.labelSize === s.under.label.length
+      TheSizeOfByIsTrue: (s) => !RowState.guards.Decided(s) || s.under.bySize === s.under.by.length,
+      TheSizeOfStepIsTrue: (s) => !RowState.guards.Decided(s) || s.under.stepSize === s.under.step.length,
+      TheSizeOfFlagsIsTrue: (s) => !RowState.guards.Decided(s) || s.under.flagsSize === s.under.flags.length,
+      TheSizeOfLabelIsTrue: (s) => !RowState.guards.Decided(s) || s.under.labelSize === s.under.label.length
     },
     transitions: {
       // A row has no decision again only when nothing was under the one taken back.
       ARowIsUndecidedOnlyWhenNothingWasUnder: ({ before, after }) =>
-        !isDecided(before) || !isUndecided(after) || before.under.change === 0,
+        !RowState.guards.Decided(before) || !RowState.guards.Undecided(after) || before.under.change === 0,
       ARowNeverChangesImportOrOrganization: ({ before, after }) =>
-        isUntouched(before) ||
-        isUntouched(after) ||
+        RowState.guards.Untouched(before) ||
+        RowState.guards.Untouched(after) ||
         (before.organizationId === after.organizationId && before.importId === after.importId)
     },
     events: [RowDecided, StepUndone],
@@ -237,7 +231,7 @@ export class Row extends Domain.Aggregate(
           flags: e.flags,
           madeOn: e.madeOn,
           label: e.label,
-          under: isDecided(s)
+          under: RowState.guards.Decided(s)
             ? Level.make({
                 change: s.change,
                 by: s.by,
@@ -252,7 +246,7 @@ export class Row extends Domain.Aggregate(
               })
             : noLevel,
           below:
-            !isDecided(s) || s.under.change === 0
+            !RowState.guards.Decided(s) || s.under.change === 0
               ? ""
               : s.below.length > MOST_BELOW
                 ? CUT
@@ -260,7 +254,7 @@ export class Row extends Domain.Aggregate(
           undone: s.undone
         }),
       StepUndone: (s, e) =>
-        !isDecided(s)
+        !RowState.guards.Decided(s)
           ? s
           : s.under.change !== 0
             ? RowState.cases.Decided.make({

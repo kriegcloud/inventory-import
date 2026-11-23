@@ -23,26 +23,19 @@ import {
   UndoneSince
 } from "@inventory/catalog-model/Deciding"
 import { DecideGroup } from "@inventory/catalog-model/DecidingGroup"
-import {
-  Group,
-  GroupDecided,
-  type GroupState,
-  GroupUndone,
-  isDecidedGroup
-} from "@inventory/catalog-model/GroupAggregate"
+import { Group, GroupDecided, GroupUndone, GroupState } from "@inventory/catalog-model/GroupAggregate"
 import { ActCounted, GroupCounted, Import, ImportStaged, ReviewMovedOn } from "@inventory/catalog-model/ImportAggregate"
 import { Catalog } from "@inventory/catalog-model/Model"
 import { firstDecisions, recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import {
-  isDecided,
   Level,
   NO_DECISION,
   noLevel,
   Row,
   RowDecided,
-  type RowState,
   seal,
-  StepUndone
+  StepUndone,
+  RowState
 } from "@inventory/catalog-model/RowAggregate"
 import { NotYourStep, UndoRowStep } from "@inventory/catalog-model/Undoing"
 import { UndoGroup } from "@inventory/catalog-model/UndoingGroup"
@@ -1036,7 +1029,7 @@ const decoded = Effect.fnUntraced(function* (reading: Reading) {
   const own = yield* Effect.forEach(
     R.toEntries(reading.rows),
     Effect.fnUntraced(function* ([row, state]) {
-      if (!isDecided(state)) return O.none<readonly [string, Own]>()
+      if (!RowState.guards.Decided(state)) return O.none<readonly [string, Own]>()
       const decision = yield* Effect.orDie(S.decodeEffect(Flags)(state.flags))
       return O.map(
         R.get(toRegionDecisions({ [row]: decision }), row),
@@ -1048,7 +1041,7 @@ const decoded = Effect.fnUntraced(function* (reading: Reading) {
   const groups = yield* Effect.forEach(
     R.values(reading.groups),
     Effect.fnUntraced(function* (state) {
-      if (!isDecidedGroup(state)) return O.none<GroupUnit>()
+      if (!GroupState.guards.Decided(state)) return O.none<GroupUnit>()
       const patches = yield* S.decodeEffect(GroupPatches)(state.patch)
       const rows = yield* S.decodeEffect(GroupRows)(state.rows)
       const parts = A.zipWith(patches, rows, (patch, named): Part => ({ patch, rows: named }))

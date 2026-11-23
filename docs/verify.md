@@ -396,3 +396,18 @@ how a case is told and a state built so that the prover reads them, why a rule i
 who may change a row or a group are stated on each decision, and the 4,096 paths past which nothing is proved. The
 library itself is pinned to one commit and kept as files (`vendor/alchemy/`), with the repository's patches to it
 applied at every install (`packages/patches`, [Patching a dependency](patches.md)).
+
+### A check on a field of the state
+
+What a state's schema says of a field is proved or not by the kind of check, seen on a small aggregate on 2026-11-23:
+
+- **A length or a bound** (`isMinLength`, `isMaxLength`, `isBetween`, `isGreaterThanOrEqualTo`, `isInt`,
+  `isMultipleOf`) is read. It is assumed of the state a command starts from and **proved** of the state the command
+  leaves: the prover's own rule "The state stays in its schema" comes back violated, with the command that does it,
+  when a `decide` can write a value the check refuses. So such a check on the state is a rule like any other, not an
+  assumption.
+- **A pattern** (`isPattern`) and a filter written by hand are not read, with or without the repository's patches.
+  On a field of the state it proves nothing ("the prover does not read that check, so it is not proved kept"), and it
+  costs the other rules too: the solver may start from a state the pattern refuses, and every rule of that command
+  then comes back "not proved: the solver's state is not one the state's schema allows". A pattern stays off the
+  model's state and off what its commands take until the prover reads regular expressions.

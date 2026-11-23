@@ -454,12 +454,13 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (input: {
  *
  * @param write Lower the baseline. Refused with files named, and when any file is over its baseline.
  * @param only The files to read, from the root or from the folder the command runs in; every file when none is named.
- * @param exempt The files that keep places on purpose: `exemptions`, unless a test names its own.
+ * @param exempt The files that keep places on purpose: the command passes `exemptions`. It has no default, so a test
+ *   in a made-up tree says which it means and is not failed for a file of this repository that its tree lacks.
  */
 export const defaults = Effect.fn("Defaults.defaults")(function* (
   write: boolean,
   only: ReadonlyArray<string>,
-  exempt: ReadonlyArray<DefaultsExemption> = exemptions
+  exempt: ReadonlyArray<DefaultsExemption>
 ) {
   const repo = yield* Repo
   const git = (pathspec: ReadonlyArray<string>) =>

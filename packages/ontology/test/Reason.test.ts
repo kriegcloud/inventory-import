@@ -45,7 +45,7 @@ type Case = {
   /** The jar before a fetch, and after one. */
   readonly jar?: O.Option<JarFound>
   readonly fetched?: O.Option<JarFound>
-  readonly fetchFails?: string
+  readonly fetchFails?: O.Option<string>
   /** What ROBOT answers: by default the profile passes and the reasoner refuses the three files that state a ban. */
   readonly robot?: (command: "validate-profile" | "reason", document: string) => RobotResult
 }
@@ -55,25 +55,32 @@ const honest = (command: "validate-profile" | "reason", document: string): Robot
   command === "reason" && A.some(refusedFiles, (text) => Str.includes(text)(document)) ? inconsistent : fine
 
 /** Runs the gate on the machine of one case; answers what it came to, each call ROBOT got, and the fetches. */
-const gate = Effect.fn("gate")(function* (given: Case) {
+const gate = Effect.fn("gate")(function* (asked: Case) {
   const pin = yield* robotPin
   const approved: JarFound = { sha256: pin.sha256, bytes: pin.bytes }
+  // What a case leaves out is the machine that passes: both Javas, the approved jar, a fetch that works, honest ROBOT.
+  const given = {
+    javas: [java27, java17],
+    jar: O.some(approved),
+    fetched: O.some(approved),
+    fetchFails: O.none(),
+    robot: honest,
+    ...asked
+  }
   const calls = yield* Ref.make<ReadonlyArray<string>>([])
   const fetches = yield* Ref.make<ReadonlyArray<string>>([])
   const machine = Machine.of({
-    javas: Effect.succeed(given.javas ?? [java27, java17]),
-    jar: Effect.map(Ref.get(fetches), (made) =>
-      A.isReadonlyArrayEmpty(made) ? (given.jar ?? O.some(approved)) : (given.fetched ?? O.some(approved))
-    ),
+    javas: Effect.succeed(given.javas),
+    jar: Effect.map(Ref.get(fetches), (made) => (A.isReadonlyArrayEmpty(made) ? given.jar : given.fetched)),
     fetch: Effect.fnUntraced(function* (url: string) {
-      if (given.fetchFails !== undefined) {
-        return yield* JarNotFetched.make({ url, reason: given.fetchFails })
+      if (O.isSome(given.fetchFails)) {
+        return yield* JarNotFetched.make({ url, reason: given.fetchFails.value })
       }
       yield* Ref.update(fetches, A.append(url))
     }),
     robot: Effect.fnUntraced(function* ({ command, document, java }) {
       yield* Ref.update(calls, A.append(`${java} ${command}`))
-      return (given.robot ?? honest)(command, document)
+      return given.robot(command, document)
     })
   })
   const result = yield* Effect.result(Effect.provideService(reason(), Machine, machine))
@@ -147,7 +154,7 @@ describe("gate 9, the reasoner's checks", () => {
 
   it.effect("refusal 3: the jar is not there and cannot be fetched", () =>
     Effect.gen(function* () {
-      const run = yield* refusalOf({ jar: O.none(), fetchFails: "no route to host" })
+      const run = yield* refusalOf({ jar: O.none(), fetchFails: O.some("no route to host") })
       expect(O.exists(run.refusal, S.is(JarNotFetched))).toBe(true)
       expect(run.sentence).toContain(`could not be fetched from ${run.pin.url}: no route to host`)
       expect(run.calls).toStrictEqual([])
@@ -281,6 +288,6 @@ describe("gate 9, the reasoner's checks", () => {
       ["fixtures/reason/entry-is-person.ttl", "inconsistent", 3],
       ["fixtures/reason/entry-is-tenant.ttl", "inconsistent", 3]
     ])
-    expect(A.every(runs, (run) => Str.includes("inv:Tenant a owl:Class")(run.files[0] ?? ""))).toBe(true)
+    expect(A.every(runs, (run) => O.exists(A.head(run.files), Str.includes("inv:Tenant a owl:Class")))).toBe(true)
   })
 })

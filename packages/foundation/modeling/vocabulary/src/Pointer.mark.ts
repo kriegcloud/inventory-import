@@ -14,6 +14,7 @@ import type { Curie, VocabShape } from "@beep/identity/Vocab"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as Result from "effect/Result"
@@ -148,9 +149,12 @@ export const noTermFor = <Slice extends string>(): NoTermMaker<Slice> => {
   function noTerm(reason: "deferred", slice: Slice): DeferredNoTermMark<Slice>
   function noTerm(
     reason: NoTermReason | "deferred",
-    slice?: Slice
+    ...slice: ReadonlyArray<Slice>
   ): { readonly noTerm: { readonly reason: NoTermReason | "deferred"; readonly slice?: Slice } } {
-    return slice === undefined ? { noTerm: { reason } } : { noTerm: { reason, slice } }
+    return O.match(A.head(slice), {
+      onNone: () => ({ noTerm: { reason } }),
+      onSome: (named) => ({ noTerm: { reason, slice: named } })
+    })
   }
   return noTerm
 }
@@ -347,24 +351,26 @@ const decodeTerm = S.decodeUnknownResult(MarkedName, strict)
 const decodePath = S.decodeUnknownResult(LiftPathRead, strict)
 const decodeNoTerm = S.decodeUnknownResult(NoTermRead, strict)
 
-const malformed = (key: MarkKey, error: S.SchemaError): MarkReading =>
-  MalformedMark.make({ key, message: error.message })
+const malformed: {
+  (key: MarkKey): (error: S.SchemaError) => MarkReading
+  (error: S.SchemaError, key: MarkKey): MarkReading
+} = dual(2, (error: S.SchemaError, key: MarkKey): MarkReading => MalformedMark.make({ key, message: error.message }))
 
 const readOne = (key: MarkKey, value: unknown): MarkReading =>
   MarkKey.match(key, {
     term: () =>
       Result.match(decodeTerm(value), {
-        onFailure: (error) => malformed(key, error),
+        onFailure: malformed(key),
         onSuccess: (term) => TermReading.make({ term })
       }),
     path: () =>
       Result.match(decodePath(value), {
-        onFailure: (error) => malformed(key, error),
+        onFailure: malformed(key),
         onSuccess: (path) => PathReading.make({ path })
       }),
     noTerm: () =>
       Result.match(decodeNoTerm(value), {
-        onFailure: (error) => malformed(key, error),
+        onFailure: malformed(key),
         onSuccess: (noTerm) => NoTermReading.make({ noTerm })
       })
   })

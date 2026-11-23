@@ -93,8 +93,9 @@ type Lookup = (name: string) => O.Option<Node>
 const noLookup: Lookup = () => O.none()
 
 /** Every way to join one text of each part, in order; none when a part has no text. */
+const joinedNone: ReadonlyArray<string> = [""]
 const joined = (parts: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<string> =>
-  A.reduce(parts, [""] as ReadonlyArray<string>, (so, part) =>
+  A.reduce(parts, joinedNone, (so, part) =>
     A.take(
       A.flatMap(so, (head) => A.map(part, (tail) => `${head}${tail}`)),
       64

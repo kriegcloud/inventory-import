@@ -30,7 +30,7 @@ type Agree<Marked extends S.Top, Unmarked extends S.Top> = [
 type Holds<T extends true> = T
 
 /** `id`: select, insert, update and json. */
-export type IdVariants = [
+export type IdVariants = readonly [
   Holds<Agree<typeof Activity.select.fields.id, typeof id.schemas.select>>,
   Holds<Agree<typeof Activity.insert.fields.id, typeof id.schemas.insert>>,
   Holds<Agree<typeof Activity.update.fields.id, typeof id.schemas.update>>,
@@ -38,7 +38,7 @@ export type IdVariants = [
 ]
 
 /** `agent`: all six. */
-export type AgentVariants = [
+export type AgentVariants = readonly [
   Holds<Agree<typeof Activity.select.fields.agent, typeof agent.schemas.select>>,
   Holds<Agree<typeof Activity.insert.fields.agent, typeof agent.schemas.insert>>,
   Holds<Agree<typeof Activity.update.fields.agent, typeof agent.schemas.update>>,
@@ -48,7 +48,7 @@ export type AgentVariants = [
 ]
 
 /** `createdAt`: select, insert and json. */
-export type CreatedAtVariants = [
+export type CreatedAtVariants = readonly [
   Holds<Agree<typeof Activity.select.fields.createdAt, typeof createdAt.schemas.select>>,
   Holds<Agree<typeof Activity.insert.fields.createdAt, typeof createdAt.schemas.insert>>,
   Holds<Agree<typeof Activity.json.fields.createdAt, typeof createdAt.schemas.json>>

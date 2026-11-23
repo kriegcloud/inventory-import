@@ -13,6 +13,7 @@ import { Vocabulary } from "@beep/vocabulary/Model"
 import { noTermFor, readKeyMark } from "@beep/vocabulary/Pointer"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Model from "effect/schema/Model"
@@ -81,10 +82,10 @@ const placedAs = (entry: string, field: string, mark: S.Annotations.Key<string>)
 
 /** A finding as its rule, entry and field, so a changed sentence does not fail the gate's test. */
 const named = (findings: ReadonlyArray<PointerFinding>) =>
-  A.map(findings, (found) => [found.rule, found.entry, O.getOrElse(found.field, () => "")])
+  A.map(findings, (found) => [found.rule, found.entry, O.match(found.field, { onNone: () => "", onSome: identity })])
 
 /** The real inputs, decoded; a negative overrides one of them. */
-const gate = Effect.fn("gate")(function* (overrides: Partial<PointerInput> = {}) {
+const gate = Effect.fn("gate")(function* (overrides: Partial<PointerInput>) {
   const decoded = yield* decodeVocabulary(vocabulary)
   const enrolment = yield* decodeEnrolment(enrolmentFile)
   return named(
@@ -142,7 +143,7 @@ class Uneven extends Model.Class<Uneven>("Uneven")(
 describe("gate 5, record pointers", () => {
   it.effect("finds nothing in the five enrolled exports, the committed enrolment list and the vocabulary", () =>
     Effect.gen(function* () {
-      const found = yield* gate()
+      const found = yield* gate({})
       expect(found).toEqual([])
     })
   )

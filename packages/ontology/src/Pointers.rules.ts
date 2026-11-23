@@ -21,7 +21,7 @@ import {
 } from "@beep/vocabulary/Pointer"
 import { ParentLink, RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
 import * as A from "effect/Array"
-import { pipe } from "effect/Function"
+import { identity, pipe } from "effect/Function"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
@@ -164,7 +164,7 @@ const sameMark = S.toEquivalence(MarkReading)
 // ---------------------------------------------------------------------------------------------------------------
 
 /** A class and its local ancestors, nearest first; a cycle stops at the class seen twice. */
-const lineage = (vocabulary: Vocabulary, key: string, seen: ReadonlyArray<string> = []): ReadonlyArray<string> => {
+const lineage = (vocabulary: Vocabulary, key: string, seen: ReadonlyArray<string>): ReadonlyArray<string> => {
   if (A.contains(seen, key)) {
     return seen
   }
@@ -177,7 +177,7 @@ const lineage = (vocabulary: Vocabulary, key: string, seen: ReadonlyArray<string
 
 /** Whether `domain` is absent or names `key` or one of its ancestors. */
 const domainFits = (vocabulary: Vocabulary, domain: O.Option<string>, key: string): boolean =>
-  O.match(domain, { onNone: () => true, onSome: (named) => A.contains(lineage(vocabulary, key), named) })
+  O.match(domain, { onNone: () => true, onSome: (named) => A.contains(lineage(vocabulary, key, []), named) })
 
 /** A concept's scheme and notation from its local name, `<SchemeKey>-<notation>`, when the scheme has it. */
 const conceptOf = (
@@ -202,13 +202,13 @@ const conceptOf = (
 type FieldNode = { readonly name: string; readonly ast: SchemaAST.AST }
 
 const fieldNodes = (ast: SchemaAST.AST): ReadonlyArray<FieldNode> =>
-  A.map(
-    O.getOrElse(fieldsOf(ast), () => []),
-    (signature): FieldNode => ({
+  O.match(fieldsOf(ast), {
+    onNone: (): ReadonlyArray<FieldNode> => [],
+    onSome: A.map((signature): FieldNode => ({
       name: P.isString(signature.name) ? signature.name : String(signature.name),
       ast: signature.type
-    })
-  )
+    }))
+  })
 
 /** The string literals a union of literals allows, or none when the node is something else. */
 const literalsOf = (ast: SchemaAST.AST): O.Option<ReadonlyArray<string>> => {
@@ -223,7 +223,8 @@ const literalsOf = (ast: SchemaAST.AST): O.Option<ReadonlyArray<string>> => {
   return literals.length === ast.types.length && literals.length > 0 ? O.some(literals) : O.none()
 }
 
-const fieldMarks = (ast: SchemaAST.AST): ReadonlyArray<FieldMark> => O.getOrElse(readMarks(ast).fields, () => [])
+const fieldMarks = (ast: SchemaAST.AST): ReadonlyArray<FieldMark> =>
+  O.match(readMarks(ast).fields, { onNone: (): ReadonlyArray<FieldMark> => [], onSome: identity })
 
 // ---------------------------------------------------------------------------------------------------------------
 // The rules on one record
@@ -309,7 +310,7 @@ const pathFindings = (
     if (!(O.isSome(nodeSide) && nodeSide.value === node.value)) {
       found.push(bad(`${step.property}'s ${nodeSideName} is not ${node.value}, the class of the node it makes`))
     }
-    if (!(O.isSome(parentSide) && A.contains(lineage(vocabulary, parent), parentSide.value))) {
+    if (!(O.isSome(parentSide) && A.contains(lineage(vocabulary, parent, []), parentSide.value))) {
       found.push(bad(`${step.property}'s ${parentSideName} is neither ${parent} nor an ancestor of it`))
     }
     for (const fix of fixed) {

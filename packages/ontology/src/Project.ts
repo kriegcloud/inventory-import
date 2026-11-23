@@ -15,6 +15,7 @@
 import { ParentLink, RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
 import { RdfVocab } from "@beep/vocabulary/Rdf"
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
@@ -35,9 +36,10 @@ export const w3 = {
  *
  * @example term("owl", "Class") // "http://www.w3.org/2002/07/owl#Class"
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const term = <P extends keyof typeof w3>(prefix: P, local: RdfVocab[P]["terms"][number]): Iri =>
-  `${w3[prefix]}${local}`
+export const term: {
+  <P extends keyof typeof w3>(local: RdfVocab[P]["terms"][number]): (prefix: P) => Iri
+  <P extends keyof typeof w3>(prefix: P, local: RdfVocab[P]["terms"][number]): Iri
+} = dual(2, <P extends keyof typeof w3>(prefix: P, local: RdfVocab[P]["terms"][number]): Iri => `${w3[prefix]}${local}`)
 
 /**
  * What the writer turns into one file: its two comment lines, every prefix it may use, its subjects in sections, and
@@ -66,8 +68,7 @@ const prefixesOf = (context: ProjectContext): Readonly<Record<string, Iri>> => (
 })
 
 /** The name the files carry: the last segment of the base IRI. */
-const nameOf = (vocabulary: Vocabulary): string =>
-  O.getOrElse(A.last(Str.split("/")(vocabulary.base)), () => vocabulary.base)
+const nameOf = (vocabulary: Vocabulary): string => A.lastNonEmpty(Str.split("/")(vocabulary.base))
 
 const versionOf = (vocabulary: Vocabulary): string =>
   `${vocabulary.version.major}.${vocabulary.version.minor}.${vocabulary.version.patch}`
@@ -116,9 +117,13 @@ const wordsOf = (subject: Iri, described: Described): ReadonlyArray<Triple> => [
  *
  * @example conceptIri(vocabulary, "MemberRoleScheme", "admin") // "…/ontology/MemberRoleScheme-admin"
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const conceptIri = (vocabulary: Vocabulary, scheme: string, notation: string): Iri =>
-  `${vocabulary.namespace}${scheme}-${notation}`
+export const conceptIri: {
+  (scheme: string, notation: string): (vocabulary: Vocabulary) => Iri
+  (vocabulary: Vocabulary, scheme: string, notation: string): Iri
+} = dual(
+  3,
+  (vocabulary: Vocabulary, scheme: string, notation: string): Iri => `${vocabulary.namespace}${scheme}-${notation}`
+)
 
 /** The predicates of the OWL file, in the order section 6.3's table lists them. */
 const owlPredicates: ReadonlyArray<Iri> = [
@@ -149,15 +154,7 @@ const skosPredicates: ReadonlyArray<Iri> = [
   term("skos", "topConceptOf")
 ]
 
-/**
- * The OWL file (section 8): the document, the four annotation properties it uses, the gist classes with their links
- * and pairs, the vocabulary's classes and properties, and every concept as a named individual, typed by its class
- * where it is also an instance of one.
- *
- * @example owlProjection(context, "packages/kernel/src/Terms.vocab.ts") // seven sections
- */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const owlProjection = (context: ProjectContext, source: string): Projection => {
+const owlProjectionOf = (context: ProjectContext, source: string): Projection => {
   const { vocabulary } = context
   const inv = (key: string): Iri => `${vocabulary.namespace}${key}`
   const gist = (name: string): Iri => `${vocabulary.gist.namespace}${name}`
@@ -177,8 +174,9 @@ export const owlProjection = (context: ProjectContext, source: string): Projecti
     ]),
     // A pair is written once, from the IRI that sorts first.
     ...A.map(vocabulary.gist.disjointPairs, ([one, other]) => {
-      const [first, second] = A.sort([gist(one), gist(other)], byCodePoint)
-      return link(first ?? gist(one), term("owl", "disjointWith"), second ?? gist(other))
+      const [first, second] =
+        byCodePoint(gist(one), gist(other)) < 0 ? [gist(one), gist(other)] : [gist(other), gist(one)]
+      return link(first, term("owl", "disjointWith"), second)
     })
   ]
   const classes = A.flatMap(R.toEntries(vocabulary.classes), ([key, entry]) => [
@@ -234,13 +232,18 @@ export const owlProjection = (context: ProjectContext, source: string): Projecti
 }
 
 /**
- * The SKOS file (section 8): the document, the schemes, and each concept with its notation, its scheme and its words.
- * Every concept is a top concept of its scheme: the vocabulary states no broader one.
+ * The OWL file (section 8): the document, the four annotation properties it uses, the gist classes with their links
+ * and pairs, the vocabulary's classes and properties, and every concept as a named individual, typed by its class
+ * where it is also an instance of one.
  *
- * @example skosProjection(context, "packages/kernel/src/Terms.vocab.ts") // three sections
+ * @example owlProjection(context, "packages/kernel/src/Terms.vocab.ts") // seven sections
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const skosProjection = (context: ProjectContext, source: string): Projection => {
+export const owlProjection: {
+  (source: string): (context: ProjectContext) => Projection
+  (context: ProjectContext, source: string): Projection
+} = dual(2, owlProjectionOf)
+
+const skosProjectionOf = (context: ProjectContext, source: string): Projection => {
   const { vocabulary } = context
   const inv = (key: string): Iri => `${vocabulary.namespace}${key}`
   const type = term("rdf", "type")
@@ -269,12 +272,17 @@ export const skosProjection = (context: ProjectContext, source: string): Project
 }
 
 /**
- * A graph as a file: one section, its predicates `rdf:type` and then the vocabulary's own properties by IRI.
+ * The SKOS file (section 8): the document, the schemes, and each concept with its notation, its scheme and its words.
+ * Every concept is a top concept of its scheme: the vocabulary states no broader one.
  *
- * @example graphProjection(context, "…/CQ-P06.fixture.ttl and …/CQ-P06.members.json", graph)
+ * @example skosProjection(context, "packages/kernel/src/Terms.vocab.ts") // three sections
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const graphProjection = (context: ProjectContext, sources: string, graph: ReadonlyArray<Triple>): Projection => {
+export const skosProjection: {
+  (source: string): (context: ProjectContext) => Projection
+  (context: ProjectContext, source: string): Projection
+} = dual(2, skosProjectionOf)
+
+const graphProjectionOf = (context: ProjectContext, sources: string, graph: ReadonlyArray<Triple>): Projection => {
   const { vocabulary } = context
   const properties = A.map(
     [...R.keys(vocabulary.objectProperties), ...R.keys(vocabulary.datatypeProperties)],
@@ -287,6 +295,16 @@ export const graphProjection = (context: ProjectContext, sources: string, graph:
     predicates: [term("rdf", "type"), ...A.sort(properties, byCodePoint)]
   }
 }
+
+/**
+ * A graph as a file: one section, its predicates `rdf:type` and then the vocabulary's own properties by IRI.
+ *
+ * @example graphProjection(context, "…/CQ-P06.fixture.ttl and …/CQ-P06.members.json", graph)
+ */
+export const graphProjection: {
+  (sources: string, graph: ReadonlyArray<Triple>): (context: ProjectContext) => Projection
+  (context: ProjectContext, sources: string, graph: ReadonlyArray<Triple>): Projection
+} = dual(3, graphProjectionOf)
 
 /**
  * Every triple of a projection, section after section: what the writer is given, and what a re-parse must give back.

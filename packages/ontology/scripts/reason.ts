@@ -1,63 +1,101 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // `bun run reason`, gate 9: the machine `src/Reason.ts` asks its questions of, and nothing else. It finds the Javas
 // (JAVA_HOME, then `java` on the PATH, then each folder of /usr/lib/jvm, so a machine whose default Java is newer
 // still finds the pinned one), keeps the jar outside the repository, under the user's cache folder by its release,
 // fetches it from the pinned address when it is not there, and runs ROBOT on one document at a time in a temporary
 // folder it removes. What a run must come to, and every refusal, is decided in `src/Reason.ts`. The script exits 1
 // when the gate fails: it never skips.
-import { spawnSync } from "node:child_process"
-import { createHash } from "node:crypto"
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
-import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import * as BunRuntime from "@effect/platform-bun/BunRuntime"
+import * as BunServices from "@effect/platform-bun/BunServices"
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as Console from "effect/Console"
+import * as Digest from "effect/crypto/Digest"
+import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
+import * as Path from "effect/Path"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as S from "effect/Schema"
+import * as Stream from "effect/Stream"
 import * as Str from "effect/String"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
-import { JarNotFetched, Machine, reason, refusalSentence, robotPin, type JavaFound } from "../src/Reason.ts"
+import { JarNotFetched, Machine, reason, refusalSentence, robotPin, type RobotResult } from "../src/Reason.ts"
 
 const vendorFolder = "/usr/lib/jvm"
 
-/** What `java -version` says there, or none when nothing answers. It prints to the error stream. */
-const versionAt = (where: string): JavaFound => {
-  const asked = spawnSync(where, ["-version"], { encoding: "utf8" })
-  const version =
-    asked.error === undefined && asked.status === 0 ? Str.match(/version "([^"]+)"/)(asked.stderr) : O.none()
-  return { where, version: O.flatMap(version, (match) => O.fromUndefinedOr(match[1])) }
-}
-
-const javas = Effect.gen(function* () {
-  const home = yield* Config.schema(S.String, "JAVA_HOME").pipe(Config.option, Effect.orDie)
-  const installed = yield* Effect.orElseSucceed(
-    Effect.tryPromise({ try: () => readdir(vendorFolder), catch: () => "none" as const }),
-    (): ReadonlyArray<string> => []
-  )
-  const places = [
-    ...A.fromOption(O.map(home, (folder) => join(folder, "bin", "java"))),
-    "java",
-    ...A.map(A.sort(installed, Str.Order), (folder) => join(vendorFolder, folder, "bin", "java"))
-  ]
-  return A.map(A.dedupe(places), versionAt)
-})
+/** A run takes under a second. One that hangs is stopped and counted failed, as a Java that did not start is. */
+const runLimit = Duration.minutes(5)
 
 const machine = Effect.gen(function* () {
-  const pin = yield* robotPin
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+  const digest = yield* Digest.Digest
   const client = yield* HttpClient.HttpClient
-  const cacheHome = yield* Config.schema(S.String, "XDG_CACHE_HOME").pipe(Config.option, Effect.orDie)
-  const cache = O.getOrElse(cacheHome, () => join(homedir(), ".cache"))
-  const folder = join(cache, "inventory-import", "robot", pin.release)
-  const jar = join(folder, pin.file)
+  const pin = yield* robotPin
+  const cache = yield* Config.schema(S.String, "XDG_CACHE_HOME").pipe(
+    Config.orElse(() => Config.map(Config.schema(S.String, "HOME"), (home) => path.join(home, ".cache"))),
+    Effect.orDie
+  )
+  const folder = path.join(cache, "inventory-import", "robot", pin.release)
+  const jar = path.join(folder, pin.file)
 
-  const held = Effect.map(
-    Effect.option(Effect.tryPromise({ try: () => readFile(jar), catch: () => "none" as const })),
-    O.map((bytes) => ({ sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength }))
+  /** One command run to its end: its exit code and what it printed. A command that could not start, or ran past the
+   * limit, is a failed command, never a pass. */
+  const run = (command: string, args: ReadonlyArray<string>, cwd: string) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const handle = yield* spawner.spawn(ChildProcess.make(command, args, { cwd, stdin: "ignore" }))
+        const [stdout, stderr, code] = yield* Effect.all(
+          [
+            handle.stdout.pipe(Stream.decodeText, Stream.mkString),
+            handle.stderr.pipe(Stream.decodeText, Stream.mkString),
+            handle.exitCode
+          ],
+          { concurrency: "unbounded" }
+        )
+        return { code: Number(code), stdout, stderr, error: "" }
+      })
+    ).pipe(
+      Effect.timeoutOption(runLimit),
+      Effect.map(
+        O.match({
+          onNone: () => ({ code: 1, stdout: "", stderr: "", error: `stopped after ${Duration.format(runLimit)}` }),
+          onSome: (ran) => ran
+        })
+      ),
+      Effect.catch((error) => Effect.succeed({ code: 1, stdout: "", stderr: "", error: String(error) }))
+    )
+
+  /** What `java -version` says there, or none when nothing answers. It prints to the error stream. */
+  const versionAt = (where: string) =>
+    Effect.map(run(where, ["-version"], cache), (asked) => ({
+      where,
+      version: asked.code === 0 ? O.flatMap(Str.match(/version "([^"]+)"/)(asked.stderr), A.get(1)) : O.none<string>()
+    }))
+
+  const javas = Effect.gen(function* () {
+    const home = yield* Config.schema(S.String, "JAVA_HOME").pipe(Config.option, Effect.orDie)
+    const installed = yield* Effect.orElseSucceed(fs.readDirectory(vendorFolder), (): ReadonlyArray<string> => [])
+    const places = [
+      ...A.fromOption(O.map(home, (where) => path.join(where, "bin", "java"))),
+      "java",
+      ...A.map(A.sort(installed, Str.Order), (where) => path.join(vendorFolder, where, "bin", "java"))
+    ]
+    return yield* Effect.forEach(A.dedupe(places), versionAt, { concurrency: 1 })
+  })
+
+  const held = Effect.flatMap(Effect.option(fs.readFile(jar)), (read) =>
+    O.match(read, {
+      onNone: () => Effect.succeedNone,
+      onSome: (bytes) =>
+        Effect.map(digest.digestHex(Digest.sha256, bytes), (sha256) => O.some({ sha256, bytes: bytes.byteLength }))
+    })
   )
 
   const fetch = Effect.fn("reason.fetch")(function* (url: string) {
@@ -65,13 +103,13 @@ const machine = Effect.gen(function* () {
     const response = yield* Effect.mapError(Effect.flatMap(client.get(url), HttpClientResponse.filterStatusOk), refused)
     const bytes = yield* Effect.mapError(response.arrayBuffer, refused)
     // Written beside its place and moved there whole, so a fetch that stops halfway leaves no jar.
-    yield* Effect.tryPromise({
-      try: () =>
-        mkdir(folder, { recursive: true })
-          .then(() => writeFile(`${jar}.part`, new Uint8Array(bytes)))
-          .then(() => rename(`${jar}.part`, jar)),
-      catch: refused
-    })
+    yield* Effect.mapError(
+      Effect.andThen(
+        fs.makeDirectory(folder, { recursive: true }),
+        Effect.andThen(fs.writeFile(`${jar}.part`, new Uint8Array(bytes)), fs.rename(`${jar}.part`, jar))
+      ),
+      refused
+    )
   })
 
   const robot = Effect.fn("reason.robot")(function* (input: {
@@ -79,51 +117,40 @@ const machine = Effect.gen(function* () {
     readonly command: "validate-profile" | "reason"
     readonly document: string
   }) {
-    const work = yield* Effect.orDie(
-      Effect.tryPromise({ try: () => mkdtemp(join(tmpdir(), "reason-")), catch: String })
+    // The temporary folder is removed when the run's scope closes.
+    return yield* Effect.scoped(
+      Effect.gen(function* () {
+        const work = yield* Effect.orDie(fs.makeTempDirectoryScoped({ prefix: "reason-" }))
+        const document = path.join(work, "run.ttl")
+        const report = path.join(work, "profile.txt")
+        yield* Effect.orDie(fs.writeFileString(document, input.document))
+        const flags =
+          input.command === "validate-profile" ? ["--profile", "DL", "--output", report] : ["--reasoner", "hermit"]
+        const ran = yield* run(input.java, ["-jar", jar, input.command, "--input", document, ...flags], work)
+        const written = yield* Effect.orElseSucceed(fs.readFileString(report), () => "")
+        const result: RobotResult = {
+          code: ran.code,
+          output: A.join(A.filter([ran.stdout, ran.stderr, written, ran.error], Str.isNonEmpty), "\n")
+        }
+        return result
+      })
     )
-    const document = join(work, "run.ttl")
-    const report = join(work, "profile.txt")
-    yield* Effect.orDie(Effect.tryPromise({ try: () => writeFile(document, input.document, "utf8"), catch: String }))
-    const flags =
-      input.command === "validate-profile" ? ["--profile", "DL", "--output", report] : ["--reasoner", "hermit"]
-    const ran = spawnSync(input.java, ["-jar", jar, input.command, "--input", document, ...flags], {
-      cwd: work,
-      encoding: "utf8",
-      // A run takes under a second. One that hangs is stopped and counted failed, as a Java that did not start is.
-      timeout: 300_000
-    })
-    const written = yield* Effect.orElseSucceed(
-      Effect.tryPromise({ try: () => readFile(report, "utf8"), catch: () => "none" as const }),
-      () => ""
-    )
-    yield* Effect.orDie(Effect.tryPromise({ try: () => rm(work, { recursive: true, force: true }), catch: String }))
-    return {
-      // A Java that could not be started is a failed command, never a pass.
-      code: ran.error === undefined ? (ran.status ?? 1) : 1,
-      output: A.join(
-        A.filter([ran.stdout, ran.stderr, written, ran.error === undefined ? "" : String(ran.error)], Str.isNonEmpty),
-        "\n"
-      )
-    }
   })
 
   return Machine.of({ javas, jar: held, fetch, robot })
 })
 
-const live = Layer.provide(Layer.effect(Machine, Effect.orDie(machine)), FetchHttpClient.layer)
+/** The machine on Bun's services, the fetch client and Web Crypto's digest. */
+const services = Layer.effect(Machine, Effect.orDie(machine)).pipe(
+  Layer.provide(Layer.mergeAll(BunServices.layer, FetchHttpClient.layer, Digest.layerWebCrypto))
+)
 
-// The script is the entry point: the one place the machine is provided.
-// @effect-diagnostics-next-line strictEffectProvide:off
-const main = Effect.matchEffect(Effect.provide(reason(), live), {
-  onSuccess: (lines) => Console.log(A.join(["reason OK  gate 9, the reasoner:", ...lines], "\n")),
-  onFailure: (refusal) =>
-    Effect.andThen(
-      Console.error(`reason FAIL  gate 9, the reasoner:\n${refusalSentence(refusal)}`),
-      Effect.sync(() => {
-        process.exitCode = 1
-      })
-    )
-})
-
-void Effect.runPromise(main)
+// The script is the entry point: the machine is built once, for the run. A refusal is printed and fails the run,
+// which sets the exit code to 1.
+Layer.build(services).pipe(
+  Effect.flatMap((context) => reason().pipe(Effect.provideContext(context))),
+  Effect.scoped,
+  Effect.tap((lines) => Console.log(A.join(["reason OK  gate 9, the reasoner:", ...lines], "\n"))),
+  Effect.tapError((refusal) => Console.error(`reason FAIL  gate 9, the reasoner:\n${refusalSentence(refusal)}`)),
+  BunRuntime.runMain({ disableErrorReporting: true })
+)

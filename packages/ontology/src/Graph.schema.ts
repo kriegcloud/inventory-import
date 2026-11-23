@@ -12,8 +12,8 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import { dual, pipe } from "effect/Function"
-import * as O from "effect/Option"
 import * as Order from "effect/Order"
+import type * as Ordering from "effect/Ordering"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
@@ -83,28 +83,36 @@ export class Triple extends S.Opaque<Triple, { readonly brand: unique symbol }>(
  *
  * @example link(member, membershipIn, tenant) // <member> inv:membershipIn <tenant>
  */
-// A triple's maker: its three IRIs are one statement, none of them a subject to pipe.
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const link = (subject: Iri, predicate: Iri, object: Iri): Triple =>
+export const link: {
+  (predicate: Iri, object: Iri): (subject: Iri) => Triple
+  (subject: Iri, predicate: Iri, object: Iri): Triple
+} = dual(3, (subject: Iri, predicate: Iri, object: Iri): Triple =>
   Triple.make({ subject, predicate, object: IriNode.make({ kind: "iri", iri: object }) })
+)
 
 /**
  * A triple whose object is a value of one datatype.
  *
  * @example literal(ontology, versionInfo, "0.1.0", xsdString)
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const literal = (subject: Iri, predicate: Iri, value: string, datatype: Iri): Triple =>
+export const literal: {
+  (predicate: Iri, value: string, datatype: Iri): (subject: Iri) => Triple
+  (subject: Iri, predicate: Iri, value: string, datatype: Iri): Triple
+} = dual(4, (subject: Iri, predicate: Iri, value: string, datatype: Iri): Triple =>
   Triple.make({ subject, predicate, object: LiteralNode.make({ kind: "literal", value, datatype }) })
+)
 
 /**
  * A triple whose object is words in one language.
  *
  * @example text(member, prefLabel, "Member", "en") // <member> skos:prefLabel "Member"@en
  */
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const text = (subject: Iri, predicate: Iri, value: string, language: string): Triple =>
+export const text: {
+  (predicate: Iri, value: string, language: string): (subject: Iri) => Triple
+  (subject: Iri, predicate: Iri, value: string, language: string): Triple
+} = dual(4, (subject: Iri, predicate: Iri, value: string, language: string): Triple =>
   Triple.make({ subject, predicate, object: TextNode.make({ kind: "text", value, language }) })
+)
 
 /**
  * Text between two quotes as Turtle and N-Triples both write it: `\\`, `"`, newline, carriage return and tab escaped.
@@ -141,23 +149,20 @@ export const objectLine = (object: ObjectNode): string =>
 export const lineOf = (triple: Triple): string =>
   `<${triple.subject}> <${triple.predicate}> ${objectLine(triple.object)}`
 
+/** A text's code points, one for each character. */
+const pointsOf = (text: string): ReadonlyArray<number> => A.getSomes(A.map(A.fromIterable(text), Str.codePointAt(0)))
+
+/** Code points compared one by one, then by length: the shorter of two texts that agree so far comes first. */
+const byPoints = A.makeOrder(Order.Number)
+
 /**
  * Text ordered by code point: the order of the characters' numbers, the same on every machine and in every locale.
  * A plain `<` compares UTF-16 units, which puts a character outside the basic plane before some inside it.
  */
-// An order is called by a sort, with both texts.
-// @effect-diagnostics-next-line missingPipeableSignature:off
-export const byCodePoint: Order.Order<string> = Order.make((self, that) => {
-  const left = A.fromIterable(self)
-  const right = A.fromIterable(that)
-  const differing = A.findFirst(A.zip(left, right), ([a, b]) => a !== b)
-  if (O.isSome(differing)) {
-    const [a, b] = differing.value
-    const point = (character: string): number => O.getOrElse(Str.codePointAt(0)(character), () => 0)
-    return point(a) < point(b) ? -1 : 1
-  }
-  return Order.Number(left.length, right.length)
-})
+export const byCodePoint: {
+  (that: string): (self: string) => Ordering.Ordering
+  (self: string, that: string): Ordering.Ordering
+} = dual(2, (self: string, that: string): Ordering.Ordering => byPoints(pointsOf(self), pointsOf(that)))
 
 /**
  * A graph as the sorted lines of its distinct triples. Two graphs hold the same statements exactly when their lines

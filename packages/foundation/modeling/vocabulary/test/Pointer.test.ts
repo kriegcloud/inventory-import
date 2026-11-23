@@ -76,10 +76,10 @@ const Book = S.Struct({
 
 const fieldsOf = (marks: SchemaMarks): Record<string, MarkReading> =>
   R.fromEntries(
-    A.map(
-      O.getOrElse(marks.fields, () => []),
-      (field: FieldMark) => [field.name, field.mark]
-    )
+    O.match(marks.fields, {
+      onNone: (): ReadonlyArray<readonly [string, MarkReading]> => [],
+      onSome: A.map((field: FieldMark) => [field.name, field.mark] as const)
+    })
   )
 
 describe("the makers", () => {

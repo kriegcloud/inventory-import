@@ -120,6 +120,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@effect/atom-react": "4.1.5",
+    "@effect/platform-bun": "4.1.5",
     "@effect/platform-node": "4.1.5",
     "@effect/sql-d1": "4.1.5",
     "@effect/tsgo": "0.73.2",

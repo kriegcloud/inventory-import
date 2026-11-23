@@ -25,6 +25,7 @@
     "n3": "^2.13.12"
   },
   "devDependencies": {
+    "@effect/platform-bun": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/n3": "^1.26.6",
     "@types/node": "catalog:",

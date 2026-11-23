@@ -288,5 +288,5 @@ type Schemes = Terms["schemes"]
  * @example "inv:GrantScopeKindScheme-organization"
  */
 export type InvConceptCurie = {
-  [K in keyof Schemes & string]: `inv:${K}-${keyof Schemes[K]["concepts"] & string}`
+  readonly [K in keyof Schemes & string]: `inv:${K}-${keyof Schemes[K]["concepts"] & string}`
 }[keyof Schemes & string]

@@ -157,8 +157,8 @@ const valid = {
 
 const exceptions = [{ class: "Genre", reason: genreReason, ratification: { decision: 2 } }] as const
 
-/** The rule and key of each finding the gate reports for a copy of the vocabulary and the exception list. */
-const findingsOf = Effect.fn("findingsOf")(function* (vocabulary: unknown, list: unknown = exceptions) {
+/** The rule and key of each finding the gate reports for a copy of the vocabulary and an exception list. */
+const findingsWith = Effect.fn("findingsWith")(function* (vocabulary: unknown, list: unknown) {
   const decoded = yield* decodeVocabulary(vocabulary)
   const entries = yield* decodeExceptions(list)
   return A.map(
@@ -166,6 +166,9 @@ const findingsOf = Effect.fn("findingsOf")(function* (vocabulary: unknown, list:
     (finding) => [finding.rule, finding.kind, finding.key]
   )
 })
+
+/** The same, with the library's own exception list. */
+const findingsOf = (vocabulary: unknown) => findingsWith(vocabulary, exceptions)
 
 const withClasses = (classes: object): unknown => ({ ...valid, classes: { ...valid.classes, ...classes } })
 
@@ -254,7 +257,7 @@ describe("coherenceFindings", () => {
   it.effect("C4: an entry for a class that has a parent, and an entry written twice", () =>
     Effect.gen(function* () {
       const list = [...exceptions, { class: "Book", reason: genreReason, ratification: { decision: 2 } }, ...exceptions]
-      const found = yield* findingsOf(valid, list)
+      const found = yield* findingsWith(valid, list)
       expect(found).toEqual([
         ["C4", "exception", "Book"],
         ["C4", "exception", "Genre"]
@@ -411,7 +414,7 @@ describe("coherenceFindings", () => {
         }
       }
       const list = [{ ...exceptions[0], ratification: { decision: 43 } }]
-      const found = yield* findingsOf(copy, list)
+      const found = yield* findingsWith(copy, list)
       expect(found).toEqual([
         ["C12", "concept", "GenreScheme-fiction"],
         ["C12", "exception", "Genre"]

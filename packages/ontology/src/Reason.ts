@@ -13,6 +13,7 @@
 import * as A from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import { identity, pipe } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -204,11 +205,13 @@ export const runs: ReadonlyArray<Run> = [
  * @example majorOf("17.0.21.1") // O.some(17)
  */
 export const majorOf = (version: string): O.Option<number> =>
-  O.flatMap(Str.match(/^(\d+)(?:\.(\d+))?/)(version), (match) => {
-    const first = Number(match[1])
-    const major = first === 1 && match[2] !== undefined ? Number(match[2]) : first
-    return Number.isSafeInteger(major) && major > 0 ? O.some(major) : O.none()
-  })
+  pipe(
+    // The old form names its major after "1.": tried first, so `1.8.0_292` is 8 and a plain `17.0.2` is 17.
+    O.orElse(Str.match(/^1\.(\d+)/)(version), () => Str.match(/^(\d+)/)(version)),
+    O.flatMap(A.get(1)),
+    O.map(Number),
+    O.filter((major) => Number.isSafeInteger(major) && major > 0)
+  )
 
 /** The first Java of the pinned major version, or the refusal naming every place looked at. */
 const pinnedJava = Effect.fnUntraced(function* (pin: RobotLock) {
@@ -218,7 +221,10 @@ const pinnedJava = Effect.fnUntraced(function* (pin: RobotLock) {
   if (O.isNone(pinned)) {
     return yield* JavaNotPinned.make({
       major: pin.javaMajor,
-      found: A.map(found, (java) => `${java.where}: ${O.getOrElse(java.version, () => "no Java answers there")}`)
+      found: A.map(
+        found,
+        (java) => `${java.where}: ${O.match(java.version, { onNone: () => "no Java answers there", onSome: identity })}`
+      )
     })
   }
   return pinned.value.where

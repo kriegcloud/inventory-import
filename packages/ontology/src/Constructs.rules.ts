@@ -14,7 +14,8 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { Vocabulary } from "@beep/vocabulary/Model"
 import * as A from "effect/Array"
-import { dual } from "effect/Function"
+import * as Eq from "effect/Equal"
+import { dual, identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -63,15 +64,16 @@ export const firstDifference: {
   }
   const ours = Str.split("\n")(projected)
   const theirs = Str.split("\n")(committed)
-  const lineAt = (lines: ReadonlyArray<string>, index: number): string => O.getOrElse(A.get(lines, index), () => "")
-  const index = O.getOrElse(
+  // A file that ends before the other has no line there: it reads as empty text in the difference.
+  const lineAt = (lines: ReadonlyArray<string>, index: number): string =>
+    O.match(A.get(lines, index), { onNone: () => "", onSome: identity })
+  return O.map(
     A.findFirstIndex(
       A.makeBy(Math.max(ours.length, theirs.length), (at) => at),
-      (at) => O.getOrUndefined(A.get(ours, at)) !== O.getOrUndefined(A.get(theirs, at))
+      (at) => !Eq.equals(A.get(ours, at), A.get(theirs, at))
     ),
-    () => 0
+    (index) => Difference.make({ line: index + 1, projected: lineAt(ours, index), committed: lineAt(theirs, index) })
   )
-  return O.some(Difference.make({ line: index + 1, projected: lineAt(ours, index), committed: lineAt(theirs, index) }))
 })
 
 /**

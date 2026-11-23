@@ -3,6 +3,7 @@
 // Oxigraph does no reasoning, so a question answers only from the triples it is given.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
 import * as oxigraph from "oxigraph"
@@ -37,5 +38,9 @@ export const ask = Effect.fn("ask")(function* (
   if (!A.isArray(result) || !A.every(result, isSolution)) {
     return yield* NotAsked.make({ reason: "the query returned no table of solutions" })
   }
-  return A.map(result, (solution) => A.map(variables, (variable) => solution.get(variable)?.value ?? ""))
+  return A.map(result, (solution) =>
+    A.map(variables, (variable) =>
+      O.match(O.fromUndefinedOr(solution.get(variable)), { onNone: () => "", onSome: (term) => term.value })
+    )
+  )
 })

@@ -22,22 +22,24 @@ coverage metrics, and ad hoc data exploration.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; it wins over this file. The ontology work lives in
-`explorations/erp-ontology/`. Nothing queryable of this repository's own exists yet: the vocabulary module, the
-projector, the generated Turtle, the SHACL, the competency-question suite and the reasoner step are not built. For
-any of them, say "not built"; never report a query as run against them.
+`explorations/erp-ontology/`. The thin thread is built (`goals/erp-vocabulary`). Query the generated Turtle:
+`packages/ontology/generated/inventory.owl.ttl`, `inventory.skos.ttl` and `generated/fixtures/CQ-P06.graph.ttl`.
+CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph), over a hand-written two-organization
+fixture and the lift of two member rows, not over the stored rows of the messy sample. SHACL, alignments and any term
+beyond the thread's 22 are not built. For those, say "not built"; never report a query as run against them.
 
 | Upstream step or output | Here |
 | --- | --- |
-| Step 1 target: endpoint or local file | An external ontology file (gist, IOF, a published vocabulary). No endpoint, no triple store |
-| Step 2 schema lookup | Take `gist:`, `inv:` (example only), `iof-core:` and the alignment prefixes from `namespaces.json`; our terms are the proposal in `research/02-schema-as-source.md` until the vocabulary module exists. gist labels are `skos:prefLabel` (no `rdfs:label`): a query over gist reads that |
+| Step 1 target: endpoint or local file | An external ontology file (gist, IOF, a published vocabulary), or the generated Turtle above. No endpoint, no triple store |
+| Step 2 schema lookup | Take `gist:`, `inv:` (example only), `iof-core:` and the alignment prefixes from `namespaces.json`. Our terms are `packages/kernel/src/Terms.vocab.ts` (7 classes, 9 properties, 2 schemes, 4 concepts). gist labels are `skos:prefLabel` (no `rdfs:label`): a query over gist reads that |
 | Step 4 syntax check | Runs as written, with `uv run --no-project --with rdflib` (checked 2026-11-22) |
-| Step 5 ROBOT query | Does not apply: ROBOT is not installed, and is not downloaded without asking. Use the rdflib form |
-| Step 5 over our ontology | Not built: there is no generated Turtle to query |
-| A CQ query for `ontology-requirements` | Query text in a research report, with its entailment regime stated. No JavaScript SPARQL engine is installed or chosen; research/02 plans N3 and shacl-engine in Vitest, not tried |
+| Step 5 ROBOT query | Does not apply to a skill: ROBOT is not on the PATH, and a skill does not download it. The reasoner script fetches its own jar. Use the rdflib form |
+| Step 5 over our ontology | Query the generated Turtle above with rdflib. SHACL is not built |
+| A CQ query for `ontology-requirements` | CQ-P06 and CQ-P11 are the files in `packages/ontology/fixtures/cq/`, run by Oxigraph in `Questions.test.ts`. A new question is text in a research report until it is a test. N3.js re-parses Turtle (decision 26). shacl-engine is not built |
 | `sparql/{name}.sparql`, results | A fenced block in `explorations/erp-ontology/research/NN-title.md`, or a file under `explorations/erp-ontology/assets/` |
 | RDF-star, federated queries | Do not apply |
 
-A result is over asserted triples only until the reasoner step exists; say so beside it.
+A rdflib result is over asserted triples. The reasoner step checks the OWL 2 DL profile and consistency; it does not add inferred triples to these queries. CQ-P06 needs only asserted types. Say which.
 
 ## When to Activate
 
@@ -63,7 +65,7 @@ before beginning work:
 
 ### Step 1: Analyze Intent
 
-> Here: the target is always a local file; there is no endpoint, and this repository's own Turtle is not built.
+> Here: the target is always a local file; there is no endpoint. This repository's Turtle is `packages/ontology/generated/inventory.owl.ttl`, `inventory.skos.ttl` and `generated/fixtures/CQ-P06.graph.ttl`.
 
 Determine:
 - **Query type**: SELECT, CONSTRUCT, ASK, DESCRIBE
@@ -131,7 +133,7 @@ the prefixes the query uses by hand; other engines reject the missing line.
 
 ### Step 5: Execute
 
-> Here: rdflib only, on an external file; ROBOT is not installed. Over this repository's ontology: "not built".
+> Here: rdflib only. ROBOT is not on the PATH, and a skill does not download it; the reasoner script fetches the jar for task `reason`. Over this repository, query the generated Turtle named above. SHACL is not built.
 
 ```bash
 # Via ROBOT (local ontology files): --query takes the query file and the
@@ -257,7 +259,7 @@ LIMIT 100
 
 ## Entailment Regime Awareness
 
-> Here: asserted triples only until the reasoner step in `check:full` exists; which reasoner is not chosen.
+> Here: rdflib returns asserted triples. The reasoner in `bun run check:full` is ROBOT v1.9.11 with HermiT under Java 17 (decisions 112 to 114), task `reason`. It does not add inferred triples to a SPARQL result. How a later question reads inferred types is open (decision 27).
 
 Query results depend on whether inference is applied:
 

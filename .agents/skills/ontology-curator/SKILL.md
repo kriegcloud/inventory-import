@@ -25,20 +25,22 @@ Read `../_shared/project-profile.md` first; it wins over this file. Benjamin is 
 ratification is his answer scribed in a `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/`,
 mirrored one line in the packet's `DECISIONS.md`. One TypeScript vocabulary module
 owns every term fact and all Turtle is generated from it, so a change is never made in a `.ttl` or `.obo` file.
-The vocabulary module, the projector, generated Turtle, SHACL, the competency-question suite and the reasoner step
-are not built: say "not built" for each, never run or report them.
+The thin thread is built: `packages/kernel/src/Terms.vocab.ts`, the projector in `packages/ontology`, the generated
+Turtle, CQ-P06 and CQ-P11, the law `bun run beep laws ontology-terms`, and the reasoner step. SHACL over the stored
+rows, alignments and any term beyond the thread's 22 are not built: say "not built" for those, and never report a
+check as run that has no code behind it.
 
 | Step or output | What it becomes here |
 | --- | --- |
 | Step 1 classify | Same table; the steward and auditor routes go to Benjamin |
 | Step 2 KGCL patch | A diff or typed TypeScript sketch of the vocabulary module in a research report; KGCL lines may sit beside it as readable text, never applied |
 | Step 3 propose | `explorations/erp-ontology/research/NN-title.md` with frontmatter, then `bun run docs:check` |
-| Step 4 apply | Does not apply yet; later, an edit to the module through schema, contract, implementation, then regenerate |
-| Step 5 version header | Version facts in the vocabulary module, emitted by the projector (not built); IRIs stay under `example.org` |
+| Step 4 apply | An approved change is an edit of `packages/kernel/src/Terms.vocab.ts`, then `bun run ontology:write`. Never edit a generated file |
+| Step 5 version header | Version facts in the vocabulary module (semantic version, decision 24; the thread is `0.1.0`), emitted by the projector. IRIs stay under `example.org` |
 | Step 5.5 release check | A release-notes section of the report |
-| Step 6 diff | The module's diff; once the projector exists, `git diff` of the generated Turtle |
-| Step 7 validate | The gates of decision 6, each "not built" until it has code |
-| Tool Commands, release pipeline | Do not apply; ROBOT is not installed and no OBO file is curated here |
+| Step 6 diff | The module's diff, and `git diff` of `packages/ontology/generated` |
+| Step 7 validate | Byte-compare and re-parse are in `bun run check`. The reasoner is task `reason` in `bun run check:full` (ROBOT v1.9.11, HermiT, Java 17). The ontology-terms law is in `bun run check`. SHACL over the messy sample is not built. Report a gate only when its command ran |
+| Tool Commands, release pipeline | Do not apply as ROBOT commands: ROBOT is not on the PATH, and no OBO file is curated here. The reasoner script fetches its own jar |
 | Import refresh | A check of the gist projection against a newer gist release, read-only |
 
 A deprecated term must drop out of the projector's logical output (subClassOf, domain, range). The module has no
@@ -163,7 +165,7 @@ Deprecation metadata:
 
 ### Step 3: Propose Patch for Review
 
-> Here: propose in `explorations/erp-ontology/research/NN-title.md`; there is no Turtle or OBO file to apply to or diff (not built), and no ROBOT template or rdflib writes a term.
+> Here: propose in `explorations/erp-ontology/research/NN-title.md`. There is no OBO file. Do not edit the generated Turtle; the projector writes it. No ROBOT template or rdflib writes a term.
 
 Present `changes.kgcl` to the user BEFORE applying, with the effect it
 will have. Show the effect by applying it to a scratch copy (never the
@@ -206,7 +208,7 @@ diff above. Never edit the Turtle file by hand.
 
 ### Step 4: Apply Approved Changes
 
-> Here: does not apply until the vocabulary module and projector exist; then the approved change is an edit to the module followed by regeneration, never an edit to a generated file.
+> Here: the vocabulary module and the projector exist. An approved change is an edit of `packages/kernel/src/Terms.vocab.ts` followed by `bun run ontology:write`, never an edit of a generated file.
 
 Only after the user (and the named steward, where Step 1 requires one)
 approves the patch shown in Step 3. Start from a clean git tree
@@ -242,7 +244,7 @@ as the reviewer decided in Step 3.
 
 ### Step 5: Version Update
 
-> Here: the version facts go in the vocabulary module and the projector writes this header (not built); IRIs stay under `example.org`, and the scheme is Benjamin's choice.
+> Here: the version facts go in the vocabulary module and the projector writes this header. The version is the semantic version in the module (decision 24); the thread is `0.1.0`. IRIs stay under `example.org`.
 
 Update the ontology header:
 
@@ -280,7 +282,7 @@ notes:
 
 ### Step 6: Generate Diff
 
-> Here: ROBOT is not installed; show the vocabulary module's diff, and once the projector exists, `git diff` of the generated Turtle.
+> Here: ROBOT is not on the PATH, and a skill does not download it. Show the vocabulary module's diff and `git diff` of `packages/ontology/generated`.
 
 Write each release's diff to its own file and link it from
 `CHANGELOG.md`; `--output` replaces the file it names, so never point it
@@ -293,7 +295,7 @@ robot diff --left previous.ttl --right ontology.ttl \
 
 ### Step 7: Validate
 
-> Here: report each gate of decision 6 (byte-compare and re-parse in `bun run check`, a reasoner in `bun run check:full`, SHACL over the messy sample as a slow test) as "not built"; which reasoner runs is owed and is Benjamin's.
+> Here: byte-compare and re-parse are in `bun run check`. The reasoner in `bun run check:full` is task `reason`: ROBOT v1.9.11 with HermiT under Java 17 (decisions 112 to 114). The ontology-terms law is in `bun run check`. SHACL over the messy sample is not built. Report a gate only when its command ran.
 
 Hand off to `ontology-validator` for full validation, or run quick checks.
 ELK (ROBOT's default) reasons over OWL 2 EL only and ignores other axioms
@@ -348,7 +350,7 @@ uvx --from oaklib runoak -i simpleobo:onto.obo apply \
 
 ### Release pipeline
 
-> Here: does not apply; a release will be regenerate, `bun run check`, `bun run check:full`, once those gates exist.
+> Here: does not apply as a ROBOT pipeline. A release is regenerate (`bun run ontology:write`), `bun run check`, and `bun run check:full` (task `reason`). SHACL over the stored rows is not built.
 
 The reasoner follows Step 7: `ELK` only for an EL ontology, else `hermit`.
 
@@ -419,7 +421,7 @@ robot diff --left old.ttl --right new.ttl
 
 ## Outputs
 
-> Here: every output is a section of a research report or a file under `explorations/erp-ontology/assets/`, never `ontologies/{name}/`, `docs/` or `release/`; there is no updated ontology file.
+> Here: every output is a section of a research report or a file under `explorations/erp-ontology/assets/`, never `ontologies/{name}/`, `docs/` or `release/`. There is no hand-edited ontology file. The projector writes `packages/ontology/generated`.
 
 This skill produces:
 
@@ -472,7 +474,7 @@ This skill produces:
 
 ## Error Handling
 
-> Here: mostly does not apply until there is generated Turtle; a failure of a gate that is not built is reported as "not built".
+> Here: generated Turtle exists. A failure of a gate that is not built (SHACL over the stored rows, alignments, the party slice) is reported as "not built".
 
 | Error | Likely Cause | Recovery |
 |-------|-------------|----------|

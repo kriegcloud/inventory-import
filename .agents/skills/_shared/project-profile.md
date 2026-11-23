@@ -6,7 +6,7 @@ disagree, they win and this file is out of date: say so.
 
 The ontology work lives in the exploration packet `explorations/erp-ontology/`. Its `DECISIONS.md` holds the decisions
 below with their reasons; its `research/` reports hold the evidence. `explorations/erp-ontology/research/14-thin-thread.md`
-is the one specification of the first deliverable, the thin thread. It is a design, not an implementation.
+is the specification of the first deliverable, the thin thread. The thread is built. The goal is `goals/erp-vocabulary`; its `PLAN.md` records what was built.
 
 ## What is decided
 
@@ -39,7 +39,7 @@ is the one specification of the first deliverable, the thin thread. It is a desi
 | 112 | ROBOT v1.9.11 is approved: `robot.jar`, 82,708,624 bytes, sha256 `53cd275c…ab26`, from the release's GitHub URL; tried under Java 17.0.2 | Gate 9 fetches that file, checks that hash and keeps the jar outside the repository. Report 14, 6.9, has the full hash and URL |
 | 113 | The reasoner pin names Java 17 by its major version | Compare the major version only; patch levels may differ between machines |
 | 114 | Gate 9 also runs in a CI job of its own, the jar restored from a cache keyed by its sha256 | The job fetches the jar only when the cache has none, checks the hash, then runs gate 9 |
-| 117 | The thread carries three to five forbidden conclusions, in the goal's SPEC, each with a fixture to refuse and a near miss to pass | The agent drafts the bans and Benjamin rules on each; none is drafted yet |
+| 117 | The thread carries three to five forbidden conclusions, in the goal's SPEC, each with a fixture to refuse and a near miss to pass | The five are signed in `goals/erp-vocabulary/SPEC.md` (decision 121) |
 | 118 | The expected rows are the lock on competency answers: no lock file, no update flag | A commit that changes an expected-rows file says so; the release notes name the question with its old and new answer |
 | 34 | `Person` is the human and `Organization` the real body. The tenant's `SourceRecord` links to the party by `recordOf` | Reidentify the record by tenant, source system, source type and exact source id. Join possible matches only by an `IdentityDecision` |
 | 38 | `Tenant` is a role class under `Organization`, keyed by `OrganizationId` | `membershipIn` ranges over `Tenant`, not any organization |
@@ -59,7 +59,7 @@ Rules from the reports, not numbered decisions (state them as the report's, and 
 
 - No `owl:sameAs` for deduplication: two records that may be one party are settled by a recorded identity decision
   (report 01, `IdentityDecision`).
-- No `owl:inverseOf`: a reverse relation is a SPARQL `^p` path (report 02, the planned `laws ontology-terms` rule).
+- No `owl:inverseOf`: a reverse relation is a SPARQL `^p` path (report 02). The repository law is `bun run beep laws ontology-terms` (root script `ontology-terms:check`, part of `bun run check`).
 - On an identity card, put the `SourceRecord` key from decision 34 in `reidentification_key`, never a name or SKU.
   One company known to two tenants is one party with two records.
 - An inventory measure (Available, Committed, Reserved) is not one enum because they overlap (report 01).
@@ -86,10 +86,23 @@ Beware: `gist:Account` is an agreement with a balance, not the Sutton Account (d
 - Exists: the packet, including the brief, the decision register and research reports 01 to 14. Read the Answered
   section before treating a report's "(pending Qn)" as open. A fact from an untracked file cannot be pinned to a
   commit until Benjamin commits it.
-- Does not exist yet: the vocabulary module, the projector, any generated Turtle, any SHACL, any competency-question
-  suite, the reasoner step. A skill never reports a check as run that has no code behind it; it says "not built".
-- ROBOT and oaklib are not installed on Benjamin's machine. ROBOT v1.9.11 is the approved release (decision 112): it
-  was tried once outside the repository, and the gate 9 script, not a skill, fetches it. `uvx` is, so `uvx --from oaklib runoak`,
+- Built, the thin thread:
+  - The vocabulary module `packages/kernel/src/Terms.vocab.ts` (7 classes, 9 properties, 2 schemes, 4 concepts) and
+    its helpers `packages/kernel/src/Terms.pointer.ts`. `@beep/vocabulary` is `packages/foundation/modeling/vocabulary`.
+  - The projector and the gates are `packages/ontology` (`@inventory/ontology`). `bun run ontology:write` writes
+    `packages/ontology/generated/inventory.owl.ttl`, `inventory.skos.ttl` and `generated/fixtures/CQ-P06.graph.ttl`.
+  - CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph). Their queries are in
+    `packages/ontology/fixtures/cq/`. They answer over a hand-written two-organization fixture and the lift of two
+    member rows, not over the stored rows of the messy sample.
+  - The repository law is `bun run beep laws ontology-terms` (root script `ontology-terms:check`, part of `bun run check`).
+  - The reasoner step is ROBOT v1.9.11 with HermiT under Java 17, pinned in `packages/ontology/robot.lock.json`,
+    run by `packages/ontology/scripts/reason.ts`. That file is the turbo task `reason` of `@inventory/ontology`, part
+    of `bun run check:full` and of the CI job `reason` (decisions 112, 113, 114). The script fetches the jar into
+    the user's cache folder. ROBOT is not on the PATH.
+- Not built: SHACL over the stored rows of the messy sample, alignments (SSSOM rows), any term beyond the thread's
+  22, the party slice. A skill says "not built" for those, and never reports a check as run that has no code behind it.
+- ROBOT and oaklib are not installed on Benjamin's machine. ROBOT v1.9.11 is the approved release (decision 112): the
+  gate 9 script, not a skill, fetches it into the cache. `uvx` is, so `uvx --from oaklib runoak`,
   `uvx --from sssom sssom` and `uvx pyshacl` run. `uv run --no-project --with rdflib` may read and query an external
   or generated file. None of them writes this repository's terms. On gist (labels in `skos:prefLabel` only) a
   `runoak lexmatch` wrote 0 rows and exited 0, with or without a `skos:prefLabel` rule, and `runoak info` printed no
@@ -123,8 +136,8 @@ Beware: `gist:Account` is an agreement with a balance, not the Sutton Account (d
   with. It becomes code only through this repository's order: schema, then service contract, then implementation.
 - Where a skill names another output file (`glossary.csv`, `conceptual-model.yaml`, `property-design.yaml`,
   `axiom-plan.yaml`, `upper-alignment.md`), the content is the same but it is a section of a research report or a
-  file under `assets/`, and it is never a second hand-written home for a term fact: once the vocabulary module
-  exists, the module is the home and the file is a review note.
+  file under `assets/`, and it is never a second hand-written home for a term fact. The vocabulary module is the home
+  and the file is a review note.
 
 ## How decisions are made
 

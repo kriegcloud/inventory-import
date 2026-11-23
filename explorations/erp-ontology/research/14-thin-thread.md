@@ -17,6 +17,25 @@ below: decision 120 (gate 8 runs CQ-P11 beside CQ-P06) and decision 121 (five fo
 second adds two reasoner fixtures and a near miss). The goal's [SPEC](../../../goals/erp-vocabulary/SPEC.md) states
 both under "Where the goal differs from report 14".
 
+Built on 2026-11-23, on branch `docs/erp-ontology-packet`. The sections below stay the design as last edited, and
+"nothing here is built" above is no longer so. The goal's [PLAN](../../../goals/erp-vocabulary/PLAN.md) records what
+was built, each choice that differs from a sketch here, and the walk of section 6.11 made on the code. Where the
+code differs from the text below:
+
+- Gate 8 runs CQ-P11 too, from `packages/ontology/fixtures/cq/CQ-P11.rq`. This replaces done line item 4, the
+  Questions count of section 1.2, section 5.5's "until it is added", and gate 8's row in the gate table.
+- Gate 9 makes five runs, two that must be consistent and three that must not, over four files in
+  `fixtures/reason/`. This replaces section 1.3's "the only data", section 6.9's two runs, section 6.10's "the
+  negative fixture" and row 9 as the only reasoner row of section 6.11. Section 6.8's "none is drafted yet" is
+  replaced by the five bans signed in the goal's SPEC.
+- `fixtures/negative/` holds seven files: gate 2's one, five gate 3 refuses, and `gate3-subclass.ttl`, the near
+  miss of ban 5 that gate 3 passes. Ban 5 added `gate3-hasKey.ttl` and `gate3-inverseFunctional.ttl`.
+- The helpers' module is `Pointer.mark.ts`, exported as `@beep/vocabulary/Pointer`, and files are named by role
+  (`Terms.vocab.ts`, `Terms.pointer.ts`, `Pointers.rules.ts`). The vocabulary's own test is
+  `packages/ontology/test/Terms.test.ts`: gate 7's rule 7 lets only that package load the vocabulary as a value.
+- `n3` is a dependency of the ontology package, not a test dependency: `src/Turtle.ts` reads with it.
+- Gate 9's workflow, which section 6.10 leaves undesigned, is the job `reason` in `.github/workflows/ci.yml`.
+
 Inputs: the answered decisions in `DECISIONS.md` (8 to 11, 13 to 16, 20 to 26, 32, 34, 38 to 41, 46, 93 to 115, 117,
 118), the kernel and access contract files named in section 3 as they stand today, `laws boundaries` as written, the root
 `turbo.json`, the vendored `@beep/identity`, the advisory audit in report 15, and Effect 4.1.5 as installed. Every

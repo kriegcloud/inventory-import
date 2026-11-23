@@ -104,42 +104,47 @@ with; it does not show a reasoner refusing data that says they are one.
 
 ## Acceptance
 
-Each line names what proves it. None holds today: nothing is built.
+Each line names what proves it. All eleven hold on the branch as of the closing review (2026-11-23), which read each
+against the code; [PLAN](PLAN.md)'s closing note says what was run.
 
-- [ ] `bun run ontology:write` writes `packages/ontology/generated/inventory.owl.ttl`,
+- [x] `bun run ontology:write` writes `packages/ontology/generated/inventory.owl.ttl`,
       `packages/ontology/generated/inventory.skos.ttl` and `packages/ontology/generated/fixtures/CQ-P06.graph.ttl`.
       With the three committed, a second run changes no byte: `git diff --exit-code packages/ontology/generated`.
-- [ ] `packages/ontology/RELEASES.md` holds the line "0.1.0: the thin thread" (report 14 sections 1.3 and 8).
-- [ ] The vocabulary module holds the 7 classes, 9 properties, 2 schemes and 4 concepts of report 14 section 2.
+- [x] `packages/ontology/RELEASES.md` holds the line "0.1.0: the thin thread" (report 14 sections 1.3 and 8).
+- [x] The vocabulary module holds the 7 classes, 9 properties, 2 schemes and 4 concepts of report 14 section 2.
       Gate 4 passes in `bun run check`. Since rule C12 accepts any decision number that has a heading, a test in
       `Coherence.test.ts` also asserts that all 22 name decision 111 and that `Role`'s exception entry names 97.
-- [ ] The five enrolled records are placed field by field as report 14 section 3 says: gate 5 with rule P13, in
+- [x] The five enrolled records are placed field by field as report 14 section 3 says: gate 5 with rule P13, in
       `bun run check`.
-- [ ] CQ-P06 returns its two expected rows and CQ-P11 its two; must-fail cases M1 to M7 and CQ-P11's each change the
+- [x] CQ-P06 returns its two expected rows and CQ-P11 its two; must-fail cases M1 to M7 and CQ-P11's each change the
       answer as stated; and the three guards of report 14 section 4.4 hold, the second keeping the graph equal to
       what `lift` returns: `Questions.test.ts`, in `bun run check`.
-- [ ] Gates 1 to 8 pass in `bun run check`, each with one committed test that plants its mistake and asserts the gate
+- [x] Gates 1 to 8 pass in `bun run check`, each with one committed test that plants its mistake and asserts the gate
       reports it, and the further negatives report 14 section 6 names for gates 2, 3, 4, 5 and 7. Gate 7's root
       task is in `check`, `check:full` and `check:ci`.
-- [ ] Gate 9 passes in `bun run check:full` on a run that started the reasoner: both positive runs are DL-valid and
+- [x] Gate 9 passes in `bun run check:full` on a run that started the reasoner: both positive runs are DL-valid and
       consistent, and the three negative runs are each reported inconsistent. The `reason` task has `cache: false`.
       The script fails, never skips, when Java is missing, when Java is not 17, when the jar cannot be fetched, and
       when the jar does not hash to the approved value; a test of the script's checks holds each of the four.
-- [ ] Each forbidden conclusion has its refused case and its near miss committed. Bans 3 and 4 are named tests in
+- [x] Each forbidden conclusion has its refused case and its near miss committed. Bans 3 and 4 are named tests in
       `Questions.test.ts` and ban 5's in `Generated.test.ts`, in `bun run check`. Bans 1 and 2 are named runs of
       `scripts/reason.ts`, whose output names the ban, in `bun run check:full`.
-- [ ] `laws boundaries` has the ontology family's two rows and nothing imports `@inventory/ontology`:
+- [x] `laws boundaries` has the ontology family's two rows and nothing imports `@inventory/ontology`:
       `bun run beep laws boundaries`.
-- [ ] The CI job for gate 9 is a committed workflow file with the jar restored from a cache keyed by its sha256
+- [x] The CI job for gate 9 is a committed workflow file with the jar restored from a cache keyed by its sha256
       (decision 114), read by the closing review. Whether it has run on GitHub is said in PLAN: nothing is pushed
       without Benjamin asking.
-- [ ] PLAN's table of what the design left unchecked has an outcome in every row, read by the closing review.
+- [x] PLAN's table of what the design left unchecked has an outcome in every row, read by the closing review.
 
 ## Where it stands
 
-Nothing is built. The design is complete and reviewed three times as documents; no sketch in it was compiled or run.
-The one thing tried on this machine is the reasoner itself: ROBOT v1.9.11 with HermiT under Java 17.0.2 on a
-seven-line test ontology (decision 112). [PLAN](PLAN.md) has the steps.
+Built, on branch `docs/erp-ontology-packet`, not pushed and not merged. The vocabulary is
+`packages/kernel/src/Terms.vocab.ts`, its helpers `@beep/vocabulary` (`packages/foundation/modeling/vocabulary`), and
+the projector, the fixtures and gates 1 to 5, 8 and 9 are `@inventory/ontology` (`packages/ontology`). Gate 6 is the
+type-check and gate 7 the law `bun run beep laws ontology-terms`. `bun run check` runs gates 1 to 8 and
+`bun run check:full` gate 9 as well, with ROBOT v1.9.11 and HermiT under Java 17. The CI job for gate 9 is written
+and has not run on GitHub. [PLAN](PLAN.md) has the steps, the choices made along the way, the walk of each planted
+mistake through the gates and the closing note.
 
 ## Decisions
 

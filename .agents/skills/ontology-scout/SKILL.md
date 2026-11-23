@@ -24,14 +24,15 @@ downstream skills.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; where it and this file disagree, it wins. The work belongs to the
-packet `explorations/erp-ontology/` (its `DECISIONS.md` is binding). ROBOT is not installed and oaklib is not installed as a tool, but `uvx --from
-oaklib runoak` runs, and ROBOT is never downloaded without asking Benjamin.
+packet `explorations/erp-ontology/` (its `DECISIONS.md` is binding). ROBOT is not on the PATH. The reasoner script
+fetches a pinned jar for this repository's task `reason` only. Do not use it on a candidate, and do not download
+anything unasked. oaklib is not installed as a tool, but `uvx --from oaklib runoak` runs.
 
 | Step or output here | What it becomes |
 | --- | --- |
 | Always-Reuse Baseline | gist (a small projection, decision 4), SKOS, dcterms, PROV-O for annotation and provenance |
 | Step 1 registries | gist first, then IOF core, ISA-95/B2MML, schema.org, GS1, UN/CEFACT, W3C ORG, FIBO, EPCIS; OLS and BioPortal only as a cross-check |
-| Step 2 scoring | The rubric as written; ROBOT rows say "not run (ROBOT not installed)"; upper-ontology alignment means gist |
+| Step 2 scoring | The rubric as written; a ROBOT row on a candidate says "not run" (ROBOT is not on the PATH, and this skill does not download it); upper-ontology alignment means gist |
 | Step 3 reuse decision | Either "add these gist terms to the projection list" or "alignment row" (for `ontology-mapper`); never `owl:imports` |
 | CQ benchmark probe | Probes drafted in the report; run only against an external candidate file with an installed tool, else "not run" |
 | Step 4 module extraction | Does not apply: no `imports/` folder, no extracted OWL |
@@ -39,8 +40,9 @@ oaklib runoak` runs, and ROBOT is never downloaded without asking Benjamin.
 | Reuse report, ODP recommendations | One report, `explorations/erp-ontology/research/NN-title.md`, with frontmatter; then `bun run docs:check` |
 | Import term lists, extracted modules | Do not apply. A projected gist term is a proposed change to the vocabulary module, shown as a TypeScript sketch in the report |
 
-Never say a check of this repository ran: the vocabulary module, the projector, generated Turtle, SHACL and the
-competency-question suite are not built. No candidate becomes a parent except through gist; an IOF, ISA-95,
+The thin thread is built (the module, the projector, the generated Turtle, CQ-P06 and CQ-P11, the reasoner step, the
+ontology-terms law). SHACL, alignments and any term beyond the thread's 22 are not built. This skill does not run
+those gates, and it never reports a check as run that has no code behind it. No candidate becomes a parent except through gist; an IOF, ISA-95,
 schema.org, W3C ORG, FIBO or EPCIS match is an alignment row. Never mint an IRI under a real domain (`example.org`
 until published), never propose `owl:sameAs` to merge parties or `owl:inverseOf`, and do not propose a relationship
 class or role classes for an Account (decision 3).
@@ -116,7 +118,7 @@ Also check specialized repositories when relevant:
 
 ### Step 2: Evaluate Candidates
 
-> Here: score as written, but every ROBOT row reads "not run (ROBOT not installed)" unless Benjamin agrees to install it; the OBO Dashboard and RO rows do not apply to non-OBO candidates.
+> Here: score as written, but every ROBOT row on a candidate reads "not run" (ROBOT is not on the PATH, and this skill does not download it); the OBO Dashboard and RO rows do not apply to non-OBO candidates.
 
 Score each candidate ontology on ten dimensions:
 
@@ -152,7 +154,7 @@ Apply the NeOn reuse decision tree:
 
 #### CQ Benchmark Probe
 
-> Here: this repository's competency-question suite is not built; draft the probes and their expected answers in the report, run them only against a candidate's own file with an installed tool, and otherwise write "not run".
+> Here: CQ-P06 and CQ-P11 are built and answer the thread, over a hand-written fixture, not over a candidate. Draft a probe of a candidate, and its expected answer, in the report. Run it only against the candidate's own file with an installed tool, and otherwise write "not run". Do not report the thread's suite as a result about the candidate.
 
 Run representative competency-question probes against each short-listed
 candidate (or extracted module) to test practical fit:
@@ -166,7 +168,7 @@ candidate (or extracted module) to test practical fit:
 
 ### Step 4: Module Extraction
 
-> Here: does not apply. Nothing is extracted and nothing goes in `imports/`; the gist projection is a term list in the vocabulary module (not built).
+> Here: does not apply. Nothing is extracted and nothing goes in `imports/`. The thread's gist projection is in `packages/kernel/src/Terms.vocab.ts`. A new gist term is a proposed change to that module.
 
 #### Extraction Method Trade-offs
 
@@ -336,7 +338,7 @@ This skill produces:
 
 ## Anti-Patterns to Avoid
 
-> Here: nothing is extracted; take only the gist terms needed into the projection list (a research report until the vocabulary module exists).
+> Here: nothing is extracted. The vocabulary module exists. A new gist term is a proposed change to it, written in a research report until Benjamin accepts it.
 
 - **Not-invented-here syndrome**: Always search before creating new terms.
   Reuse is preferred over reinvention.

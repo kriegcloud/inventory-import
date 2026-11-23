@@ -24,18 +24,19 @@ write scratch copies.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; where it and this file disagree, it wins. Every term fact has one
-hand-written home, the TypeScript vocabulary module (`Terms.vocab.ts`, sketched in the packet's report 02); a local
-projector generates all Turtle from it (decisions 2 and 5). Neither exists yet, so this skill writes no OWL: its output
-is a proposed change to the module, a typed TypeScript sketch or diff in a research report for Benjamin to argue with.
+hand-written home, `packages/kernel/src/Terms.vocab.ts` (7 classes, 9 properties, 2 schemes, 4 concepts), with helpers
+in `Terms.pointer.ts`. The projector in `packages/ontology` writes the Turtle (`bun run ontology:write`; decisions 2 and 5).
+This skill still writes no OWL file: a change is a proposed edit of the module, for Benjamin, then regeneration. Any
+term beyond the thread's 22, an alignment row and the party slice are not built.
 
 | Upstream step or output | Here |
 | --- | --- |
-| Step 1 profile, Step 7 reasoner | The profile is what the projector emits; the reasoner for `check:full` is not chosen (decision 6): ask Benjamin |
-| Step 2 header | Written by the projector from the module: `example.org` namespace, no clock date, no ORCID |
-| Step 3 ROBOT template, Step 4 KGCL, Step 5 OWLAPY or rdflib | One entry per term in the module sketch: IRI, label (`skos:prefLabel`) and definition (`skos:definition`) until Benjamin decides the properties, parent, disjointness, kind or role tag (until its values are decided, the ratified `candidate_category` of the auditor's identity card; a property carries none), scheme, alignment |
+| Step 1 profile, Step 7 reasoner | The projector writes the Turtle. The reasoner is ROBOT v1.9.11 with HermiT under Java 17 (decisions 25, 112 to 114): task `reason` in `bun run check:full` and the CI job `reason`. Report it only when that task ran |
+| Step 2 header | Written by the projector from the module: `example.org` namespace, the version from the module, no clock date, no ORCID |
+| Step 3 ROBOT template, Step 4 KGCL, Step 5 OWLAPY or rdflib | One entry per term in the module: IRI, label (`skos:prefLabel`) and definition (`skos:definition`) (decision 11), parent, disjointness, kind or role tag (until its values are decided, the ratified `candidate_category` of the auditor's identity card; a property carries none), scheme. Alignment rows are not built |
 | A required field, datatype, pattern or allowed value | A proposed change to the record schema (Effect Schema) in the context's contract package; for a term with no record yet (a party), which context owns it is Benjamin's question |
 | Step 6 LinkML, ODK | Do not apply |
-| Step 7 reason, report, SHACL; the handoff checklist | Not built: say "not built", never "passed" |
+| Step 7 reason, report, SHACL; the handoff checklist | The projector, the generated Turtle, CQ-P06 and CQ-P11 and the reasoner step are built. SHACL over the stored rows is not built: say "not built", never "passed". Report a built gate only when its command ran |
 | Outputs and handoff files | A section of `explorations/erp-ontology/research/NN-title.md` (frontmatter `type`, `title`, `description`; then `bun run docs:check`), data in `assets/`; never `docs/` or `ontologies/{name}/` |
 
 Top classes go only under the gist projection (`../_shared/gist-categories.md`); an IOF, ISA-95, schema.org, W3C ORG,
@@ -67,7 +68,7 @@ Read these files from `../_shared/` (relative to this skill's directory) before 
 ## Core Workflow
 
 ### Step 1: Select OWL 2 Profile
-> Here: the profile follows from what the projector emits (not built), and the reasoner is Benjamin's open question (decision 6): ELK is complete only for EL constructs (subClassOf, some, DisjointClasses); unionOf, only, cardinality or disjointUnionOf need HermiT or Openllet.
+> Here: the projector writes the Turtle. The reasoner is ROBOT v1.9.11 with HermiT under Java 17 (decisions 112 to 114), task `reason`. ELK is complete only for EL constructs (subClassOf, some, DisjointClasses); unionOf, only, cardinality or disjointUnionOf need HermiT or Openllet.
 
 Full OWL 2 is highly expressive but unrestricted reasoning can be costly. Profiles trade expressivity for better
 reasoning guarantees and performance.
@@ -87,7 +88,7 @@ Reasoning strategy options:
 Default to OWL 2 DL unless there is a clear scalability or deployment reason to choose a restricted profile.
 
 ### Step 2: Create Ontology Header
-> Here: does not apply; the projector (not built) writes the header from the vocabulary module, with the `example.org` placeholder namespace, the version from the module, no clock date, no `prov:generatedAtTime` and no ORCID.
+> Here: does not apply; the projector writes the header from the vocabulary module, with the `example.org` placeholder namespace, the version from the module, no clock date, no `prov:generatedAtTime` and no ORCID.
 
 Every new ontology needs a Turtle header with metadata:
 
@@ -273,7 +274,7 @@ The LinkML file is then the source: regenerate the generated files rather than e
 axioms in a separate file that imports the generated OWL.
 
 ### Step 7: Verify (after structural changes)
-> Here: not built: the projector, generated Turtle, SHACL, the reasoner step and the competency-question suite do not exist, so report each gate as "not built"; ROBOT is not installed and is not downloaded without asking.
+> Here: the projector, the generated Turtle, CQ-P06 and CQ-P11 and the reasoner step are built. SHACL over the stored rows of the messy sample is not built, so report that gate as "not built". Report a built gate only when its command ran. ROBOT is not on the PATH. The reasoner script fetches the jar; a skill does not download it.
 
 Reasoning strategy depends on context:
 
@@ -330,7 +331,7 @@ If the project uses the Ontology Development Kit (ODK), understand these convent
 When working in a non-ODK project, the ROBOT commands below apply directly.
 
 ### ROBOT operations
-> Here: does not apply; ROBOT is not installed, and nothing writes this repository's Turtle except the projector.
+> Here: does not apply to writing terms. The projector writes this repository's Turtle. ROBOT is not on the PATH; the reasoner script fetches the jar, and a skill does not download it.
 
 ```bash
 # Merge imports
@@ -349,7 +350,7 @@ robot annotate --input ontology.ttl \
 ```
 
 ### oaklib operations
-> Here: search the vocabulary module (once it exists), the gist projection and the packet's report 01 before proposing a term; runoak reads external ontologies only.
+> Here: search `packages/kernel/src/Terms.vocab.ts`, the gist projection and the packet's report 01 before proposing a term; runoak reads external ontologies only.
 
 On a Turtle file, oaklib resolves the project's CURIEs only when the prefix is passed with `--prefix` (or use full
 IRIs).
@@ -380,7 +381,7 @@ This skill produces:
 | Reference individuals (optional) | `ontologies/{name}/{name}-reference-individuals.ttl` | Turtle | A-box reference instances kept separate from schema |
 
 ## Handoff
-> Here: receive the conceptualizer's design (report sections or `assets/` files) and the auditor's `rat-` records; pass the vocabulary-module diff to Benjamin and the validator in a research report. Each checklist item is passed, failed or not built; a not-built gate is never ticked; labels are `skos:prefLabel` until decided.
+> Here: receive the conceptualizer's design (report sections or `assets/` files) and the auditor's `rat-` records; pass the vocabulary-module diff to Benjamin and the validator in a research report. Each checklist item is passed, failed or not built; a not-built gate is never ticked. Labels are `skos:prefLabel` and definitions are `skos:definition` (decision 11).
 
 **Receives from**:
 - `ontology-conceptualizer` — `ontologies/{name}/docs/glossary.csv`, `ontologies/{name}/docs/conceptual-model.yaml`,
@@ -406,7 +407,7 @@ This skill produces:
 - [ ] SHACL shapes exist for core structural constraints
 
 ## Anti-Patterns to Avoid
-> Here: the vocabulary module is the file edited by hand (once it exists); generated Turtle never is. "Run the reasoner" means report the reasoner gate: not built until decision 6's reasoner exists. The label is `skos:prefLabel` until decided.
+> Here: `packages/kernel/src/Terms.vocab.ts` is the file edited by hand; generated Turtle never is. "Run the reasoner" means task `reason` (`packages/ontology/scripts/reason.ts`), part of `bun run check:full`. Report it only when that task ran. The label is `skos:prefLabel` (decision 11).
 
 - **Hand-editing Turtle**: Never manually edit `.ttl` files. Use ROBOT, oaklib, or Python tools, and never edit a
   generated file at all.

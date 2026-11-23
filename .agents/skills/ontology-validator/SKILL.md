@@ -26,20 +26,22 @@ skill.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; it wins over this file. Terms live in one TypeScript vocabulary module,
-record rules in Effect Schemas, and every Turtle file is generated. None of that exists yet: the vocabulary module,
-the projector, generated Turtle, SHACL, the competency-question suite and the reasoner step are not built. Report each
-such gate as "not built", never as run or passed. ROBOT is not installed; do not download it without asking.
+record rules in Effect Schemas, and every Turtle file is generated. The thin thread is built: the module
+`packages/kernel/src/Terms.vocab.ts`, the projector in `packages/ontology`, the generated Turtle, CQ-P06 and CQ-P11,
+the law `bun run beep laws ontology-terms`, and the reasoner step. SHACL over the stored rows, alignments and any term
+beyond the thread's 22 are not built. Report a gate as run only when its command ran. Report the rest as "not built",
+never as run or passed. ROBOT is not on the PATH; do not download it without asking. The reasoner script fetches its jar.
 
 | Upstream step or output | Here |
 | --- | --- |
-| Byte-compare and re-parse of the Turtle (not upstream) | The first gate, in `bun run check` (decision 6). Not built |
-| Step 1 reasoner | The reasoner step in `bun run check:full`. Not built, and which reasoner is not chosen: put it to Benjamin |
-| Step 2 ROBOT report | Label and definition coverage as a vocabulary-module test or SPARQL over the generated Turtle; the properties are open, so read `skos:prefLabel` and `skos:definition`, never `rdfs:label` alone. Not built |
-| Step 3 SHACL over the ontology | The generated shapes over the 155 stored rows of the messy sample plus must-fail fixtures, a slow test. Not built. The sample stores items only: a party term has no stored row, so only the CQ suite's named `test_` fixtures (not built) could cover it; which data proves the party model is Benjamin's |
-| Step 4 CQ suite | Not built. Run nothing; say so |
+| Byte-compare and re-parse of the Turtle (not upstream) | Built, in `bun run check` (decision 6). `bun run ontology:write` writes the three files under `packages/ontology/generated/` |
+| Step 1 reasoner | Built. Task `reason` of `@inventory/ontology`: `packages/ontology/scripts/reason.ts`, ROBOT v1.9.11 with HermiT under Java 17, pinned in `packages/ontology/robot.lock.json`. Part of `bun run check:full` and of the CI job `reason` (decisions 112, 113, 114). Report it only when that task ran |
+| Step 2 ROBOT report | No ROBOT report gate. Read `skos:prefLabel` and `skos:definition` (decision 11) on the generated Turtle with rdflib. Do not download ROBOT to run `robot report` |
+| Step 3 SHACL over the ontology | The generated shapes over the 155 stored rows of the messy sample plus must-fail fixtures, a slow test. Not built. The sample stores items only: a party term has no stored row. CQ-P06 and CQ-P11 answer over a hand-written two-organization fixture and the lift of two member rows, not over those stored rows. Which data proves the party model is Benjamin's |
+| Step 4 CQ suite | Built for CQ-P06 and CQ-P11 in `packages/ontology/test/Questions.test.ts` (Oxigraph), queries in `packages/ontology/fixtures/cq/`. Report them only when that test ran. Any other question is not built |
 | Step 5 metrics, Step 6 dimensions | Apply, from whatever gates exist; a gate not built is not a 0% or a PASS |
-| Step 7 diff | `git diff` of the generated Turtle, once it exists |
-| Also check | No `owl:inverseOf`, no `owl:sameAs`, every IRI under the `example.org` placeholder (the `laws ontology-terms` rule, not built) |
+| Step 7 diff | `git diff` of `packages/ontology/generated` |
+| Also check | No `owl:inverseOf`, no `owl:sameAs`, every IRI under the `example.org` placeholder. The law is `bun run beep laws ontology-terms` (root script `ontology-terms:check`, part of `bun run check`). Report it only when that command ran |
 | SSSOM validation | Applies: `uvx --from sssom sssom validate` on a file under `explorations/erp-ontology/assets/mappings/`. Every row is a candidate until Benjamin's `rat-` record for it exists, whatever its confidence |
 | Validation report | A section of `explorations/erp-ontology/research/NN-title.md` (frontmatter `type`, `title`, `description`); then `bun run docs:check` |
 | A fix | Never an edit to Turtle. A proposed change to the vocabulary module or a record schema, for Benjamin; a missing or wrong shape is a projector bug |
@@ -85,7 +87,7 @@ It can also pass SHACL and still be logically inconsistent.
 
 ### Step 1: Logical Validation (Level 1)
 
-> Here: the reasoner step in `bun run check:full` is not built and its reasoner is not chosen. Report "not built" and put the choice to Benjamin: ELK is complete only if the projector emits EL constructs alone (subClassOf, some, DisjointClasses); HermiT or Openllet is needed once it emits unionOf, only, cardinality or disjointUnionOf. The route is part of the question (a pinned ROBOT jar through `java`, a standalone HermiT or Openllet, a JavaScript reasoner); once he has chosen, propose how `check:full` gets a pinned copy, and ask before downloading anything.
+> Here: the reasoner step is built. It is task `reason` in `bun run check:full` and the CI job `reason`: `packages/ontology/scripts/reason.ts`, ROBOT v1.9.11 with HermiT under Java 17, pinned in `packages/ontology/robot.lock.json` (decisions 112 to 114). The script fetches the jar into the cache. Report the gate only when that task ran. A skill does not download the jar. ELK is complete only for EL constructs; this step uses HermiT.
 
 ```bash
 mkdir -p results
@@ -119,7 +121,7 @@ If inconsistent:
 
 ### Step 2: Quality Report (Level 2)
 
-> Here: ROBOT is not installed. Label and `skos:definition` coverage over the generated Turtle is a vocabulary-module test or the SPARQL below run with rdflib; not built, so report "not built".
+> Here: ROBOT is not on the PATH, and a skill does not download it. There is no `robot report` gate: say "not built" for that check. Read `skos:prefLabel` and `skos:definition` (decision 11) on the generated Turtle with rdflib, and report that query only when you ran it.
 
 ```bash
 robot report --input ontology.ttl \
@@ -155,7 +157,7 @@ SELECT DISTINCT ?entity ?property ?value WHERE {
 
 ### Step 3: SHACL Validation (Level 3)
 
-> Here: the shapes are generated from the record schemas and run over the 155 stored rows of the messy sample plus must-fail fixtures, as a slow test. T-Box lint (labels, definitions, orphans) belongs to Step 2; a label shape reads `skos:prefLabel` until the label property is decided. Not built: report "not built".
+> Here: the shapes are generated from the record schemas and run over the 155 stored rows of the messy sample plus must-fail fixtures, as a slow test. T-Box lint (labels, definitions, orphans) belongs to Step 2; a label shape reads `skos:prefLabel` (decision 11). Not built: report "not built".
 
 ```bash
 uvx pyshacl -s shapes/ontology-shapes.ttl -i none ontology.ttl -f human
@@ -178,7 +180,7 @@ Standard shapes:
 
 ### Step 4: CQ Test Suite (Level 4)
 
-> Here: no competency-question suite exists. Report "not built" and run nothing.
+> Here: CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph), over a hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample. Report them only when that test ran. Any other question is "not built".
 
 `tests/cq-test-manifest.yaml`, written by `ontology-requirements`, names
 each CQ's query, fixture graph, expected result (`tests/expected/`),
@@ -245,7 +247,7 @@ and the change recorded by `ontology-requirements`.
 
 ### Step 5: Coverage Metrics (Level 5)
 
-> Here: report a metric only for a gate that exists; for the rest write "not built", never 0% or PASS. Label coverage counts `skos:prefLabel` until the label property is decided.
+> Here: report a metric only for a gate that exists; for the rest write "not built", never 0% or PASS. Label coverage counts `skos:prefLabel` (decision 11).
 
 Calculate and report:
 
@@ -272,7 +274,7 @@ judgments with rationale.
 
 ### Step 7: Diff Report (for PRs/releases)
 
-> Here: `git diff` of the generated Turtle, once a projector writes it; until then "not built".
+> Here: `git diff` of `packages/ontology/generated`. `bun run ontology:write` writes `inventory.owl.ttl`, `inventory.skos.ttl` and `generated/fixtures/CQ-P06.graph.ttl`.
 
 ```bash
 robot diff --left previous.ttl --right ontology.ttl \
@@ -283,7 +285,7 @@ robot diff --left previous.ttl --right ontology.ttl \
 
 ### Anti-pattern detection queries
 
-> Here: run them, once generated Turtle exists, with the rdflib command of Step 4 (`uv run --with rdflib python ...`), not `robot query`.
+> Here: run them on the generated Turtle with the rdflib command of Step 4 (`uv run --with rdflib python ...`), not `robot query`. Report a query only when you ran it.
 
 Save the detection queries from `../_shared/anti-patterns.md` to files:
 section 1 (singleton hierarchy) as `singleton-check.sparql`, section 4
@@ -343,7 +345,7 @@ This skill produces:
 
 ## Handoff
 
-> Here: the inputs are the generated Turtle and its tests (none built yet) and SSSOM files under `explorations/erp-ontology/assets/mappings/`. A curator's or architect's proposal arrives as a research report with the module diff: review it against each gate, reported as not built. Fixes go back as a proposed change to the vocabulary module or a record schema. Each checklist item is passed, failed or not built; a not-built gate is never ticked as executed.
+> Here: the inputs are the generated Turtle, `packages/ontology/test/Questions.test.ts` and SSSOM files under `explorations/erp-ontology/assets/mappings/` (alignment rows are not built). A curator's or architect's proposal arrives as a research report with the module diff. Byte-compare, re-parse, CQ-P06 and CQ-P11, the ontology-terms law and the reasoner are built; SHACL over the stored rows is not built. Report a gate only as it ran. Fixes go back as a proposed change to the vocabulary module or a record schema. Each checklist item is passed, failed or not built; a not-built gate is never ticked as executed.
 
 **Receives from**:
 - `ontology-architect` — `ontologies/{name}/{name}.ttl`,
@@ -430,7 +432,7 @@ Date: {date}
 
 ## Error Handling
 
-> Here: a missing shapes file is a projector bug or a gate not built, not a hand-back to the architect; a missing CQ suite is "not built".
+> Here: a missing shapes file is the SHACL gate, which is not built, not a hand-back to the architect. CQ-P06 and CQ-P11 live in `Questions.test.ts`; a question with no test is "not built".
 
 Missing validation prerequisites are blockers, not passing checks. The validator
 reports them and requests the owning role's output; it does not author replacement

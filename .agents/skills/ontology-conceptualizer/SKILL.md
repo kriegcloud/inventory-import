@@ -39,12 +39,13 @@ packet's `DECISIONS.md`); decisions 1 to 7 ratify no term by name. There is no `
 | Step 4 `property-design.yaml` | Domain and range in the design; cardinality and datatype in the record schema. With no record yet, give a provisional range marked "moves to the record schema", and name the owning context as a question for Benjamin. No inverse |
 | Step 5 `axiom-plan.yaml` | A report section; disjointness in the vocabulary sketch; no `owl:sameAs`, no HasKey |
 | Step 6 anti-patterns | Applies as written |
-| Tool commands | OLS search reads external terms; the taxonomy tree needs generated Turtle: not built |
+| Tool commands | OLS search reads external terms. The generated Turtle is `packages/ontology/generated/inventory.owl.ttl`. Show a hierarchy you did not query as a nested list |
 | Outputs | `explorations/erp-ontology/research/NN-title.md`, data in `assets/`; then `bun run docs:check` |
 | Handoff | The design goes to `ontology-architect`, which writes the vocabulary-module diff for Benjamin |
 
-Not built, so never run or report as run: the vocabulary module, the projector, generated Turtle, SHACL, the
-competency-question suite, the reasoner step. A party's identity is "tenant and a source id, never a name" (report 01),
+The thin thread is built: the vocabulary module, the projector, the generated Turtle, CQ-P06 and CQ-P11, and the
+reasoner step. Not built, so never run or report as run: SHACL over the stored rows, alignments, any term beyond the
+thread's 22, the party slice. A party's identity is "tenant and a source id, never a name" (report 01),
 open as criterion or key (profile); an Account is an `Organization` with role flags; IRIs stay under the `example.org` placeholder.
 
 ## When to Activate
@@ -241,7 +242,7 @@ Output as `ontologies/{name}/docs/property-design.yaml`.
 
 ### Step 5: Axiom Pattern Selection
 
-> Here: plan disjointness and subsumption in the vocabulary sketch; never select `owl:sameAs` or HasKey (two records that may be one party are settled by a recorded identity decision), and say "not built" for any competency-question test.
+> Here: plan disjointness and subsumption in the vocabulary sketch; never select `owl:sameAs` or HasKey (two records that may be one party are settled by a recorded identity decision). CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts`. Say "not built" for any other competency-question test, and never report one as run.
 
 For each CQ, choose the needed axiom pattern from the Pattern Selection
 Guide in `../_shared/axiom-patterns.md` (it maps each CQ wording to a
@@ -299,7 +300,7 @@ uvx --from oaklib runoak -i ols: search "instrument"
 
 ### Visualizing taxonomy (for review)
 
-> Here: not built (there is no generated Turtle yet); show the hierarchy as a nested list in the report.
+> Here: the generated Turtle is `packages/ontology/generated/inventory.owl.ttl`. If you do not run the tree, show the hierarchy as a nested list in the report. Do not report the command as run.
 
 ```bash
 # Tree of the is-a hierarchy below a root class; --prefix maps the CURIE

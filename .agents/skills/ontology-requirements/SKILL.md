@@ -24,9 +24,11 @@ the work of downstream skills.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; it wins over everything below.
-No model of record exists: report 01 is a proposed starting model, and the first
-vocabulary module is next to shape (`DECISIONS.md`). So CQs are written before that
-module, from what the app's records, screens and import rules (`CLAUDE.md`, "Rules
+The thin thread is built. Its questions are CQ-P06 and CQ-P11
+(`packages/ontology/test/Questions.test.ts`, queries in `packages/ontology/fixtures/cq/`), answered over a
+hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample.
+The vocabulary module is `packages/kernel/src/Terms.vocab.ts`. A new question, and the party slice, are not built:
+draft them here, from what the app's records, screens and import rules (`CLAUDE.md`, "Rules
 for an import") and the Sutton mapping must answer. The scope and the CQ file always
 go to `explorations/erp-ontology/assets/requirements/scope.md` (OKF frontmatter) and
 `.../assets/requirements/competency-questions.yaml`, where the auditor reads them; a
@@ -36,17 +38,17 @@ report summarises them. Run `bun run docs:check` after adding a `.md`.
 | --- | --- |
 | Step 1 `scope.md` | `assets/requirements/scope.md`; `Upper ontology: gist (projection)`, decision 4 |
 | Step 1.5 use cases | From the app's screens and import rules; `assets/use-cases.yaml` |
-| Steps 2 to 5 CQs | `assets/requirements/competency-questions.yaml`; queries use `inv:` from `namespaces.json` (example only), never the bare `:` example; labels read `skos:prefLabel` until decided |
+| Steps 2 to 5 CQs | `assets/requirements/competency-questions.yaml`; queries use `inv:` from `namespaces.json` (example only), never the bare `:` example; labels are `skos:prefLabel` (decision 11) |
 | Step 5 `sample_answer` | Rows of the messy sample as stored (155 items) for an item term. A term no stored row instantiates (a party: vendors are only names in `item.vendors`) uses named `test_` fixtures, said in the CQ entry; what data proves the party model is Benjamin's |
 | Closed-world CQs | A CQ that reads a missing flag or a `NOT EXISTS` as false records its closure assumption (for example "flags are always stated true or false by the record schema") and puts it to Benjamin |
 | Step 6 pre-glossary | `assets/pre-glossary.csv`; candidates only, never a term fact |
-| Step 7 test suite | Drafted only: queries, fixtures and must-fail cases written out, none run. The suite, the generated Turtle and the reasoner are not built; say "not built" |
+| Step 7 test suite | CQ-P06 and CQ-P11 are built and run in `Questions.test.ts`. A new question is drafted only (query, fixture, must-fail case) and is "not built" until it is a test. Do not say the thread's tests ran unless that file ran. They do not run over the messy sample's stored rows |
 | Step 8 traceability | `assets/traceability-matrix.csv`; the term column names candidates or vocabulary-module keys |
 | Parse check | Runs today on a drafted query (command below) |
-| ROBOT commands | Do not apply: ROBOT is not installed; do not download it unasked |
+| ROBOT commands | Do not apply here. ROBOT is not on the PATH. The reasoner script fetches its jar for task `reason` only. Do not download it unasked |
 
-An answer comes from the generated T-box plus the stored rows (the A-box), not
-from the T-box alone. A choice about what a CQ means for the data is Benjamin's.
+CQ-P06 and CQ-P11 are answered from the generated T-box plus a hand-written two-organization fixture and the lift
+of two member rows, not from the stored rows of the messy sample. A choice about what a new CQ means for the data is Benjamin's.
 
 ## When to Activate
 
@@ -153,7 +155,7 @@ Classify each CQ:
 
 ### Step 5: Formalization
 
-> Here: fixture and expected paths go under `explorations/erp-ontology/assets/`; sample answers are stored rows of the messy sample, or named `test_` fixtures for a term no row instantiates; write `inv:` for `:` and `skos:prefLabel` for `rdfs:label` until decided; a party's identity is report 01's "tenant and a source id", never a SKU or name.
+> Here: fixture and expected paths for a new question go under `explorations/erp-ontology/assets/`. CQ-P06 and CQ-P11 answer over a hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample. A party term still has no stored row. Write `inv:` for `:` and `skos:prefLabel` (decision 11); a party's identity is report 01's "tenant and a source id", never a SKU or name.
 
 For each Must/Should CQ, produce a structured entry:
 
@@ -207,7 +209,7 @@ Output as `ontologies/{name}/docs/pre-glossary.csv` with columns:
 
 ### Step 7: Test Suite Generation
 
-> Here: draft the queries, fixtures and must-fail cases in the packet; run none against the ontology, because no generated Turtle or CQ suite exists. Report them as "not built". Where the suite will run is not decided: propose it to Benjamin.
+> Here: CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph) over the generated graph. Draft a new question's query, fixture and must-fail case in the packet, and report that question as "not built" until it is a test. Do not report it as run. The thread's questions do not run over the stored rows of the messy sample.
 
 For each formalized CQ:
 - Generate a `.sparql` file in `ontologies/{name}/tests/`
@@ -269,7 +271,7 @@ Rules:
 
 ### Writing SPARQL test files
 
-> Here: write the file under `explorations/erp-ontology/assets/cq/`, with the `inv:` prefix from `namespaces.json` (an `example.org` placeholder, decision 7; the exact IRI is not fixed); never a real domain.
+> Here: write a new query under `explorations/erp-ontology/assets/cq/`, with the `inv:` prefix from `namespaces.json`. The base is `https://example.org/inventory-import/ontology/` (decision 10), an `example.org` placeholder (decision 7); never a real domain. The thread's queries are in `packages/ontology/fixtures/cq/`.
 
 ```bash
 # Write individual test queries
@@ -304,7 +306,7 @@ print("Valid")
 
 ### Running a CQ test against its fixture
 
-> Here: does not apply yet: there is no generated Turtle to load. Say "not built"; never report a CQ test as run.
+> Here: CQ-P06 and CQ-P11 load the generated graph in `packages/ontology/test/Questions.test.ts` (Oxigraph). This rdflib command is for a drafted query. Do not report it as the suite. Over the stored rows of the messy sample: not built.
 
 Arguments: the query, the expected result (a CSV with a header row for
 SELECT, `true` or `false` for ASK), then the graphs to load. Exit code 0 is
@@ -375,7 +377,7 @@ This skill produces:
 
 **Handoff checklist**:
 - [ ] All Must-Have CQs have formalized SPARQL queries
-> Here: each item is passed, failed or not built; a not-built gate is never ticked. "Was run" reads "drafted; run: not built".
+> Here: each item is passed, failed or not built; a not-built gate is never ticked. A new draft reads "drafted; run: not built". CQ-P06 and CQ-P11 count as run only when `packages/ontology/test/Questions.test.ts` ran.
 
 - [ ] Every CQ test has a fixture, an expected result and a must-fail case, and was run
 - [ ] Pre-glossary covers all terms mentioned in CQs
@@ -387,7 +389,7 @@ This skill produces:
 
 ## Anti-Patterns to Avoid
 
-> Here: CQs are answered over the generated T-box plus stored rows (or `test_` fixtures). They come before the first vocabulary module; a CQ shaped to fit report 01 (a proposal) is flagged so in its entry, and whether that is "retroactive" is Benjamin's call.
+> Here: CQ-P06 and CQ-P11 are answered over the generated T-box plus a hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample. A question for a new slice comes before that slice's terms. A CQ shaped to fit a proposal is flagged so in its entry, and whether that is "retroactive" is Benjamin's call.
 
 - **Vague CQs**: "What is the meaning of X?" — CQs must be answerable by
   a SPARQL query against the ontology. A good CQ is specific enough to

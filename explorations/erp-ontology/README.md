@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Build the thin thread in goals/erp-vocabulary. Each later slice is specified after its open decisions are answered.
+next: Specify slice 1 once its open decisions are answered. The thin thread is built (goals/erp-vocabulary).
 goals: [erp-vocabulary]
 ---
 
@@ -13,19 +13,20 @@ goals: [erp-vocabulary]
 The question: what are the things an operations ERP and WMS like Sutton deals in, how do they relate, and how does
 this repository's domain model point at them?
 
-The thin thread is the first deliverable (decision 8). It answers one question: who belongs to this organization and
-with which role? [Report 14](research/14-thin-thread.md) is its one specification. Section 1.1 says what counts as
+The thin thread is the first deliverable (decision 8). It answers two questions: who belongs to which organization
+with which role (CQ-P06), and at which scope (CQ-P11). [Report 14](research/14-thin-thread.md) is its one specification. Section 1.1 says what counts as
 done and section 5 gives the question and its expected answer. Decisions 112 to 118 update the design. Nothing is
 owed from Benjamin for the thread now. Benjamin said the brief matches (119), and the exploration graduated to the goal
 [erp-vocabulary](../../goals/erp-vocabulary/SPEC.md). Its SPEC carries the five forbidden conclusions he signed (117,
 121), and the thread's gate 8 runs CQ-P11 beside CQ-P06 (120). A commit that changes an
-expected-rows file says so, and the release notes name the question with its old and new answer (118). Nothing is
-built yet.
+expected-rows file says so, and the release notes name the question with its old and new answer (118). The
+thread is built, on branch `docs/erp-ontology-packet`, not pushed: the goal's
+[PLAN](../../goals/erp-vocabulary/PLAN.md) says what was built and checked. No later slice is.
 
 ROBOT v1.9.11 was approved and tried outside the repository (112). Its jar is 82,708,624 bytes, sha256
 `53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`. Under Java 17.0.2 the DL profile check
 passed a small test ontology, HermiT found it consistent with exit 0, and an inconsistent variant exited 1. Java 17
-is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job, with
+is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job (written, not yet run on GitHub), with
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
 Slice 1, the party slice, follows the thread. Benjamin will take each of the 63 open decisions with a concrete record
@@ -86,3 +87,5 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-23: decisions 112 to 121 approved the reasoner (ROBOT v1.9.11 on Java 17, tried), put gate 9 in a CI job,
   added CQ-P11 to the thread and five signed forbidden conclusions; Benjamin said the brief matches (119) and the
   packet graduated to [goals/erp-vocabulary](../../goals/erp-vocabulary/SPEC.md).
+- 2026-11-23: the thin thread built in thirteen steps and closed by review: the vocabulary module, the helpers'
+  package, the projector, nine gates and the CI job for gate 9, on branch `docs/erp-ontology-packet`, not pushed.

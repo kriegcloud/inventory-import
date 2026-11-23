@@ -13,7 +13,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
-import type { Review } from "../Review/Review.rules.ts"
+import { type Review, RowStatus } from "../Review/Review.rules.ts"
 
 /** A value of a ready row that differs from its file, and who decided it when a person did. */
 export class PlannedChange extends S.Opaque<PlannedChange, { readonly brand: unique symbol }>()(
@@ -107,11 +107,7 @@ export class ConfirmPlan extends S.Opaque<ConfirmPlan, { readonly brand: unique 
 export const plannedItems = (
   plan: ConfirmPlan
 ): ReadonlyArray<Extract<PlannedRow, { readonly status: "ready" | "update" }>> =>
-  A.filter(
-    plan.rows,
-    (row): row is Extract<PlannedRow, { readonly status: "ready" | "update" }> =>
-      PlannedRow.guards.ready(row) || PlannedRow.guards.update(row)
-  )
+  A.filter(plan.rows, PlannedRow.isAnyOf(["ready", "update"]))
 
 /**
  * The plan of a confirm, from the review as it stands. A ready row is created, or replaces the stored item when the
@@ -132,7 +128,7 @@ export const confirmPlan = (input: {
     const at = { rowNumber: row.rowNumber, part: row.part ?? 0, sku: row.values.sku, name: row.values.name }
     // Every problem of the row, so the not-imported rows and their download name each one.
     const why = A.join(row.reasons, " ")
-    if (row.status === "ready" && row.item !== null) {
+    if (RowStatus.is.ready(row.status) && row.item !== null) {
       const made = {
         ...at,
         item: row.item,
@@ -145,11 +141,11 @@ export const confirmPlan = (input: {
       }
       return row.update ? PlannedUpdate.make(made) : PlannedReady.make(made)
     }
-    if (row.status === "already") return PlannedAlready.make({ ...at, reason: why })
+    if (RowStatus.is.already(row.status)) return PlannedAlready.make({ ...at, reason: why })
     return PlannedNotImported.make({
       ...at,
       reason: why,
-      decidedBy: row.status === "out" ? person(row.id) : decidedByNobody
+      decidedBy: RowStatus.is.out(row.status) ? person(row.id) : decidedByNobody
     })
   })
   return ConfirmPlan.make({ draft: input.draft, rows })

@@ -26,7 +26,7 @@ import {
   type StaleAccept,
   StoredChoice,
   storedUndecided,
-  type TakenBackKind
+  TakenBackKind
 } from "@inventory/catalog-contract/Decision"
 import { type ItemFields, skuKey } from "@inventory/catalog-contract/Item"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
@@ -651,7 +651,7 @@ const placeInFile = (rowId: string): readonly [number, number] => {
   return found === null ? [Number.MAX_SAFE_INTEGER, 0] : [Number(found[1] ?? "0"), Number(found[2] ?? "0")]
 }
 const fileOrder: Order.Order<string> = Order.mapInput(Order.Tuple([Order.Number, Order.Number]), placeInFile)
-const kindOrder: ReadonlyArray<TakenBackKind> = ["accept", "stored", "twin", "undo"]
+const kindOrder = TakenBackKind.literals
 const indexIn = <A>(list: ReadonlyArray<A>, value: A): number =>
   O.getOrElse(
     A.findFirstIndex(list, (candidate) => candidate === value),

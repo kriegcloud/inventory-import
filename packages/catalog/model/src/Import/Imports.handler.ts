@@ -9,11 +9,13 @@ import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
 import {
+  ChoicesSaved,
   Confirmed,
   ConfirmWrite,
   Decided,
   ImportStore,
   Draft,
+  DraftStatus,
   draftTries,
   noStoredDecisions,
   type StoredDecisions,
@@ -382,7 +384,7 @@ export const importsEndpoints = Effect.gen(function* () {
       draft,
       known
     )
-    const confirmed = draft.status !== "open"
+    const confirmed = !DraftStatus.is.open(draft.status)
     const outcomes = confirmed ? yield* imports.outcomes(actor.organizationId, draft.id) : []
     const tally = (outcome: string): number => A.filter(outcomes, (row) => row.outcome === outcome).length
     const history = yield* imports.history(actor.organizationId, draft.id)
@@ -539,7 +541,7 @@ export const importsEndpoints = Effect.gen(function* () {
     AlreadyImported | ImportNotFound | RevisionAhead | DraftMoved | AcceptsTakenBack | DraftBusy
   > {
     const draft = yield* find(actor, id)
-    if (draft.status !== "open") return yield* closed(draft)
+    if (!DraftStatus.is.open(draft.status)) return yield* closed(draft)
     // A revision the draft has not reached is not taken on the client's word.
     const madeOn = madeOnRead({ ...payload, over: {} })
     if (latestNamed(madeOn, payload.revision) > draft.revision) return yield* ahead(draft)
@@ -634,10 +636,9 @@ export const importsEndpoints = Effect.gen(function* () {
 
   const kept = (draft: Draft) =>
     ImportKept.make({
-      reason:
-        draft.status === "open"
-          ? `${draft.fileName} has items in the system, so it stays with them. Nothing was removed.`
-          : `${draft.fileName} was confirmed, so it stays with the items and results it wrote. Nothing was removed.`
+      reason: DraftStatus.is.open(draft.status)
+        ? `${draft.fileName} has items in the system, so it stays with them. Nothing was removed.`
+        : `${draft.fileName} was confirmed, so it stays with the items and results it wrote. Nothing was removed.`
     })
 
   return {
@@ -721,7 +722,7 @@ export const importsEndpoints = Effect.gen(function* () {
     }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      if (draft.status !== "open") return yield* closed(draft)
+      if (!DraftStatus.is.open(draft.status)) return yield* closed(draft)
       const table = yield* imports.table(actor.organizationId, draft)
       const asked = O.getOrNull(payload.column)
       const column = A.findFirst(table.columns, (candidate) => candidate.index === asked)
@@ -752,9 +753,9 @@ export const importsEndpoints = Effect.gen(function* () {
         }),
         compare
       )
-      if (saved === "closed") return yield* closed(draft)
+      if (ChoicesSaved.is.closed(saved)) return yield* closed(draft)
       // The store does not say whether the import or what its review read kept changing: the words name both.
-      if (saved === "busy") return yield* busy({ draft: true, items: true })
+      if (ChoicesSaved.is.busy(saved)) return yield* busy({ draft: true, items: true })
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),
@@ -790,7 +791,7 @@ export const importsEndpoints = Effect.gen(function* () {
     suggest: Effect.fn("imports.suggest")(function* ({ params }: { readonly params: { readonly id: ImportId } }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      if (draft.status !== "open") return yield* closed(draft)
+      if (!DraftStatus.is.open(draft.status)) return yield* closed(draft)
       const { table, current, suggestions } = yield* reviewOf(actor, draft)
       const done = yield* suggest({
         importId: draft.id,
@@ -855,14 +856,14 @@ export const importsEndpoints = Effect.gen(function* () {
     reopen: Effect.fn("imports.reopen")(function* ({ params }: { readonly params: { readonly id: ImportId } }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      if (draft.status !== "open") yield* imports.reopen(actor, draft)
+      if (!DraftStatus.is.open(draft.status)) yield* imports.reopen(actor, draft)
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),
     remove: Effect.fn("imports.remove")(function* ({ params }: { readonly params: { readonly id: ImportId } }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      if (draft.status !== "open") return yield* kept(draft)
+      if (!DraftStatus.is.open(draft.status)) return yield* kept(draft)
       // An open import that still has items (reopened, or taken back with one kept) is refused by the batch,
       // as is one a confirm closed after the read above.
       if (yield* imports.remove(actor, draft)) return

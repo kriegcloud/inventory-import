@@ -9,13 +9,14 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import {
   type Cell,
+  CellType,
   type Column,
   CsvFormat,
   type ExtraCell,
   type Note,
   type NoteKind,
   type Row,
-  type SheetChoice,
+  SheetChoiceReason,
   type SheetSummary,
   type SpreadsheetTable,
   WorkbookFormat
@@ -109,13 +110,15 @@ export const columnLetter = (index: number): string => {
   return letters
 }
 
-const isBlank = (row: GridRow): boolean => A.every(row.cells, (cell) => cell.type === "empty")
-const filledCount = (row: GridRow): number => A.reduce(row.cells, 0, (n, cell) => (cell.type === "empty" ? n : n + 1))
+const isBlank = (row: GridRow): boolean => A.every(row.cells, (cell) => CellType.is.empty(cell.type))
+const filledCount = (row: GridRow): number =>
+  A.reduce(row.cells, 0, (n, cell) => (CellType.is.empty(cell.type) ? n : n + 1))
 const numberLike = /^[\s\d.,+\-$€£%()]*$/
 const hasDigit = /\d/
 /** A header cell is words: text that is not a number in disguise. */
 const isLabel = (cell: Cell): boolean =>
-  cell.type === "empty" || (cell.type === "text" && !(numberLike.test(cell.text) && hasDigit.test(cell.text)))
+  CellType.is.empty(cell.type) ||
+  (CellType.is.text(cell.type) && !(numberLike.test(cell.text) && hasDigit.test(cell.text)))
 const totalWord = /^\s*(grand\s+|sub-?)?totals?\b/i
 
 /**
@@ -192,11 +195,11 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
 
   // Columns run from the header's first named cell to its last; letters stay the file's own.
   const firstColumn = O.getOrElse(
-    A.findFirstIndex(headerRow.cells, (cell) => cell.type !== "empty"),
+    A.findFirstIndex(headerRow.cells, (cell) => !CellType.is.empty(cell.type)),
     () => 0
   )
   const lastColumn = O.getOrElse(
-    A.findLastIndex(headerRow.cells, (cell) => cell.type !== "empty"),
+    A.findLastIndex(headerRow.cells, (cell) => !CellType.is.empty(cell.type)),
     () => 0
   )
   const seen: Record<string, number> = {}
@@ -315,7 +318,10 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
     if (
       pendingBlank.length > 0 &&
       filledCount(row) >= 2 &&
-      A.every(row.cells, (cell) => cell.type === "empty" || (cell.type === "text" && !hasDigit.test(cell.text)))
+      A.every(
+        row.cells,
+        (cell) => CellType.is.empty(cell.type) || (CellType.is.text(cell.type) && !hasDigit.test(cell.text))
+      )
     ) {
       const rest = A.filter(grid.rows.slice(r), (other) => !isBlank(other))
       secondTable = O.some({
@@ -323,7 +329,7 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
         last: rest[rest.length - 1]?.rowNumber ?? row.rowNumber,
         names: listOf(
           A.map(
-            A.filter(row.cells, (cell) => cell.type !== "empty"),
+            A.filter(row.cells, (cell) => !CellType.is.empty(cell.type)),
             (cell) => quote(cell.text, 30)
           ),
           4
@@ -339,15 +345,15 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
     const extra: Array<ExtraCell> = []
     for (let c = 0; c < row.cells.length; c++) {
       const cell = row.cells[c]
-      if ((c < firstColumn || c > lastColumn) && cell !== undefined && cell.type !== "empty") {
+      if ((c < firstColumn || c > lastColumn) && cell !== undefined && !CellType.is.empty(cell.type)) {
         extra.push({ letter: columnLetter(c), cell })
       }
     }
     if (row.cells.length < lastColumn + 1) short.push(row.rowNumber)
     if (extra.length > 0) withExtra.push(row.rowNumber)
     if (row.hidden) hiddenRows.push(row.rowNumber)
-    const first = A.findFirst(cells, (cell) => cell.type !== "empty")
-    if (O.isSome(first) && first.value.type === "text" && totalWord.test(first.value.text)) {
+    const first = A.findFirst(cells, (cell) => !CellType.is.empty(cell.type))
+    if (O.isSome(first) && CellType.is.text(first.value.type) && totalWord.test(first.value.text)) {
       totals.push(row.rowNumber)
     }
     let rowHasSpaces = false
@@ -356,25 +362,25 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       if (cell === undefined) continue
       const letter = columnLetter(c + firstColumn)
       const ref = `${letter}${row.rowNumber}`
-      if (cell.type === "text" && cell.text !== Str.trim(cell.text)) rowHasSpaces = true
+      if (CellType.is.text(cell.type) && cell.text !== Str.trim(cell.text)) rowHasSpaces = true
       if (cell.formula !== undefined) {
-        if (cell.type === "empty") noResult.push(ref)
+        if (CellType.is.empty(cell.type)) noResult.push(ref)
         else formulaCount++
         if (!A.contains(formulaColumns, letter)) formulaColumns.push(letter)
       }
-      if (cell.type === "error") {
+      if (CellType.is.error(cell.type)) {
         errors.push(`${ref} (${cell.text})`)
         if (!A.contains(errorRows, row.rowNumber)) errorRows.push(row.rowNumber)
       }
-      if (cell.type === "date") {
+      if (CellType.is.date(cell.type)) {
         if (!A.contains(dateColumns, letter)) dateColumns.push(letter)
         if (dateExample === "" && cell.shown !== undefined) dateExample = `${quote(cell.shown)} is ${cell.text}`
       }
-      if (cell.type === "number" && cell.shown !== undefined && /^0\d/.test(cell.shown)) {
+      if (CellType.is.number(cell.type) && cell.shown !== undefined && /^0\d/.test(cell.shown)) {
         zeroCells.push(`${ref} shows ${cell.shown}, stored as ${cell.text}`)
         zeroRows.push(row.rowNumber)
       }
-      if (cell.type === "number" && /^-?\d{16,}/.test(cell.text)) {
+      if (CellType.is.number(cell.type) && /^-?\d{16,}/.test(cell.text)) {
         longCells.push(`${ref} (${cell.text})`)
         longRows.push(row.rowNumber)
       }
@@ -621,7 +627,7 @@ export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* 
   const othersText = listOf(
     A.map(others, (i) => `"${summaries[i]?.name}" (${plural(summaries[i]?.rowCount ?? 0, "row", "rows")})`)
   )
-  const reason: SheetChoice["reason"] = O.isSome(asked)
+  const reason: SheetChoiceReason = O.isSome(asked)
     ? "chosenByPerson"
     : visibleWithData.length === 0
       ? "onlyHiddenSheetsHaveData"
@@ -630,14 +636,13 @@ export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* 
         : "mostData"
   const read = yield* input.grid(index)
   const layout = yield* layoutSheet({ fileName: input.fileName, sheetName: O.some(sheet.name), grid: read.grid })
-  const explanation =
-    reason === "chosenByPerson"
-      ? "You chose this sheet."
-      : reason === "onlySheetWithData"
-        ? "It is the only sheet with data."
-        : reason === "onlyHiddenSheetsHaveData"
-          ? "Only hidden sheets have data; this one has the most."
-          : `It has the most data (${plural(summary.rowCount, "row", "rows")}, ${plural(layout.columns.length, "column", "columns")}). ${others.length === 1 ? "Another sheet also has" : "Other sheets also have"} data: ${othersText}.`
+  const explanation = SheetChoiceReason.match(reason, {
+    chosenByPerson: () => "You chose this sheet.",
+    onlySheetWithData: () => "It is the only sheet with data.",
+    onlyHiddenSheetsHaveData: () => "Only hidden sheets have data; this one has the most.",
+    mostData: () =>
+      `It has the most data (${plural(summary.rowCount, "row", "rows")}, ${plural(layout.columns.length, "column", "columns")}). ${others.length === 1 ? "Another sheet also has" : "Other sheets also have"} data: ${othersText}.`
+  })
 
   const hidden = A.filter(withData, (i) => i !== index && input.sheets[i]?.visibility !== "visible")
   const notes: Array<Note> = [...input.notes, ...read.notes]

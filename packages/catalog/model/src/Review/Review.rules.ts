@@ -33,11 +33,13 @@ import {
   Vendor
 } from "@inventory/catalog-contract/Item"
 import { ColumnMatch, UnusedColumn, MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import {
   canonicalTags,
@@ -63,6 +65,7 @@ import {
 } from "./CellReading.rules.ts"
 import {
   Suggestion,
+  type SuggestionByKind,
   suggestionField as suggestionFieldOf,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
@@ -186,7 +189,7 @@ export type Proposal = {
   readonly kind: ProblemKindId
   readonly to: string
   /** Who proposes it: a fixed rule, or a language model whose suggestion the guard checked and stored. */
-  readonly by: "rule" | "model"
+  readonly by: SuggestionByKind
   /**
    * The id of the stored suggestion behind it (`Suggestion.id`), when it came from one. Such a proposal is a guess
    * at a value the file does not hold: it never changes the row's outcome until the person accepts it.
@@ -238,7 +241,12 @@ export type Problem = {
 }
 
 /** Where a row stands. The four counts add up to the rows of the file. `needs` splits into decision and cannot (`RowOutcome`). */
-export type RowStatus = "ready" | "needs" | "out" | "already"
+export const RowStatus = LiteralKit(["ready", "needs", "out", "already"]).annotate({
+  identifier: "RowStatus",
+  description: "Where a row stands: ready, needs the person, left out, or already there"
+})
+/** The decoded value of `RowStatus`. */
+export type RowStatus = typeof RowStatus.Type
 
 /**
  * The outcome of a row in the brief's words: Ready, Needs a decision (a proposal or a choice is open), Cannot import
@@ -333,12 +341,11 @@ export type Review = {
   }
 }
 
-type DateField = "firstReceivedOn" | "discontinuedOn"
-const isDateField = (field: Field): field is DateField => field === "firstReceivedOn" || field === "discontinuedOn"
-const isCountField = (field: Field): field is "quantityOnHand" | "reorderPoint" =>
-  field === "quantityOnHand" || field === "reorderPoint"
-const isBooleanField = (field: Field): field is "isActive" | "lotTracked" =>
-  field === "isActive" || field === "lotTracked"
+const DateField = Field.pick(["firstReceivedOn", "discontinuedOn"])
+type DateField = typeof DateField.Type
+const isDateField = S.is(DateField)
+const isCountField = S.is(Field.pick(["quantityOnHand", "reorderPoint"]))
+const isBooleanField = S.is(Field.pick(["isActive", "lotTracked"]))
 
 /**
  * What a typed value is stored as. A person who types "bx" means BX and one who types "yes" means true, so their own
@@ -1372,24 +1379,23 @@ export const review = (input: {
     const twice = (problem: Problem): boolean => problem.kind === "duplicate" || problem.kind === "clash"
     const problems = A.filter(all, (problem) => !twice(problem) || !(live.length === 0 || keptFirst))
     const open: RowStatus = entry.out ? "out" : entry.already ? "already" : problems.length > 0 ? "needs" : "ready"
-    const item = open === "ready" ? entry.item : null
-    const status: RowStatus = open === "ready" && item === null ? "needs" : open
+    const item = RowStatus.is.ready(open) ? entry.item : null
+    const status: RowStatus = RowStatus.is.ready(open) && item === null ? "needs" : open
     const head = problems[0]
-    const reason =
-      status === "out"
-        ? "You left this row out."
-        : status === "already"
-          ? entry.mine
-            ? "This row was imported from this file earlier."
-            : entry.keptStored
-              ? `SKU ${sku} is already there with other values. You kept the stored item.`
-              : `SKU ${sku} is already there. It is skipped, not changed.`
-          : head !== undefined
-            ? head.message
-            : item === null
-              ? "A value could not be read."
-              : null
-    const shown = status === "needs" ? problems : []
+    const reason = RowStatus.is.out(status)
+      ? "You left this row out."
+      : RowStatus.is.already(status)
+        ? entry.mine
+          ? "This row was imported from this file earlier."
+          : entry.keptStored
+            ? `SKU ${sku} is already there with other values. You kept the stored item.`
+            : `SKU ${sku} is already there. It is skipped, not changed.`
+        : head !== undefined
+          ? head.message
+          : item === null
+            ? "A value could not be read."
+            : null
+    const shown = RowStatus.is.needs(status) ? problems : []
     return {
       rowNumber: entry.row.rowNumber,
       ...(entry.row.part === 0 ? {} : { part: entry.row.part }),
@@ -1400,21 +1406,20 @@ export const review = (input: {
       proposals: entry.proposals,
       problems: shown,
       status,
-      outcome:
-        status !== "needs"
-          ? status
-          : shown.length === 0 || A.some(shown, (problem) => problem.tone === "blocker")
-            ? "cannot"
-            : "decision",
+      outcome: !RowStatus.is.needs(status)
+        ? status
+        : shown.length === 0 || A.some(shown, (problem) => problem.tone === "blocker")
+          ? "cannot"
+          : "decision",
       kept: hasKeep(entry.decision),
       changes: entry.changes,
       item,
-      update: status === "ready" && entry.replace,
+      update: RowStatus.is.ready(status) && entry.replace,
       stored: entry.stored,
       reason,
       // Every problem of a row that waits, in the order the screen asks them: a row with two names both.
       reasons:
-        status === "needs" && problems.length > 0
+        RowStatus.is.needs(status) && problems.length > 0
           ? A.dedupe(A.map(problems, (problem) => problem.message))
           : reason === null
             ? []
@@ -1424,7 +1429,7 @@ export const review = (input: {
 
   const count = (status: RowStatus): number => A.filter(rows, (row) => row.status === status).length
   const outcome = (wanted: RowOutcome): number => A.filter(rows, (row) => row.outcome === wanted).length
-  const ready = A.filter(rows, (row) => row.status === "ready")
+  const ready = A.filter(rows, (row) => RowStatus.is.ready(row.status))
   const readyItems = keepSome(ready, (row) => O.fromNullishOr(row.item))
   const readyQuantities = keepSome(uoms, (unit): O.Option<UnitTotal> => {
     const inUnit = A.filter(readyItems, (item) => item.uom === unit)
@@ -1433,7 +1438,7 @@ export const review = (input: {
       : O.some({ unit, quantity: A.reduce(inUnit, 0, (total, item) => total + item.quantityOnHand) })
   })
   const byRule = A.map(
-    A.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
+    A.filter(rows, (row) => RowStatus.is.ready(row.status) || RowStatus.is.needs(row.status)),
     (row) => A.filter(row.changes, Change.guards.appliedByRule).length
   )
 

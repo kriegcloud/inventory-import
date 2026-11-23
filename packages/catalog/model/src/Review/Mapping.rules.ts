@@ -17,6 +17,7 @@ import {
   MappingChoice,
   ColumnMatch,
   ColumnPick,
+  MatchHow,
   matchedByPerson,
   notMatched,
   matchedByHeading
@@ -137,7 +138,7 @@ export const matchColumns = (input: {
   return A.map(picked, ({ field, column, how }): ColumnMatch => {
     const found = O.map(column, pick)
     // A heading that named a column always has one; without it the field is simply not matched.
-    return how === "person"
+    return MatchHow.is.person(how)
       ? matchedByPerson({ field, column: found })
       : O.match(found, {
           onNone: (): ColumnMatch => notMatched({ field }),

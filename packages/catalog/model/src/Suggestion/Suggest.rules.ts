@@ -12,6 +12,7 @@ import {
   type NewSuggestion,
   Suggestion,
   SuggestionBy,
+  SuggestionByKind,
   type SuggestionKind,
   suggestionField,
   suggestionFits
@@ -318,7 +319,7 @@ export const suggestLines = (input: {
   readonly made: ReadonlyArray<NewSuggestion>
   readonly refused: number
   readonly asked: SuggestDigest
-  readonly by: "model" | "rule"
+  readonly by: SuggestionByKind
 }): ReadonlyArray<string> => {
   const count = (kind: SuggestionKind): number => A.filter(input.made, (s) => s.kind === kind).length
   const made = [
@@ -328,7 +329,8 @@ export const suggestLines = (input: {
   ]
   const lines = A.map(
     A.filter(made, (entry) => entry.n > 0),
-    (entry) => `Suggested ${plural(entry.n, entry.words[0], entry.words[1])}${input.by === "rule" ? entry.from : ""}`
+    (entry) =>
+      `Suggested ${plural(entry.n, entry.words[0], entry.words[1])}${SuggestionByKind.is.rule(input.by) ? entry.from : ""}`
   )
   const left = input.asked.rowsWithoutCategory.length - count("category")
   return [
@@ -336,7 +338,7 @@ export const suggestLines = (input: {
     ...(input.refused > 0
       ? [`Turned down ${plural(input.refused, "suggestion", "suggestions")} that did not pass the checks`]
       : []),
-    ...(input.by === "rule" && left > 0
+    ...(SuggestionByKind.is.rule(input.by) && left > 0
       ? [`Left ${plural(left, "category", "categories")} for you: a rule does not guess a category`]
       : [])
   ]

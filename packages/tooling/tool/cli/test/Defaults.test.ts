@@ -228,6 +228,21 @@ describe("against main", () => {
           return printed(render(defaultsSentence)(found))
         })
       )
+      // A line for a file that is gone would hand its allowance to the next file at that path.
+      const gone = "packages/a/src/gone.ts"
+      const left = yield* inTree(
+        start,
+        run(false, [], { [baselineFile]: baseline({ [held]: [2, 0, 0, 0], [gone]: [1, 0, 0, 0] }) })
+      )
+      strictEqual(
+        A.some(
+          left,
+          (line) =>
+            line ===
+            `err: ${gone}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+        ),
+        true
+      )
       deepStrictEqual(renamed, [
         "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
       ])

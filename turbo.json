@@ -145,6 +145,8 @@
     // comparisons with null or undefined, Options turned back into missing values, or clean-ups outside a schema than
     // `defaults-baseline.json` allows it. The baseline only falls.
     "//#defaults:check": {
+      // Its baseline is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
       "inputs": [
         "apps/*/src/**/*.{ts,tsx}",
         "apps/*/test/**/*.{ts,tsx}",

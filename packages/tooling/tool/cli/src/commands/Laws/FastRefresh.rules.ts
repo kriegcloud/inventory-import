@@ -28,7 +28,7 @@ import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { silencings } from "./internal/directives.ts"
-import { ledgerAgainst, ledgersFolder, readLedger, standingOf, standingWords } from "./internal/ledger.ts"
+import { ledgerAgainst, ledgersFolder, readLedger, Standing, standingOf, standingWords } from "./internal/ledger.ts"
 
 const $I = $RepoCliId.create("commands/Laws/FastRefresh.rules")
 
@@ -107,6 +107,9 @@ export const FastRefreshFinding = S.TaggedUnion({
   },
   Standing: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of places moved" })),
+    grew: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether its number rose above the ledger's, which is code that breaks the rule" })
+    ),
     words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Ledger: {
@@ -199,7 +202,10 @@ export const fastRefresh = Effect.fn("FastRefresh.fastRefresh")(function* () {
       FastRefreshFinding.cases.Refused.make({
         broken: A.some(
           problems,
-          (problem) => FastRefreshFinding.guards.At(problem) || FastRefreshFinding.guards.Silenced(problem)
+          (problem) =>
+            FastRefreshFinding.guards.At(problem) ||
+            FastRefreshFinding.guards.Silenced(problem) ||
+            (FastRefreshFinding.guards.Standing(problem) && problem.grew)
         )
       })
     )
@@ -248,7 +254,8 @@ export const fastRefresh = Effect.fn("FastRefresh.fastRefresh")(function* () {
       onSome: (standing) =>
         O.match(standingWords(standing, fastRefreshLedger), {
           onNone: () => [],
-          onSome: (words) => A.of(FastRefreshFinding.cases.Standing.make({ file, words }))
+          onSome: (words) =>
+            A.of(FastRefreshFinding.cases.Standing.make({ file, words, grew: Standing.$is("Grew")(standing) }))
         })
     })
   })

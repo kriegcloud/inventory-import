@@ -65,7 +65,7 @@ import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { unreadSentence } from "./internal/budget.ts"
 import { silencings } from "./internal/directives.ts"
-import { ledgerAgainst, ledgersFolder, readLedger, standingOf, standingWords } from "./internal/ledger.ts"
+import { ledgerAgainst, ledgersFolder, readLedger, Standing, standingOf, standingWords } from "./internal/ledger.ts"
 import { type PromiseUse, readPromises } from "./internal/promiseCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Promises.rules")
@@ -171,6 +171,9 @@ export const PromiseFinding = S.TaggedUnion({
   },
   Standing: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of uses moved" })),
+    grew: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether its number rose above the ledger's, which is code that breaks the rule" })
+    ),
     words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Typed: {
@@ -386,7 +389,8 @@ export const promises = Effect.fn("Promises.promises")(function* () {
         if (O.isSome(standing)) {
           return O.match(standingWords(standing.value, promisesLedger), {
             onNone: () => [],
-            onSome: (words) => A.of(PromiseFinding.cases.Standing.make({ file, words }))
+            onSome: (words) =>
+              A.of(PromiseFinding.cases.Standing.make({ file, words, grew: Standing.$is("Grew")(standing.value) }))
           })
         }
         return A.appendAll(
@@ -410,7 +414,8 @@ export const promises = Effect.fn("Promises.promises")(function* () {
             (problem) =>
               PromiseFinding.guards.At(problem) ||
               PromiseFinding.guards.Typed(problem) ||
-              PromiseFinding.guards.Silenced(problem)
+              PromiseFinding.guards.Silenced(problem) ||
+              (PromiseFinding.guards.Standing(problem) && problem.grew)
           )
         })
       )

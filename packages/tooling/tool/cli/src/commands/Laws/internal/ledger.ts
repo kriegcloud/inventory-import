@@ -6,11 +6,14 @@
 // a number that rose or a file added is refused, whatever the same commit wrote.
 //
 // The base is where this branch left `main` (the merge base of HEAD and `origin/main`, else `main`). In CI's run for a
-// push, it is the commit CI names in `LEDGER_BASE`: the last commit pushed to that branch whose run passed, else on
-// main the push's `before`, each taken only when it is fetched and HEAD holds it (ci.yml); with none of them, the
-// merge base. On the branch `main` with no `LEDGER_BASE`, it is `origin/main` when HEAD is ahead of it, else the
-// commit before HEAD. A `LEDGER_BASE` that is not fetched or not in HEAD's history is refused: CI never sets one, so
-// it is one set by hand. A shallow checkout is refused, since its base
+// push, a step of its own runs the laws again with the commit CI names in `LEDGER_BASE` (ci.yml): the last commit
+// pushed to that branch whose run passed, else on main the push's `before`, each taken only when it is fetched, holds
+// every ledger and HEAD holds it; failing that, where such a candidate and HEAD meet (their merge base, after a force
+// push), when that holds every ledger; with none, it names no base and the law takes its own. Only that step sees
+// `LEDGER_BASE`: the laws' tests build repositories that do not hold the commit (their vitest configs clear it). On
+// the branch `main` with no `LEDGER_BASE`, the base is `origin/main` when HEAD is ahead of it, else the commit before
+// HEAD. A `LEDGER_BASE` that is not fetched or not in HEAD's history is refused: CI only names one it checked, so it
+// is one set by hand, and is not taken in silence. "" reads as unset. A shallow checkout is refused, since its base
 // may be missing and the comparison would pass in silence. On a branch whose base has no such ledger yet, nothing is
 // compared.
 //
@@ -152,8 +155,10 @@ const baseCommit = Effect.fn("ledger.baseCommit")(function* (main: string) {
 })
 
 /**
- * The commit CI names for a push (`LEDGER_BASE`: the last commit of the branch whose run passed, else the push's
- * `before`); none in a pull request's run, locally, or for a push that made the branch (all zeros).
+ * The commit CI names for a push (`LEDGER_BASE`: the last commit of the branch whose run passed, else on main the
+ * push's `before`, each only when it holds every ledger and HEAD holds it; else where such a candidate and HEAD meet;
+ * see the head of this file); none in a pull request's run, locally, for a push that made the branch (all zeros), or
+ * when it is "".
  */
 const pushBase = Effect.fn("ledger.pushBase")(function* () {
   const named = yield* Config.String("LEDGER_BASE")

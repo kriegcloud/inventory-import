@@ -28,6 +28,7 @@ import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -231,16 +232,31 @@ const encodeKey = S.encodeEffect(S.fromJsonString(S.String))
 const BaselineJson = S.fromJsonString(DefaultsBaseline)
 
 /**
- * What the baseline says against main's (where this branch left it; on a push, the commit CI names): each file main's
- * does not name, under the name it had there, and each count above main's. Main with no baseline yet says nothing.
+ * What the baseline says against the files there are and against main's (where this branch left it; on a push, the
+ * commit CI names): each file it names that is not there, so a new file at that path inherits no allowance (unless
+ * `--write` is about to take its line off); each file main's does not name, under the name it had there; and each
+ * count above main's. Main with no baseline yet is not compared.
  */
-const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBaseline["files"]) {
+const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBaseline["files"], write: boolean) {
+  const repo = yield* Repo
+  const gone = write
+    ? []
+    : yield* Effect.filter(
+        A.sort(R.keys(now), Order.String),
+        (file) => Effect.map(repo.exists(repo.join(repo.root, file)), (there) => !there),
+        { concurrency: 1 }
+      )
+  const missing = A.map(
+    gone,
+    (file) =>
+      `${file}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+  )
   const base = yield* atBase(baselineFile)
-  if (O.isSome(base.problem)) return A.of(base.problem.value)
-  if (O.isNone(base.text)) return []
+  if (O.isSome(base.problem)) return A.append(missing, base.problem.value)
+  if (O.isNone(base.text)) return missing
   const was = S.decodeOption(BaselineJson)(base.text.value)
-  if (O.isNone(was)) return A.of(`${baselineFile} on main is not a baseline, so it could not be compared`)
-  return A.flatMap(R.toEntries(now), ([file, counts]): ReadonlyArray<string> =>
+  if (O.isNone(was)) return A.append(missing, `${baselineFile} on main is not a baseline, so it could not be compared`)
+  const moved = A.flatMap(R.toEntries(now), ([file, counts]): ReadonlyArray<string> =>
     O.match(
       R.get(
         was.value.files,
@@ -259,6 +275,7 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBa
       }
     )
   )
+  return A.appendAll(missing, moved)
 })
 
 /**
@@ -300,7 +317,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   const kept = yield* repo.exists(baselinePath)
   const baseline = kept ? (yield* repo.json(DefaultsBaseline)(baselinePath)).files : {}
   // Given files, the law answers an edit in milliseconds and leaves the baseline to the run over the whole tree.
-  const against = kept && A.isReadonlyArrayEmpty(only) ? yield* againstMain(baseline) : []
+  const against = kept && A.isReadonlyArrayEmpty(only) ? yield* againstMain(baseline, write) : []
   const read = yield* Effect.forEach(
     files,
     (file) =>

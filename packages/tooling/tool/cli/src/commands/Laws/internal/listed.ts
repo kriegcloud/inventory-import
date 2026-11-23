@@ -15,7 +15,7 @@ import { Repo } from "../../../Repo.service.ts"
 import { err, type Line, out } from "../../../Report.schema.ts"
 import { type Stopped, Unread, unreadable, unreadSentence } from "./budget.ts"
 import { hashedKitFiles } from "./kit.ts"
-import { ledgerAgainst, readLedger, standingOf, standingWords } from "./ledger.ts"
+import { ledgerAgainst, readLedger, Standing, standingOf, standingWords } from "./ledger.ts"
 import { linesOf } from "./lines.ts"
 import { type Node, parsedAs } from "./tryCode.ts"
 
@@ -66,6 +66,9 @@ export const ListedFinding = S.TaggedUnion({
   },
   Standing: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of places moved" })),
+    grew: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether its number rose above the ledger's, which is code that breaks the rule" })
+    ),
     words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Ledger: {
@@ -145,7 +148,12 @@ export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSp
   const refused = (problems: ReadonlyArray<ListedFinding>) =>
     A.prepend<ListedFinding, ListedFinding>(
       problems,
-      ListedFinding.cases.Refused.make({ broken: A.some(problems, ListedFinding.guards.At) })
+      ListedFinding.cases.Refused.make({
+        broken: A.some(
+          problems,
+          (problem) => ListedFinding.guards.At(problem) || (ListedFinding.guards.Standing(problem) && problem.grew)
+        )
+      })
     )
   const ledger = yield* readLedger(spec.ledger)
   if (Result.isFailure(ledger)) return refused([ListedFinding.cases.Ledger.make({ said: ledger.failure })])
@@ -179,7 +187,8 @@ export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSp
           onSome: (standing) =>
             O.match(standingWords(standing, spec.ledger), {
               onNone: () => [],
-              onSome: (words) => A.of(ListedFinding.cases.Standing.make({ file, words }))
+              onSome: (words) =>
+                A.of(ListedFinding.cases.Standing.make({ file, words, grew: Standing.$is("Grew")(standing) }))
             })
         })
       }),

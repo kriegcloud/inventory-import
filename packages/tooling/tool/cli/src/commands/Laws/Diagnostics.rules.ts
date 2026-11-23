@@ -29,7 +29,7 @@ import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
-import { ledgerAgainst, ledgersFolder, readLedger, standingOf, standingWords } from "./internal/ledger.ts"
+import { ledgerAgainst, ledgersFolder, readLedger, Standing, standingOf, standingWords } from "./internal/ledger.ts"
 import { linesOf } from "./internal/lines.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Diagnostics.rules")
@@ -84,6 +84,9 @@ export const DiagnosticsFinding = S.TaggedUnion({
   },
   Standing: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of directives moved" })),
+    grew: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether its number rose above the ledger's, which is code that breaks the rule" })
+    ),
     words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Ledger: {
@@ -163,7 +166,8 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
         if (O.isSome(standing)) {
           return O.match(standingWords(standing.value, diagnosticsLedger), {
             onNone: () => [],
-            onSome: (words) => A.of(DiagnosticsFinding.cases.Standing.make({ file, words }))
+            onSome: (words) =>
+              A.of(DiagnosticsFinding.cases.Standing.make({ file, words, grew: Standing.$is("Grew")(standing.value) }))
           })
         }
         return A.map(A.dedupe(lines), (line) => DiagnosticsFinding.cases.At.make({ place: `${file}:${line}` }))
@@ -179,7 +183,11 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
     ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(
         problems,
         DiagnosticsFinding.cases.Refused.make({
-          directive: A.some(problems, DiagnosticsFinding.guards.At)
+          directive: A.some(
+            problems,
+            (problem) =>
+              DiagnosticsFinding.guards.At(problem) || (DiagnosticsFinding.guards.Standing(problem) && problem.grew)
+          )
         })
       )
     : A.of<DiagnosticsFinding>(DiagnosticsFinding.cases.Clean.make({}))

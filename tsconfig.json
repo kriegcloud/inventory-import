@@ -28,6 +28,7 @@
     { "path": "./packages/kernel/tsconfig.test.json" },
     { "path": "./packages/review/tsconfig.test.json" },
     { "path": "./packages/tooling/tool/cli/tsconfig.test.json" },
-    { "path": "./packages/patches/tsconfig.test.json" }
+    { "path": "./packages/patches/tsconfig.test.json" },
+    { "path": "./packages/foundation/modeling/vocabulary/tsconfig.test.json" }
   ]
 }

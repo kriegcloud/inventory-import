@@ -393,6 +393,20 @@
         "vitest": "catalog:",
       },
     },
+    "packages/foundation/modeling/vocabulary": {
+      "name": "@beep/vocabulary",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/node": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/foundation/modeling/xlsx": {
       "name": "@beep/xlsx",
       "version": "0.0.0",
@@ -694,6 +708,8 @@
     "@beep/types": ["@beep/types@workspace:packages/foundation/primitive/types"],
 
     "@beep/utils": ["@beep/utils@workspace:packages/foundation/modeling/utils"],
+
+    "@beep/vocabulary": ["@beep/vocabulary@workspace:packages/foundation/modeling/vocabulary"],
 
     "@beep/xlsx": ["@beep/xlsx@workspace:packages/foundation/modeling/xlsx"],
 

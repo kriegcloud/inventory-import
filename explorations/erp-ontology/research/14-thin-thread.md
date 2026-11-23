@@ -7,7 +7,7 @@ description: The one specification of decision 8's thin thread as it now stands:
 # The thin thread
 
 Design only: nothing here is built. No vocabulary module, no pointer helper, no projector, no generated file, no gate
-and no `rat-` record exists today. TypeScript, Turtle and SPARQL in this document are sketches, not code, and none was
+and no `rat-` record exists today (decision 107: the thread uses none; section 1.6). TypeScript, Turtle and SPARQL in this document are sketches, not code, and none was
 compiled or run. This report is the one specification of the thin thread (decision 8 as amended by decisions 38, 40,
 41, 46 and 93 to 101). Where reports 04 to 13 or the brief say something else about the thread, this report is the one
 to follow; what they say about later slices is untouched.
@@ -31,7 +31,7 @@ The thread is done when all of the following hold on a clean checkout:
    `packages/ontology/generated/inventory.owl.ttl`, `packages/ontology/generated/inventory.skos.ttl` and
    `packages/ontology/generated/fixtures/CQ-P06.graph.ttl`.
 2. The seven classes, nine properties, two schemes and four concepts of section 2 are in the vocabulary module, each
-   naming its `rat-` record (a concept names its scheme's, decision 101).
+   naming the decision that accepted it (decision 111; a concept names its scheme's, decision 101; section 1.6).
 3. The five enrolled records of section 3 carry their marks, every field of each is placed, and each field's mark is
    the one section 3 gives it. Gate 5's rule P13 compares the marks read from the records with those placements,
    field by field, so `Activity` with its actor and tenant pointers the wrong way round fails it (6.5).
@@ -100,7 +100,8 @@ Two things, both already recorded as his:
    Before anything is fetched the builder names the release, its URL, its sha256 and its size to Benjamin. This report
    did not look them up. Gate 9 cannot be built until then; gates 1 to 8 can. Whether `check:ci` also runs the
    reasoner belongs to the same approval, since CI would fetch the same jar.
-2. **The `rat-` records (decisions 32 and 101).** Every term names the `rat-` record that holds Benjamin's answer, and
+2. **The `rat-` records (decisions 32 and 101). No longer owed: decisions 107 and 111 replace them for the thread
+   (section 1.6). What follows is the first plan, kept for the slices that may use it.** Every term names the `rat-` record that holds Benjamin's answer, and
    none is written. A record ratifies one term proposal. The thread has 22 terms (7 classes, 9 properties, 2 schemes, 4
    concepts). The ruling on a scheme covers the concepts its proposal lists (decision 101), so the thread needs 18
    records: seven classes, nine properties and two schemes. The labels, definitions, parents, tags and identity criteria in section 2 are the proposals: they are
@@ -118,6 +119,27 @@ Two things, both already recorded as his:
 
 The two smaller questions this report raised are answered by decisions 100 and 101 (section 9.2).
 
+### 1.6 Decisions 107 to 111: what replaces the `rat-` chain in the thread
+
+The foundational auditor ran twice on the terms of section 2 and its adversary failed every proposal
+([report 15](15-audit-findings.md)). Decision 107 makes that audit advisory, and decision 111 accepts the 18 terms as
+a set. So in the thread no `rat-` record and no proposal file is read by anything. Wherever this report says a term
+names a `rat-` record, read the following instead:
+
+- **The module (2.6).** A term's `ratification` is `{ decision: <n> }`, the number of the entry of
+  `explorations/erp-ontology/DECISIONS.md` that accepted it. For the 18 terms and the four concepts that is 111; for
+  `Role`'s entry on the exception list it is 97.
+- **Gate 4, rule C12 (6.4).** Every term and the exception entry names a decision number, and `DECISIONS.md` has a
+  heading `### <n>. ` for it. The gate reads that one file as text and checks nothing else about it. The planted
+  negative is a term naming a decision that has no heading, reported by its key. The two negatives about a stale
+  proposal digest and a concept missing from a proposal file do not apply.
+- **Turbo inputs (6.10).** `DECISIONS.md` is the input that is neither a dependency edge nor a default, in place of
+  the `rat-` records and the proposal files.
+- **What is owed (1.5).** Only the reasoner download.
+
+The definitions and identity criteria of section 2 carry decisions 103, 104, 108 and 109. A later slice may still
+use the auditor and its `rat-` records; that is decided with the slice.
+
 ## 2. The terms
 
 Notation used below. `inv:` is `https://example.org/inventory-import/ontology/` (decision 10). `gist:` is
@@ -129,11 +151,11 @@ with the language tag `en` (decision 11). The kind tag and the identity criterio
 
 | Key | IRI | Label | Definition | Tag | Parent | Named ancestors | Identity criterion |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `Organization` | `inv:Organization` | Organization | An organized body of people or of other organizations formed for a purpose, such as a company the tenant buys from, sells to, ships with or has goods made by, or the tenant itself. | kind | `gist:Organization` | none | Stated: the organized body itself (decision 34). No thread record holds it. |
+| `Organization` | `inv:Organization` | Organization | An organized body of people or of other organizations formed for a purpose, such as a company the tenant buys from, sells to, ships with or has goods made by, or the tenant itself. | kind | `gist:Organization` | none | Stated: the organized body itself (decision 34), the same organization being the same legal entity; a body with no registration is told apart by its founding (decision 103). No thread record holds it. |
 | `Tenant` | `inv:Tenant` | Tenant | An organization for which this application keeps a workspace, whose records are scoped to it and hidden from every other organization. | role | `inv:Organization` (local) | `gist:Organization` | Inherited from `Organization`. In the repository it is told apart by `OrganizationId` (decision 38). |
-| `Person` | `inv:Person` | Person | A human being that a tenant deals with, as a member of its workspace or as a contact at another organization. | kind | `gist:Person` | `gist:LivingThing`, `gist:PhysicalIdentifiableItem` | Stated: the human being (decision 34). No thread record holds it; the fixture names one. |
+| `Person` | `inv:Person` | Person | A human being. (decision 108) | kind | `gist:Person` | `gist:LivingThing`, `gist:PhysicalIdentifiableItem` | Stated: the human being, one for life and after death, whatever records name them (decisions 34 and 104). No thread record holds it; the fixture names one. |
 | `Member` | `inv:Member` | Member | A relationship between one person and one tenant that lets the person act in the tenant's workspace from the day it is made until it is removed. | relator | `gist:TemporalRelation` | none | Stated, one criterion: the `MemberId` within its tenant, kept after removal. It rests on `Member.id` and `Member.organizationId`. |
-| `Role` | `inv:Role` | Role | A named level of access a grant gives a member, such as viewer, editor or admin. | information | none, on the exception list (decision 97) | none | Stated, one criterion: the concept's scheme and notation (decision 41). |
+| `Role` | `inv:Role` | Role | A named level of access a grant gives a member, such as viewer, editor or admin. | information | none, on the exception list (decision 97) | none | Stated, one criterion: the concept's scheme and notation (decision 41); the named level, the same role when what it permits changes (decision 109). |
 | `Grant` | `inv:Grant` | Grant | An assignment of one role to one member at one scope (the whole tenant, one site or one field), made by a member allowed to make it. | relator | `gist:Assignment` | `gist:TemporalRelation` | Stated, one criterion: the member it is granted to and the record field it is read from. In the thread that field is `role`, so a member has exactly one grant. See the note below. |
 | `AuditEntry` | `inv:AuditEntry` | Audit entry (altLabel: Activity, decision 46) | A record of one change to a tenant's data, written in the same batch as the change, naming who made it, the agent that acted for them if any, and what was done. | information | `gist:Content` | none | Stated: the tenant and the entry's id. It rests on `Activity.organizationId` and `Activity.id`. |
 
@@ -265,7 +287,7 @@ export const vocabulary = {
       label: "Member", definition: "A relationship between one person and one tenant ...",
       tag: "relator", parent: { kind: "gist", name: "TemporalRelation" },
       identity: { kind: "stated", criterion: "The MemberId within its tenant, kept after removal." },
-      ratification: { record: "<audit>/rat-<nnn>", proposal: "otp:..." }
+      ratification: { decision: 111 }  // section 1.6; was a rat- record and a proposal before decision 107
     },
     Role: { /* ... */ parent: { kind: "none", reason: "Its individuals are the concepts of MemberRoleScheme; gist:Permission fits once permits exists." } },
     Tenant: { /* ... */ tag: "role", parent: { kind: "local", key: "Organization" }, identity: { kind: "inherited" } }
@@ -996,7 +1018,7 @@ rule runs. Its rules for the thread:
 | C9 | A sub-property link names a property on the gist list whose domain and range the property falls under (decision 16) | none in the thread |
 | C10 | A scheme has at least one concept; `alsoInstanceOf` names a class of the vocabulary | the three roles |
 | C11 | The tag is one of kind, role, relator, information; a `role` class has a local parent | `Tenant` |
-| C12 | Every term and every exception entry names a `rat-` record that exists and reads `decision: accept`, and whose `proposal_ref` equals the proposal the term names; the proposal file that reference names exists, and the sha256 of its bytes equals the record's `proposal_sha256`; a concept that names its scheme's record is named, by its local name `<SchemeKey>-<notation>`, in that scheme's proposal file; no two of the classes, properties and schemes name the same record | 22 terms, 1 entry; the two scheme proposals name the four concepts |
+| C12 | (Replaced for the thread by section 1.6: every term and the exception entry names a decision of `DECISIONS.md` that exists.) First plan: Every term and every exception entry names a `rat-` record that exists and reads `decision: accept`, and whose `proposal_ref` equals the proposal the term names; the proposal file that reference names exists, and the sha256 of its bytes equals the record's `proposal_sha256`; a concept that names its scheme's record is named, by its local name `<SchemeKey>-<notation>`, in that scheme's proposal file; no two of the classes, properties and schemes name the same record | 22 terms, 1 entry; the two scheme proposals name the four concepts |
 | C13 | The version is three numbers, and `0.y.0` before publication (decision 24) | `0.1.0` |
 
 Decision 97 settles the conflict four findings name (03-schema.grok#1, 05-ontology.astra#1, 07-provenance.astra#1,

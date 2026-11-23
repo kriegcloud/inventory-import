@@ -576,3 +576,48 @@ thread: a thread term names the decision of this file that accepted it. The agen
   code; the audit cannot certify that kind of term, and its other findings are still worth having.
 - Reverse: take the adversary's cuts (no Grant class, no Organization class) and rerun, or run a third round on the
   merged branch; either reopens decisions 34, 40 and 102.
+
+### 108. How Person is defined (2026-11-22)
+
+A design point the audit's adversary raised (report 15, section 5). Person read "A human being that a tenant deals
+with, as a member of its workspace or as a contact at another organization", which stops being true of someone removed
+from every workspace. I chose the definition "A human being." What a tenant has to do with a person is said by Member
+and by the party slice's contact terms. The agent recommended the same.
+
+- Rationale: decision 104 makes a person the human for life; a definition that ends when a tenant stops dealing with
+  them describes a role.
+- Reverse: restore the longer wording; Person then reads as a role and its parent `gist:Person` no longer fits.
+
+### 109. What a role is when what it permits changes (2026-11-22)
+
+A design point the audit's adversary raised. I chose the named level: a role is the named level of access (viewer,
+editor, admin), and it is the same role when what it permits changes. Decision 41's criterion, the scheme and the
+notation, stands. What a role permits is not a term in the thread; if permissions ever need a history, that is a term
+of its own then. The agent recommended the same.
+
+- Rationale: the application stores a role's code and no policy version, and no thread question asks what a role
+  permitted in the past.
+- Reverse: identify a role by its level and one policy version; every stored role then needs a version it does not
+  have.
+
+### 110. Whether Organization stays in the thread (2026-11-22)
+
+A design point the audit's adversary raised: no thread question needs the Organization class, since Tenant answers
+them all. I chose to keep it in the thread. The agent recommended the same.
+
+- Rationale: Tenant is a role an organization plays (decision 38) and takes its identity from Organization
+  (decision 103); without it Tenant has no identity of its own until the party slice.
+- Reverse: move Organization to the party slice and put Tenant directly under `gist:Organization`; the thread drops
+  to 17 terms.
+
+### 111. The thread's 18 terms are accepted (2026-11-22)
+
+With the audit advisory (decision 107) the thread's terms are settled by my ruling. I chose to accept them as a set:
+the seven classes, nine properties and two schemes of report 14, section 2, as that section states them with
+decisions 103, 104, 108 and 109 applied, and the four concepts the two schemes list (decision 101). Grant stays as
+decisions 40 and 102 set it. Each of these terms names this decision in the vocabulary module; the exception entry
+for `Role` names decision 97. The agent recommended the same.
+
+- Rationale: I decided each term's shape in decisions 8 to 110; ruling on each again would ask the same things
+  eighteen times.
+- Reverse: walk the 18 one by one; a term I then refuse leaves the module and report 14.

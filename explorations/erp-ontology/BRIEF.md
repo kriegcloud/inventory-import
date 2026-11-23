@@ -107,10 +107,10 @@ is not on the exception list (gate 4), a record with one unplaced field (gate 5)
 typed as a tenant (gate 9). A class under two parents gist states disjoint is no gate's mistake: a class has one
 parent field, so it cannot be written (section 6.4).
 
-The thread waits on no open decision. Two things are owed from Benjamin (section 1.5). One is the approval of the Java
+The thread waits on no open decision. One thing is still owed from Benjamin (section 1.5). It is the approval of the Java
 pin and the jar download for ROBOT, with the release, its source, its hash and its size named first (decision 25).
-The other is the 18 `rat-` records and the entry for `Role`'s exception (decisions 32, 97 and 101), none of which is
-written. Gates 1 to 8 can be built before the download; the thread is not done until the reasoner has run and has
+The other was the 18 `rat-` records (decisions 32, 97 and 101): decisions 107 and 111 replace them for the thread,
+whose terms name the decision that accepted them ([report 14](research/14-thin-thread.md), section 1.6). Gates 1 to 8 can be built before the download; the thread is not done until the reasoner has run and has
 failed once.
 
 Out of the thread (section 1.3): `Party`, `SignInAccount`, `SourceRecord`, `AgentRun`, `Permission` and `permits`,

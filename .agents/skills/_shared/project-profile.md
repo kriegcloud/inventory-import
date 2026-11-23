@@ -35,6 +35,7 @@ is the one specification of the first deliverable, the thin thread. It is a desi
 | 25 | ROBOT with HermiT checks the OWL 2 DL profile and consistency in `check:full` | Before fetching anything, ask Benjamin to approve the Java pin and jar with its release, source, hash and size; `check:ci` inclusion is still open |
 | 26 | Vitest uses N3.js to re-parse Turtle and Oxigraph for SPARQL | Add shacl-engine for SHACL Core only with the SHACL slice |
 | 32, 101 | The module admits only terms backed by Benjamin's `rat-` record. A scheme ruling covers the concepts listed in its proposal; a later concept needs its own ruling | The thread needs 18 rulings: seven classes, nine properties and two schemes covering four concepts |
+| 107, 111 | For the thin thread the foundational audit is advisory (two runs, every proposal failed; report 15). Its 18 terms are accepted as a set and name decision 111 in the module, not a `rat-` record | A later slice may still use the auditor and `rat-` records; that is decided with the slice |
 | 34 | `Person` is the human and `Organization` the real body. The tenant's `SourceRecord` links to the party by `recordOf` | Reidentify the record by tenant, source system, source type and exact source id. Join possible matches only by an `IdentityDecision` |
 | 38 | `Tenant` is a role class under `Organization`, keyed by `OrganizationId` | `membershipIn` ranges over `Tenant`, not any organization |
 | 39, 43 | A `ContactAssignment` links one person to one account | Put the purpose and contact point on that assignment |

@@ -77,7 +77,9 @@ are Benjamin's commitments about what the application means. That is what decisi
 
 ## 5. Design points the adversary raised that are still worth a ruling
 
-Each is a finding about the design, not about the audit. None is decided.
+Each is a finding about the design, not about the audit. Benjamin ruled on points 2, 3 and 4 the same day
+(decisions 110, 108 and 109) and accepted the 18 terms as a set (decision 111); point 1 stands as decisions 40 and 102
+set it, and point 5 is not decided.
 
 1. **Whether Grant is its own thing.** CQ-P11 (at which scope does each member hold which role) can be answered by
    one statement on the member naming a role and a scope, with no grant. The adversary's rival: no `Grant` class,

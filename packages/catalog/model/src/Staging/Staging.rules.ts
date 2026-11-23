@@ -5,7 +5,7 @@
  * what Excel displays when that differs.
  */
 import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
-import { StagedTable, maxStagedRows } from "@inventory/catalog-contract/Staged"
+import { StagedTable, maxColumns, maxStagedRows } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
 import * as O from "effect/Option"
@@ -54,7 +54,7 @@ export const stagingProblem = (input: {
   const { fileName, rowCount, columnCount } = input
   if (rowCount <= 0) return fileProblem.noRows({ fileName })
   if (rowCount > maxStagedRows) return fileProblem.tooManyRows({ fileName, rows: rowCount, limit: maxStagedRows })
-  if (columnCount > 200) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
+  if (columnCount > maxColumns) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
   return null
 }
 

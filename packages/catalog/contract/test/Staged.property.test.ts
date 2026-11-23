@@ -3,8 +3,17 @@
 // upload announces are ones the browser's own chunking produces. All data here is generated from the schemas.
 import { describe, expect, it } from "@effect/vitest"
 import { rowId } from "@inventory/catalog-contract/Decision"
-import { maxColumns, maxStagedRows, StagedHead, StagedRow } from "@inventory/catalog-contract/Staged"
+import {
+  lastColumnIndex,
+  maxColumns,
+  maxNotes,
+  maxStagedRows,
+  StagedHead,
+  StagedNote,
+  StagedRow
+} from "@inventory/catalog-contract/Staged"
 import { chunkRows, UploadChunk, UploadStart } from "@inventory/catalog-contract/Upload"
+import { MAX_COLUMN } from "@beep/xlsx/XlsxAddress"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as S from "effect/Schema"
@@ -51,9 +60,10 @@ describe("a staged head", () => {
       expect(head.columns.length).toBeGreaterThanOrEqual(1)
       expect(head.columns.length).toBeLessThanOrEqual(maxColumns)
       for (const column of head.columns) {
-        // XFD, Excel's last column, is index 16,383; its letters are one to three capitals.
+        // XFD, Excel's last column as the workbook reader bounds it; its letters are one to three capitals.
         expect(column.index).toBeGreaterThanOrEqual(0)
-        expect(column.index).toBeLessThanOrEqual(16_383)
+        expect(column.index).toBeLessThanOrEqual(lastColumnIndex)
+        expect(lastColumnIndex).toBe(MAX_COLUMN)
         expect(column.letter).toMatch(/^[A-Z]{1,3}$/)
       }
     },
@@ -73,6 +83,22 @@ describe("a staged head", () => {
   )
 })
 
+describe("a staged head's notes", () => {
+  it.prop(
+    "are refused past the most a file may carry, and a note naming more rows than an import stages is refused",
+    [Arbitrary.schema(StagedHead), Arbitrary.schema(StagedNote)],
+    ([head, note]) => {
+      const notes = A.makeBy(maxNotes - head.notes.length + 1, () => note)
+      expect(S.is(StagedHead)({ ...head, notes: [...head.notes, ...notes] })).toBe(false)
+      // The rows of the file, numbered from 1, one more than an import stages.
+      const rows = A.makeBy(maxStagedRows + 1, (n) => n + 1)
+      expect(S.is(StagedNote)({ ...note, rows })).toBe(false)
+      expect(S.is(StagedNote)({ ...note, rows: A.take(rows, maxStagedRows) })).toBe(true)
+    },
+    { arbitrary: { runs: 20 } }
+  )
+})
+
 describe("the start of an upload", () => {
   it.prop(
     "announces at least one row and no more than an import stages",
@@ -81,6 +107,19 @@ describe("the start of an upload", () => {
       expect(start.rowCount).toBeGreaterThanOrEqual(1)
       expect(start.rowCount).toBeLessThanOrEqual(maxStagedRows)
       expect(start.chunkCount).toBeGreaterThanOrEqual(1)
+    },
+    runs
+  )
+
+  it.prop(
+    "is refused when its pieces cannot carry its rows: one piece more than rows, or one fewer than they need",
+    [Arbitrary.schema(UploadStart)],
+    ([start]) => {
+      expect(start.chunkCount).toBeLessThanOrEqual(start.rowCount)
+      expect(start.chunkCount * chunkRows).toBeGreaterThanOrEqual(start.rowCount)
+      expect(S.is(UploadStart)({ ...start, chunkCount: start.rowCount + 1 })).toBe(false)
+      const fewest = Math.ceil(start.rowCount / chunkRows)
+      if (fewest > 1) expect(S.is(UploadStart)({ ...start, chunkCount: fewest - 1 })).toBe(false)
     },
     runs
   )

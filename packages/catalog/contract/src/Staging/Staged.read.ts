@@ -2,6 +2,7 @@
 // columns and its notes. The one thing not to break: a staged cell is what the file said, never a corrected value.
 import * as S from "effect/Schema"
 import { nullAsNone } from "@inventory/kernel/Wire"
+import { MAX_COLUMN } from "@beep/xlsx/XlsxAddress"
 
 /** The fields of an item, in the order the screens list them. */
 export const fields = [
@@ -30,7 +31,7 @@ export const Field = S.Literals(fields).annotate({
 export type Field = typeof Field.Type
 
 /** The words the screens use for each field. Every reason uses these, never the property name. */
-export const fieldLabels: Record<Field, string> = {
+export const fieldLabels: Readonly<Record<Field, string>> = {
   sku: "SKU",
   name: "Name",
   description: "Description",
@@ -66,8 +67,14 @@ export const maxStagedRows = 50000
  */
 export const maxColumns = 200
 
-/** Excel's last column, XFD, from 0: a column's place in a file is never past it. */
-export const lastColumnIndex = 16_383
+/** Excel's last column, XFD, from 0: a column's place in a file is never past it. The workbook reader's own bound. */
+export const lastColumnIndex = MAX_COLUMN
+
+/**
+ * The most notes a staged file may carry. A reader writes a few notes about the file and at most one for each number
+ * format it could not show, and a workbook holds about 250 formats, so this is far past any file and still a bound.
+ */
+export const maxNotes = 1000
 
 /**
  * The highest row number a row id can carry (`row-9999999`): a staged row numbered past it could not be named by
@@ -143,7 +150,7 @@ export const StagedNote = S.Struct({
   message: S.String.check(S.isMinLength(1), S.isMaxLength(4000)).annotateKey({
     description: "The sentence the reader wrote: never empty"
   }),
-  rows: S.Array(RowNumber).check(S.isMaxLength(maxRowNumber)).annotateKey({
+  rows: S.Array(RowNumber).check(S.isMaxLength(maxStagedRows)).annotateKey({
     description: "The rows of the file it is about, as Excel numbers them; empty when it is about the whole file"
   })
 }).annotate({
@@ -171,7 +178,9 @@ export const StagedTable = S.Struct({
   rows: S.Array(StagedRow)
     .check(S.isMaxLength(maxStagedRows))
     .annotateKey({ description: `The data rows, in file order: at most ${maxStagedRows}` }),
-  notes: S.Array(StagedNote).annotateKey({ description: "What the reader did, skipped or noticed" })
+  notes: S.Array(StagedNote)
+    .check(S.isMaxLength(maxNotes))
+    .annotateKey({ description: `What the reader did, skipped or noticed: at most ${maxNotes} notes` })
 }).annotate({
   identifier: "StagedTable",
   description:

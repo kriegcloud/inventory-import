@@ -1817,6 +1817,23 @@ describe("infra setup: failures named for what failed", () => {
           expect(onePasswordFailure(said)).toBe("refused")
         }
         expect(onePasswordFailure("[ERROR] 2026/11/22 10:00:00 something else")).toBe("unclear")
+        // A name op quotes is not op's words: a held word inside one says nothing about the app.
+        expect(
+          onePasswordFailure(
+            '[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "Vault" vault'
+          )
+        ).toBe("refused")
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Vault is locked" isn\'t a vault in this account')).toBe(
+          "refused"
+        )
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Vault/Not signed in/field': no item matched"
+          )
+        ).toBe("refused")
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "timed out" item: something else')).toBe("unclear")
+        // Outside a name the held words still count.
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 reading "Vault": authorization timeout')).toBe("held")
         expect(onePasswordFailure("")).toBe("unclear")
       })
   )
@@ -1876,9 +1893,10 @@ describe("infra setup: failures named for what failed", () => {
       expect(said).toContain('"Integrate with 1Password CLI"')
       // A line of 1Password's is not all one thing: the app's lines and a refused reference are told apart.
       expect(said).toContain("that it is locked or not signed in, or that a prompt was dismissed or timed out")
-      expect(said).toContain(
-        "Any other line of 1Password's is a reference it refused: check the references in packages/infra/env/op.env.local"
-      )
+      expect(said).toContain("1Password refused a reference: check the references in packages/infra/env/op.env.local")
+      // A line of 1Password's that says neither is not said to be a refused reference: both fixes are named.
+      expect(said).toContain("Any other line of 1Password's may be either: try both")
+      expect(said).not.toContain("Any other line of 1Password's is a reference it refused")
       expect(said).not.toContain("1Password did not answer")
     })
   )

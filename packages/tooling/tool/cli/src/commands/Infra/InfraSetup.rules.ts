@@ -476,6 +476,8 @@ export type OnePasswordFailure = typeof OnePasswordFailure.Type
 // so a line with none of these words and none of a reference's is said as either, never guessed.
 const heldWords = ["not signed in", "not currently signed in", "is locked", "prompt dismissed", "timed out", "timeout"]
 // op's words for a reference it read and could not fill: no such vault, item or field.
+// Both lists are matched outside the names op quotes ("Cloudflare timeout token", 'op://v/i/f'): a vault, item or
+// field may be named with any of these words, and its name says nothing about why op failed.
 const refusedWords = [
   "isn't a vault",
   "isn't an item",
@@ -493,10 +495,12 @@ const refusedWords = [
  * @example
  * onePasswordFailure("[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, please try again") // "held"
  * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "x" isn\'t an item in the "v" vault') // "refused"
+ * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "v" vault') // "refused"
  */
 export const onePasswordFailure = (stderr: string): OnePasswordFailure => {
+  const unquoted = A.map(linesOf(Str.toLowerCase(stderr)), Str.replaceAll(/"[^"]*"|'op:\/\/[^']*'/g, '""'))
   const says = (words: ReadonlyArray<string>) =>
-    A.some(linesOf(Str.toLowerCase(stderr)), (line) => A.some(words, (word) => Str.includes(word)(line)))
+    A.some(unquoted, (line) => A.some(words, (word) => Str.includes(word)(line)))
   if (onePasswordUnreachable(stderr)) return "unreachable"
   if (says(heldWords)) return "held"
   if (says(refusedWords)) return "refused"
@@ -1357,7 +1361,7 @@ const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
     ])
     if (stored !== 0) {
       return yield* stop(
-        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR] …"), Alchemy was never started. When they say op never reached the app ("error initializing client"), that it is locked or not signed in, or that a prompt was dismissed or timed out, ${theApp}. Any other line of 1Password's is a reference it refused: check ${referencesRefused}, then run this again.`
+        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR] …"), Alchemy was never started. When they say op never reached the app ("error initializing client"), that it is locked or not signed in, or that a prompt was dismissed or timed out, ${theApp}. When they say a vault, an item or a field "isn't" one, 1Password refused a reference: check ${referencesRefused}. Any other line of 1Password's may be either: try both, then run this again.`
       )
     }
     const now = yield* listed

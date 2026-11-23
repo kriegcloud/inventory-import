@@ -375,7 +375,8 @@ What uses them:
 - **Who did not answer is said, not guessed.** A call under `op-human` that fails with op's own error lines
   (`[ERROR] …`), or any failure of an `op-human` command of its own (`vault list`, `item list`, `item create`, the
   comparison of a profile's account), is 1Password's, and stops with op's words (they carry no value), sorted
-  by them (`onePasswordFailure`). An app op never reached ("error initializing client", "connecting to desktop
+  by them (`onePasswordFailure`), read outside the names op quotes, since a vault, item or field may be named
+  with any of those words. An app op never reached ("error initializing client", "connecting to desktop
   app", as in Benjamin's run) is "1Password did not answer"; an app that is locked, a CLI not signed in, or a
   prompt dismissed or timed out ("You are not currently signed in", "authorization prompt dismissed") is
   "1Password did not let … through". Both say where to look: the app open and unlocked, its prompt approved,
@@ -387,7 +388,8 @@ What uses them:
   op's as it prints them, not read here. A tool that failed is shown in its own words; an answer that does not decode is said as that;
   a token that is not active is said with the status cf gave; a verify that failed says it decides nothing about
   the token. A failed `cf zones list` is said in cf's words, not as a zone held in no account. The profile edit run under
-  `op-human` hands the terminal over, so its error is on screen above, and the stop tells the app's lines from a refused reference the same way.
+  `op-human` hands the terminal over, so its error is on screen above, and the stop names the app's lines and a refused reference's, and says any other line of 1Password's may be
+  either.
   op's error format was read from its output in Benjamin's run, not from op's source.
 - **The previews' Alchemy profile** takes both values with `alchemy profile edit --add Cloudflare --method stored
   --set apiToken=env:... --set accountId=env:...`, filled by 1Password for that one command; Alchemy then keeps the

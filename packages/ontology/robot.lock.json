@@ -1,0 +1,9 @@
+{
+  "tool": "ROBOT",
+  "release": "v1.9.11",
+  "file": "robot.jar",
+  "url": "https://github.com/ontodev/robot/releases/download/v1.9.11/robot.jar",
+  "bytes": 82708624,
+  "sha256": "53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26",
+  "javaMajor": 17
+}

@@ -128,7 +128,8 @@ export type DeferredNoTermMark<Slice extends string> = {
 /** The no-term helper: a closed reason alone, or `deferred` with the slice that will place the position. */
 export interface NoTermMaker<Slice extends string> {
   (reason: NoTermReason): ClosedNoTermMark
-  (reason: "deferred", slice: Slice): DeferredNoTermMark<Slice>
+  // One mark, written as two words: a tuple, so the helper has no second parameter to be piped into.
+  (...deferred: readonly [reason: "deferred", slice: Slice]): DeferredNoTermMark<Slice>
 }
 
 /**

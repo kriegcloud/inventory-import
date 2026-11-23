@@ -11,7 +11,8 @@
   },
   "scripts": {
     "check": "tsrs -p tsconfig.test.json && tsrs -p tsconfig.json",
-    "lint": "oxlint --quiet src test",
+    "lint": "oxlint --quiet src test scripts",
+    "reason": "bun scripts/reason.ts",
     "test": "vitest run"
   },
   "dependencies": {

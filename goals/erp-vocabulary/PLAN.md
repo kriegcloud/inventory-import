@@ -22,7 +22,7 @@ passing and a commit; the app is never broken between steps.
 | 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | done |
 | 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | done |
 | 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | done |
-| 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | todo |
+| 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | done |
 | 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` | todo |
 | 12 | The walk of each planted mistake through all nine gates (6.11), with the new fixtures of bans 2 and 5 added to it | Each row of SPEC's ban table names a test or a run that exists | todo |
 | 13 | Close: `/quality-review-fix-loop`, the documents the build made false (report 14's sections SPEC names as replaced), the closing note | Reviewers' findings at zero required | todo |
@@ -45,8 +45,8 @@ here when it is.
 | Whether N3.js and Oxigraph run under this repository's Vitest and Effect rules (decision 26) | 7, 8 | Both do. N3.js 2.13 parses under Vitest on Node with its typings one major behind; only `Parser` is used, behind `Effect.try`. Oxigraph 0.5.13 loads its WebAssembly at import with no setup, takes the graph as N-Triples and answers a SELECT as an array of maps; the one call that throws is behind `Effect.try` in `test/support/ask.ts`. Neither needed a diagnostic turned off |
 | `import type` erasure, and how gate 7's rule 7 resolves `paths` and `imports` aliases from text, without the compiler | 9 | Checked in the law's test, on text: a whole-statement `import type` or `export type` passes; `import { type X }` is refused, because `verbatimModuleSyntax` keeps the statement and the module is loaded. A specifier is resolved to files through a relative path, a package's `exports`, the nearest `package.json`'s `imports` and each `tsconfig*.json`'s `paths` (with `baseUrl`, and through `extends` to a configuration of any name in the repository), each with a test; a `types` condition is not the file loaded, and a `?raw` suffix names the same file. A dynamic import is read where its module is a text, a constant, a sum or a template of those. Not resolved: a dynamic import whose module is worked out at run time, a plain `require()` call, and files ending `.mts`, `.cts` or `.js` (the repository has none in a workspace). A module that re-exports the vocabulary is refused where it re-exports, not where it is imported |
 | gist itself: the parents of `LivingThing`, `TemporalRelation` and `Assignment`, the three disjoint pairs and that there is no other, and the version IRI. Report 11 read them; the pinned gist file was never opened. Bans 1 and 2 rest on them | 7, 10 | Step 7: the version IRI is `gistCore14.1.0` by decision 122, not read from a file. The rest waits for step 10 |
-| ROBOT's flags, where the jar is kept, how the script reads Java's major version, and whether a merged file with undeclared fixture individuals passes the OWL 2 DL profile check (five fixtures now) | 10 | |
-| Whether ROBOT reports ban 2's two fixtures inconsistent and its near miss consistent | 10 | |
+| ROBOT's flags, where the jar is kept, how the script reads Java's major version, and whether a merged file with undeclared fixture individuals passes the OWL 2 DL profile check (five fixtures now) | 10 | Tried on v1.9.11 under Java 17.0.21. ROBOT's own `merge --input a --input b` fails the profile check: it reads each file alone, a file of data alone declares no property, and its statements are read as annotations ("Cannot pun between properties"). Joined into one Turtle document, ontology first, all five pass the profile check with the fixture individuals undeclared. So the script joins the files; a test holds that the joined document states the triples the files state apart. The flags are `validate-profile --input f --profile DL --output report` and `reason --input f --reasoner hermit`, each run in a temporary folder. The jar is kept at `$XDG_CACHE_HOME` (or `~/.cache`) `/inventory-import/robot/v1.9.11/robot.jar`. Java's major version is read from the quoted text of `java -version` |
+| Whether ROBOT reports ban 2's two fixtures inconsistent and its near miss consistent | 10 | Yes: `entry-is-person.ttl` and `entry-is-tenant.ttl` are each reported inconsistent (exit 1, "The ontology is inconsistent") and `entry-names-member.ttl` consistent. With gist's `owl:disjointWith` statements taken out of a copy of the ontology, all three refused files turn consistent, so each refusal rests on the disjointness its ban names (tried by hand, not a committed test) |
 | The CI workflow for gate 9: its cache action, its key and its Java setup | 11 | |
 | That the stored `userId` links an account and not the human | not met: no stored row is read in the thread | |
 | Whether a term may name a combined heading such as `### 39 and 43.` | not met: the thread names 111 and 97 only | |
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 9 are done; step 10 starts on Benjamin's word.
+None. Steps 1 to 10 are done; step 11 starts on Benjamin's word.
 
 ## Choices made
 
@@ -235,6 +235,26 @@ Where the design left a choice open, or the code showed it could not be followed
   exemption wider than the one module, `typeof` a helper refused, a `vendor.json` above the packages, an
   unrelated function of a helper's name, and data handed to a curried function refused. The second reading's
   fixes were not read a third time. Step 13's reviewers read the step again.
+- **Gate 9 is `packages/ontology`'s `reason` task** (`bun scripts/reason.ts`), never cached, named in the root
+  `check:full` only. What a run must come to is in `src/Reason.ts`, behind a port for the machine (`Machine`: the
+  Javas, the jar, the fetch, ROBOT), so the four refusals and the judgments are tested in `bun run check` with no
+  Java (`Reason.test.ts`); the script supplies the real machine. Its output names the ban each run stands for.
+- **The five runs**: the thread's graph alone (ban 1's near miss, one person a member of two tenants) and with
+  `entry-names-member.ttl` (ban 2's near miss) must be in the DL profile and consistent; with
+  `person-is-tenant.ttl`, `entry-is-person.ttl` and `entry-is-tenant.ttl` each must be in the DL profile and
+  reported inconsistent. A refused file that fails the profile check, or a reasoner that stops for another reason
+  than an inconsistency, fails the gate: a crash is no refusal.
+- **The script looks for Java 17 in three places**, in order: `JAVA_HOME`, `java` on the PATH, then each folder of
+  `/usr/lib/jvm`. This machine's default Java is 27, and without the third place `check:full` would fail here
+  until `JAVA_HOME` was set by hand. With no Java 17 in any of them it fails and names each place and what
+  answered there.
+- **A jar that is there and is not the approved file is refused, not replaced**: the script says to delete it.
+  The fetch writes beside the jar's place and moves the file there whole. The pin's test holds
+  `robot.lock.json` to the values of decisions 112 and 113, so a changed pin fails `bun run check`.
+- **`noTerm("deferred", slice)` is now one tuple in the helper's type** (`NoTermMaker` in `@beep/vocabulary`),
+  with the same call. Step 4 had switched an Effect diagnostic off on the kernel's `noTerm`, and the CLI's slow
+  test refuses that in any file the scratchpad can reach; `check:full` showed it at this step, the first since
+  step 4 to run the slow tests.
 
 ## Closing note
 

@@ -1,0 +1,8 @@
+# Ban 2, the near miss that passes: an audit entry about a person and a tenant names a member of that person, in
+# that tenant, and is neither of them. Hand-written; only gate 9 reads it.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<fixture/AuditEntry/test_Entry> a inv:AuditEntry ;
+    inv:recordedActor <data/test_ExampleWorks/Member/test_RaviWorks> ;
+    inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> .

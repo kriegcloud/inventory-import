@@ -13,6 +13,10 @@
         "$TURBO_ROOT$/vitest.retries.ts",
         "$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md"
       ]
-    }
+    },
+    // Gate 9, the reasoner (report 14 sections 6.9 and 6.10). Never cached: its pass depends on the Java installed
+    // and on the jar kept outside the repository, which no input can stand for, so a replay would skip the script's
+    // own check of both. Every `bun run check:full` starts it. Not in `bun run check`, which needs no Java.
+    "reason": { "dependsOn": ["transit"], "cache": false }
   }
 }

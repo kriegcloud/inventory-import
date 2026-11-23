@@ -50,7 +50,4 @@ export const aboutPath = pathFor<Curie<InvClassVocab>, Curie<InvPropertyVocab>, 
  *
  * @example noTerm("deferred", "party") // { noTerm: { reason: "deferred", slice: "party" } }
  */
-// A mark maker, not an operation on data: `noTerm("deferred", "party")` has no subject to pipe, so it has no
-// pipeable form (the slice is the second argument only because the closed reasons take none).
-// @effect-diagnostics-next-line missingPipeableSignature:off
 export const noTerm = noTermFor<"party">()

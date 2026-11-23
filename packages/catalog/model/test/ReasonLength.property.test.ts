@@ -5,7 +5,7 @@ import { StagedCell, type StagedTable } from "@inventory/catalog-contract/Staged
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { maxSaid, said } from "@inventory/catalog-model/CellReading"
 import { maxReason } from "@inventory/catalog-contract/Import"
-import { ConfirmPlan, confirmPlan, fitted } from "@inventory/catalog-model/Confirm"
+import { ConfirmPlan, confirmPlan, fitted, maxSentence } from "@inventory/catalog-model/Confirm"
 import { maxRowsNamed, review } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
@@ -180,16 +180,36 @@ describe("the one reason a plan holds for a row", () => {
     }
   )
 
-  it("leaves off what does not fit and says how many, and says something for a row with no sentence", () => {
+  it("is every sentence whenever they fit, however long one of them is", () => {
     const long = Str.repeat(1500)("x")
-    expect(fitted([long, long, long, long])).toBe(`${long} ${long} 2 more problems are not listed here.`)
     expect(fitted([long, long, Str.repeat(950)("y")])).toBe(`${long} ${long} ${Str.repeat(950)("y")}`)
-    // A first sentence too long to hold is said by its first characters and its length, and the rest follow.
-    expect(fitted([Str.repeat(5000)("x")])).toBe(`${Str.repeat(maxSaid)("x")}… (5,000 characters)`)
-    expect(fitted([Str.repeat(5000)("x"), "Name is empty."])).toBe(
-      `${Str.repeat(maxSaid)("x")}… (5,000 characters) Name is empty.`
-    )
-    expect(fitted([Str.repeat(3990)("x"), long])).toBe(`${Str.repeat(maxSaid)("x")}… (3,990 characters) ${long}`)
+    expect(fitted([Str.repeat(3970)("x"), "Name is empty."])).toBe(`${Str.repeat(3970)("x")} Name is empty.`)
+    expect(fitted([Str.repeat(maxReason)("x")])).toBe(Str.repeat(maxReason)("x"))
+  })
+
+  it("says a long sentence by its start when they do not all fit, and keeps the short ones after it", () => {
+    const long = Str.repeat(1500)("x")
+    const start = `${Str.repeat(maxSaid)("x")}…`
+    expect(fitted([long, long, long, long])).toBe(`${start} ${start} ${start} ${start}`)
+    expect(fitted([Str.repeat(5000)("x")])).toBe(start)
+    expect(fitted([Str.repeat(5000)("x"), "Name is empty."])).toBe(`${start} Name is empty.`)
+    expect(fitted([Str.repeat(3990)("x"), "Name is empty."])).toBe(`${start} Name is empty.`)
+    expect(fitted([`Name "${Str.repeat(5000)("x")}" is too long.`])).toBe(`Name "${Str.repeat(maxSaid - 6)("x")}…`)
+  })
+
+  it("leaves off what still does not fit and says how many, one or more", () => {
+    const most = Str.repeat(maxSentence)("x")
+    const six = A.join(A.replicate(most, 6), " ")
+    expect(fitted(A.replicate(most, 7))).toBe(`${six} 1 more problem is not listed here.`)
+    expect(fitted(A.replicate(most, 9))).toBe(`${six} 3 more problems are not listed here.`)
+  })
+
+  // The first sentence is always said: one kept whole when the rest do not fit leaves room for the count.
+  it("holds a sentence kept whole far under the bound", () => {
+    expect(maxSentence * 2).toBeLessThan(maxReason)
+  })
+
+  it("says something for a row with no sentence", () => {
     expect(fitted([])).toBe("A value could not be read.")
     expect(fitted(["  "])).toBe("A value could not be read.")
   })

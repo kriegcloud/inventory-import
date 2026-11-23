@@ -23,7 +23,7 @@ passing and a commit; the app is never broken between steps.
 | 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | done |
 | 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | done |
 | 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | done |
-| 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` | todo |
+| 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` || done |
 | 12 | The walk of each planted mistake through all nine gates (6.11), with the new fixtures of bans 2 and 5 added to it | Each row of SPEC's ban table names a test or a run that exists | todo |
 | 13 | Close: `/quality-review-fix-loop`, the documents the build made false (report 14's sections SPEC names as replaced), the closing note | Reviewers' findings at zero required | todo |
 
@@ -47,14 +47,14 @@ here when it is.
 | gist itself: the parents of `LivingThing`, `TemporalRelation` and `Assignment`, the three disjoint pairs and that there is no other, and the version IRI. Report 11 read them; the pinned gist file was never opened. Bans 1 and 2 rest on them | 7, 10 | Step 7: the version IRI is `gistCore14.1.0` by decision 122, not read from a file. The rest waits for step 10 |
 | ROBOT's flags, where the jar is kept, how the script reads Java's major version, and whether a merged file with undeclared fixture individuals passes the OWL 2 DL profile check (five fixtures now) | 10 | Tried on v1.9.11 under Java 17.0.21. ROBOT's own `merge --input a --input b` fails the profile check: it reads each file alone, a file of data alone declares no property, and its statements are read as annotations ("Cannot pun between properties"). Joined into one Turtle document, ontology first, all five pass the profile check with the fixture individuals undeclared. So the script joins the files; a test holds that the joined document states the triples the files state apart. The flags are `validate-profile --input f --profile DL --output report` and `reason --input f --reasoner hermit`, each run in a temporary folder. The jar is kept at `$XDG_CACHE_HOME` (or `~/.cache`) `/inventory-import/robot/v1.9.11/robot.jar`. Java's major version is read from the quoted text of `java -version` |
 | Whether ROBOT reports ban 2's two fixtures inconsistent and its near miss consistent | 10 | Yes: `entry-is-person.ttl` and `entry-is-tenant.ttl` are each reported inconsistent (exit 1, "The ontology is inconsistent") and `entry-names-member.ttl` consistent. With gist's `owl:disjointWith` statements taken out of a copy of the ontology, all three refused files turn consistent, so each refusal rests on the disjointness its ban names (tried by hand, not a committed test) |
-| The CI workflow for gate 9: its cache action, its key and its Java setup | 11 | |
+| The CI workflow for gate 9: its cache action, its key and its Java setup | 11 | The job `reason` in `.github/workflows/ci.yml`. `actions/cache/restore@v6` and `actions/cache/save@v6`, the versions the `proofs` job uses, on the folder the script keeps the jar in, under the key `robot-jar-<sha256>`; `actions/setup-java@v6` with Temurin, whose `JAVA_HOME` the script reads first. The release, the sha256 and Java's major version are read from `robot.lock.json` in the job's first step of its own. It has not run on GitHub: nothing is pushed. Its steps were run on this machine with an empty jar folder (the jar fetched) and with the jar kept |
 | That the stored `userId` links an account and not the human | not met: no stored row is read in the thread | |
 | Whether a term may name a combined heading such as `### 39 and 43.` | not met: the thread names 111 and 97 only | |
 | Decision 117's bans, undrafted when the report was last edited | settled: SPEC's table, decision 121 | |
 
 ## Current blocker
 
-Steps 1 to 10 are done; step 11 starts on Benjamin's word.
+Steps 1 to 11 are done; step 12 starts on Benjamin's word.
 
 `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`), and six laws that came with it
 refused code this goal wrote: `diagnostics:check` (15 `@effect-diagnostics` directives), `defaults:check` (25
@@ -270,6 +270,15 @@ Where the design left a choice open, or the code showed it could not be followed
   so what the reasoner itself says was tried by the orchestrator alone: the five runs, the three refused files
   turning consistent without gist's disjointness, a jar that is not the approved file, a cache that cannot be
   written, and a real fetch into an empty cache. Step 13's reviewers read the step again.
+- **Step 11's job reads the pin from `robot.lock.json`**, not from numbers written again in the workflow: the
+  release, the sha256 and Java's major version, each refused unless it is letters, digits and dots. The jar is
+  kept only after the gate passed and only when none was brought back, so only a jar the script hashed to the pin
+  is ever in the cache. The job runs one turbo task, `reason` of `@inventory/ontology`; `check:ci` is unchanged.
+- **Step 11 was built by the orchestrator and read by Grok 4.7**, the other routes being out of quota. It read
+  the job against decision 114, the script and turbo's configuration and reported no finding. It could not
+  run the workflow, and neither has anyone: what GitHub does with it (the Java action, the cache's save and
+  restore) is unseen until a push. One case stays as the script has it: a kept jar that later reads back
+  damaged is refused by the hash on every run, and is cleared by deleting that cache entry by hand.
 
 ## Closing note
 

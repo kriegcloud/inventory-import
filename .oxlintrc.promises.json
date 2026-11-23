@@ -14,7 +14,6 @@
   "rules": {
     "typescript/no-floating-promises": ["error", { "ignoreVoid": false }],
     "typescript/await-thenable": "error",
-    "typescript/no-misused-promises": "error",
-    "typescript/promise-function-async": "error"
+    "typescript/no-misused-promises": "error"
   }
 }

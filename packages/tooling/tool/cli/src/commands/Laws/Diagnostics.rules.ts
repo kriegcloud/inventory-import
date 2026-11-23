@@ -12,7 +12,8 @@
  *
  * Not read, each by name: `.agents/`, `vendor/` and `docs/`, as Benjamin's rule has it; and `scratchpad/`, whose own
  * check (`scratch:check`) refuses every directive.
- * `diagnosticsListed` names the files that hold one today: it may only shrink. A listed file with none left is refused
+ * `diagnosticsListed` names the files that hold one today, each with how many, which only falls (`internal/ledger.ts`).
+ * A listed file with none left is refused
  * until its line is taken off, and `test/Diagnostics.test.ts` holds the list at its length.
  *
  * @packageDocumentation
@@ -21,12 +22,14 @@ import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { heldAs } from "./internal/held.ts"
+import { type Ledger, standingOf, standingWords } from "./internal/ledger.ts"
 import { linesOf } from "./internal/lines.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Diagnostics.rules")
@@ -44,30 +47,30 @@ export const diagnosticsLeftOut: ReadonlyArray<string> = [".agents/", "vendor/",
  * goes there first. The decide files of `packages/catalog/model` and of `packages/patches/test` came off when the prover
  * came to read `.make` (decision 33 reversed, 2026-11-22). No file is excepted for its name.
  */
-export const diagnosticsListed: ReadonlyArray<string> = [
-  "apps/inventory/test/server/AuthIndexes.test.ts",
-  "apps/inventory/test/server/AuthSchema.test.ts",
-  "apps/inventory/test/server/Pwned.test.ts",
-  "apps/inventory/test/server/QueryPlans.test.ts",
-  "apps/inventory/test/server/Telemetry.slow.test.ts",
-  "apps/inventory/test/server/Telemetry.test.ts",
-  "apps/inventory/test/server/support/app.ts",
-  "apps/inventory/test/server/support/files.ts",
-  "apps/inventory/test/web/samples.test.ts",
-  "apps/inventory/test/web/traceContext.test.ts",
-  "apps/inventory/vite.config.ts",
-  "packages/catalog/web/test/DraftPicks.test.ts",
-  "packages/catalog/web/test/ItemEditor.test.ts",
-  "packages/catalog/web/test/KeptRows.test.ts",
-  "packages/catalog/web/test/TakenBackWords.test.ts",
-  "packages/catalog/web/test/csvDifferential.test.ts",
-  "packages/catalog/web/test/readSpreadsheet.test.ts",
-  "packages/catalog/web/test/reviewHonesty.test.ts",
-  "packages/catalog/web/test/reviewParity.test.ts",
-  "packages/catalog/web/test/support/files.ts",
-  "packages/catalog/web/test/xlsxParity.test.ts",
-  "packages/infra/src/OpReferences.secrets.ts"
-]
+export const diagnosticsListed: Ledger = {
+  "apps/inventory/test/server/AuthIndexes.test.ts": 1,
+  "apps/inventory/test/server/AuthSchema.test.ts": 1,
+  "apps/inventory/test/server/Pwned.test.ts": 1,
+  "apps/inventory/test/server/QueryPlans.test.ts": 1,
+  "apps/inventory/test/server/Telemetry.slow.test.ts": 1,
+  "apps/inventory/test/server/Telemetry.test.ts": 1,
+  "apps/inventory/test/server/support/app.ts": 1,
+  "apps/inventory/test/server/support/files.ts": 1,
+  "apps/inventory/test/web/samples.test.ts": 1,
+  "apps/inventory/test/web/traceContext.test.ts": 1,
+  "apps/inventory/vite.config.ts": 1,
+  "packages/catalog/web/test/DraftPicks.test.ts": 1,
+  "packages/catalog/web/test/ItemEditor.test.ts": 1,
+  "packages/catalog/web/test/KeptRows.test.ts": 1,
+  "packages/catalog/web/test/TakenBackWords.test.ts": 1,
+  "packages/catalog/web/test/csvDifferential.test.ts": 1,
+  "packages/catalog/web/test/readSpreadsheet.test.ts": 1,
+  "packages/catalog/web/test/reviewHonesty.test.ts": 1,
+  "packages/catalog/web/test/reviewParity.test.ts": 1,
+  "packages/catalog/web/test/support/files.ts": 1,
+  "packages/catalog/web/test/xlsxParity.test.ts": 1,
+  "packages/infra/src/OpReferences.secrets.ts": 1
+}
 
 /**
  * What the list is held by, from its contents (`internal/held.ts`): a file swapped for another changes the number, and
@@ -95,7 +98,7 @@ export const directiveLines = (text: string): ReadonlyArray<number> => {
 }
 
 /** The paths not read, as the output names them each time. */
-const notRead = `${A.join(diagnosticsLeftOut, ", ")} are not read; ${A.length(diagnosticsListed)} files are listed`
+const notRead = `${A.join(diagnosticsLeftOut, ", ")} are not read; ${R.size(diagnosticsListed)} files are listed`
 
 /**
  * What `laws diagnostics` finds: nothing, or a refusal and each directive; a listed file with none left.
@@ -111,8 +114,9 @@ export const DiagnosticsFinding = S.TaggedUnion({
   At: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" }))
   },
-  Settled: {
-    file: S.String.pipe(S.annotateKey({ description: "A listed file that holds no directive any more" }))
+  Standing: {
+    file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of directives moved" })),
+    words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Changed: {
     list: S.String.pipe(S.annotateKey({ description: "The list whose files are not the ones it is held by" })),
@@ -145,8 +149,7 @@ export const diagnosticsSentence: (finding: DiagnosticsFinding) => Line = Diagno
     ),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   At: ({ place }) => err(`${place}  an @effect-diagnostics directive: remove it and write the code the rule asks for`),
-  Settled: ({ file }) =>
-    err(`${file}  is listed in diagnosticsListed but holds no directive any more: take its line off the list`),
+  Standing: ({ file, words }) => err(`${file}  ${words}`),
   Changed: ({ held, list, now }) =>
     err(
       `${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
@@ -184,14 +187,18 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
     (file) =>
       Effect.map(repo.text(repo.join(repo.root, file)), (text): ReadonlyArray<DiagnosticsFinding> => {
         const lines = directiveLines(text)
-        if (A.contains(diagnosticsListed, file)) {
-          return A.isReadonlyArrayEmpty(lines) ? A.of(DiagnosticsFinding.cases.Settled.make({ file })) : []
+        const standing = standingOf(diagnosticsListed, { file, now: A.length(lines) })
+        if (O.isSome(standing)) {
+          return O.match(standingWords(standing.value, "diagnosticsListed"), {
+            onNone: () => [],
+            onSome: (words) => A.of(DiagnosticsFinding.cases.Standing.make({ file, words }))
+          })
         }
         return A.map(lines, (line) => DiagnosticsFinding.cases.At.make({ place: `${file}:${line}` }))
       }),
     { concurrency: 1 }
   )
-  const now = heldAs(diagnosticsListed)
+  const now = heldAs(R.keys(diagnosticsListed))
   const changed =
     now === diagnosticsHeld
       ? []

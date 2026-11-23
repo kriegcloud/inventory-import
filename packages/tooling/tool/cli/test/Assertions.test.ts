@@ -21,7 +21,8 @@ import { inTree, json, printed } from "./support/tree.ts"
 /** The holds of `lists` as they are given: each one's length and the number its files give. */
 const holding = (lists: ReadonlyArray<ReadonlyArray<string>>): AssertionHolds => ({
   ceilings: A.map(lists, (files) => files.length),
-  held: A.map(lists, heldAs)
+  held: A.map(lists, heldAs),
+  counts: R.fromEntries(A.map(A.flatten(lists), (file) => [file, 1] as const))
 })
 
 /** The law, in a fresh repository, holding the lists to `holds`. */
@@ -33,7 +34,6 @@ const inRepository = Effect.fn("inRepository")(function* (holds: AssertionHolds)
 })
 
 const ignored = [
-  "packages/ui/src/components/ui/**",
   ".agents/**",
   ".codex/**",
   "scratchpad/**",
@@ -131,7 +131,11 @@ describe("laws assertions", () => {
           "err:   list 1 names 4 files, past its ceiling of 3: a list only shrinks. Fix the code instead",
           `err:   list 1 names other files than the ones it is held by (${heldAs(first)}): it may only shrink. If files came off it because they are clean, record ${heldAs(grown)} in assertionsHeld; never add one`,
           `err:   list 2 names other files than the ones it is held by (${heldAs(second)}): it may only shrink. If files came off it because they are clean, record ${heldAs(swapped)} in assertionsHeld; never add one`,
-          `err:   l2/f0.ts  is listed but holds no type assertion: take its line off the list in ${assertionsConfig}`,
+          // A file put in a list with no number held, a clean one, and a number held for a file no list names.
+          `err:   l0/extra.ts  is in one of the lists of ${assertionsConfig} or in assertionCounts but not both: the two name the same files`,
+          `err:   l1/new.ts  is in one of the lists of ${assertionsConfig} or in assertionCounts but not both: the two name the same files`,
+          "err:   l2/f0.ts  is listed in assertionCounts but breaks the rule no more: take its line off",
+          `err:   l1/f0.ts  is in one of the lists of ${assertionsConfig} or in assertionCounts but not both: the two name the same files`,
           "err:   packages/x/src/b.ts:1  a comment that turns the type-assertion rule off (oxlint-disable-next-line): no comment does. Remove it"
         ])
         const fewer = yield* inTree(

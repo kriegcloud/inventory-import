@@ -1,14 +1,18 @@
 // What the dual-helper and readonly laws read in a file's tree.
 //
-// A helper is a function given a name where it is declared (`const f = (a, b) => …`, `function f(a, b) {}`), not one
-// handed to a call as an argument, whose order the call sets. One of two values or more that names the value it acts
-// on (`cause`, `error`, `self`, `input`) is written `dual`, that value first; a helper written `dual(…)` is a call, so
-// it is not read.
+// A helper is a function given a name where it is declared: `const f = (a, b) => …`, `function f(a, b) {}`,
+// `const f = Effect.fn("f")(function* (a, b) {…})`, or a method of an object or a class. One handed to a call as an
+// argument is not read, since the call sets its order. The law covers the clear case and no more: a helper of two
+// values or more (a TypeScript `this` parameter is not one) that names one `cause`, `error`, `self` or `input` is
+// written `dual`, that one first; one written `dual(…)` that names it after another is refused too. Which value a
+// helper with none of those names acts on is not in its words, so such a helper is not read.
 //
-// A property is a signature of an object type or an interface, an index signature, a class's field, or the properties
-// a mapped type makes; an array type inside a property's own type is one too (`readonly rows: Row[]` still lets the
-// rows change). One inside `declare global` or `declare module "…"` belongs to a type another library declared, whose
-// shape is not ours to make readonly; a `declare namespace` of our own is read.
+// A property is a signature of an object type or an interface, an index signature, a class's field (`abstract` and
+// `accessor` ones included), a constructor's parameter property, or the properties a mapped type makes. A mutable
+// array type (`T[]`, `Array<T>`, `globalThis.Array<T>`) or a mutable tuple is one too when it stands in a property's
+// own type or in a type alias, which a property names (`readonly rows: Rows` with `type Rows = Row[]`). One inside
+// `declare global` or `declare module "…"` belongs to a type another library declared, whose shape is not ours to
+// make readonly; a `declare namespace` of our own is read.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
@@ -29,13 +33,39 @@ const isFunction = (node: unknown): node is Node =>
   isNode(node) &&
   (node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression" || node.type === "FunctionDeclaration")
 
+/** A function's values: its parameters, but a TypeScript `this` parameter, which no caller passes. */
+const valuesOf = (fn: Node): ReadonlyArray<Node> =>
+  A.filter(nodesIn(fn["params"]), (parameter) => !O.exists(parameterName(parameter), (name) => name === "this"))
+
+const isSubject = (parameter: Node): boolean =>
+  O.exists(parameterName(parameter), (name) => A.contains(subjectNames, name))
+
 /** Whether a function takes two values or more and names one of them as the value it acts on. */
 const namesSubject = (fn: Node): boolean => {
-  const parameters = nodesIn(fn["params"])
-  return (
-    parameters.length >= 2 &&
-    A.some(parameters, (parameter) => O.exists(parameterName(parameter), (name) => A.contains(subjectNames, name)))
-  )
+  const values = valuesOf(fn)
+  return values.length >= 2 && A.some(values, isSubject)
+}
+
+/** Whether a function names the value it acts on after another value. */
+const subjectAfterFirst = (fn: Node): boolean => A.some(A.drop(valuesOf(fn), 1), isSubject)
+
+const calleeName = (call: Node): O.Option<string> => {
+  const callee = call["callee"]
+  if (!isNode(callee)) return O.none()
+  if (callee.type === "Identifier" && P.isString(callee["name"])) return O.some(callee["name"])
+  if (callee.type === "MemberExpression" && isNode(callee["property"]) && P.isString(callee["property"]["name"])) {
+    return O.some(callee["property"]["name"])
+  }
+  return O.none()
+}
+
+/** The function `Effect.fn("f")(function* …)` or `Effect.fnUntraced(function* …)` makes a helper of, when it is one. */
+const effectFnBody = (call: Node): O.Option<Node> => {
+  const callee = call["callee"]
+  const named =
+    O.exists(calleeName(call), (name) => name === "fnUntraced") ||
+    (isNode(callee) && callee.type === "CallExpression" && O.exists(calleeName(callee), (name) => name === "fn"))
+  return named ? A.findFirst(nodesIn(call["arguments"]), isFunction) : O.none()
 }
 
 /** Every node of a tree once, from a list of its own rather than the stack. */
@@ -59,10 +89,19 @@ const nodesOf = (program: Node): ReadonlyArray<Node> => {
 export const helpersNotDual = (program: Node): ReadonlyArray<number> =>
   A.flatMap(nodesOf(program), (node) => {
     if (node.type === "FunctionDeclaration" && namesSubject(node)) return [node.start]
-    if (node.type === "VariableDeclarator" && isFunction(node["init"]) && namesSubject(node["init"])) {
-      return [node.start]
+    // A method of an object or a class, or a function given to a key: its key names it.
+    if ((node.type === "MethodDefinition" || node.type === "Property") && isFunction(node["value"])) {
+      return namesSubject(node["value"]) ? [node.start] : []
     }
-    return []
+    if (node.type !== "VariableDeclarator") return []
+    const init = node["init"]
+    if (isFunction(init)) return namesSubject(init) ? [node.start] : []
+    if (!isNode(init) || init.type !== "CallExpression") return []
+    // `dual(2, (self, that) => …)`: dual, so it is read only for the order of its values.
+    if (O.exists(calleeName(init), (name) => name === "dual")) {
+      return A.some(A.filter(nodesIn(init["arguments"]), isFunction), subjectAfterFirst) ? [node.start] : []
+    }
+    return O.exists(effectFnBody(init), namesSubject) ? [node.start] : []
   })
 
 /** Whether a module declaration augments another's types: `declare global`, or `declare module "…"` named by a string. */
@@ -70,20 +109,34 @@ const augments = (node: Node): boolean =>
   node.type === "TSModuleDeclaration" &&
   (node["kind"] === "global" || (isNode(node["id"]) && node["id"].type === "Literal"))
 
-/** A property of any kind: a signature, an index signature, a class's field. */
+/** A property of any kind: a signature, an index signature, a class's field of any kind, a parameter property. */
 const isProperty = (node: Node): boolean =>
-  node.type === "TSPropertySignature" || node.type === "TSIndexSignature" || node.type === "PropertyDefinition"
+  node.type === "TSPropertySignature" ||
+  node.type === "TSIndexSignature" ||
+  node.type === "PropertyDefinition" ||
+  node.type === "TSAbstractPropertyDefinition" ||
+  node.type === "AccessorProperty" ||
+  node.type === "TSAbstractAccessorProperty" ||
+  node.type === "TSParameterProperty"
 
 /** Whether a mapped type makes its properties readonly (`readonly [K in …]` or `+readonly`). */
 const readonlyMapped = (node: Node): boolean => node["readonly"] === true || node["readonly"] === "+"
 
-/** A mutable array type: `T[]` not under `readonly`, or `Array<T>`. */
-const mutableArray = (node: Node, parent: O.Option<Node>): boolean =>
-  (node.type === "TSArrayType" &&
-    !O.exists(parent, (above) => above.type === "TSTypeOperator" && above["operator"] === "readonly")) ||
-  (node.type === "TSTypeReference" && isNode(node["typeName"]) && node["typeName"]["name"] === "Array")
+/** Whether a type reference names `Array`, or `globalThis.Array`. */
+const namesArray = (node: Node): boolean => {
+  const name = node["typeName"]
+  if (!isNode(name)) return false
+  if (name.type === "Identifier") return name["name"] === "Array"
+  return name.type === "TSQualifiedName" && isNode(name["right"]) && name["right"]["name"] === "Array"
+}
 
-/** One node of the walk: its parent, and whether it stands inside a property's own type. */
+/** A mutable array or tuple type: `T[]` or `[A, B]` not under `readonly`, `Array<T>` or `globalThis.Array<T>`. */
+const mutableArray = (node: Node, parent: O.Option<Node>): boolean =>
+  ((node.type === "TSArrayType" || node.type === "TSTupleType") &&
+    !O.exists(parent, (above) => above.type === "TSTypeOperator" && above["operator"] === "readonly")) ||
+  (node.type === "TSTypeReference" && namesArray(node))
+
+/** One node of the walk: its parent, and whether it stands inside a property's own type or a type alias. */
 interface Step {
   readonly node: Node
   readonly parent: O.Option<Node>
@@ -91,8 +144,9 @@ interface Step {
 }
 
 /**
- * Where a property is not `readonly`: a signature, an index signature, a class's field, a mapped type's properties,
- * or a mutable array type in a property's own type; outside another library's augmented types.
+ * Where a property is not `readonly`: a signature, an index signature, a class's field of any kind, a parameter
+ * property, a mapped type's properties, or a mutable array or tuple type in a property's own type or a type alias;
+ * outside another library's augmented types.
  *
  * @example mutableProperties(program of "type A = { a: number }") // [its offset]
  */
@@ -106,7 +160,7 @@ export const mutableProperties = (program: Node): ReadonlyArray<number> => {
     if (isProperty(node) && node["readonly"] !== true) found.push(node.start)
     if (node.type === "TSMappedType" && !readonlyMapped(node)) found.push(node.start)
     if (inProperty && mutableArray(node, parent)) found.push(node.start)
-    const within = inProperty || isProperty(node)
+    const within = inProperty || isProperty(node) || node.type === "TSTypeAliasDeclaration"
     for (const next of children(node)) left.push({ node: next, parent: O.some(node), inProperty: within })
   }
   return found

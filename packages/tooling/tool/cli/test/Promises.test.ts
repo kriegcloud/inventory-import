@@ -12,8 +12,7 @@ import {
   promisesHeld,
   promisesProfile,
   promiseSentence,
-  promisesListed,
-  promisesVendored
+  promisesListed
 } from "../src/commands/Laws/Promises.rules.ts"
 import { heldAs } from "../src/commands/Laws/internal/held.ts"
 import { readPromises } from "../src/commands/Laws/internal/promiseCode.ts"
@@ -136,18 +135,38 @@ describe("laws promises", () => {
     })
   )
 
-  it.effect("a listed file passes while it uses a Promise, and is refused once it uses none", () =>
-    Effect.gen(function* () {
-      const listed = A.findFirst(promisesListed, Str.endsWith(".ts")).pipe(O.getOrElse(() => ""))
-      const said2 = yield* inTree({ [listed]: uses }, inRepository)
-
-      expect(said2).toEqual([expect.stringContaining("out: promises:check OK")])
-      const said3 = yield* inTree({ [listed]: passes }, inRepository)
-
-      expect(said3).toContain(
-        `err: ${listed}  is listed in promisesListed but uses no Promise any more: take its line off the list`
-      )
-    })
+  it.effect(
+    "a listed file is held at its number of uses: one more or one fewer is refused, and none takes it off",
+    () =>
+      Effect.gen(function* () {
+        // A listed file that is no entry point and holds two uses or more, so one fewer is not none.
+        const [listed, held] = O.getOrElse(
+          A.findFirst(
+            R.toEntries(promisesListed),
+            ([file, count]) => Str.endsWith(".ts")(file) && !R.has(promiseEntryPoints, file) && count >= 2
+          ),
+          () => ["", 0] as const
+        )
+        const asyncs = (count: number) =>
+          A.join(
+            A.makeBy(count, (i) => `export const a${i} = async () => ${i}\n`),
+            ""
+          )
+        const kept = yield* inTree({ [listed]: asyncs(held) }, inRepository)
+        expect(kept).toEqual([expect.stringContaining("out: promises:check OK")])
+        const more = yield* inTree({ [listed]: asyncs(held + 1) }, inRepository)
+        expect(more).toContain(
+          `err: ${listed}  breaks the rule in ${held + 1} places, more than the ${held} promisesListed holds it to: a listed file may only lose places. Fix the new ones`
+        )
+        const fewer = yield* inTree({ [listed]: asyncs(held - 1) }, inRepository)
+        expect(fewer).toContain(
+          `err: ${listed}  breaks the rule in ${held - 1} places, fewer than the ${held} promisesListed holds it to: lower its number to ${held - 1}`
+        )
+        const none = yield* inTree({ [listed]: passes }, inRepository)
+        expect(none).toContain(
+          `err: ${listed}  is listed in promisesListed but breaks the rule no more: take its line off`
+        )
+      })
   )
 
   it.effect(
@@ -159,15 +178,10 @@ describe("laws promises", () => {
         expect(said).toContain(
           "err: packages/x/src/routed.ts:2  a value typed as a Promise: Promises must be awaited, add await operator. (typescript(no-floating-promises)). Write the Effect that does the work"
         )
-        expect(said).toContain(
-          "err: packages/x/src/routed.ts:3  a value typed as a Promise: Functions that return promises must be async. (typescript(promise-function-async)). Write the Effect that does the work"
-        )
-        const listed = O.getOrElse(
-          A.findFirst(promisesListed, (file) => Str.endsWith(".ts")(file) && !R.has(promiseEntryPoints, file)),
-          () => ""
-        )
-        const kept = yield* inTree({ [listed]: routed }, inRepository)
-        expect(kept).toEqual([expect.stringContaining("out: promises:check OK")])
+        // The edge the law prescribes, and a component's ReactNode, are not refused by type.
+        const edge = `import * as Effect from "effect/Effect"\nexport const got = Effect.promise(() => fetch("/"))\n`
+        const fine = yield* inTree({ "packages/x/src/edge.ts": edge }, inRepository)
+        expect(fine).toEqual([expect.stringContaining("out: promises:check OK")])
         const off = Str.trim(`oxlint-disable-next-line typescript/no-floating-promises`)
         const silenced = yield* inTree({ "packages/x/src/s.ts": `// ${off}\nexport const n = 1\n` }, inRepository)
         expect(silenced).toContain(
@@ -176,15 +190,11 @@ describe("laws promises", () => {
       })
   )
 
-  it("the lists only shrink: their lengths are held here, and lowered with them", () => {
-    expect([promisesListed.length, R.size(promisesVendored), R.size(promiseEntryPoints)]).toEqual([72, 14, 2])
-    expect(A.dedupe(promisesListed).length).toBe(promisesListed.length)
-    // Held by their contents too: a file swapped for another changes the number the law compares.
-    expect([heldAs(promisesListed), heldAs(R.keys(promisesVendored)), heldAs(R.keys(promiseEntryPoints))]).toEqual([
+  it("the lists are held by their names too, a guard the review sees", () => {
+    expect([heldAs(R.keys(promisesListed)), heldAs(R.keys(promiseEntryPoints))]).toEqual([
       promisesHeld.listed,
-      promisesHeld.vendored,
       promisesHeld.entryPoints
     ])
-    expect(heldAs(A.append(A.drop(promisesListed, 1), "packages/x/src/new.ts"))).not.toBe(promisesHeld.listed)
+    expect(heldAs(A.append(A.drop(R.keys(promisesListed), 1), "packages/x/src/new.ts"))).not.toBe(promisesHeld.listed)
   })
 })

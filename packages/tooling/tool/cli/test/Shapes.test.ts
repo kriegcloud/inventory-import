@@ -3,10 +3,10 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { heldAs } from "../src/commands/Laws/internal/held.ts"
-import { readListed } from "../src/commands/Laws/internal/listed.ts"
+import { listedLaw, listedSentence, readListed } from "../src/commands/Laws/internal/listed.ts"
 import { helpersNotDual, mutableProperties } from "../src/commands/Laws/internal/shapesCode.ts"
 import {
   dualHelpers,
@@ -67,32 +67,83 @@ describe("laws dual and readonly", () => {
     // An index signature, a class's field, a mapped type, a mutable array in a property, and a namespace of our own;
     // not a local list a function fills.
     expect(lines(wider, mutableProperties)).toEqual([1, 2, 3, 5, 7])
+    // A mutable array behind an alias, a mutable tuple, globalThis.Array, a parameter property, an accessor and an
+    // abstract field; a readonly tuple and a readonly parameter property pass.
+    const more = `export type Rows = number[]
+export type Pair = { readonly p: [number, string]; readonly q: readonly [number, string] }
+export type G = { readonly g: globalThis.Array<number> }
+export class D { constructor(private n: number, private readonly m: number) {} }
+export class E { accessor f = 1 }
+export abstract class F { abstract h: number }
+`
+    expect(lines(more, mutableProperties)).toEqual([1, 2, 3, 4, 5, 6])
   })
 
-  it.effect("refuses each place in a file no list names, and a listed file that breaks the rule no more", () =>
+  it("reads Effect.fn helpers, methods and dual's own order, and does not count a this parameter", () => {
+    const more = `import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
+export const told = Effect.fn("told")(function* (method: string, cause: unknown) { return [method, cause] })
+export const object = { refusal(method: string, error: Error) { return [method, error] } }
+export class G { refusal(method: string, cause: unknown) { return [method, cause] } }
+export const wrong = dual(2, (that: string, self: string) => that + self)
+export const right = dual(2, (self: string, that: string) => self + that)
+export function bound(this: Window, input: string) { return input }
+`
+    expect(lines(more, helpersNotDual)).toEqual([3, 4, 5, 6])
+  })
+
+  it.effect("refuses each place in a file no list names, and holds a listed file at its number of places", () =>
     Effect.gen(function* () {
       const said = yield* inTree({ "packages/x/src/a.ts": helpers }, inRepository(dualHelpers, dualSentence))
       expect(said).toContain(`err: packages/x/src/a.ts:2  ${dualSpec.instead}`)
-      const listed = O.getOrElse(A.findFirst(readonlyListed, Str.endsWith(".ts")), () => "")
-      const kept = yield* inTree({ [listed]: shapes }, inRepository(readonlyProperties, readonlySentence))
-      expect(kept).toEqual([expect.stringContaining("out: readonly:check OK")])
-      const clean = yield* inTree(
-        { [listed]: "export type A = { readonly a: 1 }\n" },
-        inRepository(readonlyProperties, readonlySentence)
+      // A spec of the readonly law with a ledger of its own: one file held at two places.
+      const listed = "packages/x/src/listed.ts"
+      const spec = { ...readonlySpec, listed: { [listed]: 2 }, held: heldAs([listed]) }
+      const law = listedLaw(spec)
+      const sentence = listedSentence(spec)
+      const mutable = (count: number) =>
+        A.join(
+          A.makeBy(count, (i) => `export type A${i} = { a: number }\n`),
+          ""
+        )
+      const got1 = yield* inTree({ [listed]: mutable(2) }, inRepository(law, sentence))
+
+      expect(got1).toEqual([expect.stringContaining("out: readonly:check OK")])
+      const got2 = yield* inTree({ [listed]: mutable(3) }, inRepository(law, sentence))
+
+      expect(got2).toContain(
+        `err: ${listed}  breaks the rule in 3 places, more than the 2 readonlyListed holds it to: a listed file may only lose places. Fix the new ones`
       )
-      expect(clean).toContain(
+      const got3 = yield* inTree({ [listed]: mutable(1) }, inRepository(law, sentence))
+
+      expect(got3).toContain(
+        `err: ${listed}  breaks the rule in 1 places, fewer than the 2 readonlyListed holds it to: lower its number to 1`
+      )
+      const got4 = yield* inTree({ [listed]: "export type A = { readonly a: 1 }\n" }, inRepository(law, sentence))
+
+      expect(got4).toContain(
         `err: ${listed}  is listed in readonlyListed but breaks the rule no more: take its line off`
       )
-      const vendored = yield* inTree(
-        { "packages/ui/src/hooks/use-x.ts": shapes, "vendor/a.ts": shapes },
+      // The ui package's components are read; only code another check holds to its source is not.
+      const read = yield* inTree(
+        {
+          "packages/ui/src/hooks/use-x.ts": shapes,
+          "vendor/a.ts": shapes,
+          "packages/foundation/modeling/utils/src/a.ts": shapes
+        },
         inRepository(readonlyProperties, readonlySentence)
       )
-      expect(vendored).toEqual([expect.stringContaining("out: readonly:check OK")])
+      expect(read).toContain("err: packages/ui/src/hooks/use-x.ts:1  " + readonlySpec.instead)
+      expect(
+        A.filter(
+          read,
+          (line) => Str.startsWith("err: vendor/")(line) || Str.startsWith("err: packages/foundation/")(line)
+        )
+      ).toEqual([])
     })
   )
 
-  it("the lists only shrink: held by their contents and their lengths", () => {
-    expect([dualListed.length, readonlyListed.length]).toEqual([12, 95])
-    expect([heldAs(dualListed), heldAs(readonlyListed)]).toEqual([dualSpec.held, readonlySpec.held])
+  it("the lists are held by their names too, a guard the review sees", () => {
+    expect([heldAs(R.keys(dualListed)), heldAs(R.keys(readonlyListed))]).toEqual([dualSpec.held, readonlySpec.held])
   })
 })

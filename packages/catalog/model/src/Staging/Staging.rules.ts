@@ -34,8 +34,10 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
 }
 
 /**
- * The reader's notes as staged: all of them when they fit `maxNotes`, else the first ones and one more that says how
- * many were not kept, so a workbook with thousands of number formats is still staged, and says so.
+ * The reader's notes as staged: all of them when they fit `maxNotes`. Past it, the warnings are kept before the
+ * information notes (a total row, a second table, a hidden sheet is a warning, and the review reads the total row's),
+ * each in the reader's order, and one more note says how many were not kept. That note is a warning when a warning was
+ * among them, so the person is shown it on the Review step; else it is information, as the notes it counts were.
  *
  * @example keptNotes(notes).length // at most maxNotes
  */
@@ -47,15 +49,37 @@ const keptNotes = (notes: SpreadsheetTable["notes"]): StagedTable["notes"] => {
     rows: note.rows
   }))
   if (staged.length <= maxNotes) return staged
-  const kept = A.take(staged, maxNotes - 1)
+  const warnings = A.filter(staged, isWarning)
+  const room = maxNotes - 1
+  const keptWarnings = A.take(warnings, room)
+  const kept = A.appendAll(
+    keptWarnings,
+    A.take(
+      A.filter(staged, (note) => !isWarning(note)),
+      room - keptWarnings.length
+    )
+  )
   const left = staged.length - kept.length
-  return A.append(kept, {
-    kind: "notesNotKept",
-    level: "info",
-    message: `${left} more notes about how the file was read were not kept.`,
-    rows: []
-  })
+  const warningsLeft = warnings.length - keptWarnings.length
+  return A.append(
+    kept,
+    warningsLeft > 0
+      ? {
+          kind: "notesNotKept",
+          level: "warning",
+          message: `${left} more notes about how the file was read were not kept, ${warningsLeft} of them warnings: look the file over in Excel before importing it.`,
+          rows: []
+        }
+      : {
+          kind: "notesNotKept",
+          level: "info",
+          message: `${left} more notes about how the file was read were not kept.`,
+          rows: []
+        }
+  )
 }
+
+const isWarning = (note: { readonly level: "info" | "warning" }): boolean => note.level === "warning"
 
 /**
  * Why a file cannot be staged, as a `FileProblem` for the person, or null when it can. It takes counts, not rows, so
@@ -86,4 +110,4 @@ export const stagingProblem = (input: {
  * @example readerWarnings({ notes: [{ kind: "delimiter", level: "info", message: "Columns are separated by tabs.", rows: [] }] }) // []
  */
 export const readerWarnings = (table: Pick<StagedTable, "notes">): ReadonlyArray<StagedTable["notes"][number]> =>
-  A.filter(table.notes, (note) => note.level === "warning")
+  A.filter(table.notes, isWarning)

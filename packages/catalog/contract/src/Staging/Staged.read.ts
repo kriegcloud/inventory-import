@@ -214,6 +214,12 @@ export const StagedHead = S.Struct(headFields).annotate({
 export type StagedHead = typeof StagedHead.Type
 
 /**
+ * A staged head as the server stores it, beside its rows: `StagedHead` as JSON text. It reads every note a stored file
+ * has, so a file staged before `maxNotes` still opens.
+ */
+export const StagedHeadJson = S.fromJsonString(StagedHead)
+
+/**
  * A staged file without its rows as an upload sends it: a `StagedHead` with at most `maxNotes` notes. The bound is
  * where a head is written, not where one is read, so a file stored with more notes still opens.
  */

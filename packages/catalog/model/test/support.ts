@@ -9,6 +9,7 @@ import type { Role } from "@inventory/kernel/Role"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Str from "effect/String"
 
 const member = (id: string, name: string, role: Role, organization: string): Member =>
   Member.make({
@@ -94,7 +95,13 @@ export const stage = Effect.fnUntraced(function* (table: StagedTable) {
   const { rows, ...head } = table
   uploads += 1
   const begun = yield* imports.beginUpload({
-    payload: { key: UploadKey.make(`twin-upload-${uploads}`), head, rowCount: rows.length, chunkCount: 1 }
+    // A version 4 UUID as the screen makes one, its last group the count of uploads so far.
+    payload: {
+      key: UploadKey.make(`7a1d3f52-9c4e-4b60-8d21-${Str.padStart(12, "0")(uploads.toString(16))}`),
+      head,
+      rowCount: rows.length,
+      chunkCount: 1
+    }
   })
   const { id } = yield* Effect.fromResult(begun)
   const put = yield* imports.putChunk({ params: { id }, payload: { seq: 0, rows } })

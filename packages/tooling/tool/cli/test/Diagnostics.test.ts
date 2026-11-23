@@ -5,6 +5,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { vi } from "vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import {
@@ -72,7 +73,16 @@ describe("laws diagnostics", () => {
       expect(more).toContain(
         `err: ${listed}  breaks the rule in 3 places, more than the 2 ${diagnosticsLedger} holds it to: a listed file may only lose places. Fix the new ones`
       )
+      // A number that rose is code that breaks the rule; one that fell is the ledger's alone.
+      expect(A.head(more)).toEqual(
+        O.some(
+          expect.stringContaining("err: diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off")
+        )
+      )
       const fewer = yield* inTree(held, inRepository({ [listed]: directives(1) }))
+      expect(A.head(fewer)).toEqual(
+        O.some(expect.stringContaining("err: diagnostics:check FAIL  its ledger does not hold"))
+      )
       expect(fewer).toContain(
         `err: ${listed}  breaks the rule in 1 places, fewer than the 2 ${diagnosticsLedger} holds it to: lower its number to 1`
       )

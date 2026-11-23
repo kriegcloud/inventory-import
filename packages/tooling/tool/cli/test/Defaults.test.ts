@@ -8,16 +8,21 @@ import { baselineFile, defaults, defaultsSentence } from "../src/commands/Laws/D
 import { readDefaults } from "../src/commands/Laws/internal/defaultsCode.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
-import { inTree, json, printed } from "./support/tree.ts"
+import { inTree, json, onMain, printed, type Tree } from "./support/tree.ts"
+import * as R from "effect/Record"
 
 const places = (source: string, file = "a.tsx") =>
   A.map(readDefaults({ file, source }).found, (place) => `${place.line} ${place.kind} ${place.code}`)
 
-// git answers "every file git would commit" and "what the file held when it was committed", so the folder is made a
-// repository first.
-const run = Effect.fn("run")(function* (write: boolean, only: ReadonlyArray<string> = []) {
+// git answers "every file git would commit", "what the file held when it was committed" and "what main's baseline
+// says", so the folder is made a repository whose main holds what the test wrote, and `after` is written on a branch.
+const run = Effect.fn("run")(function* (write: boolean, only: ReadonlyArray<string> = [], after: Tree = {}) {
   const repo = yield* Repo
-  yield* repo.run("git", ["init", "-q"])
+  yield* onMain()
+  yield* Effect.forEach(R.toEntries(after), ([file, text]) => repo.write(repo.join(repo.root, file), text), {
+    concurrency: 1,
+    discard: true
+  })
   const found = yield* defaults(write, only)
   return printed(render(defaultsSentence)(found))
 })
@@ -180,6 +185,71 @@ describe("the baseline", () => {
   )
 })
 
+describe("against main", () => {
+  it.effect("refuses a count raised above main's, and a file main's baseline does not name; follows a rename", () =>
+    Effect.gen(function* () {
+      const start = { [held]: twoFallbacks, [baselineFile]: baseline({ [held]: [2, 0, 0, 0] }) }
+      const three = `${twoFallbacks}export const c = (z?: string) => z ?? ""\n`
+      // The same commit raises the file's places and its count: main still holds it at 2.
+      const raised = yield* inTree(
+        start,
+        run(false, [], { [held]: three, [baselineFile]: baseline({ [held]: [3, 0, 0, 0] }) })
+      )
+      deepStrictEqual(raised, [
+        `err: defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`,
+        `err: ${held}  is held at [3, 0, 0, 0] in ${baselineFile}, above the [2, 0, 0, 0] main holds it to: a number only falls`
+      ])
+      const added = "packages/a/src/added.ts"
+      const grew = yield* inTree(
+        start,
+        run(false, [], {
+          [added]: twoFallbacks,
+          [baselineFile]: baseline({ [held]: [2, 0, 0, 0], [added]: [2, 0, 0, 0] })
+        })
+      )
+      strictEqual(
+        A.some(
+          grew,
+          (line) =>
+            line ===
+            `err: ${added}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`
+        ),
+        true
+      )
+      const moved = "packages/a/src/moved.ts"
+      const renamed = yield* inTree(
+        start,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, moved])
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [moved]: [2, 0, 0, 0] }))
+          const found = yield* defaults(false, [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      // A line for a file that is gone would hand its allowance to the next file at that path.
+      const gone = "packages/a/src/gone.ts"
+      const left = yield* inTree(
+        start,
+        run(false, [], { [baselineFile]: baseline({ [held]: [2, 0, 0, 0], [gone]: [1, 0, 0, 0] }) })
+      )
+      strictEqual(
+        A.some(
+          left,
+          (line) =>
+            line ===
+            `err: ${gone}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+        ),
+        true
+      )
+      deepStrictEqual(renamed, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+    })
+  )
+})
+
 describe("--write", () => {
   it.effect("records the tree when there is no baseline yet, then only lowers", () =>
     Effect.gen(function* () {
@@ -187,7 +257,7 @@ describe("--write", () => {
         { [held]: twoFallbacks, "packages/a/src/clean.ts": `export const a = 1\n` },
         Effect.gen(function* () {
           const repo = yield* Repo
-          yield* repo.run("git", ["init", "-q"])
+          yield* onMain()
           const firstFound = yield* defaults(true, [])
           const first = printed(render(defaultsSentence)(firstFound))
           const stored = yield* repo.text(repo.join(repo.root, baselineFile))

@@ -2,7 +2,7 @@
 type: Goal
 title: "erp-vocabulary"
 description: The thin thread of the ERP vocabulary. One TypeScript module holds 18 accepted terms, the real member and audit records point at them, a projector writes OWL and SKOS, two questions are answered over a lifted two-tenant fixture, and nine gates each refuse one planted mistake.
-status: active
+status: done
 from: explorations/erp-ontology
 ---
 

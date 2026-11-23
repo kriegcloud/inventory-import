@@ -25,7 +25,7 @@ passing and a commit; the app is never broken between steps.
 | 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | done |
 | 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` | done |
 | 12 | The walk of each planted mistake through all nine gates (6.11), with the new fixtures of bans 2 and 5 added to it | Each row of SPEC's ban table names a test or a run that exists | done |
-| 13 | Close: `/quality-review-fix-loop`, the documents the build made false (report 14's sections SPEC names as replaced), the closing note | Reviewers' findings at zero required | todo |
+| 13 | Close: `/quality-review-fix-loop`, the documents the build made false (report 14's sections SPEC names as replaced), the closing note | Reviewers' findings at zero required | done |
 
 Steps 4 to 9 need no Java. Step 10 is the first that does.
 
@@ -54,7 +54,8 @@ here when it is.
 
 ## Current blocker
 
-Steps 1 to 12 are done; step 13 starts on Benjamin's word.
+None. Steps 1 to 13 are done. Nothing is pushed: the push, and so the first run of the CI job for gate 9, are
+Benjamin's.
 
 `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`), and six laws that came with it
 refused code this goal wrote: `diagnostics:check` (15 `@effect-diagnostics` directives), `defaults:check` (25
@@ -283,6 +284,10 @@ Where the design left a choice open, or the code showed it could not be followed
   run the workflow, and neither has anyone: what GitHub does with it (the Java action, the cache's save and
   restore) is unseen until a push. One case stays as the script has it: a kept jar that later reads back
   damaged is refused by the hash on every run, and is cleared by deleting that cache entry by hand.
+- **Step 13's panel was eight reviewers, not the skill's ten, and all of one model.** The roles were acceptance,
+  boundaries, schema rules, Effect code, tests, comments and JSDoc, reuse, and documents; Grok 4.7 was the only
+  route with quota. Fixes were made by the orchestrator, and the ten skill files by one Grok fixer whose diff the
+  orchestrator read. The closing note has the rounds.
 - **Step 12's walk was made by the orchestrator and read by Grok 4.7** against the tests, the law and the
   design. It found the thirteen tests and runs under the names quoted, each asserting the failure its row says, and
   four things wrong in the text: why the law is silent on the inverse-functional file (its rule 4 does not list
@@ -355,4 +360,46 @@ test was named "planted" alone; it now names ban 5 as well, since SPEC lists `ga
 
 ## Closing note
 
-Written when the goal is done.
+Written on 2026-11-23, when step 13 closed.
+
+**What was built.** One module holds the thread's terms (`packages/kernel/src/Terms.vocab.ts`); the kernel's
+`Member`, `Role` and `Activity` records point at them through typed helpers (`Terms.pointer.ts`, made by
+`@beep/vocabulary`); `@inventory/ontology` projects the module to OWL and SKOS Turtle, lifts a record to triples,
+answers CQ-P06 and CQ-P11, and holds seven of the nine gates as tests, the ninth a reasoner; the law
+`ontology-terms` is the eighth and the type-check the sixth. SPEC's eleven acceptance lines are ticked, each against
+the file that proves it.
+
+**How it was closed.** `/quality-review-fix-loop`, two rounds of eight read-only reviewers (Grok 4.7; the Claude,
+Codex and Cursor routes were out of quota), each on a commit where `bun run check` (105 tasks) and
+`bun run check:full` (112 tasks, gate 9 among them) passed.
+
+| Round | Commit read | Required findings | What they were |
+| --- | --- | --- | --- |
+| 1 | `064c55a5` | 20 reported, some twice | SPEC and PLAN still told the goal as unbuilt; five schemas outside the schema rules (a language tag checked in code, a parsed triple not decoded, an optional `reverse`, a no-term mark not a tagged union, gate 9's values plain objects); two comments that said what the code does not do; the law's own copy of the base IRI, tied to nothing; the skills, the profile, the brief, the packet's README, report 14 and CLAUDE.md saying "not built" of what is |
+| 2 | `aaa7dcca` | 9 reported, 5 apart | The documents said the close was finished before this note was written; CLAUDE.md's `check:ci` row did not say it leaves out `reason`; the brief's note missed two sentences; two skills still defined a ratified term by a `rat-` file alone; one skill called the packet untracked |
+
+Every finding was checked against the code and fixed, the ones not required too: gate 9 kills a run that ignores
+the stop, asks Java its version in a folder that exists and prints a stop that is no refusal; a test holds gist's
+version IRI to the release the module names; every schema of the ontology package has a property test; the read
+side's list of no-term reasons is made from the written side's.
+
+**Left, and said.**
+
+- The law keeps its own lists of the helpers' and makers' names; nothing ties them to what the two modules export.
+  A helper added under a new name is not seen by rule 6 until the list is edited. Backlog, not fixed.
+- The CI job `reason` has never run on GitHub: nothing of this branch is pushed.
+- Not built, as SPEC's "Out" says: SHACL over the stored rows, alignments, any term beyond the thread's, the party
+  slice.
+
+**What was learned.**
+
+- A gate is only shown by a planted mistake that fails it and nothing else. The walk found two design claims that
+  did not hold as built (row 6's file, row 3's name) only because each mistake was run.
+- A merge of `main` can bring laws that refuse code written the day before (six did). Meeting them in the code,
+  with no ledger line, took one commit; a ledger line would have been debt the goal's own acceptance forbids.
+- Documents go false faster than code. Round 1's largest group was prose that still said "not built", in ten skill
+  files nobody had listed as part of the goal. The close has to search for the old sentence, not for the files the
+  plan names.
+- A reviewer that cannot start Java can still review gate 9: its verdicts are decided in `src/Reason.ts`, apart
+  from the script that runs the machine. Keeping the decision out of the script is what made it readable and
+  testable without ROBOT.

@@ -23,7 +23,8 @@ reviewable, and validated before merging.
 
 Read `../_shared/project-profile.md` first; it wins over this file. Benjamin is the named steward, and a
 ratification is his answer scribed in a `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/`,
-mirrored one line in the packet's `DECISIONS.md`. One TypeScript vocabulary module
+mirrored one line in the packet's `DECISIONS.md`. The thin thread's terms have no `rat-` file: decision 111 ratifies
+them as a set (decision 107). One TypeScript vocabulary module
 owns every term fact and all Turtle is generated from it, so a change is never made in a `.ttl` or `.obo` file.
 The thin thread is built: `packages/kernel/src/Terms.vocab.ts`, the projector in `packages/ontology`, the generated
 Turtle, CQ-P06 and CQ-P11, the law `bun run beep laws ontology-terms`, and the reasoner step. SHACL over the stored

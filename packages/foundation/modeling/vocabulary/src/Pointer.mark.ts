@@ -229,7 +229,8 @@ export const LiftPathRead = S.TupleWithRest(S.Tuple([]), [NodeStepRead, ValueSte
 /** Runtime type of {@link LiftPathRead}. */
 export type LiftPathRead = typeof LiftPathRead.Type
 
-const NoTermKind = LiteralKit(["transport", "request", "screen", "error", "bookkeeping", "deferred"])
+// The reasons of the closed list, and `deferred`: one list, so a reason added to it is a case here too.
+const NoTermKind = LiteralKit([...NoTermReason.literals, "deferred"])
 
 /** A no-term mark, as read: the position only carries a value across the wire. */
 export class TransportNoTermRead extends S.Opaque<TransportNoTermRead, { readonly brand: unique symbol }>()(

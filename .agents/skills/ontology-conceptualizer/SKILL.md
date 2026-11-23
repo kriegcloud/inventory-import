@@ -28,7 +28,8 @@ that is the architect's job.
 
 Read `../_shared/project-profile.md` first; it wins over this file. The steward is Benjamin. A ratified term is one with
 a `rat-` record under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/` (mirrored in the
-packet's `DECISIONS.md`); decisions 1 to 7 ratify no term by name. There is no `ontologies/{name}/`.
+packet's `DECISIONS.md`); decisions 1 to 7 ratify no term by name. The thin thread's terms are the exception: they are
+ratified as a set by decision 111 in `DECISIONS.md`, with no `rat-` file (decision 107), and are already in the module. There is no `ontologies/{name}/`.
 
 | Upstream step or output | Here |
 | --- | --- |
@@ -72,7 +73,7 @@ before beginning work:
 
 ### Step 1: Glossary of Terms
 
-> Here: the ratification record is the `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/`; the glossary is a table in a research report, not `glossary.csv`, and its upper column is the gist parent.
+> Here: the ratification record is the `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/` (for a thread term, decision 111 in `DECISIONS.md`); the glossary is a table in a research report, not `glossary.csv`, and its upper column is the gist parent.
 
 INPUT RULE (governs every step below): this skill operates on RATIFIED
 terms — `governance/ratifications/` records plus the proposals they

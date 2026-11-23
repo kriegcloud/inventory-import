@@ -7,11 +7,14 @@ description: The first goal of the ERP ontology and the order the rest follows, 
 # Brief: the ERP vocabulary
 
 Since this brief was signed (decision 119) the thin thread has been built, on 2026-11-23, as the goal
-[erp-vocabulary](../../goals/erp-vocabulary/SPEC.md). The text below is the brief as signed. Four of its sentences
+[erp-vocabulary](../../goals/erp-vocabulary/SPEC.md). The text below is the brief as signed. Some of its sentences
 are no longer so: gate 9 is built (`packages/ontology/scripts/reason.ts`, two consistent runs and three
 inconsistent), not "still unbuilt"; the forbidden conclusions are drafted and signed, five of them, in the goal's
 SPEC (decision 121); gate 8 runs two questions, CQ-P06 and CQ-P11 (decision 120), not one; and the thread's done
-line is the SPEC's acceptance list. The Map's later slices are untouched.
+line is the SPEC's acceptance list. Two more: the Problem's "no record points at a term" no longer holds for the records the thread marked (the
+kernel's `Member`, `Role` and `Activity`), and still holds for every other record; and the CURIE registries and gate
+5's notation check were tried in the kernel itself (the goal's PLAN, step 2), so the scratchpad trial the brief
+names is no longer owed. The Map's later slices are untouched.
 
 Decisions 1 to 7 of [DECISIONS.md](DECISIONS.md) fixed the shape: the ontology is the model of record for this
 repository's contexts, with Sutton a mapping (1); one TypeScript vocabulary module owns every term fact and all Turtle

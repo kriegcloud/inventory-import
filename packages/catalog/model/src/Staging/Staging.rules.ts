@@ -5,7 +5,7 @@
  * what Excel displays when that differs.
  */
 import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
-import { StagedTable, maxStagedRows } from "@inventory/catalog-contract/Staged"
+import { StagedTable, maxColumns, maxNotes, maxStagedRows } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
 import * as O from "effect/Option"
@@ -29,14 +29,62 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
           : { text: cell.text, shown: cell.shown }
       )
     })),
-    notes: A.map(table.notes, (note) => ({
-      kind: note.kind,
-      level: note.level,
-      message: note.message,
-      rows: note.rows
-    }))
+    notes: keptNotes(table.notes)
   }
 }
+
+/**
+ * The reader's notes as staged: all of them when they fit `maxNotes`. Past it, they are kept in three tiers, each in
+ * the reader's order: the warnings (a total row, a second table, a hidden sheet; the review reads the total row's),
+ * then every information note but the number-format ones (rows above the heading, blank rows, how dates or spaces
+ * were read), then the notes on a number format Excel shows another way, which a workbook can have thousands of. One more note says how many were not
+ * kept. It is a warning when a warning was among them, so the person is shown it on the Review step; else it is
+ * information, as the notes it counts were.
+ *
+ * @example keptNotes(notes).length // at most maxNotes
+ */
+const keptNotes = (notes: SpreadsheetTable["notes"]): StagedTable["notes"] => {
+  const staged = A.map(notes, (note) => ({
+    kind: note.kind,
+    level: note.level,
+    message: note.message,
+    rows: note.rows
+  }))
+  if (staged.length <= maxNotes) return staged
+  const warnings = A.filter(staged, isWarning)
+  const room = maxNotes - 1
+  const kept = A.take(
+    [
+      ...warnings,
+      ...A.filter(staged, (note) => !isWarning(note) && !isFormatNote(note)),
+      ...A.filter(staged, (note) => !isWarning(note) && isFormatNote(note))
+    ],
+    room
+  )
+  const left = staged.length - kept.length
+  const warningsLeft = warnings.length - A.filter(kept, isWarning).length
+  return A.append(
+    kept,
+    warningsLeft > 0
+      ? {
+          kind: "notesNotKept",
+          level: "warning",
+          message: `${left} more notes about how the file was read were not kept, ${warningsLeft} of them warnings: look the file over in Excel before importing it.`,
+          rows: []
+        }
+      : {
+          kind: "notesNotKept",
+          level: "info",
+          message: `${left} more notes about how the file was read were not kept.`,
+          rows: []
+        }
+  )
+}
+
+const isWarning = (note: { readonly level: "info" | "warning" }): boolean => note.level === "warning"
+
+// The reader writes one of these for each number format Excel shows another way: the notes a file can have most of.
+const isFormatNote = (note: { readonly kind: string }): boolean => note.kind === "formatNotShown"
 
 /**
  * Why a file cannot be staged, as a `FileProblem` for the person, or null when it can. It takes counts, not rows, so
@@ -54,7 +102,7 @@ export const stagingProblem = (input: {
   const { fileName, rowCount, columnCount } = input
   if (rowCount <= 0) return fileProblem.noRows({ fileName })
   if (rowCount > maxStagedRows) return fileProblem.tooManyRows({ fileName, rows: rowCount, limit: maxStagedRows })
-  if (columnCount > 200) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
+  if (columnCount > maxColumns) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
   return null
 }
 
@@ -67,4 +115,4 @@ export const stagingProblem = (input: {
  * @example readerWarnings({ notes: [{ kind: "delimiter", level: "info", message: "Columns are separated by tabs.", rows: [] }] }) // []
  */
 export const readerWarnings = (table: Pick<StagedTable, "notes">): ReadonlyArray<StagedTable["notes"][number]> =>
-  A.filter(table.notes, (note) => note.level === "warning")
+  A.filter(table.notes, isWarning)

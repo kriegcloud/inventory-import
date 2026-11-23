@@ -48,11 +48,14 @@ export const UploadKey = S.String.check(S.isMinLength(1), S.isMaxLength(64)).pip
 /** The decoded value of `UploadKey`. */
 export type UploadKey = typeof UploadKey.Type
 
+/** A row id's form: `row-` and the row's number, then `.` and the part when the row holds several items. */
+export const rowIdPattern = /^row-[1-9][0-9]{0,6}(\.[1-9][0-9]{0,3})?$/
+
 /**
  * One item of a file, as the review, the saved decisions and the confirm name it: its row's number, and its part
  * when the row holds several items ("row-56", "row-8.2").
  */
-export const RowId = S.String.check(S.isPattern(/^row-[1-9][0-9]{0,6}(\.[1-9][0-9]{0,3})?$/))
+export const RowId = S.String.check(S.isPattern(rowIdPattern))
   .annotate({ examples: ["row-7"] })
   .pipe(
     S.brand("RowId"),

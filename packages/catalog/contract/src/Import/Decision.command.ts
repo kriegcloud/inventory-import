@@ -1,16 +1,30 @@
 // What the person decided for one row of a file, as code holds it and as it is stored and sent (its flags), the
 // id of one item of a file, and the change to the saved decisions a screen sends.
+import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaTransformation from "effect/SchemaTransformation"
-import { RowId } from "../Catalog.id.ts"
+import { RowId, rowIdPattern } from "../Catalog.id.ts"
 import { fields } from "../Staging/Staged.read.ts"
 import { nullAsNone } from "@inventory/kernel/Wire"
 
 const bounded = (max: number) => S.String.check(S.isMaxLength(max))
+
+// A field of an item as text: the type a decision has always held, checked against the list of fields (`Field`), so
+// a decision can name nothing else. Text, not the literal type, because the screens and the server build decisions
+// from columns they hold as text.
+const fieldName = S.String.check(S.isPattern(new RegExp(`^(${A.join(fields, "|")})$`)))
+
+// Fields a decision names: each one once.
+const fieldList = S.Array(fieldName).check(S.isUnique(), S.isMaxLength(fields.length))
+
+// A row id as text: the key a draft has always held, checked against the row id's form (`RowId`). A key of any other
+// form names no row, so a record drops it and a list refuses it.
+const rowKey = S.String.check(S.isPattern(rowIdPattern))
 
 /**
  * A row's decision as it is stored and sent, the flags a draft has always held: left out, kept over
@@ -27,18 +41,19 @@ export const RowDecisionFlags = S.Struct({
       "True: the person kept this row over another with the same SKU (rows 4 and 10 both say YDR-8742). Leave it out otherwise",
     examples: [true]
   }),
-  accepted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotateKey({
+  accepted: S.optionalKey(fieldList).annotateKey({
     description:
       "Fields whose proposal the person accepted: a rule's, or a stored suggestion's. Leave it out when none was accepted",
     examples: [["unitCost"]]
   }),
-  reverted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotateKey({
+  reverted: S.optionalKey(fieldList).annotateKey({
     description:
-      "Fields whose fix or proposal the person undid: the file's value stands. Leave it out when nothing was undone",
+      "Fields whose fix or proposal the person undid: the file's value stands. Leave it out when nothing was undone. A field also in `accepted` is read as accepted: it was taken again after it was undone",
     examples: [["uom"]]
   }),
-  edits: S.optionalKey(S.Record(bounded(40), bounded(32767)).check(S.isMaxProperties(fields.length))).annotateKey({
-    description: "Values the person typed, by field. Leave it out when nothing was typed",
+  edits: S.optionalKey(S.Record(fieldName, bounded(32767)).check(S.isMaxProperties(fields.length))).annotateKey({
+    description:
+      "Values the person typed, by field. Leave it out when nothing was typed. A key that is no field is not read",
     examples: [{ name: "Steel Tube 1in" }]
   }),
   stored: S.optionalKey(S.Literals(["keep", "replace"])).annotateKey({
@@ -178,14 +193,56 @@ const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
   ...(parts.stored.kind === "undecided" ? {} : { stored: parts.stored.kind })
 })
 
-// A decision as code holds it. Every part is there, empty when the person said nothing about it.
+/**
+ * The fields undone that the person did not take again: a field both accepted and undone was accepted after it was
+ * undone (the review region takes a field out of `accepted` when it is undone, and leaves an undone proposal in
+ * `reverted` when it is taken again, so the last act was the accept), and the review reads it as accepted (`inForce`
+ * in the model's review), so a decision holds it once, as accepted.
+ *
+ * @example undoneOnly(["uom", "name"], ["uom"]) // ["name"]
+ */
+const undoneOnly: {
+  (accepted: ReadonlyArray<string>): (reverted: ReadonlyArray<string>) => ReadonlyArray<string>
+  (reverted: ReadonlyArray<string>, accepted: ReadonlyArray<string>): ReadonlyArray<string>
+} = dual(2, (reverted: ReadonlyArray<string>, accepted: ReadonlyArray<string>): ReadonlyArray<string> =>
+  A.filter(reverted, (field) => !A.contains(accepted, field))
+)
+
+const isFieldName = S.is(fieldName)
+
+/**
+ * The flags read once, where an absent flag becomes an empty part. Flags are the wire's form of a decision, every key
+ * optional, and they reach here from three places: the wire and the store (the schema's decode) and the browser's own
+ * code, which builds a decision in that form (`decisionFromFlags`). This is the one place an absent flag is read;
+ * past it a decision has every part, so the two readers never disagree. A value typed under a key that names no field
+ * is not read, as the decision's record of edits drops it.
+ */
+const partsOfFlags = (flags: RowDecisionFlags) => {
+  const accepted = flags.accepted ?? []
+  const stored: typeof StoredChoiceKind.Type = flags.stored ?? "undecided"
+  return {
+    out: flags.out === true,
+    kept: flags.kept === true,
+    stored,
+    accepted,
+    reverted: undoneOnly(flags.reverted ?? [], accepted),
+    edits: R.filter(flags.edits ?? {}, (_value, field) => isFieldName(field))
+  }
+}
+
+// A decision as code holds it. Every part is there, empty when the person said nothing about it, and no field is
+// both accepted and undone.
 const RowDecisionParts = S.Struct({
   place: RowPlace,
   stored: StoredChoice,
-  accepted: S.Array(bounded(40)).check(S.isMaxLength(fields.length)),
-  reverted: S.Array(bounded(40)).check(S.isMaxLength(fields.length)),
-  edits: S.Record(bounded(40), bounded(32767)).check(S.isMaxProperties(fields.length))
-})
+  accepted: fieldList,
+  reverted: fieldList,
+  edits: S.Record(fieldName, bounded(32767)).check(S.isMaxProperties(fields.length))
+}).check(
+  S.makeFilter((parts) => A.isReadonlyArrayEmpty(A.intersection(parts.accepted, parts.reverted)), {
+    expected: "a decision with no field both accepted and undone"
+  })
+)
 
 /**
  * What the person has decided about one row: where it stands, what happens to a stored item with its SKU, the
@@ -196,18 +253,20 @@ export const RowDecision = RowDecisionFlags.pipe(
   S.decodeTo(
     RowDecisionParts,
     SchemaTransformation.transform({
-      decode: (flags): (typeof RowDecisionParts)["Encoded"] => ({
-        place:
-          flags.out === true
-            ? { kind: "leftOut", wasKept: flags.kept === true }
-            : flags.kept === true
+      decode: (flags): (typeof RowDecisionParts)["Encoded"] => {
+        const parts = partsOfFlags(flags)
+        return {
+          place: parts.out
+            ? { kind: "leftOut", wasKept: parts.kept }
+            : parts.kept
               ? { kind: "kept" }
               : { kind: "open" },
-        stored: { kind: flags.stored ?? "undecided" },
-        accepted: flags.accepted ?? [],
-        reverted: flags.reverted ?? [],
-        edits: flags.edits ?? {}
-      }),
+          stored: { kind: parts.stored },
+          accepted: parts.accepted,
+          reverted: parts.reverted,
+          edits: parts.edits
+        }
+      },
       encode: (parts): RowDecisionFlags => flagsOf(parts)
     })
   )
@@ -236,21 +295,24 @@ export const decisionOf = (parts: Partial<RowDecision> = {}): RowDecision => ({
 export const decisionToFlags = (decision: RowDecision): RowDecisionFlags => flagsOf(decision)
 
 /**
- * The decision the stored flags say: what a test or a caller holding the wire form uses.
+ * The decision the flags say, read as the wire's are (`partsOfFlags`): for the browser's code that builds a decision
+ * in the wire's form, and for tests.
  *
  * @example decisionFromFlags({ out: true, kept: true }).place // { kind: "leftOut", wasKept: true }
  */
-export const decisionFromFlags = (flags: RowDecisionFlags): RowDecision =>
-  decisionOf({
-    place: flags.out === true ? placeLeftOut(flags.kept === true) : flags.kept === true ? placeKept : placeOpen,
-    stored: flags.stored === "keep" ? storedKeep : flags.stored === "replace" ? storedReplace : storedUndecided,
-    ...(flags.accepted === undefined ? {} : { accepted: flags.accepted }),
-    ...(flags.reverted === undefined ? {} : { reverted: flags.reverted }),
-    ...(flags.edits === undefined ? {} : { edits: flags.edits })
-  })
+export const decisionFromFlags = (flags: RowDecisionFlags): RowDecision => {
+  const parts = partsOfFlags(flags)
+  return {
+    place: parts.out ? placeLeftOut(parts.kept) : parts.kept ? placeKept : placeOpen,
+    stored: parts.stored === "keep" ? storedKeep : parts.stored === "replace" ? storedReplace : storedUndecided,
+    accepted: parts.accepted,
+    reverted: parts.reverted,
+    edits: parts.edits
+  }
+}
 
 /** Every row's decision by row id (`row-56`). This is the draft the server keeps while the person reviews. */
-export const SavedDecisions = S.Record(bounded(40), RowDecision)
+export const SavedDecisions = S.Record(rowKey, RowDecision)
   .check(S.isMaxProperties(50000))
   .annotate({ description: "Every row's decision by row id (`row-56`)" })
 /** The decoded value of `SavedDecisions`: every row's decision by row id (`row-56`). */
@@ -270,6 +332,14 @@ export const rowId = (input: { readonly rowNumber: number; readonly part?: numbe
     input.part === undefined || input.part === 0 ? `row-${input.rowNumber}` : `row-${input.rowNumber}.${input.part}`
   )
 
+// A row is either decided again or taken back in one change, never both: the screens make a change from one record
+// of rows, so a row that is in both names two things at once.
+const clearsNoRowItSets = S.makeFilter(
+  (delta: { readonly set: SavedDecisions; readonly clear: ReadonlyArray<string> }) =>
+    A.every(delta.clear, (row) => !R.has(delta.set, row)),
+  { expected: "no row both in `set` and in `clear`" }
+)
+
 /**
  * What changed in the draft since the last save: the rows whose decision is new or different, and the rows whose
  * decision was taken back. Only the difference travels, so two screens deciding different rows do not collide.
@@ -287,8 +357,8 @@ export const DecisionDelta = S.Struct({
     description: "The rows decided since the last save, each with its whole decision",
     messageMissingKey: "Send `set`: the decisions that are new, by row id, or {} for none."
   }),
-  clear: S.Array(S.String.check(S.isMaxLength(40)))
-    .check(S.isMaxLength(50000))
+  clear: S.Array(rowKey)
+    .check(S.isUnique(), S.isMaxLength(50000))
     .annotate({
       description: "Row ids (`row-7`) whose decision was taken back: they go back to what the file says",
       examples: [["row-18"]]
@@ -297,11 +367,13 @@ export const DecisionDelta = S.Struct({
       description: "The rows whose decision was undone since the last save",
       messageMissingKey: "Send `clear`: the row ids whose decision was taken back, or [] for none."
     })
-}).annotate({
-  identifier: "DecisionDelta",
-  description:
-    "What changed in the draft since the last save: the rows whose decision is new or different, and the rows whose decision was taken back"
 })
+  .check(clearsNoRowItSets)
+  .annotate({
+    identifier: "DecisionDelta",
+    description:
+      "What changed in the draft since the last save: the rows whose decision is new or different, and the rows whose decision was taken back"
+  })
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
 
@@ -309,7 +381,7 @@ export type DecisionDelta = typeof DecisionDelta.Type
 const Revision = S.Int.check(S.isGreaterThanOrEqualTo(0))
 
 // As bounded as the rows it speaks of: one key per row of `set` (or cleared row of a save's `over`), each a row id.
-const madeOn = S.Record(bounded(40), Revision)
+const madeOn = S.Record(rowKey, Revision)
   .check(S.isMaxProperties(50000))
   .annotate({
     description:
@@ -366,7 +438,7 @@ export type StaleAccept = typeof StaleAccept.Type
  * it, show both, ask"). A row not named here is a live press: the last one stands. A key naming no row of `set` or
  * `clear` is not read.
  */
-const over = S.Record(bounded(40), RowDecision.pipe(S.OptionFromNullOr, S.Array, S.check(S.isMaxLength(50))))
+const over = S.Record(rowKey, RowDecision.pipe(S.OptionFromNullOr, S.Array, S.check(S.isMaxLength(50))))
   .check(S.isMaxProperties(50000))
   .annotate({
     description:
@@ -389,11 +461,13 @@ export type DecidedSince = typeof DecidedSince.Type
  * difference only, so two screens deciding different rows do not collide; what they were made on, so a decision made
  * before a column it rests on was matched again is not applied; and for rows that waited, what they may be written over.
  */
-export const SaveRequest = S.Struct({ madeOn, over: over.pipe(S.optionalKey), ...DecisionDelta.fields }).annotate({
-  identifier: "SaveRequest",
-  description:
-    "A save of decisions: the revision of the draft they were made on, the rows whose decision is new or different, and the rows whose decision was taken back"
-})
+export const SaveRequest = S.Struct({ madeOn, over: over.pipe(S.optionalKey), ...DecisionDelta.fields })
+  .check(clearsNoRowItSets)
+  .annotate({
+    identifier: "SaveRequest",
+    description:
+      "A save of decisions: the revision of the draft they were made on, the rows whose decision is new or different, and the rows whose decision was taken back"
+  })
 /** The decoded value of `SaveRequest`. */
 export type SaveRequest = typeof SaveRequest.Type
 
@@ -414,10 +488,12 @@ export const ConfirmRequest = S.Struct({
   }),
   madeOn,
   ...DecisionDelta.fields
-}).annotate({
-  identifier: "ConfirmRequest",
-  description:
-    "A confirm: the draft's revision as the screen shows it, and the decisions made on that screen that are not saved yet (new or different in `set`, taken back in `clear`)"
 })
+  .check(clearsNoRowItSets)
+  .annotate({
+    identifier: "ConfirmRequest",
+    description:
+      "A confirm: the draft's revision as the screen shows it, and the decisions made on that screen that are not saved yet (new or different in `set`, taken back in `clear`)"
+  })
 /** The decoded value of `ConfirmRequest`. */
 export type ConfirmRequest = typeof ConfirmRequest.Type

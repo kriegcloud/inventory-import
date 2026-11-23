@@ -178,6 +178,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/schema": "workspace:*",
+        "@beep/xlsx": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "effect": "catalog:",
       },

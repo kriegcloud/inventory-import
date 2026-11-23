@@ -11,7 +11,7 @@ import { Story } from "@alchemy.run/domain/Story"
 import { expect, it } from "@effect/vitest"
 import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId, RowId } from "@inventory/catalog-contract/Ids"
-import type { StagedTable } from "@inventory/catalog-contract/Staged"
+import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { type Actor, CurrentActor } from "@inventory/catalog-model/Actor"
 import {
   DecidedSince,
@@ -1430,16 +1430,20 @@ it("the fold: of two groups over a row the later is laid over the earlier, and i
   expect(flagsOf(fold({ own: {}, groups: [later(9), earlier] }))).toEqual({ "row-1": { edits: { uom: "EA" } } })
 })
 
+// Three distinct fields of an item stand for a row's columns: one with a proposal, one typed in, one a rule fixed. A
+// saved decision names only fields, so made-up columns would be refused where the fold saves them.
+const [fieldProposed, fieldTyped, fieldApplied] = fields
 const why = Why.make({ basis: "the file's other rows" })
 const unitFix = (column: string, to: string, group?: string) =>
   Fix.make({ column, to, kind: "unit", confidence: O.none(), ...(group === undefined ? {} : { group }), why })
-const plainRow = (id: string, line: number) => ReviewRow.make({ id, line, cells: { a: "x", b: "x", c: "x" } })
+const plainRow = (id: string, line: number) =>
+  ReviewRow.make({ id, line, cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" } })
 const groupedRow = (id: string, line: number, to: string) =>
   ReviewRow.make({
     id,
     line,
-    cells: { a: "x", b: "x", c: "x" },
-    problem: Problem.make({ kind: "unit", column: "a", fix: unitFix("a", to, "g") })
+    cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
+    problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, to, "g") })
   })
 
 it.effect("the fold equals `act` on a group only when the group's rows are split by exactly what each got", () =>
@@ -2041,13 +2045,13 @@ it.effect(
         ReviewRow.make({
           id: "row-14",
           line: 14,
-          cells: { a: "x", b: "x", c: "x" },
-          problem: Problem.make({ kind: "unit", column: "a", fix: unitFix("a", "X", "g") })
+          cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
+          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", "g") })
         })
       ]
       const presses: ReadonlyArray<readonly [Actor, Action]> = [
         [ana, { type: "acceptGroup", groupId: "g", except: [] }],
-        [dana, { type: "edit", rowId: "row-14", column: "b", value: "KG" }],
+        [dana, { type: "edit", rowId: "row-14", column: fieldTyped, value: "KG" }],
         [ana, { type: "undo" }]
       ]
       const run = yield* twoOn(rows, presses, right)
@@ -2056,7 +2060,7 @@ it.effect(
       expect(A.map(run.groups, (group) => ({ change: group.change, undoneAt: group.undoneAt }))).toEqual([
         { change: 1, undoneAt: 3 }
       ])
-      expect(run.folded).toEqual({ "row-14": { accepted: ["a"], edits: { b: "KG" } } })
+      expect(run.folded).toEqual({ "row-14": { accepted: [fieldProposed], edits: { [fieldTyped]: "KG" } } })
       // One shared history has no answer: its undo would write Ana's step over Dana's later decision.
       expect(run.answered).toBe(false)
       expect(run.translation).toEqual([])
@@ -2072,8 +2076,8 @@ it.effect("a row's undo from a screen that has not received an undo on the row i
     const rows = [groupedRow("row-1", 1, "EA")]
     const side = modelSide({ rows: rows.length, first: dana })
     const live = liveReview({ side, rows: () => rows, recheck: undefined })
-    yield* live.press(dana, { type: "edit", rowId: "row-1", column: "b", value: "KG" })
-    yield* live.press(ana, { type: "edit", rowId: "row-1", column: "b", value: "LB" })
+    yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" })
+    yield* live.press(ana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "LB" })
     const anas = yield* live.press(ana, { type: "undo" })
     const danas = yield* live.press(dana, { type: "undo" }, { ...right, screen: "behindAll" })
     // The story asserts the refusal, UndoneSince naming Ana and the change her undo took back, and nothing new on
@@ -2101,7 +2105,7 @@ it.effect("a row's undo under a later group is refused naming the group, and tak
     const changeOf = (sent: Sent): number =>
       Sent.$match(sent, { Nothing: () => 0, RowAct: ({ change }) => change, GroupAct: ({ change }) => change })
     // Dana types KG in row-1; Ana then sets the whole group to its proposal, row-1 included.
-    const typed = yield* live.press(dana, { type: "edit", rowId: "row-1", column: "b", value: "KG" })
+    const typed = yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" })
     const grouped = yield* live.press(ana, { type: "acceptGroup", groupId: "g", except: [] })
     const refused = yield* live.press(dana, { type: "undo" })
     const groupUndone = yield* live.press(ana, { type: "undo" })
@@ -2117,8 +2121,8 @@ it.effect("a row's undo under a later group is refused naming the group, and tak
     const refusedIn = yield* readAt(2)
     // After the refusal row-1 still reads through Ana's group, Dana's typed value under it, as before the press.
     expect(flagsOf(fold(refusedIn))).toEqual({
-      "row-1": { accepted: ["a"], edits: { b: "KG" } },
-      "row-2": { accepted: ["a"] }
+      "row-1": { accepted: [fieldProposed], edits: { [fieldTyped]: "KG" } },
+      "row-2": { accepted: [fieldProposed] }
     })
     expect(flagsOf(fold(refusedIn))).toEqual(flagsOf(fold(groupedIn)))
     // Once the group is taken back, the same undo is taken: row-1 holds nothing, and `act` says the same.
@@ -2138,24 +2142,24 @@ it.effect(
         ReviewRow.make({
           id: "row-1",
           line: 1,
-          cells: { a: "x", b: "x", c: "x" },
-          applied: [unitFix("c", "X")],
-          problem: Problem.make({ kind: "unit", column: "a", fix: unitFix("a", "X", "g") })
+          cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
+          applied: [unitFix(fieldApplied, "X")],
+          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", "g") })
         })
       ]
       const presses: ReadonlyArray<readonly [Actor, Action]> = [
-        [dana, { type: "revert", rowId: "row-1", column: "c", how: "undo" }],
+        [dana, { type: "revert", rowId: "row-1", column: fieldApplied, how: "undo" }],
         [ana, { type: "acceptGroup", groupId: "g" }],
-        // c is undone already: the press leaves row-1 as it is.
-        [dana, { type: "revert", rowId: "row-1", column: "c", how: "undo" }],
-        // `act` puts back what Ana's step held: c undone, nothing accepted.
+        // The applied field is undone already: the press leaves row-1 as it is.
+        [dana, { type: "revert", rowId: "row-1", column: fieldApplied, how: "undo" }],
+        // `act` puts back what Ana's step held: the applied field undone, nothing accepted.
         [ana, { type: "undo" }]
       ]
       // As C2 was first found: a step counts as naming a row only when it changed it, so Ana's undo has an answer.
       // Dana's second press leaves row-1 reading as it reads through Ana's group: the screen says so (`asItReads`),
-      // the model records nothing, and Ana's undo leaves c undone and nothing accepted, as `act` does. Before that
-      // answer the model recorded the press as Dana's whole decision, and the fold kept Ana's accept:
-      // `{"accepted":["a"],"reverted":["c"]}` against `act`'s `{"reverted":["c"]}`.
+      // the model records nothing, and Ana's undo leaves the applied field undone and nothing accepted, as `act`
+      // does. Before that answer the model recorded the press as Dana's whole decision, and the fold kept Ana's
+      // accept: the proposed field accepted and the applied one undone, where `act` had only the applied one undone.
       const written = yield* twoOn(rows, presses, { ...right, rows: "written" }, "changed")
       expect(written.last).toEqual([])
       const changed = yield* twoOn(rows, presses, right, "changed")

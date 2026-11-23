@@ -3,8 +3,9 @@
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as SchemaGetter from "effect/SchemaGetter"
 import { UploadKey } from "../Catalog.id.ts"
-import { maxStagedRows, StagedHead, StagedRow } from "./Staged.read.ts"
+import { maxStagedRows, StagedRow, UploadHead } from "./Staged.read.ts"
 
 /** Rows in one piece of an upload, and in one stored chunk of an import: the two are the same chunks. */
 export const chunkRows = 500
@@ -41,24 +42,76 @@ export type UploadDiscard = typeof UploadDiscard.Type
 export const uploadDiscard = (deleted: boolean): UploadDiscard =>
   deleted ? UploadDiscarded.make({}) : NothingToDiscard.make({})
 
-/** The start of an upload: the file without its rows, and how many rows will follow in how many pieces. */
-export const UploadStart = S.Struct({
+const UploadStartWire = S.Struct({
   key: UploadKey.annotateKey({
     description:
       "Chosen by the browser for this one file: a begin sent again with the same key (a retry after a lost answer) " +
       "is the same upload, not a second one"
   }),
-  head: StagedHead,
+  head: UploadHead,
   rowCount: S.Int.check(S.isBetween({ minimum: 1, maximum: maxStagedRows })).annotateKey({
     description: `Data rows the pieces will carry in all: 1 to ${maxStagedRows}, the most an import stages`,
     examples: [13]
   }),
   chunkCount: S.Int.check(S.isBetween({ minimum: 1, maximum: maxStagedRows })).annotateKey({
-    description:
-      "Pieces that will follow, numbered from 0: at least one, and never more than there are rows (each piece carries one at least)",
+    description: `Pieces that will follow, numbered from 0: each carries one row at least and ${chunkRows} at most, so never more pieces than rows, nor fewer than the rows need`,
     examples: [1]
   })
-}).annotate({
+}).check(
+  // Named on `chunkCount`, so the 400 says which field: the pieces are what cannot carry the rows.
+  S.makeFilter((start) =>
+    piecesCarry(start)
+      ? true
+      : {
+          path: ["chunkCount"],
+          issue: `${start.chunkCount} pieces cannot carry ${start.rowCount} rows: each carries one row at least and ${chunkRows} at most`
+        }
+  )
+)
+type UploadStartShape = typeof UploadStartWire.Type
+
+const isStartWire = S.is(UploadStartWire)
+
+/**
+ * True when the pieces can carry the rows: each piece one row at least and `chunkRows` at most.
+ *
+ * @example piecesCarry({ rowCount: 1200, chunkCount: 3 }) // true: pieces of 500, 500 and 200 rows
+ * @example piecesCarry({ rowCount: 2, chunkCount: 3 }) // false: a piece would be empty
+ */
+export const piecesCarry = (start: { readonly rowCount: number; readonly chunkCount: number }): boolean =>
+  start.chunkCount <= start.rowCount && start.chunkCount >= Math.ceil(start.rowCount / chunkRows)
+
+// What a generated start is drawn from: the rows, and how many a piece carries. The pieces are then counted, so every
+// start generated is one whose pieces carry its rows.
+const UploadStartSource = S.Struct({
+  key: UploadStartWire.fields.key,
+  head: UploadHead,
+  rowCount: UploadStartWire.fields.rowCount,
+  perPiece: S.Int.check(S.isBetween({ minimum: 1, maximum: chunkRows }))
+})
+
+// The wire's own check already holds that the pieces carry the rows: the declaration is here for what it generates.
+const PiecedStart = S.declare(isStartWire, {
+  identifier: "PiecedStart",
+  description: "A start whose pieces can carry its rows",
+  expected: `a start whose pieces each carry one row at least and ${chunkRows} at most`,
+  toCodecArbitrary: () =>
+    S.link<UploadStartShape>()(UploadStartSource, {
+      decode: SchemaGetter.transform((source: typeof UploadStartSource.Type) => ({
+        key: source.key,
+        head: source.head,
+        rowCount: source.rowCount,
+        chunkCount: Math.ceil(source.rowCount / source.perPiece)
+      })),
+      encode: SchemaGetter.forbiddenEncoding
+    })
+})
+
+/**
+ * The start of an upload: the file without its rows, and how many rows will follow in how many pieces. A start whose
+ * pieces cannot carry its rows (an empty piece, or one over `chunkRows`) is refused before anything is stored.
+ */
+export const UploadStart = UploadStartWire.pipe(S.decodeTo(PiecedStart)).annotate({
   identifier: "UploadStart",
   description: "The start of an upload: the file without its rows, and how many rows will follow in how many pieces"
 })

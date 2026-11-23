@@ -4,7 +4,12 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
-import { baselineFile, defaults, defaultsSentence } from "../src/commands/Laws/Defaults.rules.ts"
+import {
+  baselineFile,
+  defaults,
+  type DefaultsExemption,
+  defaultsSentence
+} from "../src/commands/Laws/Defaults.rules.ts"
 import { readDefaults, whatIsCounted } from "../src/commands/Laws/internal/defaultsCode.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
@@ -16,14 +21,19 @@ const places = (source: string, file = "a.tsx") =>
 
 // git answers "every file git would commit", "what the file held when it was committed" and "what main's baseline
 // says", so the folder is made a repository whose main holds what the test wrote, and `after` is written on a branch.
-const run = Effect.fn("run")(function* (write: boolean, only: ReadonlyArray<string> = [], after: Tree = {}) {
+const run = Effect.fn("run")(function* (
+  write: boolean,
+  only: ReadonlyArray<string> = [],
+  after: Tree = {},
+  exempt: ReadonlyArray<DefaultsExemption> = []
+) {
   const repo = yield* Repo
   yield* onMain()
   yield* Effect.forEach(R.toEntries(after), ([file, text]) => repo.write(repo.join(repo.root, file), text), {
     concurrency: 1,
     discard: true
   })
-  const found = yield* defaults(write, only)
+  const found = yield* defaults(write, only, exempt)
   return printed(render(defaultsSentence)(found))
 })
 
@@ -89,6 +99,20 @@ export const either = (a: boolean, b: boolean, n = 0, { m = 1 } = {}) => (a || b
     )
   })
 
+  it("takes a default given to a parameter or a destructured name, but not in a .tsx file", () => {
+    const source = `export const f = (n = 0, { m = 1 } = {}) => {
+  const { k = "a" } = { k: undefined }
+  return [n, m, k]
+}`
+    deepStrictEqual(places(source, "a.ts"), [
+      "1 fallback n = 0",
+      "1 fallback { m = 1 } = {}",
+      "1 fallback m = 1",
+      '2 fallback k = "a"'
+    ])
+    deepStrictEqual(places(source, "a.tsx"), [])
+  })
+
   it("says why a file was not read", () => {
     assertNone(readDefaults({ file: "a.ts", source: "export const a = 1" }).unread)
     const broken = readDefaults({ file: "a.ts", source: "export const = (x ?? 1" })
@@ -146,7 +170,7 @@ describe("the baseline", () => {
             repo.join(repo.root, held),
             `export const b = 1\n${twoFallbacks}export const c = (z?: string) => z ?? ""\n`
           )
-          const found = yield* defaults(false, [held])
+          const found = yield* defaults(false, [held], [])
           return printed(render(defaultsSentence)(found))
         })
       )
@@ -199,6 +223,57 @@ describe("the baseline", () => {
   )
 })
 
+describe("the exemptions", () => {
+  const reader = "packages/a/src/CellReading.rules.ts"
+  const tree = {
+    [reader]: `export const read = (cell: string) => cell.trim() ?? ""\n`,
+    "packages/a/src/other.ts": `export const a = 1\n`,
+    [baselineFile]: baseline({ [reader]: [1, 0, 0, 0] })
+  }
+  const exempt = [{ file: reader, kinds: ["normalise" as const], why: "a cell's reader" }]
+
+  it.effect("a file named keeps the kinds named and no other, and the same code elsewhere is refused", () =>
+    Effect.gen(function* () {
+      const named = yield* inTree(tree, run(false, [], {}, exempt))
+      deepStrictEqual(named, [
+        "out: defaults:check OK  2 files hold to the baseline (still held: 1 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+      const elsewhere = yield* inTree(
+        tree,
+        run(false, [], { "packages/a/src/other.ts": `export const a = (x: string) => x.trim()\n` }, exempt)
+      )
+      strictEqual(
+        A.some(elsewhere, (line) =>
+          Str.startsWith("err: packages/a/src/other.ts  holds 1 normalise, and may hold 0")(line)
+        ),
+        true
+      )
+      const unnamed = yield* inTree(tree, run(false))
+      strictEqual(
+        A.some(unnamed, (line) => Str.startsWith(`err: ${reader}  holds 1 normalise, and may hold 0`)(line)),
+        true
+      )
+    })
+  )
+
+  it.effect(
+    "an exemption for a file that is not there fails the run over the tree, and not one over a named file",
+    () =>
+      Effect.gen(function* () {
+        const gone = [{ file: "packages/a/src/gone.ts", kinds: ["normalise" as const], why: "was a reader" }]
+        const said = yield* inTree(tree, run(false, [], {}, [...exempt, ...gone]))
+        deepStrictEqual(said, [
+          `err: defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`,
+          "err: packages/a/src/gone.ts  is named in the law's exemptions but is not a file the law reads: take it off the list (Defaults.rules.ts)"
+        ])
+        const oneFile = yield* inTree(tree, run(false, ["packages/a/src/other.ts"], {}, gone))
+        deepStrictEqual(oneFile, [
+          "out: defaults:check OK  1 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"
+        ])
+      })
+  )
+})
+
 describe("against main", () => {
   it.effect("refuses a count raised above main's, and a file main's baseline does not name; follows a rename", () =>
     Effect.gen(function* () {
@@ -238,7 +313,7 @@ describe("against main", () => {
           yield* onMain()
           yield* repo.run("git", ["mv", held, moved])
           yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [moved]: [2, 0, 0, 0] }))
-          const found = yield* defaults(false, [])
+          const found = yield* defaults(false, [], [])
           return printed(render(defaultsSentence)(found))
         })
       )
@@ -272,15 +347,15 @@ describe("--write", () => {
         Effect.gen(function* () {
           const repo = yield* Repo
           yield* onMain()
-          const firstFound = yield* defaults(true, [])
+          const firstFound = yield* defaults(true, [], [])
           const first = printed(render(defaultsSentence)(firstFound))
           const stored = yield* repo.text(repo.join(repo.root, baselineFile))
           yield* repo.write(repo.join(repo.root, held), `export const a = (x?: number) => x ?? 0\n`)
-          const loweredFound = yield* defaults(true, [])
+          const loweredFound = yield* defaults(true, [], [])
           const lowered = printed(render(defaultsSentence)(loweredFound))
           const after = yield* repo.text(repo.join(repo.root, baselineFile))
           yield* repo.write(repo.join(repo.root, held), `${twoFallbacks}export const c = (z?: string) => z ?? ""\n`)
-          const raisedFound = yield* defaults(true, [])
+          const raisedFound = yield* defaults(true, [], [])
           const raised = printed(render(defaultsSentence)(raisedFound))
           const kept = yield* repo.text(repo.join(repo.root, baselineFile))
           return { first, stored, lowered, after, raised, kept }
@@ -315,12 +390,12 @@ describe("--write", () => {
           Effect.gen(function* () {
             const repo = yield* Repo
             yield* onMain()
-            const beforeFound = yield* defaults(false, [])
+            const beforeFound = yield* defaults(false, [], [])
             const before = printed(render(defaultsSentence)(beforeFound))
-            const wroteFound = yield* defaults(true, [])
+            const wroteFound = yield* defaults(true, [], [])
             const wrote = printed(render(defaultsSentence)(wroteFound))
             const stored = yield* repo.text(repo.join(repo.root, baselineFile))
-            const afterFound = yield* defaults(false, [])
+            const afterFound = yield* defaults(false, [], [])
             const after = printed(render(defaultsSentence)(afterFound))
             return { before, wrote, stored, after }
           })

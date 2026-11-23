@@ -1858,3 +1858,34 @@ setup command checks the token's permissions against what previews and staging m
 anything is made. Rejected: adding production's login as a member of the second account, so the stack could keep
 making a narrow token there. Reverse: add that login as a member, put `PreviewDeployToken` back in
 `packages/infra/src/GitHub.stack.ts`, and deploy the stack; the plan then replaces the two secrets.
+
+### 2026-11-23 — the defaults law: what stays on purpose, and the order of the sweep
+
+Question: the law that counts fallbacks, absence checks, unwraps and clean-ups in code was on `main` with 2,027
+places in 239 files. Seven things were open before the places could be moved onto schemas.
+Answer: I chose each; the agent recommended the same each time.
+
+- A cell of a file the person reviews keeps its reader. The small function that returns a value or a reason stays,
+  and its trim or change of case stays in it: no schema decodes a cell to a clean value. Rejected: a schema that
+  does the clean-up and hands the review a proposal; a schema that decodes only after the person accepted.
+- The law tells those places by file. It holds a list of files, each with the kinds it keeps and the reason
+  (`exemptions` in `Laws/Defaults.rules.ts`), and code that reads a cell is gathered into such a file. It starts
+  with `CellReading.rules.ts` and its 15 clean-ups; what reads a cell inside `Review.rules.ts` (41 clean-ups) and
+  `Suggest.rules.ts` (15) moves during the sweep. Rejected: a comment on each line; leaving them in the baseline.
+- An optional prop of our own React component stays `?:` and takes its default in the destructuring. `Option` is for
+  data that came through a schema. Rejected: every optional prop an `Option`; the law exempting props.
+- A default on a parameter or a destructured name is counted as a fallback in every `.ts` file and left alone in
+  `.tsx`. It added 143 places: the baseline stands at 2,155 in 253 files. Rejected: counting only in contract, model
+  and host packages; not counting.
+- The sweep starts with the catalog's contract, model and host packages. Rejected: the small server packages; the
+  review region; the catalog's screens.
+- That first sweep is done when no line of the baseline names those three packages, the exempt files apart. A place
+  that seems to need staying is a question to me. Rejected: a pull request for each package; best effort with a list
+  of what was left.
+- One session does the first sweep by hand as the worked example; after it Codex lanes take a package each.
+  Rejected: a session for each package; Codex lanes from the start; no sweep, the ratchet only.
+
+Not decided: whether a cell reader's fallbacks and absence checks are exempt too. `CellReading.rules.ts` holds 12
+and 14, and the law still counts them. Reverse: take a file off `exemptions`, or the `AssignmentPattern` line out of
+`internal/defaultsCode.ts`, and run `bun run beep laws defaults --write` (the baseline's `reads` lets it be written
+anew).

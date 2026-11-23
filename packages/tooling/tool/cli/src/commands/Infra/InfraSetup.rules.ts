@@ -449,7 +449,7 @@ const reasonOf = (answer: { readonly stdout: string; readonly stderr: string }) 
 
 /**
  * Whether op's lines say its client never reached the 1Password app, as in Benjamin's run ("error initializing
- * client: connecting to desktop app"). Every other error of op is 1Password answering and refusing.
+ * client: connecting to desktop app").
  *
  * @example
  * onePasswordUnreachable("[ERROR] 2026/11/22 10:00:00 error initializing client: connecting to desktop app: read: connection reset") // true
@@ -461,20 +461,76 @@ export const onePasswordUnreachable = (stderr: string): boolean =>
     (line) => Str.includes("error initializing client")(line) || Str.includes("connecting to desktop app")(line)
   )
 
+/** How a failure of op reads: the app never reached, the app reached and not letting the call through, a reference
+ * it refused, or words that settle none of them. */
+export const OnePasswordFailure = LiteralKit(["unreachable", "held", "refused", "unclear"]).pipe(
+  $I.annoteSchema("OnePasswordFailure", {
+    description:
+      "How a failure of op reads: the app never reached, the app not letting the call through, a reference refused, or none of these said"
+  })
+)
+export type OnePasswordFailure = typeof OnePasswordFailure.Type
+
+// op's words for an app that is locked, a CLI that is not signed in, and an approval prompt dismissed or left to
+// time out ("You are not currently signed in", "authorization prompt dismissed"). None was seen on this machine,
+// so a line with none of these words and none of a reference's is said as either, never guessed.
+const heldWords = ["not signed in", "not currently signed in", "is locked", "prompt dismissed", "timed out", "timeout"]
+// op's words for a reference it read and could not fill: no such vault, item or field.
+// Both lists are matched outside the names op quotes ("Cloudflare timeout token", 'op://v/i/f'): a vault, item or
+// field may be named with any of these words, and its name says nothing about why op failed.
+const refusedWords = [
+  "isn't a vault",
+  "isn't an item",
+  "isn't a field",
+  "could not resolve item",
+  "no item matched",
+  "invalid secret reference"
+]
+
+/**
+ * Which failure op's lines say: an app never reached, one that did not let the call through (locked, signed out, a
+ * prompt dismissed or timed out), a reference refused, or none of these said. The advice follows from it, so a
+ * locked app is never sent to look at references that are fine.
+ *
+ * @example
+ * onePasswordFailure("[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, please try again") // "held"
+ * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "x" isn\'t an item in the "v" vault') // "refused"
+ * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "v" vault') // "refused"
+ */
+export const onePasswordFailure = (stderr: string): OnePasswordFailure => {
+  const unquoted = A.map(linesOf(Str.toLowerCase(stderr)), Str.replaceAll(/"[^"]*"|'op:\/\/[^']*'/g, '""'))
+  const says = (words: ReadonlyArray<string>) =>
+    A.some(unquoted, (line) => A.some(words, (word) => Str.includes(word)(line)))
+  if (onePasswordUnreachable(stderr)) return "unreachable"
+  if (says(heldWords)) return "held"
+  if (says(refusedWords)) return "refused"
+  return "unclear"
+}
+
 /** Where to look when 1Password answered and refused: the reference a run fills, or the vault it lists or writes. */
 const referencesRefused = `the references in ${localEnvFile} it fills (each names a vault, an item and a field that exist, with no template line left)`
 
+/** What to do about an app op did not reach or that did not let a call through. */
+const theApp = `open the 1Password app and unlock it, approve its prompt when it asks, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal`
+
 /**
- * The stop for a call 1Password failed: what op said (its error lines carry no value) and where to look. An app op
- * never reached is said as that, with where to look for it; any other error is 1Password refusing, with where the
- * fix is. Nothing about the token or the account is said, since nobody asked Cloudflare anything.
+ * The stop for a call 1Password failed: what op said (its error lines carry no value) and where to look, as
+ * `onePasswordFailure` reads it. Where op's words settle nothing, both places are named. Nothing about the token or
+ * the account is said, since nobody asked Cloudflare anything.
  */
-const onePasswordFailed = (what: string, stderr: string, refused: string) =>
-  stop(
-    onePasswordUnreachable(stderr)
-      ? `1Password did not answer, so ${what} was never asked: ${reasonOf({ stdout: "", stderr })}. Open the 1Password app and unlock it, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal. Nothing was changed.`
-      : `1Password refused ${what}: ${reasonOf({ stdout: "", stderr })}. Check ${refused}, then run this again. Nothing was changed.`
+const onePasswordFailed = (what: string, stderr: string, refused: string) => {
+  const words = reasonOf({ stdout: "", stderr })
+  return stop(
+    OnePasswordFailure.match(onePasswordFailure(stderr), {
+      unreachable: () =>
+        `1Password did not answer, so ${what} was never asked: ${words}. To fix it, ${theApp}. Nothing was changed.`,
+      held: () => `1Password did not let ${what} through: ${words}. To fix it, ${theApp}. Nothing was changed.`,
+      refused: () => `1Password refused ${what}: ${words}. Check ${refused}, then run this again. Nothing was changed.`,
+      unclear: () =>
+        `1Password stopped ${what}: ${words}. Either the app was locked or its prompt went unanswered (${theApp}), or it refused (check ${refused}). Nothing was changed.`
+    })
   )
+}
 
 /** Whether a failed call under `op-human` failed in 1Password: any failure of op itself, or op's lines from `op run`. */
 const failedInOnePassword = (call: Call, stderr: string) =>
@@ -657,29 +713,77 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
  */
 export const shellQuoted = (argument: string): string => `'${Str.replaceAll("'", "'\\''")(argument)}'`
 
+/** Which file a stack takes a variable's line from, and whether that line is a reference (`referenceGiven`). */
+type TakenLine = ReturnType<typeof referenceGiven>
+
+/**
+ * The stop a run makes before step 1 on what op.env and op.env.local hold, if it makes one: a line of op.env that is
+ * not a reference, his token's names taken from op.env, one of the two names without the other or not a reference,
+ * and staging without them. The run stops with it and the dry run says it, so the two never differ.
+ */
+export const filesStop = (input: {
+  readonly committed: string
+  readonly token: TakenLine
+  readonly accountId: TakenLine
+  readonly previewByToken: boolean
+  readonly sizes: ReadonlyArray<SetupSize>
+}): O.Option<string> => {
+  const { token, accountId } = input
+  // The tracked file holds comments and references and nothing else: a value typed there in any form would be
+  // committed with the reference this command writes, so any other line stops the run before it writes or says so.
+  const stray = strayLines(input.committed)
+  if (A.isReadonlyArrayNonEmpty(stray)) {
+    return O.some(
+      `${opEnvFile} is tracked by git and holds only comments and lines NAME=op://vault/item/field. Line ${A.join(A.map(stray, String), ", ")} is neither. If a value was typed there, take it out (and change it wherever it came from if the file was ever committed), then run this again. Nothing was started; no line was printed.`
+    )
+  }
+  // His token's references are his own: the commands that use them read op.env.local alone, and op.env is public.
+  const misplaced = A.filterMap(
+    [
+      [previewTokenName, token],
+      [previewAccountIdName, accountId]
+    ] as const,
+    ([name, given]) => (given.file === opEnvFile && given.state !== "missing" ? Result.succeed(name) : Result.failVoid)
+  )
+  if (A.isReadonlyArrayNonEmpty(misplaced)) {
+    const one = misplaced.length === 1
+    return O.some(
+      `${opEnvFile} names ${A.join(misplaced, " and ")}, and the repository's stack would take ${one ? "it" : "them"} from there. Your own token's references go in ${localEnvFile} (git ignores it): move ${one ? "that line" : "both lines"} there, then run this again. Nothing was started.`
+    )
+  }
+  if (
+    (token.state === "missing") !== (accountId.state === "missing") ||
+    token.state === "not-a-reference" ||
+    accountId.state === "not-a-reference"
+  ) {
+    return O.some(
+      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither; the last line of each name is the one taken. Nothing was started; no line was printed.`
+    )
+  }
+  if (!input.previewByToken && has(input.sizes, "staging")) {
+    return O.some(
+      `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
+    )
+  }
+  return O.none()
+}
+
 /** What `--dry-run` prints: every step in order, and that nothing was started. */
 export const dryRun = (input: {
   readonly options: SetupOptions
   /** Whether his own file names the previews' token: a run then asks cf nothing about that account. */
   readonly previewByToken: boolean
-  /** The token's names whose line the stack would take from the public op.env: a run stops before step 1. */
-  readonly misplaced?: ReadonlyArray<string>
+  /** The stop a run would make before step 1 on the two files as they are (`filesStop`). */
+  readonly stopsBefore?: O.Option<string>
 }): ReadonlyArray<string> => {
   const { options, previewByToken } = input
-  const misplaced = input.misplaced ?? []
   return [
     "Dry run: nothing is started and nothing is written. A run would do these steps, in this order:",
     `A run stops before its first tool when one of these is set in your shell or named in the root .env, since a deploy would use it in place of what the run checks: ${A.join(outranking(options.sizes), ", ")}.`,
-    ...(has(options.sizes, "staging") && !previewByToken
-      ? [
-          `As things are, a run stops before step 1: ${localEnvFile} does not name ${previewTokenName} and ${previewAccountIdName}, which the repository's stack needs.`
-        ]
-      : []),
-    ...(A.isReadonlyArrayNonEmpty(misplaced)
-      ? [
-          `As things are, a run stops before step 1: ${opEnvFile} names ${A.join(misplaced, " and ")}, which are your own and go in ${localEnvFile}.`
-        ]
-      : []),
+    ...O.match(input.stopsBefore ?? O.none(), {
+      onNone: () => [],
+      onSome: (said) => [`As things are, a run stops before step 1: ${said}`]
+    }),
     ...(previewByToken
       ? [
           `Before step 1, the previews' token (${localEnvFile}) is checked, and the previews' account is asked of cf in no step:`,
@@ -1257,7 +1361,7 @@ const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
     ])
     if (stored !== 0) {
       return yield* stop(
-        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR]", "error initializing client"), 1Password did not answer and Alchemy was never started: open the 1Password app and unlock it, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal.`
+        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR] …"), Alchemy was never started. When they say op never reached the app ("error initializing client"), that it is locked or not signed in, or that a prompt was dismissed or timed out, ${theApp}. When they say a vault, an item or a field "isn't" one, 1Password refused a reference: check ${referencesRefused}. Any other line of 1Password's may be either: try both, then run this again.`
       )
     }
     const now = yield* listed
@@ -1732,56 +1836,17 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOption
     accountId.state === "reference" &&
     token.file === localEnvFile &&
     accountId.file === localEnvFile
+  const stopsBefore = filesStop({ committed, token, accountId, previewByToken, sizes: options.sizes })
   if (options.dryRun) {
     const said = unsized ? ["No size was given, so these are the steps of all three sizes at once."] : []
-    const misplaced = A.filterMap(
-      [
-        [previewTokenName, token],
-        [previewAccountIdName, accountId]
-      ] as const,
-      ([name, given]) =>
-        given.file === opEnvFile && given.state !== "missing" ? Result.succeed(name) : Result.failVoid
-    )
-    return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken, misplaced })], workstation.say, {
+    return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken, stopsBefore })], workstation.say, {
       concurrency: 1,
       discard: true
     })
   }
   yield* ownerOnly
   yield* outside(options)
-  // The tracked file holds comments and references and nothing else: a value typed there in any form would be
-  // committed with the reference this command writes, so any other line stops the run before it writes or says so.
-  const stray = strayLines(committed)
-  if (A.isReadonlyArrayNonEmpty(stray)) {
-    return yield* stop(
-      `${opEnvFile} is tracked by git and holds only comments and lines NAME=op://vault/item/field. Line ${A.join(A.map(stray, String), ", ")} is neither. If a value was typed there, take it out (and change it wherever it came from if the file was ever committed), then run this again. Nothing was started; no line was printed.`
-    )
-  }
-  // His token's references are his own: the commands that use them read op.env.local alone, and op.env is public.
-  if (token.file === opEnvFile && token.state !== "missing") {
-    return yield* stop(
-      `${opEnvFile} names ${previewTokenName}, and the repository's stack would take it from there. Your own token's references go in ${localEnvFile} (git ignores it): move both lines there, then run this again. Nothing was started.`
-    )
-  }
-  if (accountId.file === opEnvFile && accountId.state !== "missing") {
-    return yield* stop(
-      `${opEnvFile} names ${previewAccountIdName}, and the repository's stack would take it from there. Your own token's references go in ${localEnvFile} (git ignores it): move both lines there, then run this again. Nothing was started.`
-    )
-  }
-  if (
-    (token.state === "missing") !== (accountId.state === "missing") ||
-    token.state === "not-a-reference" ||
-    accountId.state === "not-a-reference"
-  ) {
-    return yield* stop(
-      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither; the last line of each name is the one taken. Nothing was started; no line was printed.`
-    )
-  }
-  if (!previewByToken && has(options.sizes, "staging")) {
-    return yield* stop(
-      `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
-    )
-  }
+  if (O.isSome(stopsBefore)) return yield* stop(stopsBefore.value)
   const signUp = yield* signUpFor(options)
   // Before the first step, so a token that will not do is said before anything is made with it or beside it.
   if (previewByToken) yield* tokenChecked

@@ -1227,8 +1227,11 @@ const stockValue = (rows: ReadonlyArray<ReviewedRow>): string =>
  * only when every value reads exactly as an item stores it, through the file's own text, a form-only rule fix nobody
  * undid, or a decision the person made. Two rows with one SKU are both held until the person keeps one. A row whose
  * SKU reads and is stored is already there when it says what is stored, and also when another of its cells does not
- * read yet: the item is stored and the row adds nothing. When it reads as an item that says something else it waits
- * for the person to keep the stored item or replace it, and nothing stored changes without that.
+ * read yet: the item is stored and the row adds nothing. The exception is a row the person acted on (a typed value,
+ * an accepted proposal, or Replace): it waits and shows the cell that does not read (DECISIONS.md, "A stored SKU that
+ * reads, with another cell that does not, on a row the person acted on"). When a row reads as an item that says
+ * something else it waits for the person to keep the stored item or replace it, and nothing stored changes without
+ * that.
  */
 export const review = (input: {
   readonly table: StagedTable
@@ -1288,14 +1291,21 @@ export const review = (input: {
     const item = toItem(values)
     // It differs only when the row reads as an item and that item says something else than what is stored: then it
     // asks. A row whose SKU reads and is stored, with another cell that does not read yet, is already there all the
-    // same: the item is stored, nothing in the row is compared, and nothing stored changes. Only a SKU that does not
-    // read yet as written (lower case, with its proposal open) keeps the row waiting, until the SKU reads.
+    // same: the item is stored, nothing in the row is compared, and nothing stored changes. Two things keep such a
+    // row waiting: a SKU that does not read yet as written (lower case, with its proposal open), until it reads, and
+    // the person's own act on the row (`theirs`, below).
     const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
     const replace = differs && StoredChoice.guards.replace(decision.stored)
-    // What the person did to this row stands: a row they typed a value on, or chose to replace the stored item
-    // with, is not put away as already there because a cell of it stopped reading. It waits and shows that cell.
-    const theirs = !R.isEmptyRecord(decision.edits) || StoredChoice.guards.replace(decision.stored)
+    // What the person did to this row stands: a row they typed a value on, accepted a proposal on, or chose to
+    // replace the stored item with, is not put away as already there because a cell of it does not read. It waits
+    // and shows that cell. An accepted proposal counts as a typed value does: the same SKU reached either way gives
+    // the same outcome. Decided in DECISIONS.md: "A stored SKU that reads, with another cell that does not, on a row
+    // the person acted on".
+    const theirs =
+      !R.isEmptyRecord(decision.edits) ||
+      A.isReadonlyArrayNonEmpty(decision.accepted) ||
+      StoredChoice.guards.replace(decision.stored)
     const already =
       mine ||
       (O.isSome(storedItem) &&

@@ -25,6 +25,8 @@ import {
   referenceState,
   subdomainCall,
   subdomainSaid,
+  filesStop,
+  onePasswordFailure,
   onePasswordSaid,
   onePasswordUnreachable,
   shellQuoted,
@@ -58,6 +60,9 @@ const opDownSaid =
 
 /** What op says when it reached the app and the reference named no item: 1Password answered, and refused. */
 const opRefusedSaid = "[ERROR] 2026/11/22 10:00:00 could not resolve item: no item matched the reference"
+
+/** What op says when the app was reached and its approval prompt was dismissed: 1Password held the call back. */
+const opHeldSaid = "[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, please try again"
 
 /** A value no line of output and no argument may ever hold. */
 const secret = "sk-live-do-not-print"
@@ -95,6 +100,8 @@ interface World {
   opDown: O.Option<string>
   /** Part of the `op-human` calls 1Password answers and refuses: the reference names no item. */
   opRefuses: O.Option<string>
+  /** Part of the `op-human` calls 1Password holds back: the app is locked or its prompt was dismissed. */
+  opHeld: O.Option<string>
   /** What a failing `op-human item create` writes. */
   createFails: O.Option<string>
   /** What `cf accounts tokens verify` answers in place of its usual answer: an API error, or something unreadable. */
@@ -128,6 +135,7 @@ const world = (over: Partial<World> = {}): World => ({
   opFails: O.none(),
   opDown: O.none(),
   opRefuses: O.none(),
+  opHeld: O.none(),
   createFails: O.none(),
   verifyRaw: O.none(),
   subdomainError: O.none(),
@@ -153,6 +161,9 @@ const standIn = (w: World): Workstation["Service"] => {
         }
         if (command === "op-human" && O.exists(w.opRefuses, (part) => Str.includes(part)(asked))) {
           return { stdout: "", stderr: `${opRefusedSaid}\n`, code: 1 }
+        }
+        if (command === "op-human" && O.exists(w.opHeld, (part) => Str.includes(part)(asked))) {
+          return { stdout: "", stderr: `${opHeldSaid}\n`, code: 1 }
         }
         if (Str.includes("/workers/subdomain")(asked)) {
           return O.match(w.subdomainError, {
@@ -1369,8 +1380,15 @@ describe("infra setup: the second account by its token", () => {
       const locked = world({ opFails: O.some(1) })
       const first = yield* run(locked, options(), untouched, own)
       const said = O.getOrElse(first.stopped, () => "")
-      expect(said).toContain('1Password refused the comparison of profile "inventory-preview"\'s account')
+      expect(said).toContain('1Password stopped the comparison of profile "inventory-preview"\'s account')
+      expect(said).toContain("Either the app was locked or its prompt went unanswered")
+      expect(said).toContain("or it refused (check the references in packages/infra/env/op.env.local")
       expect(said).not.toContain("which is not the one")
+      const held = world({ opHeld: O.some("tr '[:upper:]'") })
+      const heldOnce = O.getOrElse((yield* run(held, options(), untouched, own)).stopped, () => "")
+      expect(heldOnce).toContain('1Password did not let the comparison of profile "inventory-preview"\'s account')
+      expect(heldOnce).toContain("approve its prompt when it asks")
+      expect(heldOnce).not.toContain("Check the references")
       const other = world({ tokenAccount: "acc-other", connects: { "inventory-preview": "acc-preview" } })
       // A profile connected by a login, to another account than the id his file names.
       other.profiles = { "inventory-preview": "Cloudflare (oauth)" }
@@ -1458,8 +1476,9 @@ describe("infra setup: the second account by its token", () => {
       const committedOnly = world()
       const third = yield* run(committedOnly, options(), `${untouched}${O.getOrElse(own, () => "")}`, O.none())
       expect(O.getOrElse(third.stopped, () => "")).toContain(
-        `${opEnvFile} names PREVIEW_CLOUDFLARE_API_TOKEN, and the repository's stack would take it from there`
+        `${opEnvFile} names PREVIEW_CLOUDFLARE_API_TOKEN and PREVIEW_CLOUDFLARE_ACCOUNT_ID, and the repository's stack would take them from there`
       )
+      expect(O.getOrElse(third.stopped, () => "")).toContain("move both lines there")
       const idOnly = world()
       const fourth = yield* run(
         idOnly,
@@ -1467,7 +1486,10 @@ describe("infra setup: the second account by its token", () => {
         `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
         O.some("PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/g\n")
       )
-      expect(O.getOrElse(fourth.stopped, () => "")).toContain(`${opEnvFile} names PREVIEW_CLOUDFLARE_ACCOUNT_ID`)
+      expect(O.getOrElse(fourth.stopped, () => "")).toContain(
+        `${opEnvFile} names PREVIEW_CLOUDFLARE_ACCOUNT_ID, and the repository's stack would take it from there`
+      )
+      expect(O.getOrElse(fourth.stopped, () => "")).toContain("move that line there")
       expect([...started(below), ...started(committedOnly), ...started(idOnly)]).toEqual([])
     })
   )
@@ -1747,14 +1769,83 @@ describe("infra setup: failures named for what failed", () => {
     })
   )
 
-  it.effect("a failing 1Password command of its own is 1Password's refusal, with where to look", () =>
+  it.effect("a failing 1Password command of its own is said by op's words, with where to look", () =>
     Effect.gen(function* () {
-      const w = world({ vaultsFail: O.some("account is not signed in") })
+      const w = world({ vaultsFail: O.some("You are not currently signed in. Please run `op signin --help`") })
       const result = yield* run(w, options({ sizes: ["staging"] }))
       const said = O.getOrElse(result.stopped, () => "")
-      expect(said).toContain("1Password refused `op-human vault list`: account is not signed in")
-      expect(said).toContain("may see its vaults")
+      expect(said).toContain("1Password did not let `op-human vault list` through: You are not currently signed in")
+      expect(said).toContain('"Integrate with 1Password CLI" is on')
       expect(said).not.toContain("did not answer")
+      // Words that name neither: both places are said, the vault's hint among them.
+      const other = O.getOrElse(
+        (yield* run(world({ vaultsFail: O.some("something odd") }), options({ sizes: ["staging"] }))).stopped,
+        () => ""
+      )
+      expect(other).toContain("1Password stopped `op-human vault list`: something odd")
+      expect(other).toContain("may see its vaults")
+      expect(other).toContain("approve its prompt when it asks")
+    })
+  )
+
+  it.effect(
+    "op's words are sorted: an app never reached, one that held the call back, a reference refused, or unclear",
+    () =>
+      Effect.sync(() => {
+        expect(onePasswordFailure(opDownSaid)).toBe("unreachable")
+        expect(onePasswordFailure("[ERROR] x connecting to desktop app: timeout")).toBe("unreachable")
+        for (const said of [
+          opHeldSaid,
+          "[ERROR] 2026/11/22 10:00:00 You are not currently signed in. Please run `op signin --help` for instructions",
+          "[ERROR] 2026/11/22 10:00:00 account is not signed in",
+          "[ERROR] 2026/11/22 10:00:00 the account is locked",
+          "[ERROR] 2026/11/22 10:00:00 authorization timeout",
+          "[ERROR] 2026/11/22 10:00:00 the request timed out",
+          "[ERROR] 2026/11/22 10:00:00 Timed out waiting for the 1Password app"
+        ]) {
+          expect(onePasswordFailure(said)).toBe("held")
+        }
+        for (const said of [
+          opRefusedSaid,
+          '[ERROR] 2026/11/22 10:00:00 "Second" isn\'t an item in the "Vault" vault',
+          '[ERROR] 2026/11/22 10:00:00 "Vault" isn\'t a vault in this account',
+          "[ERROR] 2026/11/22 10:00:00 invalid secret reference 'op://v'",
+          '[ERROR] 2026/11/22 10:00:00 "ACCOUNT_ID" isn\'t a field in the "Second" item',
+          "[ERROR] 2026/11/22 10:00:00 could not read secret: no item matched",
+          "[ERROR] 2026/11/22 10:00:00 could not resolve item"
+        ]) {
+          expect(onePasswordFailure(said)).toBe("refused")
+        }
+        expect(onePasswordFailure("[ERROR] 2026/11/22 10:00:00 something else")).toBe("unclear")
+        // A name op quotes is not op's words: a held word inside one says nothing about the app.
+        expect(
+          onePasswordFailure(
+            '[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "Vault" vault'
+          )
+        ).toBe("refused")
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Vault is locked" isn\'t a vault in this account')).toBe(
+          "refused"
+        )
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Vault/Not signed in/field': no item matched"
+          )
+        ).toBe("refused")
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "timed out" item: something else')).toBe("unclear")
+        // Outside a name the held words still count.
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 reading "Vault": authorization timeout')).toBe("held")
+        expect(onePasswordFailure("")).toBe("unclear")
+      })
+  )
+
+  it.effect("a token check 1Password held back sends the person to the app, not to the references", () =>
+    Effect.gen(function* () {
+      const w = world({ opHeld: O.some("cf accounts tokens verify") })
+      const said = O.getOrElse((yield* run(w, options(), untouched, own)).stopped, () => "")
+      expect(said).toContain(`1Password did not let \`cf accounts tokens verify\` through: ${opHeldSaid}`)
+      expect(said).toContain("open the 1Password app and unlock it, approve its prompt when it asks")
+      expect(said).not.toContain("Check the references")
+      expect(said).not.toContain("refused")
     })
   )
 
@@ -1800,6 +1891,13 @@ describe("infra setup: failures named for what failed", () => {
       const said = O.getOrElse(result.stopped, () => "")
       expect(said).toContain('Connecting profile "inventory-preview" did not finish; what it said is above')
       expect(said).toContain('"Integrate with 1Password CLI"')
+      // A line of 1Password's is not all one thing: the app's lines and a refused reference are told apart.
+      expect(said).toContain("that it is locked or not signed in, or that a prompt was dismissed or timed out")
+      expect(said).toContain("1Password refused a reference: check the references in packages/infra/env/op.env.local")
+      // A line of 1Password's that says neither is not said to be a refused reference: both fixes are named.
+      expect(said).toContain("Any other line of 1Password's may be either: try both")
+      expect(said).not.toContain("Any other line of 1Password's is a reference it refused")
+      expect(said).not.toContain("1Password did not answer")
     })
   )
 })
@@ -1836,10 +1934,69 @@ describe("infra setup: the dry run says what a run would", () => {
         `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
         O.some("PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/g\n")
       )
-      expect(A.join(one.log, "\n")).toContain("op.env names PREVIEW_CLOUDFLARE_ACCOUNT_ID, which")
+      expect(A.join(one.log, "\n")).toContain("op.env names PREVIEW_CLOUDFLARE_ACCOUNT_ID, and the repository's stack")
       const placed = world({ terminal: false })
       yield* run(placed, options({ dryRun: true }), untouched, own)
       expect(A.join(placed.log, "\n")).not.toContain("op.env names")
+    })
+  )
+
+  it.effect("every stop a run makes on the two files before step 1 is the one the dry run says", () =>
+    Effect.gen(function* () {
+      const mine = O.getOrElse(own, () => "")
+      const tokenLine = 'PREVIEW_CLOUDFLARE_API_TOKEN="op://Vault/Second Account/ACCOUNT_API_TOKEN"\n'
+      const cases: ReadonlyArray<readonly [string, SetupOptions, string, O.Option<string>, string]> = [
+        ["a stray line", options(), `${untouched}export FOO=hunter2\n`, own, "is neither"],
+        ["one of the two", options(), untouched, O.some(tokenLine), "must name both"],
+        [
+          "not a reference",
+          options(),
+          untouched,
+          O.some(`${tokenLine}PREVIEW_CLOUDFLARE_ACCOUNT_ID=abc\n`),
+          "must name both"
+        ],
+        [
+          "one misplaced, staging",
+          options({ sizes: ["staging"] }),
+          `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
+          O.some(tokenLine),
+          "names PREVIEW_CLOUDFLARE_ACCOUNT_ID, and"
+        ],
+        ["staging without them", options({ sizes: ["staging"] }), untouched, O.none(), "makes none there"]
+      ]
+      for (const [, given, env, file, words] of cases) {
+        const real = O.getOrElse((yield* run(world(), given, env, file)).stopped, () => "")
+        expect(real).toContain(words)
+        const dry = world({ terminal: false })
+        yield* run(dry, { ...given, dryRun: true }, env, file)
+        expect(A.filter(dry.log, Str.includes("As things are"))).toEqual([
+          `say: As things are, a run stops before step 1: ${real}`
+        ])
+        expect(started(dry)).toEqual([])
+      }
+      // With one of the two in op.env, staging is not said to be missing what op.env.local names.
+      const one = world({ terminal: false })
+      yield* run(
+        one,
+        options({ sizes: ["staging"], dryRun: true }),
+        `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
+        O.some(tokenLine)
+      )
+      expect(A.join(A.filter(one.log, Str.includes("As things are")), "\n")).not.toContain("Write PREVIEW")
+      // Files that are fine: no stop is said, by the function or the dry run.
+      const fine = world({ terminal: false })
+      yield* run(fine, options({ sizes: ["staging"], dryRun: true }), untouched, own)
+      expect(A.join(fine.log, "\n")).not.toContain("As things are")
+      const given = { committed: untouched, own: mine }
+      expect(
+        filesStop({
+          committed: untouched,
+          token: referenceGiven({ ...given, name: "PREVIEW_CLOUDFLARE_API_TOKEN" }),
+          accountId: referenceGiven({ ...given, name: "PREVIEW_CLOUDFLARE_ACCOUNT_ID" }),
+          previewByToken: true,
+          sizes: ["staging"]
+        })
+      ).toEqual(O.none())
     })
   )
 

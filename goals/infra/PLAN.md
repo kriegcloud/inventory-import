@@ -217,7 +217,8 @@ agents is a rule, and the command is built for the case where it is broken: it s
 everything it makes waits for a yes. `--dry-run` starts no tool and writes nothing; it prints the steps and the
 commands of a run (of all three sizes when none is given, with `test_<user>` when this machine's user makes no
 stage name), with the token's commands when his own file names one, and says when a run as things are would
-stop before step 1. What a run finds on the way (an item already there, a profile already connected) only a run
+stop before step 1 on what op.env and op.env.local hold, in the run's own words: the run and the dry run read
+that stop from one function (`filesStop`), so they cannot differ. What a run finds on the way (an item already there, a profile already connected) only a run
 shows. Run again, it leaves alone what it can see is done: a reference already written, an item already there, a
 profile already connected to the right account. The state store is the exception: nothing reads whether it exists,
 so every run asks and, on a yes, runs `state bootstrap` again, which adopts the store that is there. It comes in
@@ -285,8 +286,8 @@ What each step does, and with which tool:
   the profile's, whatever `cf` or a token says. After a profile is connected, or found connected, the command reads
   `alchemy profile show --profile <name>`, keeps the one line that names the account, and stops when it is not the
   account its questions name (for the token's account, the comparison is made inside the one process 1Password
-  fills the id for, trimmed and in lower case as Alchemy keeps one; a comparison 1Password did not answer is said
-  as that, not as a wrong account). By his token `cf` is never asked to log in to the previews' account, but when
+  fills the id for, trimmed and in lower case as Alchemy keeps one; a comparison 1Password failed is said
+  as 1Password's, not as a wrong account). By his token `cf` is never asked to log in to the previews' account, but when
   `cf` is logged in it is asked which account holds the zone (`cf zones list --name beep-effect.com --status
   active`: one active zone, so a pending copy in another account does not count), and a test stage there is asked
   about; with `cf` logged out the command says nothing could tell. **A run with `--staging` or `--production` stops
@@ -373,15 +374,22 @@ What uses them:
   account "can't" be accessed, the likely cause is a missing subdomain, and where he picks one.
 - **Who did not answer is said, not guessed.** A call under `op-human` that fails with op's own error lines
   (`[ERROR] …`), or any failure of an `op-human` command of its own (`vault list`, `item list`, `item create`, the
-  comparison of a profile's account), is 1Password's, and stops with op's words (they carry no value). Only an
-  app op never reached ("error initializing client", "connecting to desktop app", as in Benjamin's run) is
-  "1Password did not answer", with where to look: the app open and unlocked, Settings, Developer, "Integrate with
-  1Password CLI", and a run from his own terminal. Every other error of op is "1Password refused", with where the
-  fix is: a reference naming a vault, item and field that exist, a vault his account may see or read, or one it
-  may make items in. A tool that failed is shown in its own words; an answer that does not decode is said as that;
+  comparison of a profile's account), is 1Password's, and stops with op's words (they carry no value), sorted
+  by them (`onePasswordFailure`), read outside the names op quotes, since a vault, item or field may be named
+  with any of those words. An app op never reached ("error initializing client", "connecting to desktop
+  app", as in Benjamin's run) is "1Password did not answer"; an app that is locked, a CLI not signed in, or a
+  prompt dismissed or timed out ("You are not currently signed in", "authorization prompt dismissed") is
+  "1Password did not let … through". Both say where to look: the app open and unlocked, its prompt approved,
+  Settings, Developer, "Integrate with 1Password CLI", and a run from his own terminal. A reference op read and
+  could not fill ("isn't a vault", "isn't an item", "isn't a field") is "1Password refused", with where the fix
+  is: a reference naming a vault, item and field that exist, a vault his account may see or read, or one it may
+  make items in. Words that say none of these are "1Password stopped", with both places named, so a locked app is
+  never sent to references that are fine. Only the first kind's words were seen on this machine; the others are
+  op's as it prints them, not read here. A tool that failed is shown in its own words; an answer that does not decode is said as that;
   a token that is not active is said with the status cf gave; a verify that failed says it decides nothing about
   the token. A failed `cf zones list` is said in cf's words, not as a zone held in no account. The profile edit run under
-  `op-human` hands the terminal over, so its error is on screen above, and the stop names 1Password as a cause.
+  `op-human` hands the terminal over, so its error is on screen above, and the stop names the app's lines and a refused reference's, and says any other line of 1Password's may be
+  either.
   op's error format was read from its output in Benjamin's run, not from op's source.
 - **The previews' Alchemy profile** takes both values with `alchemy profile edit --add Cloudflare --method stored
   --set apiToken=env:... --set accountId=env:...`, filled by 1Password for that one command; Alchemy then keeps the

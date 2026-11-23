@@ -206,7 +206,29 @@ describe("the one reason a plan holds for a row", () => {
     const crowded = fitted([...A.replicate(most, 6), Str.repeat(394)("y"), "z"])
     expect(crowded).toBe(`${six} 2 more problems are not listed here.`)
     expect(crowded.length).toBeLessThanOrEqual(maxReason)
+    // The room is the count's own length and the space before it, to the character: one character less kept free
+    // and this reason is 4,001 long.
+    const exact = fitted([...A.replicate(most, 6), Str.repeat(358)("y"), most, "z"])
+    expect(exact).toBe(`${six} 3 more problems are not listed here.`)
   })
+
+  // Fourteen sentences of 300 characters or more never fit, so every draw leaves some off.
+  it.prop(
+    "is, when they cannot all fit, the first of them and then how many are left, within what a store writes",
+    [S.Array(S.String.check(S.isPattern(/^[a-z]{300,600}$/))).check(S.isMinLength(14), S.isMaxLength(30))],
+    ([sentences]) => {
+      const reason = fitted(sentences)
+      expect(reason.length).toBeLessThanOrEqual(maxReason)
+      const said = A.filter(sentences, (_sentence, index) =>
+        Str.startsWith(A.join(A.take(sentences, index + 1), " "))(reason)
+      )
+      const left = sentences.length - said.length
+      expect(left).toBeGreaterThan(0)
+      // The count written out here, not through the helper the rule uses.
+      const count = left === 1 ? "1 more problem is" : `${left} more problems are`
+      expect(reason).toBe(`${A.join(said, " ")} ${count} not listed here.`)
+    }
+  )
 
   it("holds no room back for a count when the sentences, long ones said by their start, all fit", () => {
     const most = Str.repeat(maxSentence)("x")

@@ -31,7 +31,7 @@ const dana = Member.make({
   organizationName: "Example Works (test)"
 })
 const counts = { rowCount: 1, chunkCount: 1 }
-// The moment of a begin whose cut-off is itself a moment D1 stores: not in the first hour of year 0, which no server's
+// The moment of each begin, whose cut-off is itself a moment D1 stores: not in the first hour of year 0, which no server's
 // clock reads.
 const beginMoment = Arbitrary.filter(Arbitrary.schema(D1Instant), (at) =>
   S.is(D1Instant)(DateTime.subtract(at, { minutes: abandonedAfterMinutes }))
@@ -40,13 +40,7 @@ const beginMoment = Arbitrary.filter(Arbitrary.schema(D1Instant), (at) =>
 layer(Store, { timeout: "60 seconds" })("abandoned uploads on D1", (it) => {
   it.effect.prop(
     "a second begin deletes the first upload exactly when it began over an hour before",
-    [
-      Arbitrary.schema(D1Instant),
-      beginMoment,
-      Arbitrary.schema(UploadKey),
-      Arbitrary.schema(UploadKey),
-      Arbitrary.schema(StagedHead)
-    ],
+    [beginMoment, beginMoment, Arbitrary.schema(UploadKey), Arbitrary.schema(UploadKey), Arbitrary.schema(StagedHead)],
     ([first, second, firstKey, secondKey, head]) =>
       Effect.gen(function* () {
         const store = yield* ImportStore

@@ -76,7 +76,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       .annotate(OpenApi.Summary, "Start an upload with the file's head")
       .annotate(
         OpenApi.Description,
-        "A file arrives in pieces, so a large one never blocks a screen or a request: begin with the file's head, send the rows in chunks, then finish. A begin sent again with the same `key` (a retry after a lost answer) is the same upload, not a second one. Until it finishes nothing reads it, so a cancelled or failed upload leaves nothing anyone could confirm. Answers 200 with a `StagingOutcome`: the upload's id, or the file's problem (`FileProblem`) as data the screen shows; its errors are only what is not about the file. Needs the editor role."
+        "A file arrives in pieces, so a large one never blocks a screen or a request: begin with the file's head, send the rows in chunks, then finish. A begin sent again with the same `key` (a retry after a lost answer) is the same upload, not a second one. Until it finishes nothing reads it, so a cancelled or failed upload leaves nothing anyone could confirm. Answers 200 with a `StagingOutcome`: the upload's id, or the file's problem (`FileProblem`) as data the screen shows; its errors are only what is not about the file. A start the browser's reader would never send (no rows, more than 50,000, more than 200 columns, or pieces that cannot carry its rows) is a bad request (400) naming the field: the reader says the same of the file in words before anything is sent (`stagingProblem`). Needs the editor role."
       ),
     HttpApiEndpoint.put("putChunk", "/uploads/:id/chunks", {
       params: importId,

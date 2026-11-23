@@ -69,16 +69,18 @@ describe("laws dual and readonly", () => {
     // An index signature, a class's field, a mapped type, a mutable array in a property, and a namespace of our own;
     // not a local list a function fills.
     expect(lines(wider, mutableProperties)).toEqual([1, 2, 3, 5, 5, 7])
-    // A mutable array behind an alias, a mutable tuple, globalThis.Array, a parameter property, an accessor and an
-    // abstract field; a readonly tuple and a readonly parameter property pass.
+    // A mutable array behind an alias, a mutable tuple, globalThis.Array, a parameter property and an abstract field;
+    // a readonly tuple, a readonly parameter property, an accessor (which cannot be readonly) and a tuple in a
+    // conditional type's test pass.
     const more = `export type Rows = number[]
 export type Pair = { readonly p: [number, string]; readonly q: readonly [number, string] }
 export type G = { readonly g: globalThis.Array<number> }
 export class D { constructor(private n: number, private readonly m: number) {} }
 export class E { accessor f = 1 }
 export abstract class F { abstract h: number }
+export type IsNever<T> = [T] extends [never] ? true : false
 `
-    expect(lines(more, mutableProperties)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(lines(more, mutableProperties)).toEqual([1, 2, 3, 4, 6])
   })
 
   it("reads Effect.fn helpers and dual's own order; not a library's methods, a typed const or a this parameter", () => {
@@ -94,6 +96,16 @@ export const reducer: (state: number, input: number) => number = (state, input) 
 `
     // The object's and the class's methods, and the typed const, have an order a library's type sets.
     expect(lines(more, helpersNotDual)).toEqual([3, 6])
+    // A dual typed as the house writes one is read for its order; so are an arrow under satisfies and an unnamed
+    // Effect.fn.
+    const typed = `import { dual } from "effect/Function"
+import * as Effect from "effect/Effect"
+export const a: { (x: number): (self: string) => string; (that: number, self: string): string } = dual(2, (that: number, self: string) => self + that)
+export const b = ((n: number, cause: unknown) => [n, cause]) satisfies (n: number, c: unknown) => unknown
+export const c = Effect.fn(function* (n: number, self: string) { return self })
+export const d: { (that: number): (self: string) => string; (self: string, that: number): string } = dual(2, (self: string, that: number) => self + that)
+`
+    expect(lines(typed, helpersNotDual)).toEqual([3, 4, 5])
   })
 
   it.effect("refuses each place in a file no list names, and holds a listed file at its number of places", () =>

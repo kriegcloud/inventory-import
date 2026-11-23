@@ -36,7 +36,13 @@ export interface PromiseRead {
 
 const promiseNames = ["Promise", "PromiseLike"]
 const chained = ["then", "catch", "finally"]
-const runs = ["runPromise", "runPromiseExit", "runPromiseWith"]
+/**
+ * Whether a name runs an Effect as a Promise: any `runPromise…` (`runPromise`, `runPromiseExit`, `runPromiseWith`,
+ * `runPromiseExitWith`, and any later one of the family), or a Fiber set's, map's or handle's `runtimePromise` and
+ * `makeRuntimePromise`.
+ */
+const isPromiseRunner = (name: string): boolean =>
+  /^runPromise\w*$/.test(name) || name === "runtimePromise" || name === "makeRuntimePromise"
 /** The names the global object goes by, through which `Promise` is reached too. */
 const globalObjects = ["globalThis", "self", "window"]
 /** Where a name stands as a name, not as a value it reads: a key, a binding, an import's or a label's. */
@@ -126,11 +132,11 @@ const useOf: {
   const { node } = placed
   if (isPromise(node)) return referenceUse(placed)
   // `runPromise` itself, called or not: `pipe(effect, Effect.runPromise)`, `const run = Effect.runPromise`.
-  if (node.type === "MemberExpression" && O.exists(propertyOf(node), (name) => A.contains(runs, name))) {
+  if (node.type === "MemberExpression" && O.exists(propertyOf(node), (name) => isPromiseRunner(name))) {
     return O.some("run")
   }
   if (
-    O.exists(nameOf(node), (name) => A.contains(runs, name)) &&
+    O.exists(nameOf(node), (name) => isPromiseRunner(name)) &&
     O.match(placed.within, {
       onNone: () => true,
       onSome: ({ key, parent }) =>
@@ -140,6 +146,14 @@ const useOf: {
     return O.some("run")
   }
   switch (node.type) {
+    // A runner imported by name, under any name (`runPromise as go`): the name it is imported under does not matter.
+    case "ImportSpecifier":
+      return O.exists(nameOf(node["imported"]), isPromiseRunner) ? O.some("run") : O.none()
+    // `const { runPromise: go } = Effect`, from a runtime too: taken out of an object under another name.
+    case "ObjectPattern":
+      return A.some(nodesIn(node["properties"]), (property) => O.exists(nameOf(property["key"]), isPromiseRunner))
+        ? O.some("run")
+        : O.none()
     // `const { Promise: Q } = globalThis`: Promise taken out of the global object under another name.
     case "VariableDeclarator":
       return isNode(node["id"]) &&
@@ -163,7 +177,7 @@ const useOf: {
     case "CallExpression":
       return O.flatMap(memberCalled(node), ({ name, object }): O.Option<PromiseUse> => {
         // A member of `Promise` is said once, where `Promise` is read; `runPromise` where it is named.
-        if (isPromise(object) || A.contains(runs, name)) return O.none()
+        if (isPromise(object) || isPromiseRunner(name)) return O.none()
         if (!A.contains(chained, name)) return O.none()
         // A module's member (`Effect.catch`, `Story.then`) is no promise's.
         return O.exists(nameOf(object), (on) => A.contains(imported, on)) ? O.none() : O.some("chain")

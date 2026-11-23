@@ -364,12 +364,16 @@ export const promises = Effect.fn("Promises.promises")(function* () {
         const entry = R.has(promiseEntryPoints, file)
         const allowed = entry ? atAnEntry : []
         const uses = A.filter(read.found, ({ use }) => !A.contains(allowed, use))
-        // At an entry point, the typed rules say nothing more of the line that runs an Effect as a Promise.
+        // At an entry point, the line that runs an Effect as a Promise leaves that Promise to the platform: only
+        // no-floating-promises is passed over there, and every other typed finding on it still counts.
         const runLines = A.map(
           A.filter(read.found, ({ use }) => entry && use === "run"),
           ({ line }) => line
         )
-        const typedHere = A.filter(typedIn(file), ({ line }) => !A.contains(runLines, line))
+        const typedHere = A.filter(
+          typedIn(file),
+          ({ line, note }) => !(A.contains(runLines, line) && Str.includes("no-floating-promises")(note))
+        )
         // A listed file is held at its number of uses, by name and by type together, which only falls.
         const standing = standingOf(ledger.success, { file, now: A.length(uses) + A.length(typedHere) })
         if (O.isSome(standing)) {

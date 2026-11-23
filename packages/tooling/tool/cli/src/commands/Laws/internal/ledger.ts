@@ -3,9 +3,10 @@
 // code, not by a review: a file that gains a place is refused, so no new one goes in under a file already listed; a file
 // that loses one is refused until its number is lowered, so it cannot gain it back later; a file at none comes off; an
 // entry for a file that is not there is refused, so a new file at its path inherits nothing; and the ledger itself is
-// compared with the same file on `main` (`origin/main`, else `main`), so a number that rose there or a file added there
-// is refused, whatever the same commit wrote. On a branch whose `main` has no such ledger yet, nothing is compared, and
-// the law says so.
+// compared with the same file where this branch left `main` (`origin/main`, else `main`: their merge base, or on main
+// itself the commit before), so a number that rose or a file added is refused, whatever the same commit wrote; a file
+// git sees renamed since then is held at its old name's number. On a branch whose base has no such ledger yet, nothing
+// is compared.
 import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
@@ -109,6 +110,43 @@ const mainCommit = Effect.fn("ledger.mainCommit")(function* () {
   return A.findFirst(asked, (answer) => answer.code === 0).pipe(O.map((answer) => Str.trim(answer.stdout)))
 })
 
+/** One commit, by what git answers for a revision; none when it names none. */
+const commitOf = Effect.fn("ledger.commitOf")(function* (revision: string) {
+  const repo = yield* Repo
+  const answer = yield* repo.run("git", ["rev-parse", "--verify", "--quiet", `${revision}^{commit}`])
+  return answer.code === 0 ? O.some(Str.trim(answer.stdout)) : O.none<string>()
+})
+
+/**
+ * The commit a ledger is compared with: where this branch left main (the merge base of HEAD and main), so a branch
+ * cut before main lowered a number is not refused for main's later work; and on the branch `main` itself, the commit
+ * before HEAD (its first parent), so a number raised in a push straight to main is seen.
+ */
+const baseCommit = Effect.fn("ledger.baseCommit")(function* (main: string) {
+  const repo = yield* Repo
+  const branch = yield* repo.run("git", ["symbolic-ref", "--quiet", "--short", "HEAD"])
+  if (branch.code === 0 && Str.trim(branch.stdout) === "main") return yield* commitOf("HEAD^1")
+  const merged = yield* repo.run("git", ["merge-base", "HEAD", main])
+  return merged.code === 0 ? O.some(Str.trim(merged.stdout)) : O.none<string>()
+})
+
+/** Each file renamed since `base`, by its name now, with the name it had there (git's own finding of a rename). */
+const renamedSince = Effect.fn("ledger.renamedSince")(function* (base: string) {
+  const repo = yield* Repo
+  const answer = yield* repo.run("git", ["diff", "--name-status", "-M", "-z", base])
+  const parts = Str.split("\0")(answer.stdout)
+  // Each rename is three parts: its status (R and a score), the name it had, the name it has.
+  return R.fromEntries(
+    A.getSomes(
+      A.map(parts, (part, i) =>
+        Str.startsWith("R")(part)
+          ? O.zipWith(A.get(parts, i + 1), A.get(parts, i + 2), (from, to) => [to, from] as const)
+          : O.none()
+      )
+    )
+  )
+})
+
 /**
  * What the ledger at `path`, as it is now (`now`), says against the files there are and against the same ledger on
  * `main`, each as one sentence: an entry for a file that is not there, a file `main` does not list, a number above
@@ -134,14 +172,20 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
       `${input.path} could not be compared with main: neither origin/main nor main is here. Fetch it (git fetch origin main), so a number that rose is seen`
     )
   }
-  const shown = yield* repo.run("git", ["show", `${main.value}:${input.path}`])
+  const base = yield* baseCommit(main.value)
+  // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
+  if (O.isNone(base)) return missing
+  const shown = yield* repo.run("git", ["show", `${base.value}:${input.path}`])
   // A main with no such ledger yet: the first one comes in whole, and nothing is compared.
   if (shown.code !== 0) return missing
   const before = S.decodeOption(LedgerJson)(shown.stdout)
   if (O.isNone(before)) return A.append(missing, `${input.path} on main is not a ledger, so nothing could be compared`)
+  const renamed = yield* renamedSince(base.value)
   const moved = A.flatMap(ledgerFiles(input.now), (file) => {
     const now = O.getOrElse(R.get(input.now, file), () => 0)
-    return O.match(R.get(before.value, file), {
+    // A file renamed since then is held at what main held it under its old name.
+    const was = O.getOrElse(R.get(renamed, file), () => file)
+    return O.match(R.get(before.value, was), {
       onNone: () => [`${file}  is in ${input.path} but not on main: a ledger only loses files. Fix the file instead`],
       onSome: (held) =>
         now > held

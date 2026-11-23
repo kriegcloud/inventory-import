@@ -69,8 +69,8 @@ export const printed = (report: { readonly lines: ReadonlyArray<{ readonly to: s
   A.map(report.lines, (line) => `${line.to}: ${line.text}`)
 
 /**
- * Makes the repository a git repository whose `main` holds everything written so far, as a ban's ledger is compared
- * with main's: what a test writes after this is the branch's change.
+ * Makes the repository a git repository whose `main` holds everything written so far, and moves to a branch of its
+ * own, as a ban's ledger is compared with where the branch left main: what a test writes after this is its change.
  */
 export const onMain = Effect.fn("onMain")(function* () {
   const repo = yield* Repo
@@ -89,4 +89,6 @@ export const onMain = Effect.fn("onMain")(function* () {
     "-m",
     "main"
   ])
+  // Work goes on a branch of its own, as a pull request's does.
+  yield* repo.run("git", ["checkout", "-q", "-b", "work"])
 })

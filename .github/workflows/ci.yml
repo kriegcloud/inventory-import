@@ -20,10 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # The bans' ledgers may only fall, compared with where this commit left main (their merge base; on a push to
+      # main, the commit before): the whole history is fetched so git can find it (packages/tooling/tool/cli/ledgers).
       - uses: actions/checkout@v4
-      # The bans' ledgers may only fall, compared with main's (packages/tooling/tool/cli/ledgers): the checkout holds
-      # only this commit, so main is fetched beside it.
-      - run: git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22

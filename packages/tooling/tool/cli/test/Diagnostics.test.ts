@@ -104,6 +104,81 @@ describe("laws diagnostics", () => {
     })
   )
 
+  it.effect("compares with where the branch left main, or on main with the commit before, and follows a rename", () =>
+    Effect.gen(function* () {
+      const commit = Effect.fn("commit")(function* (message: string) {
+        const repo = yield* Repo
+        yield* repo.run("git", ["add", "--all"])
+        yield* repo.run("git", [
+          "-c",
+          "user.name=Test",
+          "-c",
+          "user.email=test@example.test",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-q",
+          "-m",
+          message
+        ])
+      })
+      const write = Effect.fn("write")(function* (tree: Tree) {
+        const repo = yield* Repo
+        yield* Effect.forEach(R.toEntries(tree), ([file, text]) => repo.write(repo.join(repo.root, file), text), {
+          concurrency: 1,
+          discard: true
+        })
+      })
+      const run = Effect.gen(function* () {
+        const found = yield* diagnostics()
+        return printed(render(diagnosticsSentence)(found))
+      })
+      const held = { ...ledger({ [listed]: 2 }), [listed]: directives(2) }
+      // A branch cut before main lowered the number: it still holds the old one, which main held when it left.
+      const behind = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["checkout", "-q", "main"])
+          yield* write({ ...ledger({ [listed]: 1 }), [listed]: directives(1) })
+          yield* commit("main lowers it")
+          yield* repo.run("git", ["checkout", "-q", "work"])
+          return yield* run
+        })
+      )
+      expect(behind).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+      // A number raised in a push straight to main is compared with the commit before.
+      const pushed = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["checkout", "-q", "main"])
+          yield* write({ ...ledger({ [listed]: 3 }), [listed]: directives(3) })
+          yield* commit("main raises it")
+          return yield* run
+        })
+      )
+      expect(pushed).toContain(
+        `err: ${listed}  is held at 3 in ${diagnosticsLedger}, above the 2 main holds it to: a number only falls`
+      )
+      // A file renamed since main is held at its old name's number.
+      const moved = "packages/x/src/moved.ts"
+      const renamed = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", listed, moved])
+          yield* write(ledger({ [moved]: 2 }))
+          return yield* run
+        })
+      )
+      expect(renamed).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+    })
+  )
+
   it.effect("says when main cannot be read, and refuses a ledger that is not one", () =>
     Effect.gen(function* () {
       const nomain = Effect.gen(function* () {

@@ -1,6 +1,8 @@
 // The files of beep-effect's kit that `bun run vendor:check` holds byte for byte to beep-effect: each `files` entry of
 // a `vendor.json` under `packages/foundation/`. A file of `local`, written here and hashed by nothing, is not one of
-// them, and a law reads it like any other.
+// them, and a law reads it like any other. This reads only the names a manifest lists; that each file is the one its
+// hash says is `vendor:check`'s to hold, and it fails on any file that differs, so a manifest cannot leave out a file
+// it does not hold byte for byte.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"

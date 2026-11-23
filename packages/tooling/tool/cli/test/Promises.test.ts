@@ -103,6 +103,18 @@ export const c = Effect.runPromise(Effect.succeed(1))
 const { Promise: Q } = globalThis
 `)
     ).toEqual(["run", "run", "run", "run", "value"])
+    // The whole family, renamed at its import or taken out of an object: each is refused where it is taken.
+    expect(
+      uses(`import * as Effect from "effect/Effect"
+import { runPromise as go } from "effect/Effect"
+import * as FiberSet from "effect/FiberSet"
+const { runPromise: run } = Effect
+export const a = Effect.runPromiseExitWith
+export const b = FiberSet.runtimePromise
+export const c = FiberSet.makeRuntimePromise
+export const d = go
+`)
+    ).toEqual(["run", "run", "run", "run", "run"])
   })
 
   it("catches Promise however it is reached: through the global object, in brackets, or under another name", () => {

@@ -8,8 +8,9 @@
 // written `dual`, that one first; one written `dual(…)` that names it after another is refused too. Which value a
 // helper with none of those names acts on is not in its words, so such a helper is not read.
 //
-// A property is a signature of an object type or an interface, an index signature, a class's field (`abstract` and
-// `accessor` ones included), a constructor's parameter property, or the properties a mapped type makes. A mutable
+// A property is a signature of an object type or an interface, an index signature, a class's field (`abstract` ones
+// included), a constructor's parameter property, or the properties a mapped type makes. An `accessor` field is not
+// read: TypeScript allows no `readonly` on one, so there is nothing to write. A mutable
 // array type (`T[]`, `Array<T>`, `globalThis.Array<T>`) or a mutable tuple is one too when it stands in a property's
 // own type or in a type alias, which a property names (`readonly rows: Rows` with `type Rows = Row[]`). One inside
 // `declare global` or `declare module "…"` belongs to a type another library declared, whose shape is not ours to
@@ -17,6 +18,7 @@
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
+import * as R from "effect/Record"
 import { children, isNode, type Node } from "./tryCode.ts"
 
 /** The names a helper's parameter takes when it is the value the helper acts on. */
@@ -63,11 +65,19 @@ const calleeName = (call: Node): O.Option<string> => {
 /** The function `Effect.fn("f")(function* …)` or `Effect.fnUntraced(function* …)` makes a helper of, when it is one. */
 const effectFnBody = (call: Node): O.Option<Node> => {
   const callee = call["callee"]
+  // `Effect.fn("f")(function* …)`, `Effect.fn(function* …)` unnamed, or `Effect.fnUntraced(function* …)`.
   const named =
-    O.exists(calleeName(call), (name) => name === "fnUntraced") ||
+    O.exists(calleeName(call), (name) => name === "fnUntraced" || name === "fn") ||
     (isNode(callee) && callee.type === "CallExpression" && O.exists(calleeName(callee), (name) => name === "fn"))
   return named ? A.findFirst(nodesIn(call["arguments"]), isFunction) : O.none()
 }
+
+/** What a value is under `satisfies`, `as` or parentheses. */
+const unwrapped = (node: unknown): unknown =>
+  isNode(node) &&
+  (node.type === "TSSatisfiesExpression" || node.type === "TSAsExpression" || node.type === "ParenthesizedExpression")
+    ? unwrapped(node["expression"])
+    : node
 
 /** Every node of a tree once, from a list of its own rather than the stack. */
 const nodesOf = (program: Node): ReadonlyArray<Node> => {
@@ -91,15 +101,17 @@ export const helpersNotDual = (program: Node): ReadonlyArray<number> =>
   A.flatMap(nodesOf(program), (node) => {
     if (node.type === "FunctionDeclaration" && namesSubject(node)) return [node.start]
     if (node.type !== "VariableDeclarator") return []
-    // A `const` with a type of its own is typed by that type, whose order is not ours to set here.
-    if (isNode(node["id"]) && isNode(node["id"]["typeAnnotation"])) return []
-    const init = node["init"]
-    if (isFunction(init)) return namesSubject(init) ? [node.start] : []
-    if (!isNode(init) || init.type !== "CallExpression") return []
-    // `dual(2, (self, that) => …)`: dual, so it is read only for the order of its values.
-    if (O.exists(calleeName(init), (name) => name === "dual")) {
+    const init = unwrapped(node["init"])
+    // `dual(2, (self, that) => …)`: dual, so it is read only for the order of its values, typed or not (the house
+    // style writes a dual's two signatures on the const).
+    if (isNode(init) && init.type === "CallExpression" && O.exists(calleeName(init), (name) => name === "dual")) {
       return A.some(A.filter(nodesIn(init["arguments"]), isFunction), subjectAfterFirst) ? [node.start] : []
     }
+    // Any other `const` with a type of its own is typed by that type, which sets its order. Without the checker the
+    // law cannot tell a type of ours from a library's, so neither is read.
+    if (isNode(node["id"]) && isNode(node["id"]["typeAnnotation"])) return []
+    if (isFunction(init)) return namesSubject(init) ? [node.start] : []
+    if (!isNode(init) || init.type !== "CallExpression") return []
     return O.exists(effectFnBody(init), namesSubject) ? [node.start] : []
   })
 
@@ -114,8 +126,6 @@ const isProperty = (node: Node): boolean =>
   node.type === "TSIndexSignature" ||
   node.type === "PropertyDefinition" ||
   node.type === "TSAbstractPropertyDefinition" ||
-  node.type === "AccessorProperty" ||
-  node.type === "TSAbstractAccessorProperty" ||
   node.type === "TSParameterProperty"
 
 /** Whether a mapped type makes its properties readonly (`readonly [K in …]` or `+readonly`). */
@@ -135,12 +145,25 @@ const mutableArray = (node: Node, parent: O.Option<Node>): boolean =>
     !O.exists(parent, (above) => above.type === "TSTypeOperator" && above["operator"] === "readonly")) ||
   (node.type === "TSTypeReference" && namesArray(node))
 
-/** One node of the walk: its parent, and whether it stands inside a property's own type or a type alias. */
+/** One node of the walk: its parent, whether it stands inside a property's own type or a type alias, and whether
+ * it stands in a conditional type's test (`[T] extends [never]`), a type-level position where a tuple holds no value. */
 interface Step {
   readonly node: Node
   readonly parent: O.Option<Node>
   readonly inProperty: boolean
+  readonly inTest: boolean
 }
+
+/** A node's children, each with the field of it they stand in. */
+const keyedChildren = (node: Node): ReadonlyArray<readonly [string, Node]> =>
+  A.flatMap(R.toEntries(node), ([key, value]) =>
+    key === "parent"
+      ? []
+      : A.map(
+          A.isArray(value) ? A.filter(value, isNode) : isNode(value) ? [value] : [],
+          (child) => [key, child] as const
+        )
+  )
 
 /**
  * Where a property is not `readonly`: a signature, an index signature, a class's field of any kind, a parameter
@@ -151,16 +174,19 @@ interface Step {
  */
 export const mutableProperties = (program: Node): ReadonlyArray<number> => {
   const found: Array<number> = []
-  const left: Array<Step> = [{ node: program, parent: O.none(), inProperty: false }]
+  const left: Array<Step> = [{ node: program, parent: O.none(), inProperty: false, inTest: false }]
   while (A.isArrayNonEmpty(left)) {
-    const { inProperty, node, parent } = A.lastNonEmpty(left)
+    const { inProperty, inTest, node, parent } = A.lastNonEmpty(left)
     left.splice(-1, 1)
     if (augments(node)) continue
     if (isProperty(node) && node["readonly"] !== true) found.push(node.start)
     if (node.type === "TSMappedType" && !readonlyMapped(node)) found.push(node.start)
-    if (inProperty && mutableArray(node, parent)) found.push(node.start)
+    if (inProperty && !inTest && mutableArray(node, parent)) found.push(node.start)
     const within = inProperty || isProperty(node) || node.type === "TSTypeAliasDeclaration"
-    for (const next of children(node)) left.push({ node: next, parent: O.some(node), inProperty: within })
+    for (const [key, next] of keyedChildren(node)) {
+      const test = inTest || (node.type === "TSConditionalType" && (key === "checkType" || key === "extendsType"))
+      left.push({ node: next, parent: O.some(node), inProperty: within, inTest: test })
+    }
   }
   return found
 }

@@ -8,7 +8,9 @@
  * `packages/access/web`, `packages/catalog/web`), each under `src/`.
  *
  * Not read: the registry's components and hooks under `packages/ui/src/components/` and `packages/ui/src/hooks/`,
- * whose exports their registry sets (a component beside its `cva` variants, a hook beside its types).
+ * whose exports their registry sets (a component beside its `cva` variants, a hook beside its provider): 22 places
+ * in 17 files on 2026-11-23, which a later `shadcn add` would put back. Benjamin chose this ("Skip registry folders",
+ * 2026-11-23) for this rule alone: the readonly and dual laws still read those folders.
  *
  * `ledgers/fast-refresh.json` names the files that break the rule today, each with how many places, which only falls,
  * held against the files there are and against main (`internal/ledger.ts`). The profile is held as written, and a

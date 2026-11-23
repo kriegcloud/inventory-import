@@ -138,7 +138,8 @@ against the code; [PLAN](PLAN.md)'s closing note says what was run.
 
 ## Where it stands
 
-Built, on branch `docs/erp-ontology-packet`, not pushed and not merged. The vocabulary is
+Built, on branch `docs/erp-ontology-packet`, not merged; the commits that built it are not pushed (the remote
+branch stands at `722b08a1`). The vocabulary is
 `packages/kernel/src/Terms.vocab.ts`, its helpers `@beep/vocabulary` (`packages/foundation/modeling/vocabulary`), and
 the projector, the fixtures and gates 1 to 5, 8 and 9 are `@inventory/ontology` (`packages/ontology`). Gate 6 is the
 type-check and gate 7 the law `bun run beep laws ontology-terms`. `bun run check` runs gates 1 to 8 and

@@ -20,7 +20,7 @@ owed from Benjamin for the thread now. Benjamin said the brief matches (119), an
 [erp-vocabulary](../../goals/erp-vocabulary/SPEC.md). Its SPEC carries the five forbidden conclusions he signed (117,
 121), and the thread's gate 8 runs CQ-P11 beside CQ-P06 (120). A commit that changes an
 expected-rows file says so, and the release notes name the question with its old and new answer (118). The
-thread is built, on branch `docs/erp-ontology-packet`, not pushed: the goal's
+thread is built, on branch `docs/erp-ontology-packet`, its commits not pushed: the goal's
 [PLAN](../../goals/erp-vocabulary/PLAN.md) says what was built and checked. No later slice is.
 
 ROBOT v1.9.11 was approved and tried outside the repository (112). Its jar is 82,708,624 bytes, sha256
@@ -88,4 +88,4 @@ first class list, a decision log and a product model read from public sources).
   added CQ-P11 to the thread and five signed forbidden conclusions; Benjamin said the brief matches (119) and the
   packet graduated to [goals/erp-vocabulary](../../goals/erp-vocabulary/SPEC.md).
 - 2026-11-23: the thin thread built in thirteen steps and closed by review: the vocabulary module, the helpers'
-  package, the projector, nine gates and the CI job for gate 9, on branch `docs/erp-ontology-packet`, not pushed.
+  package, the projector, nine gates and the CI job for gate 9, on branch `docs/erp-ontology-packet`, its commits not pushed.

@@ -11,10 +11,14 @@ Since this brief was signed (decision 119) the thin thread has been built, on 20
 are no longer so: gate 9 is built (`packages/ontology/scripts/reason.ts`, two consistent runs and three
 inconsistent), not "still unbuilt"; the forbidden conclusions are drafted and signed, five of them, in the goal's
 SPEC (decision 121); gate 8 runs two questions, CQ-P06 and CQ-P11 (decision 120), not one; and the thread's done
-line is the SPEC's acceptance list. Two more: the Problem's "no record points at a term" no longer holds for the records the thread marked (the
-kernel's `Member`, `Role` and `Activity`), and still holds for every other record; and the CURIE registries and gate
-5's notation check were tried in the kernel itself (the goal's PLAN, step 2), so the scratchpad trial the brief
-names is no longer owed. The Map's later slices are untouched.
+line is the SPEC's acceptance list. More, from the Problem and the rabbit holes. The Problem's "no record points at a term" no longer holds for the five enrolled records: `Member`,
+`Role`, `Activity` and `Person` carry marks (`Person` points at `inv:Member`), and `AuditTrail` is checked through
+its element; every record the thread did not enrol still points at nothing. The Problem's "Nothing exists for them to point
+at" and "nothing in the design has yet been made to fail" are no longer so either: a module exists, holding the
+thread's terms and no others, and each of the nine gates has refused a planted mistake. Of the three things the brief says to
+try in the scratchpad, the CURIE registries were tried in the kernel itself (the goal's PLAN, step 2) and gate 5's
+notation check (rule P8) in `@inventory/ontology` (step 5); the F-bounded `defineClasses` was not tried and the
+thread does not use it. The Map's later slices are untouched.
 
 Decisions 1 to 7 of [DECISIONS.md](DECISIONS.md) fixed the shape: the ontology is the model of record for this
 repository's contexts, with Sutton a mapping (1); one TypeScript vocabulary module owns every term fact and all Turtle

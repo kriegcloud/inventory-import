@@ -54,8 +54,8 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 13 are done. Nothing is pushed: the push, and so the first run of the CI job for gate 9, are
-Benjamin's.
+None. Steps 1 to 13 are done. The remote branch stands at `722b08a1`, as this checkout last saw it; every commit
+after it is local, the CI job for gate 9 among them. The push, and so that job's first run, are Benjamin's.
 
 `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`), and six laws that came with it
 refused code this goal wrote: `diagnostics:check` (15 `@effect-diagnostics` directives), `defaults:check` (25
@@ -365,31 +365,35 @@ Written on 2026-11-23, when step 13 closed.
 **What was built.** One module holds the thread's terms (`packages/kernel/src/Terms.vocab.ts`); the kernel's
 `Member`, `Role` and `Activity` records point at them through typed helpers (`Terms.pointer.ts`, made by
 `@beep/vocabulary`); `@inventory/ontology` projects the module to OWL and SKOS Turtle, lifts a record to triples,
-answers CQ-P06 and CQ-P11, and holds seven of the nine gates as tests, the ninth a reasoner; the law
-`ontology-terms` is the eighth and the type-check the sixth. SPEC's eleven acceptance lines are ticked, each against
+answers CQ-P06 and CQ-P11, and holds gates 1 to 5 and 8 as tests and gate 9 as the reasoner; gate 6 is the
+type-check and gate 7 the law `ontology-terms`. SPEC's eleven acceptance lines are ticked, each against
 the file that proves it.
 
-**How it was closed.** `/quality-review-fix-loop`, two rounds of eight read-only reviewers (Grok 4.7; the Claude,
-Codex and Cursor routes were out of quota), each on a commit where `bun run check` (105 tasks) and
-`bun run check:full` (112 tasks, gate 9 among them) passed.
+**How it was closed.** `/quality-review-fix-loop`, three rounds of eight read-only reviewers (Grok 4.7; the Claude,
+Codex and Cursor routes were out of quota), each on a commit where `bun run check` passed (105 tasks). `bun run check:full` (112 tasks, gate 9 among them)
+passed on the commits rounds 1 and 2 read and on the tree this note is committed with.
 
 | Round | Commit read | Required findings | What they were |
 | --- | --- | --- | --- |
 | 1 | `064c55a5` | 20 reported, some twice | SPEC and PLAN still told the goal as unbuilt; five schemas outside the schema rules (a language tag checked in code, a parsed triple not decoded, an optional `reverse`, a no-term mark not a tagged union, gate 9's values plain objects); two comments that said what the code does not do; the law's own copy of the base IRI, tied to nothing; the skills, the profile, the brief, the packet's README, report 14 and CLAUDE.md saying "not built" of what is |
 | 2 | `aaa7dcca` | 9 reported, 5 apart | The documents said the close was finished before this note was written; CLAUDE.md's `check:ci` row did not say it leaves out `reason`; the brief's note missed two sentences; two skills still defined a ratified term by a `rat-` file alone; one skill called the packet untracked |
+| 3 | `e3599721` | 13 reported, 5 apart | All in what round 2's commit wrote: this note gave the law the wrong gate number, cited a SPEC section named "Out" that SPEC does not have, said nothing was pushed where the remote branch holds the older commits, and said every schema had a property test where the seven refusals had none; the brief's note left out `Person`, said one trial happened where another did, and left two of the Problem's sentences standing |
 
-Every finding was checked against the code and fixed, the ones not required too: gate 9 kills a run that ignores
+Round 3 was the loop's last; its five were fixed and those fixes read once more by one reviewer, which is a
+read of the fixes and not a fourth panel. Every finding was checked against the code and fixed, the ones not
+required too: gate 9 kills a run that ignores
 the stop, asks Java its version in a folder that exists and prints a stop that is no refusal; a test holds gist's
-version IRI to the release the module names; every schema of the ontology package has a property test; the read
+version IRI to the release the module names; every schema of the ontology package has a property test, its seven refusals included; the read
 side's list of no-term reasons is made from the written side's.
 
 **Left, and said.**
 
 - The law keeps its own lists of the helpers' and makers' names; nothing ties them to what the two modules export.
   A helper added under a new name is not seen by rule 6 until the list is edited. Backlog, not fixed.
-- The CI job `reason` has never run on GitHub: nothing of this branch is pushed.
-- Not built, as SPEC's "Out" says: SHACL over the stored rows, alignments, any term beyond the thread's, the party
-  slice.
+- The CI job `reason` has never run on GitHub: the remote branch stands at `722b08a1`, which has no such job, and
+  the commits after it are not pushed.
+- Not built: SHACL over the stored rows, alignments, any term beyond the thread's, the party slice (SPEC's
+  Non-goals; the party slice is the brief's slice 1).
 
 **What was learned.**
 

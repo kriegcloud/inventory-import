@@ -229,7 +229,8 @@ export const LiftPathRead = S.TupleWithRest(S.Tuple([]), [NodeStepRead, ValueSte
 /** Runtime type of {@link LiftPathRead}. */
 export type LiftPathRead = typeof LiftPathRead.Type
 
-// The reasons of the closed list, and `deferred`: one list, so a reason added to it is a case here too.
+// The reasons of the closed list, and `deferred`. The list is written once; a reason added to it still needs its
+// class in `NoTermRead` below, and until it has one the test that decodes every reason fails.
 const NoTermKind = LiteralKit([...NoTermReason.literals, "deferred"])
 
 /** A no-term mark, as read: the position only carries a value across the wire. */

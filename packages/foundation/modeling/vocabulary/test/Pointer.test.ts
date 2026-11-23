@@ -15,6 +15,7 @@ import {
   LiftPathRead,
   MarkReading,
   NoTermRead,
+  NoTermReason,
   noTermFor,
   NoTermReading,
   pathFor,
@@ -363,6 +364,14 @@ describe("reading marks that are not well formed", () => {
 
   it("reads a key set to undefined as absent, as Effect does", () => {
     expect(readKeyMark(S.String.pipe(S.annotateKey({ term: undefined })).ast)).toEqual(none)
+  })
+})
+
+describe("the no-term reasons, read", () => {
+  it("every reason of the closed list decodes as a case of NoTermRead", () => {
+    for (const reason of NoTermReason.literals) {
+      expect(S.is(NoTermRead)({ reason })).toBe(true)
+    }
   })
 })
 

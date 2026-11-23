@@ -1,5 +1,6 @@
 // Every named schema of the ontology package generates only values it accepts (schema-first rule SF-7): the graph's
-// nodes, what a Turtle text states, the gates' findings, the enrolment list and the reasoner's pin, runs and results.
+// nodes, what a Turtle text states, the gates' findings, the enrolment list, the reasoner's pin, runs and results,
+// and every refusal.
 import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as R from "effect/Record"
@@ -16,8 +17,21 @@ import {
   RecordEntry,
   SchemeEntry
 } from "../src/Pointers.rules.ts"
-import { JarFound, JavaFound, RobotLock, RobotResult, Run, Verdict } from "../src/Reason.ts"
-import { BlankNode, ParsedNode, ParsedTriple } from "../src/Turtle.ts"
+import { LiftRefused } from "../src/Lift.ts"
+import {
+  JarFound,
+  JarNotFetched,
+  JarNotPinned,
+  JavaFound,
+  JavaNotPinned,
+  RobotLock,
+  RobotResult,
+  Run,
+  RunRefused,
+  Verdict
+} from "../src/Reason.ts"
+import { BlankNode, ParsedNode, ParsedTriple, TurtleRefused } from "../src/Turtle.ts"
+import { WriteRefused } from "../src/Write.ts"
 
 const runs = { arbitrary: { runs: 30 } }
 const schemas = {
@@ -48,7 +62,14 @@ const schemas = {
   JarFound,
   RobotResult,
   Verdict,
-  Run
+  Run,
+  TurtleRefused,
+  LiftRefused,
+  WriteRefused,
+  JavaNotPinned,
+  JarNotFetched,
+  JarNotPinned,
+  RunRefused
 }
 
 describe("every schema of the ontology package generates only valid values", () => {

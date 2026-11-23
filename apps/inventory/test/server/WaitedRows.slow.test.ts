@@ -658,3 +658,80 @@ layer(TypedApp)(
     )
   }
 )
+
+layer(TypedApp)("a row that waited across a match, her own decision taken from", (it) => {
+  const rope = { accepted: ["unitCost", "uom"], edits: { name: "Rope" } } satisfies RowDecisionFlags
+  it.effect("named as her screen showed it between two matches: hers, and written; his, after both, named", () =>
+    Effect.gen(function* () {
+      const { view, marcusSaves, danaSaves, matched, stored } = yield* seeded
+      yield* danaSaves({ on: view.revision, set: { "row-4": rope } })
+      yield* marcusSaves({ set: { "row-5": rope } })
+      const first = yield* matched("unitCost", "Net cost")
+      const second = yield* matched("uom", "Alt code")
+      // Row 4 is hers, named as her screen showed it between the matches. Row 5 is his, named as he saved it, by her
+      // press made after both: what the matches left of his is not known to her.
+      const saved = yield* danaSaves({
+        on: first.revision,
+        set: { "row-4": { out: true } },
+        over: { "row-4": [O.some({ accepted: ["uom"], edits: { name: "Rope" } })] }
+      })
+      const again = yield* danaSaves({
+        on: second.revision,
+        set: { "row-5": { out: true } },
+        over: { "row-5": [O.some(rope)] }
+      })
+      expect([saved.decidedSince, named(again.decidedSince)]).toEqual([
+        [],
+        [["row-5", some({ edits: { name: "Rope" } })]]
+      ])
+      const now = yield* stored(["row-4", "row-5"])
+      expect(now).toEqual([some({ out: true }), some({ edits: { name: "Rope" } })])
+    })
+  )
+
+  it.effect("named as she sent it by her press made after both matches: hers, and written", () =>
+    Effect.gen(function* () {
+      const { view, danaSaves, matched, stored } = yield* seeded
+      yield* danaSaves({ on: view.revision, set: { "row-4": rope } })
+      yield* matched("unitCost", "Net cost")
+      const second = yield* matched("uom", "Alt code")
+      const saved = yield* danaSaves({
+        on: second.revision,
+        set: { "row-4": { out: true } },
+        over: { "row-4": [O.some(rope)] }
+      })
+      expect(saved.decidedSince).toEqual([])
+      const now = yield* stored(["row-4"])
+      expect(now).toEqual([some({ out: true })])
+    })
+  )
+
+  it.effect("saved again unchanged by the other one of them: not hers, named", () =>
+    Effect.gen(function* () {
+      const { view, marcusSaves, danaSaves, matched, stored } = yield* seeded
+      // Row 4 is hers, saved again by Marcus unchanged after the match; row 5 is his, saved again by her unchanged
+      // before it.
+      yield* danaSaves({ on: view.revision, set: { "row-4": rope } })
+      yield* marcusSaves({ set: { "row-5": rope } })
+      const mine = yield* danaSaves({ on: view.revision + 2, set: { "row-5": rope } })
+      expect(mine.changed).toBe(false)
+      const match = yield* matched("unitCost", "Net cost")
+      const his = yield* marcusSaves({ set: { "row-4": { accepted: ["uom"], edits: { name: "Rope" } } } })
+      expect(his.changed).toBe(false)
+      // A save of another row moves the draft on: her screen reads it after his save.
+      const moved = yield* danaSaves({ on: match.revision, set: { "row-2": { out: true } } })
+      const saved = yield* danaSaves({
+        on: moved.revision,
+        set: { "row-4": { out: true }, "row-5": { out: true } },
+        over: { "row-4": [O.some(rope)], "row-5": [O.some(rope)] }
+      })
+      const left = some({ accepted: ["uom"], edits: { name: "Rope" } })
+      expect(named(saved.decidedSince)).toEqual([
+        ["row-4", left],
+        ["row-5", left]
+      ])
+      const now = yield* stored(["row-4", "row-5"])
+      expect(now).toEqual([left, left])
+    })
+  )
+})

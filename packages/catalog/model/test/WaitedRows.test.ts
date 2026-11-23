@@ -597,6 +597,33 @@ describe("a row that waited across a match, and the items since", () => {
     })
   )
 
+  alone(
+    "her own Replace she took off since, under a closed tab's press over it across a match that took nothing: named, not written",
+    () =>
+      Effect.gen(function* () {
+        const { view, danaSaves, matched, stored } = yield* seededSacks
+        const first = yield* danaSaves({ on: view.revision, set: { "row-2": mine } })
+        // In another tab she takes the Replace off: she both decided and last saved what is stored.
+        yield* danaSaves({
+          on: first.revision,
+          set: { "row-2": { edits: { name: "Sack" } } },
+          over: { "row-2": [O.some(mine)] }
+        })
+        const match = yield* matched("unitCost", "Net cost")
+        expect(match.takenBack).toEqual([])
+        // Her closed tab's press over the Replace: what a match would leave of the Replace reads as what is stored, but
+        // no match took it, and she took it off herself. She is asked.
+        const saved = yield* danaSaves({
+          on: first.revision,
+          set: { "row-2": { ...mine, out: true } },
+          over: { "row-2": [O.some(mine)] }
+        })
+        expect(named(saved.decidedSince)).toEqual([["row-2", some({ edits: { name: "Sack" } })]])
+        const now = yield* stored(["row-2"])
+        expect(now).toEqual([some({ edits: { name: "Sack" } })])
+      })
+  )
+
   alone("her own save that did not apply its Replace, its item taken back since: hers, not named", () =>
     Effect.gen(function* () {
       const stock = yield* stockSack
@@ -742,6 +769,54 @@ describe("a row that waited across a match, and the items since", () => {
       expect(now).toEqual([some({ out: true }), some({}), some({ stored: "replace" })])
     })
   )
+})
+
+describe("a row of hers past those a match's entry names by row: the known limit", () => {
+  layer(App)("is asked about, as the record cannot say what the match took of it", (it) => {
+    it.effect("hers and his past them, named as sent after the match: both named, not written", () =>
+      Effect.gen(function* () {
+        const imports = yield* importsEndpoints
+        // Every row has a cost that compares otherwise under "Net cost", and an accept of it: the match takes them all,
+        // and its entry names only the first rows. His are first, then his past them, then hers.
+        const lines = A.makeBy(takenBackRowsNamed + 2, (index) => ({
+          ...sackLine,
+          sku: `CCC-${Str.padStart(4, "0")(`${index + 1}`)}`
+        }))
+        const view = yield* stage(tableOf("many.csv", lines)).pipe(as(marcus))
+        const { danaSaves, marcusSaves, matched, stored } = people(imports, view.id)
+        const accept = { accepted: ["unitCost"], edits: { name: "Sack" } } satisfies RowDecisionFlags
+        const his = `row-${takenBackRowsNamed + 2}`
+        const hers = `row-${takenBackRowsNamed + 3}`
+        yield* marcusSaves({
+          set: R.fromEntries(A.makeBy(takenBackRowsNamed + 1, (index) => [`row-${index + 2}`, accept] as const))
+        })
+        const mine = yield* danaSaves({ on: view.revision + 1, set: { [hers]: accept } })
+        const match = yield* matched("unitCost", "Net cost")
+        const entry = A.findFirst(match.takenBack, (one) => one.kind === "accept")
+        expect(
+          O.map(entry, ({ count, rows }) => [
+            count,
+            A.some(rows, (row) => row === his),
+            A.some(rows, (row) => row === hers)
+          ])
+        ).toEqual(O.some([takenBackRowsNamed + 2, false, false]))
+        expect(mine.decidedSince).toEqual([])
+        const saved = yield* danaSaves({
+          on: match.revision,
+          set: { [hers]: { out: true }, [his]: { out: true } },
+          over: { [hers]: [O.some(accept)], [his]: [O.some(accept)] }
+        })
+        // Hers too: who decided and last saved it cannot say what she names is what she last saved, so only the record
+        // could, and it names neither row.
+        expect(named(saved.decidedSince)).toEqual([
+          [hers, some({ edits: { name: "Sack" } })],
+          [his, some({ edits: { name: "Sack" } })]
+        ])
+        const now = yield* stored([hers, his])
+        expect(now).toEqual([some({ edits: { name: "Sack" } }), some({ edits: { name: "Sack" } })])
+      })
+    )
+  })
 })
 
 describe("what lands between a save's comparison and its write", () => {
@@ -1244,6 +1319,109 @@ describe("a row that waited, and who last saved what is stored", () => {
       const now = yield* stored(["row-2"])
       expect(now).toEqual([some({ edits: { name: "Sack" } })])
     })
+  )
+
+  // Her decision is out when the match takes its accept; her screen reads the draft after it and she decides the row
+  // again over the decision still on its way, which is all she named. What is stored is hers as the match left it.
+  const acceptedSack = { accepted: ["unitCost"], edits: { name: "Sack" } } satisfies RowDecisionFlags
+  alone("her own decision as a match left it, named by a press made after the match: still hers, and written", () =>
+    Effect.gen(function* () {
+      const { view, sends, matched, stored, credit } = yield* sackSeen
+      yield* sends(dana)({ on: view.revision, set: { "row-2": acceptedSack } })
+      const match = yield* matched("unitCost", "Net cost")
+      const before = yield* stored(["row-2"])
+      expect([before, (yield* credit).last]).toEqual([[some({ edits: { name: "Sack" } })], O.some(dana.id)])
+      const saved = yield* sends(dana)({
+        on: match.revision,
+        set: { "row-2": { out: true } },
+        over: { "row-2": [O.none(), O.some(acceptedSack)] }
+      })
+      expect(saved.decidedSince).toEqual([])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ out: true })])
+    })
+  )
+
+  alone(
+    "her own decision, two matches since, named as her screen showed it after the first: still hers, and written",
+    () =>
+      Effect.gen(function* () {
+        const { view, sends, matched, stored } = yield* sackSeen
+        yield* sends(dana)({
+          on: view.revision,
+          set: { "row-2": { accepted: ["unitCost", "uom"], edits: { name: "Sack" } } }
+        })
+        const first = yield* matched("unitCost", "Net cost")
+        yield* matched("uom", "Alt code")
+        // Her screen read the draft between the two matches: it showed her decision without the accept of the cost.
+        const saved = yield* sends(dana)({
+          on: first.revision,
+          set: { "row-2": { out: true } },
+          over: { "row-2": [O.some({ accepted: ["uom"], edits: { name: "Sack" } })] }
+        })
+        expect(saved.decidedSince).toEqual([])
+        const now = yield* stored(["row-2"])
+        expect(now).toEqual([some({ out: true })])
+      })
+  )
+
+  alone("his decision, saved again by her unchanged before the match: his still, named", () =>
+    Effect.gen(function* () {
+      const { sends, presses, matched, stored, credit } = yield* sackSeen
+      yield* presses(marcus)({ set: { "row-2": acceptedSack } })
+      const mine = yield* presses(dana)({ set: { "row-2": acceptedSack } })
+      expect(mine.changed).toBe(false)
+      // Her unchanged save leaves him credited with deciding it; she saved it last.
+      const credited = yield* credit
+      expect([credited.by, credited.last]).toEqual([O.some(marcus.id), O.some(dana.id)])
+      const match = yield* matched("unitCost", "Net cost")
+      const saved = yield* sends(dana)({
+        on: match.revision,
+        set: { "row-2": { out: true } },
+        over: { "row-2": [O.none(), O.some(acceptedSack)] }
+      })
+      expect(named(saved.decidedSince)).toEqual([["row-2", some({ edits: { name: "Sack" } })]])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ edits: { name: "Sack" } })])
+    })
+  )
+
+  alone("the same decision his, named by her press made after the match: not as the match left it, named", () =>
+    Effect.gen(function* () {
+      const { presses, sends, matched, stored } = yield* sackSeen
+      yield* presses(marcus)({ set: { "row-2": acceptedSack } })
+      const match = yield* matched("unitCost", "Net cost")
+      const saved = yield* sends(dana)({
+        on: match.revision,
+        set: { "row-2": { out: true } },
+        over: { "row-2": [O.none(), O.some(acceptedSack)] }
+      })
+      expect(named(saved.decidedSince)).toEqual([["row-2", some({ edits: { name: "Sack" } })]])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ edits: { name: "Sack" } })])
+    })
+  )
+
+  alone(
+    "her own decision as a match left it, saved again by him unchanged before her screen read it: his too, named",
+    () =>
+      Effect.gen(function* () {
+        const { view, sends, presses, matched, stored } = yield* sackSeen
+        yield* sends(dana)({ on: view.revision, set: { "row-2": acceptedSack } })
+        yield* matched("unitCost", "Net cost")
+        const his = yield* presses(marcus)({ set: { "row-2": { edits: { name: "Sack" } } } })
+        expect(his.changed).toBe(false)
+        // A save of another row moves the draft on: her screen reads it after his save.
+        const moved = yield* presses(dana)({ set: { "row-3": { out: true } } })
+        const saved = yield* sends(dana)({
+          on: moved.revision,
+          set: { "row-2": { out: true } },
+          over: { "row-2": [O.none(), O.some(acceptedSack)] }
+        })
+        expect(named(saved.decidedSince)).toEqual([["row-2", some({ edits: { name: "Sack" } })]])
+        const now = yield* stored(["row-2"])
+        expect(now).toEqual([some({ edits: { name: "Sack" } })])
+      })
   )
 
   alone("the store answers `moved` when a save of what is stored came after the rows were compared", () =>

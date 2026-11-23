@@ -765,18 +765,192 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
 
 describe("orderings the properties met, pinned", () => {
   // Each is played as the properties play an ordering, and every rule they check after it is checked here too.
-  it("her decision of a row, made again over her own press on its way, goes as a live press after a closed tab's same decision beside it was found saved", () => {
+  it("her decision made again over her own on its way, after a match took a part of that one, is stored with no line", () => {
+    // What the newer picture holds of the row is what the match left of her own decision: nobody decided it since.
+    const ordering = [
+      Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
+      Command.cases.ServerTakesSave.make({}),
+      Command.cases.Match.make({}),
+      Command.cases.ReturnToTab.make({}),
+      Command.cases.ServerTakesRead.make({}),
+      Command.cases.ReadArrives.make({}),
+      Command.cases.Decide.make({ row: "a", to: "kept" }),
+      Command.cases.SaveAnswers.make({}),
+      Command.cases.ServerTakesSave.make({}),
+      Command.cases.SaveAnswers.make({})
+    ]
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    expect([R.get(world.server.decisions, "a"), world.draft.lines]).toEqual([O.some(kept), {}])
+    expect(broken(ordering)).toEqual(O.none())
+  })
+
+  it("her decision made again over her own on its way, after a picture showed somebody else's since, is no live press: she is asked", () => {
+    // Her screen showed her own decision on its way, never the other one: a live press would write over it unasked.
+    const ordering = [
+      Command.cases.Decide.make({ row: "a", to: "out" }),
+      Command.cases.ServerTakesSave.make({}),
+      Command.cases.SomeoneElse.make({ row: "a", to: "kept" }),
+      Command.cases.ReturnToTab.make({}),
+      Command.cases.ServerTakesRead.make({}),
+      Command.cases.ReadArrives.make({}),
+      Command.cases.Decide.make({ row: "a", to: "accepted" }),
+      Command.cases.SaveAnswers.make({}),
+      Command.cases.ServerTakesSave.make({}),
+      Command.cases.SaveAnswers.make({})
+    ]
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    expect([R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")]).toEqual([O.some(kept), true])
+    expect(broken(ordering)).toEqual(O.none())
+  })
+
+  it("her decision made again over her own on its way, after somebody else saved what a match left of hers, is asked", () => {
+    // The picture holds what a match would leave of her decision, but he saved it: the server, which knows who, asks.
+    const C = Command.cases
+    const orderings: ReadonlyArray<ReadonlyArray<Command>> = [
+      [
+        C.Decide.make({ row: "a", to: "acceptedOut" }),
+        C.ServerTakesSave.make({}),
+        C.Match.make({}),
+        C.SomeoneElse.make({ row: "a", to: "kept" }),
+        C.SomeoneElse.make({ row: "a", to: "out" }),
+        C.ReturnToTab.make({}),
+        C.ServerTakesRead.make({}),
+        C.ReadArrives.make({}),
+        C.Decide.make({ row: "a", to: "kept" }),
+        C.SaveAnswers.make({}),
+        C.ServerTakesSave.make({}),
+        C.SaveAnswers.make({})
+      ],
+      [
+        C.SomeoneElse.make({ row: "a", to: "acceptedOut" }),
+        C.ReturnToTab.make({}),
+        C.ServerTakesRead.make({}),
+        C.ReadArrives.make({}),
+        C.Decide.make({ row: "a", to: "kept" }),
+        C.ServerTakesSave.make({}),
+        C.SomeoneElse.make({ row: "a", to: "accepted" }),
+        C.Match.make({}),
+        C.SomeoneElse.make({ row: "a", to: "out" }),
+        C.ReturnToTab.make({}),
+        C.ServerTakesRead.make({}),
+        C.ReadArrives.make({}),
+        C.Decide.make({ row: "a", to: "accepted" }),
+        C.SaveAnswers.make({}),
+        C.ServerTakesSave.make({})
+      ]
+    ]
+    const ends = A.map(orderings, (ordering) => {
+      const world = opened()
+      for (const command of ordering) run(world, command)
+      return [R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")] as const
+    })
+    expect(ends).toEqual([
+      [O.some(out), true],
+      [O.some(out), true]
+    ])
+    expect(A.map(orderings, broken)).toEqual([O.none(), O.none()])
+  })
+
+  it("her decision made again over her own on its way, after somebody saved again what it went over, is asked", () => {
+    // The picture holds what her press on its way went over, but Marcus saved it again after her save: not hers.
+    const C = Command.cases
+    const ordering = [
+      C.SomeoneElse.make({ row: "a", to: "kept" }),
+      C.ReturnToTab.make({}),
+      C.ServerTakesRead.make({}),
+      C.ReadArrives.make({}),
+      C.Decide.make({ row: "a", to: "out" }),
+      C.ServerTakesSave.make({}),
+      C.SomeoneElse.make({ row: "a", to: "kept" }),
+      C.ReturnToTab.make({}),
+      C.ServerTakesRead.make({}),
+      C.ReadArrives.make({}),
+      C.Decide.make({ row: "a", to: "accepted" }),
+      C.SaveAnswers.make({}),
+      C.ServerTakesSave.make({}),
+      C.SaveAnswers.make({})
+    ]
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    expect([R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")]).toEqual([O.some(kept), true])
+    expect(broken(ordering)).toEqual(O.none())
+  })
+
+  it("her decision made again over her own on its way, after a picture showed only another row saved since, is stored with no line", () => {
+    const C = Command.cases
+    const ordering = [
+      C.Decide.make({ row: "a", to: "out" }),
+      C.ServerTakesSave.make({}),
+      C.SomeoneElse.make({ row: "b", to: "kept" }),
+      C.ReturnToTab.make({}),
+      C.ServerTakesRead.make({}),
+      C.ReadArrives.make({}),
+      C.Decide.make({ row: "a", to: "accepted" }),
+      C.SaveAnswers.make({}),
+      C.ServerTakesSave.make({}),
+      C.SaveAnswers.make({})
+    ]
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    expect([R.get(world.server.decisions, "a"), world.draft.lines]).toEqual([O.some(accepted), {}])
+    expect(broken(ordering)).toEqual(O.none())
+  })
+
+  it("her save of what somebody else decided, sent unchanged, then taken from by a match: his still, and her decision made again is asked", () => {
+    // The server credits the decision to whoever changed it, not to an unchanged save after; the same against the
+    // real server is in DraftServer.test.ts.
+    const C = Command.cases
+    const ordering = [
+      C.Decide.make({ row: "a", to: "acceptedOut" }),
+      C.SomeoneElse.make({ row: "a", to: "acceptedOut" }),
+      C.ServerTakesSave.make({}),
+      C.Match.make({}),
+      C.ReturnToTab.make({}),
+      C.ServerTakesRead.make({}),
+      C.ReadArrives.make({}),
+      C.Decide.make({ row: "a", to: "kept" }),
+      C.SaveAnswers.make({}),
+      C.ServerTakesSave.make({}),
+      C.SaveAnswers.make({})
+    ]
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    expect([R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")]).toEqual([O.some(out), true])
+    expect(broken(ordering)).toEqual(O.none())
+  })
+
+  it("her decision made again while somebody else's answer showed theirs since, behind her own press, is no live press", () => {
     expect(
       broken([
-        Command.cases.ReturnToTab.make({}),
-        Command.cases.Decide.make({ row: "a", to: "out" }),
-        Command.cases.TakeUp.make({ row: "a", to: "out", beside: "refused", as: "waiting" }),
-        Command.cases.ServerTakesSave.make({ which: "last" }),
-        Command.cases.ServerTakesRead.make({}),
-        Command.cases.ReadArrives.make({}),
-        Command.cases.Decide.make({ row: "a", to: "kept" })
+        Command.cases.Decide.make({ row: "a", to: "kept" }),
+        Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.Decide.make({ row: "a", to: "out" })
       ])
     ).toEqual(O.none())
+  })
+
+  it("her decision of a row, made again over her own press on its way after a closed tab's same decision beside it was found saved, is no live press once a newer picture came", () => {
+    const ordering = [
+      Command.cases.ReturnToTab.make({}),
+      Command.cases.Decide.make({ row: "a", to: "out" }),
+      Command.cases.TakeUp.make({ row: "a", to: "out", beside: "refused", as: "waiting" }),
+      Command.cases.ServerTakesSave.make({ which: "last" }),
+      Command.cases.ServerTakesRead.make({}),
+      Command.cases.ReadArrives.make({}),
+      Command.cases.Decide.make({ row: "a", to: "kept" }),
+      Command.cases.SaveAnswers.make({})
+    ]
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    // The press of Keep goes once the one on its way answered: over the decision she knew of, not as a live press.
+    expect(A.map(world.saves, ({ over, live }) => [R.get(over, "a"), A.contains(live, "a")])).toEqual([
+      [O.some([O.some(out)]), false]
+    ])
+    expect(broken(ordering)).toEqual(O.none())
   })
 
   it("a closed tab's decisions taken up with no press of this tab's beside them: what she decides of the row after waited", () => {

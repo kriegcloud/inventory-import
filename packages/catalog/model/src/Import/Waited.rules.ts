@@ -266,7 +266,9 @@ const hiddenIn = (entries: ReadonlyArray<MatchTakeBack>, rowId: string, made: nu
  * and no match took a part of it since, or is already what the save leaves (`left`): the same save sent again after a
  * lost answer finds its own; or when what is stored is the decision one of those became (the one the server held at
  * the row's revision, or the sender's own saved since, as her save applied it) with exactly the parts each match since
- * recorded it took from that decision removed. A decision somebody else last saved on or after the row's revision, even
+ * recorded it took from that decision removed: since the row's revision, or, where she both decided and last saved what
+ * is stored, since the row's revision or since her save, so a press of hers made on a picture that already showed the
+ * match is still over her own. A decision somebody else last saved on or after the row's revision, even
  * by sending exactly what was stored, is never the sender's and never what one she named became: it is written over
  * only as named or as the save leaves. Nothing here asks the file's review, so it costs the same however many
  * decisions a row names.
@@ -305,11 +307,21 @@ export const decidedSince = (
         O.getOrElse(lastSaved, () => 0)
       )
       const asItWasSaved = !takenAfter(input.takenBack, rowId, since) && !hiddenIn(input.takenBack, rowId, since)
+      // Her own decision, which she both decided and last saved, is also what each match after that save took from it,
+      // whatever revision her screen was at: a decision she sent and named is hers as it was saved, as well as as the
+      // picture her screen held showed it. Anybody else's is judged from the row's revision on only.
+      const own =
+        O.exists(R.get(input.deciders, rowId), (by) => by === input.sender) &&
+        O.exists(R.get(input.lastSavedBy, rowId), (by) => by === input.sender)
+      const windows = (saved: number): ReadonlyArray<number> =>
+        own ? [saved, Math.max(made, saved)] : [Math.max(made, saved)]
       const became = (saved: number): boolean =>
         A.some(A.getSomes(named), (one) =>
           A.some(asSaved(input, { rowId, made, saved }, one), (applied) =>
-            O.exists(leftByMatches(input, record, { rowId, made: Math.max(made, saved), saved }, applied), (left) =>
-              alike(stored, O.some(left))
+            A.some(windows(saved), (from) =>
+              O.exists(leftByMatches(input, record, { rowId, made: from, saved }, applied), (left) =>
+                alike(stored, O.some(left))
+              )
             )
           )
         )

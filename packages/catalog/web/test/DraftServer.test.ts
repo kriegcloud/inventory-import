@@ -19,17 +19,7 @@ import { catalogMemory } from "@inventory/catalog-model/Memory"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
-import {
-  type Draft,
-  DraftEffect,
-  DraftEvent,
-  emptyDraft,
-  linesShown,
-  shown,
-  step,
-  waiting
-} from "../src/Draft.machine.ts"
-import { lineWords } from "../src/internal/leftOver.ts"
+import { type Draft, DraftEffect, DraftEvent, emptyDraft, shown, step, waiting } from "../src/Draft.machine.ts"
 import { keptForm } from "../src/internal/storedWaiting.ts"
 
 const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
@@ -106,8 +96,8 @@ const opened = Effect.gen(function* () {
     draft = stepped.draft
     for (const effect of stepped.effects) if (DraftEffect.$is("Send")(effect)) sends.push(effect)
   }
-  /** The last save the draft asked for reaches the server; `lost`: its answer never comes back. */
-  const save = Effect.fnUntraced(function* (lost: boolean) {
+  /** The last save the draft asked for reaches the server; its answer reaches the draft when `arrives` is run. */
+  const taken = Effect.fnUntraced(function* () {
     const send = O.getOrThrow(A.last(sends))
     sends.length = 0
     const payload = {
@@ -116,8 +106,24 @@ const opened = Effect.gen(function* () {
       ...send.delta
     }
     const answer = yield* imports.decide({ params, payload }).pipe(as(dana))
-    happen(lost ? DraftEvent.SaveFailed({ id: send.id }) : DraftEvent.SaveAnswered({ id: send.id, ...answer }))
+    return {
+      answer,
+      arrives: (lost: boolean) =>
+        happen(lost ? DraftEvent.SaveFailed({ id: send.id }) : DraftEvent.SaveAnswered({ id: send.id, ...answer }))
+    }
+  })
+  /** The last save the draft asked for reaches the server; `lost`: its answer never comes back. */
+  const save = Effect.fnUntraced(function* (lost: boolean) {
+    const { answer, arrives } = yield* taken()
+    arrives(lost)
     return answer
+  })
+  /** Marcus decides a row on what the server holds now. */
+  const elsewhere = Effect.fnUntraced(function* (row: string, decision: SavedDecisions[string]) {
+    const now = yield* read
+    return yield* imports
+      .decide({ params, payload: { madeOn: { [row]: now.revision }, set: { [row]: decision }, clear: [] } })
+      .pipe(as(marcus))
   })
   const look = Effect.map(read, (view) => happen(arrived(view)))
   const match = (field: Field, heading: (typeof headings)[number]) =>
@@ -129,7 +135,9 @@ const opened = Effect.gen(function* () {
   return {
     id: id as ImportId,
     happen,
+    taken,
     save,
+    elsewhere,
     look,
     match,
     stored: (row: string) => Effect.map(read, (view) => R.get(view.decisions, row)),
@@ -198,7 +206,7 @@ describe("a save of hers partly written, its answer lost", () => {
     )
 
     it.effect(
-      "decided again after a match took part of it back: the server cannot tell, and the line says what is saved, not whose",
+      "decided again after a match took part of it back: the server finds her own decision as the match left it, and writes, with no line",
       () =>
         Effect.gen(function* () {
           const t = yield* opened
@@ -208,17 +216,35 @@ describe("a save of hers partly written, its answer lost", () => {
           // Her screen reads the match; the resend fails too; then she accepts Unit of measure on the row as well.
           yield* t.look
           yield* t.save(true)
-          t.happen(decide("row-2", decisionFromFlags({ out: true, accepted: ["uom"] })))
+          const again = decisionFromFlags({ out: true, accepted: ["uom"] })
+          t.happen(decide("row-2", again))
           const answer = yield* t.save(false)
-          // The decision named was sent before the match, the save is dated after it: the server judges it as it was
-          // sent, finds it is not what is stored, and names the row decided since.
+          // The decision named was sent before the match, the save is dated after it. She decided and last saved what
+          // is stored, so the server counts the match after her save as taking from it: hers, and written.
+          expect(answer.decidedSince).toEqual([])
+          yield* t.look
+          expect([R.keys(t.draft().lines), yield* t.stored("row-2")]).toEqual([[], O.some(again)])
+        })
+    )
+
+    it.effect(
+      "her save of what a colleague decided, sent unchanged, then taken from by a match: his still, and she is asked",
+      () =>
+        Effect.gen(function* () {
+          const t = yield* opened
+          t.happen(decide("row-2", acceptedOut))
+          // Marcus decides the same before her save reaches the server: it changes nothing, and the decision is his.
+          yield* t.elsewhere("row-2", acceptedOut)
+          const first = yield* t.taken()
+          expect(first.answer.changed).toBe(false)
+          yield* t.match("unitCost", "Net cost")
+          yield* t.look
+          t.happen(decide("row-2", decisionFromFlags({ kept: true })))
+          first.arrives(false)
+          const answer = yield* t.save(false)
           expect(A.map(answer.decidedSince, (row) => row.rowId)).toEqual(["row-2"])
-          const line = O.getOrThrow(R.get(linesShown(t.draft()), "row-2"))
-          const { text } = lineWords({ rowId: "row-2", line, canDecide: true })
-          expect([line.since, text]).toEqual([
-            false,
-            "Row 2: saved now: left out. Yours: left out; accepted the proposal for Unit of measure."
-          ])
+          yield* t.look
+          expect([R.keys(t.draft().lines), yield* t.stored("row-2")]).toEqual([["row-2"], O.some(out)])
         })
     )
   })

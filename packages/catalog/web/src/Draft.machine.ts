@@ -869,6 +869,20 @@ const noneLive = (draft: Draft): Draft => ({
 })
 
 /**
+ * A newer picture came: none of the rows that wait or are on their way is live any more. A decision she makes over one
+ * on its way rests on it, and her screen showed her own decision there, never what the picture holds: whoever saved
+ * that, a colleague's decision that reads as hers or what a match left of hers, the screen cannot tell. It goes over
+ * what it was pressed on, and the server, which knows who decided and saved the row, judges it.
+ */
+const noneLiveSince = (draft: Draft): Draft => ({
+  ...noneLive(draft),
+  flight: O.map(draft.flight, (flight) => ({
+    ...flight,
+    rows: R.map(flight.rows, (side) => ({ ...side, live: false }))
+  }))
+})
+
+/**
  * The draft let go, or ended: nothing of it is left. Its epoch goes on (the next visit's region is another one), and so
  * do its ids: the save that was out is remembered, so its answer, when it comes, is never taken for another's.
  *
@@ -1669,7 +1683,7 @@ const following = (draft: Draft, picture: Picture, takenBack: ReadonlyArray<Take
       if (picture.revision === held.revision && Eq.equals(picture.decisions, held.decisions)) return only(draft)
       const after = lined({
         // Somebody may have decided a row that waits: it goes over what it was pressed on, and nothing else.
-        ...noneLive(draft),
+        ...noneLiveSince(draft),
         held: O.some(picture),
         // The person's saved rows are in a picture of their revision or later.
         landed: O.filter(draft.landed, (rows) => rows.at > picture.revision)

@@ -151,6 +151,11 @@ export interface World {
   /** The rows whose stored decision somebody else wrote. */
   byElse: Record<string, boolean>
   /**
+   * The rows whose stored decision a tab of the person's decided, as the server credits it: a save that changes what is
+   * stored is its decider's, and one that sends it unchanged leaves the decider as it was, whoever sent it.
+   */
+  readonly decidedByHer: Record<string, boolean>
+  /**
    * Every decision written of each row, and who wrote it: this tab, another tab of the person's, or somebody else. What
    * a match left of one is written by whoever wrote that one. A line that says somebody decided a row since is held to
    * it (`holds`).
@@ -232,6 +237,7 @@ const start = (decisions: SavedDecisions): World => {
     history: { 1: server },
     everHeld: R.map(decisions, (one) => [O.some(one)]),
     byElse: {},
+    decidedByHer: {},
     writes: {},
     sentByHer: {},
     promised: {},
@@ -284,6 +290,7 @@ type Writer = "this tab" | "another tab" | "somebody else"
 /** The server stores one row's decision, written by this tab, another tab of the person's, or somebody else. */
 const stores = (world: World, row: string, value: Value, by: Writer): void => {
   const byElse = by === "somebody else"
+  if (!sameDecision(R.get(world.server.decisions, row), value)) world.decidedByHer[row] = !byElse
   world.everHeld[row] = [...(world.everHeld[row] ?? [O.none()]), value]
   world.writes[row] = [...(world.writes[row] ?? []), { value, by }]
   world.byElse[row] = byElse
@@ -359,8 +366,9 @@ const isPartOf = (made: Value, sent: Value): boolean =>
 /**
  * The server takes rows of a save: what it stores of each, what it does not apply, and what was decided since. A row
  * that waited is judged as the server's `decidedSince` (`Waited.rules.ts`) judges it: written while what is stored is
- * what the save leaves of it, one of the decisions named, or one of those without the accept a match after the row's
- * revision took back.
+ * what the save leaves of it, one of the decisions named, or one of those without the accept a match took back: a match
+ * after the row's revision, or, where a tab of hers decided what the match took from and nobody else saved the row
+ * since, even unchanged, any match since that write.
  */
 const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "live">): Save["answer"] => {
   const decisions: Record<string, SavedDecisions[string]> = { ...world.server.decisions }
@@ -372,8 +380,15 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
     const matchedSince = (save.madeOn[row] ?? 0) < world.server.matchedAt
     const stale = hasAccept(value) && matchedSince
     const written = stale ? withoutAccept(value) : value
+    // What a match took from a decision a tab of hers decided and last saved, as the server credits both: `before` holds
+    // what each match since the last write took from. `byElse` and `decidedByHer` may both be set, when somebody else turns
+    // an empty decision into none or back (`stores` reads them as the same decision), but `before` is then empty: a
+    // store empties it and a match adds only a row with an accept, which an empty decision or none is not, so `byElse`
+    // decides nothing here.
+    const takenFromHers = (one: Value): boolean =>
+      world.decidedByHer[row] === true && world.byElse[row] !== true && isIn(world.before[row], one)
     const leftOf = (one: Value): boolean =>
-      sameDecision(stored, one) || (matchedSince && sameDecision(stored, withoutAccept(one)))
+      sameDecision(stored, one) || ((matchedSince || takenFromHers(one)) && sameDecision(stored, withoutAccept(one)))
     if (O.exists(names, (values) => !sameDecision(stored, written) && !A.some(values, leftOf))) {
       decidedSince.push({ rowId: row, theirs: O.filter(stored, (one) => !sameDecision(O.some(one), O.none())) })
       continue
@@ -386,7 +401,8 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
     const by: Writer = A.some(world.facts, (fact) => fact.row === row && !fact.here && isPartOf(fact.value, written))
       ? "another tab"
       : "this tab"
-    // Saved as it already was: the server holds the person's decision from now on, whoever wrote it first.
+    // Saved as it already was: what is stored stays, and so does whom the server credits with deciding it
+    // (`decidedByHer`); this save's writer is who saved it last.
     if (Eq.equals(stored, written)) {
       stores(world, row, written, by)
       continue
@@ -402,6 +418,21 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
 
 /** A view reaches the step that is drawn. `waiting`: it is given while a read of it is out. */
 const arrive = (world: World, view: Snapshot, isWaiting = false): void => {
+  // The server moved on since the picture the screen holds, or says the same revision otherwise: somebody (or a save of
+  // hers whose answer is still out) saved since what waits or is on its way was pressed, and none of it is a live press
+  // any more, nor is what she presses over a row on its way. Her screen showed her own decision there, never what the
+  // picture holds, and whoever saved that is the server's to judge.
+  const moved = O.exists(
+    world.draft.held,
+    (held) =>
+      view.revision > held.revision || (view.revision === held.revision && !Eq.equals(view.decisions, held.decisions))
+  )
+  if (moved) {
+    for (const row of R.keys(world.draft.unsent)) world.waited[row] = true
+    O.map(world.draft.flight, (flight) => {
+      for (const row of R.keys(flight.rows)) world.waited[row] = true
+    })
+  }
   sees(world, view.decisions)
   dispatchIn(
     world,

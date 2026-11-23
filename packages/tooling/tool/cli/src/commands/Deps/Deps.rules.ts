@@ -17,6 +17,8 @@
  * - **A patched dependency stops the update.** A patch is made for one version (docs/patches.md). When a dependency
  *   the repository patches has a newer version, nothing is moved, and the command names the patches to re-make for
  *   the new version or to drop: moved along with the rest, bun would install it unpatched with one warning line.
+ *   A folder of patches whose headers do not say which package they are for stops it the same way: the package it
+ *   patches could be one of those that move.
  *
  * The plan is a pure function of the files' text, the held list and the registry's answers, so it is tested with no
  * network. Writing changes the files, runs `bun install`, and then `version-sync --write`, so the places a moved
@@ -211,6 +213,9 @@ export const DepsFinding = S.TaggedUnion({
     appliesTo: S.String.pipe(S.annotateKey({ description: "The version its patches were made for" })),
     folder: S.String.pipe(S.annotateKey({ description: "The folder of its patches, from the root" }))
   },
+  PatchesUnread: {
+    folder: S.String.pipe(S.annotateKey({ description: "The folder of patches whose headers cannot be read" }))
+  },
   Installed: {},
   InstallFailed: {
     files: S.Int.pipe(S.annotateKey({ description: "How many written files were put back" })),
@@ -241,6 +246,11 @@ export interface DepsInput {
   readonly holds: ReadonlyArray<Hold>
   /** The dependencies from a registry that the repository patches; none when left out. */
   readonly patched?: ReadonlyArray<PatchedDependency>
+  /**
+   * The folders of patches that do not say which package and version they are for, from the root: a header with a
+   * field missing, or two that disagree. None when left out.
+   */
+  readonly unread?: ReadonlyArray<string>
   /** The registry's newest version of each dependency that was asked about. */
   readonly latest: Readonly<Record<string, string>>
   /** Whether the files are being changed: the lines then say moved, not to move. */
@@ -383,7 +393,10 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
       }
     )
   )
-  const stopped = stops.length > 0
+  // Patches that do not say what they are for could be for anything that moves.
+  const unread =
+    moving.length > 0 ? A.map(input.unread ?? [], (folder) => DepsFinding.cases.PatchesUnread.make({ folder })) : []
+  const stopped = stops.length > 0 || unread.length > 0
   const written = input.written && !stopped
 
   const moves = A.map(
@@ -432,7 +445,7 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
     written
   })
   return {
-    findings: A.flatten<ReadonlyArray<ReadonlyArray<DepsFinding>>>([[summary], said, waiting, moves, stops]),
+    findings: A.flatten<ReadonlyArray<ReadonlyArray<DepsFinding>>>([[summary], said, waiting, moves, stops, unread]),
     drifts: A.map(stopped ? [] : moving, ({ ask, to }) =>
       Drift.make({
         file: ask.file,
@@ -478,6 +491,10 @@ export const depsSentence: (finding: DepsFinding) => Line = DepsFinding.match({
   Patched: ({ name, to, appliesTo, folder }) =>
     err(
       `deps:update STOP  ${name} would move to ${to}, and ${folder} holds patches made for ${appliesTo}. Nothing was moved: bun would install ${name} unpatched. Re-make each patch for the new version or drop it (docs/patches.md, "When a patched dependency moves"), then run \`bun run deps:update\` again`
+    ),
+  PatchesUnread: ({ folder }) =>
+    err(
+      `deps:update STOP  ${folder}: its patches do not say which package and version they are for (a header with a field missing or empty, or two that disagree), so a dependency they patch could move and be installed unpatched. Nothing was moved. Run \`bun run beep patches check\`, finish the headers, then run \`bun run deps:update\` again`
     ),
   Installed: () => out("deps:update  bun install ran: bun.lock and node_modules follow the new versions"),
   InstallFailed: ({ files, output }) =>
@@ -603,7 +620,8 @@ export const depsUpdate = Effect.fn("Deps.depsUpdate")(function* (mode: Mode, pa
           : [{ name: header.package, appliesTo: header.appliesTo, folder: `${patchesFolder}/${set.name}` }]
     })
   )
-  const plan = depsPlan({ asks, holds, patched, latest: R.fromEntries(known), written: mode === "write" })
+  const unread = A.flatMap(patches.sets, (set) => (O.isNone(headerOf(set)) ? [`${patchesFolder}/${set.name}`] : []))
+  const plan = depsPlan({ asks, holds, patched, unread, latest: R.fromEntries(known), written: mode === "write" })
   if (mode !== "write" || plan.drifts.length === 0) return plan.findings
 
   // Every file is written before the one install, so the lockfile is made from what the files finally say: the

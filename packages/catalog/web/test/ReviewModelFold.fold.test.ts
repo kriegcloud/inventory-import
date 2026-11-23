@@ -13,7 +13,15 @@ import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/De
 import { ImportId, RowId } from "@inventory/catalog-contract/Ids"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { type Actor, CurrentActor } from "@inventory/catalog-model/Actor"
-import { DecideRow } from "@inventory/catalog-model/Deciding"
+import {
+  DecidedSince,
+  DecideRow,
+  GroupedAfter,
+  GroupedSince,
+  NoLongerThere,
+  PutBackSince,
+  UndoneSince
+} from "@inventory/catalog-model/Deciding"
 import { DecideGroup } from "@inventory/catalog-model/DecidingGroup"
 import {
   Group,
@@ -22,7 +30,7 @@ import {
   GroupUndone,
   isDecidedGroup
 } from "@inventory/catalog-model/GroupAggregate"
-import { ActCounted, GroupCounted, Import, ImportStaged } from "@inventory/catalog-model/ImportAggregate"
+import { ActCounted, GroupCounted, Import, ImportStaged, ReviewMovedOn } from "@inventory/catalog-model/ImportAggregate"
 import { Catalog } from "@inventory/catalog-model/Model"
 import { firstDecisions, recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import {
@@ -37,7 +45,7 @@ import {
   StepUndone
 } from "@inventory/catalog-model/RowAggregate"
 import { NotYourStep, UndoRowStep } from "@inventory/catalog-model/Undoing"
-import { GroupedAfter, UndoGroup } from "@inventory/catalog-model/UndoingGroup"
+import { UndoGroup } from "@inventory/catalog-model/UndoingGroup"
 import {
   storedChoice,
   toRegionDecisions,
@@ -383,6 +391,35 @@ interface Reading {
   readonly groups: Readonly<Record<string, GroupState>>
 }
 
+/**
+ * What a screen says it has received when it sends a press: the import's last act on a group, how many changes the
+ * import has, the change of each row's top decision, and the change each row's last undo took back.
+ */
+interface Seen {
+  readonly lastGroup: number
+  readonly changes: number
+  readonly tops: Readonly<Record<string, number>>
+  readonly undone: Readonly<Record<string, number>>
+  /** Each row's own decisions and the groups, as that screen holds them: what it says of a row is read from these. */
+  readonly own: Readonly<Record<string, ReadonlyArray<Held>>>
+  readonly groups: ReadonlyArray<KnownGroup>
+}
+/**
+ * Where a press is sent from: a screen that has every change; one that has all but the other person's last act
+ * ("behindOne"); or one that has none of the other person's acts since its own presser's last change ("behindAll").
+ */
+type Screen = "live" | "behindOne" | "behindAll"
+/** What the model answers a press from a screen that is behind: one of its refusals, or "no change". */
+type BehindAnswer =
+  | "GroupedSince"
+  | "DecidedSince"
+  | "PutBackSince"
+  | "NoLongerThere"
+  | "UndoneSince"
+  | "ReviewMovedOn"
+  | "NotYourStep"
+  | "NoChange"
+
 const levelOf = (input: {
   readonly change: number
   readonly by: string
@@ -436,58 +473,207 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
   // row three or more decisions deep, which bring a sealed level back.
   let behindRowActs = 0
   let sealedUndos = 0
+  // Row undos refused because a group in force covers the row since the decision, and row acts the model answered
+  // "no change" (nothing recorded) from a screen that had every change.
+  let rowGroupedAfter = 0
+  let noChange = 0
+  let noChangeCovered = 0
+  // Presses from a screen that is behind, by the command and what the model answered; group undos sent from one.
+  let behindAnswers: Readonly<Record<string, number>> = {}
+  // Row acts from a screen behind whose word on the row being covered differs from what a live screen would say.
+  let behindCoveredOtherwise = 0
+  let behindGroupUndos = 0
+  // Each row's last undo taken: the change it took back and whose undo it was.
+  let undoneOf: Readonly<Record<string, { readonly change: number; readonly by: string }>> = {}
+  // Before each recorded change: whose it is, and what a screen that has not received it says it saw.
+  const history: Array<{ readonly by: string; readonly before: Seen }> = []
+  // Press sequences the bookkeeping cannot foresee the model's answer to: a failure, not a guess.
+  const odd: Array<string> = []
   const readings: Array<Reading> = []
   const stackOf = (row: string): ReadonlyArray<Held> => O.getOrElse(R.get(own, row), () => [])
+  const topOf = (stack: ReadonlyArray<Held>): number =>
+    O.match(A.last(stack), { onNone: () => 0, onSome: (held) => held.level.change })
+  const undoneChange = (row: string): number =>
+    O.match(R.get(undoneOf, row), { onNone: () => 0, onSome: (undone) => undone.change })
+  /** Called just before a change is recorded: the screen that will not have it yet saw what is there now. */
+  const recording = (actor: Actor): void => {
+    history.push({
+      by: actor.memberId,
+      before: {
+        lastGroup,
+        changes,
+        tops: R.map(own, topOf),
+        undone: R.map(undoneOf, (undone) => undone.change),
+        own,
+        groups
+      }
+    })
+  }
+  /**
+   * What a screen that is behind says it saw: the bookkeeping as it was before the other person's last act
+   * ("behindOne"), or before the first of the other person's acts since the presser's own last change ("behindAll").
+   * Either holds only while the import's last change is the other person's: a screen is never behind its own act.
+   */
+  const staleFor = (actor: Actor, screen: Screen): O.Option<Seen> => {
+    if (screen === "live") return O.none()
+    const since = A.takeWhile(A.reverse(history), (entry) => entry.by !== actor.memberId)
+    return O.map(screen === "behindOne" ? A.head(since) : A.last(since), (entry) => entry.before)
+  }
+  const heldBack = (command: string, answer: BehindAnswer): void => {
+    const key = `${command} ${answer}`
+    behindAnswers = R.set(behindAnswers, key, O.getOrElse(R.get(behindAnswers, key), () => 0) + 1)
+  }
   const as = (actor: Actor): void => {
     if (actor.memberId === acting.memberId) return
     steps.push(Story.provide(CurrentActor, actor))
     acting = actor
   }
-  const known = (): Instances => ({
+  /** The instances a screen holds: each row's top decision, and the groups. */
+  const instancesOf = (held: {
+    readonly own: Readonly<Record<string, ReadonlyArray<Held>>>
+    readonly groups: ReadonlyArray<KnownGroup>
+  }): Instances => ({
     own: R.fromEntries(
       A.getSomes(
-        A.map(R.toEntries(own), ([row, stack]) =>
+        A.map(R.toEntries(held.own), ([row, stack]) =>
           O.map(A.last(stack), (top) => [row, { change: top.level.change, decision: top.decision }] as const)
         )
       )
     ),
-    groups
+    groups: held.groups
   })
+  const known = (): Instances => instancesOf({ own, groups })
 
-  const decideRow = Effect.fnUntraced(function* (actor: Actor, step: string, row: string, decision: ReviewDecision) {
+  /**
+   * What the model answers a row's act from what its command says the screen saw, in `Deciding`'s order of checks:
+   * a refusal with its payload, "no change", or taken.
+   */
+  const behindRow = (input: {
+    readonly top: O.Option<Held>
+    readonly covered: boolean
+    readonly asItReads: boolean
+    readonly flags: string
+    readonly seen: { readonly sawGroup: number; readonly saw: number; readonly sawUndone: number }
+    readonly row: string
+  }): { readonly name: BehindAnswer | "Taken"; readonly step: O.Option<Step> } => {
+    const { top, covered, flags, seen } = input
+    const refused = (name: BehindAnswer, step: Step) => ({ name, step: O.some(step) })
+    const noChangeHere = { name: "NoChange" as const, step: O.none() }
+    if (seen.sawGroup !== lastGroup) return refused("GroupedSince", Story.rejected(GroupedSince.make({})))
+    const onRow = O.match(top, {
+      onNone: () =>
+        seen.saw !== 0
+          ? !covered && flags === NO_DECISION && lastGroup === 0
+            ? O.some(noChangeHere)
+            : O.some(refused("NoLongerThere", Story.rejected(NoLongerThere.make({}))))
+          : covered
+            ? input.asItReads
+              ? O.some(noChangeHere)
+              : O.none()
+            : flags === NO_DECISION
+              ? O.some(noChangeHere)
+              : O.none(),
+      onSome: ({ level }) =>
+        seen.saw !== level.change
+          ? !covered && flags === level.flags && level.change > lastGroup
+            ? O.some(noChangeHere)
+            : seen.saw > level.change
+              ? O.some(
+                  refused("PutBackSince", Story.rejected(PutBackSince.make({ by: level.by, change: level.change })))
+                )
+              : O.some(
+                  refused("DecidedSince", Story.rejected(DecidedSince.make({ by: level.by, change: level.change })))
+                )
+          : (covered ? input.asItReads : flags === level.flags)
+            ? O.some(noChangeHere)
+            : O.none()
+    })
+    return O.getOrElse(onRow, () => {
+      const undone = O.getOrElse(R.get(undoneOf, input.row), () => ({ change: 0, by: "" }))
+      return seen.sawUndone !== undone.change
+        ? refused("UndoneSince", Story.rejected(UndoneSince.make({ by: undone.by, change: undone.change })))
+        : { name: "Taken" as const, step: O.none() }
+    })
+  }
+
+  const decideRow = Effect.fnUntraced(function* (
+    actor: Actor,
+    step: string,
+    row: string,
+    decision: ReviewDecision,
+    screen: Screen
+  ) {
     as(actor)
     const texts = yield* regionTexts({ [row]: decision })
     const flags = textOf(texts, row)
     const stack = stackOf(row)
     const top = A.last(stack)
+    const saw = topOf(stack)
     const covered = coveredIn(known(), row)
     // On a covered row the screen says whether the press leaves it reading as it reads through its groups: then it is
     // no change, and recorded as nobody's (Benjamin, 2026-11-22: "No change, Ana's undo applies").
     const asItReads = covered && holdsAlready(foldRow(known(), row), decision)
-    steps.push(
-      Story.when(
-        DecideRow.make({
-          importId,
-          row: RowId.make(row),
-          step,
-          sawGroup: lastGroup,
-          covered,
-          asItReads,
-          opening: 0,
-          saw: O.match(top, { onNone: () => 0, onSome: (held) => held.level.change }),
-          flags,
-          madeOn: 0,
-          label: "act"
-        })
-      )
-    )
+    const sawUndone = undoneChange(row)
+    const command = (seen: {
+      readonly sawGroup: number
+      readonly saw: number
+      readonly sawUndone: number
+      readonly covered: boolean
+      readonly asItReads: boolean
+    }) =>
+      DecideRow.make({
+        importId,
+        row: RowId.make(row),
+        step,
+        sawGroup: seen.sawGroup,
+        covered: seen.covered,
+        asItReads: seen.asItReads,
+        opening: 0,
+        saw: seen.saw,
+        sawUndone: seen.sawUndone,
+        flags,
+        madeOn: 0,
+        label: "act"
+      })
+    // From a screen that is behind, the same press says what that screen saw, and whether a group covers the row
+    // and the press leaves it reading as it reads from what that screen holds, not from what is there now. The
+    // model's checks, in its order: a group act it has not received; then on the row, a decision taken back (none
+    // there, or an older one) or made since, with the exits for "no change" between; last, an undo on the row it
+    // has not received.
+    O.map(staleFor(actor, screen), (stale) => {
+      const held = instancesOf(stale)
+      const coveredThen = coveredIn(held, row)
+      const seen = {
+        sawGroup: stale.lastGroup,
+        saw: O.getOrElse(R.get(stale.tops, row), () => 0),
+        sawUndone: O.getOrElse(R.get(stale.undone, row), () => 0),
+        covered: coveredThen,
+        asItReads: coveredThen && holdsAlready(foldRow(held, row), decision)
+      }
+      if (seen.sawGroup === lastGroup && seen.saw === saw && seen.sawUndone === sawUndone) return
+      if (seen.covered !== covered) behindCoveredOtherwise += 1
+      const answer = behindRow({ top, covered: seen.covered, asItReads: seen.asItReads, flags, seen, row })
+      if (answer.name === "Taken") {
+        odd.push(`${step}: a press from a screen behind on ${row} would be taken`)
+        return
+      }
+      steps.push(Story.when(command(seen)), ...O.toArray(answer.step))
+      // Refused or no change, nothing is recorded on the row or the import; the screen then catches up and sends it.
+      steps.push(Story.then(Row.ref(`${importId}/${row}`)), Story.then(life))
+      heldBack("DecideRow", answer.name)
+    })
+    steps.push(Story.when(command({ sawGroup: lastGroup, saw, sawUndone, covered, asItReads })))
     touchedRows = A.append(touchedRows, row)
     // The row reads as this already, through its groups or by its own instance: the model records nothing.
     if (
       covered ? asItReads : flags === O.match(top, { onNone: () => NO_DECISION, onSome: (held) => held.level.flags })
     ) {
+      noChange += 1
+      if (covered) noChangeCovered += 1
+      steps.push(Story.then(Row.ref(`${importId}/${row}`)), Story.then(life))
       return Sent.Nothing()
     }
+    recording(actor)
     changes += 1
     const change = changes
     steps.push(
@@ -523,7 +709,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     return Sent.RowAct({ row, change })
   })
 
-  const undoRow = (actor: Actor, step: string, row: string, undo: number): Undid => {
+  const undoRow = (actor: Actor, step: string, row: string, undo: number, screen: Screen): Undid => {
     as(actor)
     const stack = stackOf(row)
     const mine = O.exists(A.last(stack), (top) => top.level.change === undo && top.level.by === actor.memberId)
@@ -533,27 +719,84 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     const kept = stack.length >= 3
     const next = kept ? O.getOrElse(A.get(stack, stack.length - 3), () => ({ level: noLevel })).level : noLevel
     const below = kept ? sealed(A.map(A.take(stack, stack.length - 3), (held) => held.level)) : ""
-    const command = UndoRowStep.make({
-      importId,
-      row: RowId.make(row),
-      undo,
-      step,
-      sawGroup: lastGroup,
-      opening: 0,
-      next,
-      below
+    // A group in force decided after the row's decision covers it: the screen says so, as it does for a row's act.
+    const covered = coveredIn(known(), row)
+    const commandSaw = (sawGroup: number) =>
+      UndoRowStep.make({
+        importId,
+        row: RowId.make(row),
+        undo,
+        step,
+        sawGroup,
+        covered,
+        madeOn: 0,
+        sawUndone: undoneChange(row),
+        opening: 0,
+        next,
+        below
+      })
+    const command = commandSaw(lastGroup)
+    const nothingNew = [Story.then(Row.ref(`${importId}/${row}`)), Story.then(life)]
+    // From a screen that has not received the other person's last act on a group: refused before anything else.
+    // From one that has every group act and not the other person's decision on this row, made over the sender's:
+    // the undo is of a decision the row no longer holds on top, and says what that screen holds under it. Or, when
+    // that person took their decision back too, of a decision the row holds on top again: refused for the undo.
+    O.map(staleFor(actor, screen), (stale) => {
+      if (stale.lastGroup !== lastGroup) {
+        steps.push(Story.when(commandSaw(stale.lastGroup)), Story.rejected(GroupedSince.make({})), ...nothingNew)
+        heldBack("UndoRowStep", "GroupedSince")
+        return
+      }
+      const then = O.getOrElse(R.get(stale.own, row), () => A.empty<Held>())
+      const mineThen = O.exists(A.last(then), (top) => top.level.change === undo && top.level.by === actor.memberId)
+      if (!mineThen) return
+      const sawUndone = O.getOrElse(R.get(stale.undone, row), () => 0)
+      // The row holds the sender's decision now as that screen shows it, with an undo on the row between that the
+      // screen has not received (another person decided over it and took that back): held, with whose undo it was.
+      const undone = O.getOrElse(R.get(undoneOf, row), () => ({ change: 0, by: "" }))
+      if (mine && sawUndone === undone.change) return
+      const keptThen = then.length >= 3
+      steps.push(
+        Story.when(
+          UndoRowStep.make({
+            importId,
+            row: RowId.make(row),
+            undo,
+            step,
+            sawGroup: lastGroup,
+            covered: coveredIn(instancesOf(stale), row),
+            madeOn: 0,
+            sawUndone,
+            opening: 0,
+            next: keptThen ? O.getOrElse(A.get(then, then.length - 3), () => ({ level: noLevel })).level : noLevel,
+            below: keptThen ? sealed(A.map(A.take(then, then.length - 3), (held) => held.level)) : ""
+          })
+        ),
+        mine
+          ? Story.rejected(UndoneSince.make({ by: undone.by, change: undone.change }))
+          : Story.rejected(NotYourStep.make({})),
+        ...nothingNew
+      )
+      heldBack("UndoRowStep", mine ? "UndoneSince" : "NotYourStep")
     })
     // Someone else decided the row since: it holds no decision of the sender's to take back.
     if (!mine) {
-      steps.push(Story.when(command), Story.rejected(NotYourStep.make({})))
+      steps.push(Story.when(command), Story.rejected(NotYourStep.make({})), ...nothingNew)
       return "NotYourStep"
     }
+    // The decision lies under a later group in force: it is not taken back from under it.
+    if (covered) {
+      rowGroupedAfter += 1
+      steps.push(Story.when(command), Story.rejected(GroupedAfter.make({ last: topGroup })), ...nothingNew)
+      return "GroupedAfter"
+    }
+    recording(actor)
     changes += 1
     if (kept) sealedUndos += 1
     const level = O.match(under, { onNone: () => noLevel, onSome: (held) => held.level })
     steps.push(
       Story.when(command),
-      Story.then(Row.ref(`${importId}/${row}`), StepUndone.make({ next, below })),
+      Story.then(Row.ref(`${importId}/${row}`), StepUndone.make({ next, below, undo, step, by: actor.memberId })),
       Story.then(
         life,
         ActCounted.make({
@@ -571,19 +814,35 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     )
     touchedRows = A.append(touchedRows, row)
     own = R.set(own, row, rest)
+    undoneOf = R.set(undoneOf, row, { change: undo, by: actor.memberId })
     return "taken"
   }
 
-  const decideGroup = Effect.fnUntraced(function* (actor: Actor, step: string, parts: ReadonlyArray<Part>) {
+  const decideGroup = Effect.fnUntraced(function* (
+    actor: Actor,
+    step: string,
+    parts: ReadonlyArray<Part>,
+    screen: Screen
+  ) {
     as(actor)
     const patch = yield* S.encodeEffect(GroupPatches)(A.map(parts, (part) => part.patch))
     const rows = yield* S.encodeEffect(GroupRows)(A.map(parts, (part) => part.rows))
     const count = A.reduce(parts, 0, (n, part) => n + part.rows.length)
-    steps.push(
-      Story.when(
-        DecideGroup.make({ importId, step, opening: 0, seen: changes, madeOn: 0, patch, rows, count, label: "group" })
+    const command = (seen: number) =>
+      DecideGroup.make({ importId, step, opening: 0, seen, madeOn: 0, patch, rows, count, label: "group" })
+    // From a screen that has not received the other person's last act: the review moved on, nothing is recorded.
+    O.map(staleFor(actor, screen), (stale) => {
+      if (stale.changes === changes) return
+      steps.push(
+        Story.when(command(stale.changes)),
+        Story.rejected(ReviewMovedOn.make({ last: changes })),
+        Story.then(Group.ref(`${importId}/${step}`)),
+        Story.then(life)
       )
-    )
+      heldBack("DecideGroup", "ReviewMovedOn")
+    })
+    steps.push(Story.when(command(changes)))
+    recording(actor)
     changes += 1
     const change = changes
     steps.push(
@@ -615,27 +874,42 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     return Sent.GroupAct({ step, change })
   }, Effect.orDie)
 
-  const undoGroup = (actor: Actor, step: string): Undid =>
+  const undoGroup = (actor: Actor, step: string, screen: Screen): Undid =>
     O.match(
       A.findFirst(groups, (group) => group.step === step),
       {
         onNone: (): Undid => "NotYourStep",
         onSome: (group): Undid => {
           as(actor)
-          const command = UndoGroup.make({ importId, step, undo: group.change, opening: 0 })
+          const commandSaw = (seen: number) => UndoGroup.make({ importId, step, undo: group.change, opening: 0, seen })
+          const command = commandSaw(changes)
+          const nothingNew = [Story.then(Group.ref(`${importId}/${step}`)), Story.then(life)]
           if (group.undoneAt !== 0 || group.by !== actor.memberId) {
-            steps.push(Story.when(command), Story.rejected(NotYourStep.make({})))
+            steps.push(Story.when(command), Story.rejected(NotYourStep.make({})), ...nothingNew)
             return "NotYourStep"
           }
           // A later group is in force over it: only the last in force is taken back.
           if (group.change !== topGroup) {
-            steps.push(Story.when(command), Story.rejected(GroupedAfter.make({ last: topGroup })))
+            steps.push(Story.when(command), Story.rejected(GroupedAfter.make({ last: topGroup })), ...nothingNew)
             return "GroupedAfter"
           }
+          // From a screen that has not received the other person's last act: the review moved on, nothing is
+          // recorded, and the same undo is taken once the screen has every change.
+          O.map(staleFor(actor, screen), (stale) => {
+            if (stale.changes === changes) return
+            steps.push(
+              Story.when(commandSaw(stale.changes)),
+              Story.rejected(ReviewMovedOn.make({ last: changes })),
+              ...nothingNew
+            )
+            behindGroupUndos += 1
+            heldBack("UndoGroup", "ReviewMovedOn")
+          })
           const named = A.flatMap(group.parts, (part) => part.rows)
           if (A.some(named, (row) => O.exists(A.last(stackOf(row)), (top) => top.level.change > group.change))) {
             behindRowActs += 1
           }
+          recording(actor)
           changes += 1
           const change = changes
           steps.push(
@@ -665,15 +939,16 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
   return {
     steps,
     readings,
+    odd,
     known,
     decideRow,
     decideGroup,
     /** Takes back what a press sent: a row's act by UndoRowStep, a group act by UndoGroup. */
-    undo: (actor: Actor, step: string, sent: Sent): Undid =>
+    undo: (actor: Actor, step: string, sent: Sent, screen: Screen): Undid =>
       Sent.$match(sent, {
         Nothing: (): Undid => "taken",
-        RowAct: ({ row, change }) => undoRow(actor, step, row, change),
-        GroupAct: (group) => undoGroup(actor, group.step)
+        RowAct: ({ row, change }) => undoRow(actor, step, row, change, screen),
+        GroupAct: (group) => undoGroup(actor, group.step, screen)
       }),
     /** Reads back every instance the last press touched, then keeps all of them as they stand. */
     mark: (): void => {
@@ -726,8 +1001,32 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
         A.findFirst(groups, (group) => group.step === step),
         { onNone: () => 0, onSome: (group) => group.parts.length }
       ),
-    /** The group undos taken behind a later row act on their rows, and the row undos that brought a sealed level. */
-    reached: () => ({ behindRowActs, sealedUndos })
+    /**
+     * The group undos taken behind a later row act on their rows, the row undos that brought a sealed level, the row
+     * undos refused under a later group, the no-change row acts, and what each press from a screen behind came to.
+     */
+    reached: () => {
+      const answered = (key: string): number => O.getOrElse(R.get(behindAnswers, key), () => 0)
+      return {
+        behindRowActs,
+        sealedUndos,
+        rowGroupedAfter,
+        noChange,
+        noChangeCovered,
+        behindGroupedSince: answered("DecideRow GroupedSince"),
+        behindDecidedSince: answered("DecideRow DecidedSince"),
+        behindPutBackSince: answered("DecideRow PutBackSince"),
+        behindNoLongerThere: answered("DecideRow NoLongerThere"),
+        behindNoChange: answered("DecideRow NoChange"),
+        behindUndoGroupedSince: answered("UndoRowStep GroupedSince"),
+        behindUndoNotYourStep: answered("UndoRowStep NotYourStep"),
+        behindUndoUndoneSince: answered("UndoRowStep UndoneSince"),
+        behindCoveredOtherwise,
+        behindReviewMovedOn: answered("DecideGroup ReviewMovedOn"),
+        behindUndoneSince: answered("DecideRow UndoneSince"),
+        behindGroupUndos
+      }
+    }
   }
 }
 type ModelSide = ReturnType<typeof modelSide>
@@ -805,16 +1104,19 @@ interface Person {
 const nobody: Person = { undo: [], redo: [], steps: { undo: [], redo: [] } }
 
 /**
- * How a press is translated. `redo`: "same" sends the undone unit's own rows and patches again; "again" presses the
- * action again on the screen (counterexample C1). `rows`: "changed" sends only the rows whose decision the press
- * changed; "written" every row `act` wrote, a covered row's no-change press included (counterexample C2, which the
- * model now answers "no change", so both agree).
+ * How a press is translated and sent. `redo`: "same" sends the undone unit's own rows and patches again; "again"
+ * presses the action again on the screen (counterexample C1). `rows`: "changed" sends only the rows whose decision the
+ * press changed; "written" every row `act` wrote, a covered row's no-change press included (counterexample C2, which
+ * the model now answers "no change", so both agree; the properties send "written" for three presses in ten).
+ * `screen`: "behindOne" and "behindAll" send the press first as a screen would that has not received the other
+ * person's last act, or any of their acts since the presser's own last change.
  */
 interface How {
   readonly redo: "same" | "again"
   readonly rows: "changed" | "written"
+  readonly screen: Screen
 }
-const right: How = { redo: "same", rows: "changed" }
+const right: How = { redo: "same", rows: "changed", screen: "live" }
 
 type Recheck = Parameters<typeof act>[0]["recheck"]
 
@@ -824,6 +1126,8 @@ interface Pressed {
   readonly sent: Sent
   readonly answer: boolean
   readonly undid: Undid
+  /** The rows the press wrote, or the undo took back. */
+  readonly rows: ReadonlyArray<string>
 }
 
 /**
@@ -916,10 +1220,12 @@ const liveReview = (input: {
         ? unit
         : A.filter(unit, (written) => !holdsAlready(HashMap.get(decisions, written.row), after(written)))
     if (!A.isReadonlyArrayNonEmpty(sending)) return Sent.Nothing()
-    if (isGroupAct(action, sending.length)) return yield* input.side.decideGroup(actor, step, partsOf(sending))
+    if (isGroupAct(action, sending.length)) {
+      return yield* input.side.decideGroup(actor, step, partsOf(sending), how.screen)
+    }
     if (sending.length > 1) apart.push(`${step}: ${action.type} changed ${sending.length} rows and is no group act`)
     const one = A.headNonEmpty(sending)
-    return yield* input.side.decideRow(actor, step, one.row, after(one))
+    return yield* input.side.decideRow(actor, step, one.row, after(one), how.screen)
   })
 
   /** The translation says of every row what `act` wrote. */
@@ -942,14 +1248,14 @@ const liveReview = (input: {
     presses += 1
     const actOn = (steps: Person["steps"], pressed: Action) =>
       act({ rows: shown.rows, state: stateOf(steps), action: pressed, ...checking })
-    let pressed: Pressed = { kind: "new", sent: Sent.Nothing(), answer: true, undid: "taken" }
+    let pressed: Pressed = { kind: "new", sent: Sent.Nothing(), answer: true, undid: "taken", rows: [] }
     if (action.type === "undo") {
       const done = A.last(person.undo)
       const taken = A.last(person.steps.undo)
       if (O.isSome(done) && O.isSome(taken)) {
         const answer = stands(rowsOf(taken.value), O.some(done.value.after))
-        const undid = input.side.undo(actor, step, done.value.sent)
-        pressed = { kind: "undo", sent: done.value.sent, answer, undid }
+        const undid = input.side.undo(actor, step, done.value.sent, how.screen)
+        pressed = { kind: "undo", sent: done.value.sent, answer, undid, rows: A.map(done.value.unit, (w) => w.row) }
         if (undid === "NotYourStep") {
           people = R.set(people, actor.memberId, {
             ...person,
@@ -989,7 +1295,7 @@ const liveReview = (input: {
             ? back.value.unit
             : patchesFor({ views: shown.views, decisions, action: back.value.action })
         const sent = yield* send(actor, step, back.value.action, unit, how)
-        pressed = { kind: "redo", sent, answer, undid: "taken" }
+        pressed = { kind: "redo", sent, answer, undid: "taken", rows: A.map(unit, (w) => w.row) }
         let done: Done
         let taken: UndoStep
         if (answer) {
@@ -1023,7 +1329,7 @@ const liveReview = (input: {
       const out = actOn(nobody.steps, action)
       agrees(step, unit, out.changed, out.state)
       const sent = yield* send(actor, step, action, unit, how)
-      pressed = { kind: "new", sent, answer: true, undid: "taken" }
+      pressed = { kind: "new", sent, answer: true, undid: "taken", rows: A.map(unit, (w) => w.row) }
       const before = decisions
       decisions = out.state.decisions
       // `act` takes a step only when it wrote a row, and only then starts a new future.
@@ -1239,11 +1545,17 @@ const groupPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> => {
  * there is one to put back, so histories grow deep and are walked back; otherwise a press on one row for four in ten
  * and one on several rows for two in ten (or the other kind, when the screen offers none of the first).
  */
-const pressFor = (pick: number, history: Person["steps"], views: ReadonlyArray<RowView>): O.Option<Action> => {
+const pressFor = (
+  pick: number,
+  history: Person["steps"],
+  views: ReadonlyArray<RowView>,
+  focus: ReadonlyArray<string> = []
+): O.Option<Action> => {
   const turn = pick % 100
   if (turn < 30 && A.isReadonlyArrayNonEmpty(history.undo)) return O.some({ type: "undo" as const })
   if (turn < 40 && A.isReadonlyArrayNonEmpty(history.redo)) return O.some({ type: "redo" as const })
-  const one = rowPresses(views)
+  const onFocus = rowPresses(A.filter(views, (view) => A.contains(focus, view.row.id)))
+  const one = A.isReadonlyArrayNonEmpty(onFocus) ? onFocus : rowPresses(views)
   const several = groupPresses(views)
   const first = turn < 80 ? one : several
   const actions = A.isReadonlyArrayNonEmpty(first) ? first : turn < 80 ? several : one
@@ -1275,14 +1587,64 @@ interface Walked {
   readonly compared: number
   /** Undos and redos the model took where the reference had no answer. */
   readonly noAnswer: number
-  /** Undos the model refused, by the rejection it gave. */
+  /** Undos the model refused, by the rejection it gave; of the GroupedAfter, those that were a row's undo. */
   readonly groupedAfter: number
   readonly notYourStep: number
+  readonly rowGroupedAfter: number
+  /**
+   * Row acts sent from a screen with every change that the model answered "no change", recording nothing; and of them
+   * those on a row a group in force covers, answered by `asItReads` (the case of C2).
+   */
+  readonly noChange: number
+  readonly noChangeCovered: number
+  /**
+   * Presses sent from a screen that is behind, by what the model answered: a row act refused as GroupedSince,
+   * DecidedSince, PutBackSince or NoLongerThere, or answered "no change"; a row undo refused as GroupedSince, or as
+   * NotYourStep behind another person's decision over the sender's; a group act or a group's undo refused as
+   * ReviewMovedOn. Each
+   * recorded nothing, and the screen then caught up and sent it again. `behindCoveredOtherwise` counts the row acts
+   * among them whose word on the row being covered was not what a screen with every change would say.
+   */
+  readonly behindGroupedSince: number
+  readonly behindDecidedSince: number
+  readonly behindPutBackSince: number
+  readonly behindNoLongerThere: number
+  readonly behindNoChange: number
+  readonly behindUndoGroupedSince: number
+  readonly behindUndoNotYourStep: number
+  readonly behindUndoUndoneSince: number
+  readonly behindCoveredOtherwise: number
+  readonly behindReviewMovedOn: number
+  /** Row acts from a screen behind an undo on the row it has not received, refused as UndoneSince. */
+  readonly behindUndoneSince: number
+  /** Group undos sent first from a screen that is behind: each refused as ReviewMovedOn, and taken once caught up. */
+  readonly behindGroupUndos: number
 }
 
 /**
+ * How a number sends its press: three in ten of them send every row `act` wrote, the rest only the rows it changed;
+ * with two people, two in ten are sent from a screen behind the other person's last act, and two in ten from one
+ * behind every act of theirs since the presser's own last change.
+ */
+const howFor = (pick: number, people: "one" | "two"): How => ({
+  redo: "same",
+  rows: Math.floor(pick / 1000) % 10 < 3 ? "written" : "changed",
+  screen:
+    people === "one" || Math.floor(pick / 10_000) % 10 >= 4
+      ? "live"
+      : Math.floor(pick / 10_000) % 10 < 2
+        ? "behindOne"
+        : "behindAll"
+})
+
+/**
  * Presses one seeded sequence on the messy sample, sends it, runs the story and folds every reading. With one person
- * every press is Dana's; with two, the top half of the numbers are Ana's presses, each on her own live screen.
+ * every press is Dana's; with two, the top half of the numbers are Ana's presses, each on her own screen. Which rows a
+ * press from a screen that is behind decides, and what it decides, is worked out on the shared map like any other;
+ * what its command says of them is that screen's own, as it was before the other person's acts it has not received:
+ * what it saw (`sawGroup`, `saw`, `sawUndone`, `seen`), and for a row's act whether a group covers the row and
+ * whether the press leaves it reading as it reads (`covered`, `asItReads`). The model refuses it or answers "no
+ * change", nothing is recorded, and the screen catches up and sends it again.
  * `touching` is the reference's: which steps count as naming a row.
  */
 const walk = Effect.fnUntraced(function* (
@@ -1311,11 +1673,17 @@ const walk = Effect.fnUntraced(function* (
   let groupedAfter = 0
   let notYourStep = 0
   const refused: Array<string> = []
+  // The rows the other person's last press wrote or took back: with two people, two numbers in five press on one of
+  // them when they press on one row, so presses meet on the same rows (a row act under a group just made, a group
+  // taken back behind it, a press from a screen behind an act on its row).
+  let last: { readonly by: string; readonly rows: ReadonlyArray<string> } = { by: "", rows: [] }
   for (const pick of picks) {
     const actor = people === "two" && pick >= 500_000 ? ana : dana
-    const press = pressFor(pick, live.history(actor), live.look().views)
+    const following = people === "two" && last.by !== actor.memberId && Math.floor(pick / 100_000) % 5 < 2
+    const press = pressFor(pick, live.history(actor), live.look().views, following ? last.rows : [])
     if (O.isNone(press)) continue
-    const { kind, sent, answer, undid } = yield* live.press(actor, press.value)
+    const { kind, sent, answer, undid, rows } = yield* live.press(actor, press.value, howFor(pick, people))
+    if (A.isReadonlyArrayNonEmpty(rows)) last = { by: actor.memberId, rows }
     // One person's history is walked back in order: every undo and redo has an answer, and none is refused.
     if (people === "one" && (!answer || undid !== "taken")) refused.push(`${kind}: answer ${answer}, ${undid}`)
     if (!answer && undid === "taken") noAnswer += 1
@@ -1349,7 +1717,7 @@ const walk = Effect.fnUntraced(function* (
     stackedRows = A.union(stackedRows, now.stacked)
   }
   const folded = yield* verdict(side, live.expected)
-  const apart = [...live.apart, ...refused, ...folded]
+  const apart = [...live.apart, ...side.odd, ...refused, ...folded]
   const compared = A.filter(live.expected, O.isSome).length
   const walked: Walked = {
     apart,
@@ -1373,11 +1741,16 @@ const walk = Effect.fnUntraced(function* (
   return walked
 })
 
-/** The numbers that pick each press of one run: sixty to ninety of them. */
+/**
+ * The numbers that pick each press of one run, and how many of them the run presses: sixty to ninety. The array's own
+ * generator gives as many entries as its smallest length allows (its size is at most ten), so its length is fixed at
+ * ninety and a length drawn on its own takes that many from the front.
+ */
 const Picks = S.Array(S.Int.check(S.isBetween({ minimum: 0, maximum: 999_999 }))).check(
-  S.isMinLength(60),
+  S.isMinLength(90),
   S.isMaxLength(90)
 )
+const Presses = S.Int.check(S.isBetween({ minimum: 60, maximum: 90 }))
 const SEED = 20261122
 const RUNS = 25
 
@@ -1400,7 +1773,22 @@ const nothingYet: Tally = {
   compared: 0,
   noAnswer: 0,
   groupedAfter: 0,
-  notYourStep: 0
+  notYourStep: 0,
+  rowGroupedAfter: 0,
+  noChange: 0,
+  noChangeCovered: 0,
+  behindGroupedSince: 0,
+  behindDecidedSince: 0,
+  behindPutBackSince: 0,
+  behindNoLongerThere: 0,
+  behindNoChange: 0,
+  behindUndoGroupedSince: 0,
+  behindUndoNotYourStep: 0,
+  behindUndoUndoneSince: 0,
+  behindCoveredOtherwise: 0,
+  behindReviewMovedOn: 0,
+  behindUndoneSince: 0,
+  behindGroupUndos: 0
 }
 const addUp = (tally: Tally, walked: Walked): Tally =>
   R.map(tally, (n, key) => (key === "mostInForce" || key === "deepest" ? Math.max(n, walked[key]) : n + walked[key]))
@@ -1410,15 +1798,19 @@ const addUp = (tally: Tally, walked: Walked): Tally =>
 
 let runs = 0
 let tally = nothingYet
+let shortest = 90
+let longest = 60
 
 it.effect.prop(
   "one person on a live screen: after every press the fold of the model's instances is what `act` holds",
-  { picks: Picks },
-  ({ picks }) =>
+  { picks: Picks, presses: Presses },
+  ({ picks, presses }) =>
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
-      const walked = yield* walk(table, picks)
+      const walked = yield* walk(table, A.take(picks, presses))
       runs += 1
+      shortest = Math.min(shortest, presses)
+      longest = Math.max(longest, presses)
       tally = addUp(tally, walked)
       // The translation matches `act` at every press, and the model took every command (the story fails on a
       // rejection and on an event no step names).
@@ -1429,26 +1821,34 @@ it.effect.prop(
 
 it("the sequences sent many group acts, took many of them back, and stacked groups and decisions deep", () => {
   expect(runs).toBe(RUNS)
-  // 432 group acts sent (a redo of one is a new one) and 319 taken back by UndoGroup; 405 row acts and 300 row undos.
-  expect(tally.groupActs).toBe(432)
-  expect(tally.groupUndos).toBe(319)
-  expect(tally.rowActs).toBe(405)
-  expect(tally.rowUndos).toBe(300)
-  // 77 redos pressed: 34 sent a DecideGroup and 43 a DecideRow, so a redo of each kind was a new act of its kind.
-  expect(tally.redos).toBe(77)
-  expect(tally.groupRedos).toBe(34)
-  expect(tally.rowRedos).toBe(43)
-  // 50 group acts whose rows got different patches, the case the file's sentence rests on; ten groups in force at
-  // once, and 53 rows two or more of them named at the same moment.
+  // The runs pressed from 60 to 89 numbers each: the lengths vary, as the generator says.
+  expect([shortest, longest]).toEqual([60, 89])
+  // 511 group acts sent (a redo of one is a new one) and 381 taken back by UndoGroup; 497 row acts and 362 row undos.
+  expect(tally.groupActs).toBe(511)
+  expect(tally.groupUndos).toBe(381)
+  expect(tally.rowActs).toBe(497)
+  expect(tally.rowUndos).toBe(362)
+  // 91 redos pressed: 43 sent a DecideGroup and 48 a DecideRow, so a redo of each kind was a new act of its kind.
+  expect(tally.redos).toBe(91)
+  expect(tally.groupRedos).toBe(43)
+  expect(tally.rowRedos).toBe(48)
+  // 50 group acts whose rows got different patches, the case the file's sentence rests on; fifteen groups in force at
+  // once, and 70 rows two or more of them named at the same moment.
   expect(tally.splitGroups).toBe(50)
-  expect(tally.mostInForce).toBe(10)
-  expect(tally.stackedRows).toBe(53)
-  // Five decisions deep on one row, and 12 row undos that brought a sealed level back.
-  expect(tally.deepest).toBe(5)
-  expect(tally.sealedUndos).toBe(12)
-  expect(tally.compared).toBe(1500)
+  expect(tally.mostInForce).toBe(15)
+  expect(tally.stackedRows).toBe(70)
+  // Four decisions deep on one row, and 11 row undos that brought a sealed level back.
+  expect(tally.deepest).toBe(4)
+  expect(tally.sealedUndos).toBe(11)
+  expect(tally.compared).toBe(1808)
+  // 3 row acts sent with every row `act` wrote that left their row as it was: the model answered "no change" and
+  // recorded nothing. None was on a row a group covers.
+  expect(tally.noChange).toBe(3)
+  expect(tally.noChangeCovered).toBe(0)
   // Not reached by one person: a group undone behind a later row act on its rows (N1). One history is walked back in
-  // order, so the row act is taken back before the group is. The two-people properties below reach it.
+  // order, so the row act is taken back before the group is. Nor any refusal, nor a screen that is behind.
+  expect(tally.behindRowActs).toBe(0)
+  expect(tally.groupedAfter + tally.notYourStep + tally.noAnswer).toBe(0)
 })
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1459,72 +1859,104 @@ let twoRuns = 0
 let twoTally = nothingYet
 
 it.effect.prop(
-  "two people on live screens: where `act` has an answer the fold is what it holds, and a refusal is a named one",
-  { picks: Picks },
-  ({ picks }) =>
+  "two people, some presses from a screen that is behind: where `act` has an answer the fold is what it holds, and a refusal is the one the model's checks give",
+  { picks: Picks, presses: Presses },
+  ({ picks, presses }) =>
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
-      const walked = yield* walk(table, picks, "two")
+      const walked = yield* walk(table, A.take(picks, presses), "two")
       twoRuns += 1
       twoTally = addUp(twoTally, walked)
-      // The story names each refusal exactly (GroupedAfter with the group in force, or NotYourStep) and fails on any
-      // other, and on an act it refused that was not foreseen.
+      // The story names each refusal exactly (GroupedAfter with the group in force, NotYourStep, and for a screen
+      // that is behind GroupedSince, DecidedSince or PutBackSince with whose decision is there, NoLongerThere,
+      // UndoneSince with whose undo it was, ReviewMovedOn with the last change), asserts nothing new on the row, the
+      // group and the import after each, and fails on any other rejection, and on an act it refused that was not
+      // foreseen.
       expect(walked.apart).toEqual([])
     }),
   { arbitrary: { runs: RUNS, seed: SEED }, timeout: 600_000 }
 )
 
-it("two people met every case: compared presses, undos with no answer, and both refusals", () => {
+it("two people met every case: compared presses, no-answer undos, refusals, presses from a screen behind", () => {
   expect(twoRuns).toBe(RUNS)
-  // 1,344 presses compared with `act`; 397 group acts sent and 129 taken back; 463 row acts and 291 row undos.
-  expect(twoTally.compared).toBe(1344)
-  expect(twoTally.groupActs).toBe(397)
-  expect(twoTally.groupUndos).toBe(129)
-  expect(twoTally.rowActs).toBe(463)
-  expect(twoTally.rowUndos).toBe(291)
-  // 119 redos pressed: 18 sent a DecideGroup, 96 a DecideRow, and 5 sent nothing (the rows already held what the
+  // 1,557 presses compared with `act`; 482 group acts sent and 154 taken back; 541 row acts and 307 row undos.
+  expect(twoTally.compared).toBe(1557)
+  expect(twoTally.groupActs).toBe(482)
+  expect(twoTally.groupUndos).toBe(154)
+  expect(twoTally.rowActs).toBe(541)
+  expect(twoTally.rowUndos).toBe(307)
+  // 111 redos pressed: 19 sent a DecideGroup, 85 a DecideRow, and 7 sent nothing (the rows already held what the
   // undone unit gives them, after the other person's presses).
-  expect(twoTally.redos).toBe(119)
-  expect(twoTally.groupRedos).toBe(18)
-  expect(twoTally.rowRedos).toBe(96)
-  // 41 group acts of several parts; twenty groups in force at once, and 89 rows named by two or more at one moment.
-  expect(twoTally.splitGroups).toBe(41)
-  expect(twoTally.mostInForce).toBe(20)
-  expect(twoTally.stackedRows).toBe(89)
-  // One group undone behind a later row act on its rows (N1): the reference had no answer there, so the model's map
-  // was adopted, not compared. Five decisions deep, and 8 row undos that brought a sealed level back.
-  expect(twoTally.behindRowActs).toBe(1)
-  expect(twoTally.deepest).toBe(5)
-  expect(twoTally.sealedUndos).toBe(8)
-  // 13 undos or redos the model took where `act` had no answer (a row named since by someone); 136 group undos
-  // refused as GroupedAfter and 7 undos refused as NotYourStep.
-  expect(twoTally.noAnswer).toBe(13)
-  expect(twoTally.groupedAfter).toBe(136)
-  expect(twoTally.notYourStep).toBe(7)
+  expect(twoTally.redos).toBe(111)
+  expect(twoTally.groupRedos).toBe(19)
+  expect(twoTally.rowRedos).toBe(85)
+  // 43 group acts of several parts; 23 groups in force at once, and 106 rows named by two or more at one moment.
+  expect(twoTally.splitGroups).toBe(43)
+  expect(twoTally.mostInForce).toBe(23)
+  expect(twoTally.stackedRows).toBe(106)
+  // 8 groups undone behind a later row act on their rows (N1): the reference had no answer there, so the model's map
+  // was adopted, not compared. Eight decisions deep, and 12 row undos that brought a sealed level back.
+  expect(twoTally.behindRowActs).toBe(8)
+  expect(twoTally.deepest).toBe(8)
+  expect(twoTally.sealedUndos).toBe(12)
+  // 23 undos or redos the model took where `act` had no answer (a row named since by someone); 207 undos refused as
+  // GroupedAfter, 7 of them a row's undo under a later group in force (Dana's decision, Ana's group over the row,
+  // Dana's undo), the rest a group's; and 21 undos refused as NotYourStep.
+  expect(twoTally.noAnswer).toBe(23)
+  expect(twoTally.groupedAfter).toBe(207)
+  expect(twoTally.rowGroupedAfter).toBe(7)
+  expect(twoTally.notYourStep).toBe(21)
+  // 7 row acts the model answered "no change", recording nothing; 2 of them on a row a group covers (`asItReads`).
+  expect(twoTally.noChange).toBe(7)
+  expect(twoTally.noChangeCovered).toBe(2)
+  // Presses from a screen behind the other person's acts, each answered with nothing recorded before the screen
+  // caught up: row acts refused as GroupedSince 64 times, DecidedSince 15, PutBackSince 1, NoLongerThere 5 and
+  // UndoneSince 1, and answered "no change" 2 (the same text the row holds, no group since); row undos refused as
+  // GroupedSince 58; group acts refused as ReviewMovedOn 32. 27 group undos were sent first from a screen that is
+  // behind and refused as ReviewMovedOn, then taken from one that had every change.
+  expect(twoTally.behindGroupedSince).toBe(64)
+  expect(twoTally.behindDecidedSince).toBe(15)
+  expect(twoTally.behindPutBackSince).toBe(1)
+  expect(twoTally.behindNoLongerThere).toBe(5)
+  expect(twoTally.behindUndoneSince).toBe(1)
+  expect(twoTally.behindNoChange).toBe(2)
+  expect(twoTally.behindUndoGroupedSince).toBe(58)
+  // 7 row undos from a screen that has every group act and not the other person's decision over the sender's on
+  // that row, refused as NotYourStep. Of the row acts from a screen behind, 15 said of the row being covered what a
+  // screen with every change would not: the word is the stale screen's own.
+  expect(twoTally.behindUndoNotYourStep).toBe(7)
+  // None from behind an undo on the row: the seed does not reach it (another person decides over the sender's
+  // decision and takes that back, both unseen, before the sender's undo). The test "a row's undo from a screen that
+  // has not received an undo on the row is held" sends it.
+  expect(twoTally.behindUndoUndoneSince).toBe(0)
+  expect(twoTally.behindCoveredOtherwise).toBe(15)
+  expect(twoTally.behindReviewMovedOn).toBe(32)
+  expect(twoTally.behindGroupUndos).toBe(27)
 })
 
 /*
  * Under the reference's touching "named", a press that writes a row without changing it still names the row, so a
- * later undo over it has no answer and the reference takes the model's map: what the translation sends for such a
- * press is never compared. Under "changed" only a step that changed a row names it, the undo keeps its answer, and
- * the translation's one choice (it sends only the rows whose decision a press changed, not every row `act` wrote) is
- * compared on every press that has one.
+ * later undo over it has no answer and the reference takes the model's map. Under "changed" only a step that changed
+ * a row names it, and the undo keeps its answer. Both properties send every row `act` wrote for three presses in ten
+ * and only the rows a press changed for the rest, and compare every press that has an answer.
  *
  * Before the model answered a covered row's no-change press "no change" (`asItReads`, Benjamin, 2026-11-22: "No
  * change, Ana's undo applies"), the two translations differed: at 200 runs with this seed, "every row `act` wrote"
  * failed at run 169, a group's typed value kept past its undo by a covered row's no-change act, as in C2. Now the
- * model records nothing for such a press, and the hand-written C2 test shows both translations agreeing. 25 runs.
+ * model records nothing for such a press, and the hand-written C2 test shows both translations agreeing on it. These
+ * runs reach it too: two covered rows' no-change presses sent with every row `act` wrote (`noChangeCovered`), each
+ * answered with nothing recorded, and the fold agreed with `act` after them. 25 runs.
  */
 let changedRuns = 0
 let changedTally = nothingYet
 
 it.effect.prop(
-  "two people on live screens, a step naming a row only when it changed it: where `act` has an answer the fold is what it holds",
-  { picks: Picks },
-  ({ picks }) =>
+  "two people, some presses from a screen that is behind, a step naming a row only when it changed it: where `act` has an answer the fold is what it holds",
+  { picks: Picks, presses: Presses },
+  ({ picks, presses }) =>
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
-      const walked = yield* walk(table, picks, "two", "changed")
+      const walked = yield* walk(table, A.take(picks, presses), "two", "changed")
       changedRuns += 1
       changedTally = addUp(changedTally, walked)
       expect(walked.apart).toEqual([])
@@ -1534,25 +1966,13 @@ it.effect.prop(
 
 it("two people, a step naming a row only when it changed it: compared presses, no-answer presses and refusals", () => {
   expect(changedRuns).toBe(RUNS)
-  // The same sequences as the property above, so the same presses: three more of them compared (1,347 against
-  // 1,344), and three fewer with no answer (10 against 13), where a press that changed nothing no longer names a row.
-  expect(changedTally.compared).toBe(1347)
-  expect(changedTally.noAnswer).toBe(10)
-  expect(changedTally.groupedAfter).toBe(136)
-  expect(changedTally.notYourStep).toBe(7)
-  expect(changedTally.groupActs).toBe(397)
-  expect(changedTally.groupUndos).toBe(129)
-  expect(changedTally.rowActs).toBe(463)
-  expect(changedTally.rowUndos).toBe(291)
-  expect(changedTally.redos).toBe(119)
-  expect(changedTally.groupRedos).toBe(18)
-  expect(changedTally.rowRedos).toBe(96)
-  expect(changedTally.splitGroups).toBe(41)
-  expect(changedTally.mostInForce).toBe(20)
-  expect(changedTally.stackedRows).toBe(89)
-  expect(changedTally.behindRowActs).toBe(1)
-  expect(changedTally.deepest).toBe(5)
-  expect(changedTally.sealedUndos).toBe(8)
+  // The same sequences as the property above, so the same presses; at this seed the two references also meet the same
+  // presses with an answer (1,557) and without one (23), and every other tally is the same.
+  const { compared, noAnswer, ...rest } = changedTally
+  const { compared: twoCompared, noAnswer: twoNoAnswer, ...twoRest } = twoTally
+  expect([compared, noAnswer]).toEqual([1557, 23])
+  expect([twoCompared, twoNoAnswer]).toEqual([1557, 23])
+  expect(rest).toEqual(twoRest)
 })
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1641,6 +2061,73 @@ it.effect(
       expect(run.answered).toBe(false)
       expect(run.translation).toEqual([])
     })
+)
+
+// By the rule on a press from a screen that is behind (2026-11-22). Dana types in row-1, Ana types over it and takes
+// that back: row-1 holds Dana's value again, as Dana's screen shows it, though her screen has neither of Ana's acts.
+// Her undo is sent first from that screen and refused `UndoneSince`, naming Ana's undo, with nothing recorded; then
+// from a screen that has it, and taken.
+it.effect("a row's undo from a screen that has not received an undo on the row is held, and taken once it has", () =>
+  Effect.gen(function* () {
+    const rows = [groupedRow("row-1", 1, "EA")]
+    const side = modelSide({ rows: rows.length, first: dana })
+    const live = liveReview({ side, rows: () => rows, recheck: undefined })
+    yield* live.press(dana, { type: "edit", rowId: "row-1", column: "b", value: "KG" })
+    yield* live.press(ana, { type: "edit", rowId: "row-1", column: "b", value: "LB" })
+    const anas = yield* live.press(ana, { type: "undo" })
+    const danas = yield* live.press(dana, { type: "undo" }, { ...right, screen: "behindAll" })
+    // The story asserts the refusal, UndoneSince naming Ana and the change her undo took back, and nothing new on
+    // row-1 or the import, before the same undo sent with what the row holds is taken.
+    const apart = yield* verdict(side, live.expected)
+    expect([anas.undid, danas.undid]).toEqual(["taken", "taken"])
+    expect(side.reached().behindUndoUndoneSince).toBe(1)
+    expect(side.reached().behindUndoNotYourStep).toBe(0)
+    const read = yield* A.get(side.readings, 3).pipe(Effect.fromOption, Effect.orDie, Effect.flatMap(decoded))
+    expect(flagsOf(fold(read))).toEqual({})
+    expect(apart).toEqual([])
+  })
+)
+// A row's undo from under a later group (2026-11-22, by the rule on a press from a screen that is behind). Dana's
+// decision on a row was drawn on Ana's screen when Ana's group act covered it, so taking it back from under the group
+// would change what that group was made over: it is refused, naming the group in force, and nothing is recorded.
+// Today's `act` differs here: it takes Dana's step back at once and puts the row back to what it held before her step,
+// so the group's effect goes from that row while its other rows keep it. The reference does not apply a refused undo:
+// the map stays as it is, and the person's step stays on their history for the press after the group is taken back.
+it.effect("a row's undo under a later group is refused naming the group, and taken once the group is taken back", () =>
+  Effect.gen(function* () {
+    const rows = [groupedRow("row-1", 1, "EA"), groupedRow("row-2", 2, "EA")]
+    const side = modelSide({ rows: rows.length, first: dana })
+    const live = liveReview({ side, rows: () => rows, recheck: undefined })
+    const changeOf = (sent: Sent): number =>
+      Sent.$match(sent, { Nothing: () => 0, RowAct: ({ change }) => change, GroupAct: ({ change }) => change })
+    // Dana types KG in row-1; Ana then sets the whole group to its proposal, row-1 included.
+    const typed = yield* live.press(dana, { type: "edit", rowId: "row-1", column: "b", value: "KG" })
+    const grouped = yield* live.press(ana, { type: "acceptGroup", groupId: "g", except: [] })
+    const refused = yield* live.press(dana, { type: "undo" })
+    const groupUndone = yield* live.press(ana, { type: "undo" })
+    const taken = yield* live.press(dana, { type: "undo" })
+    // The story asserts the refusal, GroupedAfter naming Ana's group, and nothing new on row-1 or the import.
+    const apart = yield* verdict(side, live.expected)
+    expect(changeOf(typed.sent)).toBe(1)
+    expect(changeOf(grouped.sent)).toBe(2)
+    expect([refused.undid, groupUndone.undid, taken.undid]).toEqual(["GroupedAfter", "taken", "taken"])
+    const readAt = (press: number) =>
+      A.get(side.readings, press).pipe(Effect.fromOption, Effect.orDie, Effect.flatMap(decoded))
+    const groupedIn = yield* readAt(1)
+    const refusedIn = yield* readAt(2)
+    // After the refusal row-1 still reads through Ana's group, Dana's typed value under it, as before the press.
+    expect(flagsOf(fold(refusedIn))).toEqual({
+      "row-1": { accepted: ["a"], edits: { b: "KG" } },
+      "row-2": { accepted: ["a"] }
+    })
+    expect(flagsOf(fold(refusedIn))).toEqual(flagsOf(fold(groupedIn)))
+    // Once the group is taken back, the same undo is taken: row-1 holds nothing, and `act` says the same.
+    const takenIn = yield* readAt(4)
+    expect(flagsOf(fold(takenIn))).toEqual({})
+    expect(O.isSome(O.getOrElse(A.get(live.expected, 4), () => O.none()))).toBe(true)
+    expect(apart).toEqual([])
+    expect(live.apart).toEqual([])
+  })
 )
 
 it.effect(

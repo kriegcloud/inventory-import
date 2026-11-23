@@ -5,7 +5,8 @@
 // thousand, and refused at ten thousand (half a million characters). Eight long shapes (a call chain, a member chain,
 // two concatenations, an else-if chain, nested JSX and a ternary chain, at 300, and a choice among 250) get the
 // verdicts both laws gave before they had a budget (the tags law's call chain, which it took minutes on, as its chain
-// of ten). The scan refuses, before parsing, fifteen shapes the parser dies on, each from the size written beside it
+// of ten). The scan refuses, before parsing, twenty-one shapes the parser dies on (six of them statements nested
+// without braces), each from the size written beside it
 // and not one smaller, at most half the size the parser dies at; a closing bracket in a string, a block comment, a
 // template's text or a regular expression, in the forms tried here, hides no nesting after it (text inside an element
 // can: PLAN.md names what the scan misreads); a file longer than `maxFileSize` is refused, and
@@ -36,6 +37,7 @@ import {
 import { linesOf } from "../src/commands/Laws/internal/lines.ts"
 import { readScreen } from "../src/commands/Laws/internal/refCallbacksCode.ts"
 import { readTags } from "../src/commands/Laws/internal/tagsCode.ts"
+import { readTry } from "../src/commands/Laws/internal/tryCode.ts"
 import { refCallbacks, refCallbacksSentence } from "../src/commands/Laws/RefCallbacks.rules.ts"
 import { tags, tagsSentence } from "../src/commands/Laws/Tags.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -449,7 +451,14 @@ const crashing: ReadonlyArray<readonly [string, Shape, number, number]> = [
   ["types nested in arguments", (n) => `type T = ${Str.repeat(n)("A<")}x${Str.repeat(n)(">")}\n`, 5760, 2000],
   ["an expectation's matchers", (n) => `expect(a)${pieces(n, (i) => `.not.m${i}(b)`)}\n`, 47_616, 1334],
   ["parentheses nested", (n) => `const x = ${Str.repeat(n)("(")}a${Str.repeat(n)(")")}\n`, 5696, maxBrackets + 1],
-  ["templates nested", (n) => `const x = ${Str.repeat(n)("`${")}a${Str.repeat(n)("}`")}\n`, 5024, maxBrackets + 1]
+  ["templates nested", (n) => `const x = ${Str.repeat(n)("`${")}a${Str.repeat(n)("}`")}\n`, 5024, maxBrackets + 1],
+  // Statements nested without braces: each head governs the statement on the next line, one inside another.
+  ["if heads, one a line", (n) => `${Str.repeat(n)("if (a)\n")}f()\n`, 27_485, 4000],
+  ["while heads, one a line", (n) => `${Str.repeat(n)("while (a)\n")}f()\n`, 27_478, 4000],
+  ["for heads, one a line", (n) => `${Str.repeat(n)("for (;;)\n")}f()\n`, 17_403, 4000],
+  ["do bodies, one a line", (n) => `${Str.repeat(n)("do\n")}f()\n${Str.repeat(n)("while (a)\n")}`, 27_490, 4000],
+  ["else bodies, one a line", (n) => `${Str.repeat(n)("if (a) f()\nelse\n")}f()\n`, 27_474, 1334],
+  ["labels, one a line", (n) => `${pieces(n, (index) => `l${index}:\n`)}f()\n`, 22_704, 4000]
 ]
 
 describe("the scan refuses, before parsing, what the parser dies on", () => {
@@ -457,9 +466,10 @@ describe("the scan refuses, before parsing, what the parser dies on", () => {
     expect(from * 2).toBeLessThan(dies)
     expect(whyOf(O.fromUndefinedOr(unreadable(shape(from - 1))))).toBe("read")
     expect(whyOf(O.fromUndefinedOr(unreadable(shape(from))))).toBe("Nested")
-    // Both laws refuse it in words, and neither hands it to the parser.
+    // Every law that parses refuses it in words, and none hands it to the parser.
     expect(whyOf(readTags({ file: "a.tsx", source: shape(dies) }).unread)).toBe("Nested")
     expect(whyOf(readScreen({ file: "a.tsx", source: shape(dies) }).unread)).toBe("Nested")
+    expect(whyOf(readTry({ file: "a.tsx", source: shape(dies) }).unread)).toBe("Nested")
   })
 
   it("refuses at the line where the bound is passed", () => {

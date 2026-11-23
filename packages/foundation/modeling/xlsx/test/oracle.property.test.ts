@@ -26,13 +26,9 @@ import { XlsxDateSystem } from "@beep/xlsx/XlsxSerial"
 import { XlsxRow, XlsxSheetInfo, XlsxSheetState, XlsxWorkbook, XlsxWorksheet } from "@beep/xlsx/XlsxWorkbook"
 
 const runs = { arbitrary: { runs: 100 } }
-const formatted = (code: string, value: number, date1904 = false): string | undefined => {
-  try {
-    return SSF.format(code, value, { date1904 }) as string
-  } catch {
-    return undefined
-  }
-}
+// What SheetJS shows for a value under a format: nothing where SheetJS refuses the format.
+const formatted = (code: string, value: number, date1904 = false): string | undefined =>
+  O.getOrUndefined(O.liftThrowable(() => SSF.format(code, value, { date1904 }) as string)())
 
 // Text a spreadsheet would hold: printable, since SheetJS does not keep every control character.
 const Words = S.String.check(S.isPattern(/^[ -~]{0,40}$/))

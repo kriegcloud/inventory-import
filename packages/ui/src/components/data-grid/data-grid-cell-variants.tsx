@@ -42,8 +42,12 @@ import {
   moveCaretToEnd,
   parseLocalDate,
   // Local change: `selectEditableText` is imported where upstream imported `replaceEditableText`.
-  selectEditableText
+  selectEditableText,
+  // Local change: `settle`, for the `try` statements upstream has here (none in this repository).
+  settle
 } from "@inventory/ui/components/data-grid/data-grid-utils"
+// Local change: `Result`, for the same.
+import * as Result from "effect/Result"
 import { DataGridCell, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { Badge } from "@inventory/ui/components/badge"
 import { Button } from "@inventory/ui/components/button"
@@ -907,22 +911,29 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
 
       let uploadedFiles: FileCellData[]
 
-      if (cell.table.options.uploadFiles) {
-        try {
-          uploadedFiles = await cell.table.options.uploadFiles({
-            files: accepted.map(({ file }) => file),
-            rowId,
-            columnId
-          })
-        } catch (error) {
-          toast.error(
+      const options = cell.table.options
+      const uploadFiles = options.uploadFiles
+      if (uploadFiles) {
+        // Local change: `settle` where upstream has a `try` statement; a refused upload says why, as upstream's did.
+        // Called on the options, as upstream called it.
+        const uploaded = await settle(
+          () =>
+            uploadFiles.call(options, {
+              files: accepted.map(({ file }) => file),
+              rowId,
+              columnId
+            }),
+          (error) =>
             error instanceof Error
               ? error.message
               : `Failed to upload ${accepted.length} file${accepted.length !== 1 ? "s" : ""}`
-          )
+        )
+        if (Result.isFailure(uploaded)) {
+          toast.error(uploaded.failure)
           clearUploadingFiles()
           return
         }
+        uploadedFiles = uploaded.success
       } else {
         uploadedFiles = accepted.map(({ file, data }) => ({
           ...data,
@@ -961,21 +972,27 @@ export function FileCell<TData extends RowData>(props: DataGridCellProps<TData>)
       const idsToDelete = new Set(filesToDelete.map((file) => file.id))
       setDeletingIds(idsToDelete)
 
-      if (cell.table.options.deleteFiles) {
-        try {
-          await cell.table.options.deleteFiles({
-            fileIds: [...idsToDelete],
-            rowId,
-            columnId
-          })
-        } catch (error) {
-          toast.error(
+      const options = cell.table.options
+      const deleteFiles = options.deleteFiles
+      if (deleteFiles) {
+        // Local change: `settle` where upstream has a `try` statement; a refused delete says why, as upstream's did.
+        // Called on the options, as upstream called it.
+        const deleted = await settle(
+          () =>
+            deleteFiles.call(options, {
+              fileIds: [...idsToDelete],
+              rowId,
+              columnId
+            }),
+          (error) =>
             error instanceof Error
               ? error.message
               : filesToDelete.length === 1
                 ? `Failed to delete ${filesToDelete[0]?.name}`
                 : "Failed to delete files"
-          )
+        )
+        if (Result.isFailure(deleted)) {
+          toast.error(deleted.failure)
           setDeletingIds(new Set())
           return
         }

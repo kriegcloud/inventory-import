@@ -3,6 +3,7 @@
 // file protects: the class on <html> and the browser's bar colour are written by the atom that derives the theme,
 // mounted once at the root, never from a render.
 import { useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
 
@@ -16,14 +17,15 @@ const media = () => window.matchMedia("(prefers-color-scheme: dark)")
 // getComputedStyle here forces a style pass inside the first render and made that task 70 ms longer (Lighthouse TBT).
 const pageColour = { light: "#ffffff", dark: "#09090b" } as const
 
+// The browser's storage may refuse (a private window, blocked site data, a full disk): a refused read is light, and a
+// refused write lasts until reload. Not `@inventory/client/Storage`, which this package may not use.
+const stored = O.liftThrowable((): string | null => window.localStorage.getItem(storageKey))
+const store = O.liftThrowable((next: Theme): void => window.localStorage.setItem(storageKey, next))
+
 const readStored = (): Theme => {
-  try {
-    const value = window.localStorage.getItem(storageKey)
-    // Light unless the person has chosen otherwise.
-    return value === "dark" || value === "system" ? value : "light"
-  } catch {
-    return "light"
-  }
+  const value = O.getOrNull(stored())
+  // Light unless the person has chosen otherwise.
+  return value === "dark" || value === "system" ? value : "light"
 }
 
 /**
@@ -33,11 +35,8 @@ const readStored = (): Theme => {
 export const theme: Atom.Writable<Theme> = Atom.writable(
   () => readStored(),
   (ctx, next: Theme) => {
-    try {
-      window.localStorage.setItem(storageKey, next)
-    } catch {
-      // Storage can be refused in private windows. The choice then lasts until reload.
-    }
+    // Storage can be refused in private windows. The choice then lasts until reload.
+    store(next)
     ctx.setSelf(next)
   }
 ).pipe(Atom.keepAlive)

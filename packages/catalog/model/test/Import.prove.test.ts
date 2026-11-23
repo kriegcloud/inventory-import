@@ -1,6 +1,7 @@
 // Proves the import's 37 rules for each of its seven commands, for every state and every input. The import also folds
 // `ActCounted` and `GroupCounted`, which only the four decisions record: what they do to these rules is proved in
-// their own tests, and this test says that those two are the only events left to them. Seconds, in `prove`.
+// their own tests, and this test says that those two are the only events left to them. It also says that some state
+// lets each command record, and that the code did what the prover read. Seconds, in `prove`.
 import * as Prove from "@alchemy.run/domain/Prove"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
@@ -37,6 +38,16 @@ layer(NodeServices.layer)("Import", (it) => {
         notProved(A.map(report.commands, (command) => `${standingOf(command.schema)}  ${command.command}`)),
         said
       ).toEqual([])
+      // Some state lets each command record: none is proved only because it never does anything.
+      expect(
+        A.map(
+          A.filter(report.commands, (command) => command.accepted !== true),
+          (command) => `never accepted  ${command.command}`
+        ),
+        said
+      ).toEqual([])
+      // And the prover read what the code does: inputs picked for its paths did the same when the code itself ran.
+      expect(report.agreement.differs, said).toEqual([])
       // The two events no command of the import records: the four decisions do, and their tests prove it.
       expect(report.outside).toEqual(["ActCounted", "GroupCounted"])
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.

@@ -1,8 +1,10 @@
 // Proves `UndoingGroup`, the decision behind the undo of one act on a group, for every state of the import and the
-// group and every input: its own 13 rules, and every rule of the two aggregates it records on. A rule that is no
-// longer proved fails here by name. Its counterexamples need a group that was decided, and the prover does not tie an
-// instance's id to a key built from two fields of the command (`importId/step`), so a broken rule here comes back
-// "not proved", with the sentence "the real code rejects it", and not "violated". It still fails by name.
+// group and every input: its own 14 rules, and every rule of the two aggregates it records on. A rule that is no
+// longer proved fails here by name. Its counterexamples need a group that was decided, under a key built from two
+// fields of the command (`importId/step`). The library as published does not tie an instance's id to such a key, and
+// a broken rule here then comes back "not proved", with the sentence "the real code rejects it". The repository
+// patches that (`packages/patches/alchemy-domain/01-computed-instance-id.patch`, docs/patches.md): with the patch a
+// broken rule comes back "violated", with the state and the command that break it.
 import * as Prove from "@alchemy.run/domain/Prove"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
@@ -23,13 +25,13 @@ layer(NodeServices.layer)("UndoingGroup", (it) => {
       expect(notProved(standings(report)), said).toEqual([])
       // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
       // are there, and the ones about who may change a row or a group it states itself.
-      expect(missingRules(report), said).toEqual([])
+      expect(missingRules({ report, decision: UndoingGroup }), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.
       expect(report.accepted, said).toBe(true)
       // Past 4,096 paths the prover proves nothing: a rule or a check that adds paths shows here first.
-      expect(report.paths, said).toBe(84)
+      expect(report.paths, said).toBe(86)
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.
       expect(report.unread).toEqual([])
       expect(report.unkept).toEqual([])

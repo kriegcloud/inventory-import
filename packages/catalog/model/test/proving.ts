@@ -42,35 +42,83 @@ export const standings = (report: Prove.DecisionReport): ReadonlyArray<string> =
   A.map(report.rules, (rule) => `${standingOf(rule.verdict)}  ${rule.name}`)
 
 /**
- * The rules about who may change an instance of an aggregate with no command of its own. Each decision that records
- * on one of these aggregates states them under these names (`CLAUDE.md`, "The model's blocks: what Verify reads").
+ * The rules about who may change an instance of an aggregate with no command of its own, by the event that changes
+ * it. Each decision that records one of these events states the rules under these names (`CLAUDE.md`, "The model's
+ * blocks: what Verify reads"). They are asked by event and not by aggregate, so that a rule is asked only of a
+ * decision in which it can fail: "nobody clears another person's decision" says nothing of a decision that records
+ * `RowDecided`, which always leaves a decision there, and it is not asked of one.
  */
 export const ruleOfWhoMayChange: Readonly<Record<string, ReadonlyArray<string>>> = {
-  Row: ["NobodyClearsAnotherPersonsDecision", "OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
-  Group: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
+  RowDecided: ["OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
+  StepUndone: ["NobodyClearsAnotherPersonsDecision", "OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
+  GroupDecided: ["OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"],
+  GroupUndone: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
 }
 
-/** The rules about who may change an instance of this aggregate, or none when it has commands of its own. */
-export const whoMayChange = (aggregate: string): ReadonlyArray<string> =>
-  O.getOrElse(R.get(ruleOfWhoMayChange, aggregate), () => A.empty<string>())
+/**
+ * What the check below reads of a decision: the events its command may record, and each aggregate it reads with the
+ * commands and the events that aggregate has. All of it is the library's own, as the decision's class holds it.
+ */
+export interface RecordingDecision {
+  readonly command: { readonly events: ReadonlyArray<{ readonly tag: string }> }
+  readonly reads: Readonly<
+    Record<
+      string,
+      {
+        readonly definition: {
+          readonly commands: ReadonlyArray<unknown>
+          readonly events: ReadonlyArray<{ readonly tag: string }>
+        }
+      }
+    >
+  >
+}
+
+/**
+ * The events a decision records on an aggregate that has no command of its own: taken from the decision's command and
+ * from the aggregates it reads, never typed where the check is called, so a name cannot be left out or misspelt there.
+ */
+export const recordsWithNoCommand = (decision: RecordingDecision): ReadonlyArray<string> =>
+  A.dedupe(
+    A.flatMap(R.values(decision.reads), (aggregate) =>
+      A.isReadonlyArrayNonEmpty(aggregate.definition.commands)
+        ? []
+        : A.filter(
+            A.map(aggregate.definition.events, (event) => event.tag),
+            (tag) => A.some(decision.command.events, (event) => event.tag === tag)
+          )
+    )
+  )
 
 /**
  * What a decision's report lacks: for each aggregate it reads, at least one rule of that aggregate (so an
- * aggregate whose rules the prover reads no names from shows), and the rules about who may change it that the decision must state itself.
+ * aggregate whose rules the prover reads no names from shows), and, for each event it records on an aggregate with
+ * no command of its own (a row, a group), the rules about who may change it that the decision must state itself. An
+ * event of that kind with no entry in `ruleOfWhoMayChange` is missing too: the list cannot fall behind a new event.
  * Empty when nothing is missing.
  *
  * Ours, and no rule's standing: the lock and `require.proved` hold the rules a decision has, but only as written, and
  * nothing in the library asks whether a decision that records on a Row or a Group says whose act it records. A Row or
- * a Group has no command, so no middleware of its own: a decision added later (adoption's, say) that records on one
+ * a Group has no command, so no middleware of its own: a decision added later that records on one
  * and states none of these would lock and prove, and let anyone change the row.
  */
-export const missingRules = (report: Prove.DecisionReport): ReadonlyArray<string> =>
-  A.flatMap(report.reads, (read) => [
-    ...(A.some(report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
+export const missingRules = (proof: {
+  readonly report: Pick<Prove.DecisionReport, "reads" | "rules">
+  readonly decision: RecordingDecision
+}): ReadonlyArray<string> => [
+  ...A.flatMap(proof.report.reads, (read) =>
+    A.some(proof.report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
       ? []
-      : [`no rule of ${read.aggregate}`]),
-    ...A.map(
-      A.filter(whoMayChange(read.aggregate), (name) => !A.some(report.rules, (rule) => rule.name === name)),
-      (name) => `does not state ${name}`
-    )
-  ])
+      : [`no rule of ${read.aggregate}`]
+  ),
+  ...A.flatMap(recordsWithNoCommand(proof.decision), (event) =>
+    O.match(R.get(ruleOfWhoMayChange, event), {
+      onNone: () => [`no rule of who may change is listed for ${event}`],
+      onSome: (names) =>
+        A.map(
+          A.filter(names, (name) => !A.some(proof.report.rules, (rule) => rule.name === name)),
+          (name) => `does not state ${name}`
+        )
+    })
+  )
+]

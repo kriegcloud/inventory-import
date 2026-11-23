@@ -11,10 +11,12 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { firstDecisions, review } from "@inventory/catalog-model/Review"
+import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
 import {
   act,
+  confirmLine,
   count,
   decisionsLeft,
   emptyState,
@@ -34,6 +36,7 @@ import { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTy
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
+import { leftToDecide } from "@inventory/catalog-web/ImportWords"
 import { costText, dimensionsCellText, vendorsCellText } from "@inventory/catalog-web/ItemText"
 import { vendorsDraft } from "@inventory/catalog-web/CellDrafts"
 import {
@@ -85,6 +88,66 @@ describe("who is behind a suggestion", () => {
         )
     })
   )
+})
+
+describe("a second load after a confirm that took accepted proposals", () => {
+  it.effect(
+    "counts every stored item as Already there, and the views, the footer and the confirm step say the same numbers",
+    () =>
+      Effect.gen(function* () {
+        const table = yield* stage(sample("items_messy.csv"))
+        // The first import: six rows are ready only because their proposal was accepted.
+        const accepted = R.map(
+          {
+            "row-55": { accepted: ["unitCost"] },
+            "row-85": { accepted: ["quantityOnHand"] },
+            "row-135": { accepted: ["category"] },
+            "row-172": { accepted: ["category"] },
+            "row-186": { accepted: ["quantityOnHand"] },
+            "row-191": { accepted: ["unitCost"] }
+          },
+          decisionFromFlags
+        )
+        const first = review({ table, choices: [], decisions: accepted, storedItems: [] })
+        const stored = A.flatMap(first.rows, (each) => (each.item === null ? [] : [each.item]))
+        expect([first.counts.ready, stored.length]).toEqual([161, 161])
+        // The same file again, nothing decided: each of the six is offered its proposal no more, its item is stored.
+        const current = review({ table, choices: [], decisions: {}, storedItems: stored })
+        expect([current.counts.already, current.counts.decision, current.counts.cannot, current.counts.ready]).toEqual([
+          161, 18, 21, 0
+        ])
+        const statusOf = (rowNumber: number) =>
+          A.map(
+            A.filter(current.rows, (each) => each.rowNumber === rowNumber),
+            (each) => each.status
+          )
+        expect(A.flatMap([55, 85, 135, 172, 186, 191], statusOf)).toEqual(A.replicate("already", 6))
+        // A SKU that does not read yet as written keeps its row waiting, stored or not.
+        expect(A.flatMap([148, 195], statusOf)).toEqual(["needs", "needs"])
+        const counts = count(viewRows({ rows: toRegionRows(current, {}), state: emptyState }))
+        expect([counts.stored, counts.needs, counts.cannot, counts.ready, counts.out, counts.total]).toEqual([
+          161, 18, 21, 0, 0, 200
+        ])
+        const words = reviewWords({ stored: "Already there" })
+        expect(heldLine(counts, words)).toBe(
+          "200 won't be imported: Needs a decision 18, Cannot import 21, Already there 161"
+        )
+        expect(confirmLine({ counts, noun: ["item", "items"], words })).toBe(
+          "200 items won't be imported (Needs a decision 18, Cannot import 21, Already there 161). Your file is not changed."
+        )
+      })
+  )
+})
+
+describe("an open import's card on the Upload step", () => {
+  it("names the rows that wait for a decision and the rows that cannot be imported apart, as the review counts them", () => {
+    expect(leftToDecide({ decision: 24, cannot: 21, rows: 200 })).toBe(
+      "24 of 200 rows need a decision, 21 cannot be imported"
+    )
+    expect(leftToDecide({ decision: 1, cannot: 0, rows: 25 })).toBe("1 of 25 rows needs a decision")
+    expect(leftToDecide({ decision: 0, cannot: 21, rows: 200 })).toBe("21 of 200 rows cannot be imported")
+    expect(leftToDecide({ decision: 0, cannot: 0, rows: 200 })).toBe("Nothing left to decide")
+  })
 })
 
 describe("every row says why", () => {

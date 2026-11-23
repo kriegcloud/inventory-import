@@ -7,6 +7,7 @@ import * as Atom from "effect/reactivity/Atom"
 import { useRef } from "react"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { leftToDecide } from "./internal/format.tsx"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,14 +181,11 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
         <ItemTitle className="max-w-full">
           <span className="truncate">{view.fileName}</span>
         </ItemTitle>
+        {/* Two descriptions, the same on a desk and a phone: what is left to do, then who loaded it and when. The
+            first wraps where the card is narrow, so both of its counts are read on a phone; the second stays one
+            line, since a wrapping one ended in a dot or split a name. A viewer is not told the rows need them. */}
+        <ItemDescription>{leftToDecide(view.progress)}</ItemDescription>
         <ItemDescription>
-          {/* Two lines of their own, the same on a desk and a phone: what is left to do, then who loaded it and
-              when. One wrapping line ended in a dot or split a name. A viewer is not told the rows need them. */}
-          <span className="block truncate">
-            {view.progress.needs === 0
-              ? "Nothing left to decide"
-              : `${whole.format(view.progress.needs)} of ${count(view.progress.rows, "row")} ${view.progress.needs === 1 ? "needs" : "need"} a decision`}
-          </span>
           <span className="block truncate" title={when(view.createdAt)}>
             {view.startedBy} · {whenShort(view.createdAt)}
           </span>

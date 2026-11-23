@@ -6,6 +6,8 @@ import * as React from "react"
 
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as S from "effect/Schema"
+// Local change: `Result`, for the `try` statement upstream has here (none in this repository).
+import * as Result from "effect/Result"
 import { useRefWithInit } from "@inventory/ui/hooks/use-ref-with-init"
 import { useValueAsRef } from "@inventory/ui/hooks/use-value-as-ref"
 import {
@@ -428,7 +430,10 @@ function FileUpload(props: FileUploadProps) {
 
   const onFilesUpload = React.useCallback(
     async (files: File[]) => {
-      try {
+      // Local change: a promise read as a `Result` where upstream has a `try` statement; a refused upload marks every
+      // file with why, as upstream's did. The upload starts at once, inside the event, as upstream's did: an async
+      // function runs up to its first `await` when it is called, and what it throws is its promise's rejection.
+      const upload = async () => {
         for (const file of files) {
           store.dispatch({ type: "SET_PROGRESS", file, progress: 0 })
         }
@@ -452,8 +457,13 @@ function FileUpload(props: FileUploadProps) {
             store.dispatch({ type: "SET_SUCCESS", file })
           }
         }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Upload failed"
+      }
+      const uploaded = await upload().then(
+        () => Result.succeed(undefined),
+        (error: unknown) => Result.fail(error instanceof Error ? error.message : "Upload failed")
+      )
+      if (Result.isFailure(uploaded)) {
+        const errorMessage = uploaded.failure
         for (const file of files) {
           store.dispatch({
             type: "SET_ERROR",

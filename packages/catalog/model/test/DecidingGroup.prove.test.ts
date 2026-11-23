@@ -1,5 +1,5 @@
 // Proves `DecidingGroup`, the decision behind one act on a group of rows, for every state of the import and the
-// group and every input: its own 21 rules, and every rule of the two aggregates it records on. A rule that is no
+// group and every input: its own 20 rules, and every rule of the two aggregates it records on. A rule that is no
 // longer proved fails here by name, with the state and the command the solver found. Seconds, in `prove`.
 import * as Prove from "@alchemy.run/domain/Prove"
 import * as NodeServices from "@effect/platform-node/NodeServices"
@@ -21,7 +21,7 @@ layer(NodeServices.layer)("DecidingGroup", (it) => {
       expect(notProved(standings(report)), said).toEqual([])
       // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
       // are there, and the ones about who may change a row or a group it states itself.
-      expect(missingRules(report), said).toEqual([])
+      expect(missingRules({ report, decision: DecidingGroup }), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.

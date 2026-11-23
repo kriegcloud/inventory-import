@@ -10,6 +10,7 @@ import { emit } from "../../Report.schema.ts"
 import { patchesBuild, patchesBuildSentence } from "./PatchesBuild.rules.ts"
 import { patchesCarry, patchesCarrySentence } from "./PatchesCarry.rules.ts"
 import { patchesCheck, patchesCheckSentence } from "./PatchesCheck.rules.ts"
+import { patchesInstalled, patchesInstalledSentence } from "./PatchesInstalled.rules.ts"
 import { patchesProve, patchesProveSentence } from "./PatchesProve.rules.ts"
 
 /** `patches check`: every patch has its header and test, is for what is installed, applies, and is installed. */
@@ -26,10 +27,19 @@ export const patchesBuildCommand = Command.make("build", {}, () =>
   Effect.flatMap(patchesBuild(), emit(patchesBuildSentence))
 ).pipe(Command.withDescription("Write the file bun reads for each patched package from the package's patches"))
 
-/** `patches prove`: each patch's test fails when it is run without the patch. */
+/** `patches installed`: what is installed holds what every registered patch writes. Every run of code waits for it. */
+export const patchesInstalledCommand = Command.make("installed", {}, () =>
+  Effect.flatMap(patchesInstalled(), emit(patchesInstalledSentence))
+).pipe(Command.withDescription("What is in node_modules holds what every registered patch writes"))
+
+/** `patches prove`: each patch's test fails when it is run with that one patch left out. */
 export const patchesProveCommand = Command.make("prove", {}, () =>
   Effect.flatMap(patchesProve(), emit(patchesProveSentence))
-).pipe(Command.withDescription("Each patch's test fails when it is run beside the package without its patches"))
+).pipe(
+  Command.withDescription(
+    "Each patch's test fails when it is run beside the package with that one patch left out and the others applied"
+  )
+)
 
 /** `patches carry`: after a re-pin's new files, carries each kept package's patches to its new file, or stops. */
 export const patchesCarryCommand = Command.make("carry", {}, () =>
@@ -43,5 +53,11 @@ export const patchesCarryCommand = Command.make("carry", {}, () =>
 /** The `patches` group. */
 export const patchesCommand = Command.make("patches").pipe(
   Command.withDescription("The repository's patches to its dependencies"),
-  Command.withSubcommands([patchesBuildCommand, patchesCarryCommand, patchesCheckCommand, patchesProveCommand])
+  Command.withSubcommands([
+    patchesBuildCommand,
+    patchesCarryCommand,
+    patchesCheckCommand,
+    patchesInstalledCommand,
+    patchesProveCommand
+  ])
 )

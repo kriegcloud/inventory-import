@@ -5,6 +5,8 @@
  *
  * - `sources`: `.syncpackrc.json` reads the root's `package.json` and one pattern for each `workspaces` pattern, so
  *   `deps:lint`, `deps:outdated` and `deps:update` see every package;
+ * - `catalog`: the version group of `.syncpackrc.json` that holds dependencies to `catalog:` lists every name of the
+ *   root's `catalog`, so `deps:lint` refuses one written as a version in a package.json;
  * - `coverage`: every folder with a `package.json` under `apps` and `packages` fits a `workspaces` pattern, and every
  *   pattern names at least one;
  * - `paths`: a `$schema`, an `extends` and a path in a script name a file that exists; one that does not, and would
@@ -44,7 +46,10 @@ import {
   type FoundBlock,
   isLocalPath,
   lineAt,
+  entriesOf,
+  membersOf,
   objectOf,
+  placed,
   renderArray,
   stringsIn,
   stringValues
@@ -209,6 +214,73 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
       found: listed(found),
       expected: listed(expected),
       text: renderArray(block.value)(A.map(expected, quoted))
+    })
+  })
+
+  // catalog: syncpack holds every dependency the root's catalog names to `catalog:`, so the group's list is the
+  // catalog's names. A name missing from it could be written as a version in one package.json and nothing would say.
+  const catalogPlan = Effect.fn("ConfigSync.catalog")(function* () {
+    const config = yield* readIfThere(repo.join(repo.root, ".syncpackrc.json"))
+    const catalog = objectOf("catalog")(rootPackage.text)
+    if (O.isNone(config) || O.isNone(catalog)) return nothing
+    const expected = A.sort(
+      A.map(entriesOf(catalog.value)(rootPackage.text), ([name]) => name.value),
+      Order.String
+    )
+    const text = config.value.text
+    const missing = one({
+      problems: [
+        Problem.make({
+          file: config.value.file,
+          message: `has no version group that holds the catalog: add { "label": "...", "policy": "catalog", "dependencies": [], "dependencyTypes": ["prod", "dev", "peer"] } to "versionGroups" and run \`bun run config-sync\`, or a dependency of the root's catalog can be written as a version in one package.json`
+        })
+      ]
+    })
+    // The group is the item of `versionGroups` that says `"policy": "catalog"` itself, whatever order its keys are
+    // in and whatever else it holds; its list is that item's own `dependencies`.
+    const blanked = blankComments(text)
+    const written = (member: { readonly start: number; readonly end: number }) =>
+      Str.slice(member.start, member.end)(blanked)
+    const group = O.flatMap(arrayOf("versionGroups")(text), (groups) =>
+      A.findFirst(
+        membersOf(groups)(text),
+        (item) =>
+          Str.startsWith("{")(written(item)) &&
+          A.some(membersOf(item)(text), (member) => /^"policy"\s*:\s*"catalog"$/.test(written(member)))
+      )
+    )
+    if (O.isNone(group)) return missing
+    const members = membersOf(group.value)(text)
+    const list = A.findFirst(members, (member) => /^"dependencies"\s*:\s*\[/.test(written(member)))
+    if (O.isNone(list)) return missing
+    const opens = list.value.start + O.getOrElse(Str.indexOf("[")(written(list.value)), () => 0)
+    const span = placed({ start: opens, end: list.value.end })(text)
+    const found = A.map(stringsIn(span)(text), (entry) => entry.value)
+    if (A.join(found, "\n") === A.join(expected, "\n")) return agreed
+    const words = {
+      what: "the catalog group's `dependencies`, from the `catalog` of package.json",
+      found: listed(found),
+      expected: listed(expected)
+    }
+    const items = A.map(expected, quoted)
+    const array = renderArray(span)(items)
+    const onOneLine = !Str.includes("\n")(Str.slice(group.value.start, opens)(text))
+    if (!onOneLine || !Str.includes("\n")(array)) return blockDrift(config.value, span, { ...words, text: array })
+    // A group written on one line whose list no longer fits there: the formatter leaves such a group one key a line,
+    // so the whole group is written that way, not a list broken inside a line.
+    const key = '"dependencies": '
+    const inner = `${span.indent}  `
+    const body = A.map(members, (member) =>
+      member.start === list.value.start
+        ? `${key}${renderArray({ indent: inner, before: inner.length + key.length, after: 1 })(items)}`
+        : Str.slice(member.start, member.end)(text)
+    )
+    return blockDrift(config.value, group.value, {
+      ...words,
+      text: `{\n${A.join(
+        A.map(body, (member) => `${inner}${member}`),
+        ",\n"
+      )}\n${span.indent}}`
     })
   })
 
@@ -635,10 +707,16 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
   })
 
   const sources = yield* sourcesPlan()
+  const catalogued = yield* catalogPlan()
   const tasks = yield* tasksPlan()
   const vendored = yield* vendoredPlan()
   return mergePlans(
-    A.flatten<ReadonlyArray<ReadonlyArray<Plan>>>([[sources, coverage, paths], solutions, scripts, [tasks, vendored]])
+    A.flatten<ReadonlyArray<ReadonlyArray<Plan>>>([
+      [sources, catalogued, coverage, paths],
+      solutions,
+      scripts,
+      [tasks, vendored]
+    ])
   )
 })
 

@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/src/Id.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/src/Id.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 /**
  * Hierarchical identity system for the `@beep` namespace.
  *
@@ -124,15 +124,16 @@ const $I = {
  * **Example** (Reject an interpolated tag call)
  *
  * ```ts
+ * import * as Result from "effect/Result"
  * import { make, IdentityInterpolationError } from "@beep/identity/Id"
  *
  * const { $MyPkgId } = make("my-pkg")
  *
- * try {
- *   $MyPkgId`User${"Name"}`
- * } catch (error) {
- *   console.log(error instanceof IdentityInterpolationError)
- * }
+ * const refused = Result.try({
+ *   try: () => $MyPkgId`User${"Name"}`,
+ *   catch: (error) => error instanceof IdentityInterpolationError
+ * })
+ * console.log(Result.isFailure(refused) && refused.failure) // true
  * ```
  *
  * @since 0.0.0

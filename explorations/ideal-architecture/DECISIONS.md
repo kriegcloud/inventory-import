@@ -395,7 +395,7 @@ preview token at the production account.
 Question: which stages get a model key? Answer: "Production only, one vendor (Recommended)". Rejected: no key
 anywhere at first; production and previews. Reverse: add or remove the key in the stage plan.
 
-The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY`: "Not deployed for now (Recommended)". It is
+The 1Password reference for `TYPESAFE_AI_API_KEY`: "Not deployed for now (Recommended)". It is
 reserved for a later confidence-score goal; no stage gets it, and it is not in `env/op.env`. Rejected: declare it,
 unused. It is never resolved by an agent.
 
@@ -697,7 +697,7 @@ Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it 
 decided: the reading, the trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md),
 and its [brief](../alchemy-domain/BRIEF.md) puts each "how" to him. None of that brief's recommendations is his
 until he answers it. Decision 1's pin is on main (as of 2026-11-22), and the review's model of its move 1 is built on
-that pin and merged into main (`0c4c5e5`, not yet on the public remote); the rest of it is built after he signs it
+that pin and merged into main (`0c4c5e5`); the rest of it is built after he signs it
 (the atoms goal, the other condition, is merged).
 
 From his own list of 2026-11-18, the items he marked as wanted (CAPTURE.md of that packet records them under
@@ -718,7 +718,7 @@ What this touches in this file:
 
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
 is the D1 core, and nothing of the reversal is on main yet but the library's pin and the review's model of move 1
-(as of 2026-11-22; `0c4c5e5`, not yet on the public remote).
+(as of 2026-11-22; `0c4c5e5`).
 
 ### 2026-11-19 — atoms, the table's own store in the review package
 
@@ -1070,7 +1070,9 @@ same. The telemetry script is converted; `theme-init.js` is the one file the law
 beside it. `.agents/` is left out by name, as for the deprecated-API check.
 
 When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
-batch". I chose; the agent recommended the same. Not built yet.
+batch". I chose; the agent recommended the same. Built: every `try` is converted but theme-init's, and
+`bun run check` refuses one in any code file git would commit, its doc comments' examples included, outside `.agents/`
+and the scratchpad (`try:check`, `docs/standards/no-try.md`).
 
 ### 2026-11-22 — Alchemy, which build, and the state store it upgrades
 
@@ -1494,20 +1496,190 @@ for the person; each of those checks has its own mutant (154 in all). `DecideRow
 176; the lock was written again on purpose for the two rules' new text. Reverse: answer the covered "no change" with
 the other one, before `saw`, and accept that such a press is lost.
 
-Narrowed later the same day by his answer "Hold it when behind" (the alchemy-domain packet's DECISIONS.md): the
-uncovered "no change" is given only when the sender has seen the row's latest decision, or the row's own decision is
-newer than the last group; otherwise the press is refused and shown. Not built yet.
+### 2026-11-22 — the review's model, a press that matches what the row holds, from a screen behind a group
+
+Found on review of the entry above, and older than it: the uncovered "no change" also trusted the sender's word
+(`covered: false`) before the check of what the sender saw. Dana accepts the fix on row 14 (change 1). Ana's group
+covers row 14 (change 2). Dana types 8 on it (change 3), and Carl's screen has all of that. Dana takes the 8 back: the
+row holds her accept of change 1 again, and the group, made after it, covers the row again. Carl, who has not
+received the undo, presses accept on what he sees as an uncovered row holding the 8. The model answered "no change",
+since the accept is what the row's own instance holds, and dropped the press; recorded, it would have put the accept
+over Ana's group. Question: should a stale press that happens to match what the row holds be dropped or held?
+Options: "Hold it when behind (Recommended)", "Keep 'no change' as decided". I chose "Hold it when behind"; the agent
+recommended the same. It narrows my answer of 2026-11-19 ("no change, whoever decided it and whether or not the sender
+has seen it") for this one case.
+
+Built so: on an uncovered row the early "no change" is answered when the sender has seen what the row holds, or when
+no group was made since the row's own decision (on a row with none: no group at all). Otherwise the press goes to the
+check of what the sender saw and is refused with what is there (`DecidedSince`, or `NoLongerThere` on a row left with
+no decision), so the screen holds it and shows both. With no group since, a press that matches is still no change,
+seen or not, as before. The two rules that excused every such press (a decision is replaced only by an act that saw
+it; an act is made on the matching now) excuse only the one answered "no change"; the lock was written again on
+purpose for those two. Three stories hold it (the six steps above, refused with Dana's change 1; the same on a row
+left with no decision; and the earlier "seen or not" one, with a press from a screen that still shows a decision taken
+back), and four mutants, each held by its story: no rule can, since a press answered "no change" or refused records
+nothing (the proof notices them only by its count of paths).
+
+The same review found the matching half of the covered order held by nothing. It has a story now (Ana's group, Dana
+matches a column, and Carl's covered press on the matching before is refused with the matching now, then is no change
+once his screen has the match) and a mutant that answers the covered "no change" before the check of the matching.
+
+`saw` is asked once in each case of the row, for the prover's paths: `DecideRow` at 368 paths in its own proof, from
+284, and the relation of a row to its import's organization still proved across it; 135 rules proved under `CI=true`.
+159 mutants. Reverse: answer the uncovered "no change" first again, as the entry of 2026-11-19 says, and accept that
+such a press is dropped.
 
 ### 2026-11-22 — the review's model, whose act a decision records, held by a check of ours again
 
 The check that every decision recording on a row or a group states the three rules about who may change it
 (`missingRules`, in each decision's proof) is back. "No hand-written assertions" was about asserting how each rule
 stands, which the lock and `require.proved` do; this check guards what the library does not. A row and a group have no
-command and so no middleware of their own: a decision that records on one, any added later included, says whose act
-it records only by stating those rules, and without them it would lock and prove and let anyone change the row. Asked
-later the same day whether it stays, he answered "Keep it, named as ours": "no hand-written assertions" means no
-hand-written list of rule names or standings, and this one check is ours (the alchemy-domain packet's DECISIONS.md).
-Reverse: drop `missingRules` from `test/proving.ts` and the four proofs.
+command and so no middleware of their own: a decision that records on one says
+whose act it records only by stating those rules, and without them it would lock and prove and let anyone change the
+row. It came back without my being asked, so it was put to me. Question: one check of ours remains; each decision
+that records on a row or a group must state the three who-may-change rules; does it stay? I chose "Keep it, named as
+ours"; the agent recommended the same. The documents say it is ours and why, and "no hand-written assertions" means no
+hand-written list of rule names or of how each stands. Reverse: drop `missingRules` from `test/proving.ts` and the
+four proofs.
+
+### 2026-11-22 — the review's model, several people on one import
+
+An answer, after the cases above were explained to me (Ana, Dana and Carl are invented names for people reviewing
+one import at once).
+
+Question: the review by several people at once, as built and proved: keep it, and how are its remaining edge cases
+settled? I chose "Keep it, stop asking me"; the agent recommended the same. What is built and proved stays. For an edge
+case that remains, one rule is applied without asking me: a press from a screen that is behind is never dropped
+without a word and never applied; it is held and shown. Each case settled by that rule is listed where the work is
+reported, so I can overrule it. A case where the rule itself cannot be kept (the prover's path limit) still comes to
+me.
+
+What is stored already is the entry "rows already stored: start empty" below.
+
+### 2026-11-22 — the review's model, decided by the rule, for me to overrule
+
+A review of the model on main found cases nobody had put to me. Each is settled here by the rule above (a press from
+a screen that is behind is never dropped without a word and never applied; it is held and shown), or by what I
+answered before, and not asked. I can overrule any of them.
+
+1. **The same decision made again on a newer matching is a change.** "No change" needs the same text and the same
+   matching. Ana keeps row 12; Dana matches a column; Ana, with the match on her screen, keeps the row again: it is
+   recorded, on the matching now. Before, it was answered "no change" and the row kept the old matching for good.
+   Whatever it decides, a press made on an older matching is refused with the matching now, a press that matches
+   what the row holds included. Reverse: compare the text only, in `leavesAsItIs`.
+2. **A row's decision is not taken back from under a later group.** Dana types 8 on row 14; Ana's group, drawn on a
+   screen that had the 8, covers the row; Dana's undo of the 8 is refused naming the group (`GroupedAfter`), as a
+   group's undo under a later group is, and is taken once the group is taken back. Before, it was taken, and the group
+   then read over a row its maker never saw. `UndoRowStep` gains `covered`, the sender's word from a screen that has
+   every group act. Reverse: remove `covered` from `UndoRowStep` and its check.
+3. **A refusal says what happened.** When the decision the sender saw was taken back and an older one is there again,
+   the refusal is `PutBackSince` with whose older decision it is, not `DecidedSince`: nobody decided the row since.
+   The six steps of the entry "a press that matches what the row holds" are refused this way.
+4. **A covered press sent twice is written once and answered the same.** The resend is known by the row holding this
+   very act: the sender's, under the same step, with the same text. It is answered with nothing new recorded, not
+   refused with the sender's own decision. The library gives a decision no number of the command to know a resend by.
+5. **A group's undo touches no row.** This stands by my answer "Row 14 stays whole": the undo takes back its
+   sender's own act, so a row decided since keeps that person's whole decision, and the screen names it. The answer
+   is the group's undo and its number; which rows were decided since and stay is read from the rows, not carried in
+   the answer: the model keeps no reading of a group's rows. This item first said the undo is therefore taken from a
+   screen that is behind on the rows; my answer was on what the row keeps, not on that, and 16 holds the press.
+6. From the entry above: a row left with no decision is guarded as a decided one is (a "clear" from a screen that
+   still shows a decision there, after a group, is refused `NoLongerThere`); and with no group made since the row's
+   own decision, a press that matches what the row holds from a screen that is behind is still "no change".
+7. **An undo sent twice is written once and answered the same** (added the same day, by the same rule as 4). A row
+   keeps the last undo it took: the change taken back, the step the undo was pressed in, and who pressed. Dana takes
+   back her keep on row 12 and the answer is lost; her screen sends the undo again: nothing more is recorded, and
+   she is not told `NotYourStep`. It is known whatever was decided on the row since, and only as hers, in that step,
+   of that change. Before, the second sending was refused as an undo of a decision the row no longer holds. Reverse:
+   remove `undone` from the row's state and the check in `Undoing`.
+8. **A press drawn before an undo on the row is held** (2026-11-22, a second review). After an undo the row holds
+   exactly what it held before the decision taken back, so the number of the row's decision cannot tell a press made
+   after the undo from one drawn before it. Dana types 8 on row 14 and takes it back; the first sending of her 8,
+   stalled on the way, arrives: before, it was written again, on the row she had cleared. Now `DecideRow` says the
+   last undo its screen has of the row (`sawUndone`: the change that undo took back), and a press without it is
+   refused `UndoneSince` with who took the undo and of which change. The same holds for another person whose screen
+   has the older decision and not the undo: before, their press was taken; now it is held and shown. Reverse: remove
+   `sawUndone` and its check.
+9. **A press sent twice is answered as the first time when a match landed between, on a row no group covers too.**
+   Before, the copy was refused `MatchedSince` though the row held that very act. Known as in 4: this step, from
+   this person, with this text on the matching it was made on.
+10. **A row's undo is made on the matching now.** It puts another person's decision back on the row; from a screen
+    that has not received a match it is refused `MatchedSince` and held, as a row's act is. `UndoRowStep` gains
+    `madeOn`. With this, no undo from a screen that has not received a match is taken.
+11. **What `GroupedAfter` names for a row's undo is the import's last group in force**, the one to take back first,
+    and its words say so. It is the group over the row or one made after it: the model keeps no reading of a
+    group's rows. The rule that held it was named for more than it reads and is renamed: a row's undo that is taken
+    is one whose sender said no later group covers the row.
+
+12. **An undo's copy is answered as the first time when a group act, or a confirm and a reopening, landed between
+    the two sendings** (a third review, the same day). Before, the copy was refused `GroupedSince` or
+    `ConfirmedSince` though the row had taken that very undo.
+13. **A row keeps its last undo only, and this one cannot be kept by the rule.** A copy of an undo that arrives after
+    another undo on the same row is refused `NotYourStep`, with nothing wrong stored. To know it, the row would have
+    to keep every undo it took. Tried: a text of them looked into with `includes`, which the prover does not read
+    (every rule of the undo comes back "not read"); not tried, read from the library: a list in the state, whose
+    rules are then proved for short lists only and not proved. For me to settle if it matters.
+14. **A press's copy is answered as the first time when a group act, or a confirm and a reopening, landed between
+    the two sendings** (a fourth review, the same day; 12 said it of an undo only). Before, the copy was refused
+    `GroupedSince` or `ConfirmedSince` though the row held that very press: this step, from this person, with this
+    text on the matching it was made on.
+15. **A row's undo from a screen that has not received an undo on the row is held** (2026-11-22, a later review).
+    Dana keeps row 12, Ana leaves it out and takes that back: the row holds Dana's keep again, as her screen shows
+    it, and her screen has neither of Ana's acts. Before, her undo of her keep was taken from that screen; now
+    `UndoRowStep` says the last undo its screen has of the row (`sawUndone`, as `DecideRow` does in 8), and a press
+    without it is refused `UndoneSince` with who took the undo and of which change. Once her screen has Ana's undo
+    the same press is taken. Reverse: remove `sawUndone` from `UndoRowStep` and its check. This item first said the
+    case was not decided by the rule and left the press applied; the rule decides it, as it does 8.
+16. **A group's undo from a screen that has not received every change of the import is held** (2026-11-22, the
+    review after that). Ana's group covers row 14, Dana types 8 on it, and Ana, whose screen has not received the 8,
+    takes her group back. Before, the undo was taken, and Ana learned only afterwards that row 14 stays as Dana
+    decided it. Now `UndoGroup` says every change its screen has (`seen`, as `DecideGroup` does), and a press without
+    them is refused `ReviewMovedOn` with the import's last change; once her screen has the 8 the same undo is
+    taken, and row 14 stays whole as in 5. The check is of the whole import: the model keeps no reading of a
+    group's rows, so a change on a row outside the group holds the undo too, until the screen has it. Reverse:
+    remove `seen` from `UndoGroup` and its check.
+
+With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
+excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
+group covers the matching is checked first, so a press behind on both is refused with the matching.
+
+The prover's limit decided how 1 is written. As two comparisons (the text, then the matching) the relation of a row to
+its import's organization was no longer proved across `DecideRow`, in three forms: 232, 226 and 220 paths in the
+decision's own proof, each past 4,096 for the relation. What counts there is how many ways through the `decide` reach
+the record, and "the text differs, or the text is the same and the matching differs" is two. As one comparison (the
+matching's number and the text as one text, `onItsMatching`) it is one, and the relation is proved: 204 paths, and
+`UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
+group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
+
+With 7: `UndoRowStep` at 324 paths, 139 rules proved under `CI=true` (three new, each one comparison: the row keeps
+which change was taken back, the step it was pressed in, and who pressed), 56 stories, 169 mutants.
+
+With 8 to 11: `DecideRow` at 222 paths and `UndoRowStep` at 326, the relation of a row to its import's organization
+still proved across both (the first form tried); 61 stories, 179 mutants. With 12: `UndoRowStep` at 362 (the test
+worked out once before the refusals gave 814), 63 stories, 184 mutants.
+
+Rules that said less than their names, each either made to say it or renamed (the same review and the one before):
+
+- Made to say it, each a new rule: an undo stops where the history was let go (the refusal `HistoryEnds` had no
+  rule); an undo is of a row, or a group, of the import it names (only the organization's half of that check had
+  one); a group keeps its count; a group's change is one its import gave, from above as well as from below; no group
+  in force is later than the one its import holds as the last in force (the last two are searched, not proved).
+- Renamed to what they read: `AConfirmLeavesAClosedImportsStatusAsItWas` (was "a confirm of a closed import writes
+  nothing"), `TheMatchingMovesOnlyOnAnOpenImport` (was "only an open import is reviewed"),
+  `AGroupSaysAtLeastOneRow` (was "a group has rows": the count is its sender's word),
+  `ARowsUndoSaysNoLaterGroupCoversIt` (11 above).
+- Taken out, because they could not fail where they stood: "nobody clears another person's decision" on a row's
+  act, which always leaves a decision there, and "nobody undoes another person's group" on a group's act. Both stay
+  on the undos. The check that a decision states who may change a row or a group now asks by the event recorded, so
+  it is never satisfied by a rule that cannot fail.
+- Said as they are, in words only: `replaced` on an import counts replacements as the confirms said them, not
+  items; a group's rows are bounded at a million characters, which takes 50,000 ids at their longest.
+
+143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these. With 14:
+`DecideRow` at 234 paths, the relation still proved across it, no rule changed; 65 stories, 190 mutants. With 15:
+`UndoRowStep` at 364 paths, one rule more (144 of the kinds a proof covers under `CI=true`), the lock written again
+on purpose for it; 66 stories, 191 mutants. With 16: `UndoGroup` at 86 paths, one rule more (145), the lock written
+again on purpose for it; 66 stories, 192 mutants.
 
 ### 2026-11-22 — the review's model, rows already stored: start empty
 
@@ -1655,3 +1827,34 @@ as published: a changed file is marked as changed here, and a later update of it
 hand. This ends the last clause of "atoms A1, what stays a hook" ("the vendored kit is not ours"). Rejected: the
 table only; the kit left as it is. Reverse: take a file again from its registry and add it back to the lint's
 ignore list. The batches are in `goals/atoms/PLAN.md`, "The kit on atoms".
+
+### 2026-11-22 — infra: the stacks read their secrets through Alchemy's 1Password provider
+
+Question: the by-hand deploy ran every stack under `op run --env-file packages/infra/env/op.env`. Should the stacks
+ask 1Password themselves?
+Answer: "Or even better use alchemy's built in 1password", then "Yes, add it" (keep `@alchemy.run/1password` as a
+file at the commit already pinned) and "Yes, wire it". I chose; the agent had built the `op run` way first and
+recommended neither. Each stack lists a `secrets` entry that hands the references its stage needs to the provider;
+`op run` is gone from every deploy line and from `bun run beep infra setup`. The agent told me this would move the
+references into the stacks' code; as built it does not: they stay in `packages/infra/env/op.env`, which the entry
+reads, and no code holds one. In a workflow the entry does nothing. Production's Alchemy profile is connected to
+1Password, and the app's "Integrate with other apps" must be on. Not tried against 1Password: the provider was never
+called by an agent. Rejected: keeping `op run`. Reverse: remove `secrets` from the two stacks and the dependency from
+`packages/infra`, and wrap the deploys in `op run` again (`git log` has both lines).
+
+### 2026-11-22 — infra: previews and staging deploy with my own Cloudflare token
+
+Question: the repository's stack made a deploy token in each Cloudflare account with the one login it is deployed
+with. That login does not reach the account for previews, test stages and staging, so the stack could not make
+its token there. How does that account get its deploy key?
+Answer: "Use my own token". I chose; the agent recommended the same. The stack no longer makes a token in the
+previews' account: it asks 1Password for the account-owned token I made there and for the account's id, by the two
+references I keep in `packages/infra/env/op.env.local` (git ignores it), and writes them to the `preview` and
+`staging` environments. Production's token is still made by the stack, with only what a deploy needs. What I accept:
+my token is broader than one made for the purpose, since it allows whatever I gave it; every preview job and every
+staging job holds it, so anyone who can push a branch can use it; and I rotate it myself (a new token in that
+account, its value into the 1Password item, `bun run beep infra setup --staging`, then revoke the old one). The
+setup command checks the token's permissions against what previews and staging make and says what is missing before
+anything is made. Rejected: adding production's login as a member of the second account, so the stack could keep
+making a narrow token there. Reverse: add that login as a member, put `PreviewDeployToken` back in
+`packages/infra/src/GitHub.stack.ts`, and deploy the stack; the plan then replaces the two secrets.

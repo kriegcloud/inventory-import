@@ -98,10 +98,12 @@ export const testRewrites: ReadonlyArray<{
 // The patches hold import statements as text. The keyword is kept apart so that the rules which read this
 // repository's own imports (laws boundaries, laws effect-imports) do not take the text for an import of this file.
 const statement = "import"
+// And `try` statements, which this repository bans: kept apart for the same reason, so the text is not taken for one.
+const keyword = "try"
 
 /**
- * Deliberate, minimal patches to vendored source files, each with the reason it exists and what would make it
- * unnecessary upstream. A patch replaces exact text; a refresh fails when the text is gone, so a patch that upstream
+ * Deliberate, minimal patches to vendored source and test files (a test's after its import rewrites), each with the
+ * reason it exists and what would make it unnecessary upstream. A patch replaces exact text; a refresh fails when the text is gone, so a patch that upstream
  * has made unnecessary is noticed and removed. The import closure (which files are vendored) is computed from the
  * unpatched upstream files, so a patch never changes the vendored subset.
  */
@@ -127,6 +129,206 @@ export const sourcePatches: ReadonlyArray<{
     to: `${statement} * as A from "@beep/utils/Array";\n${statement} * as R from "@beep/utils/Record";`,
     reason:
       "As LiteralKit.schema.ts: the @beep/utils root brings Node types into a Worker's type-check. Unnecessary once beep-effect's builders.ts imports @beep/utils/Array and @beep/utils/Record itself."
+  },
+  {
+    pkg: "@beep/identity",
+    file: "src/Id.ts",
+    from: ` * ${statement} { make, IdentityInterpolationError } from "@beep/identity/Id"
+ *
+ * const { $MyPkgId } = make("my-pkg")
+ *
+ * ${keyword} {
+ *   $MyPkgId\`User\${"Name"}\`
+ * } catch (error) {
+ *   console.log(error instanceof IdentityInterpolationError)
+ * }`,
+    to: ` * ${statement} * as Result from "effect/Result"
+ * ${statement} { make, IdentityInterpolationError } from "@beep/identity/Id"
+ *
+ * const { $MyPkgId } = make("my-pkg")
+ *
+ * const refused = Result.try({
+ *   try: () => $MyPkgId\`User\${"Name"}\`,
+ *   catch: (error) => error instanceof IdentityInterpolationError
+ * })
+ * console.log(Result.isFailure(refused) && refused.failure) // true`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The example reads the refusal with Result.try. Unnecessary once beep-effect's example does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "src/Number.ts",
+    from: ` * ${statement} { makeCapAssertion } from "@beep/utils/Number"
+ *
+ * const assertCap = makeCapAssertion("@beep/example", (message) => new Error(message))
+ *
+ * console.log(assertCap("maxDepth", 256)) // 256
+ * console.log(assertCap(64)("maxDepth")) // 64
+ * ${keyword} {
+ *   assertCap("maxDepth", 0)
+ * } catch (error) {
+ *   console.log(String(error)) // Error: @beep/example internal cap maxDepth must be a positive integer, received 0
+ * }`,
+    to: ` * ${statement} * as Result from "effect/Result"
+ * ${statement} { makeCapAssertion } from "@beep/utils/Number"
+ *
+ * const assertCap = makeCapAssertion("@beep/example", (message) => new Error(message))
+ *
+ * console.log(assertCap("maxDepth", 256)) // 256
+ * console.log(assertCap(64)("maxDepth")) // 64
+ * const refused = Result.try({ try: () => assertCap("maxDepth", 0), catch: String })
+ * if (Result.isFailure(refused)) {
+ *   console.log(refused.failure) // Error: @beep/example internal cap maxDepth must be a positive integer, received 0
+ * }`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The example reads the refusal with Result.try. Unnecessary once beep-effect's example does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "src/Utils.ts",
+    from: `${statement} * as GlobalValue from "./GlobalValue.ts";`,
+    to: `${statement} * as Result from "effect/Result";
+${statement} * as GlobalValue from "./GlobalValue.ts";`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. Result, for structuralRegion's patch below. Unnecessary once beep-effect's Utils.ts imports it itself."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "src/Utils.ts",
+    from: `  ${keyword} {
+    return body();
+  } finally {
+    structuralRegionState.enabled = current;
+    structuralRegionState.tester = currentTester;
+  }
+};`,
+    to: `  // The region ends whether \`body\` returns or throws; what it threw is thrown on unchanged.
+  const outcome = Result.try({ try: body, catch: (thrown) => ({ thrown }) });
+  structuralRegionState.enabled = current;
+  structuralRegionState.tester = currentTester;
+  return Result.getOrThrowWith(outcome, ({ thrown }) => thrown);
+};`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. structuralRegion restores the region with Result.try where upstream has try and finally; the body's answer, and what it throws, are the same. Unnecessary once beep-effect's structuralRegion does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "test/FileSystem.test.ts",
+    from: `      ${keyword} {
+        expect((yield* FileSystem.statSync("socket")).type).toBe("Socket");
+      } finally {
+        stat.mockRestore();
+        socket.mockRestore();
+        directory.mockRestore();
+      }`,
+    to: `      const found = yield* FileSystem.statSync("socket").pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            stat.mockRestore();
+            socket.mockRestore();
+            directory.mockRestore();
+          })
+        )
+      );
+      expect(found.type).toBe("Socket");`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The spies are restored with Effect.ensuring where upstream has try and finally. Unnecessary once beep-effect's test does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "test/FileSystem.test.ts",
+    from: `      ${keyword} {
+        const error = yield* Effect.flip(FileSystem.statSync("unavailable.txt"));
+        expect(error.reason._tag).toBe("Unknown");
+        expect(error.reason.method).toBe("statSync");
+        expect(error.reason.cause).toBe(cause);
+      } finally {
+        stat.mockRestore();
+      }`,
+    to: `      const error = yield* Effect.flip(FileSystem.statSync("unavailable.txt")).pipe(
+        Effect.ensuring(Effect.sync(() => stat.mockRestore()))
+      );
+      expect(error.reason._tag).toBe("Unknown");
+      expect(error.reason.method).toBe("statSync");
+      expect(error.reason.cause).toBe(cause);`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. As the patch above. Unnecessary once beep-effect's test does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "test/Schema.test.ts",
+    from: `${statement} * as Effect from "effect/Effect";
+`,
+    to: `${statement} * as Effect from "effect/Effect";
+${statement} * as O from "effect/Option";
+${statement} * as Result from "effect/Result";
+`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. Option and Result, for captureError's patch below. Unnecessary once beep-effect's test imports them."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "test/Schema.test.ts",
+    from: `const captureError = (assertion: () => void): Error => {
+  ${keyword} {
+    assertion();
+  } catch (error) {
+    if (error instanceof Error) return error;
+  }
+  throw new Error("Expected assertion to throw an Error");
+};`,
+    to: `const captureError = (assertion: () => void): Error => {
+  const thrown = Result.try({
+    try: assertion,
+    catch: (error) => (error instanceof Error ? O.some(error) : O.none()),
+  });
+  if (Result.isFailure(thrown) && O.isSome(thrown.failure)) return thrown.failure.value;
+  throw new Error("Expected assertion to throw an Error");
+};`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. captureError reads the throw with Result.try where upstream has a try statement. Unnecessary once beep-effect's test does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "test/TaggedError.equivalence.test.ts",
+    from: `      ${keyword} {
+        const fileSystemFirst = yield* captureEffectDefect(FileSystem.existsSync("missing"));
+        const fileSystemSecond = yield* captureEffectDefect(FileSystem.existsSync("missing"));
+        const pathFirst = capture(() => Path.join("one", "two"));
+        const pathSecond = capture(() => Path.join("one", "two"));
+        const urlFirst = capture(() => NodeUrl.fileURLToPath("file:///tmp/one"));
+        const urlSecond = capture(() => NodeUrl.fileURLToPath("file:///tmp/one"));
+
+        expectPrivateEquivalence(fileSystemFirst, fileSystemSecond, pathFirst);
+        expectPrivateEquivalence(pathFirst, pathSecond, urlFirst);
+        expectPrivateEquivalence(urlFirst, urlSecond, fileSystemFirst);
+      } finally {
+        if (P.isNotUndefined(descriptor)) {
+          Reflect.defineProperty(globalThis.process, "getBuiltinModule", descriptor);
+        }
+      }`,
+    to: `      yield* Effect.gen(function* () {
+        const fileSystemFirst = yield* captureEffectDefect(FileSystem.existsSync("missing"));
+        const fileSystemSecond = yield* captureEffectDefect(FileSystem.existsSync("missing"));
+        const pathFirst = capture(() => Path.join("one", "two"));
+        const pathSecond = capture(() => Path.join("one", "two"));
+        const urlFirst = capture(() => NodeUrl.fileURLToPath("file:///tmp/one"));
+        const urlSecond = capture(() => NodeUrl.fileURLToPath("file:///tmp/one"));
+
+        expectPrivateEquivalence(fileSystemFirst, fileSystemSecond, pathFirst);
+        expectPrivateEquivalence(pathFirst, pathSecond, urlFirst);
+        expectPrivateEquivalence(urlFirst, urlSecond, fileSystemFirst);
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (P.isNotUndefined(descriptor)) {
+              Reflect.defineProperty(globalThis.process, "getBuiltinModule", descriptor);
+            }
+          })
+        )
+      );`,
+    reason:
+      "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The process is restored with Effect.ensuring where upstream has try and finally. Unnecessary once beep-effect's test does."
   }
 ]
 

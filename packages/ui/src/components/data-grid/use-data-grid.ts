@@ -15,6 +15,8 @@ import {
   useTable
 } from "@tanstack/react-table"
 import * as Match from "effect/Match"
+// Local change: `Result`, for the `try` statement upstream has here (none in this repository).
+import * as Result from "effect/Result"
 import * as React from "react"
 import { toast } from "sonner"
 
@@ -42,7 +44,9 @@ import {
   getSelectionEdgePosition,
   renderDefaultCell,
   revokeFileObjectUrls,
-  scrollCellIntoView
+  scrollCellIntoView,
+  // Local change: `settle`, for the `try` statement upstream has here.
+  settle
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 import { useDirection } from "@inventory/ui/components/direction"
 
@@ -595,13 +599,16 @@ function useDataGrid<TData extends RowData>({
       const { readOnly, createRow } = propsRef.current
       if (readOnly || !createRow) return
 
-      let row: TData | null
-      try {
-        row = await createRow(trigger)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to add row")
+      // Local change: `settle` where upstream has a `try` statement; a refused new row says why, as upstream's did.
+      const created = await settle(
+        () => createRow(trigger),
+        (error) => (error instanceof Error ? error.message : "Failed to add row")
+      )
+      if (Result.isFailure(created)) {
+        toast.error(created.failure)
         return
       }
+      const row: TData | null = created.success
       const currentTable = tableRef.current
       if (!row || !currentTable) return
 

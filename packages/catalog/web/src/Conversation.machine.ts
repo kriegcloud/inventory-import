@@ -5,6 +5,7 @@
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import { browserStorage } from "@inventory/client/Storage"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ViewChange } from "@inventory/catalog-contract/TableView"
 import { progressKey, type ProgressScope } from "@inventory/review/SavedProgress"
@@ -97,27 +98,29 @@ const encode = S.encodeOption(S.fromJsonString(Conversation))
 export const conversationKey = (scope: Omit<ProgressScope, "screen">, table: string) =>
   progressKey({ ...scope, screen: `assistant:${table}` })
 
+// The global `localStorage`, as this module has always read it (the same storage as `window.localStorage`).
+const conversations = browserStorage(() => localStorage)
+
 /** Reads the conversation, converting a version 1 one and dropping one that decodes as neither. */
-export const readConversation = (key: string): Conversation => {
-  try {
-    const text = localStorage.getItem(key)
-    if (text === null) return emptyConversation
-    const found = O.orElse(decode(text), () => O.map(decodeV1(text), fromV1))
-    if (O.isSome(found)) return found.value
-    localStorage.removeItem(key)
-  } catch {
-    // A private window or a refused store: the conversation starts empty, and the table still works.
-  }
-  return emptyConversation
-}
+export const readConversation = (key: string): Conversation =>
+  // A private window or a refused store: the conversation starts empty, and the table still works.
+  O.getOrElse(
+    O.flatten(
+      conversations.attempt((storage) => {
+        const text = storage.getItem(key)
+        if (text === null) return O.none()
+        const found = O.orElse(decode(text), () => O.map(decodeV1(text), fromV1))
+        if (O.isNone(found)) storage.removeItem(key)
+        return found
+      })
+    ),
+    () => emptyConversation
+  )
 
 /** Writes the conversation. A refusal (a private window, a full disk) is ignored: only the refresh loses it. */
 export const writeConversation = (key: string, conversation: Conversation) => {
   const text = encode(conversation)
   if (O.isNone(text)) return
-  try {
-    localStorage.setItem(key, text.value)
-  } catch {
-    // Kept in memory only.
-  }
+  // Refused: kept in memory only.
+  conversations.write(key, text.value)
 }

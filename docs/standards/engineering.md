@@ -29,6 +29,10 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   (oxlint's `no-restricted-globals` refuses `new Map(` and `new Set(`).
 - **No deprecated API is used**, a library's or our own ([deprecated APIs](deprecated-apis.md)). Check: `bun run
   check` (`deprecated:check`).
+- **No `try` statement**, in any code file or a doc comment's example: `Effect.try` or `Effect.tryPromise` with a
+  typed `catch` inside an Effect, `Result.try` or `Option.liftThrowable` outside one, `Effect.ensuring` or
+  `Effect.acquireUseRelease` for a `finally` ([no try statement](no-try.md)). `apps/inventory/public/theme-init.js`
+  is the one file allowed one. Check: `bun run check` (`try:check`).
 - **`bun` is the only package manager** (`bun run`, `bun install`, `bunx`). Check: `packageManager` in
   `package.json` names bun, and `bun.lock` is the only lockfile.
 - **Migrations before features**, and **deployable at every commit**, deployed only when I ask. Check: `bun run

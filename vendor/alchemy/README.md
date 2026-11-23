@@ -4,7 +4,7 @@
 `main`. Its registry, `https://pkg.alchemy.run`, serves a build of every commit of `main` and deletes it a week after
 `main` has moved on. So the build this repository uses is kept here, and an install needs that registry for nothing.
 
-`packages/infra` uses `alchemy`, `@alchemy.run/cloudflare` and `@alchemy.run/github`. The model of the review in
+`packages/infra` uses `alchemy`, `@alchemy.run/cloudflare`, `@alchemy.run/github` and `@alchemy.run/1password`. The model of the review in
 `packages/catalog/model`, and the test in `packages/catalog/web` that holds it against the review region, use
 `@alchemy.run/domain`, which is the reason for the pin. All of them come from the same commit because one
 `node_modules` holds one `alchemy`.
@@ -12,10 +12,11 @@
 ## What is here
 
 <!-- pin:start (written by repin.py from sources.json; do not edit by hand) -->
-The commit is `734c27a` of the library's `main`, pinned on 2026-11-22: 17 packages, 38.7 MB as files.
+The commit is `734c27a` of the library's `main`, pinned on 2026-11-22: 18 packages, 38.7 MB as files.
 
 | Package | Version | Licence | Size | Sibling addresses replaced |
 | --- | --- | --- | ---: | ---: |
+| `@alchemy.run/1password` | 2.0.0-beta.87 | Apache-2.0 | 22.8 kB | 1 |
 | `@alchemy.run/acme` | 2.0.0-beta.87 | Apache-2.0 | 61.8 kB | 2 |
 | `@alchemy.run/cloudflare` | 2.0.0-beta.87 | Apache-2.0 | 3.8 MB | 11 |
 | `@alchemy.run/cloudflare-runtime` | 2.0.0-beta.87 | Apache-2.0 | 1.6 MB | 2 |
@@ -85,12 +86,19 @@ fails:
 7. Checks that the files, `sources.json`, the overrides, the workspaces, `bun.lock` and this page agree, that
    `bun.lock` names nothing by `pkg.alchemy.run`, and that no patch is registered for a file that is not pinned.
 8. Installs a copy of the working tree with an empty cache through a proxy that refuses `pkg.alchemy.run`, and fails
-   if the install asked for it, changed `bun.lock` or put anything else in place than the files here.
-9. Checks that every patch is installed (`bun run beep patches check`) and that each one's test still fails without
-   it (`bun run beep patches prove`).
+   if the install asked for it, changed `bun.lock`, left a pinned package out, installed another version of one, or
+   installed a rewritten package without this commit's notice. It reads each package where it sits at the top of
+   `node_modules`; that each comes from its file here is the lockfile's, which names each by its file and hash, is
+   installed frozen and must come out unchanged.
+9. Checks that every patch is installed (`bun run beep patches check`) and that each one's test still fails with
+   that patch alone left out (`bun run beep patches prove`).
 10. Runs `bun run check:full -- --force`: every type-check, test and proof again, nothing replayed from the cache.
     The library's `main` breaks code between releases, so a failure here is the library's change to read and answer
     in the code, never a reason to keep the old result.
+
+The move starts only when the files it rewrites (the root `package.json`, `bun.lock`, the workspaces' manifests, the
+patches, this folder) are as committed, and names the ones that are not: the way back after step 10 is `git
+checkout`, which would take an uncommitted change to one of them with the pin.
 
 A step from 1 to 9 that fails puts every file it changed back as it was and runs `bun install` again, so the old pin
 stands. Step 10 failing leaves the pin moved, and prints the one line that goes back instead. Adding

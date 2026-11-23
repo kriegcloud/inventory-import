@@ -1,0 +1,32 @@
+{
+  // The atoms rule on the vendored kit (goals/atoms, "The kit on atoms"): no effect hook, and no state hook where an
+  // atom can do the job, read only in the kit files that have moved to atoms. The design lints of `.oxlintrc.json`
+  // cannot hold here (these components are the design system), so this profile extends the atoms rule alone. Each
+  // batch adds the files it moves in the change that moves them, so a moved file cannot take a hook back; after the
+  // last batch the list is the two folders. A file listed here and changed from its registry says so on its first line.
+  "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["../../.oxlintrc.atoms.json"],
+  "ignorePatterns": [
+    "**/*",
+    "!src/",
+    "!src/hooks/",
+    "!src/components/",
+    "!src/components/data-table/",
+    // Batch 1, the data table.
+    "!src/hooks/use-data-table.ts",
+    "!src/hooks/use-debounced-callback.ts",
+    "!src/components/data-table/data-table-state.ts",
+    "!src/components/data-table/data-table-records.tsx",
+    "!src/components/data-table/data-table-toolbar.tsx",
+    "!src/components/data-table/data-table-view-options.tsx",
+    "!src/components/data-table/data-table-sort-menu.tsx",
+    "!src/components/data-table/data-table-filter-menu.tsx",
+    "!src/components/data-table/data-table-slider-filter.tsx",
+    "!src/components/data-table/data-table-range-filter.tsx",
+    "!src/components/data-table/data-table-date-filter.tsx",
+    "!src/components/faceted.tsx",
+    "!src/components/sortable.tsx",
+    "!src/components/calendar.tsx",
+    "!src/components/slider.tsx"
+  ]
+}

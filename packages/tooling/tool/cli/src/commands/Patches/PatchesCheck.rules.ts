@@ -1,7 +1,8 @@
 /**
  * `patches check`: every patch to a dependency is one the repository can stand behind (docs/patches.md).
  *
- * - **It says what it is.** Each patch has its header, every field filled, and the test its header names exists.
+ * - **It says what it is.** Each patch has its header, every field filled, and the test its header names exists and
+ *   is no other patch's.
  * - **It is for what is installed.** `bun.lock` holds the resolution the header names. bun only warns about a patch
  *   whose package has moved on, and installs the package unpatched.
  * - **It applies.** For a package kept as a file, each patch is applied to the unpacked file, in order, with no
@@ -9,6 +10,9 @@
  * - **bun reads it.** The file bun is given is the package's patches one after another, and the root's
  *   `patchedDependencies` names that file for that resolution, and nothing else.
  * - **It is installed.** What is in `node_modules` holds every change the patches make.
+ * - **Nothing runs on an install that is behind.** Every task of the root's `turbo.json` that a package runs waits
+ *   for `//#patches:installed`, itself or through a task it depends on, and so does a package's own task that states
+ *   what it depends on. A task that does not could run on the package as it was and be replayed after the install.
  *
  * @packageDocumentation
  */
@@ -21,14 +25,14 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
+import { decodeJsonc } from "../../Sync.rules.ts"
 import { notYetReported, PatchedManifest, patchesFolder } from "./Patches.schema.ts"
 import {
   applyEach,
   builtText,
-  gitApply,
   headerOf,
+  holdsPatches,
   inTempFolder,
-  installedAt,
   isKeptFile,
   type PatchFile,
   type PatchSet,
@@ -60,6 +64,11 @@ export const PatchesCheckFinding = S.TaggedUnion({
     upstream: S.String.pipe(S.annotateKey({ description: "What the header says under Upstream" }))
   },
   NoTest: { patch, test: S.String.pipe(S.annotateKey({ description: "The test the header names, from the root" })) },
+  SharedTest: {
+    patch,
+    test: S.String.pipe(S.annotateKey({ description: "The test the header names, from the root" })),
+    first: S.String.pipe(S.annotateKey({ description: "The patch that names the same test before it" }))
+  },
   Mixed: { folder: S.String.pipe(S.annotateKey({ description: "The package's folder of patches, from the root" })) },
   BuiltDiffers: {
     built: S.String.pipe(S.annotateKey({ description: "The file bun reads, from the root" })),
@@ -89,6 +98,10 @@ export const PatchesCheckFinding = S.TaggedUnion({
     name: S.String.pipe(S.annotateKey({ description: "The package" })),
     built: S.String.pipe(S.annotateKey({ description: "The file bun reads, from the root" }))
   },
+  NotWaiting: {
+    file: S.String.pipe(S.annotateKey({ description: "The turbo.json, from the root" })),
+    task: S.String.pipe(S.annotateKey({ description: "The task that does not wait for the install to be read" }))
+  },
   Failed: { problems: S.Int.pipe(S.annotateKey({ description: "How many problems were found" })) }
 }).pipe($I.annoteSchema("PatchesCheckFinding", { description: "Every patch in order, or each way one is not" }))
 
@@ -98,6 +111,13 @@ export const PatchesCheckFinding = S.TaggedUnion({
  * @category models
  */
 export type PatchesCheckFinding = typeof PatchesCheckFinding.Type
+
+/**
+ * The root task every run of code waits for: what is installed holds what the patches write (`patches installed`).
+ *
+ * @category models
+ */
+export const installedTask = "//#patches:installed"
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
@@ -129,6 +149,10 @@ export const patchesCheckSentence: (finding: PatchesCheckFinding) => Line = Patc
     ),
   NoTest: ({ patch: file, test }) =>
     err(`${file}: its header names the test ${test}, which is not there. A patch has a test that fails without it`),
+  SharedTest: ({ patch: file, test, first }) =>
+    err(
+      `${file}: its header names the test ${test}, which is ${first}'s. A patch has a test of its own: what fails without one patch shows nothing about another`
+    ),
   Mixed: ({ folder }) =>
     err(
       `${folder}: its patches name more than one package or resolution. A folder holds the patches of one package at one resolution`
@@ -157,10 +181,17 @@ export const patchesCheckSentence: (finding: PatchesCheckFinding) => Line = Patc
     err(`${file}: no longer applies to ${to} (${said}). Re-make the patch, or drop it if the library fixed the defect`),
   NotInPlace: ({ name, built }) =>
     err(`node_modules/${name}: does not hold what ${built} writes, so the package runs unpatched. Run \`bun install\``),
+  NotWaiting: ({ file, task }) =>
+    err(
+      `${file}: the task "${task}" does not wait for ${installedTask}, so it can run on an install that is behind the patches and be replayed after \`bun install\` as if it had run with them. Add "${installedTask}" to its dependsOn, or to a task it depends on`
+    ),
   Failed: ({ problems }) => err(`patches:check failed: ${plural(problems, "problem", "problems")}`)
 })
 
 const named = /^\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.patch$/
+// An address a person can open: a host, and a path on it. `https://` alone, or a host with nothing after it, names
+// no issue and no pull request.
+const address = /^https:\/\/[^\s/]+\.[^\s/]+\/\S+$/
 const one = (finding: PatchesCheckFinding) => A.of(finding)
 const none = A.empty<PatchesCheckFinding>()
 const { cases } = PatchesCheckFinding
@@ -182,7 +213,7 @@ const ofItself = Effect.fn("PatchesCheck.ofItself")(function* (file: PatchFile) 
     O.match(file.read.header, {
       onNone: () => none,
       onSome: (header) =>
-        header.upstream === notYetReported || Str.startsWith("https://")(header.upstream)
+        header.upstream === notYetReported || address.test(header.upstream)
           ? none
           : one(cases.UpstreamUnclear.make({ patch: file.file, upstream: header.upstream }))
     }),
@@ -191,6 +222,85 @@ const ofItself = Effect.fn("PatchesCheck.ofItself")(function* (file: PatchFile) 
       onSome: (path) => (testThere ? none : one(cases.NoTest.make({ patch: file.file, test: path })))
     })
   ])
+})
+
+/** The parts of a `turbo.json` that say which task waits for which. */
+class TurboTasks extends S.Class<TurboTasks, { readonly brand: unique symbol }>($I`TurboTasks`)(
+  {
+    tasks: S.Record(
+      S.String,
+      S.Struct({
+        dependsOn: S.Array(S.String).pipe(
+          S.optionalKey,
+          S.annotateKey({ description: "The tasks this one waits for: `name`, `^name`, `package#name` or `//#name`" })
+        )
+      })
+    ).pipe(S.optionalKey, S.annotateKey({ description: "The tasks, a root task as //#name" }))
+  },
+  $I.annote("TurboTasks", { description: "Which task of a turbo.json waits for which" })
+) {}
+
+/**
+ * Whether a task waits for the install to be read: it names the root task, or a task it waits for does. A task is
+ * looked up in the root's `turbo.json` by the name it is waited for under, without the `^` of "in the packages
+ * this one depends on".
+ *
+ * @example
+ * waits({ transit: ["^transit", "//#patches:installed"], test: ["transit"], prove: [] })(["transit"]) // true
+ *
+ * @category rules
+ */
+export const waits =
+  (root: Readonly<Record<string, ReadonlyArray<string>>>) =>
+  (dependsOn: ReadonlyArray<string>): boolean => {
+    const reach = (names: ReadonlyArray<string>, seen: ReadonlyArray<string>): boolean =>
+      A.some(names, (written) => {
+        const name = Str.replace(/^\^/, "")(written)
+        if (name === installedTask) return true
+        if (A.contains(seen, name)) return false
+        return reach(
+          O.getOrElse(R.get(root, name), () => A.empty<string>()),
+          A.append(seen, name)
+        )
+      })
+    return reach(dependsOn, A.empty())
+  }
+
+/**
+ * Every task a package runs that does not wait for the install to be read: in the root's `turbo.json` each task
+ * that is not a root task, and in a package's own `turbo.json` each task that states what it waits for, which
+ * replaces what the root says for it. With no `turbo.json` at the root there is nothing to hold.
+ */
+const notWaiting = Effect.fn("PatchesCheck.notWaiting")(function* () {
+  const repo = yield* Repo
+  const rootFile = repo.join(repo.root, "turbo.json")
+  if (!(yield* repo.exists(rootFile))) return none
+  const read = Effect.fnUntraced(function* (absolute: string) {
+    const text = yield* repo.text(absolute)
+    const config = yield* decodeJsonc(TurboTasks)(repo.relative(repo.root, absolute), text)
+    return R.map(config.tasks ?? {}, (task) => task.dependsOn ?? A.empty<string>())
+  })
+  const root = yield* read(rootFile)
+  const reaches = waits(root)
+  const ofRoot = A.flatMap(R.toEntries(root), ([task, dependsOn]) =>
+    Str.startsWith("//#")(task) || reaches(dependsOn) ? none : one(cases.NotWaiting.make({ file: "turbo.json", task }))
+  )
+  const workspaces = yield* repo.workspaces
+  const perPackage = yield* Effect.forEach(
+    workspaces,
+    Effect.fnUntraced(function* (workspace) {
+      const absolute = repo.join(workspace.dir, "turbo.json")
+      if (!(yield* repo.exists(absolute))) return none
+      const text = yield* repo.text(absolute)
+      const file = repo.relative(repo.root, absolute)
+      const config = yield* decodeJsonc(TurboTasks)(file, text)
+      return A.flatMap(R.toEntries(config.tasks ?? {}), ([task, stated]) =>
+        stated.dependsOn === undefined || reaches(stated.dependsOn) ? none : one(cases.NotWaiting.make({ file, task }))
+      )
+    }),
+    { concurrency: 1 }
+  )
+  return A.appendAll(ofRoot, A.flatten(perPackage))
 })
 
 /**
@@ -243,9 +353,7 @@ export const patchesCheck = Effect.fn("PatchesCheck.patchesCheck")(function* () 
         cases.DoesNotApply.make({ patch: refused.value.patch.file, to: header.appliesTo, said: refused.value.said })
       )
     }
-    const installed = repo.join(repo.root, installedAt(header.package))
-    const inPlace =
-      (yield* repo.exists(installed)) && (yield* gitApply(installed, ["--check", "--reverse"], builtFile)).code === 0
+    const inPlace = yield* holdsPatches(header.package, set.built)
     return inPlace ? none : one(cases.NotInPlace.make({ name: header.package, built: set.built }))
   })
   const perSet = yield* Effect.forEach(sets, checkSet, { concurrency: 1 })
@@ -267,7 +375,22 @@ export const patchesCheck = Effect.fn("PatchesCheck.patchesCheck")(function* () 
     ),
     ([key, path]) => cases.Unexpected.make({ key, path })
   )
-  const problems = A.flatten([A.flatten(perSet), strays, unexpected])
+  // A test is one patch's: the first to name it keeps it, and each later one is told whose it is.
+  const naming = A.flatMap(sets, (set) =>
+    A.flatMap(set.patches, (file) =>
+      O.toArray(O.map(file.read.header, (header) => ({ patch: file.file, test: `${patchesFolder}/${header.test}` })))
+    )
+  )
+  const shared = A.flatMap(naming, (one, index) =>
+    O.toArray(
+      O.map(
+        A.findFirst(A.take(naming, index), (earlier) => earlier.test === one.test),
+        (earlier) => cases.SharedTest.make({ patch: one.patch, test: one.test, first: earlier.patch })
+      )
+    )
+  )
+  const waiting = yield* notWaiting()
+  const problems = A.flatten([A.flatten(perSet), shared, strays, unexpected, waiting])
   if (A.isReadonlyArrayNonEmpty(problems)) {
     return A.append<PatchesCheckFinding, PatchesCheckFinding>(
       problems,

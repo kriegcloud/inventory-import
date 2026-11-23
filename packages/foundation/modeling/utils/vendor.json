@@ -112,8 +112,14 @@
     {
       "path": "src/Number.ts",
       "sourceSha256": "ba4d025d94c7344b57557800b24c25dc72fb64ce4c969aea999952194c863d81",
-      "sha256": "ba4d025d94c7344b57557800b24c25dc72fb64ce4c969aea999952194c863d81",
-      "rewrites": []
+      "sha256": "fae53e1fc0b3b569d1eac8e4ad56fd51cf98c30770bf41933a7cc6b49b27f6db",
+      "rewrites": [],
+      "patches": [
+        {
+          "change": " * import { makeCapAssertion } from \"@beep/utils/Number\"\n *\n * const assertCap = makeCapAssertion(\"@beep/example\", (message) => new Error(message))\n *\n * console.log(assertCap(\"maxDepth\", 256)) // 256\n * console.log(assertCap(64)(\"maxDepth\")) // 64\n * try {\n *   assertCap(\"maxDepth\", 0)\n * } catch (error) {\n *   console.log(String(error)) // Error: @beep/example internal cap maxDepth must be a positive integer, received 0\n * } ->  * import * as Result from \"effect/Result\"\n * import { makeCapAssertion } from \"@beep/utils/Number\"\n *\n * const assertCap = makeCapAssertion(\"@beep/example\", (message) => new Error(message))\n *\n * console.log(assertCap(\"maxDepth\", 256)) // 256\n * console.log(assertCap(64)(\"maxDepth\")) // 64\n * const refused = Result.try({ try: () => assertCap(\"maxDepth\", 0), catch: String })\n * if (Result.isFailure(refused)) {\n *   console.log(refused.failure) // Error: @beep/example internal cap maxDepth must be a positive integer, received 0\n * }",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The example reads the refusal with Result.try. Unnecessary once beep-effect's example does."
+        }
+      ]
     },
     {
       "path": "src/Option.ts",
@@ -178,8 +184,18 @@
     {
       "path": "src/Utils.ts",
       "sourceSha256": "970021956007b94933ad8588b23bddfe34abbf6e2eac07b71df918a281a21a0b",
-      "sha256": "970021956007b94933ad8588b23bddfe34abbf6e2eac07b71df918a281a21a0b",
-      "rewrites": []
+      "sha256": "507eec97c8e0bb96c2e4fe931ff2850df4d1b9e49c8f7430b2401e67322f08ff",
+      "rewrites": [],
+      "patches": [
+        {
+          "change": "import * as GlobalValue from \"./GlobalValue.ts\"; -> import * as Result from \"effect/Result\";\nimport * as GlobalValue from \"./GlobalValue.ts\";",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. Result, for structuralRegion's patch below. Unnecessary once beep-effect's Utils.ts imports it itself."
+        },
+        {
+          "change": "  try {\n    return body();\n  } finally {\n    structuralRegionState.enabled = current;\n    structuralRegionState.tester = currentTester;\n  }\n}; ->   // The region ends whether `body` returns or throws; what it threw is thrown on unchanged.\n  const outcome = Result.try({ try: body, catch: (thrown) => ({ thrown }) });\n  structuralRegionState.enabled = current;\n  structuralRegionState.tester = currentTester;\n  return Result.getOrThrowWith(outcome, ({ thrown }) => thrown);\n};",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. structuralRegion restores the region with Result.try where upstream has try and finally; the body's answer, and what it throws, are the same. Unnecessary once beep-effect's structuralRegion does."
+        }
+      ]
     },
     {
       "path": "src/index.ts",
@@ -226,9 +242,19 @@
     {
       "path": "test/FileSystem.test.ts",
       "sourceSha256": "c68d63dd8cc6d865581425a7877451444a7574a4bb1a34143074d0848c3157cd",
-      "sha256": "9abfeef160811b208bb1750b31a6790d57f637a7466c5a7aa3289faa1499a202",
+      "sha256": "9fb7f30e9b2cf0a4d076210972268dc264b88ad853b39d2ca3980ce7e92f8ad0",
       "rewrites": [
         "@beep/test-runner -> @effect/vitest"
+      ],
+      "patches": [
+        {
+          "change": "      try {\n        expect((yield* FileSystem.statSync(\"socket\")).type).toBe(\"Socket\");\n      } finally {\n        stat.mockRestore();\n        socket.mockRestore();\n        directory.mockRestore();\n      } ->       const found = yield* FileSystem.statSync(\"socket\").pipe(\n        Effect.ensuring(\n          Effect.sync(() => {\n            stat.mockRestore();\n            socket.mockRestore();\n            directory.mockRestore();\n          })\n        )\n      );\n      expect(found.type).toBe(\"Socket\");",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The spies are restored with Effect.ensuring where upstream has try and finally. Unnecessary once beep-effect's test does."
+        },
+        {
+          "change": "      try {\n        const error = yield* Effect.flip(FileSystem.statSync(\"unavailable.txt\"));\n        expect(error.reason._tag).toBe(\"Unknown\");\n        expect(error.reason.method).toBe(\"statSync\");\n        expect(error.reason.cause).toBe(cause);\n      } finally {\n        stat.mockRestore();\n      } ->       const error = yield* Effect.flip(FileSystem.statSync(\"unavailable.txt\")).pipe(\n        Effect.ensuring(Effect.sync(() => stat.mockRestore()))\n      );\n      expect(error.reason._tag).toBe(\"Unknown\");\n      expect(error.reason.method).toBe(\"statSync\");\n      expect(error.reason.cause).toBe(cause);",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. As the patch above. Unnecessary once beep-effect's test does."
+        }
       ]
     },
     {
@@ -282,9 +308,19 @@
     {
       "path": "test/Schema.test.ts",
       "sourceSha256": "0ad82177a6fef8836c94a6cac2c0e3944aef6edf16ba3b93bffde385449efc64",
-      "sha256": "1648883023ebdfeb947af2637c5f859b67dbd255b4c3fdfbb1a4088203d1d0fe",
+      "sha256": "90a54e5ea85cc8cea54ace04764fb5d0f9a2cd3436519f0d1ba02fb6451dbee3",
       "rewrites": [
         "@beep/test-runner -> @effect/vitest"
+      ],
+      "patches": [
+        {
+          "change": "import * as Effect from \"effect/Effect\";\n -> import * as Effect from \"effect/Effect\";\nimport * as O from \"effect/Option\";\nimport * as Result from \"effect/Result\";\n",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. Option and Result, for captureError's patch below. Unnecessary once beep-effect's test imports them."
+        },
+        {
+          "change": "const captureError = (assertion: () => void): Error => {\n  try {\n    assertion();\n  } catch (error) {\n    if (error instanceof Error) return error;\n  }\n  throw new Error(\"Expected assertion to throw an Error\");\n}; -> const captureError = (assertion: () => void): Error => {\n  const thrown = Result.try({\n    try: assertion,\n    catch: (error) => (error instanceof Error ? O.some(error) : O.none()),\n  });\n  if (Result.isFailure(thrown) && O.isSome(thrown.failure)) return thrown.failure.value;\n  throw new Error(\"Expected assertion to throw an Error\");\n};",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. captureError reads the throw with Result.try where upstream has a try statement. Unnecessary once beep-effect's test does."
+        }
       ]
     },
     {
@@ -315,9 +351,15 @@
     {
       "path": "test/TaggedError.equivalence.test.ts",
       "sourceSha256": "610eb50017ba5936fd554ad0dd0425ae8b5a7273de80d49fd3434e31df299e6f",
-      "sha256": "dc908337bb722a27ae382a7307eb7303389a4ff6dc761adf6c7513810a6d1081",
+      "sha256": "359e25fc3f85dcbdc8b0661f293812ae54c238d531631d5931d93e608437acbe",
       "rewrites": [
         "@beep/test-runner -> @effect/vitest"
+      ],
+      "patches": [
+        {
+          "change": "      try {\n        const fileSystemFirst = yield* captureEffectDefect(FileSystem.existsSync(\"missing\"));\n        const fileSystemSecond = yield* captureEffectDefect(FileSystem.existsSync(\"missing\"));\n        const pathFirst = capture(() => Path.join(\"one\", \"two\"));\n        const pathSecond = capture(() => Path.join(\"one\", \"two\"));\n        const urlFirst = capture(() => NodeUrl.fileURLToPath(\"file:///tmp/one\"));\n        const urlSecond = capture(() => NodeUrl.fileURLToPath(\"file:///tmp/one\"));\n\n        expectPrivateEquivalence(fileSystemFirst, fileSystemSecond, pathFirst);\n        expectPrivateEquivalence(pathFirst, pathSecond, urlFirst);\n        expectPrivateEquivalence(urlFirst, urlSecond, fileSystemFirst);\n      } finally {\n        if (P.isNotUndefined(descriptor)) {\n          Reflect.defineProperty(globalThis.process, \"getBuiltinModule\", descriptor);\n        }\n      } ->       yield* Effect.gen(function* () {\n        const fileSystemFirst = yield* captureEffectDefect(FileSystem.existsSync(\"missing\"));\n        const fileSystemSecond = yield* captureEffectDefect(FileSystem.existsSync(\"missing\"));\n        const pathFirst = capture(() => Path.join(\"one\", \"two\"));\n        const pathSecond = capture(() => Path.join(\"one\", \"two\"));\n        const urlFirst = capture(() => NodeUrl.fileURLToPath(\"file:///tmp/one\"));\n        const urlSecond = capture(() => NodeUrl.fileURLToPath(\"file:///tmp/one\"));\n\n        expectPrivateEquivalence(fileSystemFirst, fileSystemSecond, pathFirst);\n        expectPrivateEquivalence(pathFirst, pathSecond, urlFirst);\n        expectPrivateEquivalence(urlFirst, urlSecond, fileSystemFirst);\n      }).pipe(\n        Effect.ensuring(\n          Effect.sync(() => {\n            if (P.isNotUndefined(descriptor)) {\n              Reflect.defineProperty(globalThis.process, \"getBuiltinModule\", descriptor);\n            }\n          })\n        )\n      );",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The process is restored with Effect.ensuring where upstream has try and finally. Unnecessary once beep-effect's test does."
+        }
       ]
     }
   ],

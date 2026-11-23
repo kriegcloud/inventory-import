@@ -61,17 +61,24 @@ const rowOf = (result: Review, rowNumber: number) =>
   O.getOrThrow(A.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
 
 describe("a second import", () => {
-  it.effect("keeps a row whose SKU is stored but which does not read yet out of Already there, with its reason", () =>
-    Effect.gen(function* () {
-      const first = yield* reviewed([line({ sku: "AWP-1853" }), line({ sku: "TBD-0002" })])
-      const stored = A.getSomes(A.map(first.rows, (row) => O.fromNullishOr(row.item)))
-      expect(stored.length).toBe(2)
-      // The same two SKUs again: one in lower case (a proposal is open), one with a cost nobody can read.
-      const again = yield* reviewed([line({ sku: "awp-1853" }), line({ sku: "TBD-0002", cost: "TBD" })], stored)
-      expect([again.counts.already, again.counts.decision, again.counts.cannot]).toEqual([0, 1, 1])
-      expect(rowOf(again, 2).reason).toContain("awp-1853")
-      expect(rowOf(again, 3).reason).toBe('Unit cost "TBD" is not an amount in dollars written as digits.')
-    })
+  it.effect(
+    "counts a row whose SKU reads and is stored as Already there though another cell does not read, and keeps a SKU that does not read yet waiting",
+    () =>
+      Effect.gen(function* () {
+        const first = yield* reviewed([line({ sku: "AWP-1853" }), line({ sku: "TBD-0002" })])
+        const stored = A.getSomes(A.map(first.rows, (row) => O.fromNullishOr(row.item)))
+        expect(stored.length).toBe(2)
+        // The same two SKUs again: one in lower case (its own proposal is open), one with a cost nobody can read.
+        const again = yield* reviewed([line({ sku: "awp-1853" }), line({ sku: "TBD-0002", cost: "TBD" })], stored)
+        expect([again.counts.already, again.counts.decision, again.counts.cannot]).toEqual([1, 1, 0])
+        expect(rowOf(again, 2).reason).toContain("awp-1853")
+        // The item is stored: the row adds nothing, and its unread cost is not asked for.
+        expect([rowOf(again, 3).status, rowOf(again, 3).reason, rowOf(again, 3).item]).toEqual([
+          "already",
+          "SKU TBD-0002 is already there. It is skipped, not changed.",
+          null
+        ])
+      })
   )
 })
 

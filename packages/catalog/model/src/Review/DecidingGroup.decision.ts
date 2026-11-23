@@ -143,21 +143,9 @@ export class DecidingGroup extends Domain.Decision(
       TheImportsEventSaysHowManyRows: ({ command, events }) =>
         A.every(events, (e) => !isGroupCounted(e) || e.rows === command.count),
       // Who may change a group. The group has no command of its own, so these are rules of the decisions that record
-      // on it: only its maker takes it back, only its own organization changes it, and a viewer changes none.
-      NobodyUndoesAnotherPersonsGroup: Effect.fn("DecidingGroup.NobodyUndoesAnotherPersonsGroup")(function* ({
-        before,
-        after
-      }) {
-        if (
-          !isDecidedGroup(before.group) ||
-          !isDecidedGroup(after.group) ||
-          after.group.undoneAt === before.group.undoneAt
-        ) {
-          return true
-        }
-        const actor = yield* CurrentActor
-        return actor.memberId === before.group.by
-      }),
+      // on it: only its own organization changes it, and a viewer changes none. "Nobody undoes another person's
+      // group" is the undo's rule and not stated here: deciding a group never takes one back, so it could not fail
+      // in this decision.
       OnlyItsOwnOrganizationChangesTheGroup: Effect.fn("DecidingGroup.OnlyItsOwnOrganizationChangesTheGroup")(
         function* ({ before }) {
           if (isUntouchedGroup(before.group)) return true

@@ -12,7 +12,10 @@
 // `covered` and `asItReads` are the sender's word: the model cannot check them, so the screen must work them out from
 // what it has received, as the fold does. So a covered act that reads so is no change only once `saw` and the
 // matching pass: from a screen that is behind it is refused and held, not lost. The one thing not to break: every
-// check here that refuses an act has its rule below, so a check that is removed breaks a named rule under Verify.
+// check here that stands between an act and its record has its rule below, so one that is removed breaks a named rule
+// under Verify. The checks that choose between "no change" and a refusal, for an act that records nothing either way
+// (a press from a screen that is behind, a press sent twice), have none: a rule is checked only where something is
+// recorded. Each of those is held by a story and a mutant (mutants/README.md).
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -35,6 +38,7 @@ import {
   leavesAsItIs,
   MOST_BELOW,
   NO_DECISION,
+  onItsMatching,
   Row,
   RowDecided,
   type RowState,
@@ -48,11 +52,30 @@ export class DecidedSince extends Domain.Rejection(
   { by: S.String, change: Change },
   { description: "Someone decided the row since the sender last saw it: whose decision is there" }
 ) {}
+/**
+ * The decision its sender saw was taken back, and the row holds an older one again: whose it is and the change that
+ * recorded it. Nobody decided the row since; the one who made the decision the sender saw took it back.
+ */
+export class PutBackSince extends Domain.Rejection(
+  "PutBackSince",
+  { by: S.String, change: Change },
+  { description: "The decision the sender saw was taken back, and an older one is there again: whose" }
+) {}
 /** The decision its sender saw is no longer there, and the row has none. */
 export class NoLongerThere extends Domain.Rejection(
   "NoLongerThere",
   {},
   { description: "The decision the sender saw on the row was taken back" }
+) {}
+/**
+ * An undo was taken on the row that the sender's screen has not received: who took it, and the change it took back.
+ * A press drawn before the undo may name exactly what the row holds again, so the number of the row's decision does
+ * not tell it from a press made after: the last undo the screen has received does.
+ */
+export class UndoneSince extends Domain.Rejection(
+  "UndoneSince",
+  { by: S.String, change: Change },
+  { description: "An undo landed on the row that the sender's screen had not received: whose, and of which change" }
 ) {}
 /**
  * An act on a group of rows was recorded that the sender's screen has not received. It hands back no number: the
@@ -62,6 +85,18 @@ export class GroupedSince extends Domain.Rejection(
   "GroupedSince",
   {},
   { description: "An act on a group of rows landed that the sender's screen had not received" }
+) {}
+/**
+ * A later act on a group is still in force over what is being taken back. `last` is the import's last group in
+ * force, the one to take back first: groups are taken back last first. For a group's undo it is the group over this
+ * one. For a row's undo, whose sender says a group covers the row since its decision, it is that group or one made
+ * after it: the model keeps no reading of a group's rows, so it cannot say which. In both, the later act was drawn on
+ * a screen that had this one.
+ */
+export class GroupedAfter extends Domain.Rejection(
+  "GroupedAfter",
+  { last: Change },
+  { description: "A later act on a group is still in force: the number of the import's last group in force" }
 ) {}
 
 /** What an act is called on screen, kept with it for the history. */
@@ -73,7 +108,8 @@ export const Label = S.String.check(S.isMaxLength(200)).annotate({ description: 
  * `asItReads`: on such a row, the act leaves it reading as it reads now through its groups, so it changes nothing.
  * Both are the sender's word, worked out by the screen from what it received. `opening`: how many times the import
  * had been confirmed when the act was made. `saw`: the change that recorded the decision the sender saw on the row,
- * or 0 for none. `madeOn`: the import's matching the act was made on, whatever it decides.
+ * or 0 for none. `sawUndone`: the change the row's last undo took back, as the sender's screen has it, or 0 for
+ * none. `madeOn`: the import's matching the act was made on, whatever it decides.
  */
 export class DecideRow extends Domain.Command(
   "DecideRow",
@@ -88,12 +124,23 @@ export class DecideRow extends Domain.Command(
       asItReads: S.Boolean,
       opening: S.Int,
       saw: Change,
+      sawUndone: Change,
       flags: Flags,
       madeOn: S.Int,
       label: Label
     },
     events: [RowDecided, ActCounted],
-    rejects: [NotOpen, NotPermitted, ConfirmedSince, GroupedSince, DecidedSince, NoLongerThere, MatchedSince]
+    rejects: [
+      NotOpen,
+      NotPermitted,
+      ConfirmedSince,
+      GroupedSince,
+      DecidedSince,
+      PutBackSince,
+      NoLongerThere,
+      MatchedSince,
+      UndoneSince
+    ]
   },
   { description: "Decide one row of an import's review, naming the decision the sender saw there" }
 ) {}
@@ -106,23 +153,40 @@ const isActCounted = (event: DecidingEvent): event is ActCounted =>
 
 /**
  * The act would leave the row reading as it reads: on a row a group in force covers since its own decision, as its
- * sender says (`asItReads`); on any other, its text is what the row's own instance holds.
+ * sender says (`asItReads`); on any other, its text and its matching are what the row's own instance holds.
  */
 const changesNothing = (act: {
   readonly row: RowState
-  readonly command: { readonly flags: string; readonly covered: boolean; readonly asItReads: boolean }
-}): boolean => (act.command.covered ? act.command.asItReads : leavesAsItIs({ row: act.row, flags: act.command.flags }))
+  readonly command: {
+    readonly flags: string
+    readonly madeOn: number
+    readonly covered: boolean
+    readonly asItReads: boolean
+  }
+}): boolean =>
+  act.command.covered
+    ? act.command.asItReads
+    : leavesAsItIs({ row: act.row, flags: act.command.flags, madeOn: act.command.madeOn })
+
+/** The act's sender has seen what the row holds: its decision, by the number of the change, or that it has none. */
+const sawIt = (act: { readonly row: RowState; readonly command: { readonly saw: number } }): boolean =>
+  isDecided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
 
 /**
- * The act would leave the row as its own instance holds it, and no group in force covers the row since: no change,
- * whatever the sender has seen. A covered act that changes nothing is no change only once its sender is shown to have
- * seen the row's decision and the matching now (2026-11-22: "Same: hold, show both"): otherwise a press from a screen
- * that is behind, which reads the row through a group as it read before, would be lost as "no change".
+ * The row holds this very act already: this step, from this person, with this text on the matching it was made on. A
+ * copy of a press that was recorded is known by it, and is answered as the first time, with nothing new.
  */
-const sameAsItsOwn = (act: {
+const holdsThisAct = (act: {
   readonly row: RowState
-  readonly command: { readonly flags: string; readonly covered: boolean }
-}): boolean => !act.command.covered && leavesAsItIs({ row: act.row, flags: act.command.flags })
+  readonly step: string
+  readonly by: string
+  readonly flags: string
+  readonly madeOn: number
+}): boolean =>
+  isDecided(act.row) &&
+  act.row.step === act.step &&
+  act.row.by === act.by &&
+  onItsMatching(act.row) === onItsMatching(act)
 
 /** One act of the review: read from the import and the row, recorded on both or on neither. */
 export class Deciding extends Domain.Decision(
@@ -143,8 +207,27 @@ export class Deciding extends Domain.Decision(
       ) {
         return yield* new NotPermitted({})
       }
-      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
-      if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})
+      // The same press sent again: the row holds this very act already, and it is written once. Its sender is answered
+      // as the first time, with nothing new, whatever landed on the import between the two sendings: a confirm and a
+      // reopening, or an act on a group, which the copy cannot have seen (2026-11-22, by the rule on a press from a
+      // screen that is behind; a row's undo sent twice is answered the same way). It is asked inside each refusal, so
+      // that its comparisons are not taken on every way through this `decide` by the prover.
+      if (cmd.opening !== life.state.confirms) {
+        if (
+          holdsThisAct({ row: row.state, step: cmd.step, by: actor.memberId, flags: cmd.flags, madeOn: cmd.madeOn })
+        ) {
+          return []
+        }
+        return yield* new ConfirmedSince({})
+      }
+      if (cmd.sawGroup !== life.state.lastGroup) {
+        if (
+          holdsThisAct({ row: row.state, step: cmd.step, by: actor.memberId, flags: cmd.flags, madeOn: cmd.madeOn })
+        ) {
+          return []
+        }
+        return yield* new GroupedSince({})
+      }
       // `covered` is asked once, and each side makes its own checks: the prover takes both sides of every question it
       // cannot settle, each time it is asked, and with `covered` asked again after the checks the relation of a row
       // to its import's organization is past 4,096 paths and no longer proved.
@@ -154,6 +237,14 @@ export class Deciding extends Domain.Decision(
         // held, not lost as "no change" (2026-11-22: "Same: hold, show both").
         if (isDecided(row.state)) {
           if (cmd.saw !== row.state.change) {
+            // The same press sent again: the row holds this very act already, and it is written once.
+            if (row.state.step === cmd.step && row.state.by === actor.memberId && row.state.flags === cmd.flags) {
+              return []
+            }
+            // What the sender saw was taken back and an older decision is there again, or someone decided since.
+            if (cmd.saw > row.state.change) {
+              return yield* new PutBackSince({ by: row.state.by, change: row.state.change })
+            }
             return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
           }
         } else if (cmd.saw !== 0) {
@@ -162,18 +253,49 @@ export class Deciding extends Domain.Decision(
         if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
         if (cmd.asItReads) return []
       } else {
-        // No group covers the row: what its own instance says already is no change, whoever decided it and whether
-        // or not the sender has seen it. Any other act is from a screen that has seen what is there.
+        // No group covers the row, by its sender's word: what the row's own instance says already, made on the same
+        // matching, is no change, whoever decided it. From a screen that has not seen what is there, that holds only
+        // while no group was made since: after one, the row may read through the group again (its later decision
+        // undone), and the press would put the row's own decision over the group. That one is refused and held
+        // (2026-11-22: "Hold it when behind"). Whatever it decides, an act made on an older matching is refused, and
+        // first, so the check is made once for the prover's paths; the same text made on a newer matching than the
+        // row's is a change. `saw` is asked once in each case of the row.
+        if (cmd.madeOn !== life.state.matching) {
+          // The same press sent again after a match landed: the row holds this very act already (this step, from
+          // this person, with this text on the matching it was made on). It is answered as the first time, with
+          // nothing new, not told it was made on an older matching.
+          if (
+            isDecided(row.state) &&
+            row.state.step === cmd.step &&
+            row.state.by === actor.memberId &&
+            onItsMatching(row.state) === onItsMatching(cmd)
+          ) {
+            return []
+          }
+          return yield* new MatchedSince({ matching: life.state.matching })
+        }
         if (isDecided(row.state)) {
-          if (row.state.flags === cmd.flags) return []
           if (cmd.saw !== row.state.change) {
+            if (onItsMatching(row.state) === onItsMatching(cmd) && row.state.change > life.state.lastGroup) return []
+            if (cmd.saw > row.state.change) {
+              return yield* new PutBackSince({ by: row.state.by, change: row.state.change })
+            }
             return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
           }
+          if (onItsMatching(row.state) === onItsMatching(cmd)) return []
         } else {
+          if (cmd.saw !== 0) {
+            if (cmd.flags === NO_DECISION && life.state.lastGroup === 0) return []
+            return yield* new NoLongerThere({})
+          }
           if (cmd.flags === NO_DECISION) return []
-          if (cmd.saw !== 0) return yield* new NoLongerThere({})
         }
-        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+      }
+      // An undo landed on the row that the sender's screen has not received. After an undo the row holds exactly what
+      // it held before the decision taken back, so a press drawn before it (a late copy of the very press that was
+      // taken back, too) names what the row holds and would be written again. It is refused and held.
+      if (cmd.sawUndone !== row.state.undone.change) {
+        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })
       }
       const change = life.state.changes + 1
       return [
@@ -212,13 +334,14 @@ export class Deciding extends Domain.Decision(
       ARowsActSawTheLastGroupAct: ({ before, command }) =>
         isOpen(before.life) && command.sawGroup === before.life.lastGroup,
       // A decision is replaced only by an act whose sender saw it, by the number of the change that recorded it.
-      ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) =>
-        sameAsItsOwn({ row: before.row, command }) ||
-        (isDecided(before.row) ? command.saw === before.row.change : command.saw === 0),
+      ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) => sawIt({ row: before.row, command }),
+      // And only by one whose sender has the row's last undo: the change it took back names it.
+      ADecisionIsMadeOnAScreenThatHasTheRowsLastUndo: ({ before, command }) =>
+        command.sawUndone === before.row.undone.change,
       // Whatever it decides, an act is made on the import's matching now; one made on an older matching is not
       // applied.
       AnActIsMadeOnTheMatchingNow: ({ before, command }) =>
-        sameAsItsOwn({ row: before.row, command }) || (isOpen(before.life) && command.madeOn === before.life.matching),
+        isOpen(before.life) && command.madeOn === before.life.matching,
       // An act that would leave the row's decision as it is records nothing: the row and the import are unchanged.
       AnActThatChangesNothingLeavesTheImport: ({ before, after, command }) =>
         !changesNothing({ row: before.row, command }) ||
@@ -299,15 +422,9 @@ export class Deciding extends Domain.Decision(
               ? CUT
               : seal({ level: before.row.under, below: before.row.below })),
       // Who may change a row. The row has no command of its own, so these are rules of the decisions that record on it.
-      // No act clears a decision: only an undo by its maker does.
-      NobodyClearsAnotherPersonsDecision: Effect.fn("Deciding.NobodyClearsAnotherPersonsDecision")(function* ({
-        before,
-        after
-      }) {
-        if (!isDecided(before.row) || isDecided(after.row)) return true
-        const actor = yield* CurrentActor
-        return actor.memberId === before.row.by
-      }),
+      // "Nobody clears another person's decision" is the undo's rule and not stated here: an act always leaves a
+      // decision on the row, so it could not fail in this decision. Who may replace one is the rule above: whoever
+      // saw it.
       OnlyItsOwnOrganizationChangesTheRow: Effect.fn("Deciding.OnlyItsOwnOrganizationChangesTheRow")(function* ({
         before
       }) {

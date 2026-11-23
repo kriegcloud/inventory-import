@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/src/Number.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/src/Number.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 /**
  * Numeric predicates and `effect/Number` re-exports.
  *
@@ -128,16 +128,16 @@ export type CapAssertion = {
  * **Example** (Validate a cap in both call forms)
  *
  * ```ts
+ * import * as Result from "effect/Result"
  * import { makeCapAssertion } from "@beep/utils/Number"
  *
  * const assertCap = makeCapAssertion("@beep/example", (message) => new Error(message))
  *
  * console.log(assertCap("maxDepth", 256)) // 256
  * console.log(assertCap(64)("maxDepth")) // 64
- * try {
- *   assertCap("maxDepth", 0)
- * } catch (error) {
- *   console.log(String(error)) // Error: @beep/example internal cap maxDepth must be a positive integer, received 0
+ * const refused = Result.try({ try: () => assertCap("maxDepth", 0), catch: String })
+ * if (Result.isFailure(refused)) {
+ *   console.log(refused.failure) // Error: @beep/example internal cap maxDepth must be a positive integer, received 0
  * }
  * ```
  *

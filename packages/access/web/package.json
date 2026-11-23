@@ -20,25 +20,25 @@
   },
   "dependencies": {
     "@beep/identity": "workspace:*",
-    "@effect/atom-react": "4.1.5",
+    "@effect/atom-react": "catalog:",
     "@inventory/access-contract": "workspace:*",
     "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "@inventory/ui": "workspace:*",
-    "better-auth": "1.7.22",
-    "effect": "4.1.5",
-    "sonner": "^2.0.8"
+    "better-auth": "catalog:",
+    "effect": "catalog:",
+    "sonner": "catalog:"
   },
   "devDependencies": {
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "oxlint": "1.93.0",
-    "tsrs": "7.1.0-beta.tsrs3",
-    "typescript": "~7.0.2"
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "oxlint": "catalog:",
+    "tsrs": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "beep": {
     "family": "context",

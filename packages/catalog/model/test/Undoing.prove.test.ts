@@ -1,5 +1,5 @@
 // Proves `Undoing`, the decision behind the undo of one row's act, for every state of the import and the row and
-// every input: its own 21 rules, and every rule of the two aggregates it records on. A rule that is no longer proved
+// every input: its own 28 rules, and every rule of the two aggregates it records on. A rule that is no longer proved
 // fails here by name, with the state and the command the solver found. The longest proof of the model, about twenty
 // seconds; it runs in `prove`, which turbo replays until the model's files or the pinned library change.
 import * as Prove from "@alchemy.run/domain/Prove"
@@ -22,12 +22,12 @@ layer(NodeServices.layer)("Undoing", (it) => {
       expect(notProved(standings(report)), said).toEqual([])
       // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
       // are there, and the ones about who may change a row or a group it states itself.
-      expect(missingRules(report), said).toEqual([])
+      expect(missingRules({ report, decision: Undoing }), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       expect(report.accepted, said).toBe(true)
       // Past 4,096 paths the prover proves nothing: a rule or a check that adds paths shows here first.
-      expect(report.paths, said).toBe(298)
+      expect(report.paths, said).toBe(364)
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.
       expect(report.unread).toEqual([])
       expect(report.unkept).toEqual([])

@@ -3,8 +3,11 @@
 // rows. Only its maker takes it back, once, and only while it is the last group still in force (Benjamin, 2026-11-22:
 // "Only the last group act"): a later group was drawn on a screen that had this one. Taking the last one back makes
 // the one that was under it the last in force again, so the groups are taken back in the order they were laid, one by
-// one. It does not reach past a confirm that stands, nor into another opening of the import. The one thing not to
-// break: every check here that refuses an undo has its rule below.
+// one. It does not reach past a confirm that stands, nor into another opening of the import, and it is taken only from
+// a screen that has every change of the import: a row decided since on a screen the sender has not received keeps
+// that person's whole decision when the group goes, and the sender is shown it first (2026-11-22, by the rule on a
+// press from a screen that is behind). The one thing not to break: every check here that refuses an undo has its
+// rule below.
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -12,28 +15,31 @@ import * as Match from "effect/Match"
 import * as S from "effect/Schema"
 import { CurrentActor, Session } from "../Actor/Actor.context.ts"
 import { Group, GroupUndone, isDecidedGroup, isUntouchedGroup } from "../Group/Group.aggregate.ts"
-import { ConfirmedSince, GroupCounted, Import, isOpen, NotOpen, NotPermitted } from "../Import/Import.aggregate.ts"
+import {
+  ConfirmedSince,
+  GroupCounted,
+  Import,
+  isOpen,
+  NotOpen,
+  NotPermitted,
+  ReviewMovedOn
+} from "../Import/Import.aggregate.ts"
 import { Change, ImportKey, Step } from "./Change.schema.ts"
+import { GroupedAfter } from "./Deciding.decision.ts"
 import { DecidedBeforeTheConfirm, NotYourStep } from "./Undoing.decision.ts"
-
-/** A later group is still in force over this one: its number. Take that one back first. */
-export class GroupedAfter extends Domain.Rejection(
-  "GroupedAfter",
-  { last: Change },
-  { description: "A later act on a group is still in force over this one: its number" }
-) {}
 
 /**
  * Take back one act on a group. `step` names the group; `undo` is the change that recorded it; `opening` is how many
- * times the import had been confirmed when the undo was made.
+ * times the import had been confirmed when the undo was made; `seen`: the screen has received every change of the
+ * import up to this number, as a group's act says.
  */
 export class UndoGroup extends Domain.Command(
   "UndoGroup",
   {
     middleware: [Session],
-    input: { importId: ImportKey, step: Step, undo: Change, opening: S.Int },
+    input: { importId: ImportKey, step: Step, undo: Change, opening: S.Int, seen: Change },
     events: [GroupUndone, GroupCounted],
-    rejects: [NotOpen, NotPermitted, ConfirmedSince, NotYourStep, DecidedBeforeTheConfirm, GroupedAfter]
+    rejects: [NotOpen, NotPermitted, ConfirmedSince, NotYourStep, DecidedBeforeTheConfirm, GroupedAfter, ReviewMovedOn]
   },
   { description: "Take back the sender's own act on a group of rows, while it is the last group in force" }
 ) {}
@@ -70,6 +76,11 @@ export class UndoingGroup extends Domain.Decision(
       // A later group is still in force: what that one did was drawn on a screen that had this one. Once it is taken
       // back, this one is the last in force again.
       if (group.state.change !== life.state.topGroup) return yield* new GroupedAfter({ last: life.state.topGroup })
+      // The sender's screen has not received every change. The model keeps no reading of a group's rows, so it cannot
+      // say whether what landed since is on one of them: a row another person decided since keeps that whole decision
+      // when the group goes, and the sender would learn it only after. Refused with the import's last change and
+      // held, as a group's act is; taken once the screen has it.
+      if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })
       const change = life.state.changes + 1
       return [
         group.record(new GroupUndone({ change })),
@@ -95,11 +106,18 @@ export class UndoingGroup extends Domain.Decision(
       ),
       AGroupsUndoIsOfThisOpening: ({ before, command }) =>
         isOpen(before.life) && command.opening === before.life.confirms,
+      // It is an undo of a group of the import it names: the group's key is built from the import's id and the step,
+      // and two pairs can build the same key.
+      AGroupsUndoIsOfAGroupOfTheImportItNames: ({ before, command }) =>
+        isDecidedGroup(before.group) && before.group.importId === command.importId,
       // Only the last group still in force is taken back; then the one that was under it is the last in force.
       OnlyTheLastGroupInForceIsTakenBack: ({ before }) =>
         isOpen(before.life) && isDecidedGroup(before.group) && before.group.change === before.life.topGroup,
       ThenTheOneUnderItIsTheLastInForce: ({ before, after }) =>
         !isDecidedGroup(before.group) || !isOpen(after.life) || after.life.topGroup === before.group.under,
+      // And only from a screen that has every change of the import, as a group is made on one.
+      AGroupsUndoIsMadeOnEveryChange: ({ before, command }) =>
+        isOpen(before.life) && command.seen === before.life.changes,
       AGroupIsTakenBackOnce: ({ before }) => isDecidedGroup(before.group) && before.group.undoneAt === 0,
       AGroupsUndoDoesNotReachPastAConfirm: ({ before }) =>
         isOpen(before.life) && isDecidedGroup(before.group) && before.group.change > before.life.confirmedAt,

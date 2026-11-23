@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/FileSystem.test.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/FileSystem.test.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 import * as NodeModule from "node:module";
 import * as NodeOS from "node:os";
 import { it } from "@effect/vitest";
@@ -183,13 +183,16 @@ it.layer(NodeCrypto.layer, { timeout: "5 seconds" })("FileSystem sync wrappers",
       const directory = vi.spyOn(stats, "isDirectory").mockReturnValue(false);
       const socket = vi.spyOn(stats, "isSocket").mockReturnValue(true);
       const stat = vi.spyOn(NFS, "statSync").mockReturnValue(stats);
-      try {
-        expect((yield* FileSystem.statSync("socket")).type).toBe("Socket");
-      } finally {
-        stat.mockRestore();
-        socket.mockRestore();
-        directory.mockRestore();
-      }
+      const found = yield* FileSystem.statSync("socket").pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            stat.mockRestore();
+            socket.mockRestore();
+            directory.mockRestore();
+          })
+        )
+      );
+      expect(found.type).toBe("Socket");
     })
   );
 
@@ -200,14 +203,12 @@ it.layer(NodeCrypto.layer, { timeout: "5 seconds" })("FileSystem sync wrappers",
       const stat = vi.spyOn(NFS, "statSync").mockImplementation(() => {
         throw cause;
       });
-      try {
-        const error = yield* Effect.flip(FileSystem.statSync("unavailable.txt"));
-        expect(error.reason._tag).toBe("Unknown");
-        expect(error.reason.method).toBe("statSync");
-        expect(error.reason.cause).toBe(cause);
-      } finally {
-        stat.mockRestore();
-      }
+      const error = yield* Effect.flip(FileSystem.statSync("unavailable.txt")).pipe(
+        Effect.ensuring(Effect.sync(() => stat.mockRestore()))
+      );
+      expect(error.reason._tag).toBe("Unknown");
+      expect(error.reason.method).toBe("statSync");
+      expect(error.reason.cause).toBe(cause);
     })
   );
 });

@@ -1,7 +1,11 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
-import { createColumnHelper, type RowData } from "@tanstack/react-table"
-import * as React from "react"
+import { useAtomValue } from "@effect/atom-react"
+import { type ColumnDef, createColumnHelper, type RowData } from "@tanstack/react-table"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as O from "effect/Option"
+import type { ReactNode } from "react"
 
 import { DataTable } from "@inventory/ui/components/data-table/data-table"
 import { DataTableCards } from "@inventory/ui/components/data-table/data-table-cards"
@@ -11,7 +15,7 @@ import type { DataTableFeatures } from "@inventory/ui/components/data-table/data
 import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
 import type { DataTableColumnConfig } from "@inventory/ui/components/data-table/data-table-types"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import { useContentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
+import { contentWidth, isNarrow } from "@inventory/ui/ContentWidth"
 
 /*
  * Local addition: a list of records the page already holds, as tablecn's data table. Every column can be sorted
@@ -28,7 +32,7 @@ export type RecordColumn<Row> = {
   /** Pixels. Leave it out on one column to give it the space that is left. */
   width?: number
   align?: "right"
-  cell: (row: Row) => React.ReactNode
+  cell: (row: Row) => ReactNode
   /** Shown on hover. Left out, a cell that is plain text shows its own text: the column may be too narrow for it. */
   title?: (row: Row) => string
   /** True when this row has nothing in this column: a phone card then leaves the line out. */
@@ -44,6 +48,76 @@ const chrome = 36 * 2 + 2
 // The least a column without a width gets when the others take the room: a sentence still shows a few words.
 const leastFlexible = 160
 
+// One config per shape of the columns (their ids, and which of them sort): the same shape gives the same config.
+const configs = MutableHashMap.empty<string, ReturnType<typeof configOf>>()
+
+function configOf(shape: string) {
+  return createDataTableConfig({
+    columns: Object.fromEntries(
+      shape.split("|").map((entry): [string, DataTableColumnConfig] => {
+        const [id = "", sorts] = entry.split(":")
+        return [id, sorts === undefined ? { enableSorting: false } : {}]
+      })
+    ),
+    defaultPageSize: pageSizes[1],
+    pageSizeOptions: pageSizes,
+    enableGlobalFilter: false
+  })
+}
+
+function configFor(shape: string) {
+  const kept = O.getOrUndefined(MutableHashMap.get(configs, shape))
+  if (kept !== undefined) return kept
+  const made = configOf(shape)
+  MutableHashMap.set(configs, shape, made)
+  return made
+}
+
+// The table's columns for one array of record columns, kept while the room for the flexible column is the same.
+const made = new WeakMap<object, { readonly flexible: number; readonly columns: unknown }>()
+
+function tableColumnsOf<Row extends RowData>(
+  columns: ReadonlyArray<RecordColumn<Row>>,
+  flexible: number
+): Array<ColumnDef<DataTableFeatures, Row, unknown>> {
+  const kept = made.get(columns)
+  if (kept !== undefined && kept.flexible === flexible) {
+    return kept.columns as Array<ColumnDef<DataTableFeatures, Row, unknown>>
+  }
+  const col = createColumnHelper<DataTableFeatures, Row>()
+  const next = col.columns(
+    columns.map((column) =>
+      col.accessor((row) => column.sort?.(row) ?? "", {
+        id: column.id,
+        header: ({ column: header }) => (
+          <DataTableColumnHeader column={header} className={column.align === "right" ? "justify-end" : undefined} />
+        ),
+        cell: ({ row }) => {
+          const content = column.cell(row.original)
+          const hover = column.title?.(row.original) ?? (typeof content === "string" ? content : undefined)
+          // The record's name, first, in semibold; numbers at the right in tabular figures.
+          const face =
+            column.align === "right"
+              ? "block truncate text-right tabular-nums"
+              : column.id === columns[0]?.id
+                ? "block truncate font-semibold"
+                : "block truncate"
+          return (
+            <span className={face} title={hover}>
+              {content}
+            </span>
+          )
+        },
+        meta: { label: column.label },
+        enableHiding: false,
+        size: column.width ?? flexible
+      })
+    )
+  )
+  made.set(columns, { flexible, columns: next })
+  return next
+}
+
 export function RecordsTable<Row extends RowData>(props: {
   /** What the table holds, for the scroll region and the screen reader ("Items in the system"). */
   caption: string
@@ -51,10 +125,10 @@ export function RecordsTable<Row extends RowData>(props: {
   rows: ReadonlyArray<Row>
   rowKey: (row: Row) => string
   /** Shown in place of rows when there are none. */
-  empty: React.ReactNode
+  empty: ReactNode
 }) {
-  const narrow = useIsNarrow()
-  const room = useContentWidth()
+  const narrow = useAtomValue(isNarrow)
+  const room = useAtomValue(contentWidth)
   const { columns } = props
   // The column without a width takes the room the others leave, as a table's free column does, never less than
   // `leastFlexible`: only then does the table scroll sideways inside its frame.
@@ -63,53 +137,8 @@ export function RecordsTable<Row extends RowData>(props: {
   // The table's config follows the columns' ids and which of them sort, not the array itself: a page that builds its
   // columns on every render (their cells close over its state) keeps its sorting and its page.
   const shape = columns.map((column) => `${column.id}${column.sort === undefined ? "" : ":sort"}`).join("|")
-  const config = React.useMemo(
-    () =>
-      createDataTableConfig({
-        columns: Object.fromEntries(
-          shape.split("|").map((entry): [string, DataTableColumnConfig] => {
-            const [id = "", sorts] = entry.split(":")
-            return [id, sorts === undefined ? { enableSorting: false } : {}]
-          })
-        ),
-        defaultPageSize: pageSizes[1],
-        pageSizeOptions: pageSizes,
-        enableGlobalFilter: false
-      }),
-    [shape]
-  )
-  const tableColumns = React.useMemo(() => {
-    const col = createColumnHelper<DataTableFeatures, Row>()
-    return col.columns(
-      columns.map((column) =>
-        col.accessor((row) => column.sort?.(row) ?? "", {
-          id: column.id,
-          header: ({ column: header }) => (
-            <DataTableColumnHeader column={header} className={column.align === "right" ? "justify-end" : undefined} />
-          ),
-          cell: ({ row }) => {
-            const content = column.cell(row.original)
-            const hover = column.title?.(row.original) ?? (typeof content === "string" ? content : undefined)
-            // The record's name, first, in semibold; numbers at the right in tabular figures.
-            const face =
-              column.align === "right"
-                ? "block truncate text-right tabular-nums"
-                : column.id === columns[0]?.id
-                  ? "block truncate font-semibold"
-                  : "block truncate"
-            return (
-              <span className={face} title={hover}>
-                {content}
-              </span>
-            )
-          },
-          meta: { label: column.label },
-          enableHiding: false,
-          size: column.width ?? flexible
-        })
-      )
-    )
-  }, [columns, flexible])
+  const config = configFor(shape)
+  const tableColumns = tableColumnsOf(columns, flexible)
   const first = columns[0]?.id
   const { table } = useDataTable({
     mode: "client",

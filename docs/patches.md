@@ -1,7 +1,7 @@
 ---
 type: Tooling Guide
 title: Patching a dependency
-description: When the repository patches a dependency and how: one file a defect, a header that says what it applies to and when it goes, a test that fails without it, the two checks that hold all of it, and what a re-pin and a dependency update do with a patch.
+description: When the repository patches a dependency and how: one file a defect, a header that says what it applies to and when it goes, a test of its own that fails without it, the three checks that hold all of it, and what a re-pin and a dependency update do with a patch.
 tags: [tooling, dependencies, patches]
 ---
 
@@ -53,22 +53,27 @@ field above it.
 | --- | --- |
 | `Package` | The dependency's name |
 | `Applies-to` | Its resolution, as `bun.lock` writes it after the `@`: an exact version for a package from a registry (`4.1.5`), the kept file for a package kept as a file (`vendor/alchemy/alchemy.run-domain-734c27a.tgz`, whose name carries the commit) |
-| `Upstream` | The address of the issue or pull request, or `not yet reported` |
+| `Upstream` | The address of the issue or pull request, whole (`https://`, a host and a path), or `not yet reported` |
 | `Why` | What goes wrong without it, for us |
 | `Remove-when` | What has to be true for the patch to be dropped |
-| `Test` | The test that fails without it, from `packages/patches` |
+| `Test` | The test that fails without it, from `packages/patches`: its own, named by no other patch |
 
 The repository is public: a header names nothing private, no working note and no folder outside the repository.
 
 ## The test
 
-Every patch has a test that **passes with the patch and fails without it**. It is as small as the defect: a few lines
-of code that meet it, and what the fixed package answers. The comment at its top says what the unpatched package
-does instead.
+Every patch has a test of its own that **passes with the patch and fails without it**. It is as small as the
+defect: a few lines of code that meet it, and what the fixed package answers. The comment at its top says what the
+unpatched package does instead. It tests what this patch alone fixes, and no two patches name the same test.
 
 `bun run check` runs it twice. The workspace's own `test` runs it on what is installed. `bun run beep patches prove`
-copies it beside the package without its patches, where node finds that copy first, and there it has to fail with a
-failed test: a file that does not load shows nothing.
+copies it beside the package **with that one patch left out and every other patch of the package applied**, where
+node finds that copy first, and there it has to fail with a failed test: a file that does not load shows nothing.
+Leaving out all of a package's patches at once would show nothing about any one of them.
+
+A later patch that changes the same lines does not apply without the one it was written on. It is then left out
+too, and the test is run once more with only that later patch out, where it has to pass: the failure is then this
+patch's, not the later one's. The line the proof prints says when it did this.
 
 ## Making a patch
 
@@ -128,16 +133,31 @@ To give up on an edit instead: `rm -rf node_modules/@alchemy.run/domain && bun i
 | Refused | Why |
 | --- | --- |
 | A patch with no header, or a field missing or empty | Nobody can tell what it is for or when it goes |
-| `Upstream` that is neither an address nor `not yet reported` | The report cannot be found |
-| A patch whose test is not there | Nothing shows it is needed |
+| `Upstream` that is neither a whole address nor `not yet reported` | The report cannot be found. `https://` alone names none |
+| A patch whose test is not there, or is another patch's | Nothing shows it is needed: what fails without one patch shows nothing about another |
 | An `Applies-to` that `bun.lock` does not hold | A patch for a version that is no longer installed. bun warns once and installs the package unpatched |
 | A patch that does not apply to the kept file it names | Applied to the unpacked file, in order, with no install. For a package from a registry, `bun install` is what refuses it, with exit 1 |
 | The file bun reads differing from the folder's files | bun would apply something else |
 | No line in `patchedDependencies` for it, a line for another resolution, or a patch file with no folder | bun applies only what is registered |
 | An installed package that does not hold what the patches write | The install is behind: `bun install` |
+| A task in a `turbo.json` that does not wait for `//#patches:installed` | It could run on an install that is behind (below) |
 
 `bun run beep patches prove` (`patches:prove` in `bun run check`) refuses a patch whose test passes, or does not run,
-beside the package without its patches.
+beside the package with that one patch left out, and a test that fails for a later patch's sake.
+
+### Nothing runs on an install that is behind
+
+`bun run beep patches installed` (`patches:installed`) asks one thing: does `node_modules` hold what every file
+named in `patchedDependencies` writes? It reads no header, takes under a second and is never replayed.
+
+Every task that runs or type-checks code waits for it in `turbo.json`, whichever script started the task
+(`bun run test` and `bun run proofs` as well as the checks), and when it fails none of them runs. The reason is the
+cache. turbo takes the patch files into every task's hash and reads nothing of `node_modules`. A test run after
+`bun run beep patches build` and before `bun install` would run on the package as it was, pass, and be stored under
+the new patch's hash; after the install turbo would replay it, and the test would never have run with the patch.
+
+A task that waits takes the root's `package.json` into its hash, since that file says which file bun applies to
+which package. So an edit to the root's `package.json` runs every task again.
 
 ## When a patched dependency moves
 
@@ -155,7 +175,8 @@ re-pin therefore:
 After a stop, on the old pin: re-make the patch for the new code, or drop it, and move the pin again.
 
 **A package from a registry.** `bun run deps:update` stops before it moves anything when a patched package has a
-newer version, and names the folder of its patches. Move that one package by hand: its version in the `package.json`
+newer version, and names the folder of its patches. It stops the same way on a folder whose headers do not say
+which package and version its patches are for, since that package could be one that moves. Move that one package by hand: its version in the `package.json`
 files, each patch's `Applies-to`, and the line in `patchedDependencies`, all to the new version. Then
 `bun run beep patches build` and `bun install`, which fails on a patch that no longer applies: re-make that patch or
 drop it. Once `bun run check` passes, run `bun run deps:update` again.
@@ -165,7 +186,7 @@ drop it. Once `bun run check` passes, run `bun run deps:update` again.
 When its `Remove-when` is true, or `patches prove` says its test passes without it:
 
 1. delete the patch file and its test folder. A later patch of the same package that changes the same file is a
-   diff on top of it: re-make that one;
+   diff on top of it: re-make that one (`patches prove` names such a patch on the earlier one's line);
 2. `bun run beep patches build`, or, when it was the package's last patch, delete the file bun reads, the line in
    `patchedDependencies` and the package from `packages/patches/package.json`;
 3. `bun install`, then `bun run check`.
@@ -179,9 +200,10 @@ archive nobody can read in a diff, re-making it needs the registry's own bytes, 
 a week after its `main` moves on, and a package from npm would need bun's patches anyway.
 
 The one thing bun does not do is fail on a patch whose package has moved to another resolution: it warns and
-installs the package unpatched. That is what `patches check`, the re-pin's step and the stop in `deps:update` are for.
+installs the package unpatched. That is what `patches check`, `patches installed`, the re-pin's step and the stop in
+`deps:update` are for.
 
 The layout follows beep-effect's (`patches/`, bun's `patchedDependencies`, a regression test for each patch that
 must fail on the unpatched package before the patch is retired). What differs: there a patch has no header and its
 reason is in a runbook, one file holds every fix to a package, and "is it still needed" is asked by hand at each
-update. Here the header is in the patch, a file is one defect, and the two checks ask.
+update. Here the header is in the patch, a file is one defect, and the checks ask.

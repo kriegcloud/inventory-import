@@ -5,9 +5,9 @@
  *
  * The subset is computed, not hand-listed: the import closure of the entries in `VendorSubset.data.ts`, plus the
  * tests named there. Source files are copied byte for byte under a one-line provenance header. Test files get the
- * import rewrites listed there, recorded per file. A source file is patched only by a listed patch, each with its
- * reason, recorded in `vendor.json` and named in the file's provenance line. Run it again, pointed at a newer
- * commit, to refresh.
+ * import rewrites listed there, recorded per file. A source or test file is patched only by a listed patch, each with
+ * its reason, recorded in `vendor.json` and named in the file's provenance line (a test's patches apply after its
+ * rewrites). Run it again, pointed at a newer commit, to refresh.
  *
  * The words written into the kit (the provenance line, each README, the comment in `vendor.json`) name this command
  * and `vendor check`. A run at the recorded commit changes no file.
@@ -26,6 +26,7 @@ import * as Str from "effect/String"
 import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { type Line, out } from "../../Report.schema.ts"
+import { entriesOf, objectOf } from "../../Sync.rules.ts"
 import {
   allowedOutside,
   entries,
@@ -76,6 +77,36 @@ const decoder = new TextDecoder()
 const encoder = new TextEncoder()
 const pretty = S.encodeEffect(S.fromJsonString(S.Unknown, { space: 2 }))
 const fromJson = S.decodeEffect(S.fromJsonString(S.Unknown))
+
+/**
+ * The names of the root's `catalog`, read from its package.json's text: the dependencies whose version is written
+ * once, there. None when the root has no catalog.
+ *
+ * @example
+ * cataloguedIn('{ "catalog": { "effect": "4.1.5" } }') // ["effect"]
+ *
+ * @category rules
+ */
+export const cataloguedIn = (rootPackage: string): ReadonlyArray<string> =>
+  O.match(objectOf("catalog")(rootPackage), {
+    onNone: () => A.empty<string>(),
+    onSome: (block) => A.map(entriesOf(block)(rootPackage), ([name]) => name.value)
+  })
+
+/**
+ * What a vendored package's package.json asks for a dependency: `catalog:` when the root's catalog names it, so the
+ * version stays written once, and otherwise the version given.
+ *
+ * @example
+ * vendoredSpec(["effect"])("effect", "4.1.5") // "catalog:"
+ * vendoredSpec(["effect"])("yaml", "^2.9.1") // "^2.9.1"
+ *
+ * @category rules
+ */
+export const vendoredSpec =
+  (catalogued: ReadonlyArray<string>) =>
+  (name: string, version: string): string =>
+    A.contains(catalogued, name) ? "catalog:" : version
 
 const stop = (message: string) => RepoError.make({ path: "beep-effect", message })
 
@@ -240,6 +271,11 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     )
     return A.sort(A.dedupe(found), Order.String)
   })
+  // A dependency the root's catalog names is asked for as `catalog:`, as in every other package.json. The versions
+  // stay written below, where `version-sync` keeps them: they are what a repository with no catalog is given.
+  const rootPackage = yield* repo.text(repo.join(repo.root, "package.json"))
+  const asked = vendoredSpec(cataloguedIn(rootPackage))
+  const asking = (entries: Record<string, string>) => R.map(entries, (version, name) => asked(name, version))
   const versionOf = (name: string): string => (name === "type-fest" ? "^6.0.1" : "workspace:*")
   const versioned = (names: ReadonlyArray<string>) => A.map(names, (name) => [name, versionOf(name)] as const)
 
@@ -284,8 +320,8 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
         check: "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
         test: "vitest run"
       },
-      dependencies,
-      devDependencies
+      dependencies: asking(dependencies),
+      devDependencies: asking(devDependencies)
     }).pipe(Effect.orDie)
     yield* repo.write(repo.join(target, "package.json"), `${packageJson}\n`)
     const base = repo.relative(pkg.dir, "tsconfig.base.json")
@@ -321,8 +357,9 @@ here under the same name and the same export subpaths, and is replaced by the pu
   copy starts with one provenance line, which the hash leaves out). \`bun run vendor:check\` fails when they differ.
 - Copied tests have their imports of beep-effect's test runner and run-count helper rewritten (each rewrite is listed
   in \`vendor.json\`); \`test/support/fcRuns.ts\`, when present, stands in for the run-count helper.
-- A source file differs from upstream only by a patch \`bun run beep vendor sync\` applies (\`sourcePatches\`),
-  recorded with its reason under \`patches\` in \`vendor.json\` and named in the file's first line.
+- A source file, or a copied test beyond its rewrites, differs from upstream only by a patch
+  \`bun run beep vendor sync\` applies (\`sourcePatches\`), recorded with its reason under \`patches\` in
+  \`vendor.json\` and named in the file's first line.
 - Licensed under MIT, as the package's own LICENSE file in beep-effect says (\`LICENSE\`, copied unchanged).
 `
     )
@@ -395,10 +432,26 @@ here under the same name and the same export subpaths, and is replaced by the pu
         if (O.isSome(beyond)) {
           return yield* stop(`${pkg.name} ${file} imports ${beyond.value[0]}, which is outside the vendored subset`)
         }
-        yield* repo.write(repo.join(target, file), header(pkg.dir, file, false) + rewritten.body)
+        // A test's patches apply to the text its rewrites left, in order, as a source file's do.
+        const patches = A.filter(sourcePatches, (patch) => patch.pkg === pkg.name && patch.file === file)
+        const gone = A.findFirst(patches, (patch) => !Str.includes(patch.from)(rewritten.body))
+        if (O.isSome(gone)) {
+          return yield* stop(
+            `${pkg.name} ${file}: the text a patch replaces is gone upstream; remove or update the patch`
+          )
+        }
+        const body = A.reduce(patches, rewritten.body, (so, patch) => Str.replace(patch.from, patch.to)(so))
+        yield* repo.write(repo.join(target, file), header(pkg.dir, file, A.isReadonlyArrayNonEmpty(patches)) + body)
         const sourceSha256 = yield* repo.sha256(source)
-        const sha256 = yield* repo.sha256(encoder.encode(rewritten.body))
-        return { path: file, sourceSha256, sha256, rewrites: rewritten.rewrites }
+        const sha256 = yield* repo.sha256(encoder.encode(body))
+        const applied = A.map(patches, (patch) => ({ change: `${patch.from} -> ${patch.to}`, reason: patch.reason }))
+        return {
+          path: file,
+          sourceSha256,
+          sha256,
+          rewrites: rewritten.rewrites,
+          ...(A.isReadonlyArrayNonEmpty(applied) ? { patches: applied } : {})
+        }
       }),
       { concurrency: 1 }
     )

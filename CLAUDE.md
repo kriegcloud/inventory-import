@@ -236,21 +236,23 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and test, for what is installed, installed, and needed: its test fails without it (`patches:check`, `patches:prove`; `docs/patches.md`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), the Alchemy packages kept as files against their recorded hashes (`alchemy:check`; needs python3), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and a test of its own, for what is installed, and needed: its test fails with that one patch left out (`patches:check`, `patches:prove`), with every task that runs code waiting until what is installed holds the patches (`patches:installed`; `docs/patches.md`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs), the property that holds the model against the review region (`fold`: a minute and a half), a sample of the model's mutants (`mutants:sample`: under a minute), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in) and the production build. The model's tasks are replayed by turbo until what they read changes |
-| `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`bun run proofs:nightly`, `.github/workflows/proofs-nightly.yml`) |
+| `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, the tasks of `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`.github/workflows/proofs-nightly.yml`; `bun run proofs:nightly` runs the same four tasks by hand with nothing replayed, with two differences: turbo starts the four at once on one machine, so the first mutants share it with the proofs, Verify's search and the fold, where the nightly runs those three in one job and the mutants on runners of their own; and every mutant runs in one task, two at a time, with `row-open` given 50 minutes beside another mutant where the nightly runs it alone with 100: `docs/verify.md`) |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, Node). Not the fold or the mutants: `bun run proofs` |
 | `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
 | `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason and how to move it), runs `version-sync -- --write`, then `bun install` once, and says what moved from which version to which; a failed install puts every file back. `-- --dry-run` lists the moves and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source (`.bun-version`, `engines.node`, the `effect` the packages state, the app's `wrangler.jsonc` and the rest) and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written. `docs/sync-commands.md` has every source and what is left alone |
-| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
+| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources and its list of the catalog's names, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
 | `bun run scratch:new <name> --template <probe\|service\|screen\|verify>` | Starts an experiment in `scratchpad/experiments/<name>` from a template whose test already passes. `scratch:test [name]` runs the experiments' tests, or one experiment's folder only (Vitest, Node); `scratch:check` holds the scratchpad's own rules (no install inside an experiment, a note for each) and runs the type-checker with the Effect diagnostics; `scratch:list` shows what is open with its age; `scratch:serve experiments/<name>` serves a screen on the first free port from 5273; `scratch:graduate <name> --to <path> --learned "<line>"` or `scratch:drop <name> --learned "<line>"` ends one. `bun run check`, the build and CI never read the scratchpad (`docs/scratchpad.md`) |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
 | `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
 | `bun run telemetry` | Optional, Benjamin's to start (needs Docker): Grafana's LGTM stack, then `OTEL_EXPORTER_OTLP_ENDPOINT` in `apps/inventory/.dev.vars` sends the Worker's and the browser's traces, metrics and logs to it. Never part of `bun run dev`; `telemetry:down` stops it |
+| `bun run release <major\|minor\|patch>` | Benjamin asks for it. Cuts a release: `major` or `minor` makes `release/<major>.<minor>` from `main`, `patch` tags the next patch on the release branch it is run on; it sets the app's version, writes the notes, runs `check:full`, commits and makes an annotated tag. It pushes nothing and prints the one push that sends branch and tag together (`docs/releasing.md`). `bun run beep release verify <tag>` says whether a tag may deploy |
+| `bun run beep infra setup --test-stage` | Benjamin's to run at his own terminal, never an agent's: what a first deploy needs (the Cloudflare account, an Alchemy profile, the state store), then a plan he reads and a deploy on his yes. `--staging` sets up what GitHub must hold, `--production` deploys production. An agent may run it only with `--dry-run`, which prints the steps and starts nothing (`goals/infra/PLAN.md`) |
 | `bun run alchemy:repin -- <commit>` | Moves the Alchemy packages kept as files in `vendor/alchemy` to another commit of the library's `main`: the files, the root `overrides`, the lockfile's hashes, the repository's patches to them carried to the new files (it stops on one that no longer applies, or is no longer needed), an install that is refused the library's registry, then `check:full` with nothing replayed from the cache (`vendor/alchemy/README.md`). Benjamin asks for it; it commits nothing. `bun run alchemy:check` checks the pin as it stands. Needs python3 |
 
 | App command (`apps/inventory`) | What it does |
@@ -265,12 +267,17 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `auth:schema` | After a change to Better Auth's options, prints the migration it still needs |
 | `grid:keys` | Types on every data grid editor in Chromium and reads what is stored (needs `CHROME_PATH`); by hand, after a change to the grid |
 
-Hosting is not a script: `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
-only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
+Hosting is Benjamin's alone. `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
+`bun run beep infra setup` does what comes before a first deploy and then deploys on his yes. No agent runs either
+for real, whatever it was asked to get done; an agent may run `bun run beep infra setup --dry-run`, which prints the
+steps and starts no tool. None runs `bun run release` unless he asks for a release in that message
+(`goals/infra/PLAN.md`, "What Benjamin does by hand"; `docs/releasing.md`).
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
 (`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile of the workspaces, and `bunfig.toml` keeps one
-hoisted `node_modules`. The one other lockfile is the scratchpad's (`scratchpad/bun.lock`, committed), for the
+hoisted `node_modules`. A dependency more than one package uses has its version once, in the `catalog` of the root's
+package.json, and each package.json says `"catalog:"` (`docs/sync-commands.md`, "One place for a shared version");
+`bun run deps:lint` refuses one written as a version. The one other lockfile is the scratchpad's (`scratchpad/bun.lock`, committed), for the
 libraries an experiment added: the scratchpad is no workspace, and a library the root already has never goes there.
 
 **A second dev server.** Benjamin usually runs the dev server in his own terminal on port 5173; ask before starting
@@ -328,10 +335,12 @@ packages/infra/          @beep/infra: what is deployed, per stage. The stage pla
                         (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:
                         the deploy environments, their secrets, the rule on main). Nothing in the app imports it.
 alchemy.run.ts          The app's stack, re-exported for `bunx alchemy deploy --stage <name>`. A deploy is Benjamin's:
-                        no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state` (goals/infra/PLAN.md).
+                        no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state`, nor
+                        `bun run beep infra setup`, which runs them for him, except with `--dry-run`, which
+                        starts nothing (goals/infra/PLAN.md).
 vendor/alchemy/         The Alchemy packages as files, one commit of the library's main, with every sibling address
                         inside them rewritten so an install needs the library's registry for nothing. Its README says
-                        why, and how the pin moves. Never edit a file there: `bun run alchemy:check` fails on a change.
+                        why, and how the pin moves. Never edit a file there: `bun run alchemy:check`, part of `bun run check`, fails on a change.
 packages/patches/        @inventory/patches: the repository's patches to its dependencies, applied by bun at every
                         install. One file a defect (alchemy-domain/01-computed-instance-id.patch) with a header that
                         says what it applies to, where the defect is reported, why we need it and when it goes; the
@@ -352,8 +361,8 @@ packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as comman
                         under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout); `deps update`, `version-sync` and
                         `config-sync`, which move dependencies and keep repeated versions and derived configuration in
-                        step (`docs/sync-commands.md`); `patches` (check, prove, build, and carry, which a re-pin
-                        runs: `docs/patches.md`); and `scratch` (new, list, check, graduate, drop). Nothing
+                        step (`docs/sync-commands.md`); `patches` (check, installed, prove, build, and carry, which a
+                        re-pin runs: `docs/patches.md`); and `scratch` (new, list, check, graduate, drop). Nothing
                         imports it.
 scratchpad/             A folder beside the workspaces, not one of them, where an idea is tried in a folder of its own
                         (experiments/<name>/: a NOTE.md, code and a test), importing every package from the root's
@@ -448,11 +457,14 @@ those files, read [docs/verify.md](docs/verify.md).
   and in every rule a decision reads; past 4,096 paths it proves nothing. The proof tests state each decision's paths.
   A relation of the model is proved across each decision too, with paths of its own that no proof test states: a
   `decide` that asks the same thing of its command twice (`cmd.covered`, then `cmd.covered` again after other checks)
-  doubles them, and the relation is then only searched, which fails `verify`. Ask once, and branch.
+  doubles them, and the relation is then only searched, which fails `verify`. Ask once, and branch. What counts most
+  is how many ways through the `decide` reach the record: a check that lets an act go on in two ways ("the text
+  differs, or the matching does") is written as one comparison (`onItsMatching`).
 - **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
   the rules about who may change a row or a group are rules of each decision that records on it, under the same
-  name in each. A new decision that records on one states them too, and its proof calls the check that it
-  does, as the four do (`missingRules` in `test/proving.ts`, which runs only where a proof calls it): ours, because the lock and the list of rules that must stay proved take its
+  name in each, and only where the rule can fail: who may take a decision or a group back is the undo's rule, not the
+  act's. A new decision that records on one states them too, and its proof calls the check that it
+  does with the events its command records, as the four do (`missingRules` in `test/proving.ts`, which runs only where a proof calls it): ours, because the lock and the list of rules that must stay proved take its
   rules as they are written, and nothing in the library asks whose act a decision records.
 - **Annotate `keyOf`'s parameter** in a decision (`keyOf: (cmd: DecideRow) => ...`): without it the parameters of
   `decide` are `any`, and a typo in one passes the type-check.

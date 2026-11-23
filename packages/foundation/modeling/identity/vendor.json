@@ -34,8 +34,14 @@
     {
       "path": "src/Id.ts",
       "sourceSha256": "e09b2402fb8e5375ae8a06495126c90f00408d369af87e4057d0fd47cb109835",
-      "sha256": "e09b2402fb8e5375ae8a06495126c90f00408d369af87e4057d0fd47cb109835",
-      "rewrites": []
+      "sha256": "6fa3b66e38fdc57d4ca3417ac3d027779ecde7e658004aa0b3a6c79cfb1a8fd7",
+      "rewrites": [],
+      "patches": [
+        {
+          "change": " * import { make, IdentityInterpolationError } from \"@beep/identity/Id\"\n *\n * const { $MyPkgId } = make(\"my-pkg\")\n *\n * try {\n *   $MyPkgId`User${\"Name\"}`\n * } catch (error) {\n *   console.log(error instanceof IdentityInterpolationError)\n * } ->  * import * as Result from \"effect/Result\"\n * import { make, IdentityInterpolationError } from \"@beep/identity/Id\"\n *\n * const { $MyPkgId } = make(\"my-pkg\")\n *\n * const refused = Result.try({\n *   try: () => $MyPkgId`User${\"Name\"}`,\n *   catch: (error) => error instanceof IdentityInterpolationError\n * })\n * console.log(Result.isFailure(refused) && refused.failure) // true",
+          "reason": "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The example reads the refusal with Result.try. Unnecessary once beep-effect's example does."
+        }
+      ]
     },
     {
       "path": "src/IdentityRegistry.ts",

@@ -7,6 +7,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import clean from "./fixtures/samples/items_clean.csv?raw"
 import messy from "./fixtures/samples/items_messy.csv?raw"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
@@ -239,6 +240,43 @@ describe("a second import", () => {
         true,
         1
       ])
+      // What the person did to the row stands when one of its cells then stops reading: the row waits and shows
+      // that cell. It is not put away as already there, with the Replace or the typed value gone from the screen.
+      const broken = { edits: { quantityOnHand: "12.5" } }
+      for (const decision of [{ stored: "replace" as const, ...broken }, broken]) {
+        const waits = reviewOf(table, { "row-2": decision }, other)
+        expect([rowOf(waits, 2).status, rowOf(waits, 2).problems[0]?.field, waits.counts.already]).toEqual([
+          "needs",
+          "quantityOnHand",
+          24
+        ])
+      }
+      // Replace alone, with no typed value, on a row whose cost does not read: it waits too. With no choice on it
+      // the same row is already there.
+      const noCostText = Str.replace(",EA,12.33,", ",EA,TBD,")(clean)
+      const noCost = yield* stage(new File([noCostText], "items_clean.csv"))
+      const replaceOnly = reviewOf(noCost, { "row-2": { stored: "replace" } }, other)
+      expect([rowOf(replaceOnly, 2).item, rowOf(replaceOnly, 2).status, replaceOnly.counts.already]).toEqual([
+        null,
+        "needs",
+        24
+      ])
+      const untouched = reviewOf(noCost, {}, other)
+      expect([rowOf(untouched, 2).status, untouched.counts.already]).toEqual(["already", 25])
+      // A SKU in lower case reads once its proposal is accepted or the same value is typed: either way the person
+      // acted on the row, and it waits on its cost. The two ways give one outcome and the same counts.
+      const lower = yield* stage(new File([Str.replace("SHH-9574,", "shh-9574,")(noCostText)], "items_clean.csv"))
+      const acceptedSku = reviewOf(lower, { "row-2": { accepted: ["sku"] } }, other)
+      const typedSku = reviewOf(lower, { "row-2": { edits: { sku: "SHH-9574" } } }, other)
+      for (const result of [acceptedSku, typedSku]) {
+        expect([rowOf(result, 2).values.sku, rowOf(result, 2).status, rowOf(result, 2).problems[0]?.field]).toEqual([
+          "SHH-9574",
+          "needs",
+          "unitCost"
+        ])
+      }
+      expect(acceptedSku.counts).toEqual(typedSku.counts)
+      expect(acceptedSku.counts.already).toBe(24)
     })
   )
 })

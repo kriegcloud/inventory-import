@@ -58,9 +58,12 @@ const DEPTH = 3
 
 layer(NodeServices.layer)("Catalog", (it) => {
   it.effect(
-    "135 rules are proved, seven hold in every sequence of up to three commands, and every command can be taken",
+    "every rule the lock keeps of a kind a proof covers is proved, the others hold in every sequence of up to three commands, and every command can be taken",
     Effect.fnUntraced(function* () {
       const proved = yield* lockedProved()
+      // The number docs/verify.md states for the rules that must stay proved. It is read from the lock as it stood
+      // before this run: a rule added or taken out on purpose changes it here and there, with the lock.
+      expect(proved.length).toBe(145)
       const report = yield* Verify.report(Catalog, {
         apis: [CatalogApi],
         story: Story.make(Catalog),

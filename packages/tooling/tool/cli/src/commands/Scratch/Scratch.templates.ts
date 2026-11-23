@@ -297,22 +297,14 @@ const screen = (slug: string): ReadonlyArray<TemplateFile> => {
 const diagnosticsWord = "diagnostics"
 export const diagnosticDirective = `@effect-${diagnosticsWord}`
 
-/**
- * The one diagnostic line a decide file may hold, as its first line (decision 33 of the Alchemy brief, 2026-11-22: "`new`
- * only in decide files"): the prover knows an event or a rejection only by `new`, which the profile refuses elsewhere.
- */
-export const decideFileLine = `// ${diagnosticDirective} newSchemaClass:off`
-
 const verify = (slug: string): ReadonlyArray<TemplateFile> => {
   const name = typeName(slug)
   return [
     {
       name: `${name}.aggregate.ts`,
       text: lines([
-        decideFileLine,
-        "// The prover reads this file's source and knows an event or a rejection by `new`, not by `X.make(...)`. So a",
-        "// decide file (`*.aggregate.ts`, `*.decision.ts`) builds them with `new`, with that one diagnostic off on its",
-        "// first line, and every other file uses `.make` (decision 33 of the Alchemy brief, 2026-11-22).",
+        "// The prover reads this file's source. An event or a rejection is built with `.make`, here as everywhere: the",
+        "// prover reads it as the instance it builds (the repository's third patch to the library, docs/patches.md).",
         "/**",
         ` * ${slug}: a domain model the prover can read. Commands are decided against a state, events change it, and the`,
         " * rules (`invariants` of a state, `transitions` between two) are what the prover holds every path to.",
@@ -350,8 +342,8 @@ const verify = (slug: string): ReadonlyArray<TemplateFile> => {
         "  keyOf: (command) => command.shelf,",
         "  decide: {",
         "    CountOne: Effect.fn(function* (state, command) {",
-        "      if (state.counted >= LIMIT) return yield* new ShelfFull({})",
-        "      return [new Counted({ shelf: command.shelf })]",
+        "      if (state.counted >= LIMIT) return yield* ShelfFull.make({})",
+        "      return [Counted.make({ shelf: command.shelf })]",
         "    })",
         "  },",
         "  evolve: {",

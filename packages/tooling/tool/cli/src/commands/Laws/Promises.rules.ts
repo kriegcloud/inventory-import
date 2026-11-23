@@ -23,8 +23,8 @@
  *
  * `typescript/no-misused-promises` keeps its void-return checks whole, though React 19's `ReactNode` includes a Promise,
  * so a function typed to return one is refused where a callback returns nothing (`onClick={render}`). Turning the
- * attribute and argument checks off would let through what they catch today: every one of their 6 findings is a
- * handler that really returns a Promise (a `.catch` chain in `AppSidebar.tsx`, the stepper's handlers), and no
+ * attribute and argument checks off would let through what they catch today: every one of their 5 findings is a
+ * handler that really returns a Promise (the stepper's handlers), and no
  * `ReactNode`-typed function stands in such a slot.
  *
  * `typescript/promise-function-async` is not run: it refuses the edge this law prescribes (`Effect.tryPromise({ try:
@@ -85,7 +85,7 @@ export const promisesLeftOut: ReadonlyArray<string> = [".agents/", `${scratchpad
  * Promise and name its type. Every other use of a Promise there is refused as anywhere else.
  */
 export const promiseEntryPoints: Readonly<Record<string, string>> = {
-  "apps/inventory/src/server/App.ts": "the Worker's exported fetch, which Cloudflare calls and awaits",
+  "apps/inventory/src/server/worker.ts": "the Worker's exported fetch, which Cloudflare calls and awaits",
   "apps/inventory/src/web/main.tsx": "the browser's root, which starts the app"
 }
 

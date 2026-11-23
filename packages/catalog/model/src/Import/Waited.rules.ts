@@ -12,19 +12,19 @@ import * as A from "effect/Array"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as S from "effect/Schema"
 import {
   type DecidedSince,
   decisionOf,
   hasKeep,
   RowDecision,
   type SavedDecisions,
-  StoredChoice
+  StoredChoice,
+  TakenBackKind
 } from "@inventory/catalog-contract/Decision"
 import type { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import type { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { type Field, fields } from "@inventory/catalog-contract/Staged"
-import { matchedAfter, withoutStaleDecisions } from "./Rematch.rules.ts"
+import { matchedAfter, sameDecision, withoutStaleDecisions } from "./Rematch.rules.ts"
 
 /** For each row that waited, the decisions the server may hold of it; none for no decision. */
 export type Over = Readonly<Record<string, ReadonlyArray<O.Option<RowDecision>>>>
@@ -44,7 +44,6 @@ export const overOfSave = (save: {
   return R.filter(save.over ?? {}, (_named, rowId) => R.has(save.set, rowId) || HashSet.has(cleared, rowId))
 }
 
-const sameDecision = S.toEquivalence(RowDecision)
 const nothingSaid = decisionOf()
 // A decision that says nothing (a row put back, or one a match took everything of) and no decision are the same.
 const said = (decision: O.Option<RowDecision>): RowDecision => O.getOrElse(decision, () => nothingSaid)
@@ -108,7 +107,7 @@ const savedSinceByAnother = (input: Judging, rowId: string, made: number): boole
 
 /** The part a take-back names, by kind and the field it rests on; a Replace or Keep-stored and a keep of one of two by kind alone. */
 const partKey = (kind: MatchTakeBack["kind"], field: string): string =>
-  kind === "accept" || kind === "undo" ? `${kind}:${field}` : kind
+  TakenBackKind.is.accept(kind) || TakenBackKind.is.undo(kind) ? `${kind}:${field}` : kind
 
 /**
  * The parts a decision lost to the matches (`applied` as it was stored, `left` as they left it), by the key a take-back
@@ -285,7 +284,7 @@ const hiddenIn = (entries: ReadonlyArray<MatchTakeBack>, rowId: string, made: nu
 export const decidedSince = (
   input: Judging & { readonly left: (rowId: string) => O.Option<RowDecision> }
 ): ReadonlyArray<DecidedSince> => {
-  const kept = A.filter(input.takenBack, (entry) => entry.kind === "stored" && entry.field !== "sku")
+  const kept = A.filter(input.takenBack, (entry) => TakenBackKind.is.stored(entry.kind) && entry.field !== "sku")
   const record = {
     taken: takenByRow(kept),
     partial: A.filter(kept, (entry) => entry.count > entry.rows.length),

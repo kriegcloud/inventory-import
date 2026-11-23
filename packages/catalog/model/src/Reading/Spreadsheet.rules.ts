@@ -3,6 +3,7 @@
 // The rule this file protects: nothing in a file is coerced on the way in. A cell keeps its own text and says what
 // type it was in the file; anything the reader skipped or noticed is a Note the screen can show, never a console line.
 
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as S from "effect/Schema"
 
 /** The two formats the importer reads. `.xls` (Excel 97-2003) is refused with a way out (`fileProblem.oldExcel`). */
@@ -16,7 +17,7 @@ export type FileKind = typeof FileKind.Type
  * What a cell was in the file. A CSV has no types, so its cells are `text` or `empty`; a workbook's cells keep the
  * type the spreadsheet stored. The app decides what a text "12" means, never the reader.
  */
-export const CellType = S.Literals(["text", "number", "date", "boolean", "empty", "error"]).annotate({
+export const CellType = LiteralKit(["text", "number", "date", "boolean", "empty", "error"]).annotate({
   description: "What the cell was in the file. A CSV's cells are text or empty; a workbook keeps its stored type."
 })
 /** One of the `CellType` names. */
@@ -100,6 +101,19 @@ export const SheetSummary = S.Struct({
 /** A decoded `SheetSummary`. */
 export type SheetSummary = typeof SheetSummary.Type
 
+/** Why the reader took the sheet it took: the only one with data, the one with the most, or the person's choice. */
+export const SheetChoiceReason = LiteralKit([
+  "onlySheetWithData",
+  "mostData",
+  "chosenByPerson",
+  "onlyHiddenSheetsHaveData"
+]).annotate({
+  description:
+    "Why this sheet was read: the only one with data, the one with the most, the person's choice, or only hidden ones had data."
+})
+/** One of the `SheetChoiceReason` names. */
+export type SheetChoiceReason = typeof SheetChoiceReason.Type
+
 /** Which sheet the table came from and why, stated so the choice is never silent. */
 export const SheetChoice = S.Struct({
   name: S.String,
@@ -107,7 +121,7 @@ export const SheetChoice = S.Struct({
     description: "1-based position of the chosen sheet among all the workbook's sheets."
   }),
   sheetCount: S.Int.annotateKey({ description: "How many sheets the workbook has, hidden ones included." }),
-  reason: S.Literals(["onlySheetWithData", "mostData", "chosenByPerson", "onlyHiddenSheetsHaveData"]).annotateKey({
+  reason: SheetChoiceReason.annotateKey({
     description:
       "Why this sheet: the only one with data, the one with the most, the person's choice, or only hidden ones had data."
   }),
@@ -157,7 +171,9 @@ export const NoteKind = S.Literals([
   "delimiter",
   "notUtf8",
   "strayQuote",
-  "wrongExtension"
+  "wrongExtension",
+  // Written when a file is staged, not by the reader: more notes than a staged file keeps (`stageTable`).
+  "notesNotKept"
 ]).annotate({ description: "What a Note is about, so the screen can group or filter notes." })
 /** One of the `NoteKind` names. */
 export type NoteKind = typeof NoteKind.Type

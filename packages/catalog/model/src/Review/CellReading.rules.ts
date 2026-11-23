@@ -17,8 +17,8 @@ import * as Str from "effect/String"
 import {
   UnitCost,
   isoDate,
-  categories,
-  uoms,
+  Category,
+  Uom,
   Dimensions,
   Vendor,
   ItemFields,
@@ -69,9 +69,9 @@ export const readDate = (text: string): O.Option<string> => {
 }
 
 /** Whether the text is one of the listed categories, exactly as listed. */
-export const isCategory = (text: string): boolean => A.contains(categories as ReadonlyArray<string>, text)
+export const isCategory = S.is(Category)
 /** Whether the text is one of the listed units of measure, exactly as listed. */
-export const isUom = (text: string): boolean => A.contains(uoms as ReadonlyArray<string>, text)
+export const isUom = S.is(Uom)
 
 /** A category as people write it, reduced to the list's own form: lower case, hyphens for spaces and underscores. */
 export const categoryKey = (text: string): string => Str.replace(/[\s_]+/g, "-")(Str.toLowerCase(Str.trim(text)))
@@ -166,6 +166,47 @@ const bad = <A>(message: string): Read<A> => makeBad({ message })
  */
 export const wasRead = <A>(read: Read<A>): read is ReadOk<A> => isOk(read)
 
+/** The most characters of a value a sentence says back. A longer one is cut there, and its length said. */
+export const maxSaid = 80
+
+/** A count as a sentence says it: "5,000". */
+export const wholeNumber = new Intl.NumberFormat("en-US")
+
+/**
+ * A value as a sentence says it back, in two parts: the text, whole or cut to its first `maxSaid` characters with
+ * "…", and after it how long the whole value is, empty when nothing was cut. A reason names the value without
+ * carrying it: a cell of thousands of characters would otherwise make a reason no store can write. Characters are
+ * counted as a store counts them (UTF-16 units, as `Schema.isMaxLength` does), and the cut never leaves half of a
+ * character that takes two.
+ *
+ * @example saidParts("BLT-0042") // { text: "BLT-0042", length: "" }
+ * @example saidParts("x".repeat(5000)) // { text: "xxxx…xxxx…", length: " (5,000 characters)" }
+ */
+export const saidParts = (value: string): { readonly text: string; readonly length: string } => {
+  if (value.length <= maxSaid) return { text: value, length: "" }
+  const head = Str.takeLeft(maxSaid)(value)
+  // A character past U+FFFF is two units, the first from D800 to DBFF: one left alone at the cut is dropped.
+  const whole = /[\uD800-\uDBFF]$/.test(head) ? Str.takeLeft(maxSaid - 1)(value) : head
+  return { text: `${whole}…`, length: ` (${wholeNumber.format(value.length)} characters)` }
+}
+
+/**
+ * A value in quotes, as a sentence says it back: a long one cut, with its length after the closing quote.
+ *
+ * @example said("12 boxes") // '"12 boxes"'
+ * @example said("x".repeat(5000)) // '"xxxx…xxxx…" (5,000 characters)'
+ */
+export const said = (value: string): string => {
+  const parts = saidParts(value)
+  return `"${parts.text}"${parts.length}`
+}
+
+/** A value with no quotes around it, as a sentence names a SKU or a vendor: a long one cut, with its length. */
+export const named = (value: string): string => {
+  const parts = saidParts(value)
+  return `${parts.text}${parts.length}`
+}
+
 /**
  * The dimensions a cell holds: none for an empty cell, the three measurements and their unit, or what is wrong, in a
  * sentence that names the missing measurement.
@@ -189,7 +230,7 @@ export const readDimensions = (text: string): Read<Dimensions | null> => {
   }
   if (length <= 0 || width <= 0 || height <= 0) return bad("Dimensions has a measurement that is not above zero.")
   if (unit !== undefined && unit !== "cm" && unit !== "in")
-    return bad(`Dimensions has the unit "${unit}", not cm or in.`)
+    return bad(`Dimensions has the unit ${said(unit)}, not cm or in.`)
   return ok({ length, width, height, unit: unit === "in" ? "in" : "cm" })
 }
 
@@ -206,14 +247,16 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
     const place = `Vendor ${index + 1}`
     const name = Str.trim(vendor.vendor_name ?? "")
     if (name === "") return bad(`${place} has no name.`)
-    if (vendor.unit_cost === undefined) return bad(`${place} (${name}) has no unit cost.`)
+    if (vendor.unit_cost === undefined) return bad(`${place} (${named(name)}) has no unit cost.`)
     const cost = readUnitCost(`${vendor.unit_cost}`)
     if (O.isNone(cost)) {
-      return bad(`${place} (${name}) has the unit cost ${vendor.unit_cost}, not 0 or more with up to 4 decimals.`)
+      return bad(
+        `${place} (${named(name)}) has the unit cost ${named(`${vendor.unit_cost}`)}, not 0 or more with up to 4 decimals.`
+      )
     }
     const lead = vendor.lead_time_days ?? null
     if (lead !== null && (!Number.isInteger(lead) || lead < 0)) {
-      return bad(`${place} (${name}) has the lead time ${lead}, not a whole number of days.`)
+      return bad(`${place} (${named(name)}) has the lead time ${lead}, not a whole number of days.`)
     }
     return ok({
       vendorName: name,

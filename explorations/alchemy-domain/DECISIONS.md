@@ -297,7 +297,7 @@ Further rounds of the same dialog. Of each: I chose; the agent recommended the s
 | --- | --- | --- | --- |
 | 28 | What runs on the Cluster pool as a cron or a singleton? | A cron that closes each organization's day of model calls into a history, and a singleton that keeps the operator's live total; the cron only; neither: "cannot yet" written down | "A history cron + a live total" |
 | 32 | Where do an aggregate's blocks live? | In the context's `model` package, one folder per aggregate; everything in `contract`; leave the blocks split and wait for the prover | "In each model package" |
-| 33 | Are domain blocks built with `new`? | `new` in files that hold a `decide`; `new` for every domain class; `.make` everywhere | "`new` only in decide files" |
+| 33 | Are domain blocks built with `new`? | `new` in files that hold a `decide`; `new` for every domain class; `.make` everywhere | "`new` only in decide files" (reversed the same day: "decision 33 reversed", below) |
 | 36 | Who writes each audit line, and what answers the Activity page? | The `activity` table stays the trail; a stream per model | "The activity table stays" |
 | 37 | How do rows already stored arrive in the model? | Adopt at first touch; adopt everything at a deploy; start empty | "Adopt at first touch" |
 | 38 | What does Remove do once decisions are events? | The import is marked removed and its rows in D1 are deleted, the events stay; the app also deletes the objects' storage | "Mark removed, events stay" |
@@ -737,3 +737,20 @@ Overrule any line by saying so.
   names the row after the undo lands ("Row 14 was changed by Dana and stays"); the Review step's screen, move 3.
 - A suggested fix accepted on a rival row after a keep; the rival stays out, as an accept made before the keep; only a
   deliberate keep or edit after the keep wins and shows the clash; `review`'s rule for rivals, move 3.
+
+### 2026-11-22 — decision 33 reversed: the prover reads `.make`
+
+Asked again after the rule "no `@effect-diagnostics` comment in any file" met the eight files decision 33 had excepted
+(five of the review's model, three of the patches' tests), each with the one line that turns `newSchemaClass` off.
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The prover knows an event or a rejection only by `new`, and the rule against diagnostic comments has no exception. What happens to the eight files with a `decide`? | Teach the prover `.make`, in the repository's patch to it, proved with mutants like the rest of the patch; keep these 8 as exceptions; `new` everywhere, no comment | "Teach the prover .make" |
+
+I chose; the agent recommended the same. Reverse it: a new decision by him.
+
+Built 2026-11-23 in `packages/patches/alchemy-domain/03-a-schemas-own-guards.patch`: `X.make(fields)` of an event or a
+rejection is read as the instance `new X(fields)` builds, held by the mutant `make-is-not-new`. The review's model and
+the patches' test aggregates build with `.make`, no file of either holds a diagnostic comment, and the scratchpad's
+`verify` template and its check lost the exception with them. The five proofs pass with the path counts their tests
+state.

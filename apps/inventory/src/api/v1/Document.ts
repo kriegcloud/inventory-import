@@ -2,7 +2,9 @@
 // only (`OpenApi.Transform` on the `Api`, applied last). Nothing here changes a route, a payload or an answer; the
 // one thing not to break is that every line below states what the server already does, never what it should do.
 import * as A from "effect/Array"
+import * as P from "effect/Predicate"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 
 /** The name of the security scheme every signed-in endpoint lists: the session cookie Better Auth sets. */
@@ -47,14 +49,13 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
     for (const item of node) renameRefs(item, renamed)
     return
   }
-  if (typeof node !== "object" || node === null) return
-  const object = node as Json
-  const ref = object["$ref"]
+  if (!P.isObject(node)) return
+  const ref = node["$ref"]
   if (typeof ref === "string" && Str.startsWith(refPrefix)(ref)) {
     const name = Str.slice(refPrefix.length)(ref)
-    if (R.has(renamed, name)) object["$ref"] = `${refPrefix}${renamed[name]}`
+    if (R.has(renamed, name)) node["$ref"] = `${refPrefix}${renamed[name]}`
   }
-  for (const value of R.values(object)) renameRefs(value, renamed)
+  for (const value of R.values(node)) renameRefs(value, renamed)
 }
 
 /**
@@ -65,20 +66,17 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
  * the path) when that name is free, and a numbered copy that is identical to the original is folded into it. A copy
  * that differs keeps its number.
  */
-/** True when two parts of the document say the same thing: the same keys and values, whatever order the keys are in. */
-const sameShape = (a: unknown, b: unknown): boolean => {
-  if (A.isArray(a) || A.isArray(b)) {
-    return A.isArray(a) && A.isArray(b) && a.length === b.length && A.every(a, (item, i) => sameShape(item, b[i]))
-  }
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return a === b
-  const left = a as Json
-  const right = b as Json
-  const keys = R.keys(left)
-  return (
-    keys.length === R.keys(right).length &&
-    A.every(keys, (key) => R.has(right, key) && sameShape(left[key], right[key]))
-  )
-}
+/** A part of the document as JSON writes it, told apart by its structure, not by Effect's opaque `Schema.Json`. */
+const DocumentPart = S.suspend((): S.Codec<S.Json> =>
+  S.Union([S.Null, S.Boolean, S.Finite, S.String, S.Array(DocumentPart), S.Record(S.String, DocumentPart)])
+)
+
+/**
+ * True when two parts of the document say the same thing: the same keys and values, whatever order the keys are in.
+ * Derived from the structure, so it compares afresh on every pass: `Equal.equals` would remember a pair of objects
+ * that a later pass has changed in place.
+ */
+const sameShape = S.toEquivalence(DocumentPart)
 
 /** One pass of naming: true when a component was renamed or folded, so another pass may find more. */
 const nameOnce = (spec: Json): boolean => {

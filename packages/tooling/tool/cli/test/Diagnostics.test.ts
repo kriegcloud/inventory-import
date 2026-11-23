@@ -188,6 +188,38 @@ describe("laws diagnostics", () => {
         })
       )
       expect(renamed).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+      // A move with a new file at the old name lends nothing: the new file keeps the number, so the moved one is new.
+      // The same whether the new file is untracked (git sees a rename, and the law says so) or both are committed (git
+      // sees a change of the old file and a new one).
+      const notTwice = `err: ${moved}  is in ${diagnosticsLedger} but not on main:`
+      const retaken = `${notTwice} it was moved from ${listed}, and the file at ${listed} now keeps that number, so this one starts from nothing. Fix the file instead`
+      for (const committed of [false, true]) {
+        const both = yield* inTree(
+          held,
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* onMain()
+            yield* repo.run("git", ["mv", listed, moved])
+            yield* write({ ...ledger({ [listed]: 2, [moved]: 2 }), [listed]: directives(2) })
+            if (committed) yield* commit("moves it, and writes a new file at its name")
+            return yield* run
+          })
+        )
+        expect(both).toContainEqual(expect.stringContaining(notTwice))
+        if (!committed) expect(both).toContain(retaken)
+      }
+      // A stray file git ignores at the old name is no file of the law's: the move still lends its number.
+      const ignored = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", listed, moved])
+          yield* write({ ...ledger({ [moved]: 2 }), ".gitignore": `${listed}\n`, [listed]: directives(2) })
+          return yield* run
+        })
+      )
+      expect(ignored).toEqual([expect.stringContaining("out: diagnostics:check OK")])
       // A file changed beside a listed one is no rename: git's records are a status and one path each.
       const beside = yield* inTree(
         { ...held, "README.md": "# a\n" },

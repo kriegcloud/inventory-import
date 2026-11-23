@@ -96,6 +96,12 @@ export const RowNumber = S.Int.check(S.isBetween({ minimum: 1, maximum: maxRowNu
 /** The decoded value of `RowNumber`: a row of the file as Excel numbers it. */
 export type RowNumber = typeof RowNumber.Type
 
+/**
+ * The most items one row of a file can hold, and so the highest part a row id can carry (`row-7.9999`): the result
+ * and the plan of a confirm number a row's items no higher.
+ */
+export const maxPart = 9_999
+
 /** One cell as the reader found it: `text` with nothing coerced, and `shown` when Excel displays it differently. */
 export const StagedCell = S.Struct({
   text: bounded(32767).annotateKey({ description: "The cell's value as text, nothing coerced", examples: ["120"] }),

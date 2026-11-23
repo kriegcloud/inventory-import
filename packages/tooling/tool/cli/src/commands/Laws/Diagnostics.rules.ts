@@ -11,7 +11,7 @@
  * `diagnosticDirective`), so its file holds none.
  *
  * Not read, each by name: `.agents/`, `vendor/` and `docs/`, as Benjamin's rule has it; and `scratchpad/`, whose own
- * check (`scratch:check`) allows one directive only, decision 33 of the Alchemy brief, and refuses every other.
+ * check (`scratch:check`) refuses every directive.
  * `ledgers/diagnostics.json` names the files that hold one today, each with how many, which only falls, held against
  * the files there are and against main (`internal/ledger.ts`).
  * A listed file with none left is refused

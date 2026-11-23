@@ -29,7 +29,7 @@ import {
   SuggestAnswer
 } from "./Suggest.rules.ts"
 import { AllowanceAnswer, taken, ModelAllowance } from "../Answer/ModelAllowance.external.ts"
-import { Answerer, modelIsOn, ModelQuestion, answeredByRules } from "../Answer/Answerer.external.ts"
+import { Answerer, ModelAvailability, ModelQuestion, answeredByRules } from "../Answer/Answerer.external.ts"
 import { asAgent } from "@inventory/kernel/Agent"
 import { ImportId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { CurrentActor } from "@inventory/kernel/Actor"
@@ -88,7 +88,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
     return none
   }
   // One call from the day's allowance, taken before the call is made, and only when there is a model to ask.
-  const call = modelIsOn(answerer.status) ? yield* input.take : taken
+  const call = ModelAvailability.is.on(answerer.status) ? yield* input.take : taken
   const byRules = (reason: string): Proposed => {
     const checked = guard({ source: input.source, answer: answerByRules(asked), by: suggestedByRule })
     return {

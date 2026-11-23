@@ -164,7 +164,17 @@ describe("the baseline", () => {
           const repo = yield* Repo
           yield* repo.run("git", ["init", "-q"])
           yield* repo.run("git", ["add", "."])
-          yield* repo.run("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "first"])
+          yield* repo.run("git", [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "first"
+          ])
           // A line is put above, so both old places move, and a third place is written.
           yield* repo.write(
             repo.join(repo.root, held),
@@ -300,7 +310,8 @@ describe("against main", () => {
         run(false, [], { [held]: three, [baselineFile]: baseline({ [held]: [3, 0, 0, 0] }) })
       )
       deepStrictEqual(raised, [
-        `err: defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`,
+        // A count raised beside the code is code that breaks the rule: the code's heading, not the baseline's alone.
+        "err: defaults:check FAIL  code that settles absence, a starting value or a clean-up by itself. A schema settles it, where the value enters (docs/standards/schema-first.md):",
         `err: ${held}  is held at [3, 0, 0, 0] in ${baselineFile}, above the [2, 0, 0, 0] main holds it to: a number only falls`
       ])
       const added = "packages/a/src/added.ts"
@@ -347,6 +358,111 @@ describe("against main", () => {
         ),
         true
       )
+      // A file moved with `git mv` and its line not yet moved: the check names the fix, and `--write` makes it.
+      const before = yield* inTree(
+        start,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, moved])
+          const checkFound = yield* defaults(false, [], [])
+          const check = printed(render(defaultsSentence)(checkFound))
+          const wroteFound = yield* defaults(true, [], [])
+          const wrote = printed(render(defaultsSentence)(wroteFound))
+          const afterFound = yield* defaults(false, [], [])
+          const after = printed(render(defaultsSentence)(afterFound))
+          const stored = yield* repo.text(repo.join(repo.root, baselineFile))
+          return { check, wrote, after, stored }
+        })
+      )
+      deepStrictEqual(before.check, [
+        `err: defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`,
+        `err: ${held}  is in ${baselineFile} but was renamed to ${moved}: bun run beep laws defaults --write moves its line`
+      ])
+      deepStrictEqual(before.wrote, ["out: defaults:check OK  defaults-baseline.json lowered: it names 1 files"])
+      strictEqual(Str.includes(`"${moved}": [2, 0, 0, 0]`)(before.stored), true)
+      deepStrictEqual(before.after, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+      // Moved out of what the law reads (a declaration file), its line is only taken off: `--write` moves nothing.
+      const declared = yield* inTree(
+        start,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, "packages/a/src/held.d.ts"])
+          const found = yield* defaults(false, [], [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.contains(
+          declared,
+          `err: ${held}  is in ${baselineFile} but is not there: take its line off (bun run beep laws defaults --write), so a new file at its path inherits nothing`
+        ),
+        true
+      )
+      // A new file at the old name keeps the line, so the moved file does not borrow it too.
+      const both = yield* inTree(
+        start,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, moved])
+          yield* repo.write(repo.join(repo.root, held), twoFallbacks)
+          const found = yield* defaults(false, [], [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.some(both, (line) => Str.startsWith(`err: ${moved}  holds 2 fallback, and may hold 0`)(line)),
+        true
+      )
+      // Nor does the baseline lend it twice: a line for the moved file beside the old name's is new to main, whether the
+      // move and the new file are still in the tree (git sees a rename, and the law names the move) or committed (git
+      // sees a change of the old file and a new one).
+      const twice = (committed: boolean) =>
+        inTree(
+          start,
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* onMain()
+            yield* repo.run("git", ["mv", held, moved])
+            yield* repo.write(repo.join(repo.root, held), twoFallbacks)
+            yield* repo.write(
+              repo.join(repo.root, baselineFile),
+              baseline({ [held]: [2, 0, 0, 0], [moved]: [2, 0, 0, 0] })
+            )
+            if (committed) {
+              yield* repo.run("git", ["add", "--all"])
+              yield* repo.run("git", [
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.test",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-q",
+                "-m",
+                "moves it, and writes a new file at its name"
+              ])
+            }
+            const found = yield* defaults(false, [], [])
+            return printed(render(defaultsSentence)(found))
+          })
+        )
+      const notTwice = `err: ${moved}  is in ${baselineFile} but not on main:`
+      const inTheTree = yield* twice(false)
+      const committedBoth = yield* twice(true)
+      strictEqual(
+        A.contains(
+          inTheTree,
+          `${notTwice} it was moved from ${held}, and the file at ${held} now keeps that line, so this one starts from nothing. Fix the file instead`
+        ),
+        true
+      )
+      strictEqual(A.contains(committedBoth, `${notTwice} a baseline only loses files. Fix the file instead`), true)
       deepStrictEqual(renamed, [
         "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
       ])
@@ -436,6 +552,134 @@ describe("--write", () => {
       strictEqual(said.length, 1)
       strictEqual(
         A.some(said, (line) => Str.startsWith("err: --write lowers the baseline for the whole tree")(line)),
+        true
+      )
+    })
+  )
+})
+
+describe("main's baseline written for a reader that counted less", () => {
+  // Main's baseline was written when only `??` was counted. Its numbers are of fewer things, so each line is held to
+  // what this reader finds in the file as it stood on main.
+  const older = ["??"]
+
+  it.effect("passes code nobody changed, and refuses a place written since", () =>
+    Effect.gen(function* () {
+      const widened = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({}, older) },
+        run(false, [], { [baselineFile]: baseline({ [held]: [2, 0, 0, 0] }) })
+      )
+      deepStrictEqual(widened, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+      const three = `${twoFallbacks}export const c = (z?: string) => z ?? ""
+`
+      const written = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({}, older) },
+        run(false, [], { [held]: three, [baselineFile]: baseline({ [held]: [3, 0, 0, 0] }) })
+      )
+      strictEqual(
+        A.contains(
+          written,
+          `err: ${held}  is held at [3, 0, 0, 0] in ${baselineFile}, above the [2, 0, 0, 0] this reader finds in it on main (main's baseline counts less, so the file is held to its code there): a number only falls`
+        ),
+        true
+      )
+    })
+  )
+
+  it.effect("holds each kind to its own count there, not to the larger of main's line and the code", () =>
+    Effect.gen(function* () {
+      // Main's line allows 2 fallbacks; the code there holds 1 fallback and 1 absence. The file now holds 2 and 1: each
+      // kind is above one of the two, so a larger-of-both per kind would let a place written since through.
+      const there = `export const a = (x?: number, y?: number) => [x ?? 0, y === undefined]
+`
+      const now = `export const a = (x?: number, y?: number) => [x ?? 0, y === undefined, x ?? 1]
+`
+      const said = yield* inTree(
+        { [held]: there, [baselineFile]: baseline({ [held]: [2, 0, 0, 0] }, older) },
+        run(false, [], { [held]: now, [baselineFile]: baseline({ [held]: [2, 1, 0, 0] }) })
+      )
+      strictEqual(
+        A.some(said, (line) =>
+          Str.startsWith(`err: ${held}  is held at [2, 1, 0, 0] in ${baselineFile}, above the [1, 1, 0, 0]`)(line)
+        ),
+        true
+      )
+    })
+  )
+
+  it.effect("credits a moved file from its old name's code", () =>
+    Effect.gen(function* () {
+      const moved = "packages/a/src/moved.ts"
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({ [held]: [1, 0, 0, 0] }, older) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", held, moved])
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [moved]: [2, 0, 0, 0] }))
+          const found = yield* defaults(false, [], [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      deepStrictEqual(said, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+    })
+  )
+
+  it.effect("gives no credit to a file the law did not read there (a registry component moved into its reach)", () =>
+    Effect.gen(function* () {
+      const registry = "packages/ui/src/components/tour.tsx"
+      const moved = "packages/ui/src/tour-moved.tsx"
+      const said = yield* inTree(
+        { [registry]: twoFallbacks, [baselineFile]: baseline({}, older) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", registry, moved])
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [moved]: [2, 0, 0, 0] }))
+          const found = yield* defaults(false, [], [])
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.contains(
+          said,
+          `err: ${moved}  is in ${baselineFile} but not on main: a baseline only loses files. Fix the file instead`
+        ),
+        true
+      )
+    })
+  )
+
+  it.effect("refuses to compare when git cannot list the files there, rather than reading an empty list", () =>
+    Effect.gen(function* () {
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({}, older) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [held]: [2, 0, 0, 0] }))
+          // git grep answers 2 or more when it could not search: a list it could not give, never an empty one.
+          const failing = Repo.of({
+            ...repo,
+            run: Effect.fn("failingGrep")(function* (command, args, options) {
+              if (A.contains(args, "grep"))
+                return { bytes: new Uint8Array(), stdout: "", stderr: "grep broke", code: 2 }
+              return yield* repo.run(command, args, options)
+            })
+          })
+          const found = yield* Effect.provideService(defaults(false, [], []), Repo, failing)
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      strictEqual(
+        A.contains(
+          said,
+          `err: ${baselineFile} could not be compared with main: git could not list the files at the base (grep broke)`
+        ),
         true
       )
     })

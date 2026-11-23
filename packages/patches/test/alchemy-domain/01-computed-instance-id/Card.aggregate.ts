@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // A card that keeps who wrote it. It has no command of its own: the decision beside it records on it.
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"

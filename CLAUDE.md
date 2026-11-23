@@ -449,14 +449,13 @@ The review is also a model of `@alchemy.run/domain` (`packages/catalog/model`: `
 its rules from the code of `decide` and `evolve`, so that code is written for two readers. Before changing one of
 those files, read [docs/verify.md](docs/verify.md).
 
-- **`new` only where a `decide` is**: files named `*.aggregate.ts` and `*.decision.ts` build events and rejections with
-  `new`, since the prover does not read `X.make(...)` there. The `// @effect-diagnostics newSchemaClass:off` first line
-  that lets them is refused in a new file (`diagnostics:check`): the model's decide files that hold it today are held
-  in `packages/tooling/tool/cli/ledgers/diagnostics.json`, and a new decide file builds with `.make` once the prover
-  reads it (Benjamin's later answer to decision 33, "Teach the prover .make", in progress), so it waits for that
-  change. Everywhere else, tests included, `.make`.
-- **A case is told with `effect/Match`**, in a guard written once beside the schema (`isOpen`, `isDecided`); the prover
-  does not read a schema's `guards` or `match`. **A state is built by its case's own `make`, with the status written
+- **`.make` everywhere, a `decide` included**: an event or a rejection is built with `X.make(...)` in `*.aggregate.ts`
+  and `*.decision.ts` as in every other file, and no file turns a diagnostic off. The prover reads `X.make(...)` as the
+  instance it builds, through the repository's third patch to it (`docs/patches.md`).
+- **A case is told by its schema's own guard** (`ImportState.guards.Open`, `ImportCommand.isAnyOf([...])`,
+  `ImportEvent.guards.ActCounted`), never by a copy written beside it: the prover reads a tagged union's `guards`,
+  `isAnyOf`, `match` and `matchOrElse`, and `Schema.is`, through the repository's third patch to it
+  (`docs/patches.md`), from a union the file exports. **A state is built by its case's own `make`, with the status written
   out** (`ImportState.cases.Open.make({ status: "Open", ... })`): the prover sees only what `make` is given. A state's
   union is keyed by `status`.
 - **A rule is one comparison.** The prover takes both sides of every `&&`, `||` and `?:` it cannot settle, in the code

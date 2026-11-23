@@ -1,4 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // The app as the tests run it. Two storages: `TestDatabase`, a real D1 database in local workerd with the real
 // migrations (slow: name the file `*.slow.test.ts`), and the in-memory services in `inMemory`, for rules that live in
 // the handlers and middleware (fast). Settings come from a ConfigProvider, the same way the Worker gets them. Sign-in
@@ -12,6 +11,7 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
+import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
@@ -19,6 +19,10 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import * as DevTools from "effect/devtools/DevTools"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientError from "effect/http/HttpClientError"
+import type * as HttpClientRequest from "effect/http/HttpClientRequest"
+import type * as HttpClientResponse from "effect/http/HttpClientResponse"
 import type * as HttpRouter from "effect/http/HttpRouter"
 import * as HttpServer from "effect/http/HttpServer"
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
@@ -28,12 +32,12 @@ import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
 import { signIn } from "@inventory/access-host/SignIn"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
-import { MemberId, type OrganizationId } from "@inventory/kernel/Ids"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
+import { makeApp, makeRoutes, servicesWith, toServe } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { Handlers } from "../../../src/server/handlers.ts"
 import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
@@ -104,6 +108,27 @@ export const TestAuth = (options: { readonly rateLimit?: boolean; readonly produ
     })
   ).pipe(Layer.provide(TestDatabase))
 
+/**
+ * The network as a test sees it: every request the app sends (to the collector) is answered by `answer`, in Effect, and
+ * nothing reaches a real service.
+ */
+export const standInHttp = (
+  answer: (
+    request: HttpClientRequest.HttpClientRequest
+  ) => Effect.Effect<HttpClientResponse.HttpClientResponse, HttpClientError.HttpClientError>
+): Layer.Layer<HttpClient.HttpClient> => Layer.succeed(HttpClient.HttpClient, HttpClient.make(answer))
+
+/** A request that could not be sent at all, as fetch fails when nothing answers at the address. */
+export const unreachable = (request: HttpClientRequest.HttpClientRequest) =>
+  Effect.fail(
+    new HttpClientError.HttpClientError({
+      reason: new HttpClientError.TransportError({ request, description: "nothing answers in tests" })
+    })
+  )
+
+/** No network: every request the app sends fails as unreachable. What a test that sends nothing out runs on. */
+export const noNetwork = standInHttp(unreachable)
+
 /** Sign-in for the in-memory app: nobody is ever signed in, and /api/auth/* is not there. A test double. */
 export const SignedOutAuth = BetterAuthTest.signedOut
 
@@ -113,7 +138,8 @@ export const TestApp = makeApp({
   identity: HeaderIdentity,
   auth: TestAuth(),
   production: false,
-  docs: false
+  docs: false,
+  http: noNetwork
 }).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer()))
 
 /**
@@ -124,7 +150,7 @@ const seededLines = (at: DateTime.Utc): ReadonlyArray<Activity> =>
   A.map(["org_prairie", "org_northline"] as const, (org, index) =>
     Activity.make({
       id: ActivityId.make(`00000000-0000-4000-8000-00000000000${index}`),
-      organizationId: org as OrganizationId,
+      organizationId: OrganizationId.make(org),
       actorId: MemberId.make(org === "org_prairie" ? "mem_dana" : "mem_elena"),
       actorName: "Seeded",
       action: "Uploaded a file",
@@ -162,6 +188,7 @@ const InMemoryStorage = Layer.mergeAll(
 export const inMemoryApp = <E, R>({
   ai,
   docs = false,
+  http = noNetwork,
   member,
   settings = testSettings
 }: {
@@ -169,10 +196,13 @@ export const inMemoryApp = <E, R>({
   readonly ai: Layer.Layer<OpenRouter, E, R>
   /** Mount the API reference page, as a development build does. */
   readonly docs?: boolean
+  /** How the app's requests out (to the collector) are answered. Default: `noNetwork`. */
+  readonly http?: Layer.Layer<HttpClient.HttpClient>
   /** The settings the app reads, as the Worker's `env` would give them. Default: `testSettings`. */
   readonly settings?: Record<string, string>
 }) =>
   makeRoutes({ docs, identity: HeaderIdentity }).pipe(
+    Layer.provide(http),
     Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
     Layer.provide(InMemoryAccess(member)),
     Layer.provide(SignedOutAuth),
@@ -260,23 +290,41 @@ export const TypedApp = testAppWith(OpenRouterTest.off("noKey", ModelId.make(tes
 export const testAppAround = (around: Layer.Layer<ImportStore, never, StoreNeeds>) =>
   handlersOn(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)), around)
 
-/** The app's `fetch`, as the Worker exports it: security headers included. `dispose` runs when the test block ends. */
+/** The app as the Worker serves it: security headers included. `dispose` runs when the test block ends. */
 export class TestFetch extends Context.Service<
   TestFetch,
-  { readonly handle: (request: Request) => Promise<Response> }
+  { readonly handle: (request: Request) => Effect.Effect<Response> }
 >()("@inventory/app/test/server/support/app/TestFetch") {
   static readonly layer = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>) =>
     Layer.effect(
       TestFetch,
       Effect.map(
         Effect.acquireRelease(
-          Effect.sync(() => toFetch(app)),
-          (running) => Effect.promise(() => running.dispose())
+          Effect.sync(() => toServe(app)),
+          (running) => running.dispose
         ),
-        (running) => TestFetch.of({ handle: running.fetch })
+        (running) => TestFetch.of({ handle: running.serve })
       )
     )
 }
+
+/** A response's body as text: the platform's promise, taken in. */
+export const textOf = (response: Response): Effect.Effect<string> => Effect.promise(() => response.text())
+
+/** A response's body as JSON, or its text when it is not JSON. */
+export const jsonOf = (response: Response): Effect.Effect<unknown> =>
+  Effect.flatMap(textOf(response), (text) => fromJson(text).pipe(Effect.orElseSucceed(() => text)))
+
+/**
+ * What a request hands the platform after its answer, started at once as `waitUntil` starts it, and kept in `pending`
+ * to be waited for by `settled`.
+ */
+export const afterAnswerInto =
+  (pending: Array<Fiber.Fiber<void>>) =>
+  (work: Effect.Effect<void>): Effect.Effect<void> =>
+    Effect.map(Effect.forkDetach(work), (fiber) => {
+      pending.push(fiber)
+    })
 
 const toJson = S.encodeEffect(S.fromJsonString(S.Unknown))
 const fromJson = S.decodeUnknownEffect(S.fromJsonString(S.Unknown))
@@ -285,11 +333,11 @@ const fromJson = S.decodeUnknownEffect(S.fromJsonString(S.Unknown))
 export const testOrigin = "http://localhost:5320"
 
 /**
- * Waits for everything a request handed to `waitUntil`. Each promise is already running, so nothing is started here:
- * they are only waited for, all of them at once, and a rejected one fails the test.
+ * Waits for everything a request handed on after its answer. Each piece is already running, so nothing is started
+ * here: they are only waited for, all of them at once, and a failed one fails the test.
  */
-export const settled = (pending: ReadonlyArray<Promise<unknown>>): Effect.Effect<void> =>
-  Effect.forEach(pending, (promise) => Effect.promise(() => promise), { concurrency: "unbounded", discard: true })
+export const settled = (pending: ReadonlyArray<Fiber.Fiber<void>>): Effect.Effect<void> =>
+  Effect.asVoid(Fiber.joinAll(pending))
 
 /**
  * Sends one request to the app the way a browser or curl would, as the member named by `actingAs` (the demo
@@ -307,16 +355,14 @@ export const send = Effect.fn("test.send")(function* (options: {
   const headers = new Headers(options.headers)
   if (options.actingAs !== undefined) headers.set("x-acting-as", options.actingAs)
   if (body !== undefined) headers.set("content-type", "application/json")
-  const response = yield* Effect.promise(() =>
-    handle(
-      new Request(`${testOrigin}${options.path}`, {
-        method: options.method ?? (body === undefined ? "GET" : "POST"),
-        headers,
-        ...(body === undefined ? {} : { body })
-      })
-    )
+  const response = yield* handle(
+    new Request(`${testOrigin}${options.path}`, {
+      method: options.method ?? (body === undefined ? "GET" : "POST"),
+      headers,
+      ...(body === undefined ? {} : { body })
+    })
   )
-  const text = yield* Effect.promise(() => response.text())
+  const text = yield* textOf(response)
   const json = text === "" ? undefined : yield* fromJson(text).pipe(Effect.orElseSucceed(() => text))
   return { status: response.status, headers: response.headers, json, text }
 })
@@ -343,7 +389,8 @@ export const signInApp = (
         identity: SessionIdentityLive,
         auth: TestAuth({ rateLimit: true, production: options.production ?? false }),
         production: options.production ?? false,
-        docs: false
+        docs: false,
+        http: noNetwork
       }),
       SeededAccounts
     ).pipe(Layer.provide(settingsLayer({ ...testSettings, PWNED_PASSWORD_CHECK: "false", ...options.settings })))
@@ -375,20 +422,18 @@ export const browser = (address: string) => {
       ...extra
     }
     const payload = body === undefined ? undefined : yield* encodeAny(body).pipe(Effect.orDie)
-    const response = yield* Effect.promise(() =>
-      handle(
-        new Request(`${testOrigin}${path}`, {
-          method,
-          headers: R.filter(headers, (value) => value !== ""),
-          ...(payload === undefined ? {} : { body: payload })
-        })
-      )
+    const response = yield* handle(
+      new Request(`${testOrigin}${path}`, {
+        method,
+        headers: R.filter(headers, (value) => value !== ""),
+        ...(payload === undefined ? {} : { body: payload })
+      })
     )
     const setCookie = O.getOrUndefined(
       A.findFirst(response.headers.getSetCookie(), (line) => Str.includes("inventory.session_token=")(line))
     )
     if (setCookie !== undefined) cookie = Str.split(setCookie, ";")[0] ?? ""
-    const text = yield* Effect.promise(() => response.text())
+    const text = yield* textOf(response)
     const json = text === "" ? undefined : yield* decodeAny(text).pipe(Effect.orElseSucceed(() => text))
     return { status: response.status, json, setCookie }
   })

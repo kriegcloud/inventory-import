@@ -370,6 +370,31 @@ describe("a stored reason longer than the result reads", () => {
     })
   )
 
+  // Each reason here is cut within a character or two of a cell's edge, where the pairing runs cells together that
+  // the exact reading keeps apart: so the exact reading is taken or not on one character, of the cut, of a cell's
+  // first characters or of the text between cells. A long run of one character fills the reason up to the cut.
+  const atTheCut = (fill: number, unit: string, category: number, tags: string, name: string) =>
+    ` ${Str.repeat(fill)("z")}. Unit of measure "${unit}" is not one of the 5 categories. Category "${Str.repeat(category)(" y")}" is not one of EA. Tags "${tags}" are not lower case, each once. Name "${name}" has spaces around it.`
+  it.effect.each([atTheCut(3816, "😀", 26, "😀", "(((")])(
+    "cut where a character more of it would show past the cut, reads as the pairing did: %#",
+    (stored) =>
+      Effect.gen(function* () {
+        const read = yield* readReason(stored)
+        expect(read).toBe(readAt(stored, pairing))
+      })
+  )
+  it.effect.each([
+    atTheCut(3724, "(((", 60, "(((", ""),
+    atTheCut(3823, "y", 26, "y", " y"),
+    atTheCut(3841, " y", 12, " y", "y"),
+    `${Str.repeat(3807)("q")}. Unit of measure "😀" is not one of EA. Tags " ${Str.repeat(23)("y")}😀" are not lower case, each once. SKU "(((${Str.repeat(23)("😀")}" has spaces around it. Name " 😀" has spaces around it.`
+  ])("cut where it shows all the pairing showed, to the character, is read exactly: %#", (stored) =>
+    Effect.gen(function* () {
+      const read = yield* readReason(stored)
+      expect([read, read === readAt(stored, pairing)]).toEqual([readAt(stored, '"'), false])
+    })
+  )
+
   it.effect("whose next cell starts with a space, is read exactly where the pairing ran the two cells into one", () =>
     Effect.gen(function* () {
       const [sku, name] = [Str.repeat(3000)("a"), ` ${Str.repeat(3000)("b")}`]

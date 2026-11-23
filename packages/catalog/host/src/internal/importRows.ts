@@ -17,6 +17,7 @@ import { said, saidParts } from "@inventory/catalog-model/CellReading"
 import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as A from "effect/Array"
+import * as HashSet from "effect/HashSet"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -211,7 +212,7 @@ const eachLabelOnce = (parts: ReadonlyArray<string>): boolean => {
       (part) => O.flatMap(Str.match(labelBefore)(part), (found) => A.get(found, 1))
     )
   )
-  return labels.length <= pastLabels.length && A.dedupe(labels).length === labels.length
+  return HashSet.size(HashSet.fromIterable(labels)) === labels.length
 }
 
 /**

@@ -373,9 +373,24 @@ describe("the writer", () => {
     const words = S.decodeUnknownOption(TextNode)
     expect(O.isNone(iri("https://example.org/a\u0001b"))).toBe(true)
     expect(O.isSome(iri("https://example.org/a-b"))).toBe(true)
-    expect(O.isNone(words({ kind: "text", value: "Hi", language: "en-US" }))).toBe(true)
+    expect(O.map(words({ kind: "text", value: "Hi", language: "en-US" }), (text) => text.language)).toStrictEqual(
+      O.some("en-us")
+    )
     expect(O.isSome(words({ kind: "text", value: "Hi", language: "en-us" }))).toBe(true)
+    expect(O.isNone(words({ kind: "text", value: "Hi", language: "english_us" }))).toBe(true)
   })
+
+  it.effect("the reader lowers a language tag written in capitals, as the writer writes it", () =>
+    Effect.gen(function* () {
+      const read = yield* parseTurtle(
+        "https://example.org/thing",
+        '<a> <http://www.w3.org/2000/01/rdf-schema#label> "Hi"@EN-us .'
+      )
+      expect(A.map(read, (triple) => triple.object)).toStrictEqual([
+        TextNode.make({ kind: "text", value: "Hi", language: "en-us" })
+      ])
+    })
+  )
 
   it.effect("writes the same text whatever order it is given the triples in", () =>
     Effect.gen(function* () {

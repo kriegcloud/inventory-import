@@ -14,8 +14,9 @@
  * - 4: the text of a construct the vocabulary never states, as a CURIE or as a full IRI, in any code file.
  * - 5: the vocabulary's base IRI written out, in any code file but the vocabulary module.
  * - 6: a mark's annotation key written by hand: `term`, `path` or `noTerm` in an annotation object, or anywhere with
- *   the shape a helper returns. The package that makes the helpers and the vendored kit, which has a `term`
- *   annotation of its own, are not read for it.
+ *   the shape a helper returns. Three places are not read for it: the module that makes the helpers
+ *   (`Pointer.mark.ts` of the helpers' package), that package's tests, and each folder of the vendored kit, which
+ *   has a `term` annotation of its own. The rest of the helpers' package is read.
  * - 7: a value import, a value re-export or a dynamic import that resolves to the vocabulary module, from any file
  *   outside `packages/ontology`. A specifier is resolved, not matched: a relative path, a package's `exports`, a
  *   tsconfig `paths` alias and a `package.json` `imports` alias each lead to a file, and the rule is on that file.
@@ -60,7 +61,10 @@ const helperFiles: ReadonlyArray<string> = [`${helperPackage}src/Pointer.mark.ts
 const helperModule = "packages/kernel/src/Terms.pointer.ts"
 const enrolmentList = "packages/ontology/enrolment.json"
 
-/** The vocabulary's base IRI, written here because the law imports no package to take it from (rule 5). */
+/**
+ * The vocabulary's base IRI, written here because the law imports no package to take it from (rule 5). The law
+ * reads the module's text, so it holds this copy to the module's own `const base`: one that differs is a finding.
+ */
 const baseIri = "https://example.org/inventory-import"
 
 /** The constructs the vocabulary never states (rule 4), by namespace: the prefix, the namespace, the local names. */
@@ -421,7 +425,22 @@ export const ontologyTerms = Effect.fn("OntologyTerms.ontologyTerms")(function* 
         )
         const bases =
           file === vocabularyModule
-            ? []
+            ? A.flatMap(A.fromIterable(Str.matchAll(/^const base = "([^"]+)"/gm)(source)), (match) =>
+                A.fromOption(
+                  O.flatMap(A.get(match, 1), (written) =>
+                    written === baseIri
+                      ? O.none()
+                      : O.some(
+                          at(
+                            file,
+                            O.match(Str.indexOf(match[0])(source), { onNone: () => 1, onSome: lineAt }),
+                            "5",
+                            `the vocabulary's base is ${written} and this law searches for ${baseIri}: change baseIri in the law to match, or rule 5 lets the new base be written anywhere`
+                          )
+                        )
+                  )
+                )
+              )
             : A.map(
                 A.fromIterable(Str.matchAll(new RegExp(Str.replace(/[./]/g, "\\$&")(baseIri), "g"))(source)),
                 (match) =>

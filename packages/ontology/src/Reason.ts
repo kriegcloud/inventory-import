@@ -10,6 +10,7 @@
  *
  * @packageDocumentation
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -63,13 +64,30 @@ export class RobotLock extends S.Class<RobotLock, { readonly brand: unique symbo
 export const robotPin = S.decodeUnknownEffect(RobotLock)(lock)
 
 /** One place the machine may keep a Java, and the version found there: none when no Java answers there. */
-export type JavaFound = { readonly where: string; readonly version: O.Option<string> }
+export class JavaFound extends S.Opaque<JavaFound, { readonly brand: unique symbol }>()(
+  S.Struct({
+    where: S.String.pipe(S.annotateKey({ description: "The path of the java looked at" })),
+    version: S.Option(S.String).pipe(
+      S.annotateKey({ description: "The version it says it is; none when nothing answers there" })
+    )
+  }).pipe($I.annoteSchema("JavaFound", { description: "One place a Java may be, and the version found there" }))
+) {}
 
 /** The jar as the machine holds it: the sha256 and the size of its bytes. */
-export type JarFound = { readonly sha256: string; readonly bytes: number }
+export class JarFound extends S.Opaque<JarFound, { readonly brand: unique symbol }>()(
+  S.Struct({
+    sha256: S.String.pipe(S.annotateKey({ description: "The sha256 of the bytes on the machine, in hex" })),
+    bytes: S.Int.check(S.isGreaterThanOrEqualTo(0)).pipe(S.annotateKey({ description: "How many bytes are there" }))
+  }).pipe($I.annoteSchema("JarFound", { description: "The jar as the machine holds it" }))
+) {}
 
 /** What a command of ROBOT came to: its exit code and everything it printed. */
-export type RobotResult = { readonly code: number; readonly output: string }
+export class RobotResult extends S.Opaque<RobotResult, { readonly brand: unique symbol }>()(
+  S.Struct({
+    code: S.Int.pipe(S.annotateKey({ description: "The exit code; a command that never ran, or was stopped, has 1" })),
+    output: S.String.pipe(S.annotateKey({ description: "Everything the command printed, both streams" }))
+  }).pipe($I.annoteSchema("RobotResult", { description: "What one command of ROBOT came to" }))
+) {}
 
 /**
  * No Java of the pinned major version is on the machine. `found` is each place looked at with what answered there.
@@ -152,13 +170,22 @@ export class Machine extends Context.Service<
   }
 >()($I`Machine`) {}
 
+/** What a reasoner run must come to. */
+export const Verdict = LiteralKit(["consistent", "inconsistent"]).pipe(
+  $I.annoteSchema("Verdict", { description: "What the reasoner must find: consistent, or inconsistent" })
+)
+/** Runtime type of {@link Verdict}. */
+export type Verdict = typeof Verdict.Type
+
 /** One run: the files it joins, what the reasoner must find, and the forbidden conclusion it stands for. */
-export type Run = {
-  readonly name: string
-  readonly ban: string
-  readonly files: ReadonlyArray<string>
-  readonly must: "consistent" | "inconsistent"
-}
+export class Run extends S.Opaque<Run, { readonly brand: unique symbol }>()(
+  S.Struct({
+    name: S.String.pipe(S.annotateKey({ description: "What the run is called in the gate's output" })),
+    ban: S.String.pipe(S.annotateKey({ description: "The forbidden conclusion it stands for, and which side of it" })),
+    files: S.Array(S.String).pipe(S.annotateKey({ description: "The Turtle texts it joins, the ontology first" })),
+    must: Verdict.pipe(S.annotateKey({ description: "What the reasoner must find for the gate to pass" }))
+  }).pipe($I.annoteSchema("Run", { description: "One run of the reasoner and what it must come to" }))
+) {}
 
 const thread: ReadonlyArray<string> = [ontology, graph]
 
@@ -167,36 +194,36 @@ const thread: ReadonlyArray<string> = [ontology, graph]
  * Each is the generated ontology and the thread's graph, the three refusals and one near miss with one file more.
  */
 export const runs: ReadonlyArray<Run> = [
-  {
+  Run.make({
     name: "the thread's graph",
     ban: "ban 1, the near miss: the same person is a member of two tenants",
     files: thread,
     must: "consistent"
-  },
-  {
+  }),
+  Run.make({
     name: "fixtures/reason/entry-names-member.ttl",
     ban: "ban 2, the near miss: an audit entry names a member of the person, in the tenant",
     files: [...thread, entryNamesMember],
     must: "consistent"
-  },
-  {
+  }),
+  Run.make({
     name: "fixtures/reason/person-is-tenant.ttl",
     ban: "ban 1, refused: a person is a tenant",
     files: [...thread, personIsTenant],
     must: "inconsistent"
-  },
-  {
+  }),
+  Run.make({
     name: "fixtures/reason/entry-is-person.ttl",
     ban: "ban 2, refused: an audit entry is the person it is about",
     files: [...thread, entryIsPerson],
     must: "inconsistent"
-  },
-  {
+  }),
+  Run.make({
     name: "fixtures/reason/entry-is-tenant.ttl",
     ban: "ban 2, refused: an audit entry is the organization it is about",
     files: [...thread, entryIsTenant],
     must: "inconsistent"
-  }
+  })
 ]
 
 /**

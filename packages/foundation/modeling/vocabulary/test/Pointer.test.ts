@@ -156,7 +156,7 @@ describe("reading a struct", () => {
         path: [
           {
             property: "lib:loanOf",
-            reverse: true,
+            reverse: O.some(true),
             node: "lib:Loan",
             fixed: [{ property: "lib:loanScope", concept: "lib:LoanScopeScheme-branch" }]
           },

@@ -392,6 +392,23 @@ describe("rule 5, the base IRI is written once", () => {
       expect(found).toStrictEqual(["packages/ontology/test/Questions.test.ts:2 rule 5"])
     })
   )
+
+  it.effect("refuses a vocabulary module whose base is not the one this rule searches for", () =>
+    Effect.gen(function* () {
+      const found = yield* refusals({
+        ...thread,
+        "packages/kernel/src/Terms.vocab.ts":
+          'const base = "https://example.org/another"\nexport const vocabulary = { base }\n'
+      })
+      expect(found).toStrictEqual(["packages/kernel/src/Terms.vocab.ts:1 rule 5"])
+      const same = yield* refusals({
+        ...thread,
+        "packages/kernel/src/Terms.vocab.ts":
+          'const base = "https://example.org/inventory-import"\nexport const vocabulary = { base }\n'
+      })
+      expect(same).toStrictEqual([])
+    })
+  )
 })
 
 describe("rule 6, a mark's key written by hand", () => {

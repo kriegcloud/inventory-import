@@ -4,8 +4,9 @@
  *
  * Do not break: the same projection gives the same text on every machine and on every run. UTF-8, LF, one final
  * newline, no trailing space; two comment lines; only the prefixes the file uses, sorted; subjects by section and,
- * within one, by IRI in code-point order; predicates in the projection's order, `rdf:type` written `a`; objects by
- * their N-Triples form, one a line; no blank node, no `@base`, and no date, host, path outside the repository or
+ * within one, by IRI in code-point order; predicates in the projection's order, `rdf:type` written `a`; a name
+ * written with its prefix where one leaves a plain local name, and as `<iri>` otherwise; the objects of one
+ * predicate one a line, in the order of their N-Triples form, which is used to sort and never written; no blank node, no `@base`, and no date, host, path outside the repository or
  * commit anywhere. A predicate the projection's order lacks, or words that are not NFC, are refused: nothing is
  * written around them.
  *

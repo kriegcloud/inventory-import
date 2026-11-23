@@ -56,6 +56,12 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
+  // The literal states gist's release twice, as a number and inside the IRI the OWL file names as its source. No rule
+  // of the gate compares them, and only the IRI is written, so a number moved alone would go unseen.
+  it("gist's version IRI is the release the vocabulary says it projects", () => {
+    expect(vocabulary.gist.versionIri).toBe(`https://w3id.org/semanticarts/ontology/gistCore${vocabulary.gist.version}`)
+  })
+
   // Section 6.4's planted mistake: `none` is a legal parent, so the copy decodes, and only C4 can see that no entry
   // of the list allows it. The reason is held to a definition's length, so it is longer than the report's "planted".
   it.effect("reports exactly C4 on Grant when a copy gives Grant no parent and the list no entry", () =>

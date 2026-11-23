@@ -362,7 +362,15 @@ describe("the question runner", () => {
     Effect.gen(function* () {
       const graph = yield* threadGraph()
       const refusal = yield* Effect.flip(ask(graph, "SELECT ?member WHERE {", ["member"]))
-      expect(refusal.reason).not.toBe("")
+      expect(refusal.reason).toContain("error at 1:23")
+    })
+  )
+
+  it.effect("answers a query that parses and matches nothing with no rows, not with a refusal", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const rows = yield* ask(graph, "SELECT ?member WHERE { ?member <https://example.org/none> ?nothing }", ["member"])
+      expect(rows).toStrictEqual([])
     })
   )
 })

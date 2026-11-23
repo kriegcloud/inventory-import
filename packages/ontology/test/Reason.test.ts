@@ -22,23 +22,23 @@ import {
   refusalSentence,
   robotPin,
   runs,
-  type JarFound,
-  type JavaFound,
-  type RobotResult
+  JarFound,
+  JavaFound,
+  RobotResult
 } from "../src/Reason.ts"
 import { linesOf } from "../src/Graph.schema.ts"
 import { readTurtle } from "../src/Turtle.ts"
 
-const java17: JavaFound = { where: "/opt/java-17/bin/java", version: O.some("17.0.2") }
-const java27: JavaFound = { where: "java", version: O.some("27.0.1.1") }
-const absent: JavaFound = { where: "/opt/none/bin/java", version: O.none() }
+const java17 = JavaFound.make({ where: "/opt/java-17/bin/java", version: O.some("17.0.2") })
+const java27 = JavaFound.make({ where: "java", version: O.some("27.0.1.1") })
+const absent = JavaFound.make({ where: "/opt/none/bin/java", version: O.none() })
 
 /** What ROBOT prints for an inconsistency (v1.9.11, tried by hand), and its exit code. */
-const inconsistent: RobotResult = {
+const inconsistent = RobotResult.make({
   code: 1,
   output: "ERROR org.obolibrary.robot.ReasonerHelper - The ontology is inconsistent. TIP: use a tool like Protege"
-}
-const fine: RobotResult = { code: 0, output: "" }
+})
+const fine = RobotResult.make({ code: 0, output: "" })
 
 type Case = {
   readonly javas?: ReadonlyArray<JavaFound>
@@ -57,7 +57,7 @@ const honest = (command: "validate-profile" | "reason", document: string): Robot
 /** Runs the gate on the machine of one case; answers what it came to, each call ROBOT got, and the fetches. */
 const gate = Effect.fn("gate")(function* (asked: Case) {
   const pin = yield* robotPin
-  const approved: JarFound = { sha256: pin.sha256, bytes: pin.bytes }
+  const approved = JarFound.make({ sha256: pin.sha256, bytes: pin.bytes })
   // What a case leaves out is the machine that passes: both Javas, the approved jar, a fetch that works, honest ROBOT.
   const given = {
     javas: [java27, java17],
@@ -143,7 +143,7 @@ describe("gate 9, the reasoner's checks", () => {
   it.effect("refusal 2: Java is installed and is not 17", () =>
     Effect.gen(function* () {
       const run = yield* refusalOf({
-        javas: [java27, { where: "/opt/java-8/bin/java", version: O.some("1.8.0_292") }, absent]
+        javas: [java27, JavaFound.make({ where: "/opt/java-8/bin/java", version: O.some("1.8.0_292") }), absent]
       })
       expect(O.exists(run.refusal, S.is(JavaNotPinned))).toBe(true)
       expect(run.sentence).toContain("java: 27.0.1.1; /opt/java-8/bin/java: 1.8.0_292")
@@ -167,7 +167,7 @@ describe("gate 9, the reasoner's checks", () => {
 
   it.effect("refusal 4: the jar's bytes do not hash to the pin, kept or just fetched", () =>
     Effect.gen(function* () {
-      const other: JarFound = { sha256: Str.repeat(64)("0"), bytes: 82708624 }
+      const other = JarFound.make({ sha256: Str.repeat(64)("0"), bytes: 82708624 })
       const kept = yield* refusalOf({ jar: O.some(other) })
       expect(O.exists(kept.refusal, S.is(JarNotPinned))).toBe(true)
       expect(kept.sentence).toContain("is not the approved file")
@@ -178,7 +178,7 @@ describe("gate 9, the reasoner's checks", () => {
       expect(fetched.fetches).toStrictEqual([fetched.pin.url])
       expect(fetched.calls).toStrictEqual([])
       // The right hash over another size is not the approved file either.
-      const short = yield* refusalOf({ jar: O.some({ sha256: kept.pin.sha256, bytes: 1 }) })
+      const short = yield* refusalOf({ jar: O.some(JarFound.make({ sha256: kept.pin.sha256, bytes: 1 })) })
       expect(O.exists(short.refusal, S.is(JarNotPinned))).toBe(true)
     })
   )
@@ -206,7 +206,7 @@ describe("gate 9, the reasoner's checks", () => {
       const run = yield* refusalOf({
         robot: (command, document) =>
           command === "reason" && honest(command, document).code !== 0
-            ? { code: 1, output: "java.lang.OutOfMemoryError" }
+            ? RobotResult.make({ code: 1, output: "java.lang.OutOfMemoryError" })
             : fine
       })
       expect(run.sentence).toContain("must report an inconsistency, and it stopped for another reason")
@@ -219,7 +219,7 @@ describe("gate 9, the reasoner's checks", () => {
       const run = yield* refusalOf({
         robot: (command, document) =>
           command === "validate-profile" && Str.includes("test_Ravi> a inv:Tenant")(document)
-            ? { code: 1, output: "PROFILE VIOLATION ERROR" }
+            ? RobotResult.make({ code: 1, output: "PROFILE VIOLATION ERROR" })
             : honest(command, document)
       })
       expect(run.sentence).toContain(
@@ -237,7 +237,8 @@ describe("gate 9, the reasoner's checks", () => {
         "the thread's graph: it must be consistent, and the reasoner reports an inconsistency"
       )
       const crashed = yield* refusalOf({
-        robot: (command) => (command === "reason" ? { code: 2, output: "Unable to access jarfile" } : fine)
+        robot: (command) =>
+          command === "reason" ? RobotResult.make({ code: 2, output: "Unable to access jarfile" }) : fine
       })
       expect(crashed.sentence).toContain("it must be consistent, and the reasoner stopped for another reason")
     })

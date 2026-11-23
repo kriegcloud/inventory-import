@@ -194,14 +194,15 @@ export class FixedConceptRead extends S.Opaque<FixedConceptRead, { readonly bran
   }).pipe($I.annoteSchema("FixedConceptRead", { description: "A concept a lift fixes on its node" }))
 ) {}
 
-/** A node step of a lift, as read: a missing `reverse` reads as false and a missing `fixed` as none. */
+/** A node step of a lift, as read: a missing `reverse` reads as none, and a missing `fixed` as no concept. */
 export class NodeStepRead extends S.Opaque<NodeStepRead, { readonly brand: unique symbol }>()(
   S.Struct({
     property: MarkedName.pipe(S.annotateKey({ description: "The property joining the new node to the one before" })),
     node: MarkedName.pipe(S.annotateKey({ description: "The class of the new node" })),
     reverse: S.Literal(true).pipe(
       S.annotateKey({ description: "The new node is the triple's subject; absent, its object" }),
-      S.optionalKey
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     fixed: S.Array(FixedConceptRead).pipe(
       S.annotateKey({ description: "The concepts the new node always has" }),
@@ -228,11 +229,43 @@ export const LiftPathRead = S.TupleWithRest(S.Tuple([]), [NodeStepRead, ValueSte
 /** Runtime type of {@link LiftPathRead}. */
 export type LiftPathRead = typeof LiftPathRead.Type
 
-/** A no-term mark with a closed reason, as read. */
-export class ClosedNoTermRead extends S.Opaque<ClosedNoTermRead, { readonly brand: unique symbol }>()(
-  S.Struct({
-    reason: NoTermReason.pipe(S.annotateKey({ description: "Why the position stands for no term" }))
-  }).pipe($I.annoteSchema("ClosedNoTermRead", { description: "No term, for one of the closed reasons" }))
+const NoTermKind = LiteralKit(["transport", "request", "screen", "error", "bookkeeping", "deferred"])
+
+/** A no-term mark, as read: the position only carries a value across the wire. */
+export class TransportNoTermRead extends S.Opaque<TransportNoTermRead, { readonly brand: unique symbol }>()(
+  S.Struct({ reason: S.tag("transport") }).pipe(
+    $I.annoteSchema("TransportNoTermRead", {
+      description: "No term: the position only carries a value across the wire"
+    })
+  )
+) {}
+
+/** A no-term mark, as read: the position holds a request's own data. */
+export class RequestNoTermRead extends S.Opaque<RequestNoTermRead, { readonly brand: unique symbol }>()(
+  S.Struct({ reason: S.tag("request") }).pipe(
+    $I.annoteSchema("RequestNoTermRead", { description: "No term: the position holds a request's own data" })
+  )
+) {}
+
+/** A no-term mark, as read: the position exists for a screen. */
+export class ScreenNoTermRead extends S.Opaque<ScreenNoTermRead, { readonly brand: unique symbol }>()(
+  S.Struct({ reason: S.tag("screen") }).pipe(
+    $I.annoteSchema("ScreenNoTermRead", { description: "No term: the position exists for a screen" })
+  )
+) {}
+
+/** A no-term mark, as read: the position describes a failure. */
+export class ErrorNoTermRead extends S.Opaque<ErrorNoTermRead, { readonly brand: unique symbol }>()(
+  S.Struct({ reason: S.tag("error") }).pipe(
+    $I.annoteSchema("ErrorNoTermRead", { description: "No term: the position describes a failure" })
+  )
+) {}
+
+/** A no-term mark, as read: the position is the store's bookkeeping. */
+export class BookkeepingNoTermRead extends S.Opaque<BookkeepingNoTermRead, { readonly brand: unique symbol }>()(
+  S.Struct({ reason: S.tag("bookkeeping") }).pipe(
+    $I.annoteSchema("BookkeepingNoTermRead", { description: "No term: the position is the store's bookkeeping" })
+  )
 ) {}
 
 /** A deferred no-term mark, as read: the slice that will place the position. */
@@ -243,10 +276,20 @@ export class DeferredNoTermRead extends S.Opaque<DeferredNoTermRead, { readonly 
   }).pipe($I.annoteSchema("DeferredNoTermRead", { description: "No term yet: a later slice places it" }))
 ) {}
 
-/** A no-term mark as read: a closed reason, or deferred with its slice. */
-export const NoTermRead = S.Union([ClosedNoTermRead, DeferredNoTermRead]).pipe(
-  $I.annoteSchema("NoTermRead", { description: "Why a position stands for no term" })
-)
+/**
+ * A no-term mark as read, one case a reason: the five closed reasons, each with nothing more, and deferred with its
+ * slice. A reason added to the list is a case every `match` over this union must then name.
+ */
+export const NoTermRead = NoTermKind.mapMembers(() =>
+  Tuple.make(
+    TransportNoTermRead,
+    RequestNoTermRead,
+    ScreenNoTermRead,
+    ErrorNoTermRead,
+    BookkeepingNoTermRead,
+    DeferredNoTermRead
+  )
+).pipe(S.toTaggedUnion("reason"), $I.annoteSchema("NoTermRead", { description: "Why a position stands for no term" }))
 /** Runtime type of {@link NoTermRead}. */
 export type NoTermRead = typeof NoTermRead.Type
 

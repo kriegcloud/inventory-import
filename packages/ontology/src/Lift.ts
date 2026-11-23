@@ -152,7 +152,7 @@ const pathTriples = Effect.fnUntraced(function* (
       const concept = yield* iriOf(context, at, fix.concept)
       triples.push(link(node, fixing, concept))
     }
-    triples.push(step.reverse === true ? link(node, linking, subject) : link(subject, linking, node))
+    triples.push(O.isSome(step.reverse) ? link(node, linking, subject) : link(subject, linking, node))
     from = node
   }
   const property = yield* propertyNamed(context, at, last.value.property)

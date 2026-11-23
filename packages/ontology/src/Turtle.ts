@@ -60,26 +60,30 @@ export class ParsedTriple extends S.Opaque<ParsedTriple, { readonly brand: uniqu
   }).pipe($I.annoteSchema("ParsedTriple", { description: "One statement of a Turtle text" }))
 ) {}
 
-const nodeOf = (term: N3.Quad["subject"] | N3.Quad["object"]): O.Option<ParsedNode> => {
+/** A term as the parser gives it, in the shape `ParsedNode` decodes: the decode lowers a language tag and checks it. */
+const nodeOf = (term: N3.Quad["subject"] | N3.Quad["object"]): O.Option<typeof ParsedNode.Encoded> => {
   if (term.termType === "NamedNode") {
-    return O.some(IriNode.make({ kind: "iri", iri: term.value }))
+    return O.some({ kind: "iri", iri: term.value })
   }
   if (term.termType === "BlankNode") {
-    return O.some(BlankNode.make({ kind: "blank", id: term.value }))
+    return O.some({ kind: "blank", id: term.value })
   }
   if (term.termType === "Literal") {
     return O.some(
       term.language === ""
-        ? LiteralNode.make({ kind: "literal", value: term.value, datatype: term.datatype.value })
-        : TextNode.make({ kind: "text", value: term.value, language: term.language })
+        ? { kind: "literal", value: term.value, datatype: term.datatype.value }
+        : { kind: "text", value: term.value, language: term.language }
     )
   }
   return O.none()
 }
 
+const decodeParsed = S.decodeUnknownEffect(ParsedTriple)
+
 /**
  * Every statement a Turtle text makes, in the order written, its relative IRIs resolved against `base` with a
- * trailing slash. It fails when the text does not parse, with the parser's message.
+ * trailing slash. Each statement is decoded, so a language tag is lowered here. It fails when the text does not
+ * parse, with the parser's message, and when a statement is none `ParsedTriple` decodes.
  *
  * @example parseTurtle(vocabulary.base, text) // the statements, blank nodes among them
  */
@@ -95,7 +99,11 @@ export const parseTurtle = Effect.fnUntraced(function* (base: string, text: stri
     if (O.isNone(subject) || O.isNone(object) || quad.predicate.termType !== "NamedNode") {
       return yield* TurtleRefused.make({ reason: "the text states a quoted triple or a variable" })
     }
-    parsed.push(ParsedTriple.make({ subject: subject.value, predicate: quad.predicate.value, object: object.value }))
+    const triple = yield* Effect.mapError(
+      decodeParsed({ subject: subject.value, predicate: quad.predicate.value, object: object.value }),
+      (cause) => TurtleRefused.make({ reason: `the text states something no graph here holds: ${String(cause)}` })
+    )
+    parsed.push(triple)
   }
   return A.fromIterable(parsed)
 })

@@ -15,6 +15,7 @@ import { dual, pipe } from "effect/Function"
 import * as Order from "effect/Order"
 import type * as Ordering from "effect/Ordering"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import { $OntologyId } from "./internal/identity.ts"
@@ -55,8 +56,9 @@ export class TextNode extends S.Opaque<TextNode, { readonly brand: unique symbol
   S.Struct({
     kind: S.tag("text"),
     value: S.String.check(S.isMaxLength(4000)).pipe(S.annotateKey({ description: "The words as written" })),
-    language: S.String.check(S.isPattern(/^[a-z]{2,3}(?:-[a-z0-9]{1,8})*$/)).pipe(
-      S.annotateKey({ description: "The language tag in lower case, such as en: a reader lowers it" })
+    language: S.String.pipe(
+      S.decodeTo(S.String.check(S.isPattern(/^[a-z]{2,3}(?:-[a-z0-9]{1,8})*$/)), SchemaTransformation.toLowerCase()),
+      S.annotateKey({ description: "The language tag in lower case, such as en: decoding lowers one written EN" })
     )
   }).pipe($I.annoteSchema("TextNode", { description: "An object that is words in one language" }))
 ) {}

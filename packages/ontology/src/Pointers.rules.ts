@@ -17,7 +17,8 @@ import {
   readKeyMark,
   readMarks,
   type FieldMark,
-  type LiftPathRead
+  type LiftPathRead,
+  NoTermRead
 } from "@beep/vocabulary/Pointer"
 import { ParentLink, RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
 import * as A from "effect/Array"
@@ -285,7 +286,7 @@ const pathFindings = (
   let parent = record
   for (const step of A.filter(path, (_, index) => index < nodeSteps.length)) {
     const stepNode = "node" in step ? step.node : ""
-    const reverse = "reverse" in step && step.reverse === true
+    const reverse = "reverse" in step && O.isSome(step.reverse)
     const fixed = "fixed" in step ? step.fixed : []
     const node = O.flatMap(context.local(stepNode), (local) => classOf(vocabulary, local))
     const property = O.flatMap(context.local(step.property), (local) => propertyOf(vocabulary, local))
@@ -410,7 +411,7 @@ const recordFindings = (context: Context, entry: string, schema: S.Top): Readonl
         found.push(finding(rule, entry, at, `the ${malformed.key} mark is not well formed`))
       },
       noTerm: (noTerm) => {
-        if ("slice" in noTerm.noTerm && !A.contains(context.slices, noTerm.noTerm.slice)) {
+        if (NoTermRead.guards.deferred(noTerm.noTerm) && !A.contains(context.slices, noTerm.noTerm.slice)) {
           found.push(finding("P9", entry, at, `deferred to ${noTerm.noTerm.slice}, which is no slice`))
         }
       },

@@ -24,12 +24,23 @@ import * as Str from "effect/String"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
-import { JarNotFetched, Machine, reason, refusalSentence, robotPin, type RobotResult } from "../src/Reason.ts"
+import {
+  JarFound,
+  JarNotFetched,
+  JavaFound,
+  Machine,
+  reason,
+  refusalSentence,
+  robotPin,
+  RobotResult
+} from "../src/Reason.ts"
 
 const vendorFolder = "/usr/lib/jvm"
 
 /** A run takes under a second. One that hangs is stopped and counted failed, as a Java that did not start is. */
 const runLimit = Duration.minutes(5)
+/** A command stopped at the limit is asked to end, then killed: one that ignores the request would hold the gate open. */
+const killAfter = Duration.seconds(5)
 
 const machine = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem
@@ -44,13 +55,17 @@ const machine = Effect.gen(function* () {
   )
   const folder = path.join(cache, "inventory-import", "robot", pin.release)
   const jar = path.join(folder, pin.file)
+  // Where a Java is asked its version: the folder the script runs in, which is there. The jar's folder may not be yet.
+  const here = path.resolve(".")
 
   /** One command run to its end: its exit code and what it printed. A command that could not start, or ran past the
    * limit, is a failed command, never a pass. */
   const run = (command: string, args: ReadonlyArray<string>, cwd: string) =>
     Effect.scoped(
       Effect.gen(function* () {
-        const handle = yield* spawner.spawn(ChildProcess.make(command, args, { cwd, stdin: "ignore" }))
+        const handle = yield* spawner.spawn(
+          ChildProcess.make(command, args, { cwd, stdin: "ignore", forceKillAfter: killAfter })
+        )
         const [stdout, stderr, code] = yield* Effect.all(
           [
             handle.stdout.pipe(Stream.decodeText, Stream.mkString),
@@ -74,10 +89,12 @@ const machine = Effect.gen(function* () {
 
   /** What `java -version` says there, or none when nothing answers. It prints to the error stream. */
   const versionAt = (where: string) =>
-    Effect.map(run(where, ["-version"], cache), (asked) => ({
-      where,
-      version: asked.code === 0 ? O.flatMap(Str.match(/version "([^"]+)"/)(asked.stderr), A.get(1)) : O.none<string>()
-    }))
+    Effect.map(run(where, ["-version"], here), (asked) =>
+      JavaFound.make({
+        where,
+        version: asked.code === 0 ? O.flatMap(Str.match(/version "([^"]+)"/)(asked.stderr), A.get(1)) : O.none<string>()
+      })
+    )
 
   const javas = Effect.gen(function* () {
     const home = yield* Config.schema(S.String, "JAVA_HOME").pipe(Config.option, Effect.orDie)
@@ -94,7 +111,9 @@ const machine = Effect.gen(function* () {
     O.match(read, {
       onNone: () => Effect.succeedNone,
       onSome: (bytes) =>
-        Effect.map(digest.digestHex(Digest.sha256, bytes), (sha256) => O.some({ sha256, bytes: bytes.byteLength }))
+        Effect.map(digest.digestHex(Digest.sha256, bytes), (sha256) =>
+          O.some(JarFound.make({ sha256, bytes: bytes.byteLength }))
+        )
     })
   )
 
@@ -128,11 +147,10 @@ const machine = Effect.gen(function* () {
           input.command === "validate-profile" ? ["--profile", "DL", "--output", report] : ["--reasoner", "hermit"]
         const ran = yield* run(input.java, ["-jar", jar, input.command, "--input", document, ...flags], work)
         const written = yield* Effect.orElseSucceed(fs.readFileString(report), () => "")
-        const result: RobotResult = {
+        return RobotResult.make({
           code: ran.code,
           output: A.join(A.filter([ran.stdout, ran.stderr, written, ran.error], Str.isNonEmpty), "\n")
-        }
-        return result
+        })
       })
     )
   })
@@ -146,11 +164,13 @@ const services = Layer.effect(Machine, Effect.orDie(machine)).pipe(
 )
 
 // The script is the entry point: the machine is built once, for the run. A refusal is printed and fails the run,
-// which sets the exit code to 1.
+// which sets the exit code to 1. So does a stop that is no refusal (a pin that does not decode, no home folder for
+// the cache): it is printed too, since the runtime's own report is off.
 Layer.build(services).pipe(
   Effect.flatMap((context) => reason().pipe(Effect.provideContext(context))),
   Effect.scoped,
   Effect.tap((lines) => Console.log(A.join(["reason OK  gate 9, the reasoner:", ...lines], "\n"))),
   Effect.tapError((refusal) => Console.error(`reason FAIL  gate 9, the reasoner:\n${refusalSentence(refusal)}`)),
+  Effect.tapDefect((stopped) => Console.error(`reason FAIL  gate 9, the reasoner stopped:\n${String(stopped)}`)),
   BunRuntime.runMain({ disableErrorReporting: true })
 )

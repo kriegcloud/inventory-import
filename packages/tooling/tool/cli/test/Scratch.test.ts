@@ -618,7 +618,8 @@ describe("scratch", () => {
     expect(
       leakingLines("/** @effect-leakable-service */\nclass Database {}\n// @Effect-Expect-Leaking Database\n")
     ).toEqual([1, 3])
-    expect(leakingLines("// @effect-diagnostics floatingEffect:off\n")).toEqual([])
+    // Put together here, so this file holds no directive the checker would read.
+    expect(leakingLines(`// ${diagnosticDirective} floatingEffect:off\n`)).toEqual([])
   })
 
   it.effect("check refuses a comment that silences a leaking requirement, and lets a quoted directive stand", () =>

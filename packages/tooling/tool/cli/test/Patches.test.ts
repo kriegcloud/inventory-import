@@ -82,10 +82,7 @@ const kept = (commits: Readonly<Record<string, string>>, files: Tree = {}): Tree
   "packages/patches/test/left/SaysB.test.ts": "",
   "node_modules/left/index.js": says("b"),
   "vendor/.keep": "",
-  ...A.reduce(R.toEntries(commits), {} as Tree, (tree, [commit, what]) => ({
-    ...tree,
-    [`stage/${commit}/package/index.js`]: says(what)
-  })),
+  ...R.fromEntries(A.map(R.toEntries(commits), ([commit, what]) => [`stage/${commit}/package/index.js`, says(what)])),
   ...files
 })
 

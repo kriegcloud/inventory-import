@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Str from "effect/String"
 import {
   anchorless,
@@ -14,7 +16,32 @@ import {
   stringsIn,
   stringValues
 } from "../src/Sync.rules.ts"
-import { Drift, modeOf, repaired } from "../src/Sync.schema.ts"
+import { Drift, modeOf, Plan, repaired } from "../src/Sync.schema.ts"
+
+/** Where a path from the repository's root ends up: its segments, `..` and `.` resolved; none when it leaves the root. */
+const resolved = (file: string): O.Option<ReadonlyArray<string>> =>
+  Str.startsWith("/")(file)
+    ? O.none()
+    : A.reduce(Str.split("/")(file), O.some<ReadonlyArray<string>>([]), (at, part) =>
+        O.flatMap(at, (parts) =>
+          part === ".."
+            ? O.map(A.init(parts), (rest) => rest)
+            : part === "."
+              ? O.some(parts)
+              : O.some(A.append(parts, part))
+        )
+      )
+
+// A text of distinct characters (the private-use block), so a character written twice or lost can be counted.
+const marked = (length: number) =>
+  A.join(
+    A.makeBy(length, (i) => String.fromCharCode(0xe000 + i)),
+    ""
+  )
+const counted = (text: string) =>
+  A.reduce(Str.split("")(text), R.empty<string, number>(), (counts, char) =>
+    R.set(counts, char, O.getOrElse(R.get(counts, char), () => 0) + 1)
+  )
 
 const config = A.join(
   [
@@ -88,4 +115,28 @@ describe("the text a sync command reads and repairs", () => {
     expect(modeOf({ write: true, dryRun: false })).toBe("write")
     expect(modeOf({ write: false, dryRun: false })).toBe("check")
   })
+})
+
+describe("a plan's repairs, generated from the schema", () => {
+  // Every plan the schema allows writes each file inside the repository, and keeps every character of it that no
+  // repair replaces exactly once, in place: no repair writes a part of the file twice or loses one.
+  it.prop(
+    "keep every character outside the stretches they replace once, in files inside the repository",
+    [Arbitrary.schema(Plan)],
+    ([plan]) => {
+      for (const drift of plan.drifts) {
+        expect([drift.file, O.isSome(resolved(drift.file))]).toEqual([drift.file, true])
+      }
+      for (const [, own] of R.toEntries(A.groupBy(plan.drifts, (drift) => drift.file))) {
+        const length = A.reduce(own, 0, (most, drift) => Math.max(most, drift.start, drift.end)) + 2
+        // A longer file says nothing more, and the private-use block holds 6,400 characters.
+        if (length > 6000) continue
+        const text = marked(length)
+        const counts = counted(repaired(own)(text))
+        const kept = A.makeBy(length, (i) => O.getOrElse(R.get(counts, String.fromCharCode(0xe000 + i)), () => 0))
+        const expected = A.makeBy(length, (i) => (A.some(own, (drift) => drift.start <= i && i < drift.end) ? 0 : 1))
+        expect(kept).toEqual(expected)
+      }
+    }
+  )
 })

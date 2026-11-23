@@ -393,13 +393,36 @@ export const withReference = (input: {
 }
 
 /**
+ * An id Cloudflare gives an account or a token: 32 lower-case hexadecimal digits. Read from cf's answers and written
+ * into `op.env` lines and GitHub variables, so nothing but those digits may pass: a newline, a `/` or a quote in one
+ * would add a line or redirect a reference.
+ *
+ * @category schemas
+ */
+export const CloudflareId = S.String.check(S.isPattern(/^[0-9a-f]{32}$/)).pipe(
+  $I.annoteSchema("CloudflareId", { description: "A Cloudflare account's or token's id: 32 lower-case hex digits" })
+)
+
+/**
+ * An id 1Password gives a vault or an item: 26 lower-case letters and digits. A reference this command writes is
+ * built from two of them (`op://<vault>/<item>/password`), so nothing else may pass.
+ *
+ * @category schemas
+ */
+export const OnePasswordId = S.String.check(S.isPattern(/^[a-z0-9]{26}$/)).pipe(
+  $I.annoteSchema("OnePasswordId", {
+    description: "A 1Password vault's or item's id: 26 lower-case letters and digits"
+  })
+)
+
+/**
  * A Cloudflare account as `cf auth whoami` names it.
  *
  * @category schemas
  */
 export class Account extends S.Class<Account, { readonly brand: unique symbol }>($I`Account`)(
   {
-    id: S.String.pipe(S.annotateKey({ description: "The account's id, which a stack and a token name it by" })),
+    id: CloudflareId.pipe(S.annotateKey({ description: "The account's id, which a stack and a token name it by" })),
     name: S.String.pipe(S.annotateKey({ description: "The account's name, as its owner reads it" }))
   },
   $I.annote("Account", { description: "One Cloudflare account the logged-in person can use" })
@@ -414,7 +437,7 @@ const WhoAmI = S.Struct({
 // Cloudflare's published schema of a zone gives its account an id and a name, both optional; one with no id names
 // no account and is not read, one with no name is called by its id.
 const Zone = S.Struct({
-  account: S.Struct({ id: S.String, name: S.String.pipe(S.NullOr, S.optionalKey) })
+  account: S.Struct({ id: CloudflareId, name: S.String.pipe(S.NullOr, S.optionalKey) })
 }).pipe(
   $I.annoteSchema("Zone", {
     description: "A zone as `cf zones list` names it: the account that holds it, nothing else"
@@ -424,11 +447,11 @@ const Zone = S.Struct({
 /** The question that names production's account: the one zone of that name that is active, in any account cf sees. */
 const zoneCall: Call = { command: "cf", args: ["zones", "list", "--name", productionZone, "--status", "active"] }
 
-const Named = S.Struct({ id: S.String, name: S.String }).pipe(
+const Named = S.Struct({ id: OnePasswordId, name: S.String }).pipe(
   $I.annoteSchema("Named", { description: "A 1Password vault: its id and name, nothing it holds" })
 )
 
-const Titled = S.Struct({ id: S.String, title: S.String }).pipe(
+const Titled = S.Struct({ id: OnePasswordId, title: S.String }).pipe(
   $I.annoteSchema("Titled", { description: "A 1Password item: its id and title, none of its fields" })
 )
 
@@ -1177,7 +1200,7 @@ const asPreviews = (script: string): Call => ({
   ]
 })
 
-const Verified = S.Struct({ id: S.String, status: S.String }).pipe(
+const Verified = S.Struct({ id: CloudflareId, status: S.String }).pipe(
   $I.annoteSchema("Verified", { description: "What `cf accounts tokens verify` answers: the token's id and status" })
 )
 

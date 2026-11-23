@@ -90,7 +90,7 @@ decision. A parent with no mark is in `gist-categories.md` already or is admitte
 | FileUpload | class | event | `gist:Event` | 09 | import | in the repository today |
 | FulfilmentProgressScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
 | Grant | class | relator | `gist:Assignment` (decision 13) | 06 | party and access | in the repository today (the thin thread: the record's role field read as one grant at organization scope, stated by `grantScope`, decisions 40 and 96); Sutton only (site scope); later (field scope) |
-| GrantScopeKindScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today (the organization scope, implied by every record; no other scope is stored; the thin thread ships the scheme with that one concept, decision 96) |
+| GrantScopeKindScheme | scheme | not applicable: scheme | none: a scheme (pending) | 10 | taxonomy | in the repository today (the organization scope, implied by every record; no other scope is stored; the thin thread ships the scheme with that one concept, decision 96) |
 | GroupDecision | class | event | `gist:Event` | 09 | import | in the repository today |
 | HoldPlacement | class | event | `gist:Event` | 09 | execution | Sutton only |
 | HoldReasonScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | Sutton only |
@@ -140,7 +140,7 @@ decision. A parent with no mark is in `gist-categories.md` already or is admitte
 | MaterialLot | class | kind | `gist:PhysicalSubstance` (pending) | 08 | warehouse and stock | Sutton only |
 | MeasurementDimensionScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | later |
 | Member | class | relator | `gist:TemporalRelation` (decision 13) | 06 | party and access | in the repository today |
-| MemberRoleScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
+| MemberRoleScheme | scheme | not applicable: scheme | none: a scheme (pending) | 10 | taxonomy | in the repository today |
 | MembershipStatusScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | not proposed (the `member` table stores `removedAt` and no status: active is `removedAt` being null, removed is its being set; invited and suspended are not stored) |
 | ModelCall | class | event | `gist:Event` | 06 | party and access | later |
 | ModelCallPurposeScheme | scheme | information | none: a scheme (pending) | 10 | taxonomy | in the repository today |
@@ -240,7 +240,9 @@ The ten concepts are 08's inventory measure kinds and position bases, which 08 l
 definitions and arithmetic; every other concept is in report 10's scheme tables and is counted there, not here.
 
 By tag, classes only (115; a scheme or a concept carries no kind tag in 05's model, though 08 and 10 wrote one
-in their Tag column):
+in their Tag column). `MemberRoleScheme` and `GrantScopeKindScheme` read `not applicable: scheme` above, because
+report 14 section 2.3 gives a scheme no kind tag. Every other scheme, and the ten concepts, keeps the tag its
+owner wrote:
 
 | Tag | Classes |
 | --- | --- |
@@ -723,7 +725,10 @@ The thread takes nine term rows of this index: the classes `Organization`, `Tena
 one concept organization). It takes nine property rows: `membershipOf`, `membershipIn`, `grantedTo`, `grantsRole`,
 `grantScope`, `recordedActor`, `action`, `recordedAt` and `inTenant` (decisions 96 and 98). Their labels, definitions,
 tags, parents and identity criteria as the thread ships them are report 14 sections 2.1 to 2.4, and where a row here
-is shorter or differs, that text holds. `Grant` has one identity criterion there, the member and the field it is read
+is shorter or differs, that text holds. The Tag cells of `MemberRoleScheme` and `GrantScopeKindScheme` read
+`not applicable: scheme`, because section 2.3 gives a scheme no kind tag. Their gist parent stays
+`none: a scheme (pending)`: whether a scheme is also typed by gist is open decision 17, and this index does not
+answer it. `Grant` has one identity criterion there, the member and the field it is read
 from, and no pair is stated between `inv:` classes (section 2.1). `Role` has no gist parent, by the stated exception
 of decision 97, and ships without `permits` (decision 41). The gist names the thread admits are seven classes, five
 parents and the two ancestors `gist:LivingThing` and `gist:PhysicalIdentifiableItem`, with the three
@@ -820,6 +825,11 @@ repository. What changed, with the decision that now holds the choice:
   owners' counts summing to it. The thread's nine term rows and nine property rows were read against report 14
   sections 2.1 to 2.3, and the audit entry's rows against report 06 as it stood during its own revision, where no row
   for `auditAction`, `actorNameThen`, `auditDetail`, `actingAgentName` or `recordedActor` was found.
+- After the third review of report 14, by hand, with no script run: the Tag cells of `MemberRoleScheme` and
+  `GrantScopeKindScheme` were `information`, which report 14 section 2.3 refuses (a scheme has no kind tag). Both now
+  read `not applicable: scheme`. No row came in or went out, no gist parent and no status word changed, and the
+  by-tag table counts classes only, so the counts stand (165 term rows, 40 schemes, 115 classes, 267 property rows,
+  the status totals, 65 not proposed). Every other scheme keeps the tag its owner wrote. Decision 17 stays open.
 
 ## Not checked
 

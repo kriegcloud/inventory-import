@@ -220,7 +220,9 @@ for 12 to carry as a contract and for Benjamin to confirm:
 ## 4. Drafted queries for the ten hardest
 
 These queries are sketches, not code. Their base IRI is `https://example.org/inventory-import/`, not the `inv:`
-namespace, which names vocabulary terms. A relative IRI in angle brackets names a fixture individual under `<base>/fixture/<ClassKey>/<name>` ([report 14, section 4.1](14-thin-thread.md#41-iris-of-data)).
+namespace, which names vocabulary terms. A lifted record or a link to one uses `<base>/data/<organizationId>/<ClassKey>/<id>`,
+including a link to the tenant. An individual named only by the fixture uses `<base>/fixture/<ClassKey>/<name>`
+([report 14, section 4.1](14-thin-thread.md#41-iris-of-data)).
 A constraint query passes with zero rows only beside its companion query, which shows the fixture holds the rule's
 antecedent. [Report 14, section 5](14-thin-thread.md#5-the-question) specifies CQ-P06. Slice 1 writes CQ-P02, P03
 and P07. Executable queries and fixtures take the base from the module.
@@ -238,7 +240,7 @@ record would wrongly return `test_SharedCo` (decision 34).
 PREFIX inv: <https://example.org/inventory-import/ontology/>
 # CQ-P01. Drafted, not run; sketch, not code.
 SELECT DISTINCT ?org WHERE {
-  VALUES ?tenant { <fixture/Tenant/test_ExampleWorks> }
+  VALUES ?tenant { <data/test_ExampleWorks/Tenant/test_ExampleWorks> }
   ?record a inv:SourceRecord ; inv:inTenant ?tenant ; inv:recordOf ?org ; inv:isCustomer true ; inv:isVendor true .
   ?org a inv:Organization .
 }
@@ -260,7 +262,7 @@ PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 # CQ-P04. Drafted, not run; sketch, not code. The latest decision of this tenant about a pair is the one in force.
 SELECT ?a ?b ?decider ?at ?evidence WHERE {
-  VALUES ?tenant { <fixture/Tenant/test_ExampleWorks> }
+  VALUES ?tenant { <data/test_ExampleWorks/Tenant/test_ExampleWorks> }
   ?decision a inv:IdentityDecision ; inv:inTenant ?tenant ;
             inv:decidesOn ?a , ?b ;
             inv:identityOutcome ?outcome ;
@@ -370,7 +372,7 @@ PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 # CQ-W03. Each kind uses the latest item-level position of one basis at each location that states that kind.
 SELECT ?kind ?unit (SUM(?value) AS ?quantity) WHERE {
-  VALUES (?tenant ?item ?site ?basisCode) { (<fixture/Tenant/test_ExampleWorks> <fixture/ItemSpecification/test_ItemFlour> <fixture/Site/test_SiteNorth> "book") }
+  VALUES (?tenant ?item ?site ?basisCode) { (<data/test_ExampleWorks/Tenant/test_ExampleWorks> <fixture/ItemSpecification/test_ItemFlour> <fixture/Site/test_SiteNorth> "book") }
   VALUES ?location { <fixture/Bin/test_BinN1> <fixture/Bin/test_BinN2> <fixture/Site/test_SiteNorth> }
   ?basis skos:inScheme inv:PositionBasisScheme ; skos:notation ?basisCode .
   ?position a inv:StockPosition ; inv:inTenant ?tenant ; inv:positionBasis ?basis ;

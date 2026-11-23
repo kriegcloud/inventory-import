@@ -220,7 +220,7 @@ flowchart LR
   H --> G3["SHACL over stored rows:<br/>slow test"]
 ```
 
-Three things meet, and nothing else is hand-written:
+Three things meet in the projection:
 
 1. **The term model** (05). A class term has one identity-bearing parent and may have category parents (pending Q12);
    it has no gist parent only with a stated reason on the committed exception list (decision 97). A property has one
@@ -308,8 +308,11 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
 - No gist name that no term of the slice being built needs (decision 13), and no disjointness beyond the pairs gist
   states between the classes taken (decision 15). No gist property's domain or range is copied (decision 16).
 - No gate counts as built until it has failed once on a planted mistake.
-- No hand-written `.ttl`, `.owl` or SHACL file states a term (decision 2); fixtures hold instance data only.
-- No `owl:sameAs`, `owl:inverseOf`, `owl:equivalentClass`, `HasKey` or cardinality restriction.
+- No hand-written `.ttl`, `.owl` or SHACL file is a source for a term fact, such as a class's definition or parent.
+  Those facts come from the vocabulary module (decision 2). Hand-written Turtle may supply instance data for a
+  question or a mistake for a gate to reject. The negative fixtures in report 14 sections 6.2 and 6.3 are test
+  inputs only, not inputs to the projector, the question or the reasoner.
+- No `owl:sameAs`, `owl:inverseOf`, `owl:equivalentClass`, `HasKey` or cardinality restriction in the vocabulary.
 - No IRI under Sutton's name, a customer's subdomain or any real domain (decision 7).
 - No import of IOF, ISA-95, schema.org, FIBO or any other vocabulary; they are alignment rows (decision 4).
 - No customer or vendor flag on the shared organization (decision 34), and no contact purpose on a person or a

@@ -14,8 +14,9 @@ to follow; what they say about later slices is untouched.
 
 Inputs: the answered decisions in `DECISIONS.md` (8 to 11, 13 to 16, 20 to 26, 32, 34, 38 to 41, 46, 93 to 101), the
 kernel and access contract files named in section 3 as they stand today, `laws boundaries` as written, the root
-`turbo.json`, the vendored `@beep/identity`, and Effect 4.1.5 as installed. Every statement about a file was made with
-the file open; every Effect API named was read in `node_modules/effect/src`. Section 10 lists what was not checked.
+`turbo.json`, the vendored `@beep/identity`, the ratification and proposal schemas of the ontology skills with the
+auditor's validator, and Effect 4.1.5 as installed. Every statement about a file was made with the file open; every
+Effect API named was read in `node_modules/effect/src`. Section 10 lists what was not checked.
 
 Sixty-two decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92). The thread is designed so
 that it rests on none of them. Section 1 says how, for each open decision it comes near.
@@ -31,12 +32,20 @@ The thread is done when all of the following hold on a clean checkout:
    `packages/ontology/generated/fixtures/CQ-P06.graph.ttl`.
 2. The seven classes, nine properties, two schemes and four concepts of section 2 are in the vocabulary module, each
    naming its `rat-` record (a concept names its scheme's, decision 101).
-3. The five enrolled records of section 3 carry their marks, and every field of each is placed.
+3. The five enrolled records of section 3 carry their marks, every field of each is placed, and each field's mark is
+   the one section 3 gives it. Gate 5's rule P13 compares the marks read from the records with those placements,
+   field by field, so `Activity` with its actor and tenant pointers the wrong way round fails it (6.5).
 4. The one question, CQ-P06, returns the two expected rows of section 5 over a graph in which the role triples come
-   from the lift of two decoded `Member` values and from nowhere else.
-5. Gates 1 to 8 run in `bun run check` and pass. Gate 9 runs in `bun run check:full` and passes.
+   from the lift of two decoded `Member` values, read through the `aboutPath` mark on `Member.role`, and from nowhere
+   else. Must-fail cases M6 and M7 change that mark and nothing else, and the answer changes with it (5.4); the
+   second guard of section 4.4 holds the graph equal to what `lift` returns.
+5. Gates 1 to 8 run in `bun run check` and pass. Gate 9 runs in `bun run check:full` and passes, on a run that started
+   the reasoner: its task is never replayed from a cache, and it fails when Java or the jar is missing or is not the
+   approved one (6.9, 6.10).
 6. Each of the nine gates has one committed test that plants the mistake of section 6 and asserts that the gate
-   reports it. That is what "shown failing once" means here: the failure is a permanent test, not a screenshot.
+   reports it. That is what "shown failing once" means here: the failure is a permanent test, not a screenshot. The
+   further negatives section 6 names for gates 2, 3, 4, 5 and 7 are committed tests too, and section 6.11 walks each
+   planted mistake through all nine gates.
 
 ### 1.2 What is in
 
@@ -98,9 +107,14 @@ Two things, both already recorded as his:
    reports 06 and 10's text where a term exists there under the same key, and written here where it does not (marked
    "new"). A record lives at `explorations/erp-ontology/assets/audit/<audit>/governance/ratifications/rat-<nnn>.yaml`
    (the project profile and the foundational auditor's outputs table), with the fields `id`, `proposal_ref`,
-   `decision`, `steward`, `decided_at`, `verbatim_decision` and `rationale`
-   (`.agents/skills/_shared/schemas/ratification.schema.yaml`). The exception entry for `Role` (decision 97) is
-   ratified too.
+   `proposal_sha256`, `decision`, `steward`, `decided_at`, `verbatim_decision` and `rationale`
+   (`.agents/skills/_shared/schemas/ratification.schema.yaml`). `proposal_sha256` is required: it is the sha256 of
+   the bytes of the proposal file Benjamin saw, `work/proposals/otp-<slug>-<nnn>.yaml` in the same audit folder
+   (`ontology-term-proposal.schema.yaml`). The auditor's validator rejects a record without it, and rejects as stale
+   a record whose proposal file has changed since (`validate_artifacts.ts`, the check that compares the two
+   digests); gate 4 holds the same (6.4, rule C12). A scheme's proposal names each concept its ruling covers, so that
+   decision 101's "listed" is read from the bytes he approved; where in the proposal they are written is the second
+   question of section 9.2. The exception entry for `Role` (decision 97) is ratified too.
 
 The two smaller questions this report raised are answered by decisions 100 and 101 (section 9.2).
 
@@ -206,19 +220,19 @@ files, so the reasoner's input holds no punned IRI:
 | --- | --- | --- | --- |
 | `gist:Organization` | none | Parent of `Organization` | yes |
 | `gist:Person` | `gist:LivingThing` | Parent of `Person` | yes |
-| `gist:LivingThing` | `gist:PhysicalIdentifiableItem` | Ancestor (decision 14) | no row of its own |
+| `gist:LivingThing` | `gist:PhysicalIdentifiableItem` | Ancestor (decision 14) | yes |
 | `gist:PhysicalIdentifiableItem` | none | Ancestor (decision 14) | yes |
 | `gist:Content` | none | Parent of `AuditEntry` | yes |
-| `gist:TemporalRelation` | none | Parent of `Member` | no |
-| `gist:Assignment` | `gist:TemporalRelation` | Parent of `Grant` | no |
+| `gist:TemporalRelation` | none | Parent of `Member` | yes |
+| `gist:Assignment` | `gist:TemporalRelation` | Parent of `Grant` | yes |
 
 Each is written as `owl:Class` with its `rdfs:subClassOf` link and nothing else: no label, no definition, no other
 axiom (decision 14, "as names and links only"). Where gist states a parent inside an `owl:equivalentClass`
 intersection, the projection writes the named operand as a plain `rdfs:subClassOf` (report 11). Decision 13 asks that
-a name be added to `gist-categories.md` when it is admitted: the thread's change adds the three missing rows and
-replaces that file's sentence that disjointness copying is open with decision 15's answer. These seven parents and
-three pairs are report 11's reading of the pinned gist file, which is kept outside the repository and was not opened
-for this report (section 10).
+a name be added to `gist-categories.md` when it is admitted. That file already has a row for each of the seven, in
+bold, with the parents of this table, and states the three pairs of section 2.1 as decision 15's answer, so the
+thread changes nothing there. These seven parents and three pairs are report 11's reading of the pinned gist file,
+which is kept outside the repository and was not opened for this report (section 10).
 
 ### 2.6 The module's shape
 
@@ -227,9 +241,12 @@ the value is the kernel's.
 
 ```ts
 // packages/kernel/src/Terms.vocab.ts (sketch, not code). Public entry: @inventory/kernel/Terms
+import type * as S from "effect/Schema"
+import type { Vocabulary } from "@beep/vocabulary/Model"
+
 const base = "https://example.org/inventory-import" // the one literal; every other IRI is derived from it
 
-export const vocabulary = Vocabulary.make({
+export const vocabulary = {
   base,
   namespace: `${base}/ontology/`,
   version: "0.1.0",
@@ -274,8 +291,19 @@ export const vocabulary = Vocabulary.make({
     },
     GrantScopeKindScheme: { /* ... */ closed: false, concepts: { organization: {} } }
   }
-})
+} as const satisfies S.Codec.Encoded<typeof Vocabulary>
 ```
+
+The value is a literal kept `as const` and checked with `satisfies` against the encoded side of the metamodel's
+`Vocabulary`, as report 05 section 4.7 writes it. It is not built with `Vocabulary.make`. `make` returns the schema's
+declared `Type`, never the type of its argument (`Schema.ts` 240), and the metamodel declares the term tables as
+`S.Record` (report 05 section 4.6), so the keys of a made value are `string`: `keyof typeof vocabulary.schemes` would
+be `string`, and every name type below would accept any text. Both imports in the sketch are type-only, so the file
+still holds the value and nothing else.
+
+Every registry type and name type below is derived from this literal and from nothing else. Gate 4's test and the
+projector decode the same literal through `Vocabulary`, strictly (`onExcessProperty: "error"`, every error
+reported, report 05 section 4.6), and work on the decoded value; no type is derived from the decoded value.
 
 Three rules of this shape settle review findings:
 
@@ -287,7 +315,7 @@ Three rules of this shape settle review findings:
   ```ts
   type Schemes = typeof vocabulary.schemes
   export type InvConceptCurie = {
-    [S in keyof Schemes & string]: `inv:${S}-${keyof Schemes[S]["concepts"] & string}`
+    [K in keyof Schemes & string]: `inv:${K}-${keyof Schemes[K]["concepts"] & string}`
   }[keyof Schemes & string]
   // "inv:MemberRoleScheme-viewer" | "inv:MemberRoleScheme-editor" | "inv:MemberRoleScheme-admin"
   //   | "inv:GrantScopeKindScheme-organization"
@@ -484,7 +512,9 @@ allow fewer codes than its scheme has, never one the scheme lacks).
 1. A plain field takes its mark as the last `S.annotateKey` in its pipe. It shows in every variant.
 2. A `Field` takes its mark on each variant schema, after the `Field` is built, with `Model.fieldEvolve`
    (`VariantSchema.ts` 587 to 598: it maps each named variant's schema through a function and returns a new `Field`,
-   so the shared `Model.DateTimeInsert` is not changed).
+   so the shared `Model.DateTimeInsert` is not changed). Each function is written in place as
+   `(s) => s.annotateKey(mark)`, the schema's own method; the mark is hoisted as an annotation object, never as an
+   `S.annotateKey(...)` callback (below).
 3. A mark written inside the argument of `Model.FieldOption(...)` is not found. `FieldOption` wraps its argument in
    `Schema.OptionFromNullOr` or in `optionalOption` (`Model.ts` 341 to 350), each a `decodeTo`. `decodeTo` returns the
    target node with the source hung on it as an encoding link (`SchemaAST.ts` 4510 to 4519), so the key context of the
@@ -505,26 +535,53 @@ allow fewer codes than its scheme has, never one the scheme lacks).
 | `createdAt` | `aboutProperty("inv:recordedAt")` | `fieldEvolve` on select, insert, json | 98 |
 
 ```ts
-// sketch of the three Field values
-const subject = S.annotateKey({ ...aboutClass("inv:AuditEntry") })
-const deferred = S.annotateKey({
+// sketch of the three Field values. The three marks are annotation objects, module-level constants of this file
+const subjectMark = aboutClass("inv:AuditEntry")
+const deferredMark = {
   description: "The agent that did this for the actor. None: the person did it themselves.",
   ...noTerm("deferred", "party")
-})
-const at = S.annotateKey({ ...aboutProperty("inv:recordedAt") })
+}
+const atMark = aboutProperty("inv:recordedAt")
 
-id: Model.fieldEvolve(Model.UuidV4Insert(ActivityId), { select: subject, insert: subject, update: subject, json: subject }),
-agent: Model.fieldEvolve(Model.FieldOption(DisplayName), {
-  select: deferred, insert: deferred, update: deferred, json: deferred, jsonCreate: deferred, jsonUpdate: deferred
+id: Model.fieldEvolve(Model.UuidV4Insert(ActivityId), {
+  select: (s) => s.annotateKey(subjectMark), insert: (s) => s.annotateKey(subjectMark),
+  update: (s) => s.annotateKey(subjectMark), json: (s) => s.annotateKey(subjectMark)
 }),
-createdAt: Model.fieldEvolve(Model.DateTimeInsert, { select: at, insert: at, json: at })
+agent: Model.fieldEvolve(Model.FieldOption(DisplayName), {
+  select: (s) => s.annotateKey(deferredMark), insert: (s) => s.annotateKey(deferredMark),
+  update: (s) => s.annotateKey(deferredMark), json: (s) => s.annotateKey(deferredMark),
+  jsonCreate: (s) => s.annotateKey(deferredMark), jsonUpdate: (s) => s.annotateKey(deferredMark)
+}),
+createdAt: Model.fieldEvolve(Model.DateTimeInsert, {
+  select: (s) => s.annotateKey(atMark), insert: (s) => s.annotateKey(atMark), json: (s) => s.annotateKey(atMark)
+})
 ```
+
+**Why the callback is not hoisted.** `S.annotateKey<S extends Top>(annotations)` fixes `S` at the outer call and
+returns `(self: S) => S["Rebuild"]` (`Schema.ts` 753 to 757). A constant such as
+`const subject = S.annotateKey({...})` has no schema to infer `S` from, so `S` is `Top` and the callback is
+`(self: Top) => Top`. `fieldEvolve` types each replaced variant as the `ReturnType` of its function
+(`VariantSchema.ts` 462 to 492), so every variant the constant touched would become `Top`: the insert variant of `id`
+would lose `withConstructorDefault<brand<String, "ActivityId">>` (`Model.ts` 843 to 850), and with it the decoded,
+encoded and constructor types of a kernel record. The mark would still be on the AST. Written in place, each
+function's parameter is typed by the variant it maps, and the method `annotateKey` returns `this["Rebuild"]`
+(`Schema.ts` 212), which for `brand` and for `withConstructorDefault` is the schema's own type (`Schema.ts` 5324 to
+5334 and 5952 to 5962).
+
+**The types are held by a compile-only file.** `packages/kernel/test/ActivityMarks.types.ts` builds the three fields
+unmarked (`Model.UuidV4Insert(ActivityId)`, `Model.FieldOption(DisplayName)`, `Model.DateTimeInsert`) and asserts, for
+each variant each has, that the decoded type, the encoded type and the constructor-input type (`Type`, `Encoded`,
+`~type.make.in`) of `Activity`'s variant schema equal the unmarked one's, each way round. The insert variant of `id`
+is among them, so `Activity.insert.make` still takes a value with no `id`. The file is part of gate 6 (6.6).
 
 **What the gates read.** Gate 5 reads the class pointer from `S.resolveAnnotations(Activity)` and the field marks from
 `Activity.fields`. It then reads the fields of each of the six variants and requires that every field a variant has
-carries the same mark as the class's field of that name. A `Field` marked on `select` only fails there. Gate 7's source
-rule recognises `class X extends Model.Class<X>("X")({...}, { ...aboutClass("...") })` and looks for the helper in the
-second argument (findings 01-gates.fable#1, 04-effect.grok#2, 06-testing.fable#2).
+carries the same mark as the class's field of that name. A `Field` marked on `select` only fails there. Agreement
+between variants shows that one mark reached all six, not that it is the right mark: rule P13 compares each field's
+mark with the table above (6.5). Gate 7's source rule recognises
+`class X extends Model.Class<X>("X")({...}, { ...aboutClass("...") })` and looks for the helper in the second
+argument (findings 01-gates.fable#1, 04-effect.grok#2, 06-testing.fable#2). Its rule 1b reads the three constants as
+part of `Activity`'s declaration, because that declaration references them (6.7).
 
 Report 06's property `recordTime`, with a domain of `gist:Event`, is not in the thread; `recordedAt` has the domain
 `AuditEntry`, so the rule that a field's record class falls under its property's domain holds
@@ -622,7 +679,9 @@ A record with none (`Person`) is lifted only when the caller supplies the tenant
 ### 4.2 What the lift does with one `Member`
 
 `lift(record, value)` in `packages/ontology/src/Lift.ts` reads the marks from the record's AST with the same reader
-gate 5 uses, and returns triples. For the decoded value
+gate 5 uses, and returns triples. It names no record, class, property or concept of its own: every one it writes
+comes from a mark on the record it is given, and must-fail cases M6 and M7 hold it to that (5.4). For the decoded
+value
 `{ id: "test_RaviWorks", name: "Ravi Example", role: "admin", organizationId: "test_ExampleWorks",
 organizationName: "Example Works (test)" }` it returns six:
 
@@ -692,12 +751,27 @@ plan CQ-P06 could pass on hand-written `Grant` triples with the lift never run (
 | Hand-written | `packages/ontology/fixtures/cq/CQ-P06.fixture.ttl` | What no record holds: the person, the two tenants' types, the two `membershipOf` links. Five triples. |
 | Lifted | `packages/ontology/fixtures/cq/CQ-P06.members.json`, two encoded `Member` records, decoded through the kernel's `Member` schema and passed to `lift` | Twelve triples: every `inv:Member` and `inv:Grant` type and every `membershipIn`, `grantedTo`, `grantsRole` and `grantScope` triple. |
 
-One function, `threadGraph()`, in `packages/ontology/src`, takes the hand-written text and the member rows and returns
+One function, `graphOf(record, rows, handWritten)`, in `packages/ontology/src`, decodes each row through `record`,
+passes each decoded value to `lift(record, value)`, and returns the lifted triples with the hand-written ones.
+`threadGraph()` is `graphOf` given the kernel's `Member`, the two committed rows and the committed hand-written text:
 the seventeen triples. `bun run ontology:write` writes them to
 `packages/ontology/generated/fixtures/CQ-P06.graph.ttl` with the projector's own writer, gate 1 byte-compares that
-file, gate 8 queries the in-memory result and gate 9 reasons over the file. Two guards keep the split honest: a test
-asserts that the hand-written file holds no triple with any of the four lifted predicates and no `inv:Member` or
-`inv:Grant` type, and the must-fail cases of section 5.4 show the answer changing when the lift or the record changes.
+file, gate 8 queries the in-memory result and gate 9 reasons over the file.
+
+Three guards keep the split honest, each a test gate 8 runs (6.8):
+
+1. The hand-written file holds no triple with any of the four lifted predicates and no `inv:Member` or `inv:Grant`
+   type.
+2. `threadGraph()` less the hand-written triples equals, triple for triple, the union of `lift(Member, row)` over the
+   two decoded rows. Nothing is added to the graph between the lift and the question, so a `threadGraph` that wrote
+   the grant itself fails here.
+3. Every property that states `evidence: "fixture"` (in the thread, `membershipOf`) is the predicate of at least one
+   triple of the hand-written file. Gate 5's rule P11 leans on this guard: without it the exception could hide a
+   property nothing uses.
+
+Beside them, the must-fail cases of section 5.4 show the answer changing when the lifted triples, the record's value
+or the mark on the record changes. M6 and M7 call `graphOf` with a copy of `Member` whose `role` mark is changed, so a
+`lift` that wrote a grant for every member, whatever the mark said, fails them.
 
 ## 5. The question
 
@@ -765,10 +839,13 @@ IRIs relative to `<base>/`:
 | `data/test_SecondOrg/Tenant/test_SecondOrg` | `fixture/Person/test_Ravi` | `data/test_SecondOrg/Member/test_RaviSecond` | `inv:MemberRoleScheme-viewer` |
 
 Exactly these two rows, in this order. One person appears twice with two roles, which is the point of the fixture.
+The test builds the expected IRIs from the module's `base` and namespace, never from the literal, which gate 7's rule
+5 allows in one file only.
 
 ### 5.4 The must-fail cases
 
-Each is a committed test that changes one thing and asserts that the result no longer equals the expected rows.
+Each is a committed test that changes one thing and asserts that the result no longer equals the expected rows. M1 to
+M3 change the graph after the lift, M4 the record's value, M5 the query, and M6 and M7 the mark on the record.
 
 | Case | The one change | Result | What it shows |
 | --- | --- | --- | --- |
@@ -777,23 +854,35 @@ Each is a committed test that changes one thing and asserts that the result no l
 | M3 | Each grant's four triples are replaced by `<member> inv:grantsRole <role>` | 0 rows | A role put on the member directly is not an answer (decision 40). |
 | M4 | `test_RaviWorks`'s `role` is `editor` in the member row | Row 1 has `inv:MemberRoleScheme-editor` | The answer comes from the record's value. |
 | M5 | A mutant query reaches the grant through the person: `?member inv:membershipOf ?person . ?other inv:membershipOf ?person . ?grant inv:grantedTo ?other` | 4 rows | The fixture tells a query that forgets the tenant from one that does not: it would report Ravi as admin of the second organization. |
+| M6 | `graphOf` is given, in place of `Member`, a copy whose `role` field carries `noTerm("screen")` and no path; the rows and the hand-written text are the committed ones | 0 rows. The graph holds no `inv:Grant` type and no `grantedTo`, `grantsRole` or `grantScope` triple; its lifted part is the two members' types and their `membershipIn` links | The grant comes from the mark on the record, not from the lift's code. |
+| M7 | `graphOf` is given a copy of `Member` whose `role` path is the real one without its `fixed` entry | 0 rows. The lifted part equals the real one less the two `inv:grantScope` triples | The lift writes what the path says and no more: the scope triple is the path's, not the lift's. |
+
+The copies of M6 and M7 are `S.Struct({ ...Member.fields, role: ... })` with `Member`'s class pointer, both marks
+written with the helpers in the test. The `role` field is built from `Role` afresh: a second `S.annotateKey` on
+`Member.fields.role` would merge with the path already there and leave two keys on the field (3.1). M7 removes the
+`fixed` entry because the thread has no second concept of `GrantScopeKindScheme` and no second property that ranges
+over `Role` to swap in; a path with no fixed entry is a legal path (3.2), so the copy type-checks. Each case asserts
+its result twice: on the rows the query returns over `graphOf`'s graph, and on the triples `lift(copy, value)`
+returns when called directly, so neither function can answer for the other. Neither copy is enrolled, so gates 5
+and 7 do not read it.
 
 ## 6. The gates
 
 Decision 95 builds gates 1 to 9. Gates 5 and 7 read the enrolment list of section 3.7 (decision 99). The table says
-where each runs and what it reads; the subsections give each gate's rules and its one planted mistake.
+where each runs and what it reads; the subsections give each gate's rules and its one planted mistake, and section
+6.11 walks each planted mistake through all nine gates.
 
 | Gate | Name | Runs in | Where the test is | Reads |
 | --- | --- | --- | --- | --- |
 | 1 | Byte-compare | `check` (`test`) | `packages/ontology/test/Generated.test.ts` | The projector's output in memory; the three committed files under `generated/` |
 | 2 | Re-parse | `check` (`test`) | the same file | The three files' text, parsed with N3.js; the triples the writer was given |
 | 3 | Forbidden constructs and the namespace guard | `check` (`test`) | the same file | The parsed triples of the three files |
-| 4 | Vocabulary coherence | `check` (`test`) | `packages/ontology/test/Coherence.test.ts` | The vocabulary value; `packages/ontology/exceptions/no-gist-parent.json`; the `rat-` records |
-| 5 | Record pointers on the AST | `check` (`test`) | `packages/ontology/test/Pointers.test.ts` | `enrolment.json`; `Enrolled.ts`; each enrolled schema's AST; the vocabulary value |
-| 6 | The type-check | `check` (`check`) | Every package's type-check; `packages/kernel/test/TermsPointer.types.test.ts` | Source |
-| 7 | `laws ontology-terms` | `check` (root task `//#ontology-terms:check`) | `packages/tooling/tool/cli`; its test `test/OntologyTerms.test.ts` | Source text of every workspace's `src` and `test` code files; `enrolment.json` |
+| 4 | Vocabulary coherence | `check` (`test`) | `packages/ontology/test/Coherence.test.ts` | The vocabulary literal, decoded; `packages/ontology/exceptions/no-gist-parent.json`; the `rat-` records and the proposal files they name |
+| 5 | Record pointers on the AST | `check` (`test`) | `packages/ontology/test/Pointers.test.ts` | `enrolment.json`; `Enrolled.ts`; each enrolled schema's AST; the vocabulary value; the placements of section 3, stated in the test |
+| 6 | The type-check | `check` (`check`) | Every package's type-check; the compile-only files `packages/kernel/test/TermsPointer.types.ts` and `ActivityMarks.types.ts` | Source |
+| 7 | `laws ontology-terms` | `check` (root task `//#ontology-terms:check`) | `packages/tooling/tool/cli`; its test `test/OntologyTerms.test.ts` | Source text of every workspace's `src` and `test` code files, the law's own source and test left out; `enrolment.json`; for rule 7, each workspace's `package.json` and tsconfig, to resolve an import to a file |
 | 8 | The question suite | `check` (`test`) | `packages/ontology/test/Questions.test.ts` | `threadGraph()` in memory, loaded into Oxigraph; `CQ-P06.rq` |
-| 9 | The reasoner | `check:full` (`reason`, a task of `@inventory/ontology`) | `packages/ontology/scripts/reason.ts` | `generated/inventory.owl.ttl`, `generated/fixtures/CQ-P06.graph.ttl`, `fixtures/reason/*.ttl` |
+| 9 | The reasoner | `check:full` (`reason`, a task of `@inventory/ontology`, never cached) | `packages/ontology/scripts/reason.ts` | `generated/inventory.owl.ttl`, `generated/fixtures/CQ-P06.graph.ttl`, `fixtures/reason/*.ttl`; `robot.lock.json`, and the installed Java and jar it pins |
 
 Gates 1, 2 and 3 work on three files; gates 4 and 5 are split so that a mistake in the terms and a mistake in a mark
 are reported by different gates: gate 4 never reads a record, and gate 5 reports nothing about a term that no mark
@@ -827,6 +916,11 @@ requires the round trip to hold.
 `inv:Member skos:definition "A "relationship" between two things."@en .` The gate reports a parse error with the line.
 Gate 1 does not read the file; gate 3 works on parsed triples and is never given it.
 
+**A second negative.** The planted mistake shows the parser refusing; it does not show the comparison of the two
+sets, and a gate that only parsed would pass it. So a second test, in memory: the OWL text is written from the real
+triples less one, and the gate is given that text with the full list. No parse error is involved, and the gate
+reports the one triple the writer was given and the text does not hold.
+
 ### 6.3 Gate 3, forbidden constructs and the namespace guard
 
 Gate 3 works on parsed triples, never on text. Per file it holds two lists, and anything outside them is a finding.
@@ -842,8 +936,10 @@ its own.
 The namespace guard, on every IRI of every file:
 
 - An `inv:` subject is a term the vocabulary holds. A `gist:` subject is on the projection list of section 2.5 and
-  carries only `rdf:type owl:Class`, `rdfs:subClassOf` and `owl:disjointWith`. A `skos:` subject carries only
-  `rdf:type owl:AnnotationProperty`.
+  carries only `rdf:type owl:Class`, `rdfs:subClassOf` and `owl:disjointWith`. A `skos:` or `dcterms:` subject
+  carries only `rdf:type owl:AnnotationProperty`: the OWL file declares the four annotation properties it uses
+  (section 8), `dcterms:source` among them, since it is not one of OWL 2's built-in annotation properties and the
+  OWL 2 DL profile asks for a declaration of every other one.
 - Every other subject is one of the two document IRIs, or under `<base>/data/` or `<base>/fixture/` in the graph
   file.
 - Every IRI is under `<base>`, the gist namespace, or the `rdf`, `rdfs`, `owl`, `skos`, `dcterms` or `xsd` namespace,
@@ -853,12 +949,29 @@ The namespace guard, on every IRI of every file:
 **Planted mistake.** `packages/ontology/fixtures/negative/gate3-sameAs.ttl` holds the two prefixes and the one triple
 `inv:Tenant owl:sameAs inv:Organization .` The test parses it and gives the triples to gate 3 as an OWL file; the gate
 reports the predicate. It is planted in a Turtle fixture, not in a `.ts` file, because gate 7's rule 4 scans code
-files for that text and does not scan `fixtures/` (6.7). So the stray `owl:sameAs` of decision 95's rationale fails in
+files for that text and does not scan `fixtures/` (6.7). For the same reason the test never writes the predicate as
+a CURIE or as a full IRI: it names what the gate reported as `RdfVocab`'s `owl` namespace followed by the local name
+`"sameAs"`, so rule 4 is silent on `Generated.test.ts`. So the stray `owl:sameAs` of decision 95's rationale fails in
 gate 3 alone (findings 01-gates.fable#5, 06-testing.fable#6).
+
+**Two further negatives.** The planted mistake trips the predicate list only. The type list and the namespace guard
+each get a Turtle fixture of their own in the same folder and the same test:
+
+- `gate3-type.ttl` holds `inv:Member a owl:Restriction .` The predicate is allowed and the subject is a term; the
+  type list reports the object.
+- `gate3-host.ttl` holds one triple whose subject is under `https://example.com/`, typed `owl:Class`. The predicate
+  and the type are allowed; the namespace guard reports the subject.
+
+The files under `packages/ontology/fixtures/negative/` are hand-written Turtle that states something about a term.
+They are the exception the brief's no-go on hand-written Turtle names: each exists to be refused by one test, and
+no projector, question or reasoner reads it. Gate 3's run over the three generated files never takes that folder as
+input, and neither does the `reason` task (6.9).
 
 ### 6.4 Gate 4, vocabulary coherence
 
-A pure function over the vocabulary value, the exception list and the `rat-` records. Its rules for the thread:
+A pure function over the decoded vocabulary, the exception list, the `rat-` records and the proposal files they name.
+The test decodes the kernel's literal strictly first (2.6); a literal that does not decode fails the gate before any
+rule runs. Its rules for the thread:
 
 | Rule | What must hold | Thread instance |
 | --- | --- | --- |
@@ -873,7 +986,7 @@ A pure function over the vocabulary value, the exception list and the `rat-` rec
 | C9 | A sub-property link names a property on the gist list whose domain and range the property falls under (decision 16) | none in the thread |
 | C10 | A scheme has at least one concept; `alsoInstanceOf` names a class of the vocabulary | the three roles |
 | C11 | The tag is one of kind, role, relator, information; a `role` class has a local parent | `Tenant` |
-| C12 | Every term and every exception entry names a `rat-` record that exists and reads `decision: accept`, and whose `proposal_ref` equals the proposal the term names; no two of the classes, properties and schemes name the same record | 22 terms, 1 entry |
+| C12 | Every term and every exception entry names a `rat-` record that exists and reads `decision: accept`, and whose `proposal_ref` equals the proposal the term names; the proposal file that reference names exists, and the sha256 of its bytes equals the record's `proposal_sha256`; a concept that names its scheme's record is named, by its local name `<SchemeKey>-<notation>`, in that scheme's proposal file; no two of the classes, properties and schemes name the same record | 22 terms, 1 entry; the two scheme proposals name the four concepts |
 | C13 | The version is three numbers, and `0.y.0` before publication (decision 24) | `0.1.0` |
 
 Decision 97 settles the conflict four findings name (03-schema.grok#1, 05-ontology.astra#1, 07-provenance.astra#1,
@@ -886,16 +999,38 @@ The exception list is `packages/ontology/exceptions/no-gist-parent.json`: an arr
 from the module on purpose: the module says `none`, the list says who allowed it, and the gate compares the two.
 
 The `rat-` records are read as text from
-`explorations/erp-ontology/assets/audit/*/governance/ratifications/rat-*.yaml`. The gate needs three top-level scalars
-of each (`id`, `proposal_ref`, `decision`), which it reads by line; no YAML library is added. A concept listed in
-its scheme's ratified proposal names the scheme's record; a concept added later names its own (decision 101).
+`explorations/erp-ontology/assets/audit/*/governance/ratifications/rat-*.yaml`, and the proposal files from
+`work/proposals/otp-*.yaml` of the same audit folder, where the proposal schema puts them. The gate needs four
+top-level scalars of each record (`id`, `proposal_ref`, `proposal_sha256`, `decision`) and one of each proposal
+(`id`, which a `proposal_ref` equals), which it reads by line; no YAML library is added. The rules stay a pure
+function: the test reads the files and hands it each record's four scalars and, for each proposal, its id, the
+sha256 of its bytes and its text.
 
-**Planted mistake.** In the test, a copy of the real vocabulary value is made in which `Grant`'s parent is
-`{ kind: "none", reason: "planted" }`, and the gate is run with the real exception list. It reports C4 naming
-`inv:Grant`. This is expressible in the term model as designed: `none` is a legal parent, so the copy type-checks and
-gate 6 is silent; it is a value in a test, so gates 1, 5 and 7 never see it. The earlier planted mistake, a class
-under two disjoint parents, cannot be written: a class has one `parent` field (findings 01-gates.fable#4,
-03-schema.grok#5, 06-testing.fable#5, 08-docs.fable#3). Disjointness is gate 9's to show.
+The digest is the one the auditor's validator compares (`validate_artifacts.ts`: a record whose `proposal_sha256`
+differs from the digest of the referenced proposal is reported as a stale ratification). Without it, C12 read three
+values that an edit to an approved proposal leaves alone, so gate 4 could pass on a proposal Benjamin never saw, and
+on records the validator rejects. With it, a proposal changed after the ruling fails gate 4 until it is shown to him
+again.
+
+A concept listed in its scheme's ratified proposal names the scheme's record; a concept added later names its own
+(decision 101). "Listed" is read from the bytes he approved: the concept's local name occurs in the proposal file,
+as a whole name and not as the start of a longer one.
+Adding a concept to an approved scheme proposal changes its bytes, so the digest catches it; adding one to the
+module alone leaves the proposal without its name, so the last clause catches it.
+
+**Planted mistake.** In the test, a copy of the kernel's literal is made in which `Grant`'s parent is
+`{ kind: "none", reason: "planted" }`; it is decoded, and the gate is run with the real exception list. It reports C4
+naming `inv:Grant`. This is expressible in the term model as designed: `none` is a legal parent, so the copy
+type-checks and decodes and gate 6 is silent; it is a value in a test, so gates 1, 5 and 7 never see it. The earlier
+planted mistake, a class under two disjoint parents, cannot be written: a class has one `parent` field (findings
+01-gates.fable#4, 03-schema.grok#5, 06-testing.fable#5, 08-docs.fable#3). Disjointness is gate 9's to show.
+
+**Two further negatives, for C12.** Both are copies in memory of the real inputs, with every `rat-` record unchanged:
+
+- The text of `MemberRoleScheme`'s proposal gains one line naming a fifth concept, and its digest is taken again.
+  C12 reports that record as stale.
+- The vocabulary gains a concept `owner` in `MemberRoleScheme` that names the scheme's record, the proposal
+  unchanged. C12 reports `MemberRoleScheme-owner` as not named in the proposal.
 
 ### 6.5 Gate 5, record pointers on the AST
 
@@ -915,13 +1050,32 @@ For each entry of the enrolment list the gate reads the schema value and reports
 | P10 | For a `Model.Class`, every field of each of the six variants carries the same mark as the class's field of that name (3.5) |
 | P11 | Every property of the vocabulary is named by a mark of some enrolled record, or states `evidence: "fixture"` |
 | P12 | A `collection` entry's schema is an array whose element is the named variant itself |
+| P13 | Every field of every `record` entry carries the mark section 3 gives it (3.3, 3.5, 3.6). The test states the placements as a table of record, field and mark, eighteen rows, each mark built with the helper that writes it so that no key is written by hand, and compares it with the key annotations read from each record; it names every field that differs |
 
-P11's exception is `membershipOf` (3.3). Gate 8's guard requires that each fixture-only property does occur in the
-hand-written fixture, so the exception cannot hide an unused term.
+P11's exception is `membershipOf` (3.3). The third guard of section 4.4, which gate 8 runs, requires that each
+fixture-only property does occur in the hand-written fixture, so the exception cannot hide an unused term.
 
-**Planted mistake.** The test builds `S.Struct({ ...Member.fields, name: DisplayName })` with `Member`'s class pointer
-and gives it to the gate in place of `Member`. It reports P3 naming the field `name`. The struct is a value in a test:
-it compiles (gate 6), it is not an enrolled export (gate 7), and gate 4 reads no record.
+P13 is the one rule that says a mark is the right mark. P1 to P12 hold that every mark is well formed, and a well
+formed mark can still be the wrong one. Give `Activity.organizationId` the `recordedActor` mark and `Activity.actorId`
+the `inTenant` mark: both are real properties whose domains fit `AuditEntry`, exactly one field still has the tenant
+range, all six variants agree, both properties still count as used, and the thread lifts no audit entry and asks no
+question of one. Nothing but a comparison with decision 98's placements sees it. So for `Activity` P13 asserts,
+on the key annotations the record really carries, that `organizationId` names `inTenant`, `actorId` names
+`recordedActor`, `action` names `action`, `createdAt` names `recordedAt`, `id` is the subject's id, `actorName` and
+`detail` are `noTerm` with the reason screen, and `agent` is deferred to the party slice. `Person`, which the thread
+does not lift either, is held the same way, and `Member` too, though gate 8 would also see a wrong mark there. A
+slice that enrols a record adds its rows to the table.
+
+**Planted mistake.** The test builds `S.Struct({ ...Member.fields, name: DisplayName })`, gives it `Member`'s class
+pointer with `aboutClass("inv:Member")`, and hands it to the gate in place of `Member`. It reports P3 naming the
+field `name` (P13 names the same field). The struct is a value in a test: it compiles (gate 6); it is not an enrolled
+export, its helper call is in a test file, which rule 1b does not read, and no annotation key is written by hand
+(gate 7); and gate 4 reads no record.
+
+**A second negative, for P13.** The test builds a struct from `Activity.fields` with the class pointer of
+`AuditEntry`, in which `organizationId` is `OrganizationId` marked `aboutProperty("inv:recordedActor")` and `actorId`
+is `MemberId` marked `aboutProperty("inv:inTenant")`, and hands it to the gate in place of `Activity`. P13 names both
+fields, and P1 to P12 report nothing.
 
 ### 6.6 Gate 6, the type-check
 
@@ -929,7 +1083,11 @@ Nothing new runs: it is the repository's type-check. What makes it a gate is tha
 registries, so these do not compile:
 
 ```ts
-// packages/kernel/test/TermsPointer.types.test.ts (sketch)
+// packages/kernel/test/TermsPointer.types.ts (sketch). Compile-only: not a *.test.ts file
+const node = { property: "inv:grantedTo", reverse: true, node: "inv:Grant" } as const
+const scope = { property: "inv:grantScope" } as const
+const value = { property: "inv:grantsRole" } as const
+
 // @ts-expect-error a property where a class is wanted
 aboutClass("inv:membershipIn")
 // @ts-expect-error a class where a property is wanted
@@ -937,50 +1095,91 @@ aboutProperty("inv:Member")
 // @ts-expect-error a misspelt class
 aboutClass("inv:Organisation")
 // @ts-expect-error a misspelt notation
-aboutPath([{ property: "inv:grantedTo", reverse: true, node: "inv:Grant",
-  fixed: [{ property: "inv:grantScope", concept: "inv:GrantScopeKindScheme-organizaton" }] },
-  { property: "inv:grantsRole" }])
+aboutPath([{ ...node, fixed: [{ ...scope, concept: "inv:GrantScopeKindScheme-organizaton" }] }, value])
+// the same call spelt right compiles, so the directive above answers to the notation alone
+aboutPath([{ ...node, fixed: [{ ...scope, concept: "inv:GrantScopeKindScheme-organization" }] }, value])
 ```
+
+Three things about the file's form, each from the repository as it stands:
+
+- **Its name.** The kernel's Vitest collects `test/**/*.test.ts` (`packages/kernel/vitest.config.ts`), and a file of
+  that name with no test in it is an empty suite, which fails the run, and its calls would be executed for nothing.
+  `tsconfig.test.json` includes the whole `test` folder and the package's `check` script compiles it, so
+  `TermsPointer.types.ts` is type-checked and never collected. The same holds for `ActivityMarks.types.ts` (3.5),
+  which holds no error line: its equalities must compile.
+- **One line a case.** A `@ts-expect-error` covers the line below it and no other, so each refused call is one line
+  directly under its directive. The path call is kept to one line, under the formatter's 120 columns, by hoisting
+  its valid parts into three constants; the misspelt concept stays in the call.
+- **Spread arguments.** A helper call here is not made of literals alone. Gate 7's rules 1b and 3 read `src` files
+  only (6.7), so they are silent on it.
 
 **Planted mistake.** `aboutProperty("inv:Member")`: a real term of the wrong kind. Each `@ts-expect-error` line is the
 planted mistake kept in the tree: if a helper ever accepted it, the unused directive would fail the type-check. Gate 7
-passes the line (a helper called with a string literal) and gate 5 never sees a file that does not compile.
+passes the file: rules 1b and 3 do not read test files, and it holds none of the texts rules 4 to 6 refuse. Gate 5
+never sees it: no test imports it.
 
 ### 6.7 Gate 7, `laws ontology-terms`
 
 A source law in `@beep/repo-cli`, run as `bun run beep laws ontology-terms` and as the root task
 `//#ontology-terms:check` in all three checks. It reads source text; it imports no package of the repository. The
-rules that run in the thread:
+five helpers are `aboutClass`, `aboutProperty`, `aboutScheme`, `aboutPath` and `noTerm`, as imported from
+`@inventory/kernel/TermsPointer`. The rules that run in the thread:
 
 | Rule | What it refuses | Runs in the thread |
 | --- | --- | --- |
 | 1 | An export on the enrolment list whose declaration carries no helper call. Recognised forms: an `S.` or `Schema.` chain, `LiteralKit(...)`, a class extending `S.Opaque` or `S.Class` over one, and `class X extends Model.Class<X>("X")(fields, annotations)` with the helper in the second argument. A `collection` entry is exempt | yes |
-| 1b | A helper call in a declaration that is not on the enrolment list: a mark no gate checks | yes |
+| 1b | In a file under a workspace's `src`, a helper call that is neither inside the declaration of an enrolled export nor inside a module-level `const` of the same file that such a declaration references by name: a mark no gate checks. Every `src` file is read, the kernel's unenrolled records included. Test files are not read: a mark built in a test reaches no generated file | yes |
 | 2 | An Alchemy block without a pointer | no: no block is enrolled |
-| 3 | A helper called with anything but string literals | yes |
+| 3 | In a file under a workspace's `src`, a helper whose argument is not the literal form its position takes. `aboutClass`, `aboutProperty`, `aboutScheme`: one string literal. `aboutPath`: one array literal of object literals whose values are string literals, the literal `true` for `reverse`, and for `fixed` an array literal of object literals of string literals. `noTerm`: one string literal, or two when the first is `"deferred"`. No identifier, spread, call or computed key anywhere in the argument | yes |
 | 4 | The text of `owl:inverseOf`, `owl:sameAs`, `owl:equivalentClass`, `owl:imports`, `owl:hasKey`, `skos:narrower` or `skos:hasTopConcept`, as a CURIE or as a full IRI, in any `.ts`, `.tsx` or `.mjs` file git would commit, outside the law's own source and test | yes |
 | 5 | The literal `https://example.org/inventory-import` in any code file but `packages/kernel/src/Terms.vocab.ts` | yes |
 | 6 | The annotation keys `term`, `path` or `noTerm` written by hand in an annotation object, anywhere but `packages/foundation/modeling/vocabulary/src/Pointer.ts` | yes |
-| 7 | In `packages/kernel/src`, an import of `Terms.vocab.ts` that is not `import type`, from any file but the `./Terms` entry; and an import of `@inventory/kernel/Terms` from any package but `@inventory/ontology` | yes |
+| 7 | A value import, a value re-export or a dynamic import whose specifier resolves to the file `packages/kernel/src/Terms.vocab.ts`, in any file outside `packages/ontology`. The rule is on the file an import resolves to, not on how the specifier is spelt: a relative path, the entry `@inventory/kernel/Terms` through the kernel's `exports`, a tsconfig `paths` alias and a `package.json` `imports` alias are each resolved. `import type` and `export type` are allowed anywhere | yes |
+
+**What the rules take as written, and why.** Rules 1b and 3 are about the marks on records, which live in `src`. The
+thread's own sketches are legal under them. `Activity`'s three hoisted marks (3.5) are module-level constants its
+declaration references, so 1b counts them as part of it; each is a helper call of literals, so rule 3 holds.
+`Member.role`'s path (3.3) is an array of object literals with one `reverse: true` and one `fixed` array, which is
+the form rule 3 gives `aboutPath`. The tests of gates 5, 6 and 8 build marked structs and call the helpers in test
+files, which neither rule reads. An unenrolled kernel record that gained a mark would be in `src`, and 1b refuses
+it.
+
+**The law does not read itself.** No rule reads the law's own source
+(`packages/tooling/tool/cli/src/commands/Laws/OntologyTerms*`) or its test and the fixture texts the test holds
+(`packages/tooling/tool/cli/test/OntologyTerms*`). The source must write the texts rules 4 and 5 search for, the
+base literal among them, since the law imports no package to take it from; the test must plant a hand-written `term`
+key for rule 6, a computed argument for rule 3 and a forbidden import for rule 7.
 
 Rule 4 scans code files only. Generated Turtle is gate 3's, on parsed triples, and the Turtle and SPARQL files under
-`packages/ontology/fixtures/` are not code files. So the two gates do not overlap and neither's planted mistake trips
-the other.
+`packages/ontology/fixtures/` are not code files. Gate 3's test, which is a code file, names the predicate it expects
+by namespace and local name and never as a CURIE or a full IRI (6.3). So the two gates do not overlap and neither's
+planted mistake trips the other.
 
 Rule 7 is the proof that no browser bundle carries the vocabulary (decision 9). The app's
 `scripts/bundle-report.mjs` cannot be that proof: it prints, per chunk over 2 kB, the eight largest owners, and names
 a workspace file by its path from `src/` without the package (finding 02-architecture.astra#5 is right about it). The
-law proves it from the imports instead: the value is reachable only through `./Terms`, and only the projector's
-package imports that.
+law proves it from the imports instead, and from where they lead. A rule on two spellings of the specifier would not
+be that proof: `laws boundaries` refuses a relative path only when it leads into `apps` or the scratchpad
+(`Boundaries.rules.ts`, the branches before `packageOf`), and lets any other relative path into another package's
+`src` through, so a web module could import the kernel's file by path and pass both laws. On resolved targets the
+value has one way out of its file, an import from inside `packages/ontology`, and nothing imports that package
+(7.2). The kernel's own `index.ts` and `Terms.pointer.ts` are outside `packages/ontology` like every other file, so
+neither may import or re-export the value.
 
 **Planted mistake.** In the law's own test, a fixture source text declares an enrolled record with
 `S.annotate({ term: "inv:Member" })` written by hand. Rule 6 reports it. The CURIE is spelt right, so gate 5 would
-accept the AST and gate 6 the types; only the source shows that the typed helper was bypassed.
+accept the AST and gate 6 the types; only the source shows that the typed helper was bypassed. The law's run over
+the repository does not read its own test, so the planted text fails nothing but the assertion made about it.
+
+**A second negative, for rule 7.** In the same test, a fixture tree holds a web source,
+`apps/inventory/src/web/Leak.ts`, with
+`import { vocabulary } from "../../../../packages/kernel/src/Terms.vocab.ts"`. Rule 7 reports it. The same line as
+`import type` passes, and the same value imported through an alias the fixture's tsconfig declares is reported.
 
 ### 6.8 Gate 8, the question suite
 
 The test loads `threadGraph()` into Oxigraph, runs `CQ-P06.rq`, and compares the rows with section 5.3. It then runs
-the five must-fail cases of section 5.4 and the two guards of section 4.4.
+the seven must-fail cases of section 5.4 and the three guards of section 4.4.
 
 **Planted mistake.** M2: the two `grantsRole` triples removed from the lifted part. The suite reports both expected
 rows missing. Gate 5 is silent (the marks are unchanged), and gate 1 is silent (the committed graph file is
@@ -988,8 +1187,10 @@ unchanged; the removal is in memory).
 
 ### 6.9 Gate 9, the reasoner
 
-`reason` is a task of `@inventory/ontology`, never a root task, named in the root `check:full` (decision 25). It runs
-ROBOT with HermiT twice and fails, never skips, when Java or the jar is missing:
+`reason` is a task of `@inventory/ontology`, never a root task, named in the root `check:full` (decision 25). It is
+never cached (6.10), so every `check:full` starts the script. The script first reads `robot.lock.json` and compares
+it with what is installed: the Java version, and the sha256 of the jar's bytes. It fails, never skips, when Java or
+the jar is missing, and when either is not the one the pin names. Only then does it run ROBOT with HermiT, twice:
 
 1. **Positive.** `inventory.owl.ttl` merged with `fixtures/CQ-P06.graph.ttl`: the OWL 2 DL profile check passes and
    the merged ontology is consistent.
@@ -1010,10 +1211,12 @@ The SKOS file is not in the reasoner's input, and no alignment exists (1.4).
 The root `test` task hashes the package's own files (`$TURBO_DEFAULT$`), two root Vitest files, and, through
 `transit`, the source of the packages it depends on. It hashes nothing else outside the package. So the kernel's
 module and records, `@beep/vocabulary` and the access contract are covered by the dependency edges, and the exception
-list, the enrolment list, `fixtures/` and `generated/` by `$TURBO_DEFAULT$`. The one input that is neither is the
-`rat-` records: without it, deleting a record would replay gate 4's last pass (findings 01-gates.fable#7,
+list, the enrolment list, `fixtures/` and `generated/` by `$TURBO_DEFAULT$`. The inputs that are neither are the
+`rat-` records and the proposal files they name: without the first, deleting a record would replay gate 4's last
+pass, and without the second, so would an edit to an approved proposal (findings 01-gates.fable#7,
 02-architecture.astra#4, 07-provenance.astra#6; the last names a path, `explorations/erp-ontology/governance/`, that
-is not where the profile puts them).
+is not where the profile puts them). Both are globs, so a file that is added or deleted changes the hash as an edit
+does.
 
 ```json
 // packages/ontology/turbo.json (sketch), after the pattern of packages/catalog/model/turbo.json
@@ -1025,29 +1228,61 @@ is not where the profile puts them).
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
-        "$TURBO_ROOT$/explorations/erp-ontology/assets/audit/*/governance/ratifications/**"
+        "$TURBO_ROOT$/explorations/erp-ontology/assets/audit/*/governance/ratifications/**",
+        "$TURBO_ROOT$/explorations/erp-ontology/assets/audit/*/work/proposals/**"
       ]
     },
-    "reason": {
-      "dependsOn": ["transit"],
-      "inputs": [
-        "generated/**",
-        "fixtures/reason/**",
-        "scripts/reason.ts",
-        "robot.lock.json"
-      ]
-    }
+    "reason": { "dependsOn": ["transit"], "cache": false }
   }
 }
 ```
 
-`reason` reads only committed files: the two generated ones (which gate 1 holds equal to the projector's output), the
-negative fixture, its own script, and `robot.lock.json`, the pin of the jar and of Java that Benjamin approves
-(release, URL, sha256, size). The thread keeps no question file under `explorations/`: the query and fixture are in
-the package, so `assets/requirements/**` is not an input.
+`reason` is not cached, as the root's `test:slow` is not. Its pass depends on two things no input can stand for:
+the Java that is installed and the jar on the machine. A hash over committed files, the pin included, stays the same
+when either is removed, and Turbo would then replay the last pass without starting the script, so the script's own
+check for a missing jar would never run. The root file says the same of `//#patches:check`, which reads
+`node_modules` and so runs every time. With `"cache": false` every `check:full` starts `scripts/reason.ts`, which
+verifies Java and the jar against `robot.lock.json` before its two runs (6.9).
+
+What the script reads is still committed files only, beside the two tools: the two generated files (which gate 1
+holds equal to the projector's output), the negative fixture under `fixtures/reason/`, and `robot.lock.json`, the pin
+of the jar and of Java that Benjamin approves (release, URL, sha256, size, and the Java version). The thread keeps no
+question file under `explorations/`: the query and fixture are in the package.
+
+So no cached task replays a pass over something that is gone. Java or the jar: `reason` is never replayed. A `rat-`
+record or a proposal file: it is an input of `test`, so its removal changes the hash and gate 4 runs and fails on
+the term that names it.
 
 The root task `//#ontology-terms:check` takes the inputs the other source laws take, plus
-`packages/ontology/enrolment.json`.
+`packages/ontology/enrolment.json` and, for rule 7's resolution, every workspace's `package.json` and tsconfig files.
+
+### 6.11 Each planted mistake, walked through the nine gates
+
+A planted mistake must fail its own gate and no other. Each row is one planted mistake; each cell says what that
+gate does with it. "Reports" is the planted failure the test asserts. Every other cell is silent, with the reason.
+The walk was made on this design as it now stands, after the changes of the third review; nothing was run.
+
+| Planted mistake, and where it lives | Gate 1 | Gate 2 | Gate 3 | Gate 4 | Gate 5 | Gate 6 | Gate 7 | Gate 8 | Gate 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1. A label changed in a copy of the committed OWL text, in memory, in `Generated.test.ts` | Reports the line | The changed text is not given to it, and would parse | Not given to it; every predicate is still allowed | Reads no generated text | Reads no generated text | The test compiles | The test holds no refused text: two labels are not a CURIE of rule 4, the base or an annotation key | Reads `threadGraph()` | Reads the committed files, unchanged |
+| 2. `fixtures/negative/gate2-unescaped.ttl` | Not one of the three files | Reports the parse error | Never given it: there are no triples to give | Reads no fixture | Reads no fixture | Not a code file; the test reads it as text and compiles | Not a code file | Does not read the folder | Reads `generated/` and `fixtures/reason/` only |
+| 3. `fixtures/negative/gate3-sameAs.ttl` | Not one of the three files | Not one of the three files, and it parses | Reports the predicate | Reads no fixture | Reads no fixture | Not a code file; the test compiles | Not a code file, and the test names the predicate by namespace and local name, so rule 4 is silent | Does not read the folder | Reads `generated/` and `fixtures/reason/` only |
+| 4. A copy of the literal with `Grant`'s parent `none`, in memory, in `Coherence.test.ts` | The projector is not run on the copy | No text is written from it | No triples are made from it | Reports C4 | Reads the real vocabulary | `none` is a legal parent: the copy type-checks | The test calls no helper and holds no refused text | Reads `threadGraph()` | Reads the committed files |
+| 5. A struct of `Member`'s fields with `name` unmarked, in `Pointers.test.ts` | No generated file changes | The same | The same | Reads no record | Reports P3 (and P13) on `name` | The struct compiles | Not an enrolled export (rule 1); its helper call is in a test file (rules 1b and 3); no key written by hand (rule 6) | Reads the real `Member` | Reads the committed files |
+| 6. `aboutProperty("inv:Member")` under a `@ts-expect-error`, in `packages/kernel/test/TermsPointer.types.ts` | Not read | Not read | Not read | Not read | No test imports the file | Reports: the call is the error the directive expects, and the type-check fails if it ever compiles | Rules 1b and 3 do not read test files; none of the texts of rules 4 to 6 is in it | Not read | Not read |
+| 7. A fixture source text with a hand-written `term` key, in the law's own test | Not read | Not read | Not read | Not read | A text, not a schema | A string: it compiles | Rule 6 reports it in the test's assertion; the law's run over the repository does not read its own test | Not read | Not read |
+| 8. M2, the two `grantsRole` triples removed from the lifted part, in memory, in `Questions.test.ts` | The committed graph file is unchanged | Not given to it | Not given to it | Reads no graph | The marks are unchanged | The test compiles | The test holds no refused text; it builds its IRIs from the module's base | Reports both expected rows missing | Reads the committed graph file |
+| 9. `fixtures/reason/person-is-tenant.ttl` | Not one of the three files | Not one of the three files | Not one of the three files | Reads no fixture | Reads no fixture | Not a code file | Not a code file | Does not read the folder | Reports the inconsistency in the negative run, which the task requires |
+
+The further negatives of sections 6.2 to 6.7 and the must-fail cases of 5.4 are of the same three kinds: a value in
+a test's memory, a file under `fixtures/negative/`, or a fixture text in the law's own test. The same reasons hold
+for each. Two were checked with care because they call helpers in a test: the copies of M6 and M7 and the swapped
+`Activity` of 6.5 are not enrolled, so gate 5 reads none of them on its real run, and they sit in test files, which
+gate 7's rules 1b and 3 do not read.
+
+Three changes of this review keep rows that would otherwise fail a second gate. Row 3: the test once had to write
+the forbidden predicate, and rule 4 would have reported the test file. Rows 5 and 6: rule 1b once refused every
+helper call outside an enrolled declaration, tests included. Row 7: rule 6 once read the law's own test.
 
 ## 7. The package map and the boundaries
 
@@ -1057,7 +1292,7 @@ The root task `//#ontology-terms:check` takes the inputs the other source laws t
 | --- | --- | --- | --- | --- |
 | `@beep/vocabulary` (new) | `packages/foundation/modeling/vocabulary` | `foundation` | The metamodel schemas (`Vocabulary`, the class, property, scheme and concept terms), gate 4's rules as a pure function, the pointer helpers' generic makers and the reader of marks from an AST, and the RDF registry of 7.3 | `./Model`, `./Rules`, `./Pointer`, `./Rdf` |
 | `@inventory/kernel` (two new entries) | `packages/kernel` | `kernel` | `src/Terms.vocab.ts`: the vocabulary value and the registries' types. `src/Terms.pointer.ts`: the five bound helpers | `./Terms`, `./TermsPointer` |
-| `@inventory/ontology` (new) | `packages/ontology` | `ontology` (new) | `src`: the projector, the writer, the lift, `threadGraph`, `Enrolled.ts`. `generated/`, `fixtures/`, `exceptions/`, `enrolment.json`, `scripts/write.ts`, `scripts/reason.ts`, `test/` | none: nothing imports it |
+| `@inventory/ontology` (new) | `packages/ontology` | `ontology` (new) | `src`: the projector, the writer, the lift, `graphOf` and `threadGraph`, `Enrolled.ts`. `generated/`, `fixtures/`, `exceptions/`, `enrolment.json`, `robot.lock.json`, `scripts/write.ts`, `scripts/reason.ts`, `test/` | none: nothing imports it |
 
 `@beep/vocabulary` is this repository's own package, like `@beep/csv` and `@beep/xlsx` beside it: it has no
 `vendor.json`, and `vendor:check` does not read it. Dependencies: the kernel adds `@beep/vocabulary`. The ontology
@@ -1150,7 +1385,7 @@ publication, since any change advances the second. Gate 4's rule C13 checks the 
 
 | File | What it holds | Document IRI | `owl:versionIRI` |
 | --- | --- | --- | --- |
-| `packages/ontology/generated/inventory.owl.ttl` | The gist classes and pairs, the seven classes, the nine properties, the declarations of the three annotation properties, the four individuals | `<base>/ontology` | `<base>/ontology/0.1.0` |
+| `packages/ontology/generated/inventory.owl.ttl` | The gist classes and pairs, the seven classes, the nine properties, the declarations of the four annotation properties it uses (`skos:prefLabel`, `skos:altLabel`, `skos:definition` and `dcterms:source`, each `a owl:AnnotationProperty`), the four individuals | `<base>/ontology` | `<base>/ontology/0.1.0` |
 | `packages/ontology/generated/inventory.skos.ttl` | The two schemes and four concepts | `<base>/taxonomy` | `<base>/taxonomy/0.1.0` |
 | `packages/ontology/generated/fixtures/CQ-P06.graph.ttl` | The seventeen triples of section 4.4 | none | none |
 
@@ -1172,6 +1407,10 @@ The OWL file's document node:
     owl:versionInfo "0.1.0" ;
     dcterms:source <the version IRI gist 14.1.0 states for itself> .
 ```
+
+`dcterms:source` is declared in the file like the three SKOS properties: it is not a built-in annotation property of
+OWL 2, so the OWL 2 DL profile check of gate 9 needs the declaration, and gate 3's guard lets a `dcterms:` subject
+carry that one triple (6.3). Report 12's mapping rules declare the same four.
 
 There is no `owl:imports`: gist is projected into the file, not imported. The gist version IRI is a constant in the
 module's `gist` part, copied from the pinned gist file, which this report did not open. The SKOS file's document node
@@ -1261,12 +1500,16 @@ file or a later slice. Sixty-four findings, ten reviews.
 
 ### 9.2 Questions for Benjamin
 
-One is open. It is not answered here, and the design does not rest on its answer except where the row says what
-waits.
+One is open, the reasoner download approval. It is not answered here, and the design does not rest on an answer
+except where the row says what waits.
 
 | # | Question | Options | What waits |
 | --- | --- | --- | --- |
 | 1 | The reasoner (decision 25): do you approve the ROBOT jar and the Java pin once the builder has named the release, its source, its hash and its size, and does `check:ci` run the reasoner too? | (a) approve, `check:full` only; (b) approve, `check:full` and `check:ci`; (c) not yet | Gate 9. Gates 1 to 8 do not wait |
+
+Question 2, where a scheme's proposal lists its concepts, is settled by design, not by Benjamin. The two scheme
+proposals list their concepts in the definition text, each by its local name, because that needs no change to the
+proposal schema or the validator and gate 4's rule C12 reads the proposal's bytes.
 
 Two questions this report raised are decided:
 
@@ -1282,18 +1525,42 @@ section 2 is the text they would ratify, including the wording marked new (`acti
 
 ### 9.3 What other files say that this report replaces, for the thread only
 
-For the later edit that makes them defer to this report. None was changed here.
+When this report was first written, the brief and reports 04, 05, 06, 12 and 13 still described an earlier thread,
+and `gist-categories.md` and `project-profile.md` were behind the decisions. They have since been edited: the brief
+and those reports name this report wherever they touch the thread, `gist-categories.md` has a row for each of the
+seven gist classes and states the three pairs (2.5), and `project-profile.md` lists decisions 8 to 11, 13 to 16, 20
+to 26 and 93 to 101 as decided. Reports 05, 06 and 11 were searched for the claims this section once listed and
+for their mentions of this report, not read whole.
 
-| File | What it says | What holds |
+Nothing remains: reports 04, 12 and 13, opened again at the places the rows named, now say what this report holds,
+and the other rows already found no difference.
+
+### 9.4 Third-review findings
+
+Nineteen findings, three reviews. Each was checked against the files it cites before anything here changed; all
+nineteen were true. "Settled" and "Outside" mean what they mean in 9.1.
+
+| Finding | Verdict | Where, or why |
 | --- | --- | --- |
-| `BRIEF.md` | Five thread properties; enrolment of "the access contract and the four kernel records"; an email on `Member`; gate 4's planted mistake a class under two disjoint parents; 63 open decisions including 24; a copied `Person` and `Organization` pair | 2.2; 3.7; 3.3; 6.4; 62 open, 24 answered; 6.9 |
-| Report 05 | The `Member` sketch with `personName` and `email`; missing OWL terms added to the vendored list; `aboutPath` typed in the foundation package; V25; V15's binding for the link to the person; a hardcoded namespace; a loose concept name type | 3.3; 7.3; 3.2; 6.4 C4; 6.5 P11; 2.6 |
-| Report 06 | `Grant`'s two criteria; local disjoint pairs; `auditAction`, `recordTime` and the other audit keys; `AuditTrail` keeping `Activity`'s pointer; `Membership` and `OrganizationChoice` pointed in the thread | 2.1; 2.1; decision 98 and 2.2; 3.5; 3.6 |
-| Report 12 | No access row lifted in the thread; path rules without case (c); `rdf:type` objects checked against the predicate table; rule 4 scanning generated files; `assets/**` as a `test` input | 4.4; 4.3; 6.3; 6.7; 6.10 |
-| Report 13 | The thread's `Member` marks naming a sign-in email; enrolment by folder; 63 open | 3.3; 3.7; 62 |
-| Report 04 | CQ-P06's must-fail text and the "non-removed" companion; fixture individuals under the ontology namespace | 5.4; 4.1 |
-| `gist-categories.md` | No rows for `gist:LivingThing`, `gist:TemporalRelation`, `gist:Assignment`; disjointness copying "open" | 2.5 |
-| `project-profile.md` | Lists as undecided what decisions 9 to 11, 15, 20 and 24 answered | Those decisions |
+| code.astra#1 | Settled | 1.5 names `proposal_sha256`; 6.4 rule C12 checks the proposal file, its digest and the concepts it names, with two negatives; 6.10 makes the proposal files an input of `test` |
+| code.astra#2 | Settled | 2.6: the value is a literal `as const satisfies` the encoded side, never `Vocabulary.make`; types come from the literal, gate 4 and the projector decode it |
+| code.astra#3 | Settled | 3.5: the marks are hoisted as annotation objects and applied with `s.annotateKey(mark)` in place; a compile-only file holds the types equal to the unmarked fields' |
+| code.astra#4 | Settled | 6.7: rule 3 has a literal form for each helper; rule 1b reads every `src` file and counts a referenced module-level constant as part of its declaration; tests are not read by either. Report 12's sentence is that file's (9.3) |
+| code.astra#5 | Settled | 6.5 rule P13 and its negative; 1.1 item 3 |
+| code.astra#6 | Settled | 6.9 and 6.10: `reason` is not cached, and the script verifies Java and the jar against the pin before it runs |
+| code.astra#7 | Settled | 6.7 rule 7 is on the file an import resolves to, with a web-source negative |
+| code.astra#8 | Settled | 6.6: `TermsPointer.types.ts`, one line a case |
+| code.astra#9 | Outside | The two cells are report 13's. 2.3 already says a scheme has no kind tag; 9.3 lists the difference |
+| gates.fable#1 | Settled | 5.4 M6 and M7; 4.4 second guard; 1.1 item 4. M7 removes the path's `fixed` entry, since the thread has no second legal concept or value-step property to swap in |
+| gates.fable#2 | Settled | 6.7 rule 1b; 3.5; 6.5; 6.6 |
+| gates.fable#3 | Settled | 6.7: no rule reads the law's own source and test; 6.3: the test names the predicate by namespace and local name |
+| gates.fable#4 | Settled | 6.2 and 6.3: one more negative for gate 2 and two for gate 3 |
+| gates.fable#5 | Settled | 4.4 third guard; 6.5; 6.8 |
+| gates.fable#6 | Settled | 6.3 says what the negative fixtures are and who never reads them. The brief's no-go already carries the exception |
+| gates.fable#7 | Settled | 9.3 describes the other files as they are now |
+| ontology.grok#1 | Settled | 6.3: a `dcterms:` subject may carry the declaration; 8: four annotation properties are declared |
+| ontology.grok#2 | Outside | Report 04's opening of section 4 already gives 4.1's two patterns; the CQ-P01 line is that file's. 9.3 lists it |
+| ontology.grok#3 | Settled | 2.5 and 9.3 |
 
 ## 10. What was not checked
 
@@ -1302,30 +1569,49 @@ For the later edit that makes them defer to this report. None was changed here.
 - **gist itself.** The pinned `gistCore.ttl` is kept outside the repository and was not opened. The parents of
   `gist:LivingThing`, `gist:TemporalRelation` and `gist:Assignment`, the three disjoint pairs, the absence of any other
   stated pair among the seven classes, and gist's version IRI rest on report 11 and `gist-categories.md`.
-- **The types of the `Model.Class` sketch.** That `Model.fieldEvolve` with `S.annotateKey` leaves each variant's type,
-  and so the class's field types and constructor default, as they are was read from signatures, not compiled. That
-  `S.resolveAnnotations(Activity)` returns the class annotations follows from `Schema.ts` 17660 to 17701 and was not
-  run. `effect/schema/Model` and `VariantSchema` are marked unstable.
+- **The types of the `Model.Class` sketch.** That `(s) => s.annotateKey(mark)` inside `Model.fieldEvolve` leaves each
+  variant's type, and so the class's field types and constructor default, as they are was read from signatures
+  (`Schema.ts` 212, 5324 to 5334 and 5952 to 5962; `VariantSchema.ts` 462 to 492), not compiled: the equalities of
+  `ActivityMarks.types.ts` are what a compile would show. That each function's parameter is typed from the variant
+  it maps, in the data-first call, was not compiled either. That `S.resolveAnnotations(Activity)` returns the class
+  annotations follows from `Schema.ts` 17660 to 17701 and was not run. `effect/schema/Model` and `VariantSchema` are
+  marked unstable.
+- **The literal and the types derived from it.** That the kernel's literal passes `satisfies` against
+  `S.Codec.Encoded<typeof Vocabulary>` while keeping its keys, and that the three registries and `InvConceptCurie`
+  derive from it as 2.6 writes them, was not compiled; the metamodel it is checked against is report 05's sketch.
+  The brief already asks for this to be tried in the scratchpad before the thread relies on it.
 - **Small type facts.** That `$I.annoteSchema`'s extras and `nullAsNone`'s argument accept the helpers' spread keys;
-  that an `S.Opaque` class exposes `fields` as gate 5's planted mistake uses it; the name of the array node's element
-  field that rule P12 reads; that `mergeVocab` keeps the literal types of an extended `owl` entry; whether
-  `CoreVocab`'s `rdf` terms include `type`.
-- **Erasure.** That `import type` of `Terms.vocab.ts` keeps the value out of every bundle is the compiler's and the
-  bundler's behaviour; rule 7 of the law holds the import structure and was designed, not run. The root tsconfig's
-  module settings were not opened for this.
-- **Reading files outside the package in a test.** Gate 4 reads the `rat-` records under `explorations/`. Whether that
-  is a `?raw` glob import or `node:fs` under the documented `nodeBuiltinImport:off` comment, and whether `laws
-  boundaries` accepts a relative glob that leaves the package, was not tried. The same for importing
-  `enrolment.json`.
-- **The `rat-` chain beyond the record.** The ratification schema's fields were read. The proposal file a
-  `proposal_ref` points at (`otp:`) was not, so rule C12 checks the record and the reference, not that the proposal's
-  text is the term's.
-- **ROBOT.** Its commands and flags, the Java version it needs, the jar's release, size and hash, and whether the
-  merged file passes the OWL 2 DL profile check as designed (undeclared fixture individuals, the three annotation
-  property declarations). ROBOT is not installed and nothing was downloaded.
+  that an `S.Opaque` class exposes `fields` as the copies of 5.4 and 6.5 use it, and that a struct built from
+  `Activity.fields` keeps the marks of the select variant; the name of the array node's element field that rule P12
+  reads; that `mergeVocab` keeps the literal types of an extended `owl` entry; whether `CoreVocab`'s `rdf` terms
+  include `type`.
+- **The compile-only file of 6.6.** That a spread of an `as const` object into the argument of `aboutPath` keeps the
+  literal types its const type parameter needs, so that the call spelt right compiles and the misspelt one does not;
+  and that the formatter leaves a line of 103 columns on one line. The width, 120, was read in `.oxfmtrc.json`.
+- **Erasure and rule 7.** That `import type` of `Terms.vocab.ts` keeps the value out of every bundle is the
+  compiler's and the bundler's behaviour; rule 7 of the law holds the import structure and was designed, not run.
+  How the law resolves a tsconfig `paths` alias and a `package.json` `imports` alias from text, without the
+  compiler, was not designed further than "it resolves them". The root tsconfig's module settings were not opened
+  for this.
+- **Reading files outside the package in a test.** Gate 4 reads the `rat-` records and the proposal files under
+  `explorations/`. Whether that is a `?raw` glob import or `node:fs` under the documented `nodeBuiltinImport:off`
+  comment, and whether `laws boundaries` accepts a relative glob that leaves the package, was not tried. The same for
+  importing `enrolment.json`. A `?raw` import gives text, and the digest is of bytes: the two agree for a UTF-8 file
+  with no byte-order mark, which was not tried. The sha256 itself can come from `effect/crypto/Digest`
+  (`digestHex` with `Digest.sha256`, and `layerWebCrypto`), which was read and not run.
+- **The `rat-` chain beyond the record.** The ratification schema, the proposal schema and the validator's stale
+  check were read. No proposal file exists, so none was. The proposal schema has no field for a scheme's concepts
+  and the validator closes its key sets, so where a scheme's proposal names them is open (9.2, question 2); whether
+  the validator and the adversary's review accept the names in the definition text was not tried. Rule C12 checks
+  the record, the reference, the digest and the names, not that the proposal's text is the term's.
+- **ROBOT.** Its commands and flags, the Java version it needs, the jar's release, size and hash, where the jar is
+  kept on a machine, how the script reads the installed Java's version, and whether the merged file passes the OWL 2
+  DL profile check as designed (undeclared fixture individuals, the four annotation property declarations). ROBOT is
+  not installed and nothing was downloaded.
 - **N3.js and Oxigraph.** Neither is installed; their APIs were not read.
 - **Turbo and the sync commands.** Whether a package's `turbo.json` may declare a task the root file does not name
-  (`reason`), how `config-sync` writes the task lists of the three root checks and a new package's scripts, exports and
+  (`reason`) and mark it `"cache": false` there, that a glob input changes a task's hash when a matching file is
+  deleted, how `config-sync` writes the task lists of the three root checks and a new package's scripts, exports and
   tsconfig references, and the exact inputs the existing source-law root tasks declare.
 - **The stored tables.** No migration was opened. That the stored member row's `userId` links a sign-in account and
   not the human is report 06's statement.

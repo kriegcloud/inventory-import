@@ -6,6 +6,7 @@ import { describe, expect, it } from "@effect/vitest"
 import {
   ConfirmRequest,
   decisionFromFlags,
+  DecisionDelta,
   RowDecision,
   RowDecisionFlags,
   rowId,
@@ -66,6 +67,19 @@ describe("a row's decision", () => {
     runs
   )
 
+  it.effect.prop(
+    "read from its flags in code is what decoding them reads, a value typed under no field left out by both",
+    [Arbitrary.schema(RowDecisionFlags), junkField, Arbitrary.schema(S.String.check(S.isMaxLength(100)))],
+    ([flags, junk, value]) =>
+      Effect.gen(function* () {
+        const withJunk = { ...flags, edits: { ...flags.edits, [junk]: value } }
+        const decoded = yield* S.decodeEffect(RowDecision)(withJunk)
+        expect(decisionFromFlags(withJunk)).toEqual(decoded)
+        expect(R.has(decisionFromFlags(withJunk).edits, junk)).toBe(false)
+      }),
+    runs
+  )
+
   it.prop(
     "refuses an accept or an undo of something that is no field",
     [Arbitrary.schema(RowDecisionFlags), junkField],
@@ -103,30 +117,34 @@ describe("the decisions of a draft", () => {
   )
 
   it.prop(
-    "a save clears each row once, never one it also sets, and names revisions only of row ids",
+    "a save names its rows and their revisions by row ids, each spelling its row's number and part",
     [Arbitrary.schema(SaveRequest)],
     ([save]) => {
-      expect(A.dedupe(save.clear).length).toBe(save.clear.length)
-      expect(A.filter(save.clear, (row) => R.has(save.set, row))).toEqual([])
-      for (const key of [...save.clear, ...R.keys(save.madeOn), ...R.keys(save.over ?? {})]) {
+      for (const key of [...save.clear, ...R.keys(save.set), ...R.keys(save.madeOn), ...R.keys(save.over ?? {})]) {
         expect(respelled(key)).toBe(key)
       }
     },
     runs
   )
 
-  it.prop(
-    "a confirm that clears a row it also sets, or clears one twice, is refused",
-    [Arbitrary.schema(ConfirmRequest)],
-    ([confirm]) => {
-      const first = A.head(R.keys(confirm.set))
-      if (O.isSome(first))
-        expect(S.is(ConfirmRequest)({ ...confirm, clear: [...confirm.clear, first.value] })).toBe(false)
-      const cleared = A.head(confirm.clear)
-      if (O.isSome(cleared)) {
-        expect(S.is(ConfirmRequest)({ ...confirm, clear: [...confirm.clear, cleared.value] })).toBe(false)
-      }
-    },
-    runs
-  )
+  // Each is generated valid, then given a row it also sets to clear, or a row it already clears to clear again.
+  for (const [name, schema] of [
+    ["a save", SaveRequest],
+    ["a change of decisions", DecisionDelta],
+    ["a confirm", ConfirmRequest]
+  ] as const) {
+    it.prop(
+      `${name} that clears a row it also sets, or clears one twice, is refused`,
+      [Arbitrary.schema(schema)],
+      ([request]) => {
+        expect(S.is(schema)(request)).toBe(true)
+        const set = A.head(R.keys(request.set))
+        if (O.isSome(set)) expect(S.is(schema)({ ...request, clear: [...request.clear, set.value] })).toBe(false)
+        const cleared = A.head(request.clear)
+        if (O.isSome(cleared))
+          expect(S.is(schema)({ ...request, clear: [...request.clear, cleared.value] })).toBe(false)
+      },
+      runs
+    )
+  }
 })

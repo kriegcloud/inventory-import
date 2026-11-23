@@ -1,6 +1,7 @@
 // What the person decided for one row of a file, as code holds it and as it is stored and sent (its flags), the
 // id of one item of a file, and the change to the saved decisions a screen sends.
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
@@ -194,11 +195,38 @@ const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
 
 /**
  * The fields undone that the person did not take again: a field both accepted and undone was accepted after it was
- * undone (the review region keeps an undone proposal in `reverted` when it is taken), and the review reads it as
- * accepted (`inForce` in the model's review), so a decision holds it once, as accepted.
+ * undone (the review region takes a field out of `accepted` when it is undone, and leaves an undone proposal in
+ * `reverted` when it is taken again, so the last act was the accept), and the review reads it as accepted (`inForce`
+ * in the model's review), so a decision holds it once, as accepted.
+ *
+ * @example undoneOnly(["uom", "name"], ["uom"]) // ["name"]
  */
-const undoneOnly = (accepted: ReadonlyArray<string>, reverted: ReadonlyArray<string>): ReadonlyArray<string> =>
+const undoneOnly: {
+  (accepted: ReadonlyArray<string>): (reverted: ReadonlyArray<string>) => ReadonlyArray<string>
+  (reverted: ReadonlyArray<string>, accepted: ReadonlyArray<string>): ReadonlyArray<string>
+} = dual(2, (reverted: ReadonlyArray<string>, accepted: ReadonlyArray<string>): ReadonlyArray<string> =>
   A.filter(reverted, (field) => !A.contains(accepted, field))
+)
+
+const isFieldName = S.is(fieldName)
+
+/**
+ * The stored flags read once, where an absent flag becomes an empty part: the schema's decode and
+ * `decisionFromFlags` both read a decision through it, so the two never disagree. A value typed under a key that
+ * names no field is not read, as the decision's record of edits drops it.
+ */
+const partsOfFlags = (flags: RowDecisionFlags) => {
+  const accepted = flags.accepted ?? []
+  const stored: typeof StoredChoiceKind.Type = flags.stored ?? "undecided"
+  return {
+    out: flags.out === true,
+    kept: flags.kept === true,
+    stored,
+    accepted,
+    reverted: undoneOnly(flags.reverted ?? [], accepted),
+    edits: R.filter(flags.edits ?? {}, (_value, field) => isFieldName(field))
+  }
+}
 
 // A decision as code holds it. Every part is there, empty when the person said nothing about it, and no field is
 // both accepted and undone.
@@ -223,18 +251,20 @@ export const RowDecision = RowDecisionFlags.pipe(
   S.decodeTo(
     RowDecisionParts,
     SchemaTransformation.transform({
-      decode: (flags): (typeof RowDecisionParts)["Encoded"] => ({
-        place:
-          flags.out === true
-            ? { kind: "leftOut", wasKept: flags.kept === true }
-            : flags.kept === true
+      decode: (flags): (typeof RowDecisionParts)["Encoded"] => {
+        const parts = partsOfFlags(flags)
+        return {
+          place: parts.out
+            ? { kind: "leftOut", wasKept: parts.kept }
+            : parts.kept
               ? { kind: "kept" }
               : { kind: "open" },
-        stored: { kind: flags.stored ?? "undecided" },
-        accepted: flags.accepted ?? [],
-        reverted: undoneOnly(flags.accepted ?? [], flags.reverted ?? []),
-        edits: flags.edits ?? {}
-      }),
+          stored: { kind: parts.stored },
+          accepted: parts.accepted,
+          reverted: parts.reverted,
+          edits: parts.edits
+        }
+      },
       encode: (parts): RowDecisionFlags => flagsOf(parts)
     })
   )
@@ -267,14 +297,16 @@ export const decisionToFlags = (decision: RowDecision): RowDecisionFlags => flag
  *
  * @example decisionFromFlags({ out: true, kept: true }).place // { kind: "leftOut", wasKept: true }
  */
-export const decisionFromFlags = (flags: RowDecisionFlags): RowDecision =>
-  decisionOf({
-    place: flags.out === true ? placeLeftOut(flags.kept === true) : flags.kept === true ? placeKept : placeOpen,
-    stored: flags.stored === "keep" ? storedKeep : flags.stored === "replace" ? storedReplace : storedUndecided,
-    ...(flags.accepted === undefined ? {} : { accepted: flags.accepted }),
-    ...(flags.reverted === undefined ? {} : { reverted: undoneOnly(flags.accepted ?? [], flags.reverted) }),
-    ...(flags.edits === undefined ? {} : { edits: flags.edits })
-  })
+export const decisionFromFlags = (flags: RowDecisionFlags): RowDecision => {
+  const parts = partsOfFlags(flags)
+  return {
+    place: parts.out ? placeLeftOut(parts.kept) : parts.kept ? placeKept : placeOpen,
+    stored: parts.stored === "keep" ? storedKeep : parts.stored === "replace" ? storedReplace : storedUndecided,
+    accepted: parts.accepted,
+    reverted: parts.reverted,
+    edits: parts.edits
+  }
+}
 
 /** Every row's decision by row id (`row-56`). This is the draft the server keeps while the person reviews. */
 export const SavedDecisions = S.Record(rowKey, RowDecision)

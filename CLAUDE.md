@@ -358,7 +358,9 @@ goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
                         both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; defaults: absence, starting values and clean-ups are a schema's, counted per file against a baseline that only falls; exports; keys; private-paths: no home path or private folder in the scratchpad; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
-                        under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
+                        under its one name; and the six bans, each with a ledger in `ledgers/` of today's files whose
+                        numbers only fall against where the branch left main: assertions, promises, diagnostics, dual,
+                        readonly and fast-refresh), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout); `deps update`, `version-sync` and
                         `config-sync`, which move dependencies and keep repeated versions and derived configuration in
                         step (`docs/sync-commands.md`); `patches` (check, installed, prove, build, and carry, which a
@@ -447,8 +449,10 @@ its rules from the code of `decide` and `evolve`, so that code is written for tw
 those files, read [docs/verify.md](docs/verify.md).
 
 - **`new` only where a `decide` is**: files named `*.aggregate.ts` and `*.decision.ts` build events and rejections with
-  `new`, with `// @effect-diagnostics newSchemaClass:off` as their first line. The prover does not read `X.make(...)`
-  there. Everywhere else, tests included, `.make`.
+  `new`, since the prover does not read `X.make(...)` there. The `// @effect-diagnostics newSchemaClass:off` first line
+  that lets them is refused in a new file (`diagnostics:check`): the model's decide files that hold it today are held
+  in `packages/tooling/tool/cli/ledgers/diagnostics.json`, and a new decide file builds with `.make` once the prover
+  reads it (decision 33, in progress), so it waits for that change. Everywhere else, tests included, `.make`.
 - **A case is told with `effect/Match`**, in a guard written once beside the schema (`isOpen`, `isDecided`); the prover
   does not read a schema's `guards` or `match`. **A state is built by its case's own `make`, with the status written
   out** (`ImportState.cases.Open.make({ status: "Open", ... })`): the prover sees only what `make` is given. A state's
@@ -567,15 +571,15 @@ profile, its copied tests included, with no override.
 - **Fast by default.** A test that needs sign-in or a real database is slow: name it `*.slow.test.ts`, and write it
   only when the rule cannot be shown another way. `bun run check` runs the fast tests; `bun run check:full` runs all.
 - **Tests run in Node under the same Effect rules.** Read a sample file with
-  `import text from "../../public/samples/items_messy.csv?raw"`. `node:fs` fails `bun run check`. A new test reads a
-  binary file (a PDF) with Vite's `?url` or `?raw`, or through the D1/miniflare test layer; the tests that read one
-  through `node:fs` today (`test/server/support/files.ts`, `packages/catalog/web/test/support/files.ts`) do it under an
-  `@effect-diagnostics` comment held in `packages/tooling/tool/cli/ledgers/diagnostics.json`, and come off as they
-  move. No new such comment is written (`diagnostics:check` refuses one), and a test is an Effect (`it.effect`), never
-  a Promise or `async` (`promises:check`). Provide layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
+  `import text from "../../public/samples/items_messy.csv?raw"`. `node:fs` fails `bun run check`. A test that
+  reads a binary file (a PDF) is to read it without `node:fs` and without a diagnostics comment; no reader for that is
+  set up yet. The eight test files that read one through `node:fs` today do it under an `@effect-diagnostics` comment
+  held in `packages/tooling/tool/cli/ledgers/diagnostics.json`, and come off as they move. No new such comment is
+  written (`diagnostics:check` refuses one), and a test is an Effect (`it.effect`), never a Promise or `async`
+  (`promises:check`). Provide layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
 
-In `src/web` the same compiler flags apply, but the rules that forbid native array methods, truthiness checks,
-`async` and browser globals are off. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect
+In `src/web` the same compiler flags apply, but the type-check's rules that forbid native array methods, truthiness
+checks, `async` and browser globals are off there; `async` is refused everywhere all the same, by `promises:check`. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect
 diagnostics at all.
 
 ## Platform: Cloudflare Workers and D1

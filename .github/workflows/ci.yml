@@ -9,10 +9,14 @@ on:
 
 permissions:
   contents: read
+  # The bans' ledgers are compared, on a push, with the last commit of the branch whose run passed: read the runs.
+  actions: read
 
+# A pull request's new push cancels its run in progress. A push to main or a release branch never cancels one: each
+# run of a push is what the next one is compared with, and its result is what starts a deploy.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -20,11 +24,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      # The bans' ledgers may only fall, compared with where this commit left main (their merge base; on a push to
-      # main, the commit before): the whole history is fetched so git can find it (packages/tooling/tool/cli/ledgers).
+      # The bans' ledgers may only fall, compared with where this commit left main (their merge base): the whole
+      # history is fetched so git can find it (packages/tooling/tool/cli/ledgers).
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # On a push, the ledgers are compared with the last commit of this branch whose run passed, so a number raised
+      # in a push whose run was cancelled, failed or is still waiting is seen all the same; with none yet, the push's
+      # `before`.
+      - name: Base of the bans' ledgers
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          passed=$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          echo "LEDGER_BASE=${passed:-$BEFORE}" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -42,9 +57,6 @@ jobs:
         run: bun run check:ci -- --summarize --continue --concurrency=2
         env:
           VITEST_MAX_WORKERS: 1
-          # On a push, the commit main moved from: the bans' ledgers are compared with it, so every commit of a push of
-          # several is checked (a pull request's run leaves it empty and compares with where the branch left main).
-          LEDGER_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
       # Chrome at this path (CHROME_BIN in actions/runner-images; the runs are on Ubuntu 26.04, whose image lists
       # Google Chrome as 24.04's does). The browser says its version first,

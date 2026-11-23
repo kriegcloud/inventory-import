@@ -53,6 +53,10 @@ const nameOf = (node: unknown): O.Option<string> =>
     ? O.some(node["name"])
     : O.none()
 
+/** The name an import or export specifier gives: an identifier, or a string (`export { "runPromise" as go }`). */
+const specifierName = (node: unknown): O.Option<string> =>
+  isNode(node) && node.type === "Literal" && P.isString(node["value"]) ? O.some(node["value"]) : nameOf(node)
+
 /** A member's name: an identifier after a dot, or a string in brackets (`x["then"]`). */
 const propertyOf = (member: Node): O.Option<string> => {
   const property = member["property"]
@@ -148,10 +152,10 @@ const useOf: {
   switch (node.type) {
     // A runner imported by name, under any name (`runPromise as go`): the name it is imported under does not matter.
     case "ImportSpecifier":
-      return O.exists(nameOf(node["imported"]), isPromiseRunner) ? O.some("run") : O.none()
+      return O.exists(specifierName(node["imported"]), isPromiseRunner) ? O.some("run") : O.none()
     // `export { runPromise as runApp } from "effect/Effect"`: passed on to another module under any name.
     case "ExportSpecifier":
-      return O.exists(nameOf(node["local"]), isPromiseRunner) ? O.some("run") : O.none()
+      return O.exists(specifierName(node["local"]), isPromiseRunner) ? O.some("run") : O.none()
     // `const { runPromise: go } = Effect`, from a runtime too: taken out of an object under another name.
     case "ObjectPattern":
       return A.some(nodesIn(node["properties"]), (property) => O.exists(nameOf(property["key"]), isPromiseRunner))

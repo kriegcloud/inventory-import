@@ -118,6 +118,7 @@ export const d = go
     expect(
       uses(`export { runPromise as runApp } from "effect/Effect"\nexport { succeed } from "effect/Effect"\n`)
     ).toEqual(["run"])
+    expect(uses(`export { "runPromise" as go } from "effect/Effect"\n`)).toEqual(["run"])
   })
 
   it("catches Promise however it is reached: through the global object, in brackets, or under another name", () => {

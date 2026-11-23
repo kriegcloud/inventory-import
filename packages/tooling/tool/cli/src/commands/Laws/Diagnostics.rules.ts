@@ -71,7 +71,11 @@ const notRead = `${A.join(diagnosticsLeftOut, ", ")} are not read; the files in 
  */
 export const DiagnosticsFinding = S.TaggedUnion({
   Clean: {},
-  Refused: {},
+  Refused: {
+    directive: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether a directive is among what is refused, or only the ledger" })
+    )
+  },
   Unlisted: {
     why: S.String.pipe(S.annotateKey({ description: "What git said when it could not list the files" }))
   },
@@ -105,10 +109,12 @@ export type DiagnosticsFinding = typeof DiagnosticsFinding.Type
  */
 export const diagnosticsSentence: (finding: DiagnosticsFinding) => Line = DiagnosticsFinding.match({
   Clean: () => out(`diagnostics:check OK  no @effect-diagnostics directive is written (${notRead})`),
-  Refused: () =>
-    err(
-      `diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off. Change the code until it holds (${notRead}):`
-    ),
+  Refused: ({ directive }) =>
+    directive
+      ? err(
+          `diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off. Change the code until it holds (${notRead}):`
+        )
+      : err(`diagnostics:check FAIL  its ledger does not hold (${notRead}):`),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   At: ({ place }) => err(`${place}  an @effect-diagnostics directive: remove it and write the code the rule asks for`),
   Standing: ({ file, words }) => err(`${file}  ${words}`),
@@ -125,7 +131,7 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
   const ledger = yield* readLedger(diagnosticsLedger)
   if (Result.isFailure(ledger)) {
     return A.make<[DiagnosticsFinding, DiagnosticsFinding]>(
-      DiagnosticsFinding.cases.Refused.make({}),
+      DiagnosticsFinding.cases.Refused.make({ directive: false }),
       DiagnosticsFinding.cases.Ledger.make({ said: ledger.failure })
     )
   }
@@ -139,7 +145,7 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
   ])
   if (listed.code !== 0) {
     return A.make<[DiagnosticsFinding, DiagnosticsFinding]>(
-      DiagnosticsFinding.cases.Refused.make({}),
+      DiagnosticsFinding.cases.Refused.make({ directive: false }),
       DiagnosticsFinding.cases.Unlisted.make({ why: Str.trim(listed.stderr) })
     )
   }
@@ -170,6 +176,11 @@ export const diagnostics = Effect.fn("Diagnostics.diagnostics")(function* () {
     A.flatten(found)
   )
   return A.isArrayNonEmpty(problems)
-    ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(problems, DiagnosticsFinding.cases.Refused.make({}))
+    ? A.prepend<DiagnosticsFinding, DiagnosticsFinding>(
+        problems,
+        DiagnosticsFinding.cases.Refused.make({
+          directive: A.some(problems, (problem) => !DiagnosticsFinding.guards.Ledger(problem))
+        })
+      )
     : A.of<DiagnosticsFinding>(DiagnosticsFinding.cases.Clean.make({}))
 })

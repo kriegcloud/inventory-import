@@ -208,6 +208,35 @@ describe("laws diagnostics", () => {
       expect(twoCommits).toContain(
         `err: ${listed}  is held at 3 in ${diagnosticsLedger}, above the 2 main holds it to: a number only falls`
       )
+      // A LEDGER_BASE not fetched, or not in HEAD's history (a force push), is refused, not taken in silence.
+      const unfetched = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          yield* onMain()
+          vi.stubEnv("LEDGER_BASE", "0123456789abcdef0123456789abcdef01234567")
+          return yield* run
+        })
+      )
+      vi.unstubAllEnvs()
+      expect(unfetched).toEqual([
+        `err: diagnostics:check FAIL  its ledger does not hold (.agents/, vendor/, docs/, scratchpad/ are not read; the files in ${diagnosticsLedger} are listed):`,
+        `err: ${diagnosticsLedger} could not be compared: LEDGER_BASE names 0123456789abcdef0123456789abcdef01234567, which is not in this checkout. Fetch it, so a number that rose since is seen`
+      ])
+      const forced = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["checkout", "-q", "--orphan", "elsewhere"])
+          yield* commit("another history")
+          const other = Str.trim((yield* repo.run("git", ["rev-parse", "HEAD"])).stdout)
+          yield* repo.run("git", ["checkout", "-q", "work"])
+          vi.stubEnv("LEDGER_BASE", other)
+          return yield* run
+        })
+      )
+      vi.unstubAllEnvs()
+      expect(A.join(forced, "\n")).toContain("which is not in HEAD's history (was the branch pushed with --force?)")
       // A shallow checkout may not hold the base: refused, not passed in silence.
       const shallow = yield* inTree(
         held,

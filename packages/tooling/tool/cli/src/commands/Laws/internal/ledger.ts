@@ -140,20 +140,47 @@ const baseCommit = Effect.fn("ledger.baseCommit")(function* (main: string) {
   })
   const branch = yield* repo.run("git", ["symbolic-ref", "--quiet", "--short", "HEAD"])
   const onMain = branch.code === 0 && Str.trim(branch.stdout) === "main"
-  // CI's run for a push names the commit main moved from; a branch's run, or a push that made the branch, names none.
-  const before = yield* Config.String("LEDGER_BASE")
-    .pipe(Config.option)
-    .parse(ConfigProvider.fromEnv())
-    .pipe(Effect.orElseSucceed(() => O.none<string>()))
-  const pushedFrom = yield* O.match(
-    O.filter(before, (commit) => Str.isNonEmpty(commit) && !/^0+$/.test(commit)),
-    { onNone: () => Effect.succeedNone, onSome: (commit) => commitOf(commit) }
-  )
+  const before = yield* pushBase()
+  const pushedFrom = yield* O.match(before, { onNone: () => Effect.succeedNone, onSome: commitOf })
   if (O.isSome(pushedFrom)) return yield* mergeBase(pushedFrom.value)
   if (!onMain) return yield* mergeBase(main)
   const head = yield* commitOf("HEAD")
   // Locally on main: what origin/main holds, when HEAD is ahead of it; else the commit before HEAD.
   return O.exists(head, (commit) => commit === main) ? yield* commitOf("HEAD^1") : yield* mergeBase(main)
+})
+
+/**
+ * The commit CI names for a push (`LEDGER_BASE`: the last commit of the branch whose run passed, else the push's
+ * `before`); none in a pull request's run, locally, or for a push that made the branch (all zeros).
+ */
+const pushBase = Effect.fn("ledger.pushBase")(function* () {
+  const named = yield* Config.String("LEDGER_BASE")
+    .pipe(Config.option)
+    .parse(ConfigProvider.fromEnv())
+    .pipe(Effect.orElseSucceed(() => O.none<string>()))
+  return O.filter(named, (commit) => Str.isNonEmpty(commit) && !/^0+$/.test(commit))
+})
+
+/**
+ * Why the commit CI names for a push cannot be the base, when it cannot: not fetched, or not in HEAD's history (a
+ * force push). Then nothing is compared with it, and the law says so rather than taking another base in silence.
+ */
+const pushBaseProblem = Effect.fn("ledger.pushBaseProblem")(function* (path: string) {
+  const repo = yield* Repo
+  const named = yield* pushBase()
+  if (O.isNone(named)) return O.none<string>()
+  const commit = yield* commitOf(named.value)
+  if (O.isNone(commit)) {
+    return O.some(
+      `${path} could not be compared: LEDGER_BASE names ${named.value}, which is not in this checkout. Fetch it, so a number that rose since is seen`
+    )
+  }
+  const ancestor = yield* repo.run("git", ["merge-base", "--is-ancestor", commit.value, "HEAD"])
+  return ancestor.code === 0
+    ? O.none<string>()
+    : O.some(
+        `${path} could not be compared: LEDGER_BASE names ${named.value}, which is not in HEAD's history (was the branch pushed with --force?). Compare it by hand against main, and run this again with LEDGER_BASE set to a commit HEAD holds`
+      )
 })
 
 /** Each file renamed since `base`, by its name now, with the name it had there (git's own finding of a rename). */
@@ -208,6 +235,8 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
       `${input.path} could not be compared with main: the checkout is shallow, so where this branch left main may be missing. Fetch main's history (git fetch --unshallow origin main), so a number that rose is seen`
     )
   }
+  const unfit = yield* pushBaseProblem(input.path)
+  if (O.isSome(unfit)) return A.append(missing, unfit.value)
   const base = yield* baseCommit(main.value)
   // HEAD with no main in its history and no parent of its own: there is nothing to compare with.
   if (O.isNone(base)) return missing

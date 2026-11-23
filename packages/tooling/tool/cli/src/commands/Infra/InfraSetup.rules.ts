@@ -521,12 +521,13 @@ const refusedWords = [
  * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "v" vault') // "refused"
  */
 export const onePasswordFailure = (stderr: string): OnePasswordFailure => {
-  // A quoted name ends at its own kind of quote followed by what op writes after one (a colon, a space, a comma, a
-  // full stop or the end of the line): an apostrophe inside a double-quoted name ("James' token") or inside a
-  // reference ('op://Benjamin's vault/…') does not end it early.
+  // A quoted name ends at its own kind of quote followed by what op writes after one. A double-quoted name ends at
+  // a quote before a colon, a space, a comma, a full stop or the end of the line, so an apostrophe in it ("James'
+  // token") does not end it. A reference ends only at an apostrophe before the colon op writes after it, or the end
+  // of the line: its vault, item and field may hold an apostrophe followed by a space ('op://Ops' tokens/i/f').
   const unquoted = A.map(
     linesOf(Str.toLowerCase(stderr)),
-    Str.replaceAll(/".*?"(?=[\s:,.]|$)|'op:\/\/.*?'(?=[\s:,.]|$)/g, '""')
+    Str.replaceAll(/".*?"(?=[\s:,.]|$)|'op:\/\/.*?'(?=:|$)/g, '""')
   )
   const says = (words: ReadonlyArray<string>) =>
     A.some(unquoted, (line) => A.some(words, (word) => Str.includes(word)(line)))

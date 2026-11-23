@@ -1885,6 +1885,17 @@ describe("infra setup: failures named for what failed", () => {
             "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Benjamin's vault/i/f': authorization timeout"
           )
         ).toBe("held")
+        // Nor inside a reference, where an apostrophe may be followed by a space.
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Ops' timeout tokens/i/f': no item matched"
+          )
+        ).toBe("refused")
+        expect(
+          onePasswordFailure(
+            "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Ops' vault/i/f': authorization timeout"
+          )
+        ).toBe("held")
         // An apostrophe and a space inside a double-quoted name do not end it either.
         expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "James\' token" isn\'t an item in the "v" vault')).toBe(
           "refused"

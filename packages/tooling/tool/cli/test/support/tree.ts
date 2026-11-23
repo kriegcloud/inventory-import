@@ -67,3 +67,26 @@ export const inTree: {
 /** A report's lines as plain text, each with the stream it goes to. */
 export const printed = (report: { readonly lines: ReadonlyArray<{ readonly to: string; readonly text: string }> }) =>
   A.map(report.lines, (line) => `${line.to}: ${line.text}`)
+
+/**
+ * Makes the repository a git repository whose `main` holds everything written so far, as a ban's ledger is compared
+ * with main's: what a test writes after this is the branch's change.
+ */
+export const onMain = Effect.fn("onMain")(function* () {
+  const repo = yield* Repo
+  yield* repo.run("git", ["init", "-q", "-b", "main"])
+  yield* repo.run("git", ["add", "--all"])
+  yield* repo.run("git", [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.test",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "main"
+  ])
+})

@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      # The bans' ledgers may only fall, compared with main's (packages/tooling/tool/cli/ledgers): the checkout holds
+      # only this commit, so main is fetched beside it.
+      - run: git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
       - uses: actions/setup-node@v4
         with:
           node-version: 22

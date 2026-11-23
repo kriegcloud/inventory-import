@@ -21,6 +21,12 @@
  * - `typescript/no-misused-promises`: a Promise where a condition, a spread or a callback that returns nothing is;
  * - `typescript/await-thenable`: an `await` of what is not one.
  *
+ * `typescript/no-misused-promises` keeps its void-return checks whole, though React 19's `ReactNode` includes a Promise,
+ * so a function typed to return one is refused where a callback returns nothing (`onClick={render}`). Turning the
+ * attribute and argument checks off would let through what they catch today: every one of their 6 findings is a
+ * handler that really returns a Promise (a `.catch` chain in `AppSidebar.tsx`, the stepper's handlers), and no
+ * `ReactNode`-typed function stands in such a slot.
+ *
  * `typescript/promise-function-async` is not run: it refuses the edge this law prescribes (`Effect.tryPromise({ try:
  * () => … })`, `Effect.promise(() => …)`, `lazy(() => import(…))`) and, since React 19's `ReactNode` includes a
  * Promise, every component that returns one; the name half refuses `async` already.
@@ -35,7 +41,7 @@
  * refused.
  *
  * Two lists, each by name. `promiseEntryPoints`: where a platform calls in and takes a Promise, which may run an
- * Effect as one and name the type. `promisesListed`: the files that use Promises today, each with how many places,
+ * Effect as one and name the type. `ledgers/promises.json`: the files that use Promises today, each with how many places,
  * which only falls (`internal/ledger.ts`): a listed file that gains a use is refused, one that loses one is refused
  * until its number is lowered, one with none comes off. The components and hooks under `packages/ui/` came from
  * registries, but every one has been changed here since it was first committed and nothing holds it to its registry,
@@ -51,6 +57,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
@@ -58,8 +65,7 @@ import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { unreadSentence } from "./internal/budget.ts"
 import { silencings } from "./internal/directives.ts"
-import { heldAs } from "./internal/held.ts"
-import { type Ledger, standingOf, standingWords } from "./internal/ledger.ts"
+import { ledgerAgainst, ledgersFolder, readLedger, standingOf, standingWords } from "./internal/ledger.ts"
 import { type PromiseUse, readPromises } from "./internal/promiseCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Promises.rules")
@@ -86,98 +92,8 @@ export const promiseEntryPoints: Readonly<Record<string, string>> = {
 /** The uses an entry point may make: an Effect run as a Promise, and the Promise type it hands the platform. */
 const atAnEntry: ReadonlyArray<PromiseUse> = ["run", "type"]
 
-/**
- * The files that use Promises today, each read as a whole: this list may only shrink. Its owner takes a file off when
- * its last use is gone, and the law refuses a listed file that has none left.
- */
-export const promisesListed: Ledger = {
-  "apps/inventory/scripts/auth-schema.mjs": 2,
-  "apps/inventory/scripts/dev-accounts.mjs": 1,
-  "apps/inventory/scripts/grid-keys.mjs": 23,
-  "apps/inventory/scripts/telemetry.mjs": 5,
-  "apps/inventory/src/server/App.ts": 4,
-  "apps/inventory/src/server/security.ts": 8,
-  "apps/inventory/src/web/Workspace.tsx": 5,
-  "apps/inventory/src/web/components/app/AppSidebar.tsx": 5,
-  "apps/inventory/src/web/lib/otlp.ts": 2,
-  "apps/inventory/src/web/pages/ActivityPage.tsx": 1,
-  "apps/inventory/src/web/preload.ts": 3,
-  "apps/inventory/test/server/AuthSchema.test.ts": 1,
-  "apps/inventory/test/server/Pwned.test.ts": 3,
-  "apps/inventory/test/server/RequestTelemetry.test.ts": 1,
-  "apps/inventory/test/server/Telemetry.slow.test.ts": 2,
-  "apps/inventory/test/server/Telemetry.test.ts": 8,
-  "apps/inventory/test/server/support/app.ts": 2,
-  "apps/inventory/test/web/gridCallbacks.test.ts": 5,
-  "apps/inventory/test/web/root.test.ts": 2,
-  "apps/inventory/test/web/session.test.ts": 11,
-  "apps/inventory/test/web/support/page.ts": 5,
-  "apps/inventory/test/web/traceContext.test.ts": 2,
-  "apps/inventory/test/web/workspace.test.ts": 3,
-  "packages/access/host/src/SignIn.route.ts": 1,
-  "packages/access/host/src/internal/authOptions.ts": 7,
-  "packages/access/web/src/People.screen.tsx": 2,
-  "packages/access/web/src/Session.atoms.ts": 17,
-  "packages/access/web/src/SignIn.screen.tsx": 14,
-  "packages/catalog/contract/test/FileProblem.test.ts": 1,
-  "packages/catalog/web/src/Catalog.runtime.ts": 2,
-  "packages/catalog/web/src/Draft.atoms.ts": 4,
-  "packages/catalog/web/src/Draft.machine.ts": 1,
-  "packages/catalog/web/src/ImportPage.screen.tsx": 3,
-  "packages/catalog/web/src/ItemsPage.screen.tsx": 2,
-  "packages/catalog/web/src/MatchStep.screen.tsx": 1,
-  "packages/catalog/web/src/ResultStep.screen.tsx": 2,
-  "packages/catalog/web/src/ReviewDraft.atoms.ts": 3,
-  "packages/catalog/web/src/ReviewStep.screen.tsx": 3,
-  "packages/catalog/web/src/TableAssistant.screen.tsx": 2,
-  "packages/catalog/web/src/Upload.controller.ts": 14,
-  "packages/catalog/web/src/UploadStep.screen.tsx": 5,
-  "packages/catalog/web/src/internal/reader.worker.ts": 2,
-  "packages/catalog/web/test/ImportPage.test.ts": 2,
-  "packages/catalog/web/test/RemoveImport.test.ts": 1,
-  "packages/catalog/web/test/RemoveImportAddress.test.ts": 1,
-  "packages/catalog/web/test/TabRows.test.ts": 15,
-  "packages/catalog/web/test/UploadOwner.test.ts": 1,
-  "packages/catalog/web/test/readInPieces.test.ts": 1,
-  "packages/catalog/web/test/support/catalog.ts": 1,
-  "packages/client/src/ApiRuntime.runtime.ts": 3,
-  "packages/client/src/Early.runtime.ts": 2,
-  "packages/client/src/Http.runtime.ts": 2,
-  "packages/client/src/Tab.atoms.ts": 4,
-  "packages/client/test/Connection.atoms.test.ts": 1,
-  "packages/review/src/ReviewRegion.atoms.ts": 1,
-  "packages/review/src/ReviewRegion.component.tsx": 1,
-  "packages/review/src/SavedProgress.hook.ts": 3,
-  "packages/review/src/internal/parts.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-cell-variants.tsx": 5,
-  "packages/ui/src/components/data-grid/data-grid-context-menu.tsx": 2,
-  "packages/ui/src/components/data-grid/data-grid-features.ts": 19,
-  "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx": 1,
-  "packages/ui/src/components/data-grid/data-grid-utils.ts": 6,
-  "packages/ui/src/components/data-grid/data-grid.tsx": 2,
-  "packages/ui/src/components/data-grid/use-data-grid.ts": 6,
-  "packages/ui/src/components/data-table/data-table-toolbar.tsx": 2,
-  "packages/ui/src/components/file-upload.tsx": 7,
-  "packages/ui/src/components/stepper.tsx": 21
-}
-
-/**
- * What the lists are held by, from their contents (`internal/held.ts`): a file swapped for another changes the number,
- * and the law refuses the list until it is recorded again. Recorded only when files came off.
- */
-export const promisesHeld = { listed: -1071579578, entryPoints: -1064530232 }
-
-/** Each list whose files are not the ones it is held by. */
-const changedLists = (): ReadonlyArray<PromiseFinding> =>
-  A.getSomes(
-    A.map(
-      [
-        ["promisesListed", heldAs(R.keys(promisesListed)), promisesHeld.listed],
-        ["promiseEntryPoints", heldAs(R.keys(promiseEntryPoints)), promisesHeld.entryPoints]
-      ] as const,
-      ([list, now, held]) => (now === held ? O.none() : O.some(PromiseFinding.cases.Changed.make({ list, held, now })))
-    )
-  )
+/** The ledger's file, from the root. */
+export const promisesLedger = `${ledgersFolder}/promises.json`
 
 /** The type-aware profile, from the root. */
 export const promisesProfile = ".oxlintrc.promises.json"
@@ -229,7 +145,7 @@ const silencesTyped = (rules: ReadonlyArray<string>) =>
 const isLeftOut = (file: string): boolean => A.some(promisesLeftOut, (path) => Str.startsWith(path)(file))
 
 /** The paths not read, as the output names them each time. */
-const notRead = `${A.join(promisesLeftOut, ", ")} are not read; ${R.size(promisesListed)} files are listed`
+const notRead = `${A.join(promisesLeftOut, ", ")} are not read; the files in ${promisesLedger} are listed`
 
 const PromiseUseSchema = S.Literals(["async", "await", "new", "static", "type", "chain", "run", "value"])
 
@@ -268,10 +184,8 @@ export const PromiseFinding = S.TaggedUnion({
     handed: S.Int.pipe(S.annotateKey({ description: "How many files oxlint was handed" })),
     read: S.Int.pipe(S.annotateKey({ description: "How many of them it read" }))
   },
-  Changed: {
-    list: S.String.pipe(S.annotateKey({ description: "The list whose files are not the ones it is held by" })),
-    held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
-    now: S.Finite.pipe(S.annotateKey({ description: "The number its files give now" }))
+  Ledger: {
+    said: S.String.pipe(S.annotateKey({ description: "What the ledger says against the files and against main" }))
   },
   Unread: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line the law stopped at, as file:line" })),
@@ -330,10 +244,7 @@ export const promiseSentence: (finding: PromiseFinding) => Line = PromiseFinding
   Loosened: ({ why }) => err(`  ${promisesProfile} is not the profile this law holds: ${why}`),
   Skipped: ({ handed, read }) =>
     err(`  oxlint read ${read} of the ${handed} files it was handed for the typed rules: none may be passed over`),
-  Changed: ({ held, list, now }) =>
-    err(
-      `${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
-    )
+  Ledger: ({ said }) => err(said)
 })
 
 /** What the typed rules say of one place: its file, its line, and their words. */
@@ -407,6 +318,13 @@ const typedUses = Effect.fn("Promises.typedUses")(function* (files: ReadonlyArra
  */
 export const promises = Effect.fn("Promises.promises")(function* () {
   const repo = yield* Repo
+  const ledger = yield* readLedger(promisesLedger)
+  if (Result.isFailure(ledger)) {
+    return A.make<[PromiseFinding, PromiseFinding]>(
+      PromiseFinding.cases.Refused.make({}),
+      PromiseFinding.cases.Ledger.make({ said: ledger.failure })
+    )
+  }
   const listed = yield* repo.run("git", [
     "ls-files",
     "-z",
@@ -426,9 +344,9 @@ export const promises = Effect.fn("Promises.promises")(function* () {
     (file) => repo.exists(repo.join(repo.root, file)),
     { concurrency: 1 }
   )
-  // The typed half over every file but the registry's and the platform's entries: a listed file is read too, so it
-  // comes off the list only when neither half finds a use in it.
-  const typed = yield* typedUses(A.filter(files, (file) => !R.has(promiseEntryPoints, file)))
+  // The typed half over every file: a listed file is read too, so it comes off the list only when neither half finds a
+  // use in it; an entry point too, where only the line that runs an Effect as a Promise is passed over.
+  const typed = yield* typedUses(files)
   const typedIn = (file: string) => A.filter(typed.places, (place) => place.file === file)
   const found = yield* Effect.forEach(
     files,
@@ -443,13 +361,19 @@ export const promises = Effect.fn("Promises.promises")(function* () {
             })
           )
         }
-        const allowed = R.has(promiseEntryPoints, file) ? atAnEntry : []
+        const entry = R.has(promiseEntryPoints, file)
+        const allowed = entry ? atAnEntry : []
         const uses = A.filter(read.found, ({ use }) => !A.contains(allowed, use))
-        const typedHere = typedIn(file)
+        // At an entry point, the typed rules say nothing more of the line that runs an Effect as a Promise.
+        const runLines = A.map(
+          A.filter(read.found, ({ use }) => entry && use === "run"),
+          ({ line }) => line
+        )
+        const typedHere = A.filter(typedIn(file), ({ line }) => !A.contains(runLines, line))
         // A listed file is held at its number of uses, by name and by type together, which only falls.
-        const standing = standingOf(promisesListed, { file, now: A.length(uses) + A.length(typedHere) })
+        const standing = standingOf(ledger.success, { file, now: A.length(uses) + A.length(typedHere) })
         if (O.isSome(standing)) {
-          return O.match(standingWords(standing.value, "promisesListed"), {
+          return O.match(standingWords(standing.value, promisesLedger), {
             onNone: () => [],
             onSome: (words) => A.of(PromiseFinding.cases.Standing.make({ file, words }))
           })
@@ -461,7 +385,11 @@ export const promises = Effect.fn("Promises.promises")(function* () {
       }),
     { concurrency: 1 }
   )
-  const problems = A.appendAll(changedLists(), A.appendAll(typed.problems, A.flatten(found)))
+  const against = yield* ledgerAgainst({ path: promisesLedger, now: ledger.success, files })
+  const problems = A.appendAll(
+    A.map(against, (said) => PromiseFinding.cases.Ledger.make({ said })),
+    A.appendAll(typed.problems, A.flatten(found))
+  )
   return A.isArrayNonEmpty(problems)
     ? A.prepend<PromiseFinding, PromiseFinding>(problems, PromiseFinding.cases.Refused.make({}))
     : A.of<PromiseFinding>(PromiseFinding.cases.Clean.make({}))

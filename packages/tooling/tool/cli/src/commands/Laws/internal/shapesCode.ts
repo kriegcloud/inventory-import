@@ -1,8 +1,9 @@
 // What the dual-helper and readonly laws read in a file's tree.
 //
-// A helper is a function given a name where it is declared: `const f = (a, b) => …`, `function f(a, b) {}`,
-// `const f = Effect.fn("f")(function* (a, b) {…})`, or a method of an object or a class. One handed to a call as an
-// argument is not read, since the call sets its order. The law covers the clear case and no more: a helper of two
+// A helper is a function of ours given a name where it is declared: `function f(a, b) {}`, `const f = (a, b) => …`
+// with no type of its own on `f`, or `const f = Effect.fn("f")(function* (a, b) {…})`. What a library's type sets the
+// order of is not read: a function handed to a call, a method or a callback in an object (a call's options, a
+// reducer, an interface's method), a class's method, and a `const` typed by a library (`const f: Reducer = …`). The law covers the clear case and no more: a helper of two
 // values or more (a TypeScript `this` parameter is not one) that names one `cause`, `error`, `self` or `input` is
 // written `dual`, that one first; one written `dual(…)` that names it after another is refused too. Which value a
 // helper with none of those names acts on is not in its words, so such a helper is not read.
@@ -89,11 +90,9 @@ const nodesOf = (program: Node): ReadonlyArray<Node> => {
 export const helpersNotDual = (program: Node): ReadonlyArray<number> =>
   A.flatMap(nodesOf(program), (node) => {
     if (node.type === "FunctionDeclaration" && namesSubject(node)) return [node.start]
-    // A method of an object or a class, or a function given to a key: its key names it.
-    if ((node.type === "MethodDefinition" || node.type === "Property") && isFunction(node["value"])) {
-      return namesSubject(node["value"]) ? [node.start] : []
-    }
     if (node.type !== "VariableDeclarator") return []
+    // A `const` with a type of its own is typed by that type, whose order is not ours to set here.
+    if (isNode(node["id"]) && isNode(node["id"]["typeAnnotation"])) return []
     const init = node["init"]
     if (isFunction(init)) return namesSubject(init) ? [node.start] : []
     if (!isNode(init) || init.type !== "CallExpression") return []

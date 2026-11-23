@@ -3,30 +3,23 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
-import {
-  promiseEntryPoints,
-  promises,
-  promisesHeld,
-  promisesProfile,
-  promiseSentence,
-  promisesListed
-} from "../src/commands/Laws/Promises.rules.ts"
-import { heldAs } from "../src/commands/Laws/internal/held.ts"
+import { promises, promisesLedger, promisesProfile, promiseSentence } from "../src/commands/Laws/Promises.rules.ts"
 import { readPromises } from "../src/commands/Laws/internal/promiseCode.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
-import { inTree, json, printed } from "./support/tree.ts"
+import { inTree, json, onMain, printed, type Tree } from "./support/tree.ts"
 
 /** This repository's root, from this file's folder: its typed profile and what it has installed are the law's. */
 const real = (repo: Repo["Service"], path: string) => repo.resolve(import.meta.dirname, "../../../../..", path)
 
-// A repository the typed half can read: the real profile, the installed tools, and one project over every file.
-const inRepository = Effect.gen(function* () {
+// A repository the typed half can read: the real profile, the installed tools, and one project over every file;
+// its main holds what `inTree` wrote (an empty ledger unless the tree has one), and `after` is the branch's change.
+const inRepositoryAfter = Effect.fn("inRepositoryAfter")(function* (after: Tree) {
   const repo = yield* Repo
   const here = (path: string) => repo.join(repo.root, path)
+  if (!(yield* repo.exists(here(promisesLedger)))) yield* repo.write(here(promisesLedger), json({}))
   const profile = yield* repo.text(real(repo, promisesProfile))
   yield* repo.write(here(promisesProfile), profile)
   yield* repo.write(
@@ -47,10 +40,16 @@ const inRepository = Effect.gen(function* () {
   )
   yield* repo.write(here(".gitignore"), "node_modules\n")
   yield* repo.run("ln", ["-s", real(repo, "node_modules"), here("node_modules")])
-  yield* repo.run("git", ["init", "-q"])
+  yield* onMain()
+  yield* Effect.forEach(R.toEntries(after), ([file, text]) => repo.write(here(file), text), {
+    concurrency: 1,
+    discard: true
+  })
   const found = yield* promises()
   return printed(render(promiseSentence)(found))
 })
+
+const inRepository = inRepositoryAfter({})
 
 const uses = `import * as Effect from "effect/Effect"
 import { Story } from "./story.ts"
@@ -90,6 +89,20 @@ describe("laws promises", () => {
       "11 await"
     ])
     expect(readPromises({ file: "b.ts", source: passes }).found).toEqual([])
+  })
+
+  it("refuses runPromise itself, called or not, and Promise taken out of the global object", () => {
+    const uses = (source: string) => A.map(readPromises({ file: "c.ts", source }).found, (found) => found.use)
+    expect(
+      uses(`import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
+export const a = pipe(Effect.succeed(1), Effect.runPromise)
+export const b = Effect.succeed(1).pipe(Effect.runPromise)
+const run = Effect.runPromise
+export const c = Effect.runPromise(Effect.succeed(1))
+const { Promise: Q } = globalThis
+`)
+    ).toEqual(["run", "run", "run", "run", "value"])
   })
 
   it("catches Promise however it is reached: through the global object, in brackets, or under another name", () => {
@@ -132,6 +145,15 @@ describe("laws promises", () => {
       expect(chained).toContain(
         `err: ${entry}:3  a .then, .catch or .finally on a promise: write Effect.map, Effect.catch or Effect.ensuring`
       )
+      // The typed half reads an entry point too: a Promise left floating there is refused, the run line is not.
+      const floating = yield* inTree(
+        { [entry]: `${ran}const g = globalThis\ng.Promise.resolve(1)\nEffect.runPromise(Effect.succeed(2))\n` },
+        inRepository
+      )
+      expect(floating).toContain(
+        `err: ${entry}:4  a value typed as a Promise: Promises must be awaited, add await operator. (typescript(no-floating-promises)). Write the Effect that does the work`
+      )
+      expect(A.filter(floating, Str.startsWith(`err: ${entry}:5`))).toEqual([])
     })
   )
 
@@ -139,32 +161,35 @@ describe("laws promises", () => {
     "a listed file is held at its number of uses: one more or one fewer is refused, and none takes it off",
     () =>
       Effect.gen(function* () {
-        // A listed file that is no entry point and holds two uses or more, so one fewer is not none.
-        const [listed, held] = O.getOrElse(
-          A.findFirst(
-            R.toEntries(promisesListed),
-            ([file, count]) => Str.endsWith(".ts")(file) && !R.has(promiseEntryPoints, file) && count >= 2
-          ),
-          () => ["", 0] as const
-        )
+        const listed = "packages/x/src/listed.ts"
         const asyncs = (count: number) =>
           A.join(
             A.makeBy(count, (i) => `export const a${i} = async () => ${i}\n`),
             ""
           )
-        const kept = yield* inTree({ [listed]: asyncs(held) }, inRepository)
+        const held = { [promisesLedger]: json({ [listed]: 2 }), [listed]: asyncs(2) }
+        const kept = yield* inTree(held, inRepository)
         expect(kept).toEqual([expect.stringContaining("out: promises:check OK")])
-        const more = yield* inTree({ [listed]: asyncs(held + 1) }, inRepository)
+        const more = yield* inTree(held, inRepositoryAfter({ [listed]: asyncs(3) }))
         expect(more).toContain(
-          `err: ${listed}  breaks the rule in ${held + 1} places, more than the ${held} promisesListed holds it to: a listed file may only lose places. Fix the new ones`
+          `err: ${listed}  breaks the rule in 3 places, more than the 2 ${promisesLedger} holds it to: a listed file may only lose places. Fix the new ones`
         )
-        const fewer = yield* inTree({ [listed]: asyncs(held - 1) }, inRepository)
+        const fewer = yield* inTree(held, inRepositoryAfter({ [listed]: asyncs(1) }))
         expect(fewer).toContain(
-          `err: ${listed}  breaks the rule in ${held - 1} places, fewer than the ${held} promisesListed holds it to: lower its number to ${held - 1}`
+          `err: ${listed}  breaks the rule in 1 places, fewer than the 2 ${promisesLedger} holds it to: lower its number to 1`
         )
-        const none = yield* inTree({ [listed]: passes }, inRepository)
+        // Content neither half reads as a Promise: no name of one, and nothing typed as one.
+        const none = yield* inTree(held, inRepositoryAfter({ [listed]: "export const n = 1\n" }))
         expect(none).toContain(
-          `err: ${listed}  is listed in promisesListed but breaks the rule no more: take its line off`
+          `err: ${listed}  is listed in ${promisesLedger} but breaks the rule no more: take its line off`
+        )
+        // A number raised with the uses, in the same commit, against main's.
+        const raised = yield* inTree(
+          held,
+          inRepositoryAfter({ [promisesLedger]: json({ [listed]: 3 }), [listed]: asyncs(3) })
+        )
+        expect(raised).toContain(
+          `err: ${listed}  is held at 3 in ${promisesLedger}, above the 2 main holds it to: a number only falls`
         )
       })
   )
@@ -189,12 +214,4 @@ describe("laws promises", () => {
         )
       })
   )
-
-  it("the lists are held by their names too, a guard the review sees", () => {
-    expect([heldAs(R.keys(promisesListed)), heldAs(R.keys(promiseEntryPoints))]).toEqual([
-      promisesHeld.listed,
-      promisesHeld.entryPoints
-    ])
-    expect(heldAs(A.append(A.drop(R.keys(promisesListed), 1), "packages/x/src/new.ts"))).not.toBe(promisesHeld.listed)
-  })
 })

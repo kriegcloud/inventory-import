@@ -281,6 +281,8 @@
     // is an input, as for the try law, with the law's own source, and what its typed half reads besides: its profile,
     // every tsconfig and every package.json, so a cached answer is never replayed over a changed one.
     "//#promises:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
       "inputs": [
         ".oxlintrc.promises.json",
         "**/tsconfig*.json",
@@ -300,6 +302,8 @@
     },
     // No `@effect-diagnostics` directive turns a rule off (`beep laws diagnostics`), but in the files it lists.
     "//#diagnostics:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
       "inputs": [
         ".gitignore",
         "bun.lock",
@@ -315,6 +319,8 @@
     },
     // Every helper declared with two values or more takes the one it acts on first and is dual (`beep laws dual`).
     "//#dual:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
       "inputs": [
         ".gitignore",
         "bun.lock",
@@ -330,6 +336,8 @@
     },
     // Every property of an object type or an interface is readonly (`beep laws readonly`).
     "//#readonly:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
       "inputs": [
         ".gitignore",
         "bun.lock",
@@ -346,6 +354,8 @@
     // No type assertion is written (oxlint, `.oxlintrc.assertions.json`, from the root), and its lists only shrink
     // (`beep laws assertions`).
     "//#assertions:check": {
+      // Its ledger is compared with main's, and main is no file turbo can hash: never replayed from the cache.
+      "cache": false,
       "inputs": [
         ".oxlintrc.assertions.json",
         ".gitignore",

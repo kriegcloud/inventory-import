@@ -125,7 +125,31 @@ const useOf: {
 } = dual(2, (placed: Placed, imported: ReadonlyArray<string>): O.Option<PromiseUse> => {
   const { node } = placed
   if (isPromise(node)) return referenceUse(placed)
+  // `runPromise` itself, called or not: `pipe(effect, Effect.runPromise)`, `const run = Effect.runPromise`.
+  if (node.type === "MemberExpression" && O.exists(propertyOf(node), (name) => A.contains(runs, name))) {
+    return O.some("run")
+  }
+  if (
+    O.exists(nameOf(node), (name) => A.contains(runs, name)) &&
+    O.match(placed.within, {
+      onNone: () => true,
+      onSome: ({ key, parent }) =>
+        !(parent.type === "MemberExpression" && key === "property") && !A.contains(naming, key)
+    })
+  ) {
+    return O.some("run")
+  }
   switch (node.type) {
+    // `const { Promise: Q } = globalThis`: Promise taken out of the global object under another name.
+    case "VariableDeclarator":
+      return isNode(node["id"]) &&
+        node["id"].type === "ObjectPattern" &&
+        O.exists(nameOf(node["init"]), (name) => A.contains(globalObjects, name)) &&
+        A.some(nodesIn(node["id"]["properties"]), (property) =>
+          O.exists(nameOf(property["key"]), (name) => name === "Promise")
+        )
+        ? O.some("value")
+        : O.none()
     case "FunctionDeclaration":
     case "FunctionExpression":
     case "ArrowFunctionExpression":
@@ -138,17 +162,12 @@ const useOf: {
       return O.exists(nameOf(node["typeName"]), (name) => A.contains(promiseNames, name)) ? O.some("type") : O.none()
     case "CallExpression":
       return O.flatMap(memberCalled(node), ({ name, object }): O.Option<PromiseUse> => {
-        // A member of `Promise` is said once, where `Promise` is read.
-        if (isPromise(object)) return O.none()
-        if (A.contains(runs, name)) return O.some("run")
+        // A member of `Promise` is said once, where `Promise` is read; `runPromise` where it is named.
+        if (isPromise(object) || A.contains(runs, name)) return O.none()
         if (!A.contains(chained, name)) return O.none()
         // A module's member (`Effect.catch`, `Story.then`) is no promise's.
         return O.exists(nameOf(object), (on) => A.contains(imported, on)) ? O.none() : O.some("chain")
-      }).pipe(
-        O.orElse(() =>
-          O.exists(nameOf(node["callee"]), (name) => A.contains(runs, name)) ? O.some<PromiseUse>("run") : O.none()
-        )
-      )
+      })
     default:
       return O.none()
   }

@@ -1,10 +1,9 @@
 // The Result screen's numbers are an import's result: the five counts are the rows of each outcome and add up to the
-// rows of the file, and the values a rule changed sit in no fewer cells than rows. All data is generated from the
-// schemas; the oracle counts the rows itself.
+// rows of the file, and the values a rule changed sit in no fewer cells than rows. Results are generated from the
+// schema, then broken one way at a time; each broken copy must be refused, so every rule of the check is seen to hold.
 import { describe, expect, it } from "@effect/vitest"
 import { rowId } from "@inventory/catalog-contract/Decision"
-import { ImportResult, type OutcomeKind, RowOutcome } from "@inventory/catalog-contract/Import"
-import * as A from "effect/Array"
+import { ImportResult } from "@inventory/catalog-contract/Import"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -12,35 +11,44 @@ import * as S from "effect/Schema"
 
 const runs = { arbitrary: { runs: 200 } }
 
-/** How many of the rows have this outcome, counted here and not by the schema. */
-const rowsOf = (result: ImportResult, outcome: OutcomeKind): number =>
-  A.filter(result.rows, RowOutcome.isAnyOf([outcome])).length
+const counts = ["created", "updated", "already", "notImported", "takenBack"] as const
 
 describe("an import's result", () => {
   it.prop(
-    "counts each outcome as the rows that have it, and the five counts add up to the rows",
+    "is refused when any one count is off by one from its rows, either way",
     [Arbitrary.schema(ImportResult)],
     ([result]) => {
-      expect([result.created, result.updated, result.already, result.notImported, result.takenBack]).toEqual([
-        rowsOf(result, "created"),
-        rowsOf(result, "updated"),
-        rowsOf(result, "already"),
-        rowsOf(result, "notImported"),
-        rowsOf(result, "takenBack")
-      ])
-      expect(result.created + result.updated + result.already + result.notImported + result.takenBack).toBe(
-        result.rows.length
-      )
+      expect(S.is(ImportResult)(result)).toBe(true)
+      for (const name of counts) {
+        expect(S.is(ImportResult)({ ...result, [name]: result[name] + 1 })).toBe(false)
+        if (result[name] > 0) expect(S.is(ImportResult)({ ...result, [name]: result[name] - 1 })).toBe(false)
+      }
     },
     runs
   )
 
   it.prop(
-    "says values a rule changed sit in at least as many cells as rows, and never a negative number",
+    "is refused when a count moves to another outcome, though the five still add up to the rows",
     [Arbitrary.schema(ImportResult)],
     ([result]) => {
-      expect(result.fixed.rows).toBeGreaterThanOrEqual(0)
-      expect(result.fixed.cells).toBeGreaterThanOrEqual(result.fixed.rows)
+      for (const from of counts) {
+        for (const to of counts) {
+          if (from !== to && result[from] > 0) {
+            expect(S.is(ImportResult)({ ...result, [from]: result[from] - 1, [to]: result[to] + 1 })).toBe(false)
+          }
+        }
+      }
+    },
+    runs
+  )
+
+  it.prop(
+    "is refused when the values a rule changed sit in fewer cells than rows",
+    [Arbitrary.schema(ImportResult)],
+    ([result]) => {
+      const { rows } = result.fixed
+      if (rows > 0) expect(S.is(ImportResult)({ ...result, fixed: { rows, cells: rows - 1 } })).toBe(false)
+      expect(S.is(ImportResult)({ ...result, fixed: { rows, cells: rows } })).toBe(true)
     },
     runs
   )
@@ -55,16 +63,6 @@ describe("an import's result", () => {
           part === undefined ? `row-${row.rowNumber}` : `row-${row.rowNumber}.${part}`
         )
       }
-    },
-    runs
-  )
-
-  it.prop(
-    "is refused when one count is off by one from its rows",
-    [Arbitrary.schema(ImportResult)],
-    ([result]) => {
-      expect(S.is(ImportResult)({ ...result, created: result.created + 1 })).toBe(false)
-      expect(S.is(ImportResult)({ ...result, takenBack: result.takenBack + 1 })).toBe(false)
     },
     runs
   )

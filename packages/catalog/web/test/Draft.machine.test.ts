@@ -765,6 +765,55 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
 
 describe("orderings the properties met, pinned", () => {
   // Each is played as the properties play an ordering, and every rule they check after it is checked here too.
+  it("a closed tab's refused decision equal to a save of hers whose answer was lost, after she decided the row again or picked on its line, is not sent", () => {
+    // Whatever she did of the row since, the lost save is not what goes: the refused one taken up after stays refused.
+    const C = Command.cases
+    const refusedOut = C.TakeUp.make({ row: "b", to: "out", beside: "no", as: "refused" })
+    const orderings: ReadonlyArray<ReadonlyArray<Command>> = [
+      [
+        C.Decide.make({ row: "b", to: "out" }),
+        C.SaveFails.make({}),
+        C.Decide.make({ row: "b", to: "kept" }),
+        C.ServerTakesSave.make({}),
+        C.SaveAnswers.make({}),
+        C.SomeoneElse.make({ row: "b", to: "accepted" }),
+        refusedOut
+      ],
+      [
+        C.Decide.make({ row: "b", to: "out" }),
+        C.Reload.make({}),
+        C.ServerTakesRead.make({}),
+        C.ReadArrives.make({}),
+        C.ServerTakesSave.make({}),
+        C.SaveAnswers.make({}),
+        C.Decide.make({ row: "b", to: "kept" }),
+        C.ServerTakesSave.make({}),
+        C.SaveAnswers.make({}),
+        C.SomeoneElse.make({ row: "b", to: "accepted" }),
+        refusedOut
+      ],
+      [
+        C.Decide.make({ row: "b", to: "out" }),
+        C.SomeoneElse.make({ row: "b", to: "kept" }),
+        C.Reload.make({}),
+        C.OtherAnswerSent.make({}),
+        C.OtherAnswerArrives.make({}),
+        C.Settle.make({ row: "b", which: "theirs" }),
+        C.SomeoneElse.make({ row: "b", to: "accepted" }),
+        refusedOut
+      ],
+      [
+        C.TakeUp.make({ row: "a", to: "kept", beside: "no", as: "waiting" }),
+        C.SaveSignedOut.make({ which: "last" }),
+        C.TakeUp.make({ row: "a", to: "out", beside: "no", as: "landed" }),
+        C.SomeoneElse.make({ row: "c", to: "accepted" }),
+        C.TakeUp.make({ row: "a", to: "kept", beside: "no", as: "refused" }),
+        C.Reload.make({})
+      ]
+    ]
+    expect(A.map(orderings, broken)).toEqual([O.none(), O.none(), O.none(), O.none()])
+  })
+
   it("her decision made again over her own on its way, after a match took a part of that one, is stored with no line", () => {
     // What the newer picture holds of the row is what the match left of her own decision: nobody decided it since.
     const ordering = [
@@ -783,6 +832,24 @@ describe("orderings the properties met, pinned", () => {
     for (const command of ordering) run(world, command)
     expect([R.get(world.server.decisions, "a"), world.draft.lines]).toEqual([O.some(kept), {}])
     expect(broken(ordering)).toEqual(O.none())
+  })
+
+  it("her own decision on its way, its answer lost with a reload, goes again though a closed tab was refused the same", () => {
+    // Her later decision of the row was let go when the import turned out confirmed and opened again: the one on its
+    // way is hers again, and the closed tab's refusal is not hers.
+    expect(
+      broken([
+        Command.cases.TakeUp.make({ row: "a", to: "accepted", beside: "another", as: "refused" }),
+        Command.cases.SomeoneConfirms.make({}),
+        Command.cases.SomeoneReopens.make({}),
+        Command.cases.Settle.make({ row: "a", which: "first" }),
+        Command.cases.OtherAnswerSent.make({}),
+        Command.cases.Decide.make({ row: "a", to: "accepted" }),
+        Command.cases.TakeUp.make({ row: "a", to: "out", beside: "no", as: "refused" }),
+        Command.cases.OtherAnswerArrives.make({}),
+        Command.cases.Reload.make({})
+      ])
+    ).toEqual(O.none())
   })
 
   it("her decision made again over her own on its way, after a picture showed somebody else's since, is no live press: she is asked", () => {
@@ -1321,6 +1388,57 @@ describe("a save's answer that comes after its draft closed", () => {
   })
 })
 
+describe("what this tab sent whose answer never came back, as the properties' world keeps it", () => {
+  // A row sent again as one of these is not counted as sent as the server refused it (`World.unanswered`), so each
+  // rule that marks or forgets one is held here: a rule left out leaves the check off, or on, where it should not be.
+  const D = Command.cases
+  const after = (ordering: ReadonlyArray<Command>): ReadonlyArray<string> => {
+    const world = opened()
+    for (const command of ordering) run(world, command)
+    return R.keys(world.unanswered)
+  }
+  const lostOnItsWay = [D.Decide.make({ row: "a", to: "out" }), D.SaveSignedOut.make({})]
+
+  it("a save lost with a reload, or signed out, is kept", () => {
+    expect([after([D.Decide.make({ row: "a", to: "out" }), D.Reload.make({})]), after(lostOnItsWay)]).toEqual([
+      ["a"],
+      ["a"]
+    ])
+  })
+
+  it("is forgotten when she decides the row again", () => {
+    expect(after([...lostOnItsWay, D.Decide.make({ row: "a", to: "kept" })])).toEqual([])
+  })
+
+  it("is forgotten when she picks on the row's line", () => {
+    const lined = [
+      D.Decide.make({ row: "b", to: "out" }),
+      D.SomeoneElse.make({ row: "b", to: "kept" }),
+      D.Reload.make({}),
+      D.OtherAnswerSent.make({}),
+      D.OtherAnswerArrives.make({})
+    ]
+    expect([after(lined), after([...lined, D.Settle.make({ row: "b", which: "theirs" })])]).toEqual([["b"], []])
+  })
+
+  it("is forgotten when a save carrying the row is answered, or refused", () => {
+    const again = [...lostOnItsWay, D.SaveAgain.make({})]
+    expect([
+      after([...again, D.ServerTakesSave.make({}), D.SaveAnswers.make({})]),
+      after([...again, D.SaveRefused.make({})])
+    ]).toEqual([[], []])
+  })
+
+  it("is forgotten when a closed tab's decision of the row is taken up", () => {
+    expect(after([...lostOnItsWay, D.TakeUp.make({ row: "a", to: "kept", beside: "no", as: "waiting" })])).toEqual([])
+  })
+
+  it("is forgotten when a confirm is made", () => {
+    const confirming = [...lostOnItsWay, D.PressConfirm.make({}), D.ServerTakesConfirm.make({})]
+    expect([after(confirming), after([...confirming, D.ConfirmAnswers.make({})])]).toEqual([["a"], []])
+  })
+})
+
 describe("seeds the properties were falsified by, played again", () => {
   const seeds = [
     {
@@ -1357,6 +1475,11 @@ describe("seeds the properties were falsified by, played again", () => {
       name: "with reloads, sign-outs and closed tabs taken up",
       seed: 1376949052012291,
       may: { confirms: false, elsewhere: false, tabs: true }
+    },
+    {
+      name: "with somebody else confirming, reopening or removing the import",
+      seed: 22,
+      may: { confirms: true, elsewhere: true, tabs: true }
     }
   ] as const
   for (const { may, name, seed } of seeds) {

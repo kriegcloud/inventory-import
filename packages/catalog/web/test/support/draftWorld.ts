@@ -212,6 +212,14 @@ export interface World {
   readonly besideWaited: Record<string, boolean>
   /** The decisions the server refused, until the person makes them again. */
   refused: ReadonlyArray<{ readonly row: string; readonly value: Value }>
+  /**
+   * The decisions of each row this tab sent whose save's answer never came back (lost with a reload, or signed out), until
+   * something newer is known of the row: she decides it or picks on its line, a save carrying it is answered or refused,
+   * a confirm's answer says it was made, or a closed tab's decision of it is taken up. A row sent again as one of these is not counted as
+   * sent as the server refused it: the check compares values, so a refused decision of the same value goes unflagged
+   * while the entry stands.
+   */
+  readonly unanswered: Record<string, ReadonlyArray<Value>>
   /** The rows the server confirmed for the person, until somebody else changes the row or the person does again. */
   confirmed: Record<string, Value>
   restarts: number
@@ -254,6 +262,7 @@ const start = (decisions: SavedDecisions): World => {
     waited: {},
     besideWaited: {},
     refused: [],
+    unanswered: {},
     confirmed: {},
     restarts: 0,
     announced: 0,
@@ -472,13 +481,16 @@ const ownRows = (world: World, rows: RowChanges): void => {
       `row ${row} is sent as ${Formatter.format(value)}, which the person never decided`
     ).toBe(true)
     // Sent as a refused decision only when nothing else she made explains it: a decision of hers that the server
-    // trims (a part a match took back) to what a closed tab was refused is still hers, and goes.
+    // trims (a part a match took back) to what a closed tab was refused is still hers, and goes; so is this tab's own
+    // send of the same decision whose answer never came back, which goes again.
+    const isUnanswered = O.exists(R.get(world.unanswered, row), (values) => isIn(values, value))
     expect(
       A.some(
         world.refused,
         (one) =>
           one.row === row &&
           sameDecision(one.value, value) &&
+          !isUnanswered &&
           !A.some(world.made[row] ?? [], (made) => isPartOf(made, value) && !sameDecision(made, one.value))
       ),
       `row ${row} is sent as the server refused it`
@@ -717,6 +729,20 @@ const replaceSave = (world: World, save: Save): void => {
 const dropSave = (world: World, save: Save): void => {
   world.saves = A.filter(world.saves, (one) => one.id !== save.id)
 }
+/** Something newer is known of a row than a save of this tab's whose answer never came back. */
+const forget = (world: World, row: string): void => {
+  delete world.unanswered[row]
+}
+
+/** A save of this tab's whose answer never comes back: what it carried is this tab's, and may go again. */
+const lost = (world: World, save: Save): void => {
+  for (const [row, value] of R.toEntries(rowsOf(save.delta))) {
+    world.unanswered[row] = O.match(R.get(world.unanswered, row), {
+      onNone: () => [value],
+      onSome: (values) => [...values, value]
+    })
+  }
+}
 const isCurrent = (world: World, save: Save): boolean =>
   O.exists(world.draft.flight, (flight) => flight.id === save.id) && world.draft.confirm !== "out"
 
@@ -775,6 +801,7 @@ const settles = (world: World, picks: ReadonlyArray<LinePick>): void => {
       }
     })
     delete world.confirmed[rowId]
+    forget(world, rowId)
   }
   dispatchIn(world, DraftEvent.Settled({ picks }))
 }
@@ -851,6 +878,7 @@ const runIn = (world: World, command: Command): void => {
           // The answer is the closed import, put into the tab's view first, as the runner does (`putConfirmed`).
           world.confirmed = {}
           world.region = O.none()
+          for (const row of R.keys(world.unanswered)) forget(world, row)
           const made = world.history[confirm.revision + 1]!
           if (!O.exists(world.view, (view) => view.revision > made.revision)) world.view = O.some(made)
           world.told = Math.max(world.told, made.revision)
@@ -914,6 +942,7 @@ const runIn = (world: World, command: Command): void => {
       world.refused = A.filter(world.refused, (one) => !(one.row === row && isPartOf(value, one.value)))
       delete world.confirmed[row]
       delete world.promised[row]
+      forget(world, row)
       // The decision it rests on counts as seen.
       presses(world, row, value, [showed])
       // What the screen knows is behind (an answer said so) makes it no live press.
@@ -978,6 +1007,7 @@ const runIn = (world: World, command: Command): void => {
     // The page is loaded again. What was on its way to the old page never arrives, and a request the server had not
     // taken is lost; what the browser kept is all the new page has of the person's.
     Reload: () => {
+      for (const save of world.saves) lost(world, save)
       world.saves = []
       world.confirm = O.none()
       world.read = O.none()
@@ -1006,6 +1036,7 @@ const runIn = (world: World, command: Command): void => {
         const answer = save.answer.value
         const current = isCurrent(world, save)
         dropSave(world, save)
+        for (const row of R.keys(rowsOf(save.delta))) forget(world, row)
         world.told = Math.max(world.told, current ? answer.revision : 0)
         if (current) {
           const since = A.map(answer.decidedSince, (one) => one.rowId)
@@ -1039,15 +1070,19 @@ const runIn = (world: World, command: Command): void => {
       void O.map(saveOf(world, which ?? "last"), (save) => {
         if (O.isSome(save.answer)) return
         if (isCurrent(world, save)) allWaited(world)
+        lost(world, save)
         dropSave(world, save)
         dispatchIn(world, DraftEvent.SaveSignedOut({ id: save.id }))
       }),
     SaveRefused: ({ which }) =>
       void O.map(saveOf(world, which ?? "last"), (save) => {
         if (O.isSome(save.answer)) return
+        // Refused: what it carried is no unanswered send of this tab's any more.
+        const carried = rowsOf(save.delta)
+        for (const row of R.keys(carried)) forget(world, row)
         if (isCurrent(world, save)) {
           allWaited(world)
-          for (const [row, value] of R.toEntries(rowsOf(save.delta))) {
+          for (const [row, value] of R.toEntries(carried)) {
             if (latestHere(world, row, value)) world.refused = [...world.refused, { row, value }]
           }
         }
@@ -1115,6 +1150,8 @@ const runIn = (world: World, command: Command): void => {
         world.pressedOver = [...world.pressedOver, { row, value: one, saw: [base, one] }]
       }
       if (sameDecision(base, value)) return
+      // A decision of the row newer than any save of this tab's whose answer was lost: that one is not what goes now.
+      forget(world, row)
       const landed = as === "landed" && world.server.open && Eq.equals(R.get(world.server.decisions, row), base)
       if (landed) {
         // Its last save reached the server, and its answer was lost with the tab.

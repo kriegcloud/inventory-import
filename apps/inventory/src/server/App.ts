@@ -3,6 +3,7 @@ import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
+import type * as HttpClient from "effect/http/HttpClient"
 import * as HttpRouter from "effect/http/HttpRouter"
 import * as HttpServer from "effect/http/HttpServer"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
@@ -102,7 +103,8 @@ export const servicesWith = <E, R>(options: {
  * The whole app on a given database, identity and sign-in. Settings come from the ConfigProvider the caller provides
  * (src/server/Settings.ts).
  * `production` picks the log format's default and the sign-in defaults; `docs` mounts the API reference page; `auth`
- * is Better Auth on the D1 binding (`signIn` in SignIn.ts), which the identity, the session answer and /api/auth/* share.
+ * is Better Auth on the D1 binding (`signIn` in SignIn.ts), which the identity, the session answer and /api/auth/* share;
+ * `http` is how it reaches the collector, so a test can answer for it without the network.
  */
 export const makeApp = <E, R, IE, IR, AE, AR>(options: {
   readonly database: Layer.Layer<D1 | SqlClient.SqlClient, E, R>
@@ -110,8 +112,11 @@ export const makeApp = <E, R, IE, IR, AE, AR>(options: {
   readonly auth: Layer.Layer<BetterAuth, AE, AR>
   readonly production: boolean
   readonly docs: boolean
+  /** How the app reaches other services (the collector): fetch in the Worker. */
+  readonly http: Layer.Layer<HttpClient.HttpClient>
 }) =>
   makeRoutes({ docs: options.docs, identity: options.identity }).pipe(
+    Layer.provide(options.http),
     Layer.provide(servicesWith({ ai: ModelLive, production: options.production })),
     Layer.provide(options.auth),
     Layer.provide(options.database),

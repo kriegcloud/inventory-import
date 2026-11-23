@@ -20,6 +20,10 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import * as DevTools from "effect/devtools/DevTools"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientError from "effect/http/HttpClientError"
+import type * as HttpClientRequest from "effect/http/HttpClientRequest"
+import type * as HttpClientResponse from "effect/http/HttpClientResponse"
 import type * as HttpRouter from "effect/http/HttpRouter"
 import * as HttpServer from "effect/http/HttpServer"
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
@@ -105,6 +109,27 @@ export const TestAuth = (options: { readonly rateLimit?: boolean; readonly produ
     })
   ).pipe(Layer.provide(TestDatabase))
 
+/**
+ * The network as a test sees it: every request the app sends (to the collector) is answered by `answer`, in Effect, and
+ * nothing reaches a real service.
+ */
+export const standInHttp = (
+  answer: (
+    request: HttpClientRequest.HttpClientRequest
+  ) => Effect.Effect<HttpClientResponse.HttpClientResponse, HttpClientError.HttpClientError>
+): Layer.Layer<HttpClient.HttpClient> => Layer.succeed(HttpClient.HttpClient, HttpClient.make(answer))
+
+/** A request that could not be sent at all, as fetch fails when nothing answers at the address. */
+export const unreachable = (request: HttpClientRequest.HttpClientRequest) =>
+  Effect.fail(
+    new HttpClientError.HttpClientError({
+      reason: new HttpClientError.TransportError({ request, description: "nothing answers in tests" })
+    })
+  )
+
+/** No network: every request the app sends fails as unreachable. What a test that sends nothing out runs on. */
+export const noNetwork = standInHttp(unreachable)
+
 /** Sign-in for the in-memory app: nobody is ever signed in, and /api/auth/* is not there. A test double. */
 export const SignedOutAuth = BetterAuthTest.signedOut
 
@@ -114,7 +139,8 @@ export const TestApp = makeApp({
   identity: HeaderIdentity,
   auth: TestAuth(),
   production: false,
-  docs: false
+  docs: false,
+  http: noNetwork
 }).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer()))
 
 /**
@@ -163,6 +189,7 @@ const InMemoryStorage = Layer.mergeAll(
 export const inMemoryApp = <E, R>({
   ai,
   docs = false,
+  http = noNetwork,
   member,
   settings = testSettings
 }: {
@@ -170,10 +197,13 @@ export const inMemoryApp = <E, R>({
   readonly ai: Layer.Layer<OpenRouter, E, R>
   /** Mount the API reference page, as a development build does. */
   readonly docs?: boolean
+  /** How the app's requests out (to the collector) are answered. Default: `noNetwork`. */
+  readonly http?: Layer.Layer<HttpClient.HttpClient>
   /** The settings the app reads, as the Worker's `env` would give them. Default: `testSettings`. */
   readonly settings?: Record<string, string>
 }) =>
   makeRoutes({ docs, identity: HeaderIdentity }).pipe(
+    Layer.provide(http),
     Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
     Layer.provide(InMemoryAccess(member)),
     Layer.provide(SignedOutAuth),
@@ -360,7 +390,8 @@ export const signInApp = (
         identity: SessionIdentityLive,
         auth: TestAuth({ rateLimit: true, production: options.production ?? false }),
         production: options.production ?? false,
-        docs: false
+        docs: false,
+        http: noNetwork
       }),
       SeededAccounts
     ).pipe(Layer.provide(settingsLayer({ ...testSettings, PWNED_PASSWORD_CHECK: "false", ...options.settings })))

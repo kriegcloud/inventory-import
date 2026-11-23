@@ -2,6 +2,7 @@ import { D1 } from "@beep/d1/D1"
 import { env, waitUntil } from "cloudflare:workers"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as Layer from "effect/Layer"
 import { makeApp, toTracedServe } from "./App.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
@@ -26,13 +27,16 @@ const app = makeApp({
   // `waitUntil`, so the answer does not wait for it and the Worker is not stopped before it is done.
   auth: signIn({ database: env.DB, production: import.meta.env.PROD, backgroundTasks: waitUntil }),
   production: import.meta.env.PROD,
-  docs: import.meta.env.DEV
+  docs: import.meta.env.DEV,
+  // The one place the Worker's fetch is chosen: the collector's exporters and the browser's batches go through it.
+  http: FetchHttpClient.layer
 }).pipe(Layer.provide(settings))
 
 const { serve } = toTracedServe({
   app,
   telemetry: RequestTelemetry.layer.pipe(
     Layer.provide(collector({ production: import.meta.env.PROD })),
+    Layer.provide(FetchHttpClient.layer),
     Layer.provide(settings)
   ),
   afterAnswer: (work) => Effect.sync(() => waitUntil(work.pipe(Effect.runPromise)))

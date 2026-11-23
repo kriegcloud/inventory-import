@@ -308,6 +308,36 @@
       ],
       "outputs": []
     },
+    // Every helper declared with two values or more takes the one it acts on first and is dual (`beep laws dual`).
+    "//#dual:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every property of an object type or an interface is readonly (`beep laws readonly`).
+    "//#readonly:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // No type assertion is written (oxlint, `.oxlintrc.assertions.json`, from the root), and its lists only shrink
     // (`beep laws assertions`).
     "//#assertions:check": {

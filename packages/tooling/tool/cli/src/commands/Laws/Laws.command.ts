@@ -20,6 +20,7 @@ import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { promises, promiseSentence } from "./Promises.rules.ts"
 import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
+import { dualHelpers, dualSentence, readonlyProperties, readonlySentence } from "./Shapes.rules.ts"
 import { tags, tagsSentence } from "./Tags.rules.ts"
 import { tryStatements, trySentence } from "./Try.rules.ts"
 
@@ -89,6 +90,16 @@ export const diagnosticsCommand = Command.make("diagnostics", {}, () =>
   Effect.flatMap(diagnostics(), emit(diagnosticsSentence))
 ).pipe(Command.withDescription("No @effect-diagnostics directive turns a rule off, in any code file git would commit"))
 
+/** `laws dual`: every helper declared with two values or more takes the one it acts on first and is dual. */
+export const dualCommand = Command.make("dual", {}, () => Effect.flatMap(dualHelpers, emit(dualSentence))).pipe(
+  Command.withDescription("Every helper takes the value it acts on first and is dual, but in the files listed")
+)
+
+/** `laws readonly`: every property of an object type or an interface is readonly. */
+export const readonlyCommand = Command.make("readonly", {}, () =>
+  Effect.flatMap(readonlyProperties, emit(readonlySentence))
+).pipe(Command.withDescription("Every property of an object type or an interface is readonly, but in the files listed"))
+
 const write = Flag.Boolean("write").pipe(
   Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
   Flag.withDefault(false)
@@ -115,11 +126,13 @@ export const lawsCommand = Command.make("laws").pipe(
     boundariesCommand,
     deprecatedApisCommand,
     diagnosticsCommand,
+    dualCommand,
     effectImportsCommand,
     exportsCommand,
     keysCommand,
     privatePathsCommand,
     promisesCommand,
+    readonlyCommand,
     refCallbacksCommand,
     screensCommand,
     tagsCommand,

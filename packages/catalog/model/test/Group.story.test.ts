@@ -40,7 +40,7 @@ import { UndoGroup } from "../src/Review/UndoingGroup.decision.ts"
 import { noLevel, Row, RowDecided, StepUndone } from "../src/Row/Row.aggregate.ts"
 
 const story = Story.make(Catalog)
-const id = ImportId.make("0190a5c2-7b1e-7c3a-9f10-4d2e8b6a1c55")
+const id = ImportId.make("0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c55")
 const life = Import.ref(id)
 const g1 = Group.ref(`${id}/g1`)
 const g2 = Group.ref(`${id}/g2`)

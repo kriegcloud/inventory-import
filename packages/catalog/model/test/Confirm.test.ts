@@ -1,10 +1,11 @@
 // The plan of a confirm is the review's verdict and nothing else: whatever a file holds and whatever was decided,
 // the plan has one row per item of the file, in the review's order, and its statuses add up to the review's.
 import { describe, expect, it } from "@effect/vitest"
-import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
-import { ImportId } from "@inventory/catalog-contract/Ids"
+import { decisionFromFlags, rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { ImportId, ItemId } from "@inventory/catalog-contract/Ids"
 import { DecidedBy } from "@inventory/catalog-contract/Import"
-import { confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
+import { ConfirmPlan, confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
+import { ConfirmWrite } from "@inventory/catalog-model/ImportStore"
 import { review } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
 import * as R from "effect/Record"
@@ -20,13 +21,15 @@ const Line = S.Struct({
   quantity_on_hand: S.Literals(["10", "1.5", ""]),
   out: S.Boolean
 })
+// Every field of a write but its plan and its ids, which the tests below put together themselves.
+const { plan: _plan, itemIds: _itemIds, ...others } = ConfirmWrite.fields
 const draft = ImportId.make("00000000-0000-4000-8000-000000000001")
 
 describe("confirmPlan", () => {
   it.prop(
     "has one row per item of the file, and its statuses add up to the review's",
-    [S.Array(Line).check(S.isMaxLength(12))],
-    ([lines]) => {
+    [S.Array(Line).check(S.isMaxLength(12)), S.Struct(others), S.Array(ItemId).check(S.isMinLength(12))],
+    ([lines, rest, ids]) => {
       const table = tableOf({ fileName: "any.csv", lines })
       const decisions: SavedDecisions = R.fromEntries(
         A.flatMap(lines, (line, index) =>
@@ -46,7 +49,48 @@ describe("confirmPlan", () => {
       expect(A.filter(deciders, DecidedBy.guards.person).length).toBe(reviewed("out"))
       // A row that is written carries an item; nothing else does.
       expect(A.every(plan.rows, (row) => PlannedRow.isAnyOf(["ready", "update"])(row) === "item" in row)).toBe(true)
+      // The plan is one a store can be handed with an id for each row it creates, and with one id short it is not.
+      const itemIds = A.take(ids, count("ready"))
+      expect(itemIds.length).toBe(count("ready"))
+      expect(S.is(ConfirmWrite)({ ...rest, plan, itemIds })).toBe(true)
+      expect(S.is(ConfirmWrite)({ ...rest, plan, itemIds: A.drop(itemIds, 1) })).toBe(count("ready") === 0)
     },
     { arbitrary: { runs: 60 } }
+  )
+})
+
+// Generated from the plan's own schema, so a plan the schema lets through is one a store can be handed.
+describe("a plan a confirm can be handed", () => {
+  it.prop(
+    "places every row on a row of the file: the contract's row id can be made from its row and part",
+    [ConfirmPlan],
+    ([plan]) => {
+      for (const row of plan.rows) {
+        expect(rowId({ rowNumber: row.rowNumber, part: row.part })).toBe(
+          row.part === 0 ? `row-${row.rowNumber}` : `row-${row.rowNumber}.${row.part}`
+        )
+      }
+    }
+  )
+
+  it.prop("says why for every row it leaves out or skips: no reason is empty", [ConfirmPlan], ([plan]) => {
+    const said = A.filter(plan.rows, PlannedRow.isAnyOf(["notImported", "already"]))
+    expect(A.filter(said, (row) => row.reason === "")).toEqual([])
+  })
+})
+
+// Generated from the schemas of a write, a plan and an item id, each drawn apart, so the ids are as often too few
+// or too many as right. Both stores pair the rows a plan creates with the ids by `A.zip`, which stops at the shorter
+// list: a write with an id missing would leave a ready row out without a word.
+describe("a confirm as it is written", () => {
+  it.prop(
+    "is a write only with one id for each row its plan creates, and then none is left unpaired",
+    [S.Struct(others), ConfirmPlan, S.Array(ItemId)],
+    ([rest, plan, itemIds]) => {
+      const creates = A.filter(plan.rows, PlannedRow.guards.ready)
+      const accepted = S.is(ConfirmWrite)({ ...rest, plan, itemIds })
+      expect(accepted).toBe(itemIds.length === creates.length)
+      if (accepted) expect(A.zip(creates, itemIds).length).toBe(creates.length)
+    }
   )
 })

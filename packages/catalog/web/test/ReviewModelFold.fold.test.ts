@@ -344,7 +344,7 @@ const partsOf = (unit: Unit): ReadonlyArray<Part> =>
 // The model, as a live screen holds it: every change it received, sent as commands and read back
 // ---------------------------------------------------------------------------------------------------------------
 
-const importId = ImportId.make("0190a5c2-7b1e-7c3a-9f10-4d2e8b6a1c55")
+const importId = ImportId.make("0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c55")
 const life = Import.ref(importId)
 const story = Story.make(Catalog)
 type Step = Parameters<typeof story>[number]

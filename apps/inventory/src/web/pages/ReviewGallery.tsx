@@ -3,6 +3,7 @@ import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import * as Str from "effect/String"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -131,7 +132,7 @@ const monthItems = [
 ]
 
 const belowZero = (month: string, onHand: string) =>
-  onHand.trim().startsWith("-")
+  Str.startsWith("-")(Str.trim(onHand))
     ? Problem.make({ kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` })
     : undefined
 

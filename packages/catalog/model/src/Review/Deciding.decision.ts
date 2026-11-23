@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // One act of the review, decided across the import and the row it names, and recorded on both or on neither. The
 // import says whether it is open, what its matching is, which act on a group was its last and what number the act
 // gets; the row says what decision it holds. An act is taken only from a screen that has the import's last group act
@@ -188,16 +187,16 @@ export class Deciding extends Domain.Decision(
     keyOf: (cmd: DecideRow) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
     decide: Effect.fn("Deciding.decide")(function* ({ life, row }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* new NotOpen({})
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       // A row instance belongs to one import of one organization, for good.
       if (
         !RowState.guards.Untouched(row.state) &&
         (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
       ) {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       // The same press sent again: the row holds this very act already, and it is written once. Its sender is answered
       // as the first time, with nothing new, whatever landed on the import between the two sendings: a confirm and a
@@ -210,7 +209,7 @@ export class Deciding extends Domain.Decision(
         ) {
           return []
         }
-        return yield* new ConfirmedSince({})
+        return yield* ConfirmedSince.make({})
       }
       if (cmd.sawGroup !== life.state.lastGroup) {
         if (
@@ -218,7 +217,7 @@ export class Deciding extends Domain.Decision(
         ) {
           return []
         }
-        return yield* new GroupedSince({})
+        return yield* GroupedSince.make({})
       }
       // `covered` is asked once, and each side makes its own checks: the prover takes both sides of every question it
       // cannot settle, each time it is asked, and with `covered` asked again after the checks the relation of a row
@@ -235,14 +234,14 @@ export class Deciding extends Domain.Decision(
             }
             // What the sender saw was taken back and an older decision is there again, or someone decided since.
             if (cmd.saw > row.state.change) {
-              return yield* new PutBackSince({ by: row.state.by, change: row.state.change })
+              return yield* PutBackSince.make({ by: row.state.by, change: row.state.change })
             }
-            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
+            return yield* DecidedSince.make({ by: row.state.by, change: row.state.change })
           }
         } else if (cmd.saw !== 0) {
-          return yield* new NoLongerThere({})
+          return yield* NoLongerThere.make({})
         }
-        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+        if (cmd.madeOn !== life.state.matching) return yield* MatchedSince.make({ matching: life.state.matching })
         if (cmd.asItReads) return []
       } else {
         // No group covers the row, by its sender's word: what the row's own instance says already, made on the same
@@ -264,21 +263,21 @@ export class Deciding extends Domain.Decision(
           ) {
             return []
           }
-          return yield* new MatchedSince({ matching: life.state.matching })
+          return yield* MatchedSince.make({ matching: life.state.matching })
         }
         if (RowState.guards.Decided(row.state)) {
           if (cmd.saw !== row.state.change) {
             if (onItsMatching(row.state) === onItsMatching(cmd) && row.state.change > life.state.lastGroup) return []
             if (cmd.saw > row.state.change) {
-              return yield* new PutBackSince({ by: row.state.by, change: row.state.change })
+              return yield* PutBackSince.make({ by: row.state.by, change: row.state.change })
             }
-            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
+            return yield* DecidedSince.make({ by: row.state.by, change: row.state.change })
           }
           if (onItsMatching(row.state) === onItsMatching(cmd)) return []
         } else {
           if (cmd.saw !== 0) {
             if (cmd.flags === NO_DECISION && life.state.lastGroup === 0) return []
-            return yield* new NoLongerThere({})
+            return yield* NoLongerThere.make({})
           }
           if (cmd.flags === NO_DECISION) return []
         }
@@ -287,12 +286,12 @@ export class Deciding extends Domain.Decision(
       // it held before the decision taken back, so a press drawn before it (a late copy of the very press that was
       // taken back, too) names what the row holds and would be written again. It is refused and held.
       if (cmd.sawUndone !== row.state.undone.change) {
-        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })
+        return yield* UndoneSince.make({ by: row.state.undone.by, change: row.state.undone.change })
       }
       const change = life.state.changes + 1
       return [
         row.record(
-          new RowDecided({
+          RowDecided.make({
             importId: cmd.importId,
             organizationId: life.state.organizationId,
             change,
@@ -304,7 +303,7 @@ export class Deciding extends Domain.Decision(
           })
         ),
         life.record(
-          new ActCounted({
+          ActCounted.make({
             change,
             step: cmd.step,
             row: cmd.row,

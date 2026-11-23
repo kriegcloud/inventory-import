@@ -24,8 +24,9 @@ is.
 
 One patch is of another kind, by Benjamin's decision (2026-11-22: "Teach the prover"): `03-a-schemas-own-guards`
 fixes no wrong answer. The prover of `@alchemy.run/domain` read a case told with `effect/Match` and nothing a schema
-gives for the same question, so the review's model told every case twice. The patch adds a model of each of those
-functions to the prover. Its rules are in "A patch that teaches the prover", below, and the text to send the library's
+gives for the same question, so the review's model told every case twice; and it knew an event or a rejection by `new`
+alone, so the files with a `decide` were the one place built without `.make` (2026-11-22: "Teach the prover .make").
+The patch adds a model of each of those functions to the prover. Its rules are in "A patch that teaches the prover", below, and the text to send the library's
 authors is [the note on it](upstream-prover-schema-guards.md).
 
 ## Where patches live
@@ -104,6 +105,12 @@ patch is held to more than its test passing:
 - **The prover's own second opinion stays on.** A proof ends by running the real code on inputs picked for each path
   and comparing ("Agreed with the real code"): the test asserts that line, and it is what caught the one wrong model
   this patch had while it was written (a class the prover loads a second time, read as another class).
+
+Where the third patch cannot answer as the library does, it says "not read": a check on a union, a struct or a literal
+(it applies a check to a text, a number and a list only), a union told by a number, a literal asked of a division, a
+struct asked of a list. Two aggregates beside the ticket hold that (`Unread.aggregate.ts`, each guard "not read") and
+what it does answer exactly (`Exact.aggregate.ts`: a class told by its name, a whole number within 2^53 - 1, a key
+that must be written, `Schema.Void`).
 
 What the third patch does not do: it reads no pattern. A text held to a pattern (`S.isPattern`) is still a check the
 prover does not read, so a rule cannot be proved from it, and a guard asked of such a schema is "not read".

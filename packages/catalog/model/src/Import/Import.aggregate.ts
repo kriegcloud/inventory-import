@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // One import's lifecycle as its own instance, with no list in its state: staged, matched, confirmed, taken back,
 // opened again, removed. It numbers every change. A confirm, a take-back, a reopen and a remove each name the last
 // change their sender's screen has received, with none before it missing, and are refused on any other (Benjamin,
@@ -535,10 +534,10 @@ export class Import extends Domain.Aggregate(
     decide: {
       StageImport: Effect.fn("Import.StageImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (actor.role === "viewer") return yield* new NotPermitted({})
-        if (!ImportState.guards.Unstaged(s)) return yield* new AlreadyStaged({})
+        if (actor.role === "viewer") return yield* NotPermitted.make({})
+        if (!ImportState.guards.Unstaged(s)) return yield* AlreadyStaged.make({})
         return [
-          new ImportStaged({
+          ImportStaged.make({
             organizationId: actor.organizationId,
             rows: cmd.rows,
             columns: cmd.columns,
@@ -548,14 +547,14 @@ export class Import extends Domain.Aggregate(
       }),
       MatchColumn: Effect.fn("Import.MatchColumn")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (!ImportState.guards.Open(s)) return yield* new NotOpen({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
-        if (cmd.opening !== s.confirms) return yield* new ConfirmedSince({})
-        if (cmd.saw !== s.matching) return yield* new MatchedSince({ matching: s.matching })
+        if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
+        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
+        if (cmd.opening !== s.confirms) return yield* ConfirmedSince.make({})
+        if (cmd.saw !== s.matching) return yield* MatchedSince.make({ matching: s.matching })
         // Every field reads this already, by its heading or by hand: nothing is recorded, and nothing is taken back.
         if (s.columns === cmd.columns) return []
         return [
-          new ColumnMatched({
+          ColumnMatched.make({
             change: s.changes + 1,
             matching: s.matching + 1,
             columns: cmd.columns,
@@ -565,24 +564,24 @@ export class Import extends Domain.Aggregate(
       }),
       RecordSuggestion: Effect.fn("Import.RecordSuggestion")(function* (s) {
         const actor = yield* CurrentActor
-        if (!ImportState.guards.Open(s)) return yield* new NotOpen({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
-        return [new SuggestionRecorded({ by: actor.memberId })]
+        if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
+        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
+        return [SuggestionRecorded.make({ by: actor.memberId })]
       }),
       ConfirmImport: Effect.fn("Import.ConfirmImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (!ImportState.guards.Open(s)) return yield* new NotOpen({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
-        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
-        if (cmd.planAt !== s.changes) return yield* new PlanBehind({ last: s.changes })
-        if (cmd.plan !== cmd.shown) return yield* new NotWhatWasShown({})
+        if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
+        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
+        if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
+        if (cmd.planAt !== s.changes) return yield* PlanBehind.make({ last: s.changes })
+        if (cmd.plan !== cmd.shown) return yield* NotWhatWasShown.make({})
         if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) {
-          return yield* new CountsDoNotAddUp({})
+          return yield* CountsDoNotAddUp.make({})
         }
         // No more is ever in force than the file has rows.
-        if (s.inForce + cmd.created > s.rows) return yield* new CountsDoNotAddUp({})
+        if (s.inForce + cmd.created > s.rows) return yield* CountsDoNotAddUp.make({})
         return [
-          new ImportConfirmed({
+          ImportConfirmed.make({
             change: s.changes + 1,
             created: cmd.created,
             updated: cmd.updated,
@@ -594,13 +593,13 @@ export class Import extends Domain.Aggregate(
       }),
       TakeBackImport: Effect.fn("Import.TakeBackImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (!ImportState.guards.Imported(s) && !ImportState.guards.Open(s)) return yield* new NotImported({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
-        if (s.standing < 1) return yield* new NotImported({})
-        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
-        if (cmd.kept > s.inForce || cmd.keptReplaced > s.replaced) return yield* new MoreKeptThanInForce({})
+        if (!ImportState.guards.Imported(s) && !ImportState.guards.Open(s)) return yield* NotImported.make({})
+        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
+        if (s.standing < 1) return yield* NotImported.make({})
+        if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
+        if (cmd.kept > s.inForce || cmd.keptReplaced > s.replaced) return yield* MoreKeptThanInForce.make({})
         return [
-          new ImportTakenBack({
+          ImportTakenBack.make({
             change: s.changes + 1,
             removed: s.inForce - cmd.kept,
             kept: cmd.kept,
@@ -612,18 +611,18 @@ export class Import extends Domain.Aggregate(
       }),
       ReopenImport: Effect.fn("Import.ReopenImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (!ImportState.guards.Imported(s) && !ImportState.guards.TakenBack(s)) return yield* new NotClosed({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
-        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
-        return [new ImportReopened({ change: s.changes + 1, by: actor.memberId })]
+        if (!ImportState.guards.Imported(s) && !ImportState.guards.TakenBack(s)) return yield* NotClosed.make({})
+        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
+        if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
+        return [ImportReopened.make({ change: s.changes + 1, by: actor.memberId })]
       }),
       RemoveImport: Effect.fn("Import.RemoveImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (!ImportState.guards.Open(s)) return yield* new NotOpen({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
-        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
-        if (s.inForce !== 0 || s.standing !== 0) return yield* new HasItemsInForce({})
-        return [new ImportRemoved({ change: s.changes + 1, by: actor.memberId })]
+        if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
+        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
+        if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
+        if (s.inForce !== 0 || s.standing !== 0) return yield* HasItemsInForce.make({})
+        return [ImportRemoved.make({ change: s.changes + 1, by: actor.memberId })]
       })
     },
     evolve: {

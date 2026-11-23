@@ -55,7 +55,7 @@ describe("laws diagnostics", () => {
   )
 
   it("the list only shrinks: its length is held here, and lowered with it", () => {
-    expect(diagnosticsListed.length).toBe(31)
+    expect(diagnosticsListed.length).toBe(22)
     expect(A.dedupe(diagnosticsListed).length).toBe(diagnosticsListed.length)
     expect(heldAs(diagnosticsListed)).toBe(diagnosticsHeld)
   })

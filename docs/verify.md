@@ -217,7 +217,7 @@ A confirm names the last change its sender's screen received, and is refused whe
 `ConfirmImport`, delete this line:
 
 ```ts
-if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
 ```
 
 ```bash
@@ -297,7 +297,7 @@ import (`AGroupIsMadeOnEveryChange`). This one is a decision across two instance
 `packages/catalog/model/src/Review/DecidingGroup.decision.ts`, delete this line:
 
 ```ts
-if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })
+if (cmd.seen !== life.state.changes) return yield* ReviewMovedOn.make({ last: life.state.changes })
 ```
 
 ```bash
@@ -393,7 +393,7 @@ it, named as ours"): "no hand-written assertions" means no hand-written list of 
 
 ## Before changing the model
 
-`CLAUDE.md`, "The model's blocks: what Verify reads", has the rules the code is written to: where `new` is allowed,
+`CLAUDE.md`, "The model's blocks: what Verify reads", has the rules the code is written to: that a block is built with `.make`,
 how a case is told and a state built so that the prover reads them, why a rule is one comparison, why the rules about
 who may change a row or a group are stated on each decision, and the 4,096 paths past which nothing is proved. The
 library itself is pinned to one commit and kept as files (`vendor/alchemy/`), with the repository's patches to it

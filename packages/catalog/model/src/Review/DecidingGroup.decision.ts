@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // One act on a group of rows, decided across the import and the group it names, and recorded on both or on neither:
 // one command, whatever the number of rows (Benjamin, 2026-11-22: "One unit per group"). It is taken only from a
 // screen that has every change of the import, so the rows it names are the ones the act fits now. It becomes the last
@@ -66,18 +65,18 @@ export class DecidingGroup extends Domain.Decision(
     keyOf: (cmd: DecideGroup) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
     decide: Effect.fn("DecidingGroup.decide")(function* ({ life, group }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* new NotOpen({})
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
-      if (!GroupState.guards.Untouched(group.state)) return yield* new StepTaken({})
-      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
-      if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })
-      if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+      if (!GroupState.guards.Untouched(group.state)) return yield* StepTaken.make({})
+      if (cmd.opening !== life.state.confirms) return yield* ConfirmedSince.make({})
+      if (cmd.seen !== life.state.changes) return yield* ReviewMovedOn.make({ last: life.state.changes })
+      if (cmd.madeOn !== life.state.matching) return yield* MatchedSince.make({ matching: life.state.matching })
       const change = life.state.changes + 1
       return [
         group.record(
-          new GroupDecided({
+          GroupDecided.make({
             importId: cmd.importId,
             organizationId: life.state.organizationId,
             change,
@@ -92,7 +91,7 @@ export class DecidingGroup extends Domain.Decision(
           })
         ),
         life.record(
-          new GroupCounted({
+          GroupCounted.make({
             change,
             step: cmd.step,
             rows: cmd.count,

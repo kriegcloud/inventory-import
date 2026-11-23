@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // A code kept only when a pattern allows it. The prover does not read a pattern, so it cannot say what `Schema.is`
 // answers here, and has to say so: a rule that rests on the answer is "not read", never proved.
 import * as Domain from "@alchemy.run/domain"
@@ -32,7 +31,7 @@ export class Code extends Domain.Aggregate("Code", {
   commands: [Keep],
   keyOf: (cmd) => cmd.codeId,
   decide: {
-    Keep: (_kept, cmd) => (S.is(Capitals)(cmd.code) ? [new Kept({ code: cmd.code })] : new NotACode({}))
+    Keep: (_kept, cmd) => (S.is(Capitals)(cmd.code) ? [Kept.make({ code: cmd.code })] : NotACode.make({}))
   },
   evolve: {
     Kept: (_kept, event) => ({ code: event.code })

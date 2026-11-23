@@ -11,7 +11,7 @@
  * `diagnosticDirective`), so its file holds none.
  *
  * Not read, each by name: `.agents/`, `vendor/` and `docs/`, as Benjamin's rule has it; and `scratchpad/`, whose own
- * check (`scratch:check`) allows one directive only, decision 33 of the Alchemy brief, and refuses every other.
+ * check (`scratch:check`) refuses every directive.
  * `diagnosticsListed` names the files that hold one today: it may only shrink. A listed file with none left is refused
  * until its line is taken off, and `test/Diagnostics.test.ts` holds the list at its length.
  *
@@ -41,9 +41,8 @@ export const diagnosticsLeftOut: ReadonlyArray<string> = [".agents/", "vendor/",
  * The files that hold a directive today: this list may only shrink. Its owner takes a file off when its last
  * directive is gone, and the law refuses a listed file that has none left. `packages/infra/src/OpReferences.secrets.ts`
  * stays until Alchemy types a secrets layer's failure: its `SecretsLayer` is `Layer<never, unknown, …>`, so the fix
- * goes there first. The five decide files of `packages/catalog/model` and the three of `packages/patches/test` hold
- * decision 33's `newSchemaClass:off`: Benjamin chose to teach the prover `.make` (2026-11-22), and the prover's patch
- * takes them off. No file is excepted for its name.
+ * goes there first. The decide files of `packages/catalog/model` and of `packages/patches/test` came off when the prover
+ * came to read `.make` (decision 33 reversed, 2026-11-22). No file is excepted for its name.
  */
 export const diagnosticsListed: ReadonlyArray<string> = [
   "apps/inventory/test/server/AuthIndexes.test.ts",
@@ -57,12 +56,6 @@ export const diagnosticsListed: ReadonlyArray<string> = [
   "apps/inventory/test/web/samples.test.ts",
   "apps/inventory/test/web/traceContext.test.ts",
   "apps/inventory/vite.config.ts",
-  "packages/catalog/model/src/Import/Import.aggregate.ts",
-  "packages/catalog/model/src/Review/Deciding.decision.ts",
-  "packages/catalog/model/src/Review/DecidingGroup.decision.ts",
-  "packages/catalog/model/src/Review/Undoing.decision.ts",
-  "packages/catalog/model/src/Review/UndoingGroup.decision.ts",
-  "packages/catalog/model/test/Ports.test.ts",
   "packages/catalog/web/test/DraftPicks.test.ts",
   "packages/catalog/web/test/ItemEditor.test.ts",
   "packages/catalog/web/test/KeptRows.test.ts",
@@ -73,17 +66,14 @@ export const diagnosticsListed: ReadonlyArray<string> = [
   "packages/catalog/web/test/reviewParity.test.ts",
   "packages/catalog/web/test/support/files.ts",
   "packages/catalog/web/test/xlsxParity.test.ts",
-  "packages/infra/src/OpReferences.secrets.ts",
-  "packages/patches/test/alchemy-domain/01-computed-instance-id/Card.aggregate.ts",
-  "packages/patches/test/alchemy-domain/01-computed-instance-id/WritingCard.decision.ts",
-  "packages/patches/test/alchemy-domain/02-text-length-in-a-template/Label.aggregate.ts"
+  "packages/infra/src/OpReferences.secrets.ts"
 ]
 
 /**
  * What the list is held by, from its contents (`internal/held.ts`): a file swapped for another changes the number, and
  * the law refuses the list until it is recorded again. Recorded only when files came off.
  */
-export const diagnosticsHeld = 751397261
+export const diagnosticsHeld = -525162974
 
 const isLeftOut = (file: string): boolean => A.some(diagnosticsLeftOut, (path) => Str.startsWith(path)(file))
 

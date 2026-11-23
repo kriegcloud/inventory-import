@@ -30,7 +30,7 @@ import {
   uncheckedLines
 } from "../src/commands/Scratch/Scratch.rules.ts"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import { decideFileLine, diagnosticDirective, typeName } from "../src/commands/Scratch/Scratch.templates.ts"
+import { diagnosticDirective, typeName } from "../src/commands/Scratch/Scratch.templates.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { lines } from "./support/sync.ts"
@@ -357,22 +357,18 @@ describe("scratch", () => {
     })
   )
 
-  it("a diagnostic may be turned off only by the one line, first in a decide file", () => {
-    const line = decideFileLine
-    expect(diagnosticLines("Shelf.aggregate.ts")(`${line}\nexport const x = 1\n`)).toEqual([])
-    expect(diagnosticLines("Count.decision.ts")(`${line}\r\n`)).toEqual([])
-    expect(diagnosticLines("Shelf.ts")(`${line}\n`)).toEqual([1])
-    expect(diagnosticLines("Shelf.test.ts")(`${line}\n`)).toEqual([1])
-    expect(diagnosticLines("Shelf.aggregate.ts")(`// a comment\n${line}\n`)).toEqual([2])
-    expect(diagnosticLines("Shelf.aggregate.ts")(`// ${diagnosticDirective} strictEffectProvide:off\n`)).toEqual([1])
-    expect(
-      diagnosticLines("Shelf.aggregate.ts")(`${line}\n// ${diagnosticDirective}-next-line floatingEffect:off\n`)
-    ).toEqual([2])
+  it("a diagnostic is turned off by no line, a decide file's first line included", () => {
+    const line = `// ${diagnosticDirective} newSchemaClass:off`
+    expect(diagnosticLines("export const x = 1\n")).toEqual([])
+    expect(diagnosticLines(`${line}\nexport const x = 1\n`)).toEqual([1])
+    expect(diagnosticLines(`${line}\r\n`)).toEqual([1])
+    expect(diagnosticLines(`// a comment\n${line}\n`)).toEqual([2])
+    expect(diagnosticLines(`${line}\n// ${diagnosticDirective}-next-line floatingEffect:off\n`)).toEqual([1, 2])
   })
 
-  it.effect("check refuses a diagnostic turned off anywhere but the first line of a decide file", () =>
+  it.effect("check refuses a diagnostic turned off anywhere, a decide file's first line included", () =>
     Effect.gen(function* () {
-      const line = decideFileLine
+      const line = `// ${diagnosticDirective} newSchemaClass:off`
       const result = yield* inTree(
         repository({
           "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "verify", ""),
@@ -383,9 +379,10 @@ describe("scratch", () => {
         }),
         scratchCheck(types, included).pipe(said)
       )
-      const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+      const refused = `turns an Effect diagnostic off. No file may: remove the line and fix what the diagnostic then says (an event or a rejection is built with \`.make\`, which the prover reads)`
       expect(result).toEqual([
-        "err: scratch:check FAIL  3 problems",
+        "err: scratch:check FAIL  4 problems",
+        `err:   scratchpad/experiments/shelf/Shelf.aggregate.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/Shelf.decision.ts:2: ${refused}`,
         `err:   scratchpad/experiments/shelf/Shelf.test.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
@@ -458,7 +455,7 @@ describe("scratch", () => {
           )
         ).pipe(said)
       )
-      const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+      const refused = `turns an Effect diagnostic off. No file may: remove the line and fix what the diagnostic then says (an event or a rejection is built with \`.make\`, which the prover reads)`
       expect(result).toEqual([
         "err: scratch:check FAIL  12 problems",
         `err:   notes/Outside.ts:1: ${refused}`,
@@ -655,7 +652,7 @@ describe("scratch", () => {
         repository({
           "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "verify", ""),
           "scratchpad/experiments/shelf/Shelf.ts": `// ${noCheck}\nexport const count = 1\n`,
-          "scratchpad/experiments/shelf/Shelf.aggregate.ts": `${decideFileLine}\n// ${noCheck}\n`
+          "scratchpad/experiments/shelf/Shelf.aggregate.ts": `// a comment\n// ${noCheck}\n`
         }),
         scratchCheck(types, included).pipe(said)
       )

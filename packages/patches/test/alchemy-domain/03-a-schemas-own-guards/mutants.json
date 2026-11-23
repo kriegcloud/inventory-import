@@ -25,8 +25,8 @@
     {
       "key": "unread-check-guessed",
       "file": "lib/Prove/internal/Symbolic.js",
-      "old": "return shaped === \"false\" ? \"false\" : checks.unread.length > 0 ? undefined : shaped;",
-      "new": "return shaped;",
+      "old": "checks.unread.length > 0 || passedOver",
+      "new": "passedOver",
       "why": "a schema with a check the prover does not read, answered as if it had none"
     },
     {
@@ -39,21 +39,21 @@
     {
       "key": "missing-field-allowed",
       "file": "lib/Prove/internal/Symbolic.js",
-      "old": "                : decides(Value.undef, property.type, run)",
-      "new": "                : \"true\"",
+      "old": "                ? \"true\"\n                : \"false\"\n              : decides(field, property.type, run);",
+      "new": "                ? \"true\"\n                : \"true\"\n              : decides(field, property.type, run);",
       "why": "a value that leaves out a field the schema needs, allowed"
     },
     {
       "key": "isanyof-always",
       "file": "lib/Prove/internal/Interpreter.js",
-      "old": "const equal = same(field, Value.str(one));",
+      "old": "const equal = isText(field) ? same(field, Value.str(one)) : undefined;",
       "new": "const equal = true;",
       "why": "isAnyOf that says yes to every case"
     },
     {
       "key": "isanyof-never",
       "file": "lib/Prove/internal/Interpreter.js",
-      "old": "const equal = same(field, Value.str(one));",
+      "old": "const equal = isText(field) ? same(field, Value.str(one)) : undefined;",
       "new": "const equal = false;",
       "why": "isAnyOf that says yes to no case"
     },
@@ -109,16 +109,16 @@
     {
       "key": "class-loaded-twice-is-another",
       "file": "lib/Prove/internal/Interpreter.js",
-      "old": "if (one.kind !== other.kind || one.tag !== other.tag) return false;",
+      "old": "return one.tag === other.tag;",
       "new": "return false;",
       "why": "a class the prover loaded a second time read as another class: no guard says yes to a command"
     },
     {
       "key": "class-name-ignored",
       "file": "lib/Prove/internal/Interpreter.js",
-      "old": "if (one.kind !== other.kind || one.tag !== other.tag) return false;",
-      "new": "",
-      "why": "two classes told by their fields' names alone, whatever each is called"
+      "old": "return one.tag === other.tag;",
+      "new": "return true;",
+      "why": "two classes read as one whatever each is called"
     },
     {
       "key": "is-schema-always",
@@ -133,6 +133,76 @@
       "old": "value ? host.is(schema, value, at) : wrongArguments(at, \"Schema.is\"),",
       "new": "value ? Effect.succeed(Value.bool(false)) : wrongArguments(at, \"Schema.is\"),",
       "why": "Schema.is that never says yes"
+    },
+    {
+      "key": "make-is-not-new",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (key === \"make\" && isDomainClass(value.value))",
+      "new": "if (key === \"make\" && isDomainClass(value.value) && false)",
+      "why": "X.make of an event or a rejection not read as the instance new X builds"
+    },
+    {
+      "key": "class-told-by-kind",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "return one.tag === other.tag;",
+      "new": "return one.kind === other.kind && one.tag === other.tag;",
+      "why": "a rejection with an event's name refused by the event's guard, where the library tells a class by its name"
+    },
+    {
+      "key": "whole-of-any-size",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "(!checks.integer || Number.isSafeInteger(value.value)),",
+      "new": "true,",
+      "why": "a written number past 2^53 - 1 read as whole, where isInt is Number.isSafeInteger"
+    },
+    {
+      "key": "whole-input-of-any-size",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "`(<= ${value.term.text} ${literal(\"Real\", Number.MAX_SAFE_INTEGER)})`,",
+      "new": "",
+      "why": "a number of the inputs past 2^53 - 1 read as whole"
+    },
+    {
+      "key": "void-is-undefined",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "      case \"Void\":\n        return \"true\";",
+      "new": "      case \"Void\":\n        return String(value._tag === \"Undef\");",
+      "why": "Schema.Void read as allowing undefined alone, where it allows everything"
+    },
+    {
+      "key": "literal-of-a-quotient",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "if (value.quotient && typeof literal === \"number\") return undefined;",
+      "new": "",
+      "why": "a literal asked of a division answered from the exact quotient, which JavaScript rounds"
+    },
+    {
+      "key": "keyless-struct-refuses",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "return ast.propertySignatures.length > 0 &&",
+      "new": "return true ||",
+      "why": "a struct with no key refusing a list, which it allows"
+    },
+    {
+      "key": "unwritten-key-as-undefined",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "                ? \"true\"\n                : \"false\"\n              : decides(field, property.type, run);",
+      "new": "                ? \"true\"\n                : decides(Value.undef, property.type, run)\n              : decides(field, property.type, run);",
+      "why": "a key that may be undefined and is not written, allowed"
+    },
+    {
+      "key": "check-on-a-union-dropped",
+      "file": "lib/Prove/internal/Symbolic.js",
+      "old": "const passedOver = !applied && (ast.checks?.length ?? 0) > 0;",
+      "new": "const passedOver = false;",
+      "why": "a check on a union, a struct or a literal passed over as if it held"
+    },
+    {
+      "key": "match-on-a-number-tag",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "const equal = isText(field) ? same(field, Value.str(key)) : undefined;",
+      "new": "const equal = same(field._tag === \"Num\" ? Value.str(String(field.value)) : field, Value.str(key));",
+      "why": "match on a union told by a number, read for a written number and for no other"
     }
   ]
 }

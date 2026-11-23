@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // A ticket that is new, then open, then closed, with every case told the way a schema tells it: the union's own
 // `guards`, `isAnyOf`, `match` and `matchOrElse`, `Schema.is`, and `constTrue` and `constFalse`
 // as the answers. That reading is what the patch is about. Each function decides one rule that holds and one that is
@@ -105,18 +104,18 @@ export class Ticket extends Domain.Aggregate("Ticket", {
   keyOf: (cmd) => cmd.ticketId,
   decide: {
     Open: (ticket, cmd) => {
-      if (!TicketState.guards.New(ticket)) return new NotNow({})
+      if (!TicketState.guards.New(ticket)) return NotNow.make({})
       // The guard of a case, asked of a value built here: it says yes only when the title fits the case's schema,
       // and no to a value that leaves a field of the case out (who closed it).
       return TicketState.guards.Open({ status: "Open", title: cmd.title, notes: 0 }) &&
         !TicketState.guards.Closed({ status: "Closed", title: cmd.title, notes: 0 })
-        ? [new Opened({ title: cmd.title })]
-        : new TitleTooLong({})
+        ? [Opened.make({ title: cmd.title })]
+        : TitleTooLong.make({})
     },
-    Note: (ticket) => (TicketState.guards.Open(ticket) && ticket.notes < 3 ? [new Noted({})] : new NotNow({})),
+    Note: (ticket) => (TicketState.guards.Open(ticket) && ticket.notes < 3 ? [Noted.make({})] : NotNow.make({})),
     Close: (ticket, cmd) =>
       // `Schema.is` of a plain schema, on the command's text.
-      S.is(Name)(cmd.by) && TicketState.guards.Open(ticket) ? [new Closed({ by: cmd.by })] : new NotNow({})
+      S.is(Name)(cmd.by) && TicketState.guards.Open(ticket) ? [Closed.make({ by: cmd.by })] : NotNow.make({})
   },
   evolve: {
     // `Schema.is` of an event's class, and the event union's own guard: each says yes to its own event only.

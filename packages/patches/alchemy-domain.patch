@@ -152,17 +152,20 @@ Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
 Upstream: not yet reported
 Why: The prover reads a case told with `effect/Match` and nothing a schema gives for the same question: a tagged
   union's `guards`, `isAnyOf`, `match` and `matchOrElse`, `Schema.is`, `constTrue` and `constFalse` each end a proof
-  with "outside the code the prover reads". So the model told every case twice, once in its schema and once by hand. With this the prover reads them as the library writes them, and where it cannot say
-  exactly what a schema answers (a check it does not read) it says "not read" and proves nothing.
+  with "outside the code the prover reads", and `X.make(...)` of an event or a rejection is not the instance `new X(...)`
+  builds. So the model told every case twice, once in its schema and once by hand, and built with `new` where the rest
+  of the repository builds with `make`. With this the prover reads them as the library writes them, and where it cannot
+  say exactly what a schema answers (a check it does not read or does not apply, a tag that is not text) it says
+  "not read" and proves nothing.
 Remove-when: The library's prover reads these itself. `bun run beep patches prove` then says this patch's test passes
   without it.
 Test: test/alchemy-domain/03-a-schemas-own-guards/SchemaGuards.test.ts
 
 diff --git a/lib/Prove/internal/Interpreter.js b/lib/Prove/internal/Interpreter.js
-index a27f8eb..d8d609c 100644
+index a27f8eb..16db4cf 100644
 --- a/lib/Prove/internal/Interpreter.js
 +++ b/lib/Prove/internal/Interpreter.js
-@@ -7,9 +7,34 @@ const KINDS = ["Event", "Rejection", "Command"];
+@@ -7,9 +7,29 @@ const KINDS = ["Event", "Rejection", "Command"];
  const isDomainClass = (u) => typeof u === "function" &&
      KINDS.includes(u.kind) &&
      typeof u.tag === "string";
@@ -175,12 +178,7 @@ index a27f8eb..d8d609c 100644
 +const sameClass = (one, other) => {
 +    if (one === other) return true;
 +    if (!isDomainClass(other)) return undefined;
-+    if (one.kind !== other.kind || one.tag !== other.tag) return false;
-+    const mine = Object.keys(one.fields).sort();
-+    const theirs = Object.keys(other.fields).sort();
-+    return mine.length === theirs.length && mine.every((key, index) => key === theirs[index])
-+        ? true
-+        : undefined;
++    return one.tag === other.tag;
 +};
  const isContextTag = (u) => typeof u === "function" &&
      typeof u.key === "string" &&
@@ -197,7 +195,7 @@ index a27f8eb..d8d609c 100644
  const fromHost = (value, name) => typeof value === "number"
      ? Value.num(value)
      : typeof value === "string"
-@@ -306,6 +331,10 @@ export const make = (loader, run) => {
+@@ -306,6 +326,10 @@ export const make = (loader, run) => {
                  : Effect.succeed(fromTruth(equal));
          },
          force: (value) => forced(value),
@@ -208,7 +206,7 @@ index a27f8eb..d8d609c 100644
          array: (name, items, fn, initial, site) => arrayMethods[name](items, fn, initial, site),
      });
      /** The array methods that take a function. The items are known; what the function gives may not be. */
-@@ -506,6 +535,11 @@ export const make = (loader, run) => {
+@@ -506,6 +530,18 @@ export const make = (loader, run) => {
                  return found ?? fromHost(value.module.exports[key], key);
              }
              case "Host":
@@ -217,10 +215,17 @@ index a27f8eb..d8d609c 100644
 +                    const own = unionMember(value.value, value.name, key);
 +                    if (own) return own;
 +                }
++                // `Opened.make({ ... })`: the instance `new Opened({ ... })` builds.
++                if (key === "make" && isDomainClass(value.value))
++                    return {
++                        _tag: "Native",
++                        name: `${value.name}.make`,
++                        call: (args, at) => construct(value, args, at),
++                    };
                  // `AccountId.make(text)`: the text, when the schema allows it.
                  if (key === "make" && Symbolic.typeOf(value.value) !== undefined) {
                      const ast = Symbolic.typeOf(value.value);
-@@ -538,6 +572,140 @@ export const make = (loader, run) => {
+@@ -538,6 +574,145 @@ export const make = (loader, run) => {
                  return yield* fail(site, `reads .${key} of ${value._tag === "Null" ? "null" : value._tag === "Undef" ? "undefined" : `a ${value._tag}`}`);
          }
      });
@@ -254,10 +259,15 @@ index a27f8eb..d8d609c 100644
 +            : Effect.succeed(fromTruth(formula));
 +    };
 +
++    /** Whether a value is text: written out, or a text the solver holds. */
++    const isText = (field) =>
++        field._tag === "Str" || (field._tag === "Term" && field.term.sort === "String");
++
 +    /** Whether the field a tagged union tells its cases by is `key`, on this path. */
 +    const tagIs = Effect.fnUntraced(function* (field, key, site) {
-+        // A handler's key is text: a case told by a number is found under the number's text.
-+        const equal = same(field._tag === "Num" ? Value.str(String(field.value)) : field, Value.str(key));
++        // A handler's key is text, and the library finds a case by the key the field turns into: the prover reads a
++        // field that is text, and no other (a number, a boolean, a field that is not there).
++        const equal = isText(field) ? same(field, Value.str(key)) : undefined;
 +        if (equal === undefined)
 +            return yield* fail(site, "matches on a field the prover does not model");
 +        return yield* decide(fromTruth(equal), site);
@@ -314,7 +324,7 @@ index a27f8eb..d8d609c 100644
 +                                const field = yield* tagOf(input, "isAnyOf", at);
 +                                const parts = [];
 +                                for (const one of wanted) {
-+                                    const equal = same(field, Value.str(one));
++                                    const equal = isText(field) ? same(field, Value.str(one)) : undefined;
 +                                    if (equal === undefined)
 +                                        return yield* fail(at, "matches on a field the prover does not model");
 +                                    parts.push(String(equal));
@@ -419,10 +429,10 @@ index 7d2552b..77dee03 100644
  export interface Unbuildable {
      readonly _tag: "Unbuildable";
 diff --git a/lib/Prove/internal/Symbolic.js b/lib/Prove/internal/Symbolic.js
-index 0aae77b..338327e 100644
+index 0aae77b..5af55ff 100644
 --- a/lib/Prove/internal/Symbolic.js
 +++ b/lib/Prove/internal/Symbolic.js
-@@ -432,6 +432,167 @@ export const fits = (value, ast, run) => {
+@@ -432,6 +432,205 @@ export const fits = (value, ast, run) => {
              return "true";
      }
  };
@@ -493,13 +503,26 @@ index 0aae77b..338327e 100644
 +      case "Number":
 +        // `NaN` and the infinities pass or not by `isFinite`, which is not kept apart.
 +        if (value._tag === "Num")
-+          return Number.isFinite(value.value) ? String(passes(checks, value.value)) : undefined;
++          return Number.isFinite(value.value)
++            ? String(
++                passes(checks, value.value) &&
++                  (!checks.integer || Number.isSafeInteger(value.value)),
++              )
++            : undefined;
 +        if (value._tag !== "Term" || value.big === true || (sort !== "Int" && sort !== "Real"))
 +          return "false";
 +        // JavaScript rounds a division: what its checks say of it is not what they say of the term.
 +        if (value.quotient) return undefined;
 +        return checked([
-+          ...(checks.integer && sort === "Real" ? [`(is_int ${value.term.text})`] : []),
++          // `isInt` is `Number.isSafeInteger`: whole, and no further from nought than 2^53 - 1. A whole number the
++          // solver holds is taken to be that near (the prover's stated assumption); any other number is asked.
++          ...(checks.integer && sort === "Real"
++            ? [
++                `(is_int ${value.term.text})`,
++                `(>= ${value.term.text} ${literal("Real", -Number.MAX_SAFE_INTEGER)})`,
++                `(<= ${value.term.text} ${literal("Real", Number.MAX_SAFE_INTEGER)})`,
++              ]
++            : []),
 +          ...checkFormulas(checks, sort, value.term.text),
 +        ]);
 +      case "Boolean":
@@ -507,8 +530,10 @@ index 0aae77b..338327e 100644
 +      case "Null":
 +        return String(value._tag === "Null");
 +      case "Undefined":
-+      case "Void":
 +        return String(value._tag === "Undef");
++      // `Schema.is(Schema.Void)` allows every value.
++      case "Void":
++        return "true";
 +      case "Literal": {
 +        const literal = ast.literal;
 +        if (typeof literal === "bigint") {
@@ -520,6 +545,8 @@ index 0aae77b..338327e 100644
 +        if (value._tag === "Str" || value._tag === "Num" || value._tag === "Bool")
 +          return String(value.value === literal);
 +        if (value._tag !== "Term" || value.big === true) return "false";
++        // JavaScript rounds a division: whether it is the literal is not what the solver's quotient says.
++        if (value.quotient && typeof literal === "number") return undefined;
 +        const term =
 +          typeof literal === "string" && sort === "String"
 +            ? Smt.string(literal)
@@ -534,16 +561,28 @@ index 0aae77b..338327e 100644
 +      }
 +      case "Objects": {
 +        if (ast.indexSignatures.length > 0) return undefined;
-+        if (value._tag !== "Obj") return "false";
++        if (value._tag === "Null" || value._tag === "Undef") return "false";
++        if (value._tag !== "Obj")
++          // A struct with no key allows everything but `null` and `undefined`; one with a key refuses what is no
++          // object, and reads an array or a moment key by key, which the prover does not.
++          return ast.propertySignatures.length > 0 &&
++            (value._tag === "Str" ||
++              value._tag === "Num" ||
++              value._tag === "Big" ||
++              value._tag === "Bool" ||
++              value._tag === "Term")
++            ? "false"
++            : undefined;
 +        if (value.brand?.kind === "Matcher") return undefined;
 +        return allKnown(
 +          ast.propertySignatures.map((property) => {
 +            const field = value.fields[String(property.name)];
-+            // A field that is not there fits when it may be left out, or may be `undefined`.
++            // A key that is not there is refused unless it may be left out: one that may be `undefined` must
++            // still be written.
 +            return field === undefined
 +              ? isOptional(property.type)
 +                ? "true"
-+                : decides(Value.undef, property.type, run)
++                : "false"
 +              : decides(field, property.type, run);
 +          }),
 +        );
@@ -583,18 +622,27 @@ index 0aae77b..338327e 100644
 +    }
 +  };
 +  const shaped = shape();
++  // The kinds whose case above applies the checks `checksOf` read. On any other kind (a union, a struct, a literal)
++  // a check is one the prover does not apply, so it must not be passed over as if it held.
++  const applied =
++    ast._tag === "String" || ast._tag === "Number" || ast._tag === "BigInt" || ast._tag === "Arrays";
++  const passedOver = !applied && (ast.checks?.length ?? 0) > 0;
 +  // A value of another shape is refused whatever a check the prover does not read would say.
-+  return shaped === "false" ? "false" : checks.unread.length > 0 ? undefined : shaped;
++  return shaped === "false"
++    ? "false"
++    : checks.unread.length > 0 || passedOver
++      ? undefined
++      : shaped;
 +};
 +
  const isUnbuildable = (u) => typeof u === "object" && u !== null && u._tag === "Unbuildable";
  const fallback = (sort) => sort === "String" ? "" : sort === "Bool" ? false : 0;
  /**
 diff --git a/src/Prove/internal/Interpreter.ts b/src/Prove/internal/Interpreter.ts
-index 36b4d8f..5c72285 100644
+index 36b4d8f..159c6a9 100644
 --- a/src/Prove/internal/Interpreter.ts
 +++ b/src/Prove/internal/Interpreter.ts
-@@ -20,6 +20,23 @@ const isDomainClass = (u: unknown): u is DomainClass =>
+@@ -20,6 +20,18 @@ const isDomainClass = (u: unknown): u is DomainClass =>
    (KINDS as ReadonlyArray<unknown>).includes((u as { kind?: unknown }).kind) &&
    typeof (u as { tag?: unknown }).tag === "string";
  
@@ -607,18 +655,13 @@ index 36b4d8f..5c72285 100644
 +const sameClass = (one: DomainClass, other: unknown): boolean | undefined => {
 +  if (one === other) return true;
 +  if (!isDomainClass(other)) return undefined;
-+  if (one.kind !== other.kind || one.tag !== other.tag) return false;
-+  const mine = Object.keys(one.fields).sort();
-+  const theirs = Object.keys(other.fields).sort();
-+  return mine.length === theirs.length && mine.every((key, index) => key === theirs[index])
-+    ? true
-+    : undefined;
++  return one.tag === other.tag;
 +};
 +
  /** A request context: a tag with the schema of what it provides. */
  interface ContextTag {
    readonly key: string;
-@@ -31,6 +48,24 @@ const isContextTag = (u: unknown): u is ContextTag =>
+@@ -31,6 +43,24 @@ const isContextTag = (u: unknown): u is ContextTag =>
    typeof (u as { key?: unknown }).key === "string" &&
    Symbolic.typeOf((u as { schema?: unknown }).schema) !== undefined;
  
@@ -643,7 +686,7 @@ index 36b4d8f..5c72285 100644
  const fromHost = (value: unknown, name: string): V =>
    typeof value === "number"
      ? Value.num(value)
-@@ -389,6 +424,10 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+@@ -389,6 +419,10 @@ export const make = (loader: Loader, run: Run): Interpreter => {
          : Effect.succeed(fromTruth(equal));
      },
      force: (value) => forced(value),
@@ -654,7 +697,7 @@ index 36b4d8f..5c72285 100644
      array: (name, items, fn, initial, site) => arrayMethods[name]!(items, fn, initial, site),
    });
  
-@@ -603,6 +642,11 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+@@ -603,6 +637,18 @@ export const make = (loader: Loader, run: Run): Interpreter => {
          return found ?? fromHost(value.module.exports[key], key);
        }
        case "Host":
@@ -663,10 +706,17 @@ index 36b4d8f..5c72285 100644
 +          const own = unionMember(value.value, value.name, key);
 +          if (own) return own;
 +        }
++        // `Opened.make({ ... })`: the instance `new Opened({ ... })` builds.
++        if (key === "make" && isDomainClass(value.value))
++          return {
++            _tag: "Native",
++            name: `${value.name}.make`,
++            call: (args: ReadonlyArray<V>, at: Site) => construct(value, args, at),
++          };
          // `AccountId.make(text)`: the text, when the schema allows it.
          if (key === "make" && Symbolic.typeOf(value.value) !== undefined) {
            const ast = Symbolic.typeOf(value.value)!;
-@@ -639,6 +683,150 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+@@ -639,6 +685,155 @@ export const make = (loader: Loader, run: Run): Interpreter => {
      }
    });
  
@@ -700,14 +750,19 @@ index 36b4d8f..5c72285 100644
 +      : Effect.succeed(fromTruth(formula));
 +  };
 +
++  /** Whether a value is text: written out, or a text the solver holds. */
++  const isText = (field: V): boolean =>
++    field._tag === "Str" || (field._tag === "Term" && field.term.sort === "String");
++
 +  /** Whether the field a tagged union tells its cases by is `key`, on this path. */
 +  const tagIs: (field: V, key: string, site: Site) => Eval<boolean> = Effect.fnUntraced(function* (
 +    field: V,
 +    key: string,
 +    site: Site,
 +  ) {
-+    // A handler's key is text: a case told by a number is found under the number's text.
-+    const equal = same(field._tag === "Num" ? Value.str(String(field.value)) : field, Value.str(key));
++    // A handler's key is text, and the library finds a case by the key the field turns into: the prover reads a
++    // field that is text, and no other (a number, a boolean, a field that is not there).
++    const equal = isText(field) ? same(field, Value.str(key)) : undefined;
 +    if (equal === undefined)
 +      return yield* fail(site, "matches on a field the prover does not model");
 +    return yield* decide(fromTruth(equal), site);
@@ -770,7 +825,7 @@ index 36b4d8f..5c72285 100644
 +                const field = yield* tagOf(input, "isAnyOf", at);
 +                const parts: Array<string> = [];
 +                for (const one of wanted) {
-+                  const equal = same(field, Value.str(one));
++                  const equal = isText(field) ? same(field, Value.str(one)) : undefined;
 +                  if (equal === undefined)
 +                    return yield* fail(at, "matches on a field the prover does not model");
 +                  parts.push(String(equal));
@@ -850,10 +905,10 @@ index f653461..85c90f0 100644
      "effect/Option:none": () => Effect.succeed(Value.none),
      "effect/Option:fromNullishOr": fromNullable(["Null", "Undef"]),
 diff --git a/src/Prove/internal/Symbolic.ts b/src/Prove/internal/Symbolic.ts
-index 0122b08..1ab50a1 100644
+index 0122b08..0ed5e8b 100644
 --- a/src/Prove/internal/Symbolic.ts
 +++ b/src/Prove/internal/Symbolic.ts
-@@ -483,6 +483,167 @@ export const fits = (value: V, ast: SchemaAST.AST, run?: Run): string => {
+@@ -483,6 +483,205 @@ export const fits = (value: V, ast: SchemaAST.AST, run?: Run): string => {
    }
  };
  
@@ -924,13 +979,26 @@ index 0122b08..1ab50a1 100644
 +      case "Number":
 +        // `NaN` and the infinities pass or not by `isFinite`, which is not kept apart.
 +        if (value._tag === "Num")
-+          return Number.isFinite(value.value) ? String(passes(checks, value.value)) : undefined;
++          return Number.isFinite(value.value)
++            ? String(
++                passes(checks, value.value) &&
++                  (!checks.integer || Number.isSafeInteger(value.value)),
++              )
++            : undefined;
 +        if (value._tag !== "Term" || value.big === true || (sort !== "Int" && sort !== "Real"))
 +          return "false";
 +        // JavaScript rounds a division: what its checks say of it is not what they say of the term.
 +        if (value.quotient) return undefined;
 +        return checked([
-+          ...(checks.integer && sort === "Real" ? [`(is_int ${value.term.text})`] : []),
++          // `isInt` is `Number.isSafeInteger`: whole, and no further from nought than 2^53 - 1. A whole number the
++          // solver holds is taken to be that near (the prover's stated assumption); any other number is asked.
++          ...(checks.integer && sort === "Real"
++            ? [
++                `(is_int ${value.term.text})`,
++                `(>= ${value.term.text} ${literal("Real", -Number.MAX_SAFE_INTEGER)})`,
++                `(<= ${value.term.text} ${literal("Real", Number.MAX_SAFE_INTEGER)})`,
++              ]
++            : []),
 +          ...checkFormulas(checks, sort, value.term.text),
 +        ]);
 +      case "Boolean":
@@ -938,8 +1006,10 @@ index 0122b08..1ab50a1 100644
 +      case "Null":
 +        return String(value._tag === "Null");
 +      case "Undefined":
-+      case "Void":
 +        return String(value._tag === "Undef");
++      // `Schema.is(Schema.Void)` allows every value.
++      case "Void":
++        return "true";
 +      case "Literal": {
 +        const literal: unknown = ast.literal;
 +        if (typeof literal === "bigint") {
@@ -951,6 +1021,8 @@ index 0122b08..1ab50a1 100644
 +        if (value._tag === "Str" || value._tag === "Num" || value._tag === "Bool")
 +          return String(value.value === literal);
 +        if (value._tag !== "Term" || value.big === true) return "false";
++        // JavaScript rounds a division: whether it is the literal is not what the solver's quotient says.
++        if (value.quotient && typeof literal === "number") return undefined;
 +        const term =
 +          typeof literal === "string" && sort === "String"
 +            ? Smt.string(literal)
@@ -965,16 +1037,28 @@ index 0122b08..1ab50a1 100644
 +      }
 +      case "Objects": {
 +        if (ast.indexSignatures.length > 0) return undefined;
-+        if (value._tag !== "Obj") return "false";
++        if (value._tag === "Null" || value._tag === "Undef") return "false";
++        if (value._tag !== "Obj")
++          // A struct with no key allows everything but `null` and `undefined`; one with a key refuses what is no
++          // object, and reads an array or a moment key by key, which the prover does not.
++          return ast.propertySignatures.length > 0 &&
++            (value._tag === "Str" ||
++              value._tag === "Num" ||
++              value._tag === "Big" ||
++              value._tag === "Bool" ||
++              value._tag === "Term")
++            ? "false"
++            : undefined;
 +        if (value.brand?.kind === "Matcher") return undefined;
 +        return allKnown(
 +          ast.propertySignatures.map((property) => {
 +            const field = value.fields[String(property.name)];
-+            // A field that is not there fits when it may be left out, or may be `undefined`.
++            // A key that is not there is refused unless it may be left out: one that may be `undefined` must
++            // still be written.
 +            return field === undefined
 +              ? isOptional(property.type)
 +                ? "true"
-+                : decides(Value.undef, property.type, run)
++                : "false"
 +              : decides(field, property.type, run);
 +          }),
 +        );
@@ -1014,8 +1098,17 @@ index 0122b08..1ab50a1 100644
 +    }
 +  };
 +  const shaped = shape();
++  // The kinds whose case above applies the checks `checksOf` read. On any other kind (a union, a struct, a literal)
++  // a check is one the prover does not apply, so it must not be passed over as if it held.
++  const applied =
++    ast._tag === "String" || ast._tag === "Number" || ast._tag === "BigInt" || ast._tag === "Arrays";
++  const passedOver = !applied && (ast.checks?.length ?? 0) > 0;
 +  // A value of another shape is refused whatever a check the prover does not read would say.
-+  return shaped === "false" ? "false" : checks.unread.length > 0 ? undefined : shaped;
++  return shaped === "false"
++    ? "false"
++    : checks.unread.length > 0 || passedOver
++      ? undefined
++      : shaped;
 +};
 +
  /** A reason a counterexample's input cannot be built as a real value. */

@@ -6,10 +6,17 @@ import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { Code } from "./Code.aggregate.ts"
+import { Exact } from "./Exact.aggregate.ts"
 import { Ticket } from "./Ticket.aggregate.ts"
+import { Mark } from "./Unread.aggregate.ts"
 
 const proved = (rule: string): RegExp =>
   new RegExp(`✓ ${rule}\\n\\s+✓ holds on the initial state\\n\\s+✓ proved for Open, Note, Close\\n`)
+
+const kept = (rule: string): RegExp =>
+  new RegExp(`✓ ${rule}\\n\\s+✓ holds on the initial state\\n\\s+✓ proved for AskName, AskWhole, AskPair, AskVoid\\n`)
+
+const unread = (command: string, why: string): RegExp => new RegExp(`✗ ${command}: not read\\n.*\\n\\s+${why}\\n`)
 
 const broken = (rule: string, others: string, by: string, command: string, after: string): RegExp =>
   new RegExp(
@@ -94,6 +101,50 @@ layer(NodeServices.layer)("a schema's own guards", (it) => {
         /✗ ACodeIsNeverLowerCaseA\n\s+✓ holds on the initial state\n\s+✗ Keep: not read\n.*\n\s+asks Schema\.is\(Capitals\) of a value, where the prover does not read the schema or the value exactly/
       )
       expect(said).not.toMatch(/proved for Keep|violated/)
+    }),
+    120_000
+  )
+
+  it.effect(
+    "are answered as the library answers: a class by its name, a whole number within 2^53 - 1, a key that is written",
+    Effect.fnUntraced(function* () {
+      const report = yield* Prove.report(Exact, { source: new URL("./Exact.aggregate.ts", import.meta.url) })
+      const said = Prove.render(report)
+      expect(said).not.toMatch(/not read|read wrongly|not decided|not proved/)
+      expect(said).toMatch(/Agreed with the real code: inputs picked for each of 5 paths/)
+      // The guard of the event `Copied` says yes to a rejection named "Copied", so the mark is made.
+      expect(said).toMatch(
+        /✗ NothingIsMarkedByItsName\n\s+✓ holds on the initial state\n\s+✓ proved for AskWhole, AskPair, AskVoid\n\s+✗ AskName: violated\n[\s\S]*?events\s+Marked \{ which: "name" \}/
+      )
+      // `isInt` refuses 2^53, written out or sent in a command.
+      expect(said).toMatch(kept("NothingIsMarkedByItsLargeWhole"))
+      expect(said).toMatch(kept("NothingIsMarkedByItsWhole"))
+      // A key that may be `undefined` and is not written is refused.
+      expect(said).toMatch(kept("NothingIsMarkedByItsPair"))
+      // `Schema.Void` says yes to a number.
+      expect(said).toMatch(kept("NothingIsMarkedByItsVoid"))
+      expect(said).toMatch(kept("The state stays in its schema"))
+    }),
+    120_000
+  )
+
+  it.effect(
+    "are not guessed where the prover applies no check or reads no tag: each such guard comes back not read",
+    Effect.fnUntraced(function* () {
+      const report = yield* Prove.report(Mark, { source: new URL("./Unread.aggregate.ts", import.meta.url) })
+      const said = Prove.render(report)
+      const inexact = (schema: string): string =>
+        `asks Schema\\.is\\(${schema}\\) of a value, where the prover does not read the schema or the value exactly`
+      // A check on a union, which the prover applies to none of its members.
+      expect(said).toMatch(unread("AskUnion", inexact("WholeOrOne")))
+      // A union told by a number: the library finds a case under the number's text.
+      expect(said).toMatch(unread("AskSize", "matches on a field the prover does not model"))
+      expect(said).toMatch(unread("AskEither", "Sized\\.isAnyOf is given cases the prover cannot see"))
+      // A literal asked of a division, which JavaScript rounds.
+      expect(said).toMatch(unread("AskShare", inexact("JustBelowOne")))
+      // A struct with no key asked of an array.
+      expect(said).toMatch(unread("AskList", inexact("Anything")))
+      expect(said).not.toMatch(/proved for Ask|violated|read wrongly/)
     }),
     120_000
   )

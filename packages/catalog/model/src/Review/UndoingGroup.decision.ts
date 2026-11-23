@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // The undo of one act on a group of rows, decided across the import and the group: one act too, whatever the number of
 // rows. Only its maker takes it back, once, and only while it is the last group still in force (Benjamin, 2026-11-22:
 // "Only the last group act"): a later group was drawn on a screen that had this one. Taking the last one back makes
@@ -52,34 +51,34 @@ export class UndoingGroup extends Domain.Decision(
     keyOf: (cmd: UndoGroup) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
     decide: Effect.fn("UndoingGroup.decide")(function* ({ life, group }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* new NotOpen({})
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
-      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
-      if (!GroupState.guards.Decided(group.state)) return yield* new NotYourStep({})
+      if (cmd.opening !== life.state.confirms) return yield* ConfirmedSince.make({})
+      if (!GroupState.guards.Decided(group.state)) return yield* NotYourStep.make({})
       // A group instance belongs to one import of one organization, for good.
       if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       if (group.state.by !== actor.memberId || group.state.change !== cmd.undo || group.state.undoneAt !== 0) {
-        return yield* new NotYourStep({})
+        return yield* NotYourStep.make({})
       }
       // What a standing confirm wrote is taken back with the import, not here.
-      if (group.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
+      if (group.state.change <= life.state.confirmedAt) return yield* DecidedBeforeTheConfirm.make({})
       // A later group is still in force: what that one did was drawn on a screen that had this one. Once it is taken
       // back, this one is the last in force again.
-      if (group.state.change !== life.state.topGroup) return yield* new GroupedAfter({ last: life.state.topGroup })
+      if (group.state.change !== life.state.topGroup) return yield* GroupedAfter.make({ last: life.state.topGroup })
       // The sender's screen has not received every change. The model keeps no reading of a group's rows, so it cannot
       // say whether what landed since is on one of them: a row another person decided since keeps that whole decision
       // when the group goes, and the sender would learn it only after. Refused with the import's last change and
       // held, as a group's act is; taken once the screen has it.
-      if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })
+      if (cmd.seen !== life.state.changes) return yield* ReviewMovedOn.make({ last: life.state.changes })
       const change = life.state.changes + 1
       return [
-        group.record(new GroupUndone({ change })),
+        group.record(GroupUndone.make({ change })),
         life.record(
-          new GroupCounted({
+          GroupCounted.make({
             change,
             step: cmd.step,
             rows: group.state.count,

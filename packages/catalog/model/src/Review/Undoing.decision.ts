@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // The undo of one act, decided across the import and the row. It takes back only its sender's own decision while that
 // is what the row holds, puts back exactly the decision that was under it, whose it was, and leaves under that exactly
 // what was recorded: the level it brings is taken only when it seals to the text the row holds, so nothing its sender
@@ -121,15 +120,15 @@ export class Undoing extends Domain.Decision(
     keyOf: (cmd: UndoRowStep) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
     decide: Effect.fn("Undoing.decide")(function* ({ life, row }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* new NotOpen({})
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       if (
         !RowState.guards.Untouched(row.state) &&
         (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
       ) {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       // The same undo sent again: the row took this very act already (this change, in this step, from this person),
       // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided on
@@ -141,15 +140,15 @@ export class Undoing extends Domain.Decision(
       // is refused as not its sender's step.
       if (cmd.opening !== life.state.confirms) {
         if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
-        return yield* new ConfirmedSince({})
+        return yield* ConfirmedSince.make({})
       }
       if (cmd.sawGroup !== life.state.lastGroup) {
         if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
-        return yield* new GroupedSince({})
+        return yield* GroupedSince.make({})
       }
       if (!RowState.guards.Decided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
         if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
-        return yield* new NotYourStep({})
+        return yield* NotYourStep.make({})
       }
       // An undo landed on the row that the sender's screen has not received: another person decided over the sender's
       // decision and took that back, so the row holds the sender's decision again, as the screen that is behind shows
@@ -157,32 +156,32 @@ export class Undoing extends Domain.Decision(
       // with who took that undo and of which change, and held (2026-11-22, by the rule on a press from a screen that
       // is behind), as a row's act is.
       if (cmd.sawUndone !== row.state.undone.change) {
-        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })
+        return yield* UndoneSince.make({ by: row.state.undone.by, change: row.state.undone.change })
       }
       // An undo puts back the decision under the one taken back, another person's included, on the matching that one
       // was made on. Pressed on a screen that has not received a match, it is refused and held as a row's act is.
-      if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+      if (cmd.madeOn !== life.state.matching) return yield* MatchedSince.make({ matching: life.state.matching })
       // A group in force was decided after this decision and covers the row: it was drawn on a screen that had the
       // decision, as a later group was on one that had an earlier group. Refused and shown; once the group is taken
       // back, the decision can be (2026-11-22, by the rule on a press from a screen that is behind).
-      if (cmd.covered) return yield* new GroupedAfter({ last: life.state.topGroup })
+      if (cmd.covered) return yield* GroupedAfter.make({ last: life.state.topGroup })
       // What a standing confirm wrote is taken back with the import, not here.
-      if (row.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
-      if (row.state.under.change === -1) return yield* new HistoryEnds({})
+      if (row.state.change <= life.state.confirmedAt) return yield* DecidedBeforeTheConfirm.make({})
+      if (row.state.under.change === -1) return yield* HistoryEnds.make({})
       // What goes under the decision put back must be what was under it, to the letter; nothing, when nothing was, and
       // a level let go when the rest was let go.
       const kept = row.state.below !== "" && row.state.below !== CUT
       if (kept && (!sizesAreTrue(cmd.next) || seal({ level: cmd.next, below: cmd.below }) !== row.state.below)) {
-        return yield* new NotWhatWasUnder({})
+        return yield* NotWhatWasUnder.make({})
       }
       const next = kept ? cmd.next : row.state.below === CUT ? letGo : noLevel
       const under = row.state.under
       return [
         row.record(
-          new StepUndone({ next, below: kept ? cmd.below : "", undo: cmd.undo, step: cmd.step, by: actor.memberId })
+          StepUndone.make({ next, below: kept ? cmd.below : "", undo: cmd.undo, step: cmd.step, by: actor.memberId })
         ),
         life.record(
-          new ActCounted({
+          ActCounted.make({
             change: life.state.changes + 1,
             step: cmd.step,
             row: cmd.row,

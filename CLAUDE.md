@@ -446,9 +446,9 @@ The review is also a model of `@alchemy.run/domain` (`packages/catalog/model`: `
 its rules from the code of `decide` and `evolve`, so that code is written for two readers. Before changing one of
 those files, read [docs/verify.md](docs/verify.md).
 
-- **`new` only where a `decide` is**: files named `*.aggregate.ts` and `*.decision.ts` build events and rejections with
-  `new`, with `// @effect-diagnostics newSchemaClass:off` as their first line. The prover does not read `X.make(...)`
-  there. Everywhere else, tests included, `.make`.
+- **`.make` everywhere, a `decide` included**: an event or a rejection is built with `X.make(...)` in `*.aggregate.ts`
+  and `*.decision.ts` as in every other file, and no file turns a diagnostic off. The prover reads `X.make(...)` as the
+  instance it builds, through the repository's third patch to it (`docs/patches.md`).
 - **A case is told by its schema's own guard** (`ImportState.guards.Open`, `ImportCommand.isAnyOf([...])`,
   `ImportEvent.guards.ActCounted`), never by a copy written beside it: the prover reads a tagged union's `guards`,
   `isAnyOf`, `match` and `matchOrElse`, and `Schema.is`, through the repository's third patch to it

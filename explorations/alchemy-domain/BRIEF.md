@@ -180,7 +180,7 @@ which is not checked from main.
   decisions).
 - **What the prover reads**: handlers written `Effect.fn("name")(…)` (whose parameters are typed `any` unless `keyOf`'s
   parameter is annotated); an id or a value schema from another package; not a request context imported from another
-  package; `new Event(…)`, not `Event.make(…)`.
+  package; `Event.make(…)` as it reads `new Event(…)`, since the repository's third patch to it (decision 33, reversed).
 
 ## Sketch
 
@@ -215,7 +215,7 @@ his answer of 2026-11-22, "Keep it, named as ours", keeps it as our check: "no h
 hand-written list of rule names or standings. `review14` has no error under a strict type-check, with no cast, nor has
 `review15` with its stories. Under the repository's profile as it was then (effect-tsgo 0.70.0, Effect 4.1.4; not run
 again under main's 0.73.2 and Effect 4.1.5) it had 133 Effect diagnostics and no type error: 73 `newSchemaClass`
-(decision 33's answer keeps `new` in the files that hold a `decide`), 32 `effectFnOpportunity`, 26 `preferEffectArray`,
+(decision 33's first answer kept `new` in the files that hold a `decide`; reversed since, and they build with `.make`), 32 `effectFnOpportunity`, 26 `preferEffectArray`,
 1 `missingPipeableSignature` and 1 `schemaClassMissingBrand`. Its functions are written `(p) => Effect.gen(...)`,
 because written `Effect.fn(function* (p) ...)` their parameters were typed `any`. The model on main writes the import
 and the four decisions with `Effect.fn`, and its counts above are of that form on `734c27a`.
@@ -1627,8 +1627,11 @@ path; an id or value schema may come from another package.
 
 ### 33. Are domain blocks built with `new`?
 
-**Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"). The
-others are kept below as what was rejected.
+**Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"), and
+**reversed the same day**: "Teach the prover .make" ([DECISIONS.md](DECISIONS.md), "decision 33 reversed: the prover
+reads `.make`"). Every file builds with `.make`, a file that holds a `decide` included, and none turns a diagnostic
+off; the prover reads `X.make(…)` through the repository's third patch to it. What follows is the question as it was
+first put.
 
 The house rule is `.make`. The prover reads `new Event(…)` in `decide` and not `Event.make(…)`.
 
@@ -2058,7 +2061,7 @@ taken.
 | 23: a Discord sign-in with an unverified email refused | A Discord sign-in with an unverified email creates no account (move 8): to write |
 | 25, 26: the allowance per organization, back at 00:00 UTC | `Allowance`'s Verify test, with the `TestClock` across midnight UTC (move 2): to write |
 | 27, 28, 29, 30, 31: the hosts, two Workers, `alchemy dev`, the screens on the model's Api | Each move's rows of "Every single thing" (moves 2 and 7): to write, in that move |
-| 32, 33: blocks in each model package; `new` only in decide files | Built on main (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
+| 32, 33: blocks in each model package; `.make` everywhere, the prover taught to read it (33 reversed) | Built on main (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
 | 35, 36, 37, 38, 39: by rule; the activity table stays; start empty; mark removed, events stay; keep, delete when an org leaves | A stored event of an older shape read by its rule; each write of the model adding its `activity` line; no row the current app stored carried into the model, with no carry-over code in the repository; Remove leaving the import's events and deleting its D1 rows; an operator's command deleting an organization's objects (moves 2 to 6): to write, in the move that builds each |
 | 40: review in memory, then host | The order of moves itself |
 | "Undecided: Ana took it back" | The story "a group taken back gives no row anything again: Ana's group of twelve rows, Dana types on row 14, both are taken back, and row 14 holds nothing" |

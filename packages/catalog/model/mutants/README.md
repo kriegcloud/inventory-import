@@ -3,7 +3,7 @@
 What the proofs and the stories of the review are worth is measured by breaking the model on purpose and seeing
 whether anything notices. A **mutant** is one change to the model's source, made in a copy of the package:
 
-- **check**: one check of a `decide` removed (`if (!ImportState.guards.Open(s)) return yield* new NotOpen({})` goes), 93 of them;
+- **check**: one check of a `decide` removed (`if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})` goes), 93 of them;
 - **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 80;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 
@@ -181,7 +181,7 @@ an object to `mutants.json`:
   "file": "src/Import/Import.aggregate.ts",
   "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
   "until": "Effect.fn(\"Import.TakeBackImport\")",
-  "old": "        if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) {\n          return yield* new CountsDoNotAddUp({})\n        }\n",
+  "old": "        if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) {\n          return yield* CountsDoNotAddUp.make({})\n        }\n",
   "new": "",
   "proof": "test/Import.prove.test.ts",
   "expect": "rule",
@@ -196,7 +196,7 @@ an object to `mutants.json`:
   `nothing`.
 - `anchors`: texts found in order; the change lands after the last. For the import, the handler
   (`Effect.fn("Import.ConfirmImport")`); for a decision, its `decide` (`Effect.fn("Deciding.decide")`); for a field,
-  that, then the event (`new RowDecided({`).
+  that, then the event (`RowDecided.make({`).
 - `until`: where the region ends: the next handler, `    evolve: {` after the last one, `    transitions: {` for a
   decision, `})` for a field of an event written over several lines, `\n` for one written on one line.
 - `old`, `new`: the exact text, indentation and line ends included. A removed check is its whole line or lines,

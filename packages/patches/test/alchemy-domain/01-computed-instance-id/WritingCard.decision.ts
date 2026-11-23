@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // Writes a card, and makes one mistake on purpose: it writes over a card somebody else wrote, which breaks
 // `Card.ACardKeepsItsAuthor`. The card's id is built from two fields of the command, which is what the patch is about.
 import * as Domain from "@alchemy.run/domain"
@@ -16,5 +15,5 @@ export class WriteCard extends Domain.Command("WriteCard", {
 export class WritingCard extends Domain.Decision(WriteCard, {
   reads: { card: Card },
   keyOf: (cmd: WriteCard) => ({ card: `${cmd.boardId}/${cmd.cardId}` }),
-  decide: ({ card }, cmd) => [card.record(new CardWritten({ by: cmd.by }))]
+  decide: ({ card }, cmd) => [card.record(CardWritten.make({ by: cmd.by }))]
 }) {}

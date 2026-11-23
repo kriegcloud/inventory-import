@@ -48,15 +48,14 @@ the test's name says it was not run, and it was checked by hand.
 | `probe` | A plain function, the same as an Effect, and a test of both. It imports `@inventory/kernel/Role`, to show that any package is imported by its name |
 | `service` | A `Context.Service`, its twin for tests with everything in memory, something that uses it, and a test through the twin |
 | `screen` | A page of its own (`index.html`, `main.tsx`), a screen from the design system's components over atoms, and a test of the atoms. Served by `scratch:serve`; the app never loads it |
-| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It takes `@alchemy.run/domain` from the root's install: until a package asks for it, `scratch:new` refuses this template and says so. The prover knows an event or a rejection only by `new`, not by `X.make(...)`, so, as decision 33 of the Alchemy brief (2026-11-22, "`new` only in decide files") has it, a decide file (`*.aggregate.ts`, `*.decision.ts`) builds them with `new` and turns that one diagnostic off on its first line (`// @effect-diagnostics newSchemaClass:off`); every other file, the template's model and test included, builds with `.make` |
+| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It takes `@alchemy.run/domain` from the root's install: until a package asks for it, `scratch:new` refuses this template and says so. An event or a rejection is built with `.make` in every file, the aggregate included: the prover reads it as the instance it builds (the repository's third patch to the library, `docs/patches.md`) |
 
 ## What is and is not enforced inside it
 
 - **On, in `scratch:check`:** the type-checker with the repository's whole Effect profile (`tsconfig.base.json`, nothing
-  turned off). What it says of an experiment is what it would say of a package. A file may turn one diagnostic off
-  only as decision 33 of the Alchemy brief allows: `// @effect-diagnostics newSchemaClass:off` as the first line of a
-  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses, with the file and line:
-  - any other `@effect-diagnostics` line, wherever it stands (the checker reads it in a string too);
+  turned off). What it says of an experiment is what it would say of a package. No file may turn a diagnostic off.
+  `scratch:check` refuses, with the file and line:
+  - any `@effect-diagnostics` line, wherever it stands (the checker reads it in a string too);
   - `@effect-leakable-service` and `@effect-expect-leaking`, the two comments that silence the `leakingRequirements`
     diagnostic, in any mix of capitals, wherever they stand;
   - a comment that starts with `@ts-nocheck` or `@ts-ignore`, in any mix of capitals, where the compiler reads one:

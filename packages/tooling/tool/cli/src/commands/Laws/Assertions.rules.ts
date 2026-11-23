@@ -35,7 +35,7 @@ export const assertionsConfig = ".oxlintrc.assertions.json"
  * How long each list of `assertionsConfig` may be, in the order its overrides stand: beep-effect's vendored kit, the
  * registry's components, and everyone else's files. Each only falls: lower it when a list shrinks.
  */
-export const assertionCeilings: ReadonlyArray<number> = [23, 33, 64]
+export const assertionCeilings: ReadonlyArray<number> = [23, 33, 60]
 
 const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
 const leftOut = [".agents/", ".codex/", `${scratchpadFolder}/`, "vendor/"]
@@ -45,7 +45,7 @@ const leftOut = [".agents/", ".codex/", `${scratchpadFolder}/`, "vendor/"]
  * for another changes the number, and the law refuses the list until it is recorded again. Recorded only when files
  * came off.
  */
-export const assertionsHeld: ReadonlyArray<number> = [153817800, -322494103, 118790471]
+export const assertionsHeld: ReadonlyArray<number> = [153817800, -322494103, 1008613313]
 
 /** An override that turns the rule off for the files it lists, and nothing else. */
 const Override = S.Struct({

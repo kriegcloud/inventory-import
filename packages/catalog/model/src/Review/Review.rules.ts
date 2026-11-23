@@ -362,6 +362,12 @@ const canonical = (field: Field, text: string): string => {
   return trimmed
 }
 
+/**
+ * One value for each field of an item, worked out field by field in the order the screens list them (`fieldLabels` is
+ * written in that order, which the contract's `CatalogContract.test.ts` holds).
+ */
+const ofEachField = <V>(of: (field: Field) => V): Record<Field, V> => R.map(fieldLabels, (_label, field) => of(field))
+
 /** True when the row says it is discontinued and active at once: a date that reads, and Active true or left empty. */
 const discontinuedYetActive = (values: Readonly<Record<Field, string>>): boolean =>
   O.isSome(readDate(values.discontinuedOn)) && (Str.trim(values.isActive) === "" || values.isActive === "true")
@@ -481,12 +487,10 @@ const makeContext = (input: {
   const totalNumbers = totalRowNumbers({ table: input.table, skuColumn: columnOf("sku") })
   const columns = R.fromEntries(A.map(fields, (field) => [field, columnOf(field)] as const))
   const read = (row: StagedRow): Readonly<Record<Field, string>> =>
-    R.fromEntries(
-      A.map(fields, (field) => {
-        const column = columns[field]
-        return [field, column === null || column === undefined ? "" : cellText(field, row.cells[column])] as const
-      })
-    ) as Record<Field, string>
+    ofEachField((field) => {
+      const column = columns[field]
+      return column === null || column === undefined ? "" : cellText(field, row.cells[column])
+    })
   const itemsOf = input.itemsOf ?? itemsOfRow
   const fileRows = A.filter(input.table.rows, (row) => !A.contains(totalNumbers, row.rowNumber))
   // Each row of the file is behind at least one item: a row that holds none is one entry, part 0, never dropped.
@@ -1262,29 +1266,27 @@ export const review = (input: {
     const decision = decisionOf(row)
     const proposals = keepSome(fields, (field) => proposeFor(ctx, row, field))
     const changes: Array<Change> = []
-    const values = R.fromEntries(
-      A.map(fields, (field) => {
-        const typed = typedValue(decision, field)
-        const proposed = A.findFirst(proposals, (p) => p.field === field)
-        const text = row.file[field]
-        if (O.isSome(typed)) {
-          const to = canonical(field, typed.value)
-          if (to !== text) {
-            changes.push(typedChange({ field, from: text, to }))
-          }
-          return [field, to] as const
+    const values = ofEachField((field) => {
+      const typed = typedValue(decision, field)
+      const proposed = A.findFirst(proposals, (p) => p.field === field)
+      const text = row.file[field]
+      if (O.isSome(typed)) {
+        const to = canonical(field, typed.value)
+        if (to !== text) {
+          changes.push(typedChange({ field, from: text, to }))
         }
-        if (O.isSome(proposed) && inForce(proposed.value, decision)) {
-          const p = proposed.value
-          const accepted = A.contains(decision.accepted, field)
-          const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
-          // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
-          changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
-          return [field, p.to] as const
-        }
-        return [field, text] as const
-      })
-    ) as Record<Field, string>
+        return to
+      }
+      if (O.isSome(proposed) && inForce(proposed.value, decision)) {
+        const p = proposed.value
+        const accepted = A.contains(decision.accepted, field)
+        const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
+        // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
+        changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
+        return p.to
+      }
+      return text
+    })
     const key = skuKey({ sku: values.sku })
     const mine = HashSet.has(created, row.id)
     // The file's own SKU is stored. Compared by key, so a SKU whose spaces were trimmed is still the file's SKU.
@@ -1494,12 +1496,10 @@ export const recheckRow = (input: {
   return (row) => {
     const known = R.get(byId, row.id)
     if (O.isNone(known)) return undefined
-    const values = R.fromEntries(
-      A.map(fields, (field) => {
-        const text = O.getOrElse(R.get(row.values, field), () => "")
-        return [field, text === known.value.file[field] ? text : canonical(field, text)] as const
-      })
-    ) as Record<Field, string>
+    const values = ofEachField((field) => {
+      const text = O.getOrElse(R.get(row.values, field), () => "")
+      return text === known.value.file[field] ? text : canonical(field, text)
+    })
     const rivals = A.map(
       A.filter(
         O.getOrElse(R.get(byKey, `sku:${skuKey({ sku: values.sku })}`), () => []),

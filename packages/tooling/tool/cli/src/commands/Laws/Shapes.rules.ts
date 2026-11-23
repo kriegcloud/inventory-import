@@ -5,12 +5,15 @@
  * - Helpers take the value they act on first and are `dual` (2026-11-22: "If we are going to make helpers. We make
  *   them dual & pipe friendly with properly ordered parameters. i.e `cause` should be first parameter"). The law
  *   reads the clear case: a helper declared with a name (`const f = (…) =>`, `function f(…)`), of two values or more,
- *   whose last is named `cause`, `error`, `self` or `input`. A function handed to a call as an argument is not read:
- *   the call sets its order.
+ *   that names one `cause`, `error`, `self` or `input` and is not written `dual(…)`, wherever that one stands. A
+ *   helper of two values that names none of them is not read: which one it acts on is not in its words. A function
+ *   handed to a call as an argument is not read: the call sets its order.
  * - Properties are `readonly` (2026-11-22: "All object types & interfaces should have readonly properties in the bast
- *   majority of cases"), React props among them. The law refuses a property signature of an object type or an
- *   interface without `readonly`. The one kind of exception is another library's types, augmented in
- *   `declare global` or `declare module "…"`, whose shape is not ours.
+ *   majority of cases"), React props among them. The law refuses, without `readonly`: a property of an object type
+ *   or an interface, an index signature, a class's field, a mapped type's properties, and an array type (`T[]`,
+ *   `Array<T>`) inside a property's own type. An array type elsewhere (a local list a function fills) is no property,
+ *   so it is not read. The one kind of exception is another library's types, augmented in `declare global` or
+ *   `declare module "…"`, whose shape is not ours; a `declare namespace` of our own is read.
  *
  * Not read by either, each by name: vendored code (shadcn's and the registries' components and hooks under
  * `packages/ui/src/components/` and `packages/ui/src/hooks/`, beep-effect's kit under `packages/foundation/`,
@@ -21,7 +24,7 @@
  */
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { type ListedSpec, listedLaw, listedSentence } from "./internal/listed.ts"
-import { helpersSubjectLast, mutableProperties } from "./internal/shapesCode.ts"
+import { helpersNotDual, mutableProperties } from "./internal/shapesCode.ts"
 
 /** What neither law reads, from the root. */
 export const shapesLeftOut: ReadonlyArray<string> = [
@@ -39,10 +42,18 @@ export const shapesLeftOut: ReadonlyArray<string> = [
 
 /** The files with a helper that takes the value it acts on last, today: this list may only shrink. */
 export const dualListed: ReadonlyArray<string> = [
+  "packages/catalog/model/src/Import/Waited.rules.ts",
   "packages/catalog/model/test/Review.story.test.ts",
   "packages/catalog/web/src/internal/spreadsheet/xlsx.ts",
+  "packages/client/src/Http.runtime.ts",
+  "packages/client/src/SayError.controller.ts",
   "packages/foundation/modeling/csv/src/Csv.codec.ts",
-  "packages/review/src/internal/keptStore.ts"
+  "packages/foundation/modeling/xlsx/src/Xlsx.codec.ts",
+  "packages/review/src/ReviewDraft.rules.ts",
+  "packages/review/src/ReviewRegion.atoms.ts",
+  "packages/review/src/internal/ReviewGrid.tsx",
+  "packages/review/src/internal/keptStore.ts",
+  "packages/ui/src/TableSearch.component.tsx"
 ]
 
 /** The files with a property that is not readonly, today: this list may only shrink. */
@@ -109,7 +120,10 @@ export const readonlyListed: ReadonlyArray<string> = [
   "packages/catalog/web/test/support/session.ts",
   "packages/client/test/Connection.atoms.test.ts",
   "packages/drivers/d1/src/D1.test-layer.ts",
+  "packages/foundation/modeling/csv/src/internal/header.ts",
+  "packages/foundation/modeling/csv/src/internal/machine.ts",
   "packages/foundation/modeling/xlsx/src/Xlsx.codec.ts",
+  "packages/foundation/modeling/xlsx/src/internal/sheet.ts",
   "packages/kernel/src/Identity.middleware.ts",
   "packages/review/src/ReviewDraft.rules.ts",
   "packages/review/src/ReviewRegion.atoms.ts",
@@ -137,31 +151,32 @@ export const readonlyListed: ReadonlyArray<string> = [
   "packages/ui/src/Skeletons.component.tsx",
   "packages/ui/src/StatusPill.component.tsx",
   "packages/ui/src/TextWidth.measure.ts",
-  "packages/ui/src/Theme.provider.tsx"
+  "packages/ui/src/Theme.provider.tsx",
+  "vitest.retries.ts"
 ]
 
 /** What the dual-helper law is. */
 export const dualSpec: ListedSpec = {
   check: "dual:check",
-  rule: "every helper declared with two values or more takes the one it acts on first and is dual",
+  rule: "every helper declared with two values or more that names the one it acts on takes it first and is dual",
   instead:
-    "a helper that takes the value it acts on (cause, error, self, input) last: put it first and write the helper with dual from effect/Function, data-last form included",
+    "a helper that names the value it acts on (cause, error, self, input) and is not dual: put that value first and write the helper with dual from effect/Function, data-last form included",
   listName: "dualListed",
   listed: dualListed,
-  held: 343339886,
+  held: -851458944,
   leftOut: shapesLeftOut,
-  offsets: helpersSubjectLast
+  offsets: helpersNotDual
 }
 
 /** What the readonly law is. */
 export const readonlySpec: ListedSpec = {
   check: "readonly:check",
-  rule: "every property of an object type or an interface is readonly",
+  rule: "every property, index signature, class field and mapped property is readonly, with readonly arrays",
   instead:
-    "a property that is not readonly: write readonly before it, and keep a value that must change in a Ref or a MutableRef",
+    "a property that is not readonly, or a mutable array in one: write readonly (ReadonlyArray for an array), and keep a value that must change in a Ref or a MutableRef",
   listName: "readonlyListed",
   listed: readonlyListed,
-  held: 386281421,
+  held: -619296762,
   leftOut: shapesLeftOut,
   offsets: mutableProperties
 }

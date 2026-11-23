@@ -7,7 +7,7 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 import { heldAs } from "../src/commands/Laws/internal/held.ts"
 import { readListed } from "../src/commands/Laws/internal/listed.ts"
-import { helpersSubjectLast, mutableProperties } from "../src/commands/Laws/internal/shapesCode.ts"
+import { helpersNotDual, mutableProperties } from "../src/commands/Laws/internal/shapesCode.ts"
 import {
   dualHelpers,
   dualListed,
@@ -22,8 +22,7 @@ import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { inTree, printed } from "./support/tree.ts"
 
-const lines = (source: string, offsets: typeof helpersSubjectLast) =>
-  readListed({ file: "a.tsx", source }, offsets).found
+const lines = (source: string, offsets: typeof helpersNotDual) => readListed({ file: "a.tsx", source }, offsets).found
 
 const helpers = `import { dual } from "effect/Function"
 export const refusal = (method: string, key: string, cause: unknown) => [method, key, cause]
@@ -32,6 +31,16 @@ export const issue = (cause: unknown, method: string) => [cause, method]
 export const one = (input: string) => input
 export const both = dual(2, (self: string, that: string) => self + that)
 export const handed = [1, 2].map((value, input) => value + input)
+`
+
+const wider = `export type I = { [key: string]: number }
+export class C { count = 0; readonly fixed = 1 }
+export type M = { [K in "a" | "b"]: number }
+export type N = { readonly [K in "a"]: number }
+export type R = { readonly rows: Row[]; readonly kept: ReadonlyArray<Row>; readonly lists: Array<number> }
+export const local: Array<number> = []
+declare namespace Ours { interface X { y: number } }
+type Row = { readonly n: number }
 `
 
 const shapes = `export type A = { a: number; readonly b: string }
@@ -50,11 +59,14 @@ const inRepository = Effect.fn("inRepository")(function* (law: typeof dualHelper
 
 describe("laws dual and readonly", () => {
   it("reads a declared helper that takes its subject last, and nothing else", () => {
-    expect(lines(helpers, helpersSubjectLast)).toEqual([2, 3])
+    expect(lines(helpers, helpersNotDual)).toEqual([2, 3, 4])
   })
 
   it("reads a property that is not readonly, and not one in another library's augmented types", () => {
     expect(lines(shapes, mutableProperties)).toEqual([1, 2])
+    // An index signature, a class's field, a mapped type, a mutable array in a property, and a namespace of our own;
+    // not a local list a function fills.
+    expect(lines(wider, mutableProperties)).toEqual([1, 2, 3, 5, 7])
   })
 
   it.effect("refuses each place in a file no list names, and a listed file that breaks the rule no more", () =>
@@ -80,7 +92,7 @@ describe("laws dual and readonly", () => {
   )
 
   it("the lists only shrink: held by their contents and their lengths", () => {
-    expect([dualListed.length, readonlyListed.length]).toEqual([4, 91])
+    expect([dualListed.length, readonlyListed.length]).toEqual([12, 95])
     expect([heldAs(dualListed), heldAs(readonlyListed)]).toEqual([dualSpec.held, readonlySpec.held])
   })
 })

@@ -12,11 +12,22 @@
  * taken as a value (`const Q = Promise`). `Promise` is caught however it is reached: by its name, through
  * `globalThis`, `self` or `window`, or by a member in brackets (`Promise["all"]`).
  *
- * The parser alone cannot read types, so this is where the law stops: a `.then` on a local name is taken for a
- * promise's, and a thenable imported from a module passes its `.then` as a module's member. The type-aware rules
- * that would close that, `typescript/no-floating-promises`, `typescript/await-thenable` and
- * `typescript/no-misused-promises`, are oxlint's on `oxlint-tsgolint`, which is installed here for the
- * deprecated-API law; none is run by this law.
+ * A law that reads names can be routed round (`globalThis["Prom" + "ise"]`, `const g = globalThis; g.Promise`, a
+ * thenable imported from a module), so the law also reads types: every file it would refuse a use in is handed to
+ * oxlint with the type-aware rules of `.oxlintrc.promises.json`, on the engine the deprecated-API law runs
+ * (`tsrs-lint`), and each finding is refused the same way:
+ *
+ * - `typescript/no-floating-promises` (with `void` not excusing one): a Promise-typed value made and left;
+ * - `typescript/promise-function-async`: a function whose type returns a Promise, however it made one; with `async`
+ *   refused by name, no function may return a Promise;
+ * - `typescript/no-misused-promises`: a Promise where a condition, a spread or a callback that returns nothing is;
+ * - `typescript/await-thenable`: an `await` of what is not one.
+ *
+ * What stays open: a Promise-typed value bound to a name and never returned, awaited, floated or passed where a
+ * callback returns nothing (`const kept = g.Promise.resolve(2)`). No rule oxlint or `tsrs-lint` has refuses a value for
+ * its type alone; that needs the TypeScript checker run by this repository over each project, which is not built. A
+ * file with no project is read by no typed rule: the deprecated-API law refuses such a file. The profile is held as
+ * written: any other rule, option or exception is refused.
  *
  * Three lists, each by name. `promiseEntryPoints`: where a platform calls in and takes a Promise, which may run an
  * Effect as one and name the type. `promisesVendored`: components copied from a registry as published, with where each
@@ -39,6 +50,7 @@ import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { unreadSentence } from "./internal/budget.ts"
+import { silencings } from "./internal/directives.ts"
 import { heldAs } from "./internal/held.ts"
 import { type PromiseUse, readPromises } from "./internal/promiseCode.ts"
 
@@ -78,10 +90,17 @@ const atAnEntry: ReadonlyArray<PromiseUse> = ["run", "type"]
  */
 export const promisesVendored: Readonly<Record<string, string>> = {
   "packages/ui/src/components/data-grid/data-grid-cell-variants.tsx": "tablecn's data-grid (@tablecn registry)",
+  "packages/ui/src/components/data-grid/data-grid-context-menu.tsx": "tablecn's data-grid (@tablecn registry)",
+  "packages/ui/src/components/data-grid/data-grid-data-cell.tsx": "tablecn's data-grid (@tablecn registry)",
   "packages/ui/src/components/data-grid/data-grid-features.ts": "tablecn's data-grid (@tablecn registry)",
+  "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx": "tablecn's data-grid (@tablecn registry)",
   "packages/ui/src/components/data-grid/data-grid-utils.ts": "tablecn's data-grid (@tablecn registry)",
+  "packages/ui/src/components/data-grid/data-grid.tsx": "tablecn's data-grid (@tablecn registry)",
   "packages/ui/src/components/data-grid/use-data-grid.ts": "tablecn's data-grid (@tablecn registry)",
   "packages/ui/src/components/data-table/data-table-toolbar.tsx": "tablecn's data-table (@tablecn registry)",
+  "packages/ui/src/components/data-table/data-table.tsx": "tablecn's data-table (@tablecn registry)",
+  "packages/ui/src/components/faceted.tsx": "Dice UI's faceted, installed with tablecn's data-table (@diceui registry)",
+  "packages/ui/src/components/field.tsx": "shadcn's field (@shadcn registry)",
   "packages/ui/src/components/file-upload.tsx": "Dice UI's file-upload (@diceui registry)",
   "packages/ui/src/components/stepper.tsx": "Dice UI's stepper (@diceui registry)"
 }
@@ -97,25 +116,30 @@ export const promisesListed: ReadonlyArray<string> = [
   "apps/inventory/scripts/telemetry.mjs",
   "apps/inventory/src/server/App.ts",
   "apps/inventory/src/server/security.ts",
+  "apps/inventory/src/web/App.tsx",
+  "apps/inventory/src/web/Workspace.tsx",
   "apps/inventory/src/web/components/app/AppSidebar.tsx",
+  "apps/inventory/src/web/components/app/SignedIn.tsx",
+  "apps/inventory/src/web/lib/api.ts",
   "apps/inventory/src/web/lib/otlp.ts",
+  "apps/inventory/src/web/lib/telemetry.ts",
   "apps/inventory/src/web/pages/ActivityPage.tsx",
   "apps/inventory/src/web/preload.ts",
-  "apps/inventory/src/web/Workspace.tsx",
   "apps/inventory/test/server/AuthSchema.test.ts",
+  "apps/inventory/test/server/Docs.test.ts",
   "apps/inventory/test/server/Pwned.test.ts",
   "apps/inventory/test/server/RequestTelemetry.test.ts",
-  "apps/inventory/test/server/support/app.ts",
   "apps/inventory/test/server/Telemetry.slow.test.ts",
   "apps/inventory/test/server/Telemetry.test.ts",
+  "apps/inventory/test/server/support/app.ts",
   "apps/inventory/test/web/gridCallbacks.test.ts",
   "apps/inventory/test/web/root.test.ts",
   "apps/inventory/test/web/session.test.ts",
   "apps/inventory/test/web/support/page.ts",
   "apps/inventory/test/web/traceContext.test.ts",
   "apps/inventory/test/web/workspace.test.ts",
-  "packages/access/host/src/internal/authOptions.ts",
   "packages/access/host/src/SignIn.route.ts",
+  "packages/access/host/src/internal/authOptions.ts",
   "packages/access/web/src/People.screen.tsx",
   "packages/access/web/src/Session.atoms.ts",
   "packages/access/web/src/SignIn.screen.tsx",
@@ -124,7 +148,6 @@ export const promisesListed: ReadonlyArray<string> = [
   "packages/catalog/web/src/Draft.atoms.ts",
   "packages/catalog/web/src/Draft.machine.ts",
   "packages/catalog/web/src/ImportPage.screen.tsx",
-  "packages/catalog/web/src/internal/reader.worker.ts",
   "packages/catalog/web/src/ItemsPage.screen.tsx",
   "packages/catalog/web/src/MatchStep.screen.tsx",
   "packages/catalog/web/src/ResultStep.screen.tsx",
@@ -133,28 +156,39 @@ export const promisesListed: ReadonlyArray<string> = [
   "packages/catalog/web/src/TableAssistant.screen.tsx",
   "packages/catalog/web/src/Upload.controller.ts",
   "packages/catalog/web/src/UploadStep.screen.tsx",
+  "packages/catalog/web/src/internal/reader.worker.ts",
+  "packages/catalog/web/src/internal/spreadsheet/index.ts",
+  "packages/catalog/web/src/internal/spreadsheet/read.ts",
   "packages/catalog/web/test/ImportPage.test.ts",
-  "packages/catalog/web/test/readInPieces.test.ts",
-  "packages/catalog/web/test/RemoveImportAddress.test.ts",
   "packages/catalog/web/test/RemoveImport.test.ts",
-  "packages/catalog/web/test/support/catalog.ts",
+  "packages/catalog/web/test/RemoveImportAddress.test.ts",
+  "packages/catalog/web/test/SessionAsked.test.ts",
   "packages/catalog/web/test/TabRows.test.ts",
   "packages/catalog/web/test/UploadOwner.test.ts",
+  "packages/catalog/web/test/readInPieces.test.ts",
+  "packages/catalog/web/test/support/catalog.ts",
   "packages/client/src/ApiRuntime.runtime.ts",
   "packages/client/src/Early.runtime.ts",
   "packages/client/src/Http.runtime.ts",
   "packages/client/src/Tab.atoms.ts",
   "packages/client/test/Connection.atoms.test.ts",
-  "packages/review/src/internal/parts.tsx",
+  "packages/drivers/better-auth/src/BetterAuth.service.ts",
+  "packages/drivers/d1/src/D1.test-layer.ts",
+  "packages/review/src/ReviewRegion.atoms.ts",
   "packages/review/src/ReviewRegion.component.tsx",
-  "packages/review/src/SavedProgress.hook.ts"
+  "packages/review/src/SavedProgress.hook.ts",
+  "packages/review/src/internal/ReviewGrid.tsx",
+  "packages/review/src/internal/ReviewQueue.tsx",
+  "packages/review/src/internal/parts.tsx",
+  "packages/ui/src/ListTable.component.tsx",
+  "packages/ui/src/Theme.provider.tsx"
 ]
 
 /**
  * What the lists are held by, from their contents (`internal/held.ts`): a file swapped for another changes the number,
  * and the law refuses the list until it is recorded again. Recorded only when files came off.
  */
-export const promisesHeld = { listed: -142488807, vendored: 75817709, entryPoints: -1064530232 }
+export const promisesHeld = { listed: -740894762, vendored: -558548379, entryPoints: -1064530232 }
 
 /** Each list whose files are not the ones it is held by. */
 const changedLists = (): ReadonlyArray<PromiseFinding> =>
@@ -168,6 +202,55 @@ const changedLists = (): ReadonlyArray<PromiseFinding> =>
       ([list, now, held]) => (now === held ? O.none() : O.some(PromiseFinding.cases.Changed.make({ list, held, now })))
     )
   )
+
+/** The type-aware profile, from the root. */
+export const promisesProfile = ".oxlintrc.promises.json"
+
+/** The typed rules, each an error; no category, option or exception beside them. */
+const typedRules = [
+  "typescript/no-floating-promises",
+  "typescript/await-thenable",
+  "typescript/no-misused-promises",
+  "typescript/promise-function-async"
+] as const
+
+/** The profile as it must be. */
+const Profile = S.fromJsonString(
+  S.Struct({
+    $schema: S.optionalKey(S.String).pipe(S.annotateKey({ description: "oxlint's own schema, for an editor" })),
+    plugins: S.Tuple([S.Literal("typescript")]).pipe(S.annotateKey({ description: "The one plugin the rules are in" })),
+    options: S.Struct({ typeAware: S.Literal(true) }).pipe(S.annotateKey({ description: "The rules read types" })),
+    categories: S.Record(S.String, S.Literal("off")).pipe(
+      S.annotateKey({ description: "Every category of other rules, off" })
+    ),
+    rules: S.Struct({
+      "typescript/no-floating-promises": S.Tuple([S.Literal("error"), S.Struct({ ignoreVoid: S.Literal(false) })]),
+      "typescript/await-thenable": S.Literal("error"),
+      "typescript/no-misused-promises": S.Literal("error"),
+      "typescript/promise-function-async": S.Literal("error")
+    }).pipe(S.annotateKey({ description: "The four typed rules, each an error" }))
+  }).pipe($I.annoteSchema("PromisesProfile", { description: "The typed half of the Promise ban, as it must be" }))
+)
+
+/** oxlint's JSON report, as far as the law reads it: each finding's file, line and words, and how many files it read. */
+const TypedReport = S.fromJsonString(
+  S.Struct({
+    diagnostics: S.Array(
+      S.Struct({
+        message: S.String,
+        code: S.optionalKey(S.String),
+        filename: S.String,
+        labels: S.Array(S.Struct({ span: S.Struct({ line: S.Int }) }))
+      })
+    ),
+    number_of_files: S.Int
+  }).pipe($I.annoteSchema("TypedReport", { description: "What oxlint found with the typed rules" }))
+)
+
+/** Whether a directive turns one of the typed rules off: it names one, under either plugin's spelling, or none. */
+const silencesTyped = (rules: ReadonlyArray<string>) =>
+  A.isReadonlyArrayEmpty(rules) ||
+  A.some(rules, (name) => A.some(typedRules, (rule) => Str.endsWith(Str.slice(11)(rule))(name)))
 
 const isLeftOut = (file: string): boolean => A.some(promisesLeftOut, (path) => Str.startsWith(path)(file))
 
@@ -194,6 +277,21 @@ export const PromiseFinding = S.TaggedUnion({
   },
   Settled: {
     file: S.String.pipe(S.annotateKey({ description: "A listed file that uses no Promise any more" }))
+  },
+  Typed: {
+    place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" })),
+    note: S.String.pipe(S.annotateKey({ description: "What the typed rule says, and which rule" }))
+  },
+  Silenced: {
+    place: S.String.pipe(S.annotateKey({ description: "The file and line of the comment, as file:line" })),
+    directive: S.String.pipe(S.annotateKey({ description: "The comment's directive, as written" }))
+  },
+  Loosened: {
+    why: S.String.pipe(S.annotateKey({ description: "How the typed profile differs from the one the law holds" }))
+  },
+  Skipped: {
+    handed: S.Int.pipe(S.annotateKey({ description: "How many files oxlint was handed" })),
+    read: S.Int.pipe(S.annotateKey({ description: "How many of them it read" }))
   },
   Changed: {
     list: S.String.pipe(S.annotateKey({ description: "The list whose files are not the ones it is held by" })),
@@ -252,10 +350,80 @@ export const promiseSentence: (finding: PromiseFinding) => Line = PromiseFinding
   Settled: ({ file }) =>
     err(`${file}  is listed in promisesListed but uses no Promise any more: take its line off the list`),
   Unread: ({ place, why }) => err(`${place}  ${why}`),
+  Typed: ({ note, place }) => err(`${place}  a value typed as a Promise: ${note}. Write the Effect that does the work`),
+  Silenced: ({ directive, place }) =>
+    err(`${place}  a comment that turns a typed Promise rule off (${directive}): no comment does. Remove it`),
+  Loosened: ({ why }) => err(`  ${promisesProfile} is not the profile this law holds: ${why}`),
+  Skipped: ({ handed, read }) =>
+    err(`  oxlint read ${read} of the ${handed} files it was handed for the typed rules: none may be passed over`),
   Changed: ({ held, list, now }) =>
     err(
       `${list} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
     )
+})
+
+/** What the typed rules say of one place: its file, its line, and their words. */
+interface TypedPlace {
+  readonly file: string
+  readonly line: number
+  readonly note: string
+}
+
+/**
+ * What the typed rules find in `files`: each place, and what keeps the law from being sure (a profile not its own, a
+ * report it cannot read, a file passed over, a comment that turns a rule off).
+ */
+const typedUses = Effect.fn("Promises.typedUses")(function* (files: ReadonlyArray<string>) {
+  const repo = yield* Repo
+  const written = yield* repo.text(repo.join(repo.root, promisesProfile))
+  const profile = S.decodeOption(Profile, { onExcessProperty: "error" })(written)
+  const none = A.empty<TypedPlace>()
+  if (O.isNone(profile)) {
+    return {
+      places: none,
+      problems: A.of<PromiseFinding>(
+        PromiseFinding.cases.Loosened.make({ why: "only the four typed rules, as errors, with void excusing nothing" })
+      )
+    }
+  }
+  const comments = yield* Effect.forEach(
+    files,
+    (file) =>
+      Effect.map(repo.text(repo.join(repo.root, file)), (text) =>
+        A.map(silencings({ text, silences: silencesTyped }), ({ directive, line }) =>
+          PromiseFinding.cases.Silenced.make({ place: `${file}:${line}`, directive })
+        )
+      ),
+    { concurrency: 16 }
+  )
+  if (A.isReadonlyArrayEmpty(files)) return { places: none, problems: A.flatten(comments) }
+  const tool = (name: string) => repo.join(repo.root, "node_modules", ".bin", name)
+  const answer = yield* repo.run(
+    tool("oxlint"),
+    ["--config", repo.join(repo.root, promisesProfile), "--disable-nested-config", "--format", "json", ...files],
+    { env: { OXLINT_TSGOLINT_PATH: tool("tsrs-lint"), TSRS_FAST: "0" } }
+  )
+  const report = S.decodeOption(TypedReport)(answer.stdout)
+  if (O.isNone(report)) {
+    return {
+      places: none,
+      problems: A.of<PromiseFinding>(
+        PromiseFinding.cases.Loosened.make({
+          why: `oxlint gave no report (exit ${answer.code}): ${Str.takeLeft(400)(Str.trim(`${answer.stdout}${answer.stderr}`))}`
+        })
+      )
+    }
+  }
+  const skipped =
+    report.value.number_of_files === A.length(files)
+      ? []
+      : [PromiseFinding.cases.Skipped.make({ handed: A.length(files), read: report.value.number_of_files })]
+  const places = A.map(report.value.diagnostics, (diagnostic): TypedPlace => ({
+    file: diagnostic.filename,
+    line: A.match(diagnostic.labels, { onEmpty: () => 0, onNonEmpty: ([first]) => first.span.line }),
+    note: `${Str.trim(diagnostic.message)}${O.match(O.fromUndefinedOr(diagnostic.code), { onNone: () => "", onSome: (code) => ` (${code})` })}`
+  }))
+  return { places, problems: A.appendAll(skipped, A.flatten(comments)) }
 })
 
 /**
@@ -284,6 +452,12 @@ export const promises = Effect.fn("Promises.promises")(function* () {
     (file) => repo.exists(repo.join(repo.root, file)),
     { concurrency: 1 }
   )
+  // The typed half over every file but the registry's and the platform's entries: a listed file is read too, so it
+  // comes off the list only when neither half finds a use in it.
+  const typed = yield* typedUses(
+    A.filter(files, (file) => !R.has(promisesVendored, file) && !R.has(promiseEntryPoints, file))
+  )
+  const typedIn = (file: string) => A.filter(typed.places, (place) => place.file === file)
   const found = yield* Effect.forEach(
     files,
     (file) =>
@@ -302,14 +476,20 @@ export const promises = Effect.fn("Promises.promises")(function* () {
         // A vendored file is the registry's; a listed one is passed while it uses a Promise, and refused once it
         // uses none, so the list shrinks with the code.
         if (R.has(promisesVendored, file)) return []
+        const typedHere = typedIn(file)
         if (A.contains(promisesListed, file)) {
-          return A.isReadonlyArrayEmpty(uses) ? A.of(PromiseFinding.cases.Settled.make({ file })) : []
+          return A.isReadonlyArrayEmpty(uses) && A.isReadonlyArrayEmpty(typedHere)
+            ? A.of(PromiseFinding.cases.Settled.make({ file }))
+            : []
         }
-        return A.map(uses, ({ line, use }) => PromiseFinding.cases.At.make({ place: `${file}:${line}`, use }))
+        return A.appendAll(
+          A.map(uses, ({ line, use }) => PromiseFinding.cases.At.make({ place: `${file}:${line}`, use })),
+          A.map(typedHere, ({ line, note }) => PromiseFinding.cases.Typed.make({ place: `${file}:${line}`, note }))
+        )
       }),
     { concurrency: 1 }
   )
-  const problems = A.appendAll(changedLists(), A.flatten(found))
+  const problems = A.appendAll(changedLists(), A.appendAll(typed.problems, A.flatten(found)))
   return A.isArrayNonEmpty(problems)
     ? A.prepend<PromiseFinding, PromiseFinding>(problems, PromiseFinding.cases.Refused.make({}))
     : A.of<PromiseFinding>(PromiseFinding.cases.Clean.make({}))

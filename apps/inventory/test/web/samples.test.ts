@@ -3,7 +3,6 @@
 // same files, name for name and character for character, or those tests prove something about a file nobody is
 // offered. Both folders are read by the build's own import of text (`?raw`), so no test reads the disk itself.
 import * as A from "effect/Array"
-import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { describe, expect, it } from "vitest"
@@ -17,9 +16,7 @@ const copies = import.meta.glob<string>("../../../../packages/catalog/web/test/f
 
 /** The files of a folder by their names, without the path they were found by. */
 const byName = (files: Readonly<Record<string, string>>): Readonly<Record<string, string>> =>
-  R.fromEntries(
-    A.map(R.toEntries(files), ([path, text]) => [O.getOrElse(A.last(Str.split(path, "/")), () => path), text] as const)
-  )
+  R.fromEntries(A.map(R.toEntries(files), ([path, text]) => [Str.replace(/^.*\//, "")(path), text] as const))
 
 describe("the sample files", () => {
   it("are the same in the app and in the catalog screens' fixtures", () => {

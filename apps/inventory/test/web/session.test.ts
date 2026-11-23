@@ -396,7 +396,7 @@ describe("what is typed, chosen or open", () => {
 })
 
 describe("the workspace", () => {
-  /** What the sign-in gate draws: the workspace, under which key, or something else. */
+  /** What the sign-in gate draws: the workspace, with the key it is drawn under (if any), or none for anything else. */
   const gate = Effect.fnUntraced(function* (t: { readonly registry: AtomRegistry.AtomRegistry }) {
     const { SignedIn } = yield* Effect.promise(() => import("../../src/web/components/app/SignedIn.tsx"))
     const seen: { drawn: ReactNode } = { drawn: undefined }
@@ -408,15 +408,15 @@ describe("the workspace", () => {
     renderToStaticMarkup(createElement(RegistryContext, { value: t.registry }, createElement(Probe)))
     const { drawn } = seen
     return isValidElement<{ readonly children?: ReactNode }>(drawn) && drawn.props.children === "WORKSPACE"
-      ? `workspace of ${O.getOrElse(O.fromNullOr(drawn.key), () => "nobody")}`
-      : "not the workspace"
+      ? O.some(O.fromNullOr(drawn.key))
+      : O.none()
   })
 
   it.live("stays drawn, the same one, while who is signed in is asked again and when it could not be read", () =>
     Effect.gen(function* () {
       const t = yield* load()
       const first = yield* gate(t)
-      expect(first).toBe("not the workspace")
+      expect(first).toEqual(O.none())
       t.page.asked[0]?.answer(signedInAs("dana"))
       yield* settle
       const answered = yield* gate(t)
@@ -426,7 +426,7 @@ describe("the workspace", () => {
       t.page.asked[1]?.fail()
       yield* settle
       const unread = yield* gate(t)
-      expect([answered, asking, unread]).toEqual(A.makeBy(3, () => "workspace of mem_dana/org_prairie"))
+      expect([answered, asking, unread]).toEqual(A.makeBy(3, () => O.some(O.some("mem_dana/org_prairie"))))
     })
   )
 
@@ -438,7 +438,7 @@ describe("the workspace", () => {
       t.page.asked[1]?.answer(signedInAs("dana", "northline"))
       yield* settle
       const there = yield* gate(t)
-      expect(there).toBe("workspace of mem_dana/org_northline")
+      expect(there).toEqual(O.some(O.some("mem_dana/org_northline")))
     })
   )
 })

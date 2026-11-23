@@ -1,0 +1,6 @@
+id: "po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0"
+schema_version: 1
+repository: {commit: "7f7c2b3f23842437520ff77d89e79c7985e237d9", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 174, end_line: 174}
+quote: "Links a grant to the role it gives."
+epistemic_status: quoted_prose

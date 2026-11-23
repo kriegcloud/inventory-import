@@ -1,0 +1,20 @@
+id: fa:grant-role-content:001
+hypothesis_ref: dh:grant-role-content:001
+identity_card_ref: ic:grant-role-content:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Constitutive mediation/content aspect of an access-assignment relator.
+  still_viable: true
+- label: Grant-borne normative mode determined by an access specification.
+  still_viable: true
+- label: Information-bearing role-value assertion about an assignment.
+  still_viable: true
+strongest_counterexample: A retained grant identifier changes from viewer to admin. Treating level as
+  immutable identity either erases its history or assumes a new grant without lifecycle evidence.
+verdict: explicitly_deferred
+needed_evidence: Resolve grant lifecycle, access-level identity and whether level replacement ends an
+  assignment or changes its state; distinguish a normative permission from an encoded claim.

@@ -1,0 +1,30 @@
+id: ic:scope-vocabulary:001
+hypothesis_ref: dh:scope-vocabulary:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Provisional: one vocabulary-version content distinguishing organization-wide, location
+    and field extent kinds; copies can realize the same distinctions. A location instance is not an entry.
+    Unresolved: semantic-equivalence and edition identity rules are absent.'
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unity
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Issued scope-vocabulary edition with provenance-sensitive identity.
+  - Implementation enumeration only, absent independently maintained vocabulary instances.
+  existential_dependencies:
+  - Generic dependence on information realizations; no specific location, field or currently issued grant
+    must exist for the vocabulary content to be available.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: Two grants select location but refer to different sites. They share an extent kind, not
+    a target. Conversely renaming the location code need not change the vocabulary meaning.
+status: proposed

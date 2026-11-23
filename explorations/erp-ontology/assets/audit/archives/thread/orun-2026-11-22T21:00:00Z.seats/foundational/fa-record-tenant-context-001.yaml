@@ -1,0 +1,19 @@
+id: fa:record-tenant-context:001
+hypothesis_ref: dh:record-tenant-context:001
+identity_card_ref: ic:record-tenant-context:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Reified data-custody/scoping relator, if it has independently specified rights and lifecycle.
+  still_viable: true
+- label: Situation in which a workspace holds a record for a tenant.
+  still_viable: true
+strongest_counterexample: Two tenants retain separate records describing the same supplier. Subject-based
+  identity collapses workspace scoping; moving or copying a record also cannot silently preserve the same
+  association.
+verdict: analyzed
+needed_evidence: Specify record identity under copy/move/shared access, workspace multiplicity and scoping
+  intervals. Isolation is prescribed in prose and is not proven by this association.

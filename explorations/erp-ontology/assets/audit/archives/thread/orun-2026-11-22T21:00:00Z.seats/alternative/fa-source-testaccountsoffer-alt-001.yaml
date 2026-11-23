@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-testaccountsoffer-alt:001"
+hypothesis_ref: "dh:source-testaccountsoffer:001"
+identity_card_ref: "ic:source-testaccountsoffer-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Human-readable test sign-in instructions (information object, dev environment only)"
+    still_viable: true
+strongest_counterexample: "The payload carries a shared test password; it is a dev-only artifact with no domain counterpart."
+verdict: analyzed
+needed_evidence: ""

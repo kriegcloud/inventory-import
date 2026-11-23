@@ -1,0 +1,29 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:audit-writing-instant-alt:001"
+hypothesis_ref: "dh:audit-writing-instant:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "Instants are identical iff they are the same point on the time line (to the stored precision). Not individuated by entries; several entries may share one instant."
+  reidentification_key:
+    - "Activity.createdAt (Model.DateTimeInsert)"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: none
+ufo_analysis:
+  candidate_category: quality
+  alternatives:
+    - "temporal instant as an abstract temporal region (OWL-Time time:Instant), outside UFO endurant categories"
+    - "no class: a datatype property writtenAt on the audit record"
+  existential_dependencies:
+    - "the writing event whose temporal location it is"
+temporality:
+  exists_during_interval: false
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "createdAt is a database insert timestamp; if the insert is in the same transaction as the change, writing instant and change instant are observationally the same, and the distinction the hypothesis draws is unobservable."
+  - description: "Clock source unspecified (application vs database server); two entries with equal stored instants need not have been written simultaneously."
+status: proposed

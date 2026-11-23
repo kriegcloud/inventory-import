@@ -1,0 +1,26 @@
+id: dh:source-changerole-unrepresented:001
+observation_refs:
+- so:sha256:14deb02703c6540851ac3908190975fc2687a82bcf666adb158dcd85ccfd57cd
+cq_warrants: []
+proposed_referent:
+  label: role-change request representation
+  description: One role-bearing request value; each request occurrence is distinct
+    from its execution or an enduring assignment.
+representation_status: unresolved
+alternatives:
+- label: Request to change an access assignment
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

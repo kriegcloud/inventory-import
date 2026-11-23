@@ -1,0 +1,34 @@
+id: ic:audit-attribution:001
+hypothesis_ref: dh:audit-attribution:001
+identity:
+  supplies_identity: false
+  identity_criterion: 'Provisional: one attribution assertion/aspect of a particular audit-entry version,
+    identified through that entry provenance and its member-directed assertion. Shared actor name or member
+    identifier across entries does not merge assertions; corrected attributions require a version policy.'
+  reidentification_key:
+  - Parent Activity.id plus actorId and entry version (technical references)
+  - actorName is explicitly not an id
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: false
+  unity: unresolved
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Repeatable proposition that a contextualized member made a change.
+  - Entry-to-member aboutness relation without a separate attribution individual.
+  - 'Actual agency relation: a separate domain hypothesis requiring occurrence evidence.'
+  existential_dependencies:
+  - As an entry-specific assertion it depends on its entry version; it refers to a historically contextualized
+    member. It need not depend on that member still existing or on the assertion being true.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: An agent acts for a member while the member later leaves or changes name, or the entry
+    names the wrong member. The attribution persists as an assertion and cannot become identical to actual
+    agency or a current account.
+status: proposed

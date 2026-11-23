@@ -1,0 +1,73 @@
+id: otp:membershipIn:001
+hypothesis_ref: dh:membership-context:001
+identity_card_ref: ic:membership-context:001
+foundational_status: analyzed
+term:
+  preferred_label: membership in
+  local_name: membershipIn
+  proposed_iri: https://example.org/inventory-import/ontology/membershipIn
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: 'A relation linking a membership episode to the tenant in whose workspace that episode enables
+    its human to act. Proposed domain: Member; proposed range: Tenant.'
+  source:
+  - CQ-P06
+  - CQ-P09
+  - po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a
+  - po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  - CQ-P09
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotation
+  links membership to the tenant it lets its person act in; the separate membership quotation supplies
+  the human-to-tenant access relationship. This context has access significance beyond a syntactic link.'
+open_issues:
+- 'Needed evidence (fa:membership-context:001): No separate relation individual is required by the supplied
+  evidence. If relations are reified later, specify occurrence boundaries and independent identity rather
+  than inheriting tuple keys.'
+- 'Identity criterion from ic:membership-context:001: The same contextual relation concerns the same membership
+  episode and tenant bearer; sharing a human or a workspace label is insufficient. This is a relation
+  extension, not a new individual or identity-supplying sortal. Its holding is temporally qualified; participant
+  identity is inherited from the referenced analyses.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Tenant role as played by the organization,
+  with organization identity. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: No separate relation individual is required by the
+  supplied evidence. If relations are reified later, specify occurrence boundaries and independent identity
+  rather than inheriting tuple keys.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Mediation aspect of the membership
+  relator. Choose the proposed shape or this rival explicitly; the current proposal does not decide between
+  them. Evidence required: No separate relation individual is required by the supplied evidence. If relations
+  are reified later, specify occurrence boundaries and independent identity rather than inheriting tuple
+  keys.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Storage link to a workspace identifier
+  (implementation_artifact_only). This alternative is not accepted, rejected or silently merged with the
+  proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:human-person-alt:001"
+hypothesis_ref: "dh:human-person:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "unresolved: the domain criterion is human biological/personal identity, which the system cannot apply. Question for Benjamin: is one Person individual shared across tenants (one human, many tenants) or does each tenant hold its own person record for the same human?"
+  reidentification_key:
+    - "none observed for the human; MemberId is membership-scoped"
+    - "AccountEmail identifies an account, not a human (Person.email is null for a member with no account)"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U): a biological individual"
+  dependence: none
+ufo_analysis:
+  candidate_category: kind
+  alternatives:
+    - "role_mixin 'person a tenant deals with' (anti-rigid, relational on the tenant) if the class is defined by the dealing rather than by humanity"
+    - "information_object: per-tenant person/contact record, if no cross-tenant human identity is ever maintained"
+  existential_dependencies: []
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+    - "death (outside system scope)"
+counterexamples:
+  - description: "The prose defines the class as 'a human being that a tenant deals with, as a member ... or as a contact': the defining clause is relational and anti-rigid. Taken literally the class is a role/role_mixin; only the head noun 'human being' is the kind. Mixing them is role-is-kind."
+  - description: "Member.id annotation: 'Who this is: people are told apart by this id' (MemberId). Inside one organization, the implementation tells people apart by membership id, an identifier-is-identity shortcut that conflates person with membership."
+status: proposed

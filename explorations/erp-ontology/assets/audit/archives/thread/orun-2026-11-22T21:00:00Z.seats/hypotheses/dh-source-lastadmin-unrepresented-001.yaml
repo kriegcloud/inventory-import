@@ -1,0 +1,26 @@
+id: dh:source-lastadmin-unrepresented:001
+observation_refs:
+- so:sha256:428d0c4d2bed1fae8dd6493a96f7d8275401a76a59caad5c6c89e081573dea66
+cq_warrants: []
+proposed_referent:
+  label: last-admin rejection representation
+  description: One tagged error value describing a proposed change leaving no administrator.
+    A declaration is not an executed rejection or a verified population count.
+representation_status: unresolved
+alternatives:
+- label: Constraint against removing the last administrator
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

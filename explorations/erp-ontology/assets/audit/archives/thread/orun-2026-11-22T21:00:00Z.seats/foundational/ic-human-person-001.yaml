@@ -1,0 +1,33 @@
+id: ic:human-person:001
+hypothesis_ref: dh:human-person:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Proposed provider: the human individual, reidentified by continuity of that human
+    independently of accounts, contacts and memberships. Unresolved: the quotations do not settle organism
+    versus legal-person continuity, death, or duplicate-person resolution; account identifiers and names
+    cannot supply this criterion.'
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unresolved
+  dependence: none
+ufo_analysis:
+  candidate_category: kind
+  alternatives:
+  - Subkind of a broader organism kind, inheriting its identity criterion.
+  - 'Human in a tenant-contact role: anti-rigid and relationally dependent if tenant involvement is made
+    definitional.'
+  existential_dependencies:
+  - No specific tenant, account or membership is required for the human to exist. Being dealt with by
+    a tenant is contextual relevance, not proposed essential human nature.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - 'Death: boundary of living organism; persistence as legal subject or deceased human is unresolved.'
+counterexamples:
+- description: One human has two accounts and memberships in two tenants, then loses all of them. The
+    human remains one individual; account or membership identity would multiply or extinguish that human.
+status: proposed

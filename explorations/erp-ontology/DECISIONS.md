@@ -506,3 +506,59 @@ rulings: seven classes, nine properties and two schemes. The agent recommended t
   three times.
 - Reverse: write a `rat-` record per concept; the terms do not change.
 
+
+### 102. What warrants Grant in the thread (2026-11-22)
+
+The auditor's adversary failed Grant, `grantedTo`, `grantsRole`, `grantScope`, `GrantScopeKindScheme` and Organization
+because CQ-P06 can be answered with a role written on the member. I chose to add one competency question that cannot
+be answered without a grant: at which scope does each member hold which role. Decision 40 stands. The agent
+recommended the same.
+
+- Rationale: a term is warranted by a question that fails without it; the scope is what a grant has and a role on a
+  member has not.
+- Reverse: drop Grant, its three properties and the scope scheme from the thread and write the role on Member; the
+  thread shrinks to 13 terms.
+
+### 103. What makes an organization the same organization (2026-11-22)
+
+The identity question the project profile kept for me. I chose the legal entity: the same organization is the same
+legal entity. A successor company is a new Organization even when it keeps the workspace, and the Tenant role then
+passes to the new one. A body with no registration is told apart by its founding. The agent recommended the same.
+
+- Rationale: it can be checked, and it decides the case the adversary raised (a dissolved company and its successor
+  under one workspace are two).
+- Reverse: read identity as continuity of the body through renames and successions; every stored link to an
+  organization that changed legal entity is then re-read as one organization.
+
+### 104. What makes a person the same person (2026-11-22)
+
+I chose the human being: one human is one Person for life and after death. Two records of the same human denote one
+Person, and merging them is a matter of data quality, not of two people. An account or a member id never identifies a
+person. The agent recommended the same.
+
+- Rationale: decision 34 made Person the human, not the record of one.
+- Reverse: one Person per stored record until linked; Person then becomes an information record and decision 34 is
+  reopened.
+
+### 105. The parked observations of the thread's audit run (2026-11-22)
+
+The auditor's gate refuses a run in which more than half of the observations that matter are parked as unresolved.
+In the thread's run 37 of 57 are (65%): each is an Effect Schema call expression the observation adapter 1.0.0 cannot
+describe, beside a declaration it did read. I chose to waive the limit for this run, with that reason in the run
+manifest. The 37 rows stay listed and the next run must re-open them. The agent recommended the same.
+
+- Rationale: the alternative is more parser code than I approved, and a new adapter version changes every
+  observation id.
+- Reverse: write adapter 1.1.0 that describes those expressions, re-prove it and re-observe.
+
+### 106. What CQ-P10 asks in the thread (2026-11-22)
+
+The auditor's adversary failed AuditEntry and `recordedActor` because CQ-P10 asked who did each recorded act, and an
+audit entry is a record about a change, not the change, and cannot prove who made it. I chose to reword the question
+to ask about the entries: what does each audit entry say was done, which member does it name, and when was it
+written. The terms stay as decision 98 set them. The change itself stays a parked candidate. The agent recommended
+the same.
+
+- Rationale: the stored rows can answer what an entry says; they cannot answer what happened.
+- Reverse: keep the first wording and add a term for the change the entry is about, after deciding how fine-grained
+  one change is.

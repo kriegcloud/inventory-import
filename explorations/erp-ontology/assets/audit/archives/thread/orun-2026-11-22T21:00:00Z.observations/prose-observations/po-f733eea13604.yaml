@@ -1,0 +1,6 @@
+id: "po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96"
+schema_version: 1
+repository: {commit: "7f7c2b3f23842437520ff77d89e79c7985e237d9", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 191, end_line: 191}
+quote: "A controlled vocabulary of the extents a grant of access covers: a whole organization, one location, or one field."
+epistemic_status: quoted_prose

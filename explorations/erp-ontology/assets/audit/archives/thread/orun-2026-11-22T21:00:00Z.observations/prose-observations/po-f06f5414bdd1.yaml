@@ -1,0 +1,6 @@
+id: "po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b"
+schema_version: 1
+repository: {commit: "7f7c2b3f23842437520ff77d89e79c7985e237d9", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 132, end_line: 132}
+quote: "An organized body of people or of other organizations formed for a purpose, such as a company the tenant buys from, sells to, ships with or has goods made by, or the tenant itself."
+epistemic_status: quoted_prose

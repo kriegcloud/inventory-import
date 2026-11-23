@@ -1,0 +1,28 @@
+id: dh:source-member-unrepresented:001
+observation_refs:
+- so:sha256:880561c3b55794cd594883a11a7dfcc70e66bb524cdf64f3f1db736aef6dd158
+- so:sha256:ee9154205a48581fb6646533e511b4f5398a588af92350ade0e1c9f9c45dfa47
+cq_warrants: []
+proposed_referent:
+  label: acting-member source projection
+  description: One member-shaped source response with organization and role. A source
+    declaration alone does not choose between a human acting in context and a membership
+    relationship.
+representation_status: unresolved
+alternatives:
+- label: Human acting within an organization
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

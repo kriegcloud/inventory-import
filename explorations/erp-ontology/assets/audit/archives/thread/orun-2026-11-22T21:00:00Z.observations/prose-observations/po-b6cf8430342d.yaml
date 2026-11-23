@@ -1,0 +1,6 @@
+id: "po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a"
+schema_version: 1
+repository: {commit: "7f7c2b3f23842437520ff77d89e79c7985e237d9", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 172, end_line: 172}
+quote: "Links a membership to the tenant it lets its person act in."
+epistemic_status: quoted_prose

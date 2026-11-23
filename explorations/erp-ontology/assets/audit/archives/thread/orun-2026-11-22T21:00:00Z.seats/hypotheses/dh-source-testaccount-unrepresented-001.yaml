@@ -1,0 +1,27 @@
+id: dh:source-testaccount-unrepresented:001
+observation_refs:
+- so:sha256:51fcc0f05a9a41f1278c8d01855adefcbd8900aff83eb503a37affcc97f28afe
+cq_warrants: []
+proposed_referent:
+  label: local development account fixture representation
+  description: One local test-account fixture described as written for development
+    and absent from deployed databases. It supplies no human counterpart or production
+    membership evidence.
+representation_status: unresolved
+alternatives:
+- label: Synthetic account used for testing
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

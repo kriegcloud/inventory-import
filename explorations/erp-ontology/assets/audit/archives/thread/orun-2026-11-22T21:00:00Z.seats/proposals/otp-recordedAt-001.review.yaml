@@ -1,0 +1,43 @@
+target: "otp:recordedAt:001"
+target_sha256: "33a021e8ac77221171af4b9c49a70602063565a4d495afb346bd8a5281c78e4f"
+chain_sha256: "a368203e8bde4eb336bcce84f6d67d5dcfce2976b7e08db707e7796e8ffced0e"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "Adopt a temporal reference system, or stop claiming instant identity. '2026-01-01T00:00:00Z' and '2025-12-31T19:00:00-05:00' are one position under UTC and two literals without the contract the card says is missing."
+  - "Say which point of the writing event the single timestamp is. Activity exposes one createdAt. The start of the batch and the commit are two instants the property identifies."
+  - "The warrant for 'when' can stand. The null rejection cannot: po:sha256:50ddbe3ee62ac9bdcea8d9e597cb1145c3bcde88a7c204db80291da9e5d053ad is a sentence that can comment createdAt."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Two stamps, 2026-01-01T00:00:00Z and 2025-12-31T19:00:00-05:00, are the same UTC position and different lexical values. The criterion says sameness is position in an adopted reference system, and that no timescale, offset, or precision contract is supplied. The two stamps are therefore one instant and two instants."
+    outcome: landed
+  - surface: identity
+    rule: "identity-conflict"
+    counterexample: "One batch has a start instant and a commit instant. so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9 gives Activity a single createdAt field, and the property stores one xsd:dateTime. The criterion identifies whatever position that literal denotes. If the literal is the transaction time, the start and the commit are two points of the writing event and one recordedAt instant. The card says which point is intended is open."
+    outcome: landed
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P10 merely mentions recordedAt. The question asks when, and the sample answer has a recordedAt value. That conjunct is unanswerable without a time position on the entry."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a dateTime column commented with po:sha256:50ddbe3ee62ac9bdcea8d9e597cb1145c3bcde88a7c204db80291da9e5d053ad ('The instant at which an audit entry was written') and po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671 (written in the same batch as the change). The discriminator says the anchor concerns a writing occurrence rather than the format of a date field. Both sentences stay true as comments on createdAt, and the discriminator admits precision and clock correctness are not established."
+    outcome: landed
+rival_models_still_viable:
+  - "Timestamp information value representing an instant or an uncertainty interval."
+  - "Temporal region or interval if writing time is known only at finite precision."
+  - "Timestamp value encoding that instant (information_artifact)."
+evidence:
+  - "CQ-P10"
+  - "po:sha256:50ddbe3ee62ac9bdcea8d9e597cb1145c3bcde88a7c204db80291da9e5d053ad"
+  - "po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671"
+  - "so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9"

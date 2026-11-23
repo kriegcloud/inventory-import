@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:grant-role-content-alt:001"
+hypothesis_ref: "dh:grant-role-content:001"
+identity_card_ref: "ic:grant-role-content-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+  - label: "Mutable quality of the grant whose value ranges over access levels (this seat)"
+    still_viable: true
+  - label: "Immutable defining characteristic of a grant (role change = new grant)"
+    still_viable: true
+  - label: "Plain object property, no quality individual"
+    still_viable: true
+strongest_counterexample: "A member promoted editor -> admin: is the audit trail one grant changing value or two grants? The current observations do not show which."
+verdict: analyzed
+needed_evidence: "Implementation or decision evidence on role-change semantics (in-place update vs revoke-and-regrant) and whether past levels must be queryable."

@@ -1,0 +1,19 @@
+id: fa:audit-action-description:001
+hypothesis_ref: dh:audit-action-description:001
+identity_card_ref: ic:audit-action-description:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+- label: Repeatable linguistic/propositional content shared across entries.
+  still_viable: true
+- label: Information-bearing component of an entry without a separate token individual.
+  still_viable: true
+strongest_counterexample: Two entries both say Imported items, one for a failed attempt and one for a
+  successful import. The wording does not establish one occurrence, successful execution, or even occurrence
+  truth.
+verdict: analyzed
+needed_evidence: Clarify token versus content identity and whether an edited description creates a new
+  entry version. It describes a claimed past action, not an executable plan or proof of its performance.

@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:eb096a1254163a33ac3a6d958da433eed1ff61f2721b487a4f9b8081cd4123a9",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/kernel/src/Role.schema.ts"
+  },
+  "source_span": {
+    "start_line": 30,
+    "end_line": 30,
+    "content_sha256": "8c836066902fc743afdd17a3bf6fe41bafe4159ca0198886ebf6db84284363aa"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Role",
+    "lexical_name": "Role",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "Role"
+    }
+  ],
+  "source_excerpt": "export type Role = typeof Role.Type\n",
+  "epistemic_status": "parser_derived"
+}

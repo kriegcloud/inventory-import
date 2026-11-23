@@ -1,0 +1,23 @@
+id: fa:access-level:001
+hypothesis_ref: dh:access-level:001
+identity_card_ref: ic:access-level:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: 'Information object: policy meaning or vocabulary-entry content reusable across assignments.'
+  still_viable: true
+- label: 'Mode: recipient-borne normative entitlement conferred by a grant.'
+  still_viable: true
+- label: 'Quality: position on an explicitly defined access scale, if a value-space interpretation is
+    supplied.'
+  still_viable: true
+strongest_counterexample: The label editor is retained while its allowed actions change, or two policy
+  levels permit the same actions today. Label equality and extensional equality yield incompatible identity
+  results.
+verdict: explicitly_deferred
+needed_evidence: Choose reusable level meaning versus instantiated entitlement; provide policy version
+  and semantic-change rules. The reading/writing/manage-people descriptions establish intended differences,
+  not enforcement or role-bearer identity.

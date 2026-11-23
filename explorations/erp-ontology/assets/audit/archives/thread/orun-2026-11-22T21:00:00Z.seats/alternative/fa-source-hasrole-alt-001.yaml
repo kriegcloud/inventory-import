@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-hasrole-alt:001"
+hypothesis_ref: "dh:source-hasrole:001"
+identity_card_ref: "ic:source-hasrole-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Ordering relation viewer < editor < admin with cumulative permissions, belonging to the access-level vocabulary"
+    still_viable: true
+strongest_counterexample: "hasRole compares rank(role) >= rank(minimum): it implements a total order with cumulative permissions, which is the only observed evidence for the prose's 'ranked' vocabulary. The function denotes nothing, but it is the vocabulary's semantics in code."
+verdict: analyzed
+needed_evidence: "Whether the cumulative-ordering semantics is normative (vocabulary-level) or incidental to this helper."

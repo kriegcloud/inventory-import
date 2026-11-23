@@ -1,0 +1,74 @@
+id: otp:inTenant:001
+hypothesis_ref: dh:record-tenant-context:001
+identity_card_ref: ic:record-tenant-context:001
+foundational_status: analyzed
+term:
+  preferred_label: in tenant
+  local_name: inTenant
+  proposed_iri: https://example.org/inventory-import/ontology/inTenant
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: 'A relation linking a record to the tenant whose workspace holds it, independently of the organization
+    the record describes. No OWL domain is declared; proposed range: Tenant.'
+  source:
+  - CQ-P09
+  - po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321
+  - po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P09
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotations
+  distinguish the workspace tenant holding a record from ownership of the body described, and specify
+  records scoped and hidden across organizations. The proposed context concerns whose workspace data is
+  being handled, beyond a syntactic reference; actual isolation is unverified.'
+open_issues:
+- 'Needed evidence (fa:record-tenant-context:001): Specify record identity under copy/move/shared access,
+  workspace multiplicity and scoping intervals. Isolation is prescribed in prose and is not proven by
+  this association.'
+- 'Identity criterion from ic:record-tenant-context:001: The same workspace-scoping association concerns
+  the same information record, served tenant and holding-workspace context over an interval. Record subject
+  organization and workspace tenant need not coincide. This is a relation extension, not a new individual
+  or identity-supplying sortal. Its holding is temporally qualified; participant identity is inherited
+  from the referenced analyses.'
+- The design declares no domain. This association does not by itself prove isolation, ownership, or record
+  identity under moving and copying.
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Reified data-custody/scoping relator,
+  if it has independently specified rights and lifecycle. Choose the proposed shape or this rival explicitly;
+  the current proposal does not decide between them. Evidence required: Specify record identity under
+  copy/move/shared access, workspace multiplicity and scoping intervals. Isolation is prescribed in prose
+  and is not proven by this association.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Situation in which a workspace holds
+  a record for a tenant. Choose the proposed shape or this rival explicitly; the current proposal does
+  not decide between them. Evidence required: Specify record identity under copy/move/shared access, workspace
+  multiplicity and scoping intervals. Isolation is prescribed in prose and is not proven by this association.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Tenant column or partition pointer
+  (implementation_artifact_only). This alternative is not accepted, rejected or silently merged with the
+  proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

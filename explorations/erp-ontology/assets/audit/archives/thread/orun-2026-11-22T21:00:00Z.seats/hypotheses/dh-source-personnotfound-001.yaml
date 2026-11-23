@@ -1,0 +1,26 @@
+id: dh:source-personnotfound:001
+observation_refs:
+- so:sha256:e529b03ff56e449261ee2219c6889a2029b560b3aa7c463c9c6ccd124d638362
+cq_warrants: []
+proposed_referent:
+  label: person-not-found rejection representation
+  description: One tagged HTTP error value described in terms of a member outside
+    the organization. It does not establish absence of a human, or even execution
+    of the lookup.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Organization-scoped lookup failure report
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

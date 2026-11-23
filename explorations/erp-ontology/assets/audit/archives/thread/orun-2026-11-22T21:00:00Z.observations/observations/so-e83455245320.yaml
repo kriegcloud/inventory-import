@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:e83455245320c475e3ccecc303d49d365b3271d155aa4a4287be172d83f3ff3c",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 36,
+    "end_line": 36,
+    "content_sha256": "d0308c34d3f21dc5e1c77b18160e2525cfbd3a4145792a91146f523a3a4ed4ad"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AccountEmail",
+    "lexical_name": "AccountEmail",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "TypeQuery"
+    }
+  ],
+  "source_excerpt": "export type AccountEmail = typeof AccountEmail.Type\n",
+  "epistemic_status": "parser_derived"
+}

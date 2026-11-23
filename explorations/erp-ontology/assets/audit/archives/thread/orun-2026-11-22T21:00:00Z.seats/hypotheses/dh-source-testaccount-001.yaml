@@ -1,0 +1,26 @@
+id: dh:source-testaccount:001
+observation_refs:
+- so:sha256:d20b16049cf886b70d0abe8fc4f2ed22932915427521021b4c034d8b46a9bff3
+cq_warrants: []
+proposed_referent:
+  label: local development account fixture representation
+  description: One local test-account fixture described as written for development
+    and absent from deployed databases. It supplies no human counterpart or production
+    membership evidence.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Synthetic account used for testing
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

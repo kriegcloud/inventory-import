@@ -1,0 +1,20 @@
+id: fa:membership-holder:001
+hypothesis_ref: dh:membership-holder:001
+identity_card_ref: ic:membership-holder:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Human membership-holder role, anti-rigid, inheriting human identity; a distinct bearer-oriented
+    model.
+  still_viable: true
+- label: Mediation aspect of the membership relator without a separate relation object.
+  still_viable: true
+strongest_counterexample: A human changes login accounts without a membership change; a member-row/account
+  join would incorrectly replace the holder. One human holding two memberships also does not imply one
+  holding relation.
+verdict: analyzed
+needed_evidence: No separate relation individual is required by the supplied evidence. If relations are
+  reified later, specify occurrence boundaries and independent identity rather than inheriting tuple keys.

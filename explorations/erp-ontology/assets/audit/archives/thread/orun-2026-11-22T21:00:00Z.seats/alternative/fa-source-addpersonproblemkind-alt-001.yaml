@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-addpersonproblemkind-alt:001"
+hypothesis_ref: "dh:source-addpersonproblemkind:001"
+identity_card_ref: "ic:source-addpersonproblemkind-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: true
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "noAccount / alreadyMember as situations (no account with that email; the human already holds a membership in the tenant) that preconditions of the add act test"
+    still_viable: true
+strongest_counterexample: "noAccount is a negative condition: it requires a declared closure over accounts (all accounts are known to this deployment) before it can be read as 'no such account exists'."
+verdict: analyzed
+needed_evidence: "Closure contract for account lookup (per deployment, per identity provider) before noAccount is read as negation."

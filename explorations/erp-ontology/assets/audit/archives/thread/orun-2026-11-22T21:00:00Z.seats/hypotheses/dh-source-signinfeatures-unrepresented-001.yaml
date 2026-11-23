@@ -1,0 +1,27 @@
+id: dh:source-signinfeatures-unrepresented:001
+observation_refs:
+- so:sha256:5540a3d628e3d5b6652895d00c91f2a6db3621fc2c566fcdcc9e0477d959a4ed
+cq_warrants: []
+proposed_referent:
+  label: browser sign-in configuration projection
+  description: One browser-facing configuration value of test offers, password-check
+    setting and sign-up setting. Defaults and settings do not prove checks executed
+    or policies enforced.
+representation_status: unresolved
+alternatives:
+- label: Sign-in policy or feature specification
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

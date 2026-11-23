@@ -1,0 +1,27 @@
+id: dh:source-emailtofind:001
+observation_refs:
+- so:sha256:a6988c5e0250715c876cccaa5b01ab65d6539256a7a411d571f1db8f8fc82d81
+- so:sha256:d3ec1b48f0727eb53aec1635a2cb99fc47f3a9a3698b8df078b000c7b2c3629a
+cq_warrants: []
+proposed_referent:
+  label: email decoding helper representation
+  description: One decoding schema or its static type, trimming and lowercasing input
+    toward AccountEmail. The computation supplies no proof of an account lookup or
+    human identity.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Normalized account lookup identifier
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

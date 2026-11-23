@@ -1,0 +1,18 @@
+id: fa:scope-vocabulary:001
+hypothesis_ref: dh:scope-vocabulary:001
+identity_card_ref: ic:scope-vocabulary:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Issued scope-vocabulary edition with provenance-sensitive identity.
+  still_viable: true
+- label: Implementation enumeration only, absent independently maintained vocabulary instances.
+  still_viable: true
+strongest_counterexample: Two grants select location but refer to different sites. They share an extent
+  kind, not a target. Conversely renaming the location code need not change the vocabulary meaning.
+verdict: analyzed
+needed_evidence: Specify content/edition identity and version rules; provide target-selection evidence
+  before using this vocabulary to infer which site or field a grant covers.

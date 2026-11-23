@@ -1,0 +1,53 @@
+target: "otp:Grant:001"
+target_sha256: "70b4f3979c28be55d037d366f7bbe27b73173b013214d42335ba55bb04b1d631"
+chain_sha256: "8dbf7eb97357dc6e20b5d8cb07ccb8af75cbd6b25975988c31d29da44d6c4552"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Withdraw gist:Assignment until the child is one of act, continuing assignment, or configuration. Those three cannot share one parent, because an act that ended Monday is not the access still held on Friday."
+  - "Pick the lifecycle: a Wednesday role edit revises one grant or replaces it. The present criterion does both."
+  - "CQ-P06 asks who holds which role, not whether a Grant individual exists. Cite a CQ that is unanswerable without the assignment individual, or move Grant to semantic support of Role and Member."
+  - "The discriminator quotes po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a, which can comment a grant configuration tuple. Replace it or stop rejecting the null."
+attacks:
+  - surface: taxonomy
+    rule: "no-valid-subsumption"
+    counterexample: "On Monday an admin assigns editor to Ravi. The act ends Monday. The access continues through Friday. po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a covers both the act and the continuing assignment, and both rivals stay viable. If the child individual is Monday's act, it is not a gist:Assignment that still exists on Friday. If the child is Friday's continuing assignment, Monday's completed act is an 'assignment made by a member' that is not that individual. One edge cannot hold for both."
+    outcome: landed
+  - surface: taxonomy
+    rule: "sortal-without-identity-supplier"
+    counterexample: "Tried: Grant is a sortal with no identity-supplying ancestor. candidate_category and carries_identity are both unresolved, so it is not established as a sortal. The missing supplier is real only after a category is chosen."
+    outcome: survived
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Monday's conferral of editor is changed to admin on Wednesday. Occurrence identity separates Monday's act from Wednesday's act. Continuity of the conferral identifies them as one revised grant. The criterion states both readings and says the quotation does not settle which. The same pair of events is one Grant and two Grants."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: the member-plus-role projection key is the assignment. The proposal says that key is not episode identity, and reidentification_key is empty."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks who the members are and which role each holds. It does not ask whether an assignment individual exists. The SPARQL introduces inv:Grant. A role value on the membership answers the listing and the sample. Grant is named because the drafted query mentions it."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a Grant configuration struct commented with po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a ('An assignment of one role to one member at one scope... made by a member allowed to make it'). The sentence stays true of the struct. No observation shows an authorized conferral occurring apart from that text."
+    outcome: landed
+rival_models_still_viable:
+  - "Relator: continuing normative access assignment."
+  - "Event: authorized act of assigning access."
+  - "Information object: configuration or prescription specifying access."
+  - "Grant configuration record (information_artifact)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a"
+  - "po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd"
+  - "po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0"
+  - "po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049"

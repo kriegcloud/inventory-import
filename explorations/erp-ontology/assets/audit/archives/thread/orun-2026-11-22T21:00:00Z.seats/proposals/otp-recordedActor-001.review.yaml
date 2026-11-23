@@ -1,0 +1,44 @@
+target: "otp:recordedActor:001"
+target_sha256: "06d4da134f726cffaf522ddd6d05a0fc92baa429740ef8ce582afa214e12e828"
+chain_sha256: "4db92aa104e7facd3bcc89668de1e493eafebdeb92ada42fc0c4d2d8588597bc"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "A correction that changes actorId on one Activity.id is one attribution or two. The criterion identifies them through entry provenance and also says a corrected attribution needs a version policy that is absent."
+  - "CQ-P10's decision is whether a change can be attributed to the member who made it. The property is defined not to establish responsibility. Warrant the listing of the label, not the decision about who made the change."
+  - "Replace the null discriminator. actorId and actorName on so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9 are the DTO, and their annotations are the cited fact."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "One Activity row names member M1, then the same Activity.id is corrected to M2. Provenance-through-the-entry identifies both attributions as one aspect of one entry version. A version policy, which the card says is required and absent, would separate the false attribution from the corrected one. The two actor links are one recordedActor assertion and two."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "actorId is a MemberId on the Activity class and actorName is a display snapshot. Two entries share actorName 'Ravi' and point at different memberships. The criterion says a shared name or member id does not merge assertions, but the only published handle is actorId. Using it identifies those entries' attributions whenever the id matches, including a reused MemberId after removal and recreation, which the membership criterion says is a different episode."
+    outcome: landed
+  - surface: warrant
+    rule: "cq-mismatch"
+    counterexample: "CQ-P10's decision is whether a change to the organization's data can be attributed to the member who made it. The property's definition says the link does not establish actual responsibility. Entry E names M1 and M2 made the change. The property returns M1, which answers 'who does the record name' and does not answer the decision. The listing form is enumerative; the decision sentence is the operational warrant, and this term does not meet it."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "The pure-DTO twin is so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9: actorId is a MemberId and actorName is annotated 'Who did it: the member's name as it was then, for the screen. Not an id'. po:sha256:b638b95df94a10990df79b6cb627319a6cae7b29d4362ab928fe404fb5f708a6 says the entry links to the member who made the change. Those strings stay true if the fields are only columns. The discriminator admits the attribution's truth is unverified."
+    outcome: landed
+rival_models_still_viable:
+  - "Repeatable proposition that a contextualized member made a change."
+  - "Entry-to-member aboutness relation without a separate attribution individual."
+  - "Actual agency relation, requiring occurrence evidence."
+  - "Actual agency in the change (domain_referent)."
+evidence:
+  - "CQ-P10"
+  - "po:sha256:b638b95df94a10990df79b6cb627319a6cae7b29d4362ab928fe404fb5f708a6"
+  - "po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671"
+  - "so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9"

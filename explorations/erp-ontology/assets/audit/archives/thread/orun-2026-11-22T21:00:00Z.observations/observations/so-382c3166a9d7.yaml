@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:382c3166a9d777ddc098f0a8a5b6c82443c9676637f1a411f5bff7d7e921d80a",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 26,
+    "end_line": 29,
+    "content_sha256": "cfe453a6ecf1454045a2419fbceb9dee4aa3ff8058878649e22136ae0ec5aa54"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AccountEmail",
+    "lexical_name": "AccountEmail",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "AccountEmail"
+    }
+  ],
+  "source_excerpt": "export const AccountEmail = S.String.check(S.isMaxLength(254), S.isPattern(/^[^\\s@]+@[^\\s@]+$/)).pipe(\n  S.brand(\"AccountEmail\"),\n  $I.annoteSchema(\"AccountEmail\", { description: \"The email an account signs in with\" })\n)\n",
+  "epistemic_status": "parser_derived"
+}

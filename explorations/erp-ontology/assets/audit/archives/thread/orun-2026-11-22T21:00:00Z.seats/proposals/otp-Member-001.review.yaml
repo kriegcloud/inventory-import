@@ -1,0 +1,55 @@
+target: "otp:Member:001"
+target_sha256: "a8139b8f51ceb4ab9feed468e20c0ca1653bd1ffcb1b563e82a12fc135010ba1"
+chain_sha256: "68ef7180dc9b206a8a7b548efb1ba7a94de343357c639ee0f3eba9f493c2873e"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Drop gist:TemporalRelation. A membership relator is not shown to be a temporal relation, and neither the relator nor that parent supplies identity."
+  - "State whether suspension without removal is the same participation episode or a new one. The current criterion identifies a Tuesday gap with the surrounding episode and separates it, because suspension is unresolved."
+  - "Replace the null discriminator. po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c can be the comment on a membership row."
+attacks:
+  - surface: taxonomy
+    rule: "sortal-without-identity-supplier"
+    counterexample: "Member is a relator with unity and carries_identity true, but supplies_identity is unresolved. gist:TemporalRelation is not shown to supply identity. Ravi is removed and re-added in the same tenant. No ancestor decides whether that is one individual of the parent or two."
+    outcome: landed
+  - surface: taxonomy
+    rule: "no-valid-subsumption"
+    counterexample: "Ravi's membership is suspended Tuesday and reinstated Wednesday, with no removal. po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c says the relationship lets the person act until removal, so it does not hold on Tuesday. The proposed Member individual persists through Tuesday. A temporal relation that tracks when the person may act does not. The relator-versus-relation rival is still viable, and a reified relator is not the relation it mediates."
+    outcome: landed
+  - surface: taxonomy
+    rule: "anti-rigid-superclass"
+    counterexample: "Tried: Member is rigid under an anti-rigid TemporalRelation. The parent's rigidity is not in the artifacts. Ending at removal ends the relator; it does not show the child leaving the parent while persisting."
+    outcome: survived
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Ravi's participation is suspended Tuesday and reinstated Wednesday without a removal record. 'Continuous episode until removal' identifies Monday and Wednesday as one episode, because no removal occurred. The enabling relationship did not hold on Tuesday, which is the recreation case the criterion says must be a new episode. One history is both one Member and two."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: tenant-qualified MemberId is the episode. The proposal says that key identifies records, not participation identity, and reidentification_key is empty."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P06 merely mentions Member. The question is who the members of this organization are, and the sample answer's rows are members. The listing has no subject without a membership individual or an equivalent bearer."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a Membership struct commented with po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c, po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c, and po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a. Those sentences stay true of the struct. The discriminator cites them and no fact that would fail if the struct denotes only a row."
+    outcome: landed
+rival_models_still_viable:
+  - "Temporally qualified participation relation without a separately reified relator."
+  - "Participation situation holding over human and tenant."
+  - "Membership row recording the relationship (information_artifact)."
+evidence:
+  - "CQ-P06"
+  - "CQ-P09"
+  - "po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c"
+  - "po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c"
+  - "po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a"

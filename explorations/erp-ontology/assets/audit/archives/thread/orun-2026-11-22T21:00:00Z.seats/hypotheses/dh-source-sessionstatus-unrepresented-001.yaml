@@ -1,0 +1,27 @@
+id: dh:source-sessionstatus-unrepresented:001
+observation_refs:
+- so:sha256:65f40cb681a6ae0beda880706435b642918f57bde153dcc48428f298b91bfdbb
+- so:sha256:c470dfafc8bcabb8f2dfd9e5286f18cbbba80baeb60b47302b95e984b495adec
+cq_warrants: []
+proposed_referent:
+  label: session status representation
+  description: One literal status code or its compile-time alias. Individuate encoded
+    values by response context, not enduring kinds of people.
+representation_status: unresolved
+alternatives:
+- label: Contextual authentication state
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

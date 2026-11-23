@@ -1,0 +1,42 @@
+target: "otp:membershipOf:001"
+target_sha256: "e2eb95650ed1f33839711edac808e750961603ed18714b3231b3296bd45f00c8"
+chain_sha256: "595adca91be1e65ead1a78d2f7ce32d5efb256240cc932c43937d90206d050a0"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "The criterion says account replacement is immaterial and sameness is the same human. Person identity does not decide duplicate person nodes. State what happens when Ada's account replacement mints a second Person node: one membershipOf or two."
+  - "Keep the CQ-P06 warrant only for the human link. Do not describe the property as establishing the human's identity; it inherits an unresolved one."
+  - "Replace the null discriminator. po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c can comment a personId foreign key."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Ada's membership points at Person node P1. Replacing her sign-in account mints Person node P2 for the same human, which the criterion says is immaterial. Person's criterion does not decide whether P1 and P2 are one human. membershipOf(M, P1) and membershipOf(M, P2) are therefore one holding, because account replacement does not count, and two holdings, because the human-sameness test is unresolved."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: the account id is the holder. The criterion says account replacement is immaterial and the range is the human, so two accounts of Ada are not two holders."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P06 merely mentions membershipOf. The decision is whether the same person may be shown an action in one organization and nowhere else, and the sample is one person with two members. Without a link from membership to human, the two member rows are not the same person."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a personId foreign key commented with po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c ('Links a membership to the human who holds it, independently of any account') and po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c. The discriminator says the relationship connects a human participant, not just identifiers. The observations are those sentences, which remain true of the foreign key."
+    outcome: landed
+rival_models_still_viable:
+  - "Human membership-holder role, anti-rigid, inheriting human identity."
+  - "Mediation aspect of the membership relator without a separate relation object."
+  - "Foreign-key representation of the holder (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c"
+  - "po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c"

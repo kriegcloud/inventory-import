@@ -1,0 +1,32 @@
+id: ic:grant-role-content:001
+hypothesis_ref: dh:grant-role-content:001
+identity:
+  supplies_identity: false
+  identity_criterion: Provisionally the same grant-to-level relation concerns the same assignment and
+    policy-qualified access level; time/version is required if the assigned level can change. This is
+    a relation extension, not a new individual or identity-supplying sortal. Its holding is temporally
+    qualified; participant identity is inherited from the referenced analyses.
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Constitutive mediation/content aspect of an access-assignment relator.
+  - Grant-borne normative mode determined by an access specification.
+  - Information-bearing role-value assertion about an assignment.
+  existential_dependencies:
+  - Requires an assignment and access-level meaning under its policy. A level can be defined when nobody
+    holds it.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: A retained grant identifier changes from viewer to admin. Treating level as immutable identity
+    either erases its history or assumes a new grant without lifecycle evidence.
+status: proposed

@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-actorofsession-alt:001"
+hypothesis_ref: "dh:source-actorofsession:001"
+identity_card_ref: "ic:source-actorofsession-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Session-to-actor relationship, if Session is admitted as a relator between account and application"
+    still_viable: true
+strongest_counterexample: "The helper only projects Ready.actor; any denotation belongs to the session/member it reads, not to the function."
+verdict: analyzed
+needed_evidence: "Whether a sign-in session is a domain referent (needed for 'who acted' in audit) or purely transport state."

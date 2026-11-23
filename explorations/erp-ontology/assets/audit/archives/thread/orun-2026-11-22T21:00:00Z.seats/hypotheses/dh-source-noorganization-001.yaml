@@ -1,0 +1,25 @@
+id: dh:source-noorganization:001
+observation_refs:
+- so:sha256:316b315fcdafdcb437ca36d84507c2d2bf4388e0cf555afe094e8f8e98373dba
+cq_warrants: []
+proposed_referent:
+  label: no-organization session response
+  description: One session-response value; the wording permits either no membership
+    or absence from the chosen organization, so it cannot establish global nonmembership.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Contextual lack of selected-organization membership
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

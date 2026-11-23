@@ -1,0 +1,72 @@
+id: otp:membershipOf:001
+hypothesis_ref: dh:membership-holder:001
+identity_card_ref: ic:membership-holder:001
+foundational_status: analyzed
+term:
+  preferred_label: membership of
+  local_name: membershipOf
+  proposed_iri: https://example.org/inventory-import/ontology/membershipOf
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: 'A relation linking a membership episode to the human who holds it, independently of the human’s
+    sign-in account. Proposed domain: Member; proposed range: Person.'
+  source:
+  - CQ-P06
+  - po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c
+  - po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The holder
+  is expressly the human independently of any account, and the membership enables that human to act in
+  the tenant. Thus the proposed relationship connects an access episode and its human participant, not
+  just identifiers.'
+open_issues:
+- 'Needed evidence (fa:membership-holder:001): No separate relation individual is required by the supplied
+  evidence. If relations are reified later, specify occurrence boundaries and independent identity rather
+  than inheriting tuple keys.'
+- 'Identity criterion from ic:membership-holder:001: The same holding relation-instance description concerns
+  the same membership episode and the same human over the applicable interval; account replacement is
+  immaterial. This is a relation extension, not a new individual or identity-supplying sortal. Its holding
+  is temporally qualified; participant identity is inherited from the referenced analyses.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Human membership-holder role, anti-rigid,
+  inheriting human identity; a distinct bearer-oriented model. Choose the proposed shape or this rival
+  explicitly; the current proposal does not decide between them. Evidence required: No separate relation
+  individual is required by the supplied evidence. If relations are reified later, specify occurrence
+  boundaries and independent identity rather than inheriting tuple keys.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Mediation aspect of the membership
+  relator without a separate relation object. Choose the proposed shape or this rival explicitly; the
+  current proposal does not decide between them. Evidence required: No separate relation individual is
+  required by the supplied evidence. If relations are reified later, specify occurrence boundaries and
+  independent identity rather than inheriting tuple keys.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Foreign-key representation of the
+  holder (implementation_artifact_only). This alternative is not accepted, rejected or silently merged
+  with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:307f5b8f0c9c84eb53136163354673d3cf1b6d1974cf665b5736fb97db5c879a",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 95,
+    "end_line": 97,
+    "content_sha256": "2422ef488f85cec0386a4a45c48071b8b6b72ba8e62493b83397c663b8a0f4d0"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SignUpOffer",
+    "lexical_name": "SignUpOffer",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "SignUpOffer"
+    }
+  ],
+  "source_excerpt": "export const SignUpOffer = LiteralKit([\"open\", \"invited\", \"closed\"]).pipe(\n  $I.annoteSchema(\"SignUpOffer\", { description: \"Whether making an account is offered, and to whom\" })\n)\n",
+  "epistemic_status": "parser_derived"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:5935f8b3539d4dc8c90e2351419a960faddf5a4b9cd809a6ff3d3eeff9a93ae1",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 249,
+    "end_line": 250,
+    "content_sha256": "9e6cb612e5814a297f0fdbc07a531ea9b8a4173e56317fdf715a65e86aed21db"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "actorOfSession",
+    "lexical_name": "actorOfSession",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "actorOfSession"
+    }
+  ],
+  "source_excerpt": "export const actorOfSession = (state: SessionState): O.Option<Member> =>\n  state.status === \"ready\" ? O.some(state.actor) : O.none()\n",
+  "epistemic_status": "parser_derived"
+}

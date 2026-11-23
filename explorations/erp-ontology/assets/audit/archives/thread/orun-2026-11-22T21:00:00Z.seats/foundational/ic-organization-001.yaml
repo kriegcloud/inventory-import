@@ -1,0 +1,33 @@
+id: ic:organization:001
+hypothesis_ref: dh:organization:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: continuity of the organized social body is proposed, but purpose, name,
+    constituent members and a directory key are not individually sufficient. The text supplies no criterion
+    for legal succession, mergers, splits or complete replacement of constituents.'
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: unresolved
+  supplies_identity: unresolved
+  unity: unresolved
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: unresolved
+  alternatives:
+  - Social-agent kind with institutional continuity supplying identity.
+  - Collective whose unity follows an organization of constituents.
+  - Category covering different social-body kinds without a common supplied identity.
+  existential_dependencies:
+  - An organized body requires organization of participants; whether dependence is on particular participants,
+    replaceable participants, or a constituting social arrangement is unspecified. No particular tenant
+    relation is required.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - Dissolution may terminate the body; merger, split and legal succession boundaries unresolved.
+counterexamples:
+- description: A company replaces every employee and changes its purpose while remaining legally continuous;
+    conversely two newly formed bodies can have the same people, name and purpose.
+status: proposed

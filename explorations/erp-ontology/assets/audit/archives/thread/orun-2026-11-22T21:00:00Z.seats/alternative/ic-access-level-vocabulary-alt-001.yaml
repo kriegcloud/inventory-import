@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:access-level-vocabulary-alt:001"
+hypothesis_ref: "dh:access-level-vocabulary:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "Proposed (unratified): same vocabulary iff same governing artifact (same name and version) with the same ordered set of level meanings; adding, removing or reordering a level yields a new version. Unresolved for Benjamin: is there any versioning beyond the source commit?"
+  reidentification_key:
+    - "Role LiteralKit declaration at commit 7f7c2b3f"
+    - "prose definition explorations/erp-ontology/research/14-thin-thread.md:190"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U): one artifact unifying its entries and their ordering"
+  dependence: none
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+    - "no separate referent: the vocabulary is just the source enumeration Role plus hasRole's rank"
+  existential_dependencies:
+    - "its entries (access levels)"
+    - "the ordering relation implemented by hasRole/rank"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+    - "superseded by a later version"
+counterexamples:
+  - description: "The prose says 'ranked by what each may do'; the source supplies the ranking only through rank()/hasRole, a function, not a declared ordering in the vocabulary itself, so the ranked vocabulary may exist only as code plus prose and never as a maintained artifact."
+status: proposed

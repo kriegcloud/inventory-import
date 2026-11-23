@@ -173,7 +173,7 @@ so no property has a super-property. Labels are written here; definitions are re
 | `grantedTo` | `inv:grantedTo` | object | granted to | Links a grant to the member who holds it. | `Grant` | `Member` | none | The lift of `Member.role`, first step |
 | `grantsRole` | `inv:grantsRole` | object | grants role | Links a grant to the role it gives. | `Grant` | `Role` | none | The lift of `Member.role`, last step |
 | `grantScope` | `inv:grantScope` | object | grant scope | Links a grant to the kind of scope it applies to. (new wording; decision 96) | `Grant` | a concept of `GrantScopeKindScheme` | none | The lift of `Member.role`, a fixed value |
-| `recordedActor` | `inv:recordedActor` | object | recorded actor | Links an audit entry to the member who made the change. | `AuditEntry` | `Member` (decision 98) | none | `Activity.actorId` |
+| `recordedActor` | `inv:recordedActor` | object | recorded actor | Links an audit entry to the member it names as having made the change (decision 106). | `AuditEntry` | `Member` (decision 98) | none | `Activity.actorId` |
 | `action` | `inv:action` | datatype | action | What was done in the change an audit entry records, in a few words a person reads. (new) | `AuditEntry` | `xsd:string` | none | `Activity.action` |
 | `recordedAt` | `inv:recordedAt` | datatype | recorded at | The instant at which an audit entry was written. (new) | `AuditEntry` | `xsd:dateTime` | none | `Activity.createdAt` |
 | `inTenant` | `inv:inTenant` | object | in tenant | The tenant whose workspace holds this record, not the owner of the body it describes. | none declared | `Tenant` | none | `Activity.organizationId` |
@@ -865,6 +865,16 @@ over `Role` to swap in; a path with no fixed entry is a legal path (3.2), so the
 its result twice: on the rows the query returns over `graphOf`'s graph, and on the triples `lift(copy, value)`
 returns when called directly, so neither function can answer for the other. Neither copy is enrolled, so gates 5
 and 7 do not read it.
+
+### 5.5 CQ-P11, added by the auditor's first run (decision 102)
+
+The foundational auditor's adversary showed that CQ-P06 is answerable with a role written on the member, so it does
+not warrant `Grant`. Decision 102 adds CQ-P11, "At which scope does each member hold which role?", which has no answer
+without a grant: `assets/requirements/competency-questions.yaml` holds its query, its sample answer on the same
+fixture (both of Ravi's grants at `inv:GrantScopeKindScheme-organization`) and its must-fail case (the two `grantScope`
+triples removed: zero rows). It is drafted and not built, and gate 8 does not run it until it is added to the suite
+with a fixture file of its own. Decision 106 rewords CQ-P10 to ask what each audit entry says; the thread still does
+not run it.
 
 ## 6. The gates
 

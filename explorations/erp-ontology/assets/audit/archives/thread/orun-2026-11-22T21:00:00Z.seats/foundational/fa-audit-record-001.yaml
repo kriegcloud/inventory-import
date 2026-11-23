@@ -1,0 +1,23 @@
+id: fa:audit-record:001
+hypothesis_ref: dh:audit-record:001
+identity_card_ref: ic:audit-record:001
+tests:
+  spec_vs_execution: unresolved
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Provenance-sensitive information record token.
+  still_viable: true
+- label: Repeatable propositional content shared by several record tokens.
+  still_viable: true
+- label: 'Writing event: viable only for the hypothesis occurrence clause, and must be separated from
+    its record output.'
+  still_viable: true
+strongest_counterexample: One writing event emits two audit assertions; alternatively one assertion is
+  copied into two storage locations. Neither writing-event count nor row count nor described-change count
+  supplies record identity.
+verdict: explicitly_deferred
+needed_evidence: Choose record token versus content identity; provide correction, copying and reserialization
+  rules and separate the writing event from the artifact it produces. Batch co-writing is stated, not
+  tested.

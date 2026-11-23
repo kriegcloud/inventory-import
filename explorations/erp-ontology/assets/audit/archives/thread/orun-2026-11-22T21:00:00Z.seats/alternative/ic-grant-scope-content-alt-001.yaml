@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:grant-scope-content-alt:001"
+hypothesis_ref: "dh:grant-scope-content:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "Individuated by its grant: one scope-kind quality per grant, valued in the scope vocabulary (organization | location | field). It does not identify the particular location or field."
+  reidentification_key:
+    - "grant -> scope kind code"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: quality
+  alternatives:
+    - "none: object property to a vocabulary entry"
+    - "part of an n-ary applicability context (scope kind + scope target), which this seat expects to be required"
+  existential_dependencies:
+    - "the grant"
+    - "the scope vocabulary"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "The grant prose says 'one site or one field', i.e. a particular extent; this link carries only the kind of extent (decision 96 wording). Without the target individual, two location-scoped grants to different sites are indistinguishable: an N-ary-relation-flattened failure."
+  - description: "'Field' is ambiguous between a data field (attribute-level permission) and a physical field (a place, alongside 'site'/'location'); the two readings give different extent kinds."
+status: proposed

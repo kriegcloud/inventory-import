@@ -1,0 +1,54 @@
+target: "otp:Organization:001"
+target_sha256: "6b44e445a7c4d6325befcc9fe25429a936f513b547e2d9d3e2c3f15ff46fa3ec"
+chain_sha256: "319a990862c3262fd9cb136ff5bb2edf1fae799f965ffe09428745d0f662d06e"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Withdraw gist:Organization until one supplied identity criterion covers companies, informal bodies, and the tenant itself, including merger and succession."
+  - "Publish a succession test. When Northwind Ltd is dissolved and Northwind Logistics Ltd keeps the directory key, say whether that is one Organization. Purpose, name, roster, and directory key are already admitted to be insufficient."
+  - "Stop using po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b as a null discriminator; the same sentence can annotate an organization DTO."
+  - "CQ-P06's drafted query never uses Organization. Show a question that is unanswerable without the class, or stop citing CQ-P06 as a decision warrant."
+attacks:
+  - surface: taxonomy
+    rule: "no-valid-subsumption"
+    counterexample: "Northwind Ltd is dissolved and replaced by Northwind Logistics Ltd, which keeps the name and the directory key. The proposal counts one persisting Organization and states no succession criterion, so that individual is not one gist:Organization social body. The directory-record rival is also still viable, and a directory row is not an individual of gist:Organization."
+    outcome: landed
+  - surface: taxonomy
+    rule: "conflicting-supplied-identity-criteria"
+    counterexample: "Tried: institutional continuity versus unity-by-constituents. Both are open rivals, and neither the child nor gist:Organization is shown supplying a criterion, so a conflict of supplied criteria is not yet in the taxonomy."
+    outcome: survived
+  - surface: taxonomy
+    rule: "anti-rigid-superclass"
+    counterexample: "Tried: a rigid child under an anti-rigid gist:Organization. Child rigidity is unresolved and the parent's rigidity is not in the artifacts, so the pattern is not shown."
+    outcome: survived
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "ExampleWorks merges into SecondOrg. 'Continuity of the organized social body' can identify the survivor with ExampleWorks, identify it with SecondOrg, or count a new body. The criterion says purpose, name, members, and directory key are each insufficient and gives no succession rule, so one merger both identifies and separates the predecessors."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: the directory key is the criterion. The card says a directory key is not sufficient, and reidentification_key is empty."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks who the members are and which role each holds. Its SPARQL binds tenant, person, member, and role and never mentions Organization. The sample answer uses test_ExampleWorks as a tenant. required_classes names Organization, but the listing is answered without the class."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: an Organization table commented with the whole of po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b ('An organized body of people or of other organizations...'). The quotation stays true and every row is a record. The discriminator cites that sentence and nothing that would fail for the table."
+    outcome: landed
+rival_models_still_viable:
+  - "Social-agent kind with institutional continuity supplying identity."
+  - "Collective whose unity follows an organization of constituents."
+  - "Category covering different social-body kinds without a common supplied identity."
+  - "Organization directory record (information_artifact)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b"

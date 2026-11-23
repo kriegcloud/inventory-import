@@ -1,0 +1,83 @@
+id: otp:Member:001
+hypothesis_ref: dh:membership:001
+identity_card_ref: ic:membership:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Member
+  local_name: Member
+  proposed_iri: https://example.org/inventory-import/ontology/Member
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A temporally bounded participation relationship between one human and one tenant that enables
+    the human to act in the tenant workspace from establishment until removal.
+  source:
+  - CQ-P06
+  - CQ-P09
+  - po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+  - po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c
+  - po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: relator
+  gufo_alignment: gufo:Relator
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: relational
+parents:
+- parent: gist:TemporalRelation
+  justification: Provisional is-a placement supported by the supplied gist projection and thin-thread
+    section 2; unresolved identity and category choices remain explicit below.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/TemporalRelation
+    compatibility: Broader parent candidate from the supplied gist 14.1.0 projection; the local definition
+      narrows its meaning. This is not an exact-reuse or equivalence claim.
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  - CQ-P09
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotations
+  describe a relationship enabling a human to act within a particular tenant and persisting from its making
+  until removal, with the human holder independent of an account; this is a participant-dependent access
+  relationship rather than just a record shape.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:membership:001): Specify remove/recreate, suspension/reinstatement and participant
+  replacement rules, with examples separating correction of a record from termination of participation.'
+- 'Identity criterion from ic:membership:001: Provisional: one continuous constituting participation episode
+  connecting this human with this tenant, from establishment until removal. Same human and tenant alone
+  do not establish sameness across removal and recreation. Unresolved: correction, suspension, transfer
+  and reinstatement rules are absent.'
+- 'Design disagreement: tenant-qualified MemberId and lifted IRIs identify records/nodes, not proven participation
+  identity. Remove/recreate and reinstatement may produce distinct episodes.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Temporally qualified participation
+  relation without a separately reified relator. Choose the proposed shape or this rival explicitly; the
+  current proposal does not decide between them. Evidence required: Specify remove/recreate, suspension/reinstatement
+  and participant replacement rules, with examples separating correction of a record from termination
+  of participation.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Participation situation holding over
+  human and tenant. Choose the proposed shape or this rival explicitly; the current proposal does not
+  decide between them. Evidence required: Specify remove/recreate, suspension/reinstatement and participant
+  replacement rules, with examples separating correction of a record from termination of participation.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Membership row recording the relationship
+  (information_artifact). This alternative is not accepted, rejected or silently merged with the proposed
+  referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

@@ -1,0 +1,26 @@
+id: dh:source-membership:001
+observation_refs:
+- so:sha256:2d591ae1e8585eb3a9bc494adf9ae9ac51902ca96f919be5170a4e105c45d5a5
+cq_warrants: []
+proposed_referent:
+  label: test-account membership projection
+  description: One organization-name and role value in a test-account display context.
+    It lacks evidence linking its account-based projection to the account-independent
+    person membership described in prose.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Workspace participation relationship
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:grant-recipient-alt:001"
+hypothesis_ref: "dh:grant-recipient:001"
+identity_card_ref: "ic:grant-recipient-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+  - label: "Mediation relation of the grant relator; bearer plays a Grantee role (this seat)"
+    still_viable: true
+  - label: "Reified recipient relationship with its own identity"
+    still_viable: false
+  - label: "Recipient is the membership relator vs the human-in-member-role (sub-rivalry; observationally equivalent until removal/re-creation is observed)"
+    still_viable: true
+strongest_counterexample: "A member is removed and later re-added: if the old grants re-attach, the recipient is the human; if they do not, it is the membership. Either way, the link itself carries nothing beyond the grant and its participant."
+verdict: analyzed
+needed_evidence: "What happens to grants on membership removal and re-creation; whether MemberId is reused across membership episodes."

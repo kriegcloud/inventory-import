@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:804033f441cdbfb34c2122fa90d4fc65f014c70072e51006757c397f60a2e02b",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Activity/AuditTrail.read.ts"
+  },
+  "source_span": {
+    "start_line": 17,
+    "end_line": 19,
+    "content_sha256": "758c9e6e3ed27195b3361b30bc6249180cda92066fed57bf20ac32262e269f0d"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AuditTrail",
+    "lexical_name": "AuditTrail",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "AuditTrail"
+    }
+  ],
+  "source_excerpt": "export const AuditTrail = S.Array(Activity.json)\n  .check(S.isMaxLength(500))\n  .pipe($I.annoteSchema(\"AuditTrail\", { description: \"The organization's audit trail, newest first\" }))\n",
+  "epistemic_status": "parser_derived"
+}

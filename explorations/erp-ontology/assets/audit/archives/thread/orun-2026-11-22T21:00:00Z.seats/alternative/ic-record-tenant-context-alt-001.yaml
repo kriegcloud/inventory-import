@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:record-tenant-context-alt:001"
+hypothesis_ref: "dh:record-tenant-context:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No individual of its own: the custody relation between a record and the tenant whose workspace holds it, identified by (record, tenant)."
+  reidentification_key:
+    - "organizationId on each tenant-scoped record (e.g. Activity.organizationId)"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+    - "relator: custody/stewardship of a record by a tenant, if it carries its own properties (since, retention, transfer)"
+    - "context: the workspace as an unhypothesized referent mediating record and tenant"
+  existential_dependencies:
+    - "the record"
+    - "the tenant organization"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "The prose distinguishes the holding tenant from the owner of the described body, which is a real distinction, but nothing indicates the holding can change; a fixed custody link needs no reification."
+  - description: "A 'workspace' is named in both tenant and record prose yet has no hypothesis of its own; if a tenant can have several workspaces, records are held by a workspace, not a tenant."
+status: proposed

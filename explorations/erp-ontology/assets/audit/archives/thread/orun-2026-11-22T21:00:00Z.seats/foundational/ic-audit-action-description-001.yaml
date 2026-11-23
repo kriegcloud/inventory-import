@@ -1,0 +1,31 @@
+id: ic:audit-action-description:001
+hypothesis_ref: dh:audit-action-description:001
+identity:
+  supplies_identity: false
+  identity_criterion: 'Provisional: the description token/aspect carried by one audit-entry version, individuated
+    by parent-entry identity, descriptive function and version provenance. Equal wording in two entries
+    is not token identity or event identity. Repeatable semantic content has a different equivalence criterion.'
+  reidentification_key:
+  - Parent Activity.id plus action field and entry version (version policy absent)
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: false
+  unity: unresolved
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Repeatable linguistic/propositional content shared across entries.
+  - Information-bearing component of an entry without a separate token individual.
+  existential_dependencies:
+  - This proposed entry-specific description depends on its containing audit-entry version. Its repeatable
+    linguistic content could be realized elsewhere; the described action need not be veridically established.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: Two entries both say Imported items, one for a failed attempt and one for a successful
+    import. The wording does not establish one occurrence, successful execution, or even occurrence truth.
+status: proposed

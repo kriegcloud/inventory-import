@@ -1,0 +1,30 @@
+id: dh:scope-vocabulary:001
+observation_refs:
+- po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96
+- po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Controlled vocabulary of access extents
+  description: An information artifact distinguishing organization-wide, location
+    and field extent kinds. An instance is a particular vocabulary version with those
+    distinctions; a location instance is not itself a vocabulary entry.
+representation_status: information_artifact
+alternatives:
+- label: Implementation scope enumeration only
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotation explicitly describes a controlled vocabulary of the
+    extents an access grant covers, distinguishing organization, location and field
+    applicability. That stated classification content is about access extents, rather
+    than merely a declaration shape; no implemented vocabulary is proven.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

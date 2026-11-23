@@ -1,0 +1,31 @@
+id: dh:audit-attribution:001
+observation_refs:
+- po:sha256:b638b95df94a10990df79b6cb627319a6cae7b29d4362ab928fe404fb5f708a6
+- po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671
+- so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9
+cq_warrants:
+- CQ-P10
+proposed_referent:
+  label: Recorded attribution of a change to a member
+  description: An information-bearing attribution in an audit entry naming the member
+    said to have made the change. An instance is one entry and its recorded member
+    attribution, not proof of actual responsibility.
+representation_status: information_artifact
+alternatives:
+- label: Actual agency in the change
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotations expressly say the record names who made the change
+    and links to that member; the excerpt separates actor identifier from the name
+    as it was then. Such attribution is communicative content about an actor, not
+    just field syntax; truth of the attribution remains unverified.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

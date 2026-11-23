@@ -1,0 +1,46 @@
+target: "otp:GrantScopeKindScheme:001"
+target_sha256: "0abb78e96db4c5bdf2e4ac9461f9c3a06322e43e138245193088450ed3f11935"
+chain_sha256: "551d7e54e834602911efea357a1e6a30e19997c40bf6c650300241996f989830"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "The criterion describes a vocabulary that distinguishes organization, location, and field. This pass lists only GrantScopeKindScheme-organization. Do not identify that one-concept scheme with the three-extent vocabulary in po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96."
+  - "Name Grant as the decision term in semantic_support_for, or drop the CQ-P06 warrant. The question does not ask for a scope-kind scheme."
+  - "Replace the null discriminator. The quotation is true of a comment on a one-value enum."
+attacks:
+  - surface: identity
+    rule: "identity-conflict"
+    counterexample: "po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96 describes a vocabulary of three extents: whole organization, one location, one field. The proposal lists only the organization concept and says no location or field concept is proposed. The criterion identifies 'one vocabulary-version content distinguishing organization-wide, location and field'. The thin-thread scheme does not have those distinctions, so identifying it with the quoted vocabulary merges a one-concept list with a three-concept vocabulary."
+    outcome: landed
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "An edition that adds a location concept later has different content under the version-content reading and may be the same issued scheme under provenance identity. The criterion says edition identity is absent, so the organization-only scheme and the later edition are one scheme and two."
+    outcome: landed
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks who holds which role. It does not ask which kind of extent a grant covers. The SPARQL hard-codes inv:GrantScopeKindScheme-organization. required_schemes mentions the scheme; the sample answer has no scope field. The listing is answered without a scheme individual."
+    outcome: landed
+  - surface: warrant
+    rule: "support-term-unnamed"
+    counterexample: "The scheme would at best support Grant or grantScope. semantic_support_for is empty, so it names no decision term it is necessary for."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a scope enum whose comment is po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96 and po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049. The discriminator says that classification content is about access extents rather than a declaration shape, and then says no implemented vocabulary is proven. The comment is true of the enum."
+    outcome: landed
+rival_models_still_viable:
+  - "Issued scope-vocabulary edition with provenance-sensitive identity."
+  - "Implementation enumeration only."
+  - "Implementation scope enumeration only (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96"
+  - "po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049"

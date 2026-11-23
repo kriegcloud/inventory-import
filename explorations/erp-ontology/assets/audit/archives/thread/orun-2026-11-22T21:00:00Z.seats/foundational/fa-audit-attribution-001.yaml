@@ -1,0 +1,21 @@
+id: fa:audit-attribution:001
+hypothesis_ref: dh:audit-attribution:001
+identity_card_ref: ic:audit-attribution:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Repeatable proposition that a contextualized member made a change.
+  still_viable: true
+- label: Entry-to-member aboutness relation without a separate attribution individual.
+  still_viable: true
+- label: 'Actual agency relation: a separate domain hypothesis requiring occurrence evidence.'
+  still_viable: true
+strongest_counterexample: An agent acts for a member while the member later leaves or changes name, or
+  the entry names the wrong member. The attribution persists as an assertion and cannot become identical
+  to actual agency or a current account.
+verdict: analyzed
+needed_evidence: Set attribution-version identity and historical member-resolution policy. actorId is
+  a technical reference and actorName is a display snapshot, not an identity criterion or proof of responsibility.

@@ -1,0 +1,26 @@
+id: dh:source-member:001
+observation_refs:
+- so:sha256:4574120c97289b69119fcb9a4cf3a6d660bd2efd898e1e500b14ff3210540e39
+cq_warrants: []
+proposed_referent:
+  label: acting-member source projection
+  description: One member-shaped source response with organization and role. A source
+    declaration alone does not choose between a human acting in context and a membership
+    relationship.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Human acting within an organization
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

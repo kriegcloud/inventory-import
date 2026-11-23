@@ -1,0 +1,25 @@
+id: dh:source-addperson:001
+observation_refs:
+- so:sha256:cbfdd84c67b022e83278656ad8930fc268cf6385b5bde14f138707be1821f3f6
+cq_warrants: []
+proposed_referent:
+  label: add-person request representation
+  description: One email-and-role request value. Distinct requests may ask for the
+    same assignment; no execution or grant-making act is shown.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Request for workspace participation
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

@@ -1,0 +1,33 @@
+id: ic:tenant-organization:001
+hypothesis_ref: dh:tenant-organization:001
+identity:
+  supplies_identity: false
+  identity_criterion: Inherited from the served organization, not supplied by tenancy. Two tenants-as-organizations
+    are the same bearer iff they are the same organization under its eventual identity criterion; separate
+    workspace-service episodes do not create organizations. The organization identity criterion remains
+    unresolved in ic:organization:001.
+  reidentification_key: []
+ontoclean:
+  rigidity: anti_rigid
+  carries_identity: true
+  supplies_identity: false
+  unity: unresolved
+  dependence: relational
+ufo_analysis:
+  candidate_category: role
+  alternatives:
+  - Workspace-service relator mediating organization and application; distinct from its tenant bearer.
+  - Information record of tenancy, distinct from served organization.
+  existential_dependencies:
+  - Depends qua tenant on the application keeping a workspace for that organization. The organization
+    can exist before and after this relation. Multiple workspaces do not alone imply multiple organizations.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - End of workspace-service relation ends role occupancy, not necessarily the organization.
+counterexamples:
+- description: An organization closes its workspace and continues trading. A kind classification of tenant
+    would require it to cease being that organization; a workspace identity would also split one organization
+    with two workspaces.
+status: proposed

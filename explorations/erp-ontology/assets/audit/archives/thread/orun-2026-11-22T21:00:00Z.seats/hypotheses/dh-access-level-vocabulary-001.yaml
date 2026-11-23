@@ -1,0 +1,31 @@
+id: dh:access-level-vocabulary:001
+observation_refs:
+- po:sha256:f37962927f2b535604cb61961ace9335b1c86887f87b34c62bfde0dd0d1866e9
+- po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8
+- so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Controlled vocabulary of access levels
+  description: An information artifact arranging organizational access levels by what
+    their holders may do. An instance is a particular vocabulary and version with
+    its meanings and ordering, not each role assignment or each source schema object.
+representation_status: information_artifact
+alternatives:
+- label: Implementation enumeration without an independently maintained vocabulary
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The prose explicitly specifies a controlled vocabulary ranked by
+    what members may do; the source supplies read, write and people-management meanings.
+    It therefore proposes organized access meanings for use across assignments, beyond
+    the declaration of literals; separate maintenance and deployment are not established.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

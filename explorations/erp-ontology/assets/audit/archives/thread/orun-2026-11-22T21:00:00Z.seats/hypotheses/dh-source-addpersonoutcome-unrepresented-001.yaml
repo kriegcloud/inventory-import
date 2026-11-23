@@ -1,0 +1,27 @@
+id: dh:source-addpersonoutcome-unrepresented:001
+observation_refs:
+- so:sha256:0597f86e71a79be6b9278cfc4a4811429252ed8df3f85457ad3552b8f93d53b2
+- so:sha256:83e4df2b7e8a0f61ff20faa8fa6610d060026a6d31dd809613f08cb7c695f063
+cq_warrants: []
+proposed_referent:
+  label: add-person result representation
+  description: One success-or-problem result value; distinguish each returned value
+    from a completed membership-creation occurrence, which is not shown.
+representation_status: unresolved
+alternatives:
+- label: Outcome report about a membership change
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

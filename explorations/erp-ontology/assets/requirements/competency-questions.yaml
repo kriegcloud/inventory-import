@@ -1,6 +1,6 @@
 # Competency questions for the thin thread (decision 8). Each is taken from report 04
 # (research/04-requirements.md) as report 14 (research/14-thin-thread.md) narrows it for the thread;
-# none is new. Queries are drafted, not run: the vocabulary module, the generated Turtle and the
+# CQ-P10 is reworded by decision 106 and CQ-P11 is new by decision 102. Queries are drafted, not run: the vocabulary module, the generated Turtle and the
 # question suite are not built.
 cqs:
   - id: CQ-P06
@@ -49,8 +49,8 @@ cqs:
     out_of_scope:
       - "Stock positions and items: the warehouse slice"
   - id: CQ-P10
-    natural_language: "Who did each recorded act, what was done, and when?"
-    decision: "Whether a change to the organization's data can be attributed to the member who made it."
+    natural_language: "What does each audit entry say was done, which member does it name, and when was it written?"
+    decision: "Whether a person reading the audit trail can be shown, for each entry, the member it names, the action it states and the instant it was written; the entry is a record about a change and does not prove who made it (decision 106)."
     type: enumerative
     priority: should_have
     derivation_method: direct_lookup
@@ -63,3 +63,31 @@ cqs:
     out_of_scope:
       - "Whether an agent acted for the member: AgentRun is the party slice's (decision 98)"
       - "Whether a removed member is still named"
+  - id: CQ-P11
+    natural_language: "At which scope does each member hold which role?"
+    decision: "Whether a role a member holds applies to every record of the organization or only to a narrower extent, before an action on one record is offered or refused."
+    type: relational
+    priority: must_have
+    derivation_method: direct_lookup
+    source: "DECISIONS.md decision 102; research/14-thin-thread.md sections 2.1 to 2.4 (Grant, grantScope, GrantScopeKindScheme)"
+    sample_answer:
+      - {member: "test_RaviWorks", role: "admin", scope: "GrantScopeKindScheme-organization"}
+      - {member: "test_RaviSecond", role: "viewer", scope: "GrantScopeKindScheme-organization"}
+    sparql: |
+      PREFIX inv: <https://example.org/inventory-import/ontology/>
+      SELECT ?member ?role ?scope
+      WHERE {
+        ?grant a inv:Grant ;
+               inv:grantedTo ?member ;
+               inv:grantsRole ?role ;
+               inv:grantScope ?scope .
+      }
+      ORDER BY ?member ?scope
+    must_fail: "The two grantScope triples removed from the lifted part: zero rows. A role written on the member with no grant cannot state a scope, so the question has no answer without Grant."
+    test_status: "drafted; run: not built"
+    required_classes: [Member, Role, Grant]
+    required_properties: [grantedTo, grantsRole, grantScope]
+    required_schemes: [MemberRoleScheme, GrantScopeKindScheme]
+    out_of_scope:
+      - "Scopes narrower than the whole organization: sites and fields come with the slice that needs them (decision 96)"
+      - "What a role permits"

@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-signinfeatures-alt:001"
+hypothesis_ref: "dh:source-signinfeatures:001"
+identity_card_ref: "ic:source-signinfeatures-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Deployment-level sign-in policy specification (information object, normative)"
+    still_viable: true
+strongest_counterexample: "A browser-facing configuration value does not show the policy is enforced server-side."
+verdict: analyzed
+needed_evidence: "Where the sign-in policy is authored and enforced."

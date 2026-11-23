@@ -1,0 +1,40 @@
+id: ic:audit-record:001
+hypothesis_ref: dh:audit-record:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: a record is not a record-writing occurrence, contrary to the hypothesis
+    sentence calling an instance an occurrence. Proposed record-token identity follows one provenance-bearing
+    audit assertion, with serializations as realizations; two separately authored assertions can describe
+    one change. Content-identical copies may or may not be the same record under the missing copy/provenance
+    policy.'
+  reidentification_key:
+  - Activity.id (technical record key only; no domain identity guarantee)
+  - organizationId (record workspace context)
+ontoclean:
+  rigidity: unresolved
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unresolved
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Provenance-sensitive information record token.
+  - Repeatable propositional content shared by several record tokens.
+  - 'Writing event: viable only for the hypothesis occurrence clause, and must be separated from its record
+    output.'
+  existential_dependencies:
+  - Depends generically on an information realization and provenance context. A record can remain after
+    membership removal or after described data is deleted; it can even contain a false attribution. Aboutness
+    does not guarantee a currently existing referent.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states:
+  - Destruction of all realizations may terminate availability; archival/deletion and correction semantics
+    are unspecified.
+counterexamples:
+- description: One writing event emits two audit assertions; alternatively one assertion is copied into
+    two storage locations. Neither writing-event count nor row count nor described-change count supplies
+    record identity.
+status: proposed

@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:audit-record-alt:001"
+hypothesis_ref: "dh:audit-record:001"
+identity_card_ref: "ic:audit-record-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Record = information-object continuant created by a writing event (this seat)"
+    still_viable: true
+  - label: "Record = the writing occurrence itself (event)"
+    still_viable: false
+  - label: "Record = representation of the change, identity tied 1:1 to the change"
+    still_viable: false
+strongest_counterexample: "One import that creates 11 items produces one entry ('Created 11 items from items.csv'); if the change is individuated per row mutation, 11 changes map to one record, so record identity cannot be derived from change identity."
+verdict: analyzed
+needed_evidence: "Append-only/immutability and retention guarantees for Activity rows; whether one user action always yields exactly one entry."

@@ -1,0 +1,27 @@
+id: dh:source-person:001
+observation_refs:
+- so:sha256:7213a1aef129f79797e999eff79becbad5fc15c5184d02bfed4a25019482b251
+cq_warrants: []
+proposed_referent:
+  label: people-page member projection
+  description: One displayed member response with memberId, role, optional account
+    email and joining time. The excerpt explicitly describes a member on the People
+    page; it does not establish identity with the account-independent human of the
+    prose.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Human or membership represented on the page
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

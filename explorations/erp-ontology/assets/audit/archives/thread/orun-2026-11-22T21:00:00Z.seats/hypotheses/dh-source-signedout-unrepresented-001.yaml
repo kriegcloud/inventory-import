@@ -1,0 +1,26 @@
+id: dh:source-signedout-unrepresented:001
+observation_refs:
+- so:sha256:68de2c656adba380bf27088384f3dbf0204150d43cdd55e26ea9c47f6433a8d4
+cq_warrants: []
+proposed_referent:
+  label: signed-out response representation
+  description: One tagged signed-out response value. It describes a session context,
+    not nonexistence of a person or account.
+representation_status: unresolved
+alternatives:
+- label: Session-specific unauthenticated state
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

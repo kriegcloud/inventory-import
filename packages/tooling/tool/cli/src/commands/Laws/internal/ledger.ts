@@ -317,7 +317,11 @@ export const ledgerAgainst = Effect.fn("ledger.ledgerAgainst")(function* (input:
       O.match(R.get(movedTo, file), {
         onNone: () =>
           `${file}  is in ${input.path} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off, so a new file at its path inherits nothing`,
-        onSome: (to) => `${file}  is in ${input.path} but was moved to ${to}: move its line to ${to}`
+        // A line already written at the new name keeps the number: the old one only goes.
+        onSome: (to) =>
+          R.has(input.now, to)
+            ? `${file}  is in ${input.path} but was moved to ${to}, which has a line of its own: take this one off`
+            : `${file}  is in ${input.path} but was moved to ${to}: move its line to ${to}, or take it off if ${to} breaks the rule no more`
       })
   )
   if (O.isSome(base.problem)) return A.append(missing, base.problem.value)

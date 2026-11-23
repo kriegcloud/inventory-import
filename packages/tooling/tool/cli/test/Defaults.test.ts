@@ -783,3 +783,31 @@ describe("what git says of a move, and when it cannot say", () => {
     })
   )
 })
+
+describe("when git cannot list today's files", () => {
+  it.effect("says what git said, trimmed, and checks nothing", () =>
+    Effect.gen(function* () {
+      const said = yield* inTree(
+        { [held]: twoFallbacks, [baselineFile]: baseline({ [held]: [2, 0, 0, 0] }) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          const failing = Repo.of({
+            ...repo,
+            run: Effect.fn("failingList")(function* (command, args, options) {
+              if (A.contains(args, "ls-files"))
+                return { bytes: new Uint8Array(), stdout: "", stderr: "ls broke\n", code: 128 }
+              return yield* repo.run(command, args, options)
+            })
+          })
+          const found = yield* Effect.provideService(defaults(false, []), Repo, failing)
+          return printed(render(defaultsSentence)(found))
+        })
+      )
+      deepStrictEqual(said, [
+        `err: defaults:check FAIL  ${baselineFile}, or what the law reads, does not hold:`,
+        "err: git could not list the files, so none was checked: ls broke"
+      ])
+    })
+  )
+})

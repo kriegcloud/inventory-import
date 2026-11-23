@@ -200,9 +200,37 @@ describe("laws diagnostics", () => {
           })
         )
         expect(lineLeft).toContain(
-          `err: ${listed}  is in ${diagnosticsLedger} but was moved to ${to}: move its line to ${to}`
+          `err: ${listed}  is in ${diagnosticsLedger} but was moved to ${to}: move its line to ${to}, or take it off if ${to} breaks the rule no more`
         )
       }
+      // Moved where the law does not read (docs/), the line has nowhere to go: it is only taken off.
+      const outOfReach = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.write(repo.join(repo.root, "docs/README.md"), "")
+          yield* repo.run("git", ["mv", listed, "docs/listed.ts"])
+          return yield* run
+        })
+      )
+      expect(outOfReach).toContain(
+        `err: ${listed}  is in ${diagnosticsLedger} but the law reads no file at that path (deleted, ignored or out of its reach): take its line off, so a new file at its path inherits nothing`
+      )
+      // A line already copied to the new name: the old one is only taken off.
+      const copied = yield* inTree(
+        held,
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          yield* repo.run("git", ["mv", listed, moved])
+          yield* write(ledger({ [listed]: 2, [moved]: 2 }))
+          return yield* run
+        })
+      )
+      expect(copied).toContain(
+        `err: ${listed}  is in ${diagnosticsLedger} but was moved to ${moved}, which has a line of its own: take this one off`
+      )
       // A move with a new file at the old name lends nothing: the new file keeps the number, so the moved one is new.
       // The same whether the new file is untracked (git sees a rename, and the law says so) or both are committed (git
       // sees a change of the old file and a new one).

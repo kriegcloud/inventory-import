@@ -10,6 +10,31 @@ import { $BetterAuthId } from "./internal/identity.ts"
 
 const $I = $BetterAuthId.create("BetterAuthConfig")
 
+/** Whether a URL is nothing but an origin on the web: http or https, no account, path, query or fragment. */
+const isWebOrigin = (url: URL): boolean =>
+  (url.protocol === "http:" || url.protocol === "https:") &&
+  url.username === "" &&
+  url.password === "" &&
+  url.pathname === "/" &&
+  url.search === "" &&
+  url.hash === ""
+
+/**
+ * The address people open the app at, as an origin on the web (`https://app.example.com`). Better Auth trusts this
+ * origin alone and makes cookies Secure exactly when it is `https:`, so anything past the origin would be dropped
+ * without a word, and a `file:` or `data:` address has no origin at all ("null"): both are refused.
+ *
+ * @category schemas
+ */
+export const PublicUrl = S.URL.check(
+  S.makeFilter(isWebOrigin, {
+    identifier: "PublicUrlOrigin",
+    title: "An http or https origin",
+    description: "An http or https address with no account, path, query or fragment, such as https://app.example.com",
+    expected: "an http or https origin, such as https://app.example.com"
+  })
+).pipe($I.annoteSchema("PublicUrl", { description: "The address people open the app at, as an http(s) origin" }))
+
 /**
  * The settings Better Auth is built from.
  *
@@ -22,7 +47,7 @@ export class BetterAuthSettings extends S.Opaque<BetterAuthSettings, { readonly 
       S.OptionFromOptionalKey,
       S.withConstructorDefault(Effect.succeedNone)
     ),
-    publicUrl: S.URL.pipe(
+    publicUrl: PublicUrl.pipe(
       S.annotateKey({
         description: "BETTER_AUTH_URL: the address people open the app at. None: each request's origin"
       }),

@@ -71,9 +71,10 @@ export const maxColumns = 200
 export const lastColumnIndex = MAX_COLUMN
 
 /**
- * The most notes a staged file may carry. A reader writes a few notes about the file and one for each number format
- * it could not show, which a workbook built to do so can have thousands of: staging keeps the first notes and says in
- * one more how many it did not keep (`stageTable`), so a file is never refused for its notes.
+ * The most notes an upload may send with its file (`UploadHead`). A reader writes a few notes about the file and one
+ * for each number format it could not show, which a workbook built to do so can have thousands of: staging keeps the
+ * warnings first and says in one more how many it did not keep (`stageTable`), so a file is never refused for its
+ * notes. A file staged before this bound keeps every note it has: `StagedHead` reads it without the bound.
  */
 export const maxNotes = 1000
 
@@ -182,9 +183,9 @@ export const StagedTable = S.Struct({
   rows: S.Array(StagedRow)
     .check(S.isMaxLength(maxStagedRows))
     .annotateKey({ description: `The data rows, in file order: at most ${maxStagedRows}` }),
-  notes: S.Array(StagedNote)
-    .check(S.isMaxLength(maxNotes))
-    .annotateKey({ description: `What the reader did, skipped or noticed: at most ${maxNotes} notes` })
+  // Not bounded in count here: this is also how a stored file is read, and one staged before `maxNotes` may hold more.
+  // What an upload sends is bounded (`UploadHead`).
+  notes: S.Array(StagedNote).annotateKey({ description: "What the reader did, skipped or noticed" })
 }).annotate({
   identifier: "StagedTable",
   description:
@@ -205,3 +206,17 @@ export const StagedHead = S.Struct(headFields).annotate({
 })
 /** The decoded value of `StagedHead`: a staged file without its rows. */
 export type StagedHead = typeof StagedHead.Type
+
+/**
+ * A staged file without its rows as an upload sends it: a `StagedHead` with at most `maxNotes` notes. The bound is
+ * where a head is written, not where one is read, so a file stored with more notes still opens.
+ */
+export const UploadHead = S.Struct({
+  ...headFields,
+  notes: S.Array(StagedNote)
+    .check(S.isMaxLength(maxNotes))
+    .annotateKey({ description: `What the reader did, skipped or noticed: at most ${maxNotes} notes` })
+}).annotate({
+  identifier: "UploadHead",
+  description: `A staged file without its rows as an upload sends it: at most ${maxNotes} notes`
+})

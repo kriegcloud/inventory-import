@@ -5,7 +5,7 @@ import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaGetter from "effect/SchemaGetter"
 import { UploadKey } from "../Catalog.id.ts"
-import { maxStagedRows, StagedHead, StagedRow } from "./Staged.read.ts"
+import { maxStagedRows, StagedRow, UploadHead } from "./Staged.read.ts"
 
 /** Rows in one piece of an upload, and in one stored chunk of an import: the two are the same chunks. */
 export const chunkRows = 500
@@ -48,7 +48,7 @@ const UploadStartWire = S.Struct({
       "Chosen by the browser for this one file: a begin sent again with the same key (a retry after a lost answer) " +
       "is the same upload, not a second one"
   }),
-  head: StagedHead,
+  head: UploadHead,
   rowCount: S.Int.check(S.isBetween({ minimum: 1, maximum: maxStagedRows })).annotateKey({
     description: `Data rows the pieces will carry in all: 1 to ${maxStagedRows}, the most an import stages`,
     examples: [13]
@@ -85,7 +85,7 @@ export const piecesCarry = (start: { readonly rowCount: number; readonly chunkCo
 // start generated is one whose pieces carry its rows.
 const UploadStartSource = S.Struct({
   key: UploadStartWire.fields.key,
-  head: StagedHead,
+  head: UploadHead,
   rowCount: UploadStartWire.fields.rowCount,
   perPiece: S.Int.check(S.isBetween({ minimum: 1, maximum: chunkRows }))
 })

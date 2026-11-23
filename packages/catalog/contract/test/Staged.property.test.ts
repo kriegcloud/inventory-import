@@ -9,7 +9,8 @@ import {
   maxStagedRows,
   StagedHead,
   StagedNote,
-  StagedRow
+  StagedRow,
+  UploadHead
 } from "@inventory/catalog-contract/Staged"
 import { chunkRows, UploadChunk, UploadStart } from "@inventory/catalog-contract/Upload"
 import * as A from "effect/Array"
@@ -83,13 +84,40 @@ describe("a staged head", () => {
   )
 })
 
+/** This many copies of a note: none for 0 (`A.makeBy` makes one at least). */
+const copies = (count: number, note: StagedNote): ReadonlyArray<StagedNote> =>
+  count === 0 ? [] : A.makeBy(count, () => note)
+
 describe("a staged head's notes", () => {
   it.prop(
-    "are refused past the most a file may carry, and a note may name every row of a sheet, data or not",
-    [Arbitrary.schema(StagedHead), Arbitrary.schema(StagedNote)],
+    "an upload sends at most the most a file may carry: that many is accepted, one more refused",
+    [Arbitrary.schema(UploadHead), Arbitrary.schema(StagedNote)],
     ([head, note]) => {
-      const notes = A.makeBy(maxNotes - head.notes.length + 1, () => note)
-      expect(S.is(StagedHead)({ ...head, notes: [...head.notes, ...notes] })).toBe(false)
+      const full = [...head.notes, ...copies(maxNotes - head.notes.length, note)]
+      expect(full.length).toBe(1000)
+      expect(S.is(UploadHead)({ ...head, notes: full })).toBe(true)
+      expect(S.is(UploadHead)({ ...head, notes: [...full, note] })).toBe(false)
+    },
+    { arbitrary: { runs: 20 } }
+  )
+
+  it.effect.prop(
+    "a file stored with more notes than an upload may send still reads, as the server reads it back",
+    [Arbitrary.schema(UploadHead), Arbitrary.schema(StagedNote)],
+    ([head, note]) =>
+      Effect.gen(function* () {
+        const stored = { ...head, notes: [...head.notes, ...copies(maxNotes + 1, note)] }
+        const json = yield* S.encodeEffect(S.fromJsonString(StagedHead))(stored)
+        const read = yield* S.decodeEffect(S.fromJsonString(StagedHead))(json)
+        expect(read.notes.length).toBe(head.notes.length + 1001)
+      }),
+    { arbitrary: { runs: 10 } }
+  )
+
+  it.prop(
+    "may name every row of a sheet, data or not",
+    [Arbitrary.schema(StagedNote)],
+    ([note]) => {
       // A label merged down a whole worksheet: 1,048,576 rows, Excel's last, far more than an import stages.
       const sheet = A.makeBy(1_048_576, (n) => n + 1)
       expect(sheet.length).toBeGreaterThan(maxStagedRows)
@@ -122,6 +150,16 @@ describe("the start of an upload", () => {
       if (fewest > 1) expect(S.is(UploadStart)({ ...start, chunkCount: fewest - 1 })).toBe(false)
     },
     runs
+  )
+
+  it.prop(
+    "is refused when its file carries more notes than an upload may send",
+    [Arbitrary.schema(UploadStart), Arbitrary.schema(StagedNote)],
+    ([start, note]) => {
+      const notes = [...start.head.notes, ...copies(maxNotes + 1 - start.head.notes.length, note)]
+      expect(S.is(UploadStart)({ ...start, head: { ...start.head, notes } })).toBe(false)
+    },
+    { arbitrary: { runs: 20 } }
   )
 
   it.effect.prop(

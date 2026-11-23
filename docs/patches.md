@@ -101,7 +101,7 @@ patch is held to more than its test passing:
   check ignored, a missing field allowed. `bun run --cwd packages/patches mutants` copies the installed package for
   each, makes the change in the copy and runs the test there, where it has to fail. A mutant the test lets through is
   a wrong model the test cannot tell from the right one: add the rule that tells them apart. Run it after any change
-  to such a patch or its test (19 mutants, about a minute; needs python3). It is not part of `bun run check`.
+  to such a patch or its test (29 mutants, about a minute; needs python3). It is not part of `bun run check`.
 - **The prover's own second opinion stays on.** A proof ends by running the real code on inputs picked for each path
   and comparing ("Agreed with the real code"): the test asserts that line, and it is what caught the one wrong model
   this patch had while it was written (a class the prover loads a second time, read as another class).

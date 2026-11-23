@@ -13,8 +13,9 @@
 // Verify reads this file's code, not only its types. A case is told by its schema's own guard (`ImportState.guards`,
 // `ImportCommand.guards`, `ImportEvent.guards`, `isAnyOf`), which the prover reads through the repository's patch to it
 // (docs/patches.md): the unions are exported, because the prover takes a schema from what the file exports. It reads a
-// state built by its case's own `make` with the status written out, and not `Event.make`: so every `make` of a state
-// names its status, and events and rejections are built with `new` (the one diagnostic this file turns off).
+// state built by its case's own `make` with the status written out, so every `make` of a state names its status, and
+// an event or a rejection built with `make` as the instance it builds, through the same patch: no file here turns a
+// diagnostic off.
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"

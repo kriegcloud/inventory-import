@@ -23,7 +23,7 @@ index a27f8eb..16db4cf 100644
 +/**
 + * Whether two domain classes are one. The source is loaded once for the prover
 + * and once by whoever asked for the proof, so one class can be two objects:
-+ * it is then told by its kind, its name and the names of its fields.
++ * it is then told by its name, as the library itself tells a class.
 + * `undefined` where that does not settle it.
 + */
 +const sameClass = (one, other) => {
@@ -500,7 +500,7 @@ index 36b4d8f..159c6a9 100644
 +/**
 + * Whether two domain classes are one. The source is loaded once for the prover
 + * and once by whoever asked for the proof, so one class can be two objects:
-+ * it is then told by its kind, its name and the names of its fields.
++ * it is then told by its name, as the library itself tells a class.
 + * `undefined` where that does not settle it.
 + */
 +const sameClass = (one: DomainClass, other: unknown): boolean | undefined => {

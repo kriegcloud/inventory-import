@@ -80,6 +80,8 @@ describe("a plan a confirm can be handed", () => {
     [ConfirmPlan],
     ([plan]) => {
       const said = A.filter(plan.rows, PlannedRow.isAnyOf(["notImported", "already"]))
+      // The store's rule written out by hand, not asked of the plan's schema: the schema drew these plans, so asking
+      // it again would hold whatever it said. A reason has a character that is not a space, and at most `maxReason`.
       expect(A.filter(said, (row) => O.isNone(Str.match(/\S/)(row.reason)) || row.reason.length > maxReason)).toEqual(
         []
       )

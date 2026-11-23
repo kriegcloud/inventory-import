@@ -12,6 +12,11 @@ This report is the one specification of the thin thread (decision 8 as amended b
 93 to 115, 117 and 118, as this report uses them). Where reports 04 to 13 or the brief say something else about the
 thread, this report is the one to follow; what they say about later slices is untouched.
 
+Two decisions made after this report was last edited change the thread and are not written into the sections
+below: decision 120 (gate 8 runs CQ-P11 beside CQ-P06) and decision 121 (five forbidden conclusions, of which the
+second adds two reasoner fixtures and a near miss). The goal's [SPEC](../../../goals/erp-vocabulary/SPEC.md) states
+both under "Where the goal differs from report 14".
+
 Inputs: the answered decisions in `DECISIONS.md` (8 to 11, 13 to 16, 20 to 26, 32, 34, 38 to 41, 46, 93 to 115, 117,
 118), the kernel and access contract files named in section 3 as they stand today, `laws boundaries` as written, the root
 `turbo.json`, the vendored `@beep/identity`, the advisory audit in report 15, and Effect 4.1.5 as installed. Every

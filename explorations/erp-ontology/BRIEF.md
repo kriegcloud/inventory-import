@@ -314,7 +314,7 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
 - No term in the thread beyond `Organization`, `Tenant`, `Person`, `Member`, `Role`, `Grant`, `AuditEntry`,
   `MemberRoleScheme` and `GrantScopeKindScheme`, with their nine properties, four concepts and gist parents (report
   14 section 1.2): no `SignInAccount`, `SourceRecord`, `Permission` or `permits`, no path to a name or an email, no
-  grant scope but organization, and no second question (decisions 8, 38, 41, 93, 94, 96, 98).
+  grant scope but organization, and no third question: decision 120 adds CQ-P11 beside CQ-P06 (decisions 8, 38, 41, 93, 94, 96, 98, 120).
 - No gist name that no term of the slice being built needs (decision 13), and no disjointness beyond the pairs gist
   states between the classes taken (decision 15). No gist property's domain or range is copied (decision 16).
 - No gate counts as built until it has failed once on a planted mistake.

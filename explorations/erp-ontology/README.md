@@ -2,10 +2,10 @@
 type: Exploration
 title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
-status: active
-stage: shape
-next: Write the thin thread goal (SPEC.md and PLAN.md). None of the 63 open decisions blocks it.
-goals: []
+status: graduated
+stage: graduated
+next: Build the thin thread in goals/erp-vocabulary. Each later slice is specified after its open decisions are answered.
+goals: [erp-vocabulary]
 ---
 
 # ERP ontology
@@ -16,8 +16,9 @@ this repository's domain model point at them?
 The thin thread is the first deliverable (decision 8). It answers one question: who belongs to this organization and
 with which role? [Report 14](research/14-thin-thread.md) is its one specification. Section 1.1 says what counts as
 done and section 5 gives the question and its expected answer. Decisions 112 to 118 update the design. Nothing is
-owed from Benjamin for the thread now. The next step is to write its goal, `SPEC.md` and `PLAN.md`. The SPEC will
-carry three to five forbidden conclusions, not yet drafted, for Benjamin to rule on (117). A commit that changes an
+owed from Benjamin for the thread now. Benjamin said the brief matches (119), and the exploration graduated to the goal
+[erp-vocabulary](../../goals/erp-vocabulary/SPEC.md). Its SPEC carries the five forbidden conclusions he signed (117,
+121), and the thread's gate 8 runs CQ-P11 beside CQ-P06 (120). A commit that changes an
 expected-rows file says so, and the release notes name the question with its old and new answer (118). Nothing is
 built yet.
 
@@ -79,3 +80,9 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-22: decisions 24 and 97 to 101 settled versioning, the exception for a class with no gist parent, the audit
   fields, which records are enrolled, which People fields wait for the party slice, and what a scheme ruling covers.
   [Report 14](research/14-thin-thread.md) brings those answers together in sections 8, 2.1, 3 and 1.5.
+- 2026-11-22: the foundational auditor ran twice on the thread's terms and its adversary failed every proposal
+  ([report 15](research/15-audit-findings.md)); decisions 102 to 111 made the audit advisory and accepted the 18
+  terms as a set.
+- 2026-11-23: decisions 112 to 121 approved the reasoner (ROBOT v1.9.11 on Java 17, tried), put gate 9 in a CI job,
+  added CQ-P11 to the thread and five signed forbidden conclusions; Benjamin said the brief matches (119) and the
+  packet graduated to [goals/erp-vocabulary](../../goals/erp-vocabulary/SPEC.md).

@@ -13,7 +13,7 @@ of eighty-five: eighty from reports 04 to 12 and the brief, merged where two rep
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
 the catalog questions. Twenty-three were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 26, 32,
-34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 118. No `rat-` record is written, and the thin thread
+34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 121. No `rat-` record is written, and the thin thread
 uses none: its terms name the decision that accepted them (decisions 107 and 111). The gaps
 in the numbers below are theirs.
 
@@ -687,3 +687,50 @@ recommended the same.
 - Rationale: gate 8 already compares each question's rows to a committed file; a rule about changing it shows a
   changed meaning that unchanged Turtle bytes hide.
 - Reverse: a lock file a run writes and an update flag, as the catalog model's rule lock has.
+
+### 119. The brief matches (2026-11-23)
+
+The packet scheme's fourth condition for graduating. I said the brief matches: `BRIEF.md`, with the thin thread of
+report 14 as the first deliverable and decisions 1 to 118 as recorded, is what I want built. The exploration
+graduates to the goal `erp-vocabulary`. The agent recommended the same.
+
+- Rationale: the brief has its five parts, the thread waits on no open decision, the Map names the goal and its first
+  slice, and nothing is owed from me for the thread.
+- Reverse: set the exploration back to `shape` and the goal to `dropped`; no code exists to undo.
+
+### 120. Whether the thread runs CQ-P11 (2026-11-23)
+
+Decision 102 added CQ-P11 as the question that warrants Grant, and report 14's done line ran CQ-P06 only. I chose to
+run both in the thread's gate 8, on the same two-tenant fixture: CQ-P11's expected rows are the two grants at
+organization scope, and its must-fail case removes the two `grantScope` triples and expects no row. No term is added.
+The agent recommended the same.
+
+- Rationale: without it the thread ships a grant's scope that no question is run against.
+- Reverse: gate 8 runs CQ-P06 only, and CQ-P11 is first run by the slice that brings a second scope kind.
+
+### 121. The thread's five forbidden conclusions (2026-11-23)
+
+The list decision 117 asked for. The agent drafted five and I signed each, one question a ban:
+
+1. A person is never an organization, so never a tenant. The reasoner refuses the fixture's person typed as a tenant;
+   the same person as a member of two tenants passes.
+2. An audit entry is never the person or the organization it is about. The reasoner refuses a node typed both audit
+   entry and person, and one typed both audit entry and tenant; an entry that names a member of that person in that
+   tenant passes. It does not say "never the member it names": gist states no disjointness that would show it, and
+   the thread adds no local pair.
+3. A role held in one tenant is never a role in another. The question asked through the person instead of the member
+   is refused (must-fail case M5); the real question passes.
+4. A role is never read off a member directly; it is held only through a grant. A graph with the role written on the
+   member answers nothing (must-fail case M3); the lifted graph passes. If decision 40 is reversed this ban goes with
+   it.
+5. Sharing a member, a person or a name never makes two tenants one organization. Gate 3 refuses a vocabulary file
+   that states sameness; Tenant stated as a kind of Organization passes. It shows the vocabulary gives a reasoner no
+   way to merge two tenants, not that a reasoner refuses data that says they are one. The review of the goal
+   added two refused files beside that one: `membershipOf` made inverse functional, and a key on `Tenant`.
+
+The agent recommended signing each.
+
+- Rationale: decision 117's; four of the five were already planted mistakes or must-fail cases of report 14, and the
+  list says in my words what each one protects.
+- Reverse: take a ban off the list; its test stays as the planted mistake or must-fail case it was. Ban 2's two
+  refused fixtures and its near miss are new and would go.

@@ -1,10 +1,13 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import { pipe } from "effect/Function"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import {
   CheckIcon,
   ChevronsUpDownIcon,
@@ -63,12 +66,13 @@ export const appPages: ReadonlyArray<AppPage> = [
 ]
 
 const initials = (name: string): string =>
-  name
-    .split(/\s+/)
-    .map((word) => word[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
+  pipe(
+    Str.split(name, /\s+/),
+    A.map((word) => O.getOrElse(Str.at(word, 0), () => "")),
+    A.join(""),
+    Str.takeLeft(2),
+    Str.toUpperCase
+  )
 
 const roleWords = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
@@ -172,7 +176,7 @@ function OrganizationPicker() {
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel>Organizations</DropdownMenuLabel>
-              {organizations.map((organization) => (
+              {A.map(organizations, (organization) => (
                 <DropdownMenuItem
                   key={organization.id}
                   onSelect={() => {
@@ -212,7 +216,7 @@ function UserMenu() {
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
   const testAccounts = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)
-  const otherAccounts = (testAccounts?.accounts ?? []).filter((account) => account.email !== email)
+  const otherAccounts = A.filter(testAccounts?.accounts ?? [], (account) => account.email !== email)
   const who = (
     <>
       <Avatar>
@@ -249,11 +253,11 @@ function UserMenu() {
               <DropdownMenuRadioGroup
                 value={theme}
                 onValueChange={(next) => {
-                  const chosen = themes.find((entry) => entry.value === next)
-                  if (chosen !== undefined) setTheme(chosen.value)
+                  const chosen = A.findFirst(themes, (entry) => entry.value === next)
+                  if (O.isSome(chosen)) setTheme(chosen.value.value)
                 }}
               >
-                {themes.map((entry) => (
+                {A.map(themes, (entry) => (
                   // Choosing a theme keeps the menu open, so the person sees the change and can pick again.
                   <DropdownMenuRadioItem
                     key={entry.value}
@@ -271,7 +275,7 @@ function UserMenu() {
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Sign in as a test account</DropdownMenuLabel>
-                  {otherAccounts.map((account) => (
+                  {A.map(otherAccounts, (account) => (
                     <DropdownMenuItem
                       key={account.email}
                       onSelect={() => {
@@ -287,9 +291,13 @@ function UserMenu() {
                       <span className="grid min-w-0 flex-1 leading-tight">
                         <span className="truncate">{account.name}</span>
                         <span className="truncate text-xs text-muted-foreground">
-                          {account.memberships
-                            .map((membership) => `${roleWords[membership.role]}, ${membership.organizationName}`)
-                            .join("; ")}
+                          {A.join(
+                            A.map(
+                              account.memberships,
+                              (membership) => `${roleWords[membership.role]}, ${membership.organizationName}`
+                            ),
+                            "; "
+                          )}
                         </span>
                       </span>
                     </DropdownMenuItem>
@@ -325,7 +333,7 @@ export function AppSidebar(props: { current: string | undefined }) {
           <SidebarGroupLabel>Pages</SidebarGroupLabel>
           <nav aria-label="Pages">
             <SidebarMenu>
-              {appPages.map((page) => (
+              {A.map(appPages, (page) => (
                 <SidebarMenuItem key={page.path}>
                   <SidebarMenuButton
                     asChild

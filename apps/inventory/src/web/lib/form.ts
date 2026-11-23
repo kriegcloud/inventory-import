@@ -1,6 +1,7 @@
 // A form says every problem at once. The rule this file protects: pressing Save on a form with three mistakes lists
 // all three, beside their fields, not one per attempt. Each field's check runs whatever the others found.
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as R from "effect/Record"
 
 /** One problem of a form: the field it is in and a sentence that says what to change. */
@@ -22,4 +23,9 @@ export const formProblems = <F extends string>(checks: {
 
 /** The sentence for one field, or undefined: what a field's `FieldError` shows. */
 export const problemOf = <F extends string>(problems: ReadonlyArray<FieldProblem<F>>, field: F): string | undefined =>
-  problems.find((problem) => problem.field === field)?.sentence
+  O.getOrUndefined(
+    O.map(
+      A.findFirst(problems, (problem) => problem.field === field),
+      (problem) => problem.sentence
+    )
+  )

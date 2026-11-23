@@ -1848,6 +1848,13 @@ describe("infra setup: failures named for what failed", () => {
             "[ERROR] 2026/11/22 10:00:00 could not read secret 'op://Benjamin's vault/i/f': authorization timeout"
           )
         ).toBe("held")
+        // An apostrophe and a space inside a double-quoted name do not end it either.
+        expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "James\' token" isn\'t an item in the "v" vault')).toBe(
+          "refused"
+        )
+        expect(
+          onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Ops\' timeout token" isn\'t an item in the "v" vault')
+        ).toBe("refused")
         // Outside a name the held words still count.
         expect(onePasswordFailure('[ERROR] 2026/11/22 10:00:00 reading "Vault": authorization timeout')).toBe("held")
         expect(onePasswordFailure("")).toBe("unclear")

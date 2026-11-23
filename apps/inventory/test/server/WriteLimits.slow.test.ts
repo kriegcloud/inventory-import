@@ -47,7 +47,11 @@ const boundChecked = <A, E, R>(query: Pending<A, E, R>): Pending<A, E, R> =>
       : Effect.void
   })
 
-/** Each statement of a batch counted as it is built; the tuple keeps the types of the statements as given. */
+/**
+ * Each statement of a batch counted as it is built; the tuple keeps the types of the statements as given. The first
+ * signature is stated over the second, which is the one checked: it maps in place, so statement `i` stays at `i`, and
+ * every test below decodes its answers by position (a batch handed on in another order fails all of them).
+ */
 function countedEach<const Queries extends ReadonlyArray<Pending<unknown, unknown, unknown>>>(queries: Queries): Queries
 function countedEach<E, R>(queries: ReadonlyArray<Pending<unknown, E, R>>): ReadonlyArray<Pending<unknown, E, R>> {
   return A.map(queries, boundChecked)

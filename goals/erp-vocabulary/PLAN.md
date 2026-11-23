@@ -20,7 +20,7 @@ passing and a commit; the app is never broken between steps.
 | 5 | The marks on the five enrolled records (3.3 to 3.7), then gate 5 with P13 and its negatives (6.5) | `Pointers.test.ts`; `ActivityMarks.types.ts` (6.6); the app's own tests unchanged || done |
 | 6 | The lift, `graphOf` and `threadGraph` (4), in memory | The seventeen triples of 4.4, asserted on the value `threadGraph()` returns || done |
 | 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | done |
-| 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | todo |
+| 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | done |
 | 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | todo |
 | 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | todo |
 | 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` | todo |
@@ -42,9 +42,9 @@ here when it is.
 | Whether a package's `turbo.json` may declare the uncached `reason` task and name an out-of-package input, and whether an edit or a deletion of that input invalidates the cache | 3, 10 | The out-of-package input is accepted (`$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md` in the package's `test` inputs): one added space, a broken heading and the file's removal each gave a cache miss, and restoring the bytes gave the first hash back as a hit. An edit to the exception list misses too. The `reason` task is not declared yet: step 10's |
 | Whether `config-sync` accepts the new package and the new root task (section 10, "Turbo and the sync commands"); the inputs the existing source-law tasks declare | 3, 9 | The package is accepted: `config-sync` wrote its three scripts and the reference in the root `tsconfig.json`, and `config-sync:check` agrees. It has no `src` yet, so no `tsconfig.json`; step 5 adds both. The new root task is step 9's |
 | The marks on a `Model.Class` and `fieldEvolve`'s types (3.5); whether the spread in the compile-only file keeps literal types; P12's element field name | 5 | Partly, in step 1 on a local `Model.Class`: the class pointer is read, `fieldEvolve` with a hoisted mark compiles, the marks reach every variant. Step 5: they hold on the real `Activity` (`packages/kernel/test/ActivityMarks.types.ts` compiles, the spread keeps the literal types); `nullAsNone` now takes a key's annotations with its description, body unchanged; P12's element is the array node's one `rest` member, compared by identity with the variant's node |
-| Whether N3.js and Oxigraph run under this repository's Vitest and Effect rules (decision 26) | 7, 8 | |
+| Whether N3.js and Oxigraph run under this repository's Vitest and Effect rules (decision 26) | 7, 8 | Both do. N3.js 2.13 parses under Vitest on Node with its typings one major behind; only `Parser` is used, behind `Effect.try`. Oxigraph 0.5.13 loads its WebAssembly at import with no setup, takes the graph as N-Triples and answers a SELECT as an array of maps; the one call that throws is behind `Effect.try` in `test/support/ask.ts`. Neither needed a diagnostic turned off |
 | `import type` erasure, and how gate 7's rule 7 resolves `paths` and `imports` aliases from text, without the compiler | 9 | |
-| gist itself: the parents of `LivingThing`, `TemporalRelation` and `Assignment`, the three disjoint pairs and that there is no other, and the version IRI. Report 11 read them; the pinned gist file was never opened. Bans 1 and 2 rest on them | 7, 10 | |
+| gist itself: the parents of `LivingThing`, `TemporalRelation` and `Assignment`, the three disjoint pairs and that there is no other, and the version IRI. Report 11 read them; the pinned gist file was never opened. Bans 1 and 2 rest on them | 7, 10 | Step 7: the version IRI is `gistCore14.1.0` by decision 122, not read from a file. The rest waits for step 10 |
 | ROBOT's flags, where the jar is kept, how the script reads Java's major version, and whether a merged file with undeclared fixture individuals passes the OWL 2 DL profile check (five fixtures now) | 10 | |
 | Whether ROBOT reports ban 2's two fixtures inconsistent and its near miss consistent | 10 | |
 | The CI workflow for gate 9: its cache action, its key and its Java setup | 11 | |
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 7 are done; step 8 starts on Benjamin's word.
+None. Steps 1 to 8 are done; step 9 starts on Benjamin's word.
 
 ## Choices made
 
@@ -183,6 +183,23 @@ Where the design left a choice open, or the code showed it could not be followed
   were fixed with a test each: the object guard, the source exception, the IRI pattern, the language tag, the header,
   the prefix, the escapes the round-trip test did not assert, and the code-point order no test held. One finding was
   kept as it is, the stricter guard above. Step 13's reviewers read the step again.
+- **`oxigraph` is a development dependency** (0.5.13): only the tests ask a question. The runner is
+  `test/support/ask.ts`, not a file of `src`; a later slice that asks questions outside a test moves it.
+- **A question's rows are compared as IRIs in the query's own order.** `ask` returns, for each solution, the value
+  of each variable asked for; the expected rows of both questions are in `Questions.test.ts`, built from the
+  vocabulary, and are the lock decision 118 names.
+- **M5 is a query file of its own** (`fixtures/cq/CQ-P06.M5.rq`), marked as a mutant in its first line, so the three
+  queries are read the same way and the mutant is not a string in a test.
+- **The guards of section 4.4 are two functions and one comparison.** `overreach` and `unshown`
+  (`src/Fixture.rules.ts`) are guards 1 and 3; each has a test where it reports something, so neither passes by
+  finding nothing to look at. What the lift states is read from the lifted triples, not from a list of four
+  predicates. Guard 2 is a comparison in the test.
+- **M3 and M7 are asked of CQ-P11 too**: a role on the member, or a grant with no scope, answers neither question.
+- **Step 8 was built by the orchestrator and read once by Grok 4.7**; Opus, Cursor's Opus seat and Codex were out
+  of quota. Its five findings were fixed: a test that the questions ask for a node's type (the query passed with
+  both type patterns deleted), the hand-written part held to section 5.2's five triples, M5's file sorted as the
+  question is and its rows compared whatever their order, and two assertions that could not fail replaced or
+  removed. Step 13's reviewers read the step again.
 
 ## Closing note
 

@@ -27,6 +27,7 @@
     "@effect/vitest": "catalog:",
     "@types/n3": "^1.26.6",
     "@types/node": "catalog:",
+    "oxigraph": "^0.5.13",
     "vitest": "catalog:"
   },
   "beep": {

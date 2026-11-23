@@ -59,7 +59,7 @@ const namedFileProblem = FileProblem.pipe(
  * problem into the call's failure, and `sayError` says it.
  *
  * @example
- * HttpApiEndpoint.post("beginUpload", "/uploads", { payload: UploadHead, success: StagingOutcome(UploadId), error: Forbidden })
+ * HttpApiEndpoint.post("beginUpload", "/uploads", { payload: UploadStart, success: StagingOutcome(UploadId), error: Forbidden })
  * // 200 {"_tag":"Failure","failure":{"_tag":"FileProblem","kind":"empty","fileName":"items.csv","problem":"...","todo":"..."}}
  */
 export const StagingOutcome = <S extends S.Top>(success: S) =>

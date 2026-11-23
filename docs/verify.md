@@ -125,15 +125,19 @@ group is refused naming the group, and taken once the group is taken back" shows
   by then (Ana left it out again), the undo is refused `NotYourStep`; after an act on a group it is refused
   `GroupedSince`, after a confirm and a reopening `ConfirmedSince`; and a copy of an undo the row already took is
   answered with nothing recorded.
-- A group's undo from a screen that has not received every change of the import is refused `ReviewMovedOn`, naming
-  the import's last change, as a group's act is. Ana's group covers row 14, Dana types 8 on it, and Ana, whose screen
+- A group's undo that would otherwise be taken, from a screen that has not received every change of the import, is
+  refused `ReviewMovedOn`, naming the import's last change, as a group's act is. Ana's group covers row 14, Dana types 8 on it, and Ana, whose screen
   has not received the 8, takes her group back: before, the undo was taken, and Ana learned only afterwards that
   row 14 stays as Dana decided it. Now `UndoGroup` says every change its screen has (`seen`); her undo is held, and
   taken once her screen has the 8. Taken, it still touches no row: a row decided since keeps that person's whole
   decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer carries the
   group's undo and its number, not the rows. The check is of the whole import, not of the group's rows: the model
   keeps no reading of a group's rows, so a change on any row that the screen lacks holds the undo. A rule of
-  `UndoingGroup` and a story hold it.
+  `UndoingGroup` and a story hold it. `ReviewMovedOn` is the answer only there: the check is the last one before
+  the undo is recorded. From such a screen the undo is refused `ConfirmedSince` after a confirm and a reopening,
+  `NotYourStep` when the group is not its sender's or was taken back already (a second sending of the same undo
+  too), `DecidedBeforeTheConfirm` when a standing confirm was made after the group, and `GroupedAfter` under a later
+  group in force, each before what the screen has is asked.
 
 With these, no press from a screen that is behind on what its command names is taken.
 

@@ -124,12 +124,12 @@ layer(TypedApp)("an import of items", (it) => {
         const facets = yield* client.items.facets().pipe(marcus)
         expect([facets.total, A.reduce(facets.uom, 0, (n, row) => n + row.count)]).toEqual([155, 155])
 
-        // The same file again: nothing is created twice. 154 of the 155 items it created are already there; row 55,
-        // imported after its "35,82" was accepted as 35.82, does not read as written, so it is not "already there":
-        // it waits with its own proposal, and is in the not-imported rows with its reason. Row 18, whose "bx" was
-        // held back the first time, is the one new item: this time the rule's fix stands.
+        // The same file again: nothing is created twice. All 155 items it created are already there: row 55 too,
+        // imported after its "35,82" was accepted as 35.82. Its SKU reads and is stored, so it is not offered its
+        // proposal again. Row 18, whose "bx" was held back the first time, is the one new item: this time the
+        // rule's fix stands.
         const again = yield* upload({ client, table }).pipe(marcus)
-        expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
+        expect(again.progress).toMatchObject({ ready: 1, needs: 44 })
         const second = yield* client.imports
           .commit({
             params: { id: again.id },
@@ -140,7 +140,7 @@ layer(TypedApp)("an import of items", (it) => {
           O.getOrUndefined(second.result)?.created,
           O.getOrUndefined(second.result)?.already,
           O.getOrUndefined(second.result)?.notImported
-        ]).toEqual([1, 154, 45])
+        ]).toEqual([1, 155, 44])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(156)
 
         // A file whose row says something else than a stored item: it waits, and only "replace" changes the item.

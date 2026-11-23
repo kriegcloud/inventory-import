@@ -357,8 +357,11 @@ explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
-                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; private-paths: no home path or private folder in the scratchpad; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
-                        under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
+                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; defaults: absence, starting values and clean-ups are a schema's, counted per file against a baseline that only falls; exports; keys; private-paths: no home path or private folder in the scratchpad; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
+                        under its one name; and the six bans, each with a ledger in `ledgers/` of today's files whose
+                        numbers only fall against the branch's base (where it left main; on a push, the last push whose
+                        run passed): assertions, promises, diagnostics, dual,
+                        readonly and fast-refresh), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout); `deps update`, `version-sync` and
                         `config-sync`, which move dependencies and keep repeated versions and derived configuration in
                         step (`docs/sync-commands.md`); `patches` (check, installed, prove, build, and carry, which a
@@ -545,7 +548,7 @@ profile, its copied tests included, with no override.
 
 **Also enforced, beyond the list above** (the full profile): the Effect modules for strings, arrays and records
 (`A`, `Str` and `R`, imported as `docs/standards/effect-imports.md` says: `A.map(xs, f)`, `A.findFirst` (an Option),
-`Str.trim(x)`, `R.toEntries(r)`); `concurrency` stated on every `Effect.forEach` and `Effect.all`
+`Str.includes("x")(name)`, `R.toEntries(r)`); `concurrency` stated on every `Effect.forEach` and `Effect.all`
 (`{ concurrency: 1 }` keeps them sequential); no `yield*` inside a call's arguments (yield, then call); time from
 `Clock` or `DateTime`, randomness from `Random`, ids from `effect/crypto/SecureRandom`, logs through `Effect.log`, never
 `console`; service keys that follow the package and path (`"@inventory/app/server/Activities"`, as the
@@ -563,6 +566,10 @@ profile, its copied tests included, with no override.
 - **Test the rules where a wrong result hurts the person**: a count, a total,
   a match, a unit, a permission that guards a write. None for plumbing or screens. Many inputs: one `it.prop` from
   the Schema; anything timed: the `TestClock`; HTTP: the Worker's own `fetch` (`send`, `test/server/support/app.ts`).
+- **A test narrows with an assert, never a check.** `assertSome`, `assertNone`, `assertDefined`, `assertSuccess`,
+  `assertFailure`, `assertExitSuccess` and `assertExitFailure` from `@effect/vitest/utils` narrow the type and fail
+  with the value. No `if (x === undefined)`, no `??`, no `if (O.isSome(x))` around an expectation: `defaults:check`
+  counts those in tests too.
 - **Fast by default.** A test that needs sign-in or a real database is slow: name it `*.slow.test.ts`, and write it
   only when the rule cannot be shown another way. `bun run check` runs the fast tests; `bun run check:full` runs all.
 - **Tests run in Node under the same Effect rules.** Read a sample file with
@@ -574,8 +581,8 @@ profile, its copied tests included, with no override.
   `await`, `new Promise`, `Promise.*` call or `.then` chain (`promises:check`; a Promise a call hands back without naming one
   is caught only where its type is read). Provide layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
 
-In `src/web` the same compiler flags apply, but the rules that forbid native array methods, truthiness checks,
-`async` and browser globals are off. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect
+In `src/web` the same compiler flags apply, but the type-check's rules that forbid native array methods, truthiness
+checks, `async` and browser globals are off there; `async` is refused everywhere all the same, by `promises:check`. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect
 diagnostics at all.
 
 ## Platform: Cloudflare Workers and D1

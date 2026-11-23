@@ -34,6 +34,7 @@ import { ItemEdit, Stocking, StoredItem, discontinuedOn } from "@inventory/catal
 // Whether two stockings say the same: the same case, and the same day for a discontinued one.
 const sameStocking = S.toEquivalence(Stocking)
 import { EditOutcome, ItemStore } from "@inventory/catalog-model/ItemStore"
+import { D1Instant } from "@beep/d1/D1Instant"
 import { D1, NoRows } from "@beep/d1/D1"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { Member } from "@inventory/kernel/Member"
@@ -131,7 +132,7 @@ const EditRequest = S.Struct({
   name: S.String,
   id: S.String,
   activity: S.String,
-  at: S.String,
+  at: D1Instant,
   edit: ItemEdit
 }).annotate({ description: "One edit of one item, by whom, with the revision it was made on" })
 
@@ -527,7 +528,7 @@ export const ItemStoreD1 = Layer.effect(
       Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
 
     const edit = Effect.fn("Items.edit")(function* (actor: Member, id: string, change: ItemEdit) {
-      const at = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
+      const at = yield* DateTime.now
       const activity = yield* random.uuidV4()
       const request = { org: actor.organizationId, actor: actor.id, name: actor.name, id, activity, at, edit: change }
       const [, edited] = yield* batch([editedLine(request), editItem(request)])

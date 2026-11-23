@@ -4,10 +4,10 @@
 import * as S from "effect/Schema"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { Activity } from "@inventory/kernel/Activity"
-import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
 import * as SqlClient from "effect/sql/SqlClient"
 import { D1, NoRows } from "@beep/d1/D1"
+import { D1Instant } from "@beep/d1/D1Instant"
 
 const Line = S.Struct({
   id: S.String,
@@ -17,7 +17,7 @@ const Line = S.Struct({
   action: S.String,
   detail: S.String,
   agent: S.NullOr(S.String),
-  at: S.String
+  at: D1Instant
 }).annotate({ description: "One audit line as the activity table holds it" })
 
 /** The audit line's columns, from the `Activity` a handler made. */
@@ -29,7 +29,7 @@ export const lineOf = (activity: Activity): typeof Line.Type => ({
   action: activity.action,
   detail: activity.detail,
   agent: O.getOrNull(activity.agent),
-  at: DateTime.formatIso(activity.createdAt)
+  at: activity.createdAt
 })
 
 /** The insert of one audit line. */

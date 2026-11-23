@@ -13,7 +13,8 @@
  * with a baseline written anew, since without them a refused `x ?? 0` was written again as `O.getOrElse(x, () => 0)`), so it holds a baseline (`defaults-baseline.json` at
  * the root): for each file, how many of each kind it may hold. A file with more than its baseline fails, and a file
  * the baseline does not name may hold none. A file with fewer never fails: `--write` lowers the baseline to what the
- * tree holds, and never raises it (the first one, with no baseline file yet, records the tree as it stands). So nobody is asked to clean a file to finish other work, nobody can add a place,
+ * tree holds, and never raises it (the first one, with no baseline file yet, records the tree as it stands, and so
+ * does the first after the reader counts more: the baseline says in `reads` what it was written for). So nobody is asked to clean a file to finish other work, nobody can add a place,
  * and the numbers only fall. A run over the whole tree also holds the baseline against main's, as the bans hold their
  * ledgers (`internal/ledger.ts`): a file main's does not name, or a count above main's, is refused, so a commit that
  * raises the baseline beside the code cannot pass. The law is done when the baseline is empty and is deleted.
@@ -36,7 +37,7 @@ import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
-import { DefaultsKind, type DefaultsPlace, readDefaults } from "./internal/defaultsCode.ts"
+import { DefaultsKind, type DefaultsPlace, readDefaults, whatIsCounted } from "./internal/defaultsCode.ts"
 import { atBase } from "./internal/ledger.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Defaults.rules")
@@ -61,6 +62,12 @@ export const DefaultsBaseline = S.Struct({
   counts: S.Tuple([S.tag("fallback"), S.tag("absence"), S.tag("unwrap"), S.tag("normalise")]).pipe(
     S.annotateKey({ description: "What the four numbers of a file count, in order" })
   ),
+  reads: S.Array(S.String).pipe(
+    S.annotateKey({
+      description: "What the reader counted when this was written. One written for less is written anew, not raised"
+    }),
+    S.withDecodingDefaultTypeKey(Effect.succeed([]))
+  ),
   files: S.Record(S.String, Held).pipe(
     S.annotateKey({ description: "Each file that still holds a place, from the root, with its four counts" }),
     S.withDecodingDefaultTypeKey(Effect.succeed({}))
@@ -73,6 +80,9 @@ export const DefaultsBaseline = S.Struct({
 
 /** The decoded value of `DefaultsBaseline`. */
 export type DefaultsBaseline = typeof DefaultsBaseline.Type
+
+// Whether a baseline was written for what the reader counts now.
+const readsAsNow = (reads: ReadonlyArray<string>): boolean => A.join(reads, "\n") === A.join(whatIsCounted, "\n")
 
 const ownCode = A.appendAll(
   A.map(
@@ -236,7 +246,8 @@ const BaselineJson = S.fromJsonString(DefaultsBaseline)
  * What the baseline says against the files there are and against main's (where this branch left it; on a push, the
  * commit CI names): each file it names that is not there, so a new file at that path inherits no allowance (unless
  * `--write` is about to take its line off); each file main's does not name, under the name it had there; and each
- * count above main's. Main with no baseline yet is not compared.
+ * count above main's. Main with no baseline yet is not compared, and neither is one written for what the reader
+ * counted before it counted more: its numbers are of fewer things, so they say nothing of these.
  */
 const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBaseline["files"], write: boolean) {
   const repo = yield* Repo
@@ -257,6 +268,7 @@ const againstMain = Effect.fn("Defaults.againstMain")(function* (now: DefaultsBa
   if (O.isNone(base.text)) return missing
   const was = S.decodeOption(BaselineJson)(base.text.value)
   if (O.isNone(was)) return A.append(missing, `${baselineFile} on main is not a baseline, so it could not be compared`)
+  if (!readsAsNow(was.value.reads)) return missing
   const moved = A.flatMap(R.toEntries(now), ([file, counts]): ReadonlyArray<string> =>
     O.match(
       R.get(
@@ -316,9 +328,22 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
   const files = yield* Effect.filter(wanted, (file) => repo.exists(repo.join(repo.root, file)), { concurrency: 1 })
   const baselinePath = repo.join(repo.root, baselineFile)
   const kept = yield* repo.exists(baselinePath)
-  const baseline = kept ? (yield* repo.json(DefaultsBaseline)(baselinePath)).files : {}
+  const stored = kept ? yield* Effect.asSome(repo.json(DefaultsBaseline)(baselinePath)) : O.none()
+  const baseline = O.match(stored, { onNone: () => ({}), onSome: (one) => one.files })
+  // A baseline written before the reader counted more holds numbers of fewer things: every file would be over it for
+  // code nobody touched. `--write` records the tree anew, as it does with no baseline, and until then the run says so.
+  const stale = O.exists(stored, (one) => !readsAsNow(one.reads))
   // Given files, the law answers an edit in milliseconds and leaves the baseline to the run over the whole tree.
-  const against = kept && A.isReadonlyArrayEmpty(only) ? yield* againstMain(baseline, write) : []
+  const against =
+    !kept || A.isReadonlyArrayNonEmpty(only)
+      ? []
+      : !stale
+        ? yield* againstMain(baseline, write)
+        : write
+          ? []
+          : [
+              `${baselineFile} was written before the law counted what it counts now (${A.join(whatIsCounted, ", ")}): bun run beep laws defaults --write records the tree anew`
+            ]
   const read = yield* Effect.forEach(
     files,
     (file) =>
@@ -337,7 +362,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
     may: O.getOrElse(R.get(baseline, one.file), () => none)
   }))
   // The first `--write`, with no baseline file yet, records the tree as it stands: nothing can be over nothing kept.
-  const starting = write && !kept
+  const starting = write && (!kept || stale)
   const over = starting ? [] : A.filter(counted, (one) => A.some(A.zip(one.count, one.may), ([now, may]) => now > may))
   const problems = yield* Effect.forEach(
     over,
@@ -386,10 +411,11 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (write: boolean
       (one) => Effect.map(encodeKey(one.file), (key) => `    ${key}: [${A.join(A.map(one.count, String), ", ")}]`),
       { concurrency: 1 }
     )
+    const reads = yield* Effect.forEach(whatIsCounted, (one) => encodeKey(one), { concurrency: 1 })
     const body = A.isArrayNonEmpty(lines) ? `{\n${A.join(lines, ",\n")}\n  }` : "{}"
     yield* repo.write(
       baselinePath,
-      `{\n  "counts": ["fallback", "absence", "unwrap", "normalise"],\n  "files": ${body}\n}\n`
+      `{\n  "counts": ["fallback", "absence", "unwrap", "normalise"],\n  "reads": [\n    ${A.join(reads, ",\n    ")}\n  ],\n  "files": ${body}\n}\n`
     )
     return A.of<DefaultsFinding>(DefaultsFinding.cases.Wrote.make({ files: holding.length }))
   }

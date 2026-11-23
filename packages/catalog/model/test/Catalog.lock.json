@@ -6,46 +6,6 @@
         "kind": "invariant",
         "source": "(s) => !ImportState.guards.Imported(s) || s.created + s.updated + s.already + s.notImported === s.rows"
       },
-      "Import.RowsAreNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.rows >= 0"
-      },
-      "Import.InForceIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.inForce >= 0"
-      },
-      "Import.ReplacedIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.replaced >= 0"
-      },
-      "Import.StandingIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.standing >= 0"
-      },
-      "Import.CreatedIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => !ImportState.guards.Imported(s) || s.created >= 0"
-      },
-      "Import.UpdatedIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => !ImportState.guards.Imported(s) || s.updated >= 0"
-      },
-      "Import.AlreadyIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => !ImportState.guards.Imported(s) || s.already >= 0"
-      },
-      "Import.NotImportedIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => !ImportState.guards.Imported(s) || s.notImported >= 0"
-      },
-      "Import.RemovedIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => !ImportState.guards.TakenBack(s) || s.removed >= 0"
-      },
-      "Import.KeptIsNotNegative": {
-        "kind": "invariant",
-        "source": "(s) => !ImportState.guards.TakenBack(s) || s.kept >= 0"
-      },
       "Import.NoMoreInForceThanRows": {
         "kind": "invariant",
         "source": "(s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.inForce <= s.rows"
@@ -613,10 +573,6 @@
       "Import.TheMatchingMovesOnlyOnAnOpenImport": {
         "kind": "transition",
         "source": "({ before, after }) =>\n        ImportState.guards.Open(before) ||\n        ImportState.guards.Unstaged(before) ||\n        ImportState.guards.Removed(before) ||\n        ImportState.guards.Removed(after) ||\n        ImportState.guards.Unstaged(after) ||\n        after.matching === before.matching"
-      },
-      "Group.AGroupSaysAtLeastOneRow": {
-        "kind": "invariant",
-        "source": "(s) => !GroupState.guards.Decided(s) || s.count >= 1"
       },
       "Group.AGroupKeepsItsCount": {
         "kind": "transition",

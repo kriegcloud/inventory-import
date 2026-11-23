@@ -23,12 +23,10 @@ import * as S from "effect/Schema"
 import { CurrentActor, Session } from "../Actor/Actor.context.ts"
 import { Change, Columns, Digest, ImportKey, Step } from "../Review/Change.schema.ts"
 
-const Count = S.Int.check(S.isGreaterThanOrEqualTo(0))
-
 /** A file was staged for review: how many rows it has and which column fills each field by its heading. */
 export class ImportStaged extends Domain.Event(
   "ImportStaged",
-  { organizationId: S.String, rows: Count, columns: Columns, by: S.String },
+  { organizationId: S.String, rows: S.Natural, columns: Columns, by: S.String },
   { description: "A file was staged for review" }
 ) {}
 
@@ -70,7 +68,7 @@ export class ActCounted extends Domain.Event(
  */
 export class GroupCounted extends Domain.Event(
   "GroupCounted",
-  { change: Change, step: Step, rows: Count, label: S.String, by: S.String, top: Change },
+  { change: Change, step: Step, rows: S.Natural, label: S.String, by: S.String, top: Change },
   {
     description:
       "One act on a group of rows, or its undo, was taken: how many rows, who acted, which group is last in force"
@@ -87,7 +85,7 @@ export class SuggestionRecorded extends Domain.Event(
 /** The import was confirmed: what became of its rows, as the four outcomes that add up to them. */
 export class ImportConfirmed extends Domain.Event(
   "ImportConfirmed",
-  { change: Change, created: Count, updated: Count, already: Count, notImported: Count, by: S.String },
+  { change: Change, created: S.Natural, updated: S.Natural, already: S.Natural, notImported: S.Natural, by: S.String },
   { description: "The import was confirmed: how many rows were created, updated, already there and not imported" }
 ) {}
 
@@ -98,7 +96,7 @@ export class ImportConfirmed extends Domain.Event(
  */
 export class ImportTakenBack extends Domain.Event(
   "ImportTakenBack",
-  { change: Change, removed: Count, kept: Count, restored: Count, keptReplaced: Count, by: S.String },
+  { change: Change, removed: S.Natural, kept: S.Natural, restored: S.Natural, keptReplaced: S.Natural, by: S.String },
   { description: "The import was taken back: what was removed, put back and kept" }
 ) {}
 
@@ -192,7 +190,7 @@ export class StageImport extends Domain.Command(
   "StageImport",
   {
     middleware: [Session],
-    input: { importId: ImportKey, rows: Count, columns: Columns },
+    input: { importId: ImportKey, rows: S.Natural, columns: Columns },
     events: [ImportStaged],
     rejects: [NotPermitted, AlreadyStaged]
   },
@@ -238,10 +236,10 @@ export class ConfirmImport extends Domain.Command(
       planAt: Change,
       shown: Digest,
       plan: Digest,
-      created: Count,
-      updated: Count,
-      already: Count,
-      notImported: Count
+      created: S.Natural,
+      updated: S.Natural,
+      already: S.Natural,
+      notImported: S.Natural
     },
     events: [ImportConfirmed],
     rejects: [NotPermitted, NotOpen, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp]
@@ -254,7 +252,7 @@ export class TakeBackImport extends Domain.Command(
   "TakeBackImport",
   {
     middleware: [Session],
-    input: { importId: ImportKey, seen: Change, kept: Count, keptReplaced: Count },
+    input: { importId: ImportKey, seen: Change, kept: S.Natural, keptReplaced: S.Natural },
     events: [ImportTakenBack],
     rejects: [NotPermitted, NotImported, ReviewMovedOn, MoreKeptThanInForce]
   },
@@ -288,7 +286,7 @@ export class RemoveImport extends Domain.Command(
 // What every import that was staged and not removed keeps, whatever its status.
 const kept = {
   organizationId: S.String,
-  rows: S.Int,
+  rows: S.Natural,
   // How many times it was confirmed: an act names it, so one made before a confirm is not taken after a reopen.
   confirms: S.Int,
   matching: S.Int,
@@ -299,9 +297,9 @@ const kept = {
   // Items its confirms created that are in force; replacements its confirms made that were not put back (each
   // confirm adds its `updated`, the sender's count, so an item replaced by two confirms counts twice: a count of
   // replacements, not of items, and bounded by nothing but what the senders said); and its confirms not taken back.
-  inForce: S.Int,
-  replaced: S.Int,
-  standing: S.Int,
+  inForce: S.Natural,
+  replaced: S.Natural,
+  standing: S.Natural,
   // The number of the last act on a group, its undo included (0 when there was none): a row's act names it.
   lastGroup: S.Int,
   // The change of the last group still in force (0 when there is none): only that one is taken back.
@@ -322,12 +320,12 @@ export const ImportState = S.Union([
   S.Struct({
     status: S.tag("Imported"),
     ...kept,
-    created: S.Int,
-    updated: S.Int,
-    already: S.Int,
-    notImported: S.Int
+    created: S.Natural,
+    updated: S.Natural,
+    already: S.Natural,
+    notImported: S.Natural
   }),
-  S.Struct({ status: S.tag("TakenBack"), ...kept, removed: S.Int, kept: S.Int }),
+  S.Struct({ status: S.tag("TakenBack"), ...kept, removed: S.Natural, kept: S.Natural }),
   S.Struct({ status: S.tag("Removed"), organizationId: S.String })
 ])
   .annotate({ description: "Where one import is in its life, with its counts and the number of its last change" })
@@ -383,17 +381,6 @@ export class Import extends Domain.Aggregate(
       // A confirm's four outcomes add up to the rows in the file: of the counts its command states.
       OutcomesAddUpToTheRows: (s) =>
         !ImportState.guards.Imported(s) || s.created + s.updated + s.already + s.notImported === s.rows,
-      // No count is negative. One comparison a rule.
-      RowsAreNotNegative: (s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.rows >= 0,
-      InForceIsNotNegative: (s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.inForce >= 0,
-      ReplacedIsNotNegative: (s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.replaced >= 0,
-      StandingIsNotNegative: (s) => ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.standing >= 0,
-      CreatedIsNotNegative: (s) => !ImportState.guards.Imported(s) || s.created >= 0,
-      UpdatedIsNotNegative: (s) => !ImportState.guards.Imported(s) || s.updated >= 0,
-      AlreadyIsNotNegative: (s) => !ImportState.guards.Imported(s) || s.already >= 0,
-      NotImportedIsNotNegative: (s) => !ImportState.guards.Imported(s) || s.notImported >= 0,
-      RemovedIsNotNegative: (s) => !ImportState.guards.TakenBack(s) || s.removed >= 0,
-      KeptIsNotNegative: (s) => !ImportState.guards.TakenBack(s) || s.kept >= 0,
       // An import never has more items in force than the file has rows.
       NoMoreInForceThanRows: (s) =>
         ImportState.guards.Unstaged(s) || ImportState.guards.Removed(s) || s.inForce <= s.rows,

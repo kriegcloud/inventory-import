@@ -26,9 +26,9 @@ the lock (`test/Proving.test.ts`).
 
 | | Rules | How far each is known to hold |
 | --- | --- | --- |
-| The import's own (`Import`) | 37 | Proved for every state and every input, for each of its seven commands and for all four decisions |
+| The import's own (`Import`) | 27 | Proved for every state and every input, for each of its seven commands and for all four decisions |
 | The row's own (`Row`) | 6 | Proved, for both decisions that record on a row |
-| An act on a group's own (`Group`) | 10 | Proved, for both decisions that record on a group |
+| An act on a group's own (`Group`) | 9 | Proved, for both decisions that record on a group |
 | An act on a row (`DecideRow`) | 26 | Proved |
 | Its undo (`UndoRowStep`) | 29 | Proved |
 | An act on a group (`DecideGroup`) | 20 | Proved |
@@ -40,7 +40,7 @@ the lock (`test/Proving.test.ts`).
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
 schemas and the invariants allow and every input, not sampled by a test.
 
-**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 145. That an act is
+**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 134. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
 `test/Group.story.test.ts`, 66 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
@@ -228,7 +228,7 @@ In about three seconds:
 
 ```text
  FAIL  |prove| test/Import.prove.test.ts > Import > each of its commands keeps every rule, for every state and every input
-AssertionError: Import: 14 invariants, 23 transitions, 7 commands
+AssertionError: Import: 4 invariants, 23 transitions, 7 commands
 ✗ AConfirmNamesEveryChange
     ✓ proved for StageImport, MatchColumn, RecordSuggestion, TakeBackImport, ReopenImport, RemoveImport
     ✗ ConfirmImport: violated
@@ -266,7 +266,7 @@ bun run --cwd packages/catalog/model prove test/Import.prove.test.ts
 ```
 
 ```text
-AssertionError: Import: 14 invariants, 23 transitions, 7 commands
+AssertionError: Import: 4 invariants, 23 transitions, 7 commands
 ✗ OutcomesAddUpToTheRows
     ✓ holds on the initial state
     ✓ proved for StageImport, MatchColumn, RecordSuggestion, TakeBackImport, ReopenImport, RemoveImport
@@ -332,7 +332,9 @@ The screen had seen up to change -1, the import was at 0, and the group was reco
 - **`violated`** comes with the state before, the command, who was asking, the events recorded and the state after.
   The solver found them, and the real code was then run on them and broke the rule.
 - **The state can be one no sequence of commands reaches** (`seen: -1`, an empty organization). A proof starts from
-  any state the schema and the invariants allow, which is why "no count is negative" is written as rules of its own.
+  any state the schema and the invariants allow, which is why "no count is negative" is said by the state's schema
+  (`S.Natural`): the solver starts only from states the schema allows, and "The state stays in its schema" proves
+  that each command leaves one ("A check on a field of the state", below).
 - **`not proved`** means the solver found inputs, and the real code kept the rule on them or refused them. It is not a
   pass: the test fails on it by name, as on `violated`.
 - **A row or a group that was already decided has its counterexample because of a patch.** A row's instance is
@@ -355,7 +357,7 @@ stands. Shown on this model: with the line of `UndoingGroup` that refuses an und
 deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
 and the lock, whose text of the rule has not changed, is silent. So the test also gives Verify the library's list of
 rules that must stay proved (`require: { proved }`, Benjamin, 2026-11-22: "Lock plus the library's proved list"):
-the names the lock keeps of the kinds a proof covers, 145 of them (the Verify test states the number, so it cannot drift from this page unseen). The same deletion then fails by name:
+the names the lock keeps of the kinds a proof covers, 134 of them (the Verify test states the number, so it cannot drift from this page unseen). The same deletion then fails by name:
 
 ```text
 Not done
@@ -405,7 +407,9 @@ What a state's schema says of a field is proved or not by the kind of check, see
   `isMultipleOf`) is read. It is assumed of the state a command starts from and **proved** of the state the command
   leaves: the prover's own rule "The state stays in its schema" comes back violated, with the command that does it,
   when a `decide` can write a value the check refuses. So such a check on the state is a rule like any other, not an
-  assumption.
+  assumption. The import's counts (`rows`, `inForce`, `created` and the rest: `S.Natural`) and a group's count (at
+  least one) are held this way and have no invariant of their own: a rule that only restates a bound of the schema is
+  the same proof under a second name.
 - **A pattern** (`isPattern`) and a filter written by hand are not read, with or without the repository's patches.
   On a field of the state it proves nothing ("the prover does not read that check, so it is not proved kept"), and it
   costs the other rules too: the solver may start from a state the pattern refuses, and every rule of that command

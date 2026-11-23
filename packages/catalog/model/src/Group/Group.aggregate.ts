@@ -14,6 +14,15 @@ import * as S from "effect/Schema"
 import { Change, Patch, Rows, Step } from "../Review/Change.schema.ts"
 
 /**
+ * How many rows an act on a group says it covers: a whole number, at least one. The count is its sender's word: the
+ * model reads no row out of a group's rows, so nothing ties it to them. Held by the schema of the event and of the
+ * state, so Verify proves it kept as part of "the state stays in its schema".
+ */
+export const GroupSize = S.Int.check(S.isGreaterThanOrEqualTo(1)).annotate({
+  description: "How many rows an act on a group covers: at least one"
+})
+
+/**
  * A group of rows was decided as one act: its rows and what it does to each, as which change of its import, by whom,
  * on which matching. `under` is the last group in force on the import when this one was decided (0 for none), so that
  * taking this one back makes that one the last in force again.
@@ -28,7 +37,7 @@ export class GroupDecided extends Domain.Event(
     step: Step,
     patch: Patch,
     rows: Rows,
-    count: S.Int,
+    count: GroupSize,
     madeOn: S.Int,
     label: S.String,
     under: Change
@@ -58,7 +67,7 @@ export const GroupState = S.Union([
     step: S.String,
     patch: S.String,
     rows: S.String,
-    count: S.Int,
+    count: GroupSize,
     madeOn: S.Int,
     label: S.String,
     undoneAt: Change,
@@ -92,8 +101,7 @@ export class Group extends Domain.Aggregate(
     invariants: {
       // That its number is one its import gave, and that its undo comes after it, need the import: they are rules
       // over every import and group in the model, searched and not proved.
-      // The count is its sender's word: the model reads no row out of a group's rows, so nothing ties it to them.
-      AGroupSaysAtLeastOneRow: (s) => !GroupState.guards.Decided(s) || s.count >= 1
+      // That a group says at least one row is its state's own schema (`GroupSize`).
     },
     transitions: {
       // What a group decided never changes: its rows, what it does to them, its number, whose it is.

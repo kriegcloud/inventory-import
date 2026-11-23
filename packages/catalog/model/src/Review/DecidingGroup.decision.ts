@@ -10,7 +10,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { CurrentActor, Session } from "../Actor/Actor.context.ts"
-import { Group, GroupDecided, GroupState } from "../Group/Group.aggregate.ts"
+import { Group, GroupDecided, GroupSize, GroupState } from "../Group/Group.aggregate.ts"
 import {
   ConfirmedSince,
   GroupCounted,
@@ -49,7 +49,7 @@ export class DecideGroup extends Domain.Command(
       madeOn: S.Int,
       patch: Patch,
       rows: Rows,
-      count: S.Int.check(S.isGreaterThanOrEqualTo(1)),
+      count: GroupSize,
       label: Label
     },
     events: [GroupDecided, GroupCounted],

@@ -23,7 +23,7 @@
  *
  * `typescript/no-misused-promises` keeps its void-return checks whole, though React 19's `ReactNode` includes a Promise,
  * so a function typed to return one is refused where a callback returns nothing (`onClick={render}`). Turning the
- * attribute and argument checks off would let through what they catch today: every one of their 6 findings is a
+ * attribute and argument checks off would let through what they catch today: every one of their 5 findings is a
  * handler that really returns a Promise (the stepper's handlers), and no
  * `ReactNode`-typed function stands in such a slot.
  *

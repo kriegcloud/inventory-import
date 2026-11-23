@@ -204,7 +204,7 @@ describe("gate 3, forbidden constructs and the namespace guard", () => {
     })
   )
 
-  it.effect("planted: sameness between two terms is refused by the predicate list", () =>
+  it.effect("planted, and ban 5: sameness between two terms is refused by the predicate list", () =>
     Effect.gen(function* () {
       const found = yield* refusedAsOwl(sameAs)
       expect(found).toStrictEqual([["predicate", `${RdfVocab.owl.iri}${"sameAs"}`]])

@@ -23,8 +23,8 @@ passing and a commit; the app is never broken between steps.
 | 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | done |
 | 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | done |
 | 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | done |
-| 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` || done |
-| 12 | The walk of each planted mistake through all nine gates (6.11), with the new fixtures of bans 2 and 5 added to it | Each row of SPEC's ban table names a test or a run that exists | todo |
+| 11 | The CI job for gate 9 (decision 114), written and not pushed | The workflow file read by the closing review; `check:ci` does not gain `reason` | done |
+| 12 | The walk of each planted mistake through all nine gates (6.11), with the new fixtures of bans 2 and 5 added to it | Each row of SPEC's ban table names a test or a run that exists | done |
 | 13 | Close: `/quality-review-fix-loop`, the documents the build made false (report 14's sections SPEC names as replaced), the closing note | Reviewers' findings at zero required | todo |
 
 Steps 4 to 9 need no Java. Step 10 is the first that does.
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-Steps 1 to 11 are done; step 12 starts on Benjamin's word.
+Steps 1 to 12 are done; step 13 starts on Benjamin's word.
 
 `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`), and six laws that came with it
 refused code this goal wrote: `diagnostics:check` (15 `@effect-diagnostics` directives), `defaults:check` (25
@@ -279,6 +279,75 @@ Where the design left a choice open, or the code showed it could not be followed
   run the workflow, and neither has anyone: what GitHub does with it (the Java action, the cache's save and
   restore) is unseen until a push. One case stays as the script has it: a kept jar that later reads back
   damaged is refused by the hash on every run, and is cleared by deleting that cache entry by hand.
+- **Step 12's walk was made by the orchestrator and read by Grok 4.7** against the tests, the law and the
+  design. It found the thirteen tests and runs under the names quoted, each asserting the failure its row says, and
+  four things wrong in the text: why the law is silent on the inverse-functional file (its rule 4 does not list
+  that type), that the walk did not say which built negatives it leaves out, that the refused files are named by
+  documents too, and that the table of what a gate reads left out the ontology package's scripts and gate 9's pin.
+  All four are corrected. It ran nothing; the runs are the orchestrator's.
+
+## The planted mistakes, walked through the nine gates
+
+Step 12: report 14 section 6.11 made this walk on the design, with nothing run. This is the same walk on what was
+built, with the four files of bans 2 and 5 added (rows 10 to 13). A planted mistake must fail its own gate and no
+other.
+
+What each gate reads, taken from its imports and its script, is what decides a cell:
+
+| Gate | Where it runs | What it reads |
+| --- | --- | --- |
+| 1, 2, 3 | `Generated.test.ts` | The three files under `generated/`, and what the projector writes now. Gates 2 and 3 also read their own refused files under `fixtures/negative/`, which no other code file imports |
+| 4 | `Coherence.test.ts` | The kernel's vocabulary, `exceptions/no-gist-parent.json`, `DECISIONS.md` as text |
+| 5 | `Pointers.test.ts` | The five enrolled exports, `enrolment.json`, the vocabulary |
+| 6 | the type-check (`check`) | Every `src` and `test` file of each package, and the ontology package's `scripts` |
+| 7 | `ontology-terms:check` | The repository's code files, less the law and its own test. A `.ttl` file is no code file |
+| 8 | `Questions.test.ts` | `threadGraph()` and the query files under `fixtures/cq/` |
+| 9 | `scripts/reason.ts` | `generated/inventory.owl.ttl`, `generated/fixtures/CQ-P06.graph.ttl`, `fixtures/reason/*.ttl`; `robot.lock.json`, and the Java and the jar it pins |
+
+In the table, "reports" is the failure the named test or run asserts; "no" means the gate does not read the
+mistake, by the table above; a cell with words is one where the gate does read the file and stays silent, with why.
+
+| # | Planted mistake | Its test or run | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | A label changed in a copy of the committed OWL text, in memory | `Generated.test.ts`, "planted: a label changed in the committed text is reported with its line and the command" | reports | no: the copy is not given to it | no | no | no | compiles | the test holds no refused text | no | no |
+| 2 | `fixtures/negative/gate2-unescaped.ttl` | `Generated.test.ts`, "planted: an unescaped quote is a parse error that names its line" | no | reports | no: it has no triples to give | no | no | read as text | no | no | no |
+| 3 | `fixtures/negative/gate3-sameAs.ttl` (ban 5 too) | `Generated.test.ts`, "planted, and ban 5: sameness between two terms is refused by the predicate list" | no | no | reports | no | no | read as text | the test spells the predicate as namespace and local name apart | no | no |
+| 4 | A copy of the vocabulary with `Grant`'s parent `none` and no exception entry, in memory | `Coherence.test.ts`, "reports exactly C4 on Grant when a copy gives Grant no parent and the list no entry" | no | no | no | reports | no: it reads the real vocabulary | `none` is a legal parent: compiles | the test calls no helper | no | no |
+| 5 | A struct of `Member`'s fields with `name` unmarked | `Pointers.test.ts`, "P3, as section 6.5 plants it: Member's name unmarked; P13 names the same field" | no | no | no | no | reports | compiles | not enrolled, and its helper calls are in a test file | no: it reads the real `Member` | no |
+| 6 | `aboutProperty("inv:Member")` under `@ts-expect-error`, with four more wrong calls, in `packages/kernel/test/TermsPointer.types.ts` | The kernel's type-check | no | no | no | no | no: no test imports the file | reports: each call is the error its directive expects, and the check fails if one ever compiles | rules 1b and 3 do not read test files | no | no |
+| 7 | A source text with a mark's key written by hand, in the law's own test | `OntologyTerms.test.ts`, "planted: an enrolled record pointed at its class by hand, the name spelt right" | no | no | no | no | no: a text, not a schema | a string: compiles | reports, in the test; the law's run over the repository leaves its own test out | no | no |
+| 8 | M2: the two `grantsRole` triples removed from the lifted part, in memory | `Questions.test.ts`, "M2, planted: with the two grantsRole triples removed, both expected rows are missing" | no: the committed graph is unchanged | no | no | no | no | compiles | the test builds its IRIs from the module's base | reports | no |
+| 9 | `fixtures/reason/person-is-tenant.ttl` (ban 1) | `reason`, "ban 1, refused: a person is a tenant" | no | no | no | no | no | no code file | no | no | reports |
+| 10 | `fixtures/reason/entry-is-person.ttl` (ban 2) | `reason`, "ban 2, refused: an audit entry is the person it is about" | no | no | no | no | no | no code file | no | no | reports |
+| 11 | `fixtures/reason/entry-is-tenant.ttl` (ban 2) | `reason`, "ban 2, refused: an audit entry is the organization it is about" | no | no | no | no | no | no code file | no | no | reports |
+| 12 | `fixtures/negative/gate3-inverseFunctional.ttl` (ban 5) | `Generated.test.ts`, "ban 5: membershipOf made inverse functional is refused by the type list" | no | no | reports | no | no | read as text | rule 4 does not list this type, so the test could write it whole | no | no |
+| 13 | `fixtures/negative/gate3-hasKey.ttl` (ban 5) | `Generated.test.ts`, "ban 5: a key on Tenant is refused by the predicate list, and its list by the blank-node guard" | no | no | reports | no | no | read as text | `owl:hasKey` is on rule 4's list; the test spells it as namespace and local name apart | no | no |
+
+The near misses pass every gate: the thread's graph and `fixtures/reason/entry-names-member.ttl` are the two
+consistent runs of `reason` (bans 1 and 2); CQ-P06 as written returns its rows in "CQ-P06: the two members of the
+two organizations, each with the role its grant gives" (bans 3 and 4); and `Generated.test.ts` has "ban 5's near
+miss: Tenant as a subclass of Organization passes". Bans 3 and 4 are refused in "M5, ban 3: asked through the
+person, a role held in one organization shows in the other" and "M3, ban 4: a role written on the member, with no
+grant, is no answer". So each row of SPEC's ban table has a refused case and a near miss that exist under a name
+that says the ban.
+
+What was run for this walk, on the tree with all thirteen committed: each test above by its name, passing, so each
+mistake is reported by its own gate; `reason`, whose three refused runs are rows 9 to 11; and `bun run check`
+and `bun run check:full` passing, so no other gate reports any of them. Which file reads which was read from the
+imports: the seven files under `fixtures/negative/` are named by `Generated.test.ts` alone, and the four under
+`fixtures/reason/` by `src/Reason.ts` and its test alone. Not done: no mistake was handed to a gate that does not
+read it, to see what that gate would say; the design asks only that it is never given one.
+
+Thirteen rows are not every negative that was built. Left out of the table, as the design's walk left them to one
+paragraph: `gate3-host.ttl` and `gate3-type.ttl`, refused by gate 3; `gate3-subclass.ttl`, which is ban 5's near
+miss; the further rules of gates 4, 5 and 7, each with a test of its own; M1, M4, M6 and M7 of CQ-P06 and the
+must-fail case of CQ-P11; and the vocabulary package's own C4 test, which plants a class of its own. Each is one of
+the same three kinds as a row above: a value in a test's memory, a file under `fixtures/negative/` that
+`Generated.test.ts` alone imports, or a source text in the law's own test. They were not walked one by one; that
+they fail no gate but their own rests on the two checks passing with all of them committed.
+
+Two things differ from the design's walk. Row 6's file holds five wrong calls where the design named one. Row 3's
+test was named "planted" alone; it now names ban 5 as well, since SPEC lists `gate3-sameAs.ttl` under that ban.
 
 ## Closing note
 

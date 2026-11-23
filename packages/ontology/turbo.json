@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Gate 4 reads one file outside the package: the decision log, whose headings say which decisions are answered
+    // (rule C12; report 14 section 6.10). It is neither in the package nor a dependency's source, so it is named here,
+    // or an edit to it, or its removal, replays gate 4's last pass. The kernel's literal is covered by the dependency
+    // edge, and the exception list by `$TURBO_DEFAULT$`.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts",
+        "$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md"
+      ]
+    }
+  }
+}

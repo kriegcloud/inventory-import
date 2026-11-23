@@ -15,8 +15,8 @@ passing and a commit; the app is never broken between steps.
 | --- | --- | --- | --- |
 | 1 | `@beep/vocabulary` (7.1): the metamodel schemas, with `ratification` as `{ decision }` (2.6); gate 4's rules as a pure function; the generic pointer makers and the reader of marks from an AST; the RDF registry (7.3) | The package type-checks under the full profile; the metamodel decodes a two-term literal | done |
 | 2 | The vocabulary value and the five bound helpers in the kernel (`Terms.vocab.ts`, `Terms.pointer.ts`; 2, 3.2) | The literal satisfies the encoded side; `TermsPointer.types.ts` (6.6) | done |
-| 3 | `@inventory/ontology`, empty but wired: the package, its `turbo.json`, the two `laws boundaries` rows (7.2), `enrolment.json`, the exception list | `boundaries:check`, `config-sync:check` | todo |
-| 4 | Gate 4, vocabulary coherence, with its planted mistake, the C12 negative and the test that the 22 terms name 111 and the exception entry 97 (6.4) | `Coherence.test.ts` | todo |
+| 3 | `@inventory/ontology`, empty but wired: the package, its `turbo.json`, the two `laws boundaries` rows (7.2), `enrolment.json`, the exception list | `boundaries:check`, `config-sync:check` | done |
+| 4 | Gate 4, vocabulary coherence, with its planted mistake, the C12 negative and the test that the 22 terms name 111 and the exception entry 97 (6.4) | `Coherence.test.ts` | done |
 | 5 | The marks on the five enrolled records (3.3 to 3.7), then gate 5 with P13 and its negatives (6.5) | `Pointers.test.ts`; `ActivityMarks.types.ts` (6.6); the app's own tests unchanged | todo |
 | 6 | The lift, `graphOf` and `threadGraph` (4), in memory | The seventeen triples of 4.4, asserted on the value `threadGraph()` returns | todo |
 | 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | todo |
@@ -38,9 +38,9 @@ here when it is.
 | --- | --- | --- |
 | Whether report 05's metamodel sketch compiles once `ratification` is `{ decision }`; `annoteSchema`'s extras, `nullAsNone`, `S.Opaque` `fields`, `mergeVocab`'s literal types, `rdf:type` in `CoreVocab` | 1 | Compiles under the full profile once cut to what the thread uses. `annoteSchema` keeps string-keyed extras beside `description`; `S.Opaque` exposes `fields`; `mergeVocab` keeps literal types (`"xsd:integer"` is a type error); `rdf:type` was already in `CoreVocab`. `nullAsNone` is the kernel's: its parameter type takes only `description` and `messageMissingKey`, so the spread of a mark that report 14 section 3.6 writes for `Person.email` and `joinedAt` does not type-check, and a mark put on the inner schema is not read. Step 5 widens the parameter to a key's annotations; its body already passes the whole object on |
 | The literal's `satisfies`, and `InvConceptCurie` and the three registries derived from it. The brief says to try this in the scratchpad first | 2 | Holds, tried in the kernel directly: the literal passes `satisfies` and decodes strictly, the namespace built from the base stays a literal type, each registry gives the exact union of CURIEs, and a misspelt class, property or notation is a type error |
-| How gate 4 reads `DECISIONS.md`, and gate 5 `enrolment.json`, from outside the test's package: a `?raw` import or `node:fs`, and what `laws boundaries` says of it | 3, 4, 5 | |
-| Whether a package's `turbo.json` may declare the uncached `reason` task and name an out-of-package input, and whether an edit or a deletion of that input invalidates the cache | 3, 10 | |
-| Whether `config-sync` accepts the new package and the new root task (section 10, "Turbo and the sync commands"); the inputs the existing source-law tasks declare | 3, 9 | |
+| How gate 4 reads `DECISIONS.md`, and gate 5 `enrolment.json`, from outside the test's package: a `?raw` import or `node:fs`, and what `laws boundaries` says of it | 3, 4, 5 | Gate 4 reads the log with a `?raw` import and a `test/raw.d.ts` declaration, as `packages/catalog/model` reads `docs/verify.md`; the type-check and Vitest accept it, and `laws boundaries` says nothing of a relative path that names no app and no scratchpad. `node:fs` was not tried. The exception list is a JSON import decoded strictly. Gate 5's read of `enrolment.json` is step 5's |
+| Whether a package's `turbo.json` may declare the uncached `reason` task and name an out-of-package input, and whether an edit or a deletion of that input invalidates the cache | 3, 10 | The out-of-package input is accepted (`$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md` in the package's `test` inputs): one added space, a broken heading and the file's removal each gave a cache miss, and restoring the bytes gave the first hash back as a hit. An edit to the exception list misses too. The `reason` task is not declared yet: step 10's |
+| Whether `config-sync` accepts the new package and the new root task (section 10, "Turbo and the sync commands"); the inputs the existing source-law tasks declare | 3, 9 | The package is accepted: `config-sync` wrote its three scripts and the reference in the root `tsconfig.json`, and `config-sync:check` agrees. It has no `src` yet, so no `tsconfig.json`; step 5 adds both. The new root task is step 9's |
 | The marks on a `Model.Class` and `fieldEvolve`'s types (3.5); whether the spread in the compile-only file keeps literal types; P12's element field name | 5 | Partly, in step 1 on a local `Model.Class`: the class pointer is read, `fieldEvolve` with a hoisted mark compiles, the marks reach every variant. The equality file on the real `Activity` is step 5's |
 | Whether N3.js and Oxigraph run under this repository's Vitest and Effect rules (decision 26) | 7, 8 | |
 | `import type` erasure, and how gate 7's rule 7 resolves `paths` and `imports` aliases from text, without the compiler | 9 | |
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-None. Step 1 can start on Benjamin's word: it is the first code of this goal.
+None. Steps 1 to 4 are done; step 5 starts on Benjamin's word.
 
 ## Choices made
 
@@ -98,6 +98,13 @@ Where the design left a choice open, or the code showed it could not be followed
   and has nothing to pipe.
 - **Mark types are type aliases.** An interface is refused by `annotateKey`, whose annotation types carry an index
   signature.
+- **A finding names a term by its key too** (`Grant`, not `inv:Grant` as section 6.4 writes the planted mistake's
+  report): the rules compare keys, which is what the vocabulary stores.
+- **`laws boundaries` reads a package's `src` and `test` only.** The ontology package's `scripts/write.ts` (step 7)
+  and `scripts/reason.ts` (step 10) would be outside the law, so each step keeps what its script imports in `src`,
+  or widens the law to `scripts/`; the step says which.
+- **The ontology package declares only what a built step uses.** Section 7.1's `@beep/identity`,
+  `@inventory/access-contract`, `n3` and `oxigraph` come with steps 5, 7 and 8.
 
 ## Closing note
 

@@ -196,6 +196,80 @@ describe("laws boundaries", () => {
     })
   )
 
+  // Report 14 section 7.2: the ontology package may use the foundation, the kernel and a context's contract package,
+  // and nothing else of the repository's.
+  it.effect("lets the ontology package use the foundation, the kernel and a context's contract, and nothing else", () =>
+    Effect.gen(function* () {
+      const contextPkg = (name: string, layer: string) => pkg(name, { family: "context", context: "access", layer })
+      const ontology = (dependencies: Record<string, string>) =>
+        pkg("@x/ontology", { family: "ontology" }, dependencies)
+      const tree = {
+        ...base,
+        "packages/schema/package.json": pkg("@x/schema", { family: "foundation" }),
+        "packages/access/contract/package.json": contextPkg("@x/access-contract", "contract"),
+        "packages/access/model/package.json": contextPkg("@x/access-model", "model")
+      }
+      const passing = yield* inTree(
+        {
+          ...tree,
+          "packages/ontology/package.json": ontology({
+            "@x/schema": "workspace:*",
+            "@x/kernel": "workspace:*",
+            "@x/access-contract": "workspace:*"
+          }),
+          "packages/ontology/test/a.test.ts":
+            'import "@x/schema"\nimport "@x/kernel/Terms"\nimport "@x/access-contract/People"\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(passing)).toEqual(["out: check-boundaries OK  7 workspaces"])
+      const refused = yield* inTree(
+        {
+          ...tree,
+          "packages/ontology/package.json": ontology({ "@x/access-model": "workspace:*", "@x/ui": "workspace:*" }),
+          "packages/ontology/test/a.test.ts": 'import "@x/access-model/People"\nimport "@x/ui/button"\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(refused)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   @x/ontology declares @x/access-model, which its layer may not use",
+        "err:   @x/ontology declares @x/ui, which its layer may not use",
+        "err:   packages/ontology/test/a.test.ts imports @x/access-model, which its layer may not use",
+        "err:   packages/ontology/test/a.test.ts imports @x/ui, which its layer may not use"
+      ])
+    })
+  )
+
+  // Decision 9: nothing imports the ontology package, the app and the kernel included, in its code or its tests.
+  it.effect("lets nothing depend on the ontology package, not even an app", () =>
+    Effect.gen(function* () {
+      const onOntology = { "@x/ontology": "workspace:*" }
+      const report = yield* inTree(
+        {
+          ...base,
+          "packages/ontology/package.json": pkg("@x/ontology", { family: "ontology" }),
+          "packages/kernel/package.json": json({
+            name: "@x/kernel",
+            beep: { family: "kernel" },
+            devDependencies: onOntology
+          }),
+          "packages/kernel/test/a.test.ts": 'import "@x/ontology/Lift"\n',
+          "apps/shop/package.json": pkg("@x/shop", {}, onOntology),
+          "apps/shop/src/main.ts": 'import "@x/ontology/Lift"\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   @x/shop declares @x/ontology, which its layer may not use",
+        "err:   apps/shop/src/main.ts imports @x/ontology, which its layer may not use",
+        "err:   @x/kernel declares @x/ontology, which its layer may not use",
+        "err:   packages/kernel/test/a.test.ts imports @x/ontology, which its layer may not use"
+      ])
+    })
+  )
+
   it.effect("lets nothing reach the scratchpad: not declared, not imported by name or by path, from any file", () =>
     Effect.gen(function* () {
       // Put together here, so the rule does not read this file as reaching into the scratchpad itself.

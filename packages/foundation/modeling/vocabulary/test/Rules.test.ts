@@ -379,6 +379,27 @@ describe("coherenceFindings", () => {
     })
   )
 
+  it.effect("C12: an object property, a datatype property and a scheme naming decision 999", () =>
+    Effect.gen(function* () {
+      const unanswered = { decision: 999 }
+      const copy = {
+        ...valid,
+        objectProperties: { ...valid.objectProperties, loanOf: { ...loanOf, ratification: unanswered } },
+        datatypeProperties: {
+          ...valid.datatypeProperties,
+          publishedAt: { ...publishedAt, ratification: unanswered }
+        },
+        schemes: { ...valid.schemes, GenreScheme: { ...genreScheme, ratification: unanswered } }
+      }
+      const found = yield* findingsOf(copy)
+      expect(found).toEqual([
+        ["C12", "objectProperty", "loanOf"],
+        ["C12", "datatypeProperty", "publishedAt"],
+        ["C12", "scheme", "GenreScheme"]
+      ])
+    })
+  )
+
   it.effect("C12: a concept and an exception entry naming a decision with no heading of its own", () =>
     Effect.gen(function* () {
       const copy = {

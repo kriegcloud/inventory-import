@@ -1,0 +1,30 @@
+{
+  "name": "@inventory/ontology",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The ontology of the inventory app's vocabulary: the gates that hold the kernel's terms coherent, and later the projection of the terms and records into generated RDF. Run, never imported",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/vocabulary": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  },
+  "beep": {
+    "family": "ontology"
+  }
+}

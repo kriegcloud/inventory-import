@@ -468,6 +468,20 @@
         "vitest": "catalog:",
       },
     },
+    "packages/ontology": {
+      "name": "@inventory/ontology",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/vocabulary": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/node": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/patches": {
       "name": "@inventory/patches",
       "version": "0.0.0",
@@ -961,6 +975,8 @@
     "@inventory/client": ["@inventory/client@workspace:packages/client"],
 
     "@inventory/kernel": ["@inventory/kernel@workspace:packages/kernel"],
+
+    "@inventory/ontology": ["@inventory/ontology@workspace:packages/ontology"],
 
     "@inventory/patches": ["@inventory/patches@workspace:packages/patches"],
 

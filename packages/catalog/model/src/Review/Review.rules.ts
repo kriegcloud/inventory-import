@@ -1226,8 +1226,9 @@ const stockValue = (rows: ReadonlyArray<ReviewedRow>): string =>
  * Reviews the file. Every row lands in exactly one of four places and the counts add up to the rows. A row is ready
  * only when every value reads exactly as an item stores it, through the file's own text, a form-only rule fix nobody
  * undid, or a decision the person made. Two rows with one SKU are both held until the person keeps one. A row whose
- * SKU is stored is already there when it says what is stored; when it says something else it waits for the person to
- * keep the stored item or replace it, and nothing stored changes without that.
+ * SKU reads and is stored is already there when it says what is stored, and also when another of its cells does not
+ * read yet: the item is stored and the row adds nothing. When it reads as an item that says something else it waits
+ * for the person to keep the stored item or replace it, and nothing stored changes without that.
  */
 export const review = (input: {
   readonly table: StagedTable
@@ -1285,14 +1286,16 @@ export const review = (input: {
     const storedItem =
       !mine && key !== "" && skuKey({ sku: row.file.sku }) === key ? ctx.storedOf(key) : O.none<ItemFields>()
     const item = toItem(values)
-    // It differs only when the row reads as an item and that item says something else than what is stored. A row
-    // that does not read yet is not compared and is not "already there": it keeps its own problems, and once it
-    // reads it is skipped (it says what is stored) or asks (it says something else).
+    // It differs only when the row reads as an item and that item says something else than what is stored: then it
+    // asks. A row whose SKU reads and is stored, with another cell that does not read yet, is already there all the
+    // same: the item is stored, nothing in the row is compared, and nothing stored changes. Only a SKU that does not
+    // read yet as written (lower case, with its proposal open) keeps the row waiting, until the SKU reads.
     const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
     const replace = differs && StoredChoice.guards.replace(decision.stored)
     const already =
-      mine || (O.isSome(storedItem) && item !== null && (!differs || StoredChoice.guards.keep(decision.stored)))
+      mine ||
+      (O.isSome(storedItem) && skuPattern.test(values.sku) && (!differs || StoredChoice.guards.keep(decision.stored)))
     return {
       row,
       decision,

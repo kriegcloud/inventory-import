@@ -9,23 +9,22 @@ import * as R from "effect/Record"
 export type FieldProblem<F extends string> = { readonly field: F; readonly sentence: string }
 
 /**
- * Every problem of a form, in the form's order: each field's check is a sentence or undefined, and all of them run.
+ * Every problem of a form, in the form's order: each field's check is a sentence or none, and all of them run.
  *
- * @example formProblems({ action: "Say what was done.", detail: undefined })
+ * @example formProblems({ action: O.some("Say what was done."), detail: O.none() })
  * // [{ field: "action", sentence: "Say what was done." }]
  */
 export const formProblems = <F extends string>(checks: {
-  readonly [K in F]: string | undefined
+  readonly [K in F]: O.Option<string>
 }): ReadonlyArray<FieldProblem<F>> =>
-  A.flatMap(R.keys(checks), (field) => {
-    const sentence = checks[field]
-    return sentence === undefined ? [] : [{ field, sentence }]
-  })
+  A.flatMap(R.toEntries(checks), ([field, check]) =>
+    O.match(check, { onNone: () => [], onSome: (sentence) => [{ field, sentence }] })
+  )
 
 /**
  * The sentence for one field, when it has a problem: what a field's `FieldError` shows. Data first or in a pipe.
  *
- * @example pipe(formProblems({ action: "Say what was done.", detail: undefined }), problemOf("action"))
+ * @example pipe(formProblems({ action: O.some("Say what was done."), detail: O.none() }), problemOf("action"))
  * // O.some("Say what was done.")
  */
 export const problemOf: {

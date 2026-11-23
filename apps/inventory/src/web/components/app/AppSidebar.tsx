@@ -215,8 +215,13 @@ function UserMenu() {
   const leave = useAtomSet(signOutSaid)
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
-  const testAccounts = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)
-  const otherAccounts = A.filter(testAccounts?.accounts ?? [], (account) => account.email !== email)
+  // The test accounts other than the signed-in one, with the password they share: only while the server offers them.
+  const offered = O.flatMap(O.fromUndefinedOr(features), (known) =>
+    O.flatMap(known.testAccounts, (accounts) => {
+      const others = A.filter(accounts.accounts, (account) => account.email !== email)
+      return others.length === 0 ? O.none() : O.some({ password: accounts.password, others })
+    })
+  )
   const who = (
     <>
       <Avatar>
@@ -270,41 +275,44 @@ function UserMenu() {
                 ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuGroup>
-            {otherAccounts.length === 0 || testAccounts === undefined ? null : (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Sign in as a test account</DropdownMenuLabel>
-                  {A.map(otherAccounts, (account) => (
-                    <DropdownMenuItem
-                      key={account.email}
-                      onSelect={() => {
-                        signInTo({
-                          email: account.email,
-                          password: testAccounts.password,
-                          name: account.name,
-                          from: actor.name
-                        })
-                      }}
-                    >
-                      <UserRoundIcon />
-                      <span className="grid min-w-0 flex-1 leading-tight">
-                        <span className="truncate">{account.name}</span>
-                        <span className="truncate text-xs text-muted-foreground">
-                          {A.join(
-                            A.map(
-                              account.memberships,
-                              (membership) => `${roleWords[membership.role]}, ${membership.organizationName}`
-                            ),
-                            "; "
-                          )}
+            {O.match(offered, {
+              onNone: () => null,
+              onSome: ({ password, others }) => (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Sign in as a test account</DropdownMenuLabel>
+                    {A.map(others, (account) => (
+                      <DropdownMenuItem
+                        key={account.email}
+                        onSelect={() => {
+                          signInTo({
+                            email: account.email,
+                            password,
+                            name: account.name,
+                            from: actor.name
+                          })
+                        }}
+                      >
+                        <UserRoundIcon />
+                        <span className="grid min-w-0 flex-1 leading-tight">
+                          <span className="truncate">{account.name}</span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {A.join(
+                              A.map(
+                                account.memberships,
+                                (membership) => `${roleWords[membership.role]}, ${membership.organizationName}`
+                              ),
+                              "; "
+                            )}
+                          </span>
                         </span>
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </>
-            )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                </>
+              )
+            })}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => leave()}>
               <LogOutIcon />

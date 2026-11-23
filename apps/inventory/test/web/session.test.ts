@@ -26,14 +26,17 @@ vi.mock("sonner", () => ({
 // Better Auth's client, as the app loads it: a switch of organization the server takes, or refuses.
 // A switch the test holds (`hold`) is answered when the test says.
 // Read when the app first loads the client, which a test does after this line has run.
-const auth = { refuses: MutableRef.make(false), hold: MutableRef.make<Promise<void> | undefined>(undefined) }
+const auth: {
+  readonly refuses: MutableRef.MutableRef<boolean>
+  readonly hold: MutableRef.MutableRef<O.Option<Promise<void>>>
+} = { refuses: MutableRef.make(false), hold: MutableRef.make(O.none()) }
 vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
   authClient: {
     organization: {
       setActive: () =>
         MutableRef.get(auth.refuses)
           ? Promise.reject(new Error("Not a member."))
-          : (MutableRef.get(auth.hold) ?? Promise.resolve(undefined))
+          : O.getOrElse(MutableRef.get(auth.hold), () => Promise.resolve(undefined))
     }
   },
   orThrow: (answer: unknown) => answer
@@ -405,7 +408,7 @@ describe("the workspace", () => {
     renderToStaticMarkup(createElement(RegistryContext, { value: t.registry }, createElement(Probe)))
     const { drawn } = seen
     return isValidElement<{ readonly children?: ReactNode }>(drawn) && drawn.props.children === "WORKSPACE"
-      ? `workspace of ${drawn.key ?? "nobody"}`
+      ? `workspace of ${O.getOrElse(O.fromNullOr(drawn.key), () => "nobody")}`
       : "not the workspace"
   })
 
@@ -610,7 +613,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
   it.live("is hers when that ask answers in the organization she chose: nothing is left, and nothing reloaded", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      MutableRef.set(auth.hold, held.promise)
+      MutableRef.set(auth.hold, O.some(held.promise))
       const t = yield* loadAs(signedInAs("dana"))
       t.ask()
       yield* settle
@@ -621,7 +624,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       expect([t.page.left, t.who()]).toEqual([[], "mem_dana/org_northline"])
       held.resolve()
-      MutableRef.set(auth.hold, undefined)
+      MutableRef.set(auth.hold, O.none())
       yield* settle
       t.page.asked[2]?.answer(signedInAs("dana", "northline"))
       yield* settle
@@ -632,7 +635,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
   it.live("answered there for somebody else's account: the page is left", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      MutableRef.set(auth.hold, held.promise)
+      MutableRef.set(auth.hold, O.some(held.promise))
       const t = yield* loadAs(signedInAs("dana"))
       t.ask()
       yield* settle
@@ -642,14 +645,14 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       expect(t.page.left).toEqual(["/"])
       held.resolve()
-      MutableRef.set(auth.hold, undefined)
+      MutableRef.set(auth.hold, O.none())
     })
   )
 
   it.live("a write she pressed for the organization she left is said as not sent, in words", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      MutableRef.set(auth.hold, held.promise)
+      MutableRef.set(auth.hold, O.some(held.promise))
       const t = yield* browserWithServer()
       const { sayError } = yield* Effect.promise(() => import("@inventory/client/SayError"))
       const pick = () => {
@@ -662,7 +665,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       t.server.cookie = "mem_dana/org_northline"
       held.resolve()
-      MutableRef.set(auth.hold, undefined)
+      MutableRef.set(auth.hold, O.none())
       yield* settle
       t.page.asked[1]?.answer(signedInAs("dana", "northline"))
       yield* settle

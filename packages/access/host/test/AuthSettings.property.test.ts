@@ -5,9 +5,11 @@ import { describe, expect, it } from "@effect/vitest"
 import { authSettings } from "@inventory/access-host/Config"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 import { passwordToVerify } from "@inventory/access-model/StagePassword"
+import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
@@ -15,8 +17,19 @@ import * as S from "effect/Schema"
 
 const runs = { arbitrary: { runs: 200 } }
 
-/** A password a stage may be given: the repository's own, or any other text. */
-const Given = S.Union([S.Literal(testAccountPassword), S.String])
+/** A password a stage may be given: the repository's own, a blank made of spaces and line ends, or other text. */
+const Repository = S.TaggedStruct("Repository", {})
+const Blank = S.TaggedStruct("Blank", { spaces: S.Array(S.Literals(["", " ", "\t", "\n", "\r\n"])) })
+const Text = S.TaggedStruct("Text", { text: S.String.check(S.isPattern(/\S/)) })
+const Given = S.Union([Repository, Blank, Text])
+
+/** The password as the stage's setting holds it. */
+const writtenPassword = (given: typeof Given.Type): string =>
+  Match.valueTags(given, {
+    Repository: () => testAccountPassword,
+    Blank: (blank) => A.join(blank.spaces, ""),
+    Text: (text) => text.text
+  })
 
 /** The settings read from `values`, or why they cannot be. */
 const read = (values: Readonly<Record<string, string>>, production: boolean) =>
@@ -57,11 +70,12 @@ describe("the sign-in settings as read", () => {
     [Arbitrary.schema(Given), Arbitrary.schema(S.Boolean)],
     ([given, production]) =>
       Effect.gen(function* () {
-        const settings = yield* read({ TEST_ACCOUNT_PASSWORD: given }, production)
-        expect(Result.isFailure(settings)).toBe(given === testAccountPassword)
+        const password = writtenPassword(given)
+        const settings = yield* read({ TEST_ACCOUNT_PASSWORD: password }, production)
+        expect(Result.isFailure(settings)).toBe(password === testAccountPassword)
         if (Result.isSuccess(settings)) {
           const stage = O.map(settings.success.testAccountPassword, Redacted.value)
-          expect(O.isNone(stage)).toBe(/^\s*$/.test(given))
+          expect(O.isNone(stage)).toBe(S.is(Blank)(given))
           if (O.isSome(stage)) {
             const opened = passwordToVerify({ stage, repository: testAccountPassword, typed: testAccountPassword })
             expect(O.isNone(opened)).toBe(true)

@@ -335,9 +335,10 @@ export class ConceptScheme extends S.Opaque<ConceptScheme, { readonly brand: uni
  *
  * @example "https://example.org/library/ontology/"
  */
-export const Namespace = S.String.check(S.isPattern(/^https:\/\/[a-z0-9.-]+(?:\/[a-z0-9-]+)+\/$/)).pipe(
-  $I.annoteSchema("Namespace", { description: "The IRI every local key is appended to" })
-)
+export const Namespace = S.String.check(
+  S.isPattern(/^https:\/\/[a-z0-9.-]+(?:\/[a-z0-9-]+)+\/$/),
+  S.isMaxLength(200)
+).pipe($I.annoteSchema("Namespace", { description: "The IRI every local key is appended to" }))
 /** Runtime type of {@link Namespace}. */
 export type Namespace = typeof Namespace.Type
 
@@ -346,7 +347,7 @@ export type Namespace = typeof Namespace.Type
  *
  * @example "https://example.org/library"
  */
-export const BaseIri = S.String.check(S.isPattern(/^https:\/\/[a-z0-9.-]+(?:\/[a-z0-9-]+)*$/)).pipe(
+export const BaseIri = S.String.check(S.isPattern(/^https:\/\/[a-z0-9.-]+(?:\/[a-z0-9-]+)*$/), S.isMaxLength(200)).pipe(
   $I.annoteSchema("BaseIri", { description: "The one IRI every other IRI of the vocabulary is derived from" })
 )
 /** Runtime type of {@link BaseIri}. */

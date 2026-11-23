@@ -10,6 +10,7 @@ import {
   promiseEntryPoints,
   promises,
   promisesHeld,
+  promisesProfile,
   promiseSentence,
   promisesListed,
   promisesVendored
@@ -18,10 +19,35 @@ import { heldAs } from "../src/commands/Laws/internal/held.ts"
 import { readPromises } from "../src/commands/Laws/internal/promiseCode.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
-import { inTree, printed } from "./support/tree.ts"
+import { inTree, json, printed } from "./support/tree.ts"
 
+/** This repository's root, from this file's folder: its typed profile and what it has installed are the law's. */
+const real = (repo: Repo["Service"], path: string) => repo.resolve(import.meta.dirname, "../../../../..", path)
+
+// A repository the typed half can read: the real profile, the installed tools, and one project over every file.
 const inRepository = Effect.gen(function* () {
   const repo = yield* Repo
+  const here = (path: string) => repo.join(repo.root, path)
+  const profile = yield* repo.text(real(repo, promisesProfile))
+  yield* repo.write(here(promisesProfile), profile)
+  yield* repo.write(
+    here("tsconfig.json"),
+    json({
+      compilerOptions: {
+        noEmit: true,
+        strict: true,
+        module: "esnext",
+        moduleResolution: "bundler",
+        target: "ES2025",
+        lib: ["ESNext", "DOM"],
+        jsx: "react-jsx",
+        skipLibCheck: true
+      },
+      include: ["**/*.ts", "**/*.tsx"]
+    })
+  )
+  yield* repo.write(here(".gitignore"), "node_modules\n")
+  yield* repo.run("ln", ["-s", real(repo, "node_modules"), here("node_modules")])
   yield* repo.run("git", ["init", "-q"])
   const found = yield* promises()
   return printed(render(promiseSentence)(found))
@@ -90,7 +116,9 @@ describe("laws promises", () => {
       expect(said).toContain(
         "err: packages/x/src/a.ts:10  an Effect run as a Promise: run it at an entry point (promiseEntryPoints), or yield* it"
       )
-      expect(said.length).toBe(12)
+      expect(said).toContain(
+        "err: packages/x/src/a.ts:9  a .then, .catch or .finally on a promise: write Effect.map, Effect.catch or Effect.ensuring"
+      )
     })
   )
 
@@ -122,8 +150,34 @@ describe("laws promises", () => {
     })
   )
 
+  it.effect(
+    "reads types too: a Promise reached by no name the parser knows is refused, and keeps a listed file on",
+    () =>
+      Effect.gen(function* () {
+        const routed = `const g = globalThis\ng.Promise.all([])\nexport const made = () => g.Promise.resolve(1)\n`
+        const said = yield* inTree({ "packages/x/src/routed.ts": routed }, inRepository)
+        expect(said).toContain(
+          "err: packages/x/src/routed.ts:2  a value typed as a Promise: Promises must be awaited, add await operator. (typescript(no-floating-promises)). Write the Effect that does the work"
+        )
+        expect(said).toContain(
+          "err: packages/x/src/routed.ts:3  a value typed as a Promise: Functions that return promises must be async. (typescript(promise-function-async)). Write the Effect that does the work"
+        )
+        const listed = O.getOrElse(
+          A.findFirst(promisesListed, (file) => Str.endsWith(".ts")(file) && !R.has(promiseEntryPoints, file)),
+          () => ""
+        )
+        const kept = yield* inTree({ [listed]: routed }, inRepository)
+        expect(kept).toEqual([expect.stringContaining("out: promises:check OK")])
+        const off = Str.trim(`oxlint-disable-next-line typescript/no-floating-promises`)
+        const silenced = yield* inTree({ "packages/x/src/s.ts": `// ${off}\nexport const n = 1\n` }, inRepository)
+        expect(silenced).toContain(
+          "err: packages/x/src/s.ts:1  a comment that turns a typed Promise rule off (oxlint-disable-next-line): no comment does. Remove it"
+        )
+      })
+  )
+
   it("the lists only shrink: their lengths are held here, and lowered with them", () => {
-    expect([promisesListed.length, R.size(promisesVendored), R.size(promiseEntryPoints)]).toEqual([57, 7, 2])
+    expect([promisesListed.length, R.size(promisesVendored), R.size(promiseEntryPoints)]).toEqual([72, 14, 2])
     expect(A.dedupe(promisesListed).length).toBe(promisesListed.length)
     // Held by their contents too: a file swapped for another changes the number the law compares.
     expect([heldAs(promisesListed), heldAs(R.keys(promisesVendored)), heldAs(R.keys(promiseEntryPoints))]).toEqual([

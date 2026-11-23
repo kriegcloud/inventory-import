@@ -8,6 +8,7 @@ import { DecidedBy, RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } fr
 import { StagedHeadJson } from "@inventory/catalog-contract/Staged"
 import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
+import * as A from "effect/Array"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -84,7 +85,8 @@ export const ItemsPiece = piece(ItemInsert).annotate({ description: "Items a con
 /**
  * Why a row was left out or found already there, as a confirm writes it: the plan's own reason, so the write asks
  * exactly what the plan holds (never empty, and within the model's bound on a reason) and no plan the review can make
- * is refused at the write; the result and the download of left-out rows show it as it is.
+ * is refused at the write. The result and the download of left-out rows read it back as `StoredReason` does: as
+ * written when it fits, else with its long quoted values shortened.
  */
 export const OutcomeReason = PlannedRow.cases.notImported.fields.reason
 
@@ -109,16 +111,51 @@ export const clipped: {
   return `${/[\uD800-\uDBFF]$/.test(kept) ? Str.takeLeft(kept, max - 2) : kept}…`
 })
 
+/** The most of a quoted value a long stored reason keeps: about the first 80 characters, as the review quotes one. */
+export const quotedValueLength = 80
+
+// How many characters a value has, as a person counts them: a pair of surrogates is one.
+const charactersIn = (text: string): string => new Intl.NumberFormat("en-US").format(A.fromIterable(text).length)
+
 /**
- * A reason as `importOutcome` holds it, written by any version: one longer than the result reads reads cut to
- * `resultReasonLength` with "…", so a past import's Result still answers. Encoding writes it as it is.
+ * A reason whose quoted values (`Category "…"`) are each cut to `quotedValueLength`, with how long the value was
+ * after its closing quote: every problem's sentence stays whole. A value is what stands between a pair of quotes, so
+ * a value with a quote of its own shifts the pairs; a reason still too long is then cut at its end.
+ *
+ * @example quotesShortened(`Category "${"x".repeat(4000)}" is not one of the 5 categories.`)
+ * // `Category "${"x".repeat(79)}…" (4,000 characters) is not one of the 5 categories.`
+ */
+export const quotesShortened = (reason: string): string => {
+  const parts = Str.split(reason, '"')
+  return A.join(
+    A.map(parts, (part, index) =>
+      index % 2 === 1
+        ? clipped(part, quotedValueLength)
+        : O.match(
+            O.filter(A.get(parts, index - 1), (quoted) => quoted.length > quotedValueLength),
+            { onNone: () => part, onSome: (quoted) => ` (${charactersIn(quoted)} characters)${part}` }
+          )
+    ),
+    '"'
+  )
+}
+
+/**
+ * A reason as `importOutcome` holds it, written by any version. One longer than the result reads (a version that
+ * quoted whole cells) reads with its long quoted values shortened, so each problem it names still reads, and is cut
+ * at its end only if it is still too long; a past import's Result and download still answer. Encoding writes it as
+ * it is.
  */
 export const StoredReason = S.String.pipe(
   S.decodeTo(
     S.toType(S.String.check(S.isMaxLength(resultReasonLength))),
-    SchemaTransformation.transform({ decode: clipped(resultReasonLength), encode: (reason) => reason })
+    SchemaTransformation.transform({
+      decode: (reason) =>
+        reason.length <= resultReasonLength ? reason : clipped(quotesShortened(reason), resultReasonLength),
+      encode: (reason) => reason
+    })
   )
-).annotate({ description: "A stored reason, cut to the length the result reads" })
+).annotate({ description: "A stored reason, its long quoted values shortened to fit the length the result reads" })
 
 // Where the item is in the file and what it is called, as `importOutcome` keeps it.
 const outcomePlace = { rowNumber: RowNumber, part: Part, sku: S.String, name: S.String }

@@ -25,7 +25,7 @@ import { sharedStorage } from "@inventory/client/Storage"
 import { browserLocks, lockOf, takingOf, thisTab } from "@inventory/client/TabAtoms"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
-import { kept } from "@inventory/review/Kept"
+import { kept, keptRefused } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
 import { call } from "./Catalog.runtime.ts"
@@ -126,6 +126,19 @@ export const letAnothersDraftGo = ({ id, registry }: DraftIn): void => {
 
 const waitingAt = Atom.family((key: string) =>
   kept({ key, schema: StoredWaiting, defaultValue: (): StoredWaiting => O.none() })
+)
+
+/**
+ * True while the browser refused the last write of one import's waiting rows (a private window that keeps nothing, a
+ * full disk): they are held by this page only, and lost if it is closed or loaded again before they are sent. What the
+ * screen says of rows waiting reads this, so it never says they are kept in this browser when they are not.
+ */
+export const waitingNotKept = perKey((id: ImportId) =>
+  Atom.readable((get): boolean =>
+    O.exists(O.all({ owner: get(draftOwner(id)), tab: get(thisTab) }), ({ owner, tab }) =>
+      get(keptRefused(keyOf(owner, id, tab)))
+    )
+  )
 )
 
 /** The scope one import's waiting rows are kept under for one member, in one organization: every tab's begins so. */

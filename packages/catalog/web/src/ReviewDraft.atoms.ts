@@ -52,8 +52,10 @@ import {
   signedInAs,
   takeBackDismissals,
   takeUpGoneTabs,
-  unreadKept
+  unreadKept,
+  waitingNotKept
 } from "./Draft.atoms.ts"
+import { notImportedToast, notSavedToast, signedOutToast } from "./internal/keptWords.ts"
 import { thisTab } from "@inventory/client/TabAtoms"
 import { leftOverLines, namedWords, rowsWords, takeBackLine } from "./internal/leftOver.ts"
 import {
@@ -267,17 +269,14 @@ const perform = (input: {
         // each only where nobody decided it otherwise meanwhile.
         NotSaved: () =>
           void toast.error("Not saved yet", {
-            description:
-              "Your last decision is kept in this browser, and the server did not take it. Save again sends it now; where someone decided that row meanwhile, the review asks you which stands.",
+            description: notSavedToast(!registry.get(waitingNotKept(id))),
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           }),
         // Said as it is: nobody is signed in, or somebody else is.
         SignedOut: () => {
           const another = ownedByAnother({ registry, id })
           void toast.error(another ? "Not saved: someone else is signed in" : "Not saved: you are signed out", {
-            description: another
-              ? "Your last decision is kept in this browser for you, and was not sent as them. Sign in again as yourself in this tab, then Save again sends it."
-              : "Your last decision is kept in this browser. Sign in again as yourself in this tab, then Save again sends it.",
+            description: signedOutToast({ another, kept: !registry.get(waitingNotKept(id)) }),
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           })
         },
@@ -367,8 +366,7 @@ const perform = (input: {
         if (!signedInAs({ registry, owner })) {
           const another = anotherThan({ registry, owner })
           void toast.error(another ? "Not imported: someone else is signed in" : "Not imported: you are signed out", {
-            description:
-              "Nothing was confirmed. Your decisions are kept in this browser; confirm again once you are signed in as yourself."
+            description: notImportedToast(!registry.get(waitingNotKept(id)))
           })
           return happened(DraftEvent.ConfirmFailed({ id: sent }))
         }

@@ -53,6 +53,8 @@ import { WhyFlagged } from "./internal/WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./internal/CellForms.tsx"
 import { heldBackSentence, notImportedColumn, reviewStepWords } from "./internal/format.tsx"
 import { totalText } from "./internal/itemText.ts"
+import { notSavedLine } from "./internal/keptWords.ts"
+import { waitingNotKept } from "./Draft.atoms.ts"
 import { regionColumns, regionKinds, storedChoice, toRegionProblem, toRegionRows } from "./ImportReview.controller.ts"
 import { toastError } from "@inventory/client/SayError"
 import { offersSuggestions } from "@inventory/catalog-model/Suggest"
@@ -292,7 +294,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
             onSettle={(picks) => happened(DraftEvent.Settled({ picks }))}
           />
           <NotImportedYet why={heldBack} />
-          <NotSavedYet rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
+          <NotSavedYet id={view.id} rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
           <MatchTakeBacks taken={takenBack} onDismiss={dismiss} />
           <ReaderWarnings table={table} />
         </>
@@ -364,10 +366,12 @@ export function AboveReview(props: { lines: ReactNode; children: ReactNode }) {
 
 /**
  * Said above the review while decisions wait after a save that failed: they are on the screen and kept in this
- * browser, not on the server yet. It stays until they are saved; the button sends them now.
+ * browser (or, where the browser refused, held by this page only, and said so), not on the server yet. It stays until
+ * they are saved; the button sends them now.
  */
-function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
+function NotSavedYet(props: { id: ImportId; rows: number; onSaveAgain: () => void }) {
   const narrow = useAtomValue(isNarrow)
+  const notKept = useAtomValue(waitingNotKept(props.id))
   if (props.rows === 0) return null
   const one = props.rows === 1
   return (
@@ -375,11 +379,7 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
       <TriangleAlertIcon aria-hidden />
       <AlertTitle>{one ? "1 decision is not saved yet" : `${props.rows} decisions are not saved yet`}</AlertTitle>
       <AlertDescription>
-        <p>
-          The server did not take {one ? "it" : "them"}. {one ? "It is" : "They are"} kept in this browser and sent with
-          your next decision, or now. Where someone decided {one ? "that row" : "one of those rows"} otherwise
-          meanwhile, you are asked which stands.
-        </p>
+        <p>{notSavedLine({ one, kept: !notKept })}</p>
         <Button variant="outline" size="xs" onClick={props.onSaveAgain}>
           Save again
         </Button>

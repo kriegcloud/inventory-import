@@ -1,0 +1,174 @@
+{
+  // No type assertion is written (Benjamin, 2026-11-22: "type assertions are banned"): `x as T` and `<T>x` tell the
+  // compiler what a value is instead of showing it, and a wrong one reaches the person as a value of the wrong shape.
+  // Decode it through a Schema, narrow it with a guard, or annotate it (`const x: T = value`, `value satisfies T`).
+  // `as const` says nothing new about a value and stays allowed (measured on oxlint 1.93.0).
+  //
+  // Run over every package at once from the root (`bun run assertions:check`), so each path below is from the root:
+  // a package's own `bun run lint` reads its nearest .oxlintrc.json, whose overrides are read from that package's
+  // folder, so no one list could serve them all. `bun run beep laws assertions` holds the lists: a listed file with no
+  // assertion left is refused until its line is taken off, and no list may grow.
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript"],
+  // Only this rule: each package's own lint runs the rest.
+  "categories": { "correctness": "off" },
+  "rules": {
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }]
+  },
+  "ignorePatterns": [
+    // shadcn's components, kept as published.
+    "packages/ui/src/components/ui/**",
+    ".agents/**",
+    ".codex/**",
+    "scratchpad/**",
+    "vendor/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.wrangler/**",
+    "**/.turbo/**",
+    ".claude/**"
+  ],
+  "overrides": [
+    {
+      // beep-effect's kit, vendored with its file hashes (`bun run vendor:check`): the fix goes to beep-effect first,
+      // and is then vendored again.
+      "files": [
+        "packages/foundation/modeling/identity/src/Curie.ts",
+        "packages/foundation/modeling/identity/src/Fibered.ts",
+        "packages/foundation/modeling/identity/src/Id.ts",
+        "packages/foundation/modeling/identity/src/internal/schemaStatics.ts",
+        "packages/foundation/modeling/identity/test/Identity.test.ts",
+        "packages/foundation/modeling/identity/test/OntologyEntrypoints.test.ts",
+        "packages/foundation/modeling/identity/test/PnLocal.test.ts",
+        "packages/foundation/modeling/identity/test/TemplateGuards.test.ts",
+        "packages/foundation/modeling/schema/src/LiteralKit/internal/builders.ts",
+        "packages/foundation/modeling/schema/src/LiteralKit/LiteralKit.schema.ts",
+        "packages/foundation/modeling/schema/src/SchemaUtils/internal/staticDescriptors.ts",
+        "packages/foundation/modeling/schema/src/SchemaUtils/withStatics.ts",
+        "packages/foundation/modeling/schema/test/LiteralKit.test.ts",
+        "packages/foundation/modeling/utils/src/FileSystem.ts",
+        "packages/foundation/modeling/utils/src/GlobalValue.ts",
+        "packages/foundation/modeling/utils/src/internal/StructPath.ts",
+        "packages/foundation/modeling/utils/src/Option.ts",
+        "packages/foundation/modeling/utils/src/Predicate.ts",
+        "packages/foundation/modeling/utils/src/Random.ts",
+        "packages/foundation/modeling/utils/src/Struct.ts",
+        "packages/foundation/modeling/utils/test/Array.test.ts",
+        "packages/foundation/modeling/utils/test/Option.test.ts",
+        "packages/foundation/modeling/utils/test/Struct.test.ts"
+      ],
+      "rules": { "typescript/consistent-type-assertions": "off" }
+    },
+    {
+      // Components and hooks copied from a registry (tablecn, Dice UI; packages/ui/components.json names them), kept
+      // as published.
+      "files": [
+        "packages/ui/src/components/action-bar.tsx",
+        "packages/ui/src/components/chart.tsx",
+        "packages/ui/src/components/data-grid/data-grid-cell.tsx",
+        "packages/ui/src/components/data-grid/data-grid-column-header.tsx",
+        "packages/ui/src/components/data-grid/data-grid-context-menu.tsx",
+        "packages/ui/src/components/data-grid/data-grid-data-cell.tsx",
+        "packages/ui/src/components/data-grid/data-grid-features.ts",
+        "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx",
+        "packages/ui/src/components/data-grid/data-grid-row-models.ts",
+        "packages/ui/src/components/data-grid/data-grid-row.tsx",
+        "packages/ui/src/components/data-grid/data-grid-search.tsx",
+        "packages/ui/src/components/data-grid/data-grid.tsx",
+        "packages/ui/src/components/data-grid/data-grid-utils.ts",
+        "packages/ui/src/components/data-grid/use-data-grid.ts",
+        "packages/ui/src/components/data-table/data-table-config.ts",
+        "packages/ui/src/components/data-table/data-table-features.ts",
+        "packages/ui/src/components/data-table/data-table-filters.ts",
+        "packages/ui/src/components/data-table/data-table-records.tsx",
+        "packages/ui/src/components/data-table/data-table-state.ts",
+        "packages/ui/src/components/data-table/data-table-toolbar.tsx",
+        "packages/ui/src/components/data-table/data-table.tsx",
+        "packages/ui/src/components/data-table/data-table-utils.ts",
+        "packages/ui/src/components/faceted.tsx",
+        "packages/ui/src/components/form.tsx",
+        "packages/ui/src/components/input-group.tsx",
+        "packages/ui/src/components/sidebar.tsx",
+        "packages/ui/src/components/sonner.tsx",
+        "packages/ui/src/components/sortable.tsx",
+        "packages/ui/src/components/stepper.tsx",
+        "packages/ui/src/components/sticky-table.tsx",
+        "packages/ui/src/components/toggle-group.tsx",
+        "packages/ui/src/components/tour.tsx",
+        "packages/ui/src/hooks/use-data-table.ts"
+      ],
+      "rules": { "typescript/consistent-type-assertions": "off" }
+    },
+    {
+      // Files that hold an assertion today. This list may only shrink: each owner takes a file off when its last
+      // assertion is gone.
+      "files": [
+        "apps/inventory/src/api/v1/Document.ts",
+        "apps/inventory/src/web/lib/form.ts",
+        "apps/inventory/src/web/pages/gallery/JobsReview.tsx",
+        "apps/inventory/src/web/pages/ReviewGallery.tsx",
+        "apps/inventory/test/server/support/app.ts",
+        "apps/inventory/test/server/Telemetry.test.ts",
+        "apps/inventory/test/server/WriteLimits.slow.test.ts",
+        "apps/inventory/test/web/session.test.ts",
+        "apps/inventory/test/web/workspace.test.ts",
+        "apps/inventory/vite.config.ts",
+        "packages/access/contract/test/AccessContract.test.ts",
+        "packages/access/web/src/People.screen.tsx",
+        "packages/catalog/contract/src/Suggestion/Suggestion.read.ts",
+        "packages/catalog/contract/test/CatalogContract.test.ts",
+        "packages/catalog/model/src/Catalog.memory.ts",
+        "packages/catalog/model/src/Review/CellReading.rules.ts",
+        "packages/catalog/model/src/Review/Review.rules.ts",
+        "packages/catalog/model/src/Suggestion/Suggest.rules.ts",
+        "packages/catalog/web/src/internal/cellDrafts.ts",
+        "packages/catalog/web/src/internal/CellForms.tsx",
+        "packages/catalog/web/src/internal/itemText.ts",
+        "packages/catalog/web/src/ItemsPage.screen.tsx",
+        "packages/catalog/web/src/TableAssistant.screen.tsx",
+        "packages/catalog/web/test/ConfirmDraft.test.ts",
+        "packages/catalog/web/test/csvDifferential.test.ts",
+        "packages/catalog/web/test/DraftLines.test.ts",
+        "packages/catalog/web/test/DraftPicks.test.ts",
+        "packages/catalog/web/test/DraftRegion.test.ts",
+        "packages/catalog/web/test/DraftServer.test.ts",
+        "packages/catalog/web/test/ItemEditor.test.ts",
+        "packages/catalog/web/test/KeptRows.test.ts",
+        "packages/catalog/web/test/readerWarnings.test.ts",
+        "packages/catalog/web/test/RemoveImport.test.ts",
+        "packages/catalog/web/test/ResultRows.test.ts",
+        "packages/catalog/web/test/ReviewDraft.test.ts",
+        "packages/catalog/web/test/support/catalog.ts",
+        "packages/catalog/web/test/support/draftWorld.ts",
+        "packages/catalog/web/test/TabRows.test.ts",
+        "packages/catalog/web/test/TakenBackWords.test.ts",
+        "packages/catalog/web/test/UploadOwner.test.ts",
+        "packages/catalog/web/test/xlsxParity.test.ts",
+        "packages/client/src/Api.atoms.ts",
+        "packages/client/src/ApiRuntime.runtime.ts",
+        "packages/drivers/better-auth/test/BetterAuth.test.ts",
+        "packages/drivers/d1/src/D1.service.ts",
+        "packages/drivers/d1/test/D1Schemas.property.test.ts",
+        "packages/drivers/d1/test/D1.test.ts",
+        "packages/drivers/openrouter/test/OpenRouterSchemas.property.test.ts",
+        "packages/foundation/modeling/csv/src/Csv.codec.ts",
+        "packages/foundation/modeling/csv/test/CsvSchemas.property.test.ts",
+        "packages/foundation/modeling/csv/test/oracle.property.test.ts",
+        "packages/foundation/modeling/xlsx/src/internal/trusted.ts",
+        "packages/foundation/modeling/xlsx/test/oracle.property.test.ts",
+        "packages/foundation/modeling/xlsx/test/XlsxSchemas.property.test.ts",
+        "packages/kernel/test/Kernel.property.test.ts",
+        "packages/review/src/ReviewRegion.atoms.ts",
+        "packages/review/src/ReviewRegion.component.tsx",
+        "packages/review/test/fixtures/fabrication.ts",
+        "packages/review/test/ReviewDecision.property.test.ts",
+        "packages/review/test/ReviewRegion.atoms.test.ts",
+        "packages/review/test/Review.test.ts",
+        "packages/review/test/SavedProgress.test.ts",
+        "packages/ui/src/ListTable.component.tsx",
+        "packages/ui/src/TableSearch.component.tsx"
+      ],
+      "rules": { "typescript/consistent-type-assertions": "off" }
+    }
+  ]
+}

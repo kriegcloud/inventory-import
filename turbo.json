@@ -277,6 +277,54 @@
       ],
       "outputs": []
     },
+    // No Promise is written (`beep laws promises`), but in the files its lists name: every code file git would commit
+    // is an input, as for the try law, with the law's own source.
+    "//#promises:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // No `@effect-diagnostics` directive turns a rule off (`beep laws diagnostics`), but in the files it lists.
+    "//#diagnostics:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // No type assertion is written (oxlint, `.oxlintrc.assertions.json`, from the root), and its lists only shrink
+    // (`beep laws assertions`).
+    "//#assertions:check": {
+      "inputs": [
+        ".oxlintrc.assertions.json",
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // The root's own .ts files and each package's vitest.config.ts type-check (tsconfig.config.json). Only the linter
     // above reads that project otherwise, and an import that does not resolve there would hide a deprecated call.
     "//#configs:check": {

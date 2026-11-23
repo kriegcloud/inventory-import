@@ -8,13 +8,16 @@ import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
+import { assertions, assertionsSentence } from "./Assertions.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
 import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
+import { diagnostics, diagnosticsSentence } from "./Diagnostics.rules.ts"
 import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
 import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
+import { promises, promiseSentence } from "./Promises.rules.ts"
 import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
 import { tags, tagsSentence } from "./Tags.rules.ts"
@@ -69,6 +72,23 @@ export const tryCommand = Command.make("try", {}, () => Effect.flatMap(tryStatem
   )
 )
 
+/** `laws assertions`: the type-assertion ban's lists only shrink, and no comment turns its rule off. */
+export const assertionsCommand = Command.make("assertions", {}, () =>
+  Effect.flatMap(assertions(), emit(assertionsSentence))
+).pipe(Command.withDescription("The type-assertion ban's lists only shrink, and no comment turns its rule off"))
+
+/** `laws promises`: no Promise is written, but in what its three lists name. */
+export const promisesCommand = Command.make("promises", {}, () =>
+  Effect.flatMap(promises(), emit(promiseSentence))
+).pipe(
+  Command.withDescription("No Promise is written: no async, await, new Promise, Promise.*, Promise type or .then chain")
+)
+
+/** `laws diagnostics`: no `@effect-diagnostics` directive turns a rule off, but in the files listed. */
+export const diagnosticsCommand = Command.make("diagnostics", {}, () =>
+  Effect.flatMap(diagnostics(), emit(diagnosticsSentence))
+).pipe(Command.withDescription("No @effect-diagnostics directive turns a rule off, in any code file git would commit"))
+
 const write = Flag.Boolean("write").pipe(
   Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
   Flag.withDefault(false)
@@ -91,12 +111,15 @@ export const effectImportsCommand = Command.make("effect-imports", { write, chec
 export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
   Command.withSubcommands([
+    assertionsCommand,
     boundariesCommand,
     deprecatedApisCommand,
+    diagnosticsCommand,
     effectImportsCommand,
     exportsCommand,
     keysCommand,
     privatePathsCommand,
+    promisesCommand,
     refCallbacksCommand,
     screensCommand,
     tagsCommand,

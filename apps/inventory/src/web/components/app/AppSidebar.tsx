@@ -216,7 +216,7 @@ function UserMenu() {
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
   // The test accounts other than the signed-in one, with the password they share: only while the server offers them.
-  const offered = O.flatMap(O.fromUndefinedOr(features), (known) =>
+  const offered = O.flatMap(features, (known) =>
     O.flatMap(known.testAccounts, (accounts) => {
       const others = A.filter(accounts.accounts, (account) => account.email !== email)
       return others.length === 0 ? O.none() : O.some({ password: accounts.password, others })

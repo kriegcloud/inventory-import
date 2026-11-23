@@ -108,6 +108,38 @@ export class ConfirmPlan extends S.Opaque<ConfirmPlan, { readonly brand: unique 
   }).annotate({ identifier: "ConfirmPlan", description: "What one confirm will do with each item of a file" })
 ) {}
 
+/** What a row says when the review gave it no sentence: it is still never blank. */
+const unread = "A value could not be read."
+
+const moreProblems = (left: number): string =>
+  left === 1 ? "1 more problem is not listed here." : `${left} more problems are not listed here.`
+
+/**
+ * A row's reasons as the one reason a plan holds: joined by a space, and never past `maxReason` nor blank, whatever
+ * the review said. The review keeps each sentence short (`said` in `CellReading.rules.ts`), so every one fits in
+ * practice; this holds the bound where the plan is made, so a confirm cannot fail on the length of a reason. A
+ * sentence that would pass the bound is left off, with every one after it, and the reason ends by saying how many.
+ *
+ * @example fitted(["Name is empty.", 'Category "Misc" is not one of the 5 categories.'])
+ * // 'Name is empty. Category "Misc" is not one of the 5 categories.'
+ */
+export const fitted = (reasons: ReadonlyArray<string>): string => {
+  const sentences = A.filter(reasons, (sentence) => /\S/.test(sentence))
+  // The room the closing count may need, kept free while any sentence is still to come.
+  const reserve = moreProblems(sentences.length).length + 1
+  const kept = A.reduce(sentences, { text: "", taken: 0, full: false }, (held, sentence, index) => {
+    if (held.full) return held
+    const next = held.text === "" ? sentence : `${held.text} ${sentence}`
+    const last = index === sentences.length - 1
+    return next.length <= maxReason - (last ? 0 : reserve)
+      ? { text: next, taken: index + 1, full: false }
+      : { ...held, full: true }
+  })
+  const left = sentences.length - kept.taken
+  const text = left === 0 ? kept.text : kept.text === "" ? moreProblems(left) : `${kept.text} ${moreProblems(left)}`
+  return text === "" ? unread : text
+}
+
 /** The rows of a plan that write an item: the new ones and the replacements. */
 export const plannedItems = (
   plan: ConfirmPlan
@@ -132,7 +164,7 @@ export const confirmPlan = (input: {
   const rows = A.map(review.rows, (row): PlannedRow => {
     const at = { rowNumber: row.rowNumber, part: row.part ?? 0, sku: row.values.sku, name: row.values.name }
     // Every problem of the row, so the not-imported rows and their download name each one.
-    const why = A.join(row.reasons, " ")
+    const why = fitted(row.reasons)
     if (RowStatus.is.ready(row.status) && row.item !== null) {
       const made = {
         ...at,

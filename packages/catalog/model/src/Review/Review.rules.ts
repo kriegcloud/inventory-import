@@ -47,6 +47,9 @@ import {
   readDecimal,
   dateReadings,
   readVendors,
+  said,
+  named,
+  wholeNumber,
   readCount,
   readDimensions,
   readUnitCost,
@@ -555,7 +558,10 @@ const makeContext = (input: {
   }
 }
 
-const quoted = (text: string): string => (text === "" ? "An empty cell" : `"${text}"`)
+/** The most rows a sentence about a repeated SKU names. Past it, it says how many more there are. */
+export const maxRowsNamed = 10
+
+const quoted = (text: string): string => (text === "" ? "An empty cell" : said(text))
 
 const proposal = (
   parts: Omit<Proposal, "by" | "alternatives" | "labels" | "targets"> & {
@@ -644,7 +650,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         : isDateField(field)
           ? `${quoted(trimmed)} on ${rows} is ${to} written another way; it has no other reading.`
           : field === "tags"
-            ? `${quoted(trimmed)} on ${rows} becomes "${to}": tags are lower case, each once.`
+            ? `${quoted(trimmed)} on ${rows} becomes ${said(to)}: tags are lower case, each once.`
             : field === "unitCost"
               ? `${quoted(trimmed)} on ${rows} carries a "$"; costs are in US dollars already, and ${plural(ctx.pointCosts, "row writes", "rows write")} the digits alone.`
               : `${quoted(trimmed)} on ${rows}; ${others} ${to}.`
@@ -672,7 +678,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
           to: upper,
           lossless: false,
           confidence: "medium",
-          basis: `"${trimmed}" is ${upper} in capitals, the form a SKU has${also > 0 ? `; ${plural(also, "other row already has", "other rows already have")} ${upper}, so the two would then share it` : ""}.`,
+          basis: `${said(trimmed)} is ${upper} in capitals, the form a SKU has${also > 0 ? `; ${plural(also, "other row already has", "other rows already have")} ${upper}, so the two would then share it` : ""}.`,
           group: "sku:capitals"
         })
       )
@@ -688,7 +694,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
           to: near.value,
           lossless: false,
           confidence: "medium",
-          basis: `"${trimmed}" on ${rows} is close to ${near.value}, one of the ${categories.length} categories; ${plural(ctx.countOf(field, near.value), "row says", "rows say")} ${near.value}.`,
+          basis: `${said(trimmed)} on ${rows} is close to ${near.value}, one of the ${categories.length} categories; ${plural(ctx.countOf(field, near.value), "row says", "rows say")} ${near.value}.`,
           group: `category:${near.value}:near`
         })
       )
@@ -708,7 +714,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
             to: digits,
             lossless: false,
             confidence: "low",
-            basis: `"${trimmed}" is ${digits} with a comma between thousands or ${asDecimal} with a decimal comma; the file does not say which.`,
+            basis: `${said(trimmed)} is ${digits} with a comma between thousands or ${asDecimal} with a decimal comma; the file does not say which.`,
             alternatives: [asDecimal],
             group: `unitCost:ask:${trimmed}`
           })
@@ -722,7 +728,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
             to: digits,
             lossless: false,
             confidence: "medium",
-            basis: `"${trimmed}" reads as ${digits} with a comma between thousands.`,
+            basis: `${said(trimmed)} reads as ${named(digits)} with a comma between thousands.`,
             group: "unitCost:thousands"
           })
         )
@@ -738,7 +744,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
             to: asDecimal,
             lossless: false,
             confidence: "medium",
-            basis: `"${trimmed}" reads as ${asDecimal} with a decimal comma: a comma between thousands is followed by three digits. ${plural(ctx.pointCosts, "cost", "costs")} of ${ctx.filledOf(field)} in this file write a point.`,
+            basis: `${said(trimmed)} reads as ${asDecimal} with a decimal comma: a comma between thousands is followed by three digits. ${plural(ctx.pointCosts, "cost", "costs")} of ${ctx.filledOf(field)} in this file write a point.`,
             group: "unitCost:decimal-comma"
           })
         )
@@ -754,7 +760,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         to: digits,
         lossless: false,
         confidence: "medium",
-        basis: `"${trimmed}" on ${rows} reads as ${digits} with a comma between thousands: ${Str.toLowerCase(label)} is a whole number, so the comma is not a decimal one.`,
+        basis: `${said(trimmed)} on ${rows} reads as ${named(digits)} with a comma between thousands: ${Str.toLowerCase(label)} is a whole number, so the comma is not a decimal one.`,
         group: `${field}:thousands`
       })
     )
@@ -767,7 +773,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         to: "true",
         lossless: false,
         confidence: "low",
-        basis: `"${trimmed}" on ${rows} is neither true nor false; ${plural(ctx.countOf(field, "true"), "row says", "rows say")} true and ${ctx.countOf(field, "false")} false. Only you know which this is.`,
+        basis: `${said(trimmed)} on ${rows} is neither true nor false; ${plural(ctx.countOf(field, "true"), "row says", "rows say")} true and ${ctx.countOf(field, "false")} false. Only you know which this is.`,
         alternatives: ["false"],
         group: `${field}:ask:${trimmed}`
       })
@@ -813,7 +819,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
           to: monthFirst.value,
           lossless: false,
           confidence: "low",
-          basis: `"${trimmed}" is ${monthFirst.value} with the month first or ${dayFirst.value} with the day first, and no other date in this column says which.`,
+          basis: `${said(trimmed)} is ${monthFirst.value} with the month first or ${dayFirst.value} with the day first, and no other date in this column says which.`,
           alternatives: [dayFirst.value],
           labels: [`${monthFirst.value} (month first)`, `${dayFirst.value} (day first)`],
           group: `${field}:ask:${trimmed}`
@@ -863,7 +869,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
               lossless: false,
               confidence: "low",
               basis: `${preferred.length} vendors are marked preferred (${A.join(
-                A.map(preferred, (vendor) => vendor.vendorName),
+                A.map(preferred, (vendor) => named(vendor.vendorName)),
                 ", "
               )}); an item has at most one.`,
               alternatives: A.map(A.drop(picks, 1), (pick) => pick.to),
@@ -903,7 +909,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (field === "isActive" && (empty || text === "true") && discontinuedYetActive(values)) {
     return {
       kind: "discontinued",
-      message: `Discontinued on ${Str.trim(values.discontinuedOn)}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
+      message: `Discontinued on ${named(Str.trim(values.discontinuedOn))}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
       ask: "Choose not active",
       choices: ["true", "false"]
     }
@@ -912,15 +918,16 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (field === "sku") {
     if (skuPattern.test(text)) return undefined
     return text !== Str.trim(text) && skuPattern.test(Str.trim(text))
-      ? { kind: "spaces", message: `SKU "${text}" has spaces around it.`, ask: null }
+      ? { kind: "spaces", message: `SKU ${said(text)} has spaces around it.`, ask: null }
       : {
           kind: "sku",
-          message: `SKU "${Str.trim(text)}" is not three capital letters, a hyphen and four digits, like BLT-0042.`,
+          message: `SKU ${said(Str.trim(text))} is not three capital letters, a hyphen and four digits, like BLT-0042.`,
           ask: "Type the SKU"
         }
   }
   if (field === "name") {
-    if (text !== Str.trim(text)) return { kind: "spaces", message: `Name "${text}" has spaces around it.`, ask: null }
+    if (text !== Str.trim(text))
+      return { kind: "spaces", message: `Name ${said(text)} has spaces around it.`, ask: null }
     return text.length > maxNameLength
       ? {
           kind: "name",
@@ -934,7 +941,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "category",
-          message: `Category "${text}" is not one of the ${categories.length} categories.`,
+          message: `Category ${said(text)} is not one of the ${categories.length} categories.`,
           ask: "Pick a category",
           choices: categories
         }
@@ -944,7 +951,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "uom",
-          message: `Unit of measure "${text}" is not one of ${A.join(uoms, ", ")}.`,
+          message: `Unit of measure ${said(text)} is not one of ${A.join(uoms, ", ")}.`,
           ask: "Pick a unit",
           choices: uoms
         }
@@ -955,10 +962,10 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     return {
       kind: "cost",
       message: /^-\s*\$?[\d.,]+$/.test(shown)
-        ? `Unit cost "${shown}" is below zero. A cost is 0 or more.`
+        ? `Unit cost ${said(shown)} is below zero. A cost is 0 or more.`
         : /^\$?\d+\.\d{5,}$/.test(shown)
-          ? `Unit cost "${shown}" has more than 4 decimals.`
-          : `Unit cost "${shown}" is not an amount in dollars written as digits.`,
+          ? `Unit cost ${said(shown)} has more than 4 decimals.`
+          : `Unit cost ${said(shown)} is not an amount in dollars written as digits.`,
       ask: "Type the unit cost"
     }
   }
@@ -968,10 +975,10 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     return {
       kind: "number",
       message: /^\d+\.\d+$/.test(shown)
-        ? `${label} "${shown}" is not a whole number.`
+        ? `${label} ${said(shown)} is not a whole number.`
         : /^-\d/.test(shown)
-          ? `${label} "${shown}" is below zero.`
-          : `${label} "${shown}" is not a whole number written as digits.`,
+          ? `${label} ${said(shown)} is below zero.`
+          : `${label} ${said(shown)} is not a whole number written as digits.`,
       ask: `Type the ${lower}`
     }
   }
@@ -980,7 +987,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "boolean",
-          message: `${label} "${Str.trim(text)}" is not true or false.`,
+          message: `${label} ${said(Str.trim(text))} is not true or false.`,
           ask: "Choose true or false",
           choices: ["true", "false"]
         }
@@ -989,7 +996,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     // A cell of separators only ("|") holds no tag: it is empty, not badly written.
     return canonicalTags(text) === text || canonicalTags(text) === ""
       ? undefined
-      : { kind: "tags", message: `Tags "${text}" are not lower case, each once.`, ask: "Type the tags" }
+      : { kind: "tags", message: `Tags ${said(text)} are not lower case, each once.`, ask: "Type the tags" }
   }
   if (isDateField(field)) {
     return O.isSome(readDate(text))
@@ -997,10 +1004,10 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : {
           kind: "date",
           message: /^\d{4}-\d{2}-\d{2}$/.test(Str.trim(text))
-            ? `${label} "${Str.trim(text)}" is not a day on the calendar.`
+            ? `${label} ${said(Str.trim(text))} is not a day on the calendar.`
             : twoDigitYear(text)
               ? `${label} “${Str.trim(text)}” has a two-digit year; type it as year-month-day.`
-              : `${label} "${Str.trim(text)}" is not written as year-month-day.`,
+              : `${label} ${said(Str.trim(text))} is not written as year-month-day.`,
           ask: "Type the date"
         }
   }
@@ -1020,7 +1027,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? {
           kind: "vendors",
           message: `${preferred.length} vendors are marked preferred (${A.join(
-            A.map(preferred, (vendor) => vendor.vendorName),
+            A.map(preferred, (vendor) => named(vendor.vendorName)),
             ", "
           )}). An item has at most one.`,
           ask: "Choose the preferred vendor"
@@ -1091,7 +1098,7 @@ const problemsOf = (
             kind: "stored",
             tone: "blocker",
             field: "sku",
-            message: `SKU ${Str.trim(values.sku)} is already there: an item your organization has uses it.`,
+            message: `SKU ${named(Str.trim(values.sku))} is already there: an item your organization has uses it.`,
             ask: "Type another SKU",
             choices: [],
             note: null,
@@ -1101,10 +1108,13 @@ const problemsOf = (
         ]
       : []
   const ids = A.map(rivals, (rival) => rival.id)
-  const where = A.join(
-    A.map(rivals, (rival) => rival.place),
+  // The first rows by name, then how many more: a SKU on thousands of rows would otherwise name them all.
+  const first = A.join(
+    A.map(A.take(rivals, maxRowsNamed), (rival) => named(rival.place)),
     ", "
   )
+  const where =
+    rivals.length > maxRowsNamed ? `${first} and ${wholeNumber.format(rivals.length - maxRowsNamed)} more` : first
   // Rows that agree in every field are copies; rows that share only the SKU are two items clashing over it.
   const copies = A.every(rivals, (rival) => rival.same)
   const twice: ReadonlyArray<Problem> =
@@ -1117,7 +1127,7 @@ const problemsOf = (
             field: "sku",
             message: copies
               ? `This row is a copy of row ${where}.`
-              : `SKU ${Str.toUpperCase(Str.trim(values.sku))} is also on row ${where} with different values. Keep one row, or leave one out.`,
+              : `SKU ${named(Str.toUpperCase(Str.trim(values.sku)))} is also on row ${where} with different values. Keep one row, or leave one out.`,
             ask: "Type another SKU",
             choices: [],
             note: `${copies ? "copy of" : "also"} row ${where}`,
@@ -1354,7 +1364,7 @@ export const review = (input: {
             kind: "changed",
             tone: "decision",
             field: "sku",
-            message: `SKU ${sku} is already there with other values (${A.join(
+            message: `SKU ${named(sku)} is already there with other values (${A.join(
               A.map(entry.stored, (difference) => fieldLabels[difference.field]),
               ", "
             )}). Keep the stored item, or replace it with this row.`,
@@ -1390,8 +1400,8 @@ export const review = (input: {
         ? entry.mine
           ? "This row was imported from this file earlier."
           : entry.keptStored
-            ? `SKU ${sku} is already there with other values. You kept the stored item.`
-            : `SKU ${sku} is already there. It is skipped, not changed.`
+            ? `SKU ${named(sku)} is already there with other values. You kept the stored item.`
+            : `SKU ${named(sku)} is already there. It is skipped, not changed.`
         : head !== undefined
           ? head.message
           : item === null

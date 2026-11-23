@@ -12,6 +12,7 @@ import { ItemFacets } from "@inventory/catalog-contract/ItemQuery"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as S from "effect/Schema"
 
 const runs = { arbitrary: { runs: 200 } }
@@ -124,12 +125,37 @@ describe("what the Items filters offer", () => {
 
   it.prop(
     "is refused when it counts more items than a stock number may be, though every list adds up",
-    [Arbitrary.schema(ItemFacets)],
-    ([facets]) => {
-      // Each list counts the items under two of its values, so every count stays within a stock number's bound.
+    [
+      Arbitrary.schema(ItemFacets),
+      Arbitrary.schema(S.Int.check(S.isBetween({ minimum: 0, maximum: 40 }))),
+      Arbitrary.schema(S.Int.check(S.isBetween({ minimum: 1, maximum: maxCount - 1 }))),
+      Arbitrary.schema(
+        S.Tuple([
+          S.Int.check(S.isBetween({ minimum: 0, maximum: maxCount })),
+          S.Int.check(S.isBetween({ minimum: 0, maximum: maxCount }))
+        ])
+      ),
+      Arbitrary.schema(
+        S.Tuple([
+          S.Finite.check(S.isBetween({ minimum: 0, maximum: 1e12 })),
+          S.Finite.check(S.isBetween({ minimum: 0, maximum: 1e12 }))
+        ])
+      )
+    ],
+    ([facets, pick, cut, quantities, costs]) => {
+      // Each list counts the items under two of its values, chosen by the draw, cut where the draw says: every count
+      // stays within a stock number's bound, and each range runs from the lower drawn end to the higher.
+      const rangeOver = (ends: ReadonlyArray<number>): Range => ({
+        min: A.head(A.sort(ends, Order.Number)),
+        max: A.last(A.sort(ends, Order.Number))
+      })
       const counted = (total: number): ItemFacets => {
         const split = (values: ReadonlyArray<string>): Listed =>
-          A.zipWith(A.take(values, 2), [total - 1, 1], (value, count) => ({ value, count }))
+          A.zipWith(
+            A.take(A.appendAll(A.drop(values, pick % values.length), values), 2),
+            [cut, total - cut],
+            (value, count) => ({ value, count })
+          )
         return {
           ...facets,
           total,
@@ -137,14 +163,14 @@ describe("what the Items filters offer", () => {
           uom: split(valuesOf.uom),
           isActive: split(valuesOf.isActive),
           lotTracked: split(valuesOf.lotTracked),
-          quantityOnHand: { min: O.some(0), max: O.some(0) },
-          unitCost: { min: O.some(0), max: O.some(0) }
+          quantityOnHand: rangeOver(quantities),
+          unitCost: rangeOver(costs)
         }
       }
       expect(accepted(counted(maxCount))).toBe(true)
       expect(accepted(counted(maxCount + 1))).toBe(false)
     },
-    { arbitrary: { runs: 5 } }
+    runs
   )
 
   it.prop(

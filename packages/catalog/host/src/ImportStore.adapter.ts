@@ -21,20 +21,15 @@ import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { ChangeSource, Confidence, changeToStored, changeFromStored } from "@inventory/catalog-contract/Change"
 import { ImportId, ConfirmId, ItemId, UploadKey } from "@inventory/catalog-contract/Ids"
-import { Instant, DisplayName } from "@inventory/kernel/Text"
+import { Instant } from "@inventory/kernel/Text"
 import {
-  OutcomeKind,
-  DecidedByKind,
   DecidedBy,
-  decidedByPerson,
-  decidedByNobody,
   PastImport,
   ImportEvent,
   changedItemsShown,
   ChangedItem,
   ChangeRecord,
-  MatchTakeBack,
-  outcomeOf
+  MatchTakeBack
 } from "@inventory/catalog-contract/Import"
 import {
   ImportStore,
@@ -68,7 +63,17 @@ import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/U
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { lineOf } from "./internal/auditLine.ts"
 import { jsonPieces, piece } from "./internal/pieces.ts"
-import { AbandonedBefore, Acting, HeadJson, ItemInsert, ItemsPiece, UploadInsert } from "./internal/importRows.ts"
+import {
+  AbandonedBefore,
+  Acting,
+  HeadJson,
+  ItemInsert,
+  ItemsPiece,
+  OutcomeInsert,
+  OutcomeRow,
+  storedOutcome,
+  UploadInsert
+} from "./internal/importRows.ts"
 import { D1Instant } from "@beep/d1/D1Instant"
 import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
 import {
@@ -104,18 +109,6 @@ const Count = S.Array(S.Struct({ n: S.Int })).annotate({ description: "One COUNT
 // One decision as it travels to SQL: the row it is for, and the decision as the JSON `importDecision` stores.
 const DecisionEntry = S.Struct({ rowId: S.String, json: DecisionJson })
 
-// What a confirm items for one item of the file.
-const OutcomeInsert = S.Struct({
-  rowNumber: S.Int,
-  part: S.Int,
-  sku: S.String,
-  name: S.String,
-  status: S.Literals(["ready", "update", "already", "notImported"]),
-  reason: S.String,
-  decidedBy: S.NullOr(S.Literals(["person", "nobody"])),
-  decidedByName: S.NullOr(S.String)
-}).annotate({ description: "The review's verdict on one row, before the confirm knows whether its item landed" })
-
 // One changed value a confirm items.
 // A change as `importChange`'s columns hold it: the words of `how` are the ones the table has always stored.
 const storedChange = {
@@ -147,6 +140,39 @@ const decisionEntryPieces = jsonPieces({ of: DecisionEntry, most: 2000 })
 const itemPieces = jsonPieces({ of: ItemInsert, most: chunkRows })
 const outcomePieces = jsonPieces({ of: OutcomeInsert, most: chunkRows })
 const changePieces = jsonPieces({ of: ChangeInsert, most: chunkRows })
+
+/** What the outcome rows store for a planned row: the reason of a row that is not written, and who left it out. */
+const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
+  const at = { rowNumber: row.rowNumber, part: row.part, sku: row.sku, name: row.name }
+  const unsettled = { decidedBy: null, decidedByName: null }
+  return PlannedRow.match(row, {
+    ready: (): typeof OutcomeInsert.Type => ({ ...at, status: "ready", reason: "", ...unsettled }),
+    update: (): typeof OutcomeInsert.Type => ({ ...at, status: "update", reason: "", ...unsettled }),
+    already: (already): typeof OutcomeInsert.Type => ({
+      ...at,
+      status: "already",
+      reason: already.reason,
+      ...unsettled
+    }),
+    notImported: (out): typeof OutcomeInsert.Type =>
+      DecidedBy.match(out.decidedBy, {
+        person: (person): typeof OutcomeInsert.Type => ({
+          ...at,
+          status: "notImported",
+          reason: out.reason,
+          decidedBy: "person",
+          decidedByName: person.name
+        }),
+        nobody: (): typeof OutcomeInsert.Type => ({
+          ...at,
+          status: "notImported",
+          reason: out.reason,
+          decidedBy: "nobody",
+          decidedByName: null
+        })
+      })
+  })
+}
 /** Decisions as they travel to SQL, in pieces. */
 const decisionPieces = (set: Readonly<Record<string, RowDecision>>) =>
   decisionEntryPieces(A.map(R.toEntries(set), ([rowId, json]) => ({ rowId, json })))
@@ -165,24 +191,6 @@ const ChangeRow = S.Struct({
   description:
     "A changed value as stored, with its part (0 for a row that is one item) and whether its item was taken back as 0 or 1"
 })
-
-// What a confirm stored for one item of the file, its part as stored: 0 for a row that is one item.
-const OutcomeRow = S.Struct({
-  rowNumber: S.Int,
-  part: S.Int,
-  sku: S.String,
-  name: S.String,
-  outcome: OutcomeKind,
-  reason: S.String,
-  decidedBy: S.NullOr(DecidedByKind),
-  decidedByName: S.NullOr(S.String)
-}).annotate({ description: "What the confirms did with one item of the file, as stored" })
-
-/** Who the stored columns say left a row out: the person, when their name was kept with it; otherwise nobody. */
-const whoDecided = (row: typeof OutcomeRow.Type): DecidedBy =>
-  row.decidedBy === "person" && row.decidedByName !== null && S.is(DisplayName)(row.decidedByName)
-    ? decidedByPerson(row.decidedByName)
-    : decidedByNobody
 
 // A confirm as `importBatch` stores it: what it did, and the take-back that reversed it, if one did.
 const BatchRow = S.Struct({
@@ -1369,25 +1377,7 @@ export const ImportStoreD1 = Layer.effect(
         )
       const items = yield* entries(A.zip(ready, write.itemIds))
       const replacements = yield* entries(A.map(replacing, (row) => [row, ""] as const))
-      // What the outcome rows store: the reason of a row that is not written, and who left it out.
-      const reasonOf = (row: PlannedRow): string =>
-        PlannedRow.guards.already(row) || PlannedRow.guards.notImported(row) ? row.reason : ""
-      const decidedBy = (row: PlannedRow): "person" | "nobody" | null =>
-        PlannedRow.guards.notImported(row) ? row.decidedBy.kind : null
-      const decidedByName = (row: PlannedRow): string | null =>
-        PlannedRow.guards.notImported(row) && DecidedBy.guards.person(row.decidedBy) ? row.decidedBy.name : null
-      const outcomes = yield* outcomePieces(
-        A.map(rows, (row) => ({
-          rowNumber: row.rowNumber,
-          part: row.part,
-          sku: row.sku,
-          name: row.name,
-          status: row.status,
-          reason: reasonOf(row),
-          decidedBy: decidedBy(row),
-          decidedByName: decidedByName(row)
-        }))
-      )
+      const outcomes = yield* outcomePieces(A.map(rows, outcomeInsertOf))
       const changes = yield* changePieces(
         A.flatMap(written, (row) =>
           A.map(row.changes, (entry) => ({
@@ -1748,18 +1738,7 @@ export const ImportStoreD1 = Layer.effect(
       }),
       outcomes: Effect.fn("Imports.outcomes")(function* (organizationId: OrganizationId, importId: string) {
         const rows = yield* findOutcomes({ org: organizationId, id: importId }).pipe(Effect.orDie)
-        return A.map(rows, (row) =>
-          outcomeOf({
-            rowNumber: row.rowNumber,
-            // Stored as 0 for a row that is one item, which the answer leaves out.
-            part: row.part === 0 ? O.none() : O.some(row.part),
-            sku: row.sku,
-            name: row.name,
-            outcome: row.outcome,
-            reason: row.reason,
-            decidedBy: whoDecided(row)
-          })
-        )
+        return A.map(rows, storedOutcome)
       }),
       items: Effect.fn("Imports.items")(function* (organizationId: OrganizationId) {
         return yield* findItems(organizationId).pipe(Effect.map(A.map(storedItem)), Effect.orDie)

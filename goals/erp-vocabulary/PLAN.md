@@ -56,14 +56,13 @@ here when it is.
 
 Steps 1 to 10 are done; step 11 starts on Benjamin's word.
 
-`bun run check` fails since `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`): six laws
-that came with the merge refuse code this goal wrote, and the merge left them for a follow-up. Counted on that
-commit: `diagnostics:check`, 15 `@effect-diagnostics` directives in `packages/ontology`; `defaults:check`, 25
-places in `packages/ontology` and `@beep/vocabulary` (a `getOrElse`, a `??`, a comparison with `undefined`);
-`promises:check`, 7 in `scripts/reason.ts` and `scripts/write.ts`; `readonly:check`, 4 in `packages/kernel`;
-`dual:check`, 1 in `Pointer.mark.ts`; `assertions:check`, 1 in `ontologyTermsCode.ts`. Nothing of the goal's own
-gates fails: the ontology's tests, `ontology-terms:check` and `reason` pass on that commit. Whether these are
-fixed before step 11 is Benjamin's to say.
+`origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`), and six laws that came with it
+refused code this goal wrote: `diagnostics:check` (15 `@effect-diagnostics` directives), `defaults:check` (25
+places), `promises:check` (7), `readonly:check` (4), `dual:check` (1) and `assertions:check` (1). Commit
+`e624f985` meets each in the code, with no directive and no ledger line: the helpers are dual, the two scripts run
+on Effect's `FileSystem`, `Path`, `ChildProcess` and `Digest` through `BunRuntime.runMain`, and absence is an
+`Option` matched where it is used. `bun run check` passes again; `ontology:write` rewrites the generated files byte
+for byte, and `reason` passes with the cached jar and with an empty cache.
 
 ## Choices made
 

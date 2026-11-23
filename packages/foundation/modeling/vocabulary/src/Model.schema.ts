@@ -372,6 +372,12 @@ export class GistProjection extends S.Opaque<GistProjection, { readonly brand: u
   S.Struct({
     version: S.SemVerFromString.pipe(S.annotateKey({ description: "The pinned gist release" })),
     namespace: Namespace.pipe(S.annotateKey({ description: "The gist namespace IRI" })),
+    versionIri: S.String.check(
+      S.isPattern(/^https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._-]+)+$/),
+      S.isMaxLength(200)
+    ).pipe(
+      S.annotateKey({ description: "The IRI of the pinned gist release, written as the generated ontology's source" })
+    ),
     classes: S.Record(GistName.annotateKey({ description: "A gist class's local name" }), GistClass).pipe(
       S.annotateKey({ description: "The admitted gist classes, by local name" })
     ),

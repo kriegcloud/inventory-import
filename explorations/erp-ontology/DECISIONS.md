@@ -734,3 +734,18 @@ The agent recommended signing each.
   list says in my words what each one protects.
 - Reverse: take a ban off the list; its test stays as the planted mistake or must-fail case it was. Ban 2's two
   refused fixtures and its near miss are new and would go.
+
+### 122. The IRI the OWL file names as gist's version (2026-11-23)
+
+Report 14 section 8 writes `dcterms:source <the version IRI gist 14.1.0 states for itself>` and says the constant is
+copied from the pinned gist file. That file, `ontologies/gistCore.ttl` at tag `v14.1.0`, states the template
+placeholder `https://w3id.org/semanticarts/ontology/gistCoreX.x.x`, which gist's release build replaces.
+
+I chose `https://w3id.org/semanticarts/ontology/gistCore14.1.0`; the agent recommended the same. It is held in the
+vocabulary's `gist` part as `versionIri`.
+
+- Rationale: it says which release was projected, in the form gist's releases use. The placeholder names no version,
+  and the unversioned ontology IRI would leave the release number out of the generated file.
+- Not verified from a file: the agent read only the tagged source, which holds the placeholder. The value follows
+  gist's naming. The first step that opens a released gist file checks it.
+- Reverse: change the one field; the OWL file's one triple changes and gate 1 shows it.

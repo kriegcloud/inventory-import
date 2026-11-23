@@ -33,6 +33,8 @@ export const vocabulary = {
   gist: {
     version: "14.1.0",
     namespace: "https://w3id.org/semanticarts/ns/ontology/gist/",
+    // Decision 122. The file at tag v14.1.0 states a template placeholder here; this is the form its releases write.
+    versionIri: "https://w3id.org/semanticarts/ontology/gistCore14.1.0",
     classes: {
       Organization: {},
       Person: { parent: "LivingThing" },

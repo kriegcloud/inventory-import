@@ -139,6 +139,7 @@ const genreScheme = {
 const gist = {
   version: "14.1.0",
   namespace: "https://w3id.org/semanticarts/ns/ontology/gist/",
+  versionIri: "https://w3id.org/semanticarts/ontology/gistCore14.1.0",
   classes: { Content: {}, Organization: {}, TemporalRelation: {} },
   disjointPairs: [["Organization", "Content"]]
 } as const

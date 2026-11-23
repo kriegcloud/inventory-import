@@ -19,7 +19,7 @@ passing and a commit; the app is never broken between steps.
 | 4 | Gate 4, vocabulary coherence, with its planted mistake, the C12 negative and the test that the 22 terms name 111 and the exception entry 97 (6.4) | `Coherence.test.ts` | done |
 | 5 | The marks on the five enrolled records (3.3 to 3.7), then gate 5 with P13 and its negatives (6.5) | `Pointers.test.ts`; `ActivityMarks.types.ts` (6.6); the app's own tests unchanged || done |
 | 6 | The lift, `graphOf` and `threadGraph` (4), in memory | The seventeen triples of 4.4, asserted on the value `threadGraph()` returns || done |
-| 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | todo |
+| 7 | The projector and the writer; `bun run ontology:write` writes the three files; `RELEASES.md`; gates 1, 2 and 3 with their fixtures, ban 5's two included (6.1 to 6.3, 8) | `Generated.test.ts`; a second write changes no byte | done |
 | 8 | Gate 8: CQ-P06 and CQ-P11 in Oxigraph, their expected rows, M1 to M7, CQ-P11's must-fail case and the three guards of 4.4 (5, 6.8; decision 120); bans 3 and 4 named | `Questions.test.ts` | todo |
 | 9 | Gate 7, `laws ontology-terms`, in the repository CLI, with its test; its root task in `check`, `check:full` and `check:ci` (6.7) | `ontology-terms:check` | todo |
 | 10 | Gate 9: `robot.lock.json`, `scripts/reason.ts` with its four refusals, the two positive runs and the three negative ones (6.9, 6.10; decisions 112, 113, 121); bans 1 and 2 named in its output | `bun run check:full` on a run that started the reasoner | todo |
@@ -54,7 +54,7 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 6 are done; step 7 starts on Benjamin's word.
+None. Steps 1 to 7 are done; step 8 starts on Benjamin's word.
 
 ## Choices made
 
@@ -103,6 +103,7 @@ Where the design left a choice open, or the code showed it could not be followed
 - **`laws boundaries` reads a package's `src` and `test` only.** The ontology package's `scripts/write.ts` (step 7)
   and `scripts/reason.ts` (step 10) would be outside the law, so each step keeps what its script imports in `src`,
   or widens the law to `scripts/`; the step says which.
+  Step 7 keeps it in `src`: `scripts/write.ts` imports `src/Generated.ts`, `effect` and `node:fs`, and nothing else.
 - **The ontology package declares only what a built step uses.** Section 7.1's `@beep/identity`,
   `@inventory/access-contract`, `n3` and `oxigraph` come with steps 5, 7 and 8.
 - **Gate 5's rules are in the ontology package** (`packages/ontology/src/Pointers.rules.ts`), a pure function over
@@ -143,10 +144,45 @@ Where the design left a choice open, or the code showed it could not be followed
   the lift never escapes a path segment; any other value is refused.
 - **`Thread.ts` reads the hand-written fixture with a `?raw` import**, which Vite resolves and bun alone does not.
   Step 7's `ontology:write` runs where Vite resolves it, or changes that one import; the step says which.
+  Measured in step 7: bun does resolve `?raw` on a `.ttl` to its text, so `bun packages/ontology/scripts/write.ts`
+  runs the same import Vitest does and nothing changed. Vite does not parse `with { type: "text" }`, the other way.
 - **What gate 5 and the lift both read is in one file** (`packages/ontology/src/internal/terms.ts`): a CURIE's local
   name, the class, scheme or property it is, the term a schema points at.
 - **Step 6 was built by the orchestrator and read by no second provider**: the Opus quota is spent until 28 November
   and Codex's was until 24 November. Step 13's reviewers read it.
+- **gist's version IRI is a field of the vocabulary** (`GistProjection.versionIri`, decision 122): the OWL file's
+  `dcterms:source` reads it from the kernel's literal. The IRI is `gistCore14.1.0`, not verified from a file: the
+  tagged source holds the placeholder `gistCoreX.x.x`.
+- **A label or a definition is a third kind of object** (`TextNode`: words and a language tag), beside an IRI and a
+  literal with a datatype. Step 6's graph had no language tag and refused one when read; the two generated
+  vocabulary files need them.
+- **The writer's order is section 6.3's table**: a file's predicates are written in the order its row of the table
+  lists them, `rdf:type` first as `a`; subjects by code point inside each section; a predicate the order does not
+  hold is refused, not written last.
+- **Gate 3 has its own lists** (`Constructs.rules.ts`), written from section 6.3 and not read from the projector's
+  order, so a predicate added to the projector by mistake is refused by the gate. It reads the text with blank
+  nodes kept (`parseTurtle`); every other reader refuses them (`readTurtle`).
+- **`gate3-subclass.ttl` is ban 5's near miss as a file**, beside the six negatives the report and SPEC name.
+- **`ontology:write` is a root script that runs a file with bun** (`packages/ontology/scripts/write.ts`), not a
+  command of the repository's CLI. The script is in the package's test project (`tsconfig.test.json`), because
+  `deprecated:check` refuses a code file in no tsconfig, so it is written under the Effect rules; it alone in the
+  package reads `node:fs`, with the diagnostic off in its first line.
+- **Gate 1 compares in memory.** The test imports each committed file as text and compares it with what
+  `generatedFiles()` returns; nothing is written during a test.
+- **Gate 3 refuses a W3C term as an object except as a type or as an `xsd:` datatype a property ranges over.**
+  Section 6.3's lists are of predicates and types, and a text passed them with `inv:membershipIn rdfs:subPropertyOf`
+  the sameness property, or a class under the restriction class: ban 5 by another road. The guard is stricter than
+  the report's table: `rdfs:subClassOf owl:Thing` and `rdfs:range rdfs:Literal` are refused too. The projector
+  writes neither; a slice that needs one widens the guard.
+- **`dcterms:source` takes one object**, gist's version IRI from the vocabulary; any other host there is refused.
+- **The writer refuses what it cannot write as Turtle**: a header line with a line break, a prefix that is not a
+  letter then letters and digits, a value that is not NFC. An IRI holds no control character and a language tag is
+  lower case, in the schema, because a reader lowers the tag and the round trip would differ.
+- **Step 7 was built by the orchestrator and read twice by Grok 4.7**, once against the report and once to break the
+  writer and the gates; Opus (direct and through Cursor) and Codex were out of quota. Seven of its nine findings
+  were fixed with a test each: the object guard, the source exception, the IRI pattern, the language tag, the header,
+  the prefix, the escapes the round-trip test did not assert, and the code-point order no test held. One finding was
+  kept as it is, the stricter guard above. Step 13's reviewers read the step again.
 
 ## Closing note
 

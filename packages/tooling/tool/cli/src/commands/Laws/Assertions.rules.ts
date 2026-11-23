@@ -16,6 +16,7 @@ import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
@@ -24,6 +25,7 @@ import { err, type Line, out } from "../../Report.schema.ts"
 import { blankComments } from "../../Sync.rules.ts"
 import { silencings } from "./internal/directives.ts"
 import { heldAs } from "./internal/held.ts"
+import { type Ledger, standingOf, standingWords } from "./internal/ledger.ts"
 import { children, isNode, type Node, parsedAs } from "./internal/tryCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Assertions.rules")
@@ -39,6 +41,130 @@ export const assertionCeilings: ReadonlyArray<number> = [23, 33, 64]
 
 const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
 const leftOut = [".agents/", ".codex/", `${scratchpadFolder}/`, "vendor/"]
+
+/** Each listed file with its number of assertions today, which only falls. */
+export const assertionCounts: Ledger = {
+  "apps/inventory/src/api/v1/Document.ts": 3,
+  "apps/inventory/src/web/lib/form.ts": 1,
+  "apps/inventory/src/web/pages/ReviewGallery.tsx": 1,
+  "apps/inventory/src/web/pages/gallery/JobsReview.tsx": 2,
+  "apps/inventory/test/server/Telemetry.test.ts": 2,
+  "apps/inventory/test/server/WriteLimits.slow.test.ts": 2,
+  "apps/inventory/test/server/support/app.ts": 1,
+  "apps/inventory/test/web/session.test.ts": 3,
+  "apps/inventory/test/web/workspace.test.ts": 1,
+  "apps/inventory/vite.config.ts": 2,
+  "packages/access/contract/test/AccessContract.test.ts": 2,
+  "packages/access/web/src/People.screen.tsx": 2,
+  "packages/catalog/contract/src/Suggestion/Suggestion.read.ts": 2,
+  "packages/catalog/contract/test/CatalogContract.test.ts": 2,
+  "packages/catalog/model/src/Catalog.memory.ts": 1,
+  "packages/catalog/model/src/Review/CellReading.rules.ts": 2,
+  "packages/catalog/model/src/Review/Review.rules.ts": 3,
+  "packages/catalog/model/src/Suggestion/Suggest.rules.ts": 1,
+  "packages/catalog/web/src/ItemsPage.screen.tsx": 5,
+  "packages/catalog/web/src/TableAssistant.screen.tsx": 2,
+  "packages/catalog/web/src/internal/CellForms.tsx": 2,
+  "packages/catalog/web/src/internal/cellDrafts.ts": 1,
+  "packages/catalog/web/src/internal/itemText.ts": 1,
+  "packages/catalog/web/test/ConfirmDraft.test.ts": 4,
+  "packages/catalog/web/test/DraftLines.test.ts": 1,
+  "packages/catalog/web/test/DraftPicks.test.ts": 1,
+  "packages/catalog/web/test/DraftRegion.test.ts": 3,
+  "packages/catalog/web/test/DraftServer.test.ts": 1,
+  "packages/catalog/web/test/ItemEditor.test.ts": 8,
+  "packages/catalog/web/test/KeptRows.test.ts": 1,
+  "packages/catalog/web/test/RemoveImport.test.ts": 1,
+  "packages/catalog/web/test/ResultRows.test.ts": 1,
+  "packages/catalog/web/test/ReviewDraft.test.ts": 7,
+  "packages/catalog/web/test/TabRows.test.ts": 20,
+  "packages/catalog/web/test/TakenBackWords.test.ts": 1,
+  "packages/catalog/web/test/UploadOwner.test.ts": 6,
+  "packages/catalog/web/test/csvDifferential.test.ts": 1,
+  "packages/catalog/web/test/readerWarnings.test.ts": 1,
+  "packages/catalog/web/test/support/catalog.ts": 6,
+  "packages/catalog/web/test/support/draftWorld.ts": 1,
+  "packages/catalog/web/test/xlsxParity.test.ts": 1,
+  "packages/client/src/Api.atoms.ts": 2,
+  "packages/client/src/ApiRuntime.runtime.ts": 2,
+  "packages/drivers/better-auth/test/BetterAuth.test.ts": 2,
+  "packages/drivers/d1/src/D1.service.ts": 4,
+  "packages/drivers/d1/test/D1.test.ts": 1,
+  "packages/drivers/d1/test/D1Schemas.property.test.ts": 2,
+  "packages/drivers/openrouter/test/OpenRouterSchemas.property.test.ts": 2,
+  "packages/foundation/modeling/csv/src/Csv.codec.ts": 9,
+  "packages/foundation/modeling/csv/test/CsvSchemas.property.test.ts": 2,
+  "packages/foundation/modeling/csv/test/oracle.property.test.ts": 1,
+  "packages/foundation/modeling/identity/src/Curie.ts": 1,
+  "packages/foundation/modeling/identity/src/Fibered.ts": 6,
+  "packages/foundation/modeling/identity/src/Id.ts": 22,
+  "packages/foundation/modeling/identity/src/internal/schemaStatics.ts": 1,
+  "packages/foundation/modeling/identity/test/Identity.test.ts": 5,
+  "packages/foundation/modeling/identity/test/OntologyEntrypoints.test.ts": 2,
+  "packages/foundation/modeling/identity/test/PnLocal.test.ts": 1,
+  "packages/foundation/modeling/identity/test/TemplateGuards.test.ts": 2,
+  "packages/foundation/modeling/schema/src/LiteralKit/LiteralKit.schema.ts": 14,
+  "packages/foundation/modeling/schema/src/LiteralKit/internal/builders.ts": 10,
+  "packages/foundation/modeling/schema/src/SchemaUtils/internal/staticDescriptors.ts": 1,
+  "packages/foundation/modeling/schema/src/SchemaUtils/withStatics.ts": 1,
+  "packages/foundation/modeling/schema/test/LiteralKit.test.ts": 16,
+  "packages/foundation/modeling/utils/src/FileSystem.ts": 1,
+  "packages/foundation/modeling/utils/src/GlobalValue.ts": 1,
+  "packages/foundation/modeling/utils/src/Option.ts": 1,
+  "packages/foundation/modeling/utils/src/Predicate.ts": 2,
+  "packages/foundation/modeling/utils/src/Random.ts": 2,
+  "packages/foundation/modeling/utils/src/Struct.ts": 6,
+  "packages/foundation/modeling/utils/src/internal/StructPath.ts": 1,
+  "packages/foundation/modeling/utils/test/Array.test.ts": 8,
+  "packages/foundation/modeling/utils/test/Option.test.ts": 3,
+  "packages/foundation/modeling/utils/test/Struct.test.ts": 9,
+  "packages/foundation/modeling/xlsx/src/internal/trusted.ts": 1,
+  "packages/foundation/modeling/xlsx/test/XlsxSchemas.property.test.ts": 2,
+  "packages/foundation/modeling/xlsx/test/oracle.property.test.ts": 3,
+  "packages/kernel/test/Kernel.property.test.ts": 2,
+  "packages/review/src/ReviewRegion.atoms.ts": 1,
+  "packages/review/src/ReviewRegion.component.tsx": 5,
+  "packages/review/test/Review.test.ts": 1,
+  "packages/review/test/ReviewDecision.property.test.ts": 2,
+  "packages/review/test/ReviewRegion.atoms.test.ts": 11,
+  "packages/review/test/SavedProgress.test.ts": 1,
+  "packages/review/test/fixtures/fabrication.ts": 1,
+  "packages/ui/src/ListTable.component.tsx": 7,
+  "packages/ui/src/TableSearch.component.tsx": 1,
+  "packages/ui/src/components/action-bar.tsx": 2,
+  "packages/ui/src/components/chart.tsx": 8,
+  "packages/ui/src/components/data-grid/data-grid-cell.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-column-header.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-context-menu.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-data-cell.tsx": 2,
+  "packages/ui/src/components/data-grid/data-grid-features.ts": 7,
+  "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-row-models.ts": 16,
+  "packages/ui/src/components/data-grid/data-grid-row.tsx": 2,
+  "packages/ui/src/components/data-grid/data-grid-search.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-utils.ts": 3,
+  "packages/ui/src/components/data-grid/data-grid.tsx": 1,
+  "packages/ui/src/components/data-grid/use-data-grid.ts": 1,
+  "packages/ui/src/components/data-table/data-table-config.ts": 4,
+  "packages/ui/src/components/data-table/data-table-features.ts": 1,
+  "packages/ui/src/components/data-table/data-table-filters.ts": 2,
+  "packages/ui/src/components/data-table/data-table-records.tsx": 2,
+  "packages/ui/src/components/data-table/data-table-state.ts": 10,
+  "packages/ui/src/components/data-table/data-table-toolbar.tsx": 4,
+  "packages/ui/src/components/data-table/data-table-utils.ts": 2,
+  "packages/ui/src/components/data-table/data-table.tsx": 2,
+  "packages/ui/src/components/faceted.tsx": 1,
+  "packages/ui/src/components/form.tsx": 2,
+  "packages/ui/src/components/input-group.tsx": 1,
+  "packages/ui/src/components/sidebar.tsx": 3,
+  "packages/ui/src/components/sonner.tsx": 2,
+  "packages/ui/src/components/sortable.tsx": 3,
+  "packages/ui/src/components/stepper.tsx": 2,
+  "packages/ui/src/components/sticky-table.tsx": 1,
+  "packages/ui/src/components/toggle-group.tsx": 1,
+  "packages/ui/src/components/tour.tsx": 15,
+  "packages/ui/src/hooks/use-data-table.ts": 1
+}
 
 /**
  * What each list is held by, from its contents (`internal/held.ts`), in the order the overrides stand: a file swapped
@@ -74,7 +200,6 @@ const Profile = S.fromJsonString(
       ])
     }).pipe(S.annotateKey({ description: "The one rule, an error, no assertion allowed" })),
     ignorePatterns: S.Tuple([
-      S.Literal("packages/ui/src/components/ui/**"),
       S.Literal(".agents/**"),
       S.Literal(".codex/**"),
       S.Literal("scratchpad/**"),
@@ -84,7 +209,7 @@ const Profile = S.fromJsonString(
       S.Literal("**/.wrangler/**"),
       S.Literal("**/.turbo/**"),
       S.Literal(".claude/**")
-    ]).pipe(S.annotateKey({ description: "What is not read: shadcn's components, and what is no source" })),
+    ]).pipe(S.annotateKey({ description: "What is not read: what is no source of ours" })),
     overrides: S.Tuple([Override, Override, Override]).pipe(
       S.annotateKey({ description: "The three lists: the vendored kit, the registry's components, everyone else's" })
     )
@@ -102,9 +227,17 @@ const silences = (rules: ReadonlyArray<string>) =>
  *
  * @example holdsAssertion({ file: "a.ts", source: "export const a = [1] as const" }) // false
  */
-export const holdsAssertion = (input: { readonly file: string; readonly source: string }): boolean => {
+export const holdsAssertion = (input: { readonly file: string; readonly source: string }): boolean =>
+  countAssertions(input) > 0
+
+/**
+ * How many type assertions `source` holds: `x as T` with any type but `const`, and `<T>x`.
+ *
+ * @example countAssertions({ file: "a.ts", source: "export const a = (1 as number) as unknown" }) // 2
+ */
+export const countAssertions = (input: { readonly file: string; readonly source: string }): number => {
   const read = parsedAs(input)
-  if (O.isNone(read.program)) return false
+  if (O.isNone(read.program)) return 0
   const asConst = (node: Node) => {
     const type = node["typeAnnotation"]
     return (
@@ -114,14 +247,15 @@ export const holdsAssertion = (input: { readonly file: string; readonly source: 
       type["typeName"]["name"] === "const"
     )
   }
+  let count = 0
   const left: Array<Node> = [read.program.value]
   while (A.isArrayNonEmpty(left)) {
     const node = A.lastNonEmpty(left)
     left.splice(-1, 1)
-    if (node.type === "TSTypeAssertion" || (node.type === "TSAsExpression" && !asConst(node))) return true
+    if (node.type === "TSTypeAssertion" || (node.type === "TSAsExpression" && !asConst(node))) count += 1
     for (const next of children(node)) left.push(next)
   }
-  return false
+  return count
 }
 
 /**
@@ -137,8 +271,14 @@ export const AssertionsFinding = S.TaggedUnion({
   Unreadable: {
     why: S.String.pipe(S.annotateKey({ description: "Why the configuration or git's list could not be read" }))
   },
-  Settled: {
-    file: S.String.pipe(S.annotateKey({ description: "A listed file that holds no assertion any more, or none" }))
+  Standing: {
+    file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of assertions moved" })),
+    words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
+  },
+  Uncounted: {
+    file: S.String.pipe(
+      S.annotateKey({ description: "A listed file with no number held, or a number for no listed file" })
+    )
   },
   Grown: {
     list: S.Int.pipe(S.annotateKey({ description: "Which list, from 1, in the order the overrides stand" })),
@@ -182,8 +322,11 @@ export const assertionsSentence: (finding: AssertionsFinding) => Line = Assertio
     out(`assertions:check OK  the type-assertion ban's lists name ${listed} files, each still holding one`),
   Refused: () => err(`assertions:check FAIL  the type-assertion ban's lists (${assertionsConfig}) do not hold:`),
   Unreadable: ({ why }) => err(`  ${why}`),
-  Settled: ({ file }) =>
-    err(`  ${file}  is listed but holds no type assertion: take its line off the list in ${assertionsConfig}`),
+  Standing: ({ file, words }) => err(`  ${file}  ${words}`),
+  Uncounted: ({ file }) =>
+    err(
+      `  ${file}  is in one of the lists of ${assertionsConfig} or in assertionCounts but not both: the two name the same files`
+    ),
   Grown: ({ ceiling, length, list }) =>
     err(
       `  list ${list} names ${length} files, past its ceiling of ${ceiling}: a list only shrinks. Fix the code instead`
@@ -207,10 +350,16 @@ export const assertionsSentence: (finding: AssertionsFinding) => Line = Assertio
 export interface AssertionHolds {
   readonly ceilings: ReadonlyArray<number>
   readonly held: ReadonlyArray<number>
+  /** Each listed file with its number of assertions, which only falls (`internal/ledger.ts`). */
+  readonly counts: Ledger
 }
 
 /** The holds this repository records. */
-export const recordedHolds: AssertionHolds = { ceilings: assertionCeilings, held: assertionsHeld }
+export const recordedHolds: AssertionHolds = {
+  ceilings: assertionCeilings,
+  held: assertionsHeld,
+  counts: assertionCounts
+}
 
 export const assertions = Effect.fn("Assertions.assertions")(function* (holds: AssertionHolds) {
   const repo = yield* Repo
@@ -242,15 +391,27 @@ export const assertions = Effect.fn("Assertions.assertions")(function* (holds: A
     }
   )
   const listed = A.flatten(lists)
-  const settled = yield* Effect.filter(
+  // Each listed file at its number of assertions, which only falls; a file in one of the two and not the other is
+  // refused, since then nothing holds it.
+  const standings = yield* Effect.forEach(
     listed,
-    (file) =>
-      Effect.gen(function* () {
-        const path = repo.join(repo.root, file)
-        if (!(yield* repo.exists(path))) return true
-        return !holdsAssertion({ file, source: yield* repo.text(path) })
-      }),
+    Effect.fnUntraced(function* (file) {
+      const path = repo.join(repo.root, file)
+      const now = (yield* repo.exists(path)) ? countAssertions({ file, source: yield* repo.text(path) }) : 0
+      return O.match(standingOf(holds.counts, { file, now }), {
+        onNone: () => A.of<AssertionsFinding>(AssertionsFinding.cases.Uncounted.make({ file })),
+        onSome: (standing) =>
+          O.match(standingWords(standing, "assertionCounts"), {
+            onNone: () => A.empty<AssertionsFinding>(),
+            onSome: (words) => A.of<AssertionsFinding>(AssertionsFinding.cases.Standing.make({ file, words }))
+          })
+      })
+    }),
     { concurrency: 1 }
+  )
+  const counted = A.map(
+    A.filter(R.keys(holds.counts), (file) => !A.contains(listed, file)),
+    (file) => AssertionsFinding.cases.Uncounted.make({ file })
   )
   const git = yield* repo.run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--deduplicate"])
   if (git.code !== 0) {
@@ -278,7 +439,8 @@ export const assertions = Effect.fn("Assertions.assertions")(function* (holds: A
   )
   const problems = A.flatten<ReadonlyArray<ReadonlyArray<AssertionsFinding>>>([
     lengths,
-    A.map(settled, (file) => AssertionsFinding.cases.Settled.make({ file })),
+    A.flatten(standings),
+    counted,
     A.flatten(silenced)
   ])
   return A.isReadonlyArrayNonEmpty(problems)

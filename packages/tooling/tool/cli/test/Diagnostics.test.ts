@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import {
   diagnostics,
   diagnosticsHeld,
@@ -39,14 +40,21 @@ describe("laws diagnostics", () => {
         "err: packages/x/src/a.ts:3  an @effect-diagnostics directive: remove it and write the code the rule asks for"
       )
       expect(said.length).toBe(4)
-      const listed = O.getOrElse(A.head(diagnosticsListed), () => "")
-      const said1 = yield* inTree({ [listed]: off }, inRepository)
-
+      const [listed, held] = O.getOrElse(A.head(R.toEntries(diagnosticsListed)), () => ["", 0] as const)
+      const directives = (count: number) =>
+        A.join(
+          A.makeBy(count, (i) => `// ${diagnosticDirective} floatingEffect:off\nexport const a${i} = ${i}\n`),
+          ""
+        )
+      const said1 = yield* inTree({ [listed]: directives(held) }, inRepository)
       expect(said1).toEqual([expect.stringContaining("out: diagnostics:check OK")])
+      const more = yield* inTree({ [listed]: directives(held + 1) }, inRepository)
+      expect(more).toContain(
+        `err: ${listed}  breaks the rule in ${held + 1} places, more than the ${held} diagnosticsListed holds it to: a listed file may only lose places. Fix the new ones`
+      )
       const said2 = yield* inTree({ [listed]: "const a = 1\n" }, inRepository)
-
       expect(said2).toContain(
-        `err: ${listed}  is listed in diagnosticsListed but holds no directive any more: take its line off the list`
+        `err: ${listed}  is listed in diagnosticsListed but breaks the rule no more: take its line off`
       )
       const said3 = yield* inTree({ "docs/a.ts": off, "scratchpad/experiments/x/a.ts": off }, inRepository)
 
@@ -54,9 +62,7 @@ describe("laws diagnostics", () => {
     })
   )
 
-  it("the list only shrinks: its length is held here, and lowered with it", () => {
-    expect(diagnosticsListed.length).toBe(31)
-    expect(A.dedupe(diagnosticsListed).length).toBe(diagnosticsListed.length)
-    expect(heldAs(diagnosticsListed)).toBe(diagnosticsHeld)
+  it("the list is held by its names too, a guard the review sees", () => {
+    expect(heldAs(R.keys(diagnosticsListed))).toBe(diagnosticsHeld)
   })
 })

@@ -278,9 +278,14 @@
       "outputs": []
     },
     // No Promise is written (`beep laws promises`), but in the files its lists name: every code file git would commit
-    // is an input, as for the try law, with the law's own source.
+    // is an input, as for the try law, with the law's own source, and what its typed half reads besides: its profile,
+    // every tsconfig and every package.json, so a cached answer is never replayed over a changed one.
     "//#promises:check": {
       "inputs": [
+        ".oxlintrc.promises.json",
+        "**/tsconfig*.json",
+        "**/package.json",
+        "!**/node_modules/**",
         ".gitignore",
         "bun.lock",
         "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",

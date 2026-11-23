@@ -1,6 +1,7 @@
-// What holds a list of files that may only shrink by its contents, not only its length: a number read from every
-// path in it, in order, recorded beside the list. A file swapped for another changes it, so the law refuses the list
-// until the number is recorded again, which a review sees.
+// A number read from every path a list names, recorded beside the list. A file swapped for another changes it, so the
+// law refuses the list until the number is recorded again. It is a guard for the review, not for the code: the
+// number sits beside the list and changes in the same commit, so what it ensures is that a change to a list shows in
+// the diff as a change to its number. What holds each file mechanically is its count (`ledger.ts`).
 import * as A from "effect/Array"
 import * as Hash from "effect/Hash"
 import * as Order from "effect/Order"

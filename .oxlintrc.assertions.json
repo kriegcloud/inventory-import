@@ -16,8 +16,6 @@
     "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }]
   },
   "ignorePatterns": [
-    // shadcn's components, kept as published.
-    "packages/ui/src/components/ui/**",
     ".agents/**",
     ".codex/**",
     "scratchpad/**",
@@ -60,8 +58,8 @@
       "rules": { "typescript/consistent-type-assertions": "off" }
     },
     {
-      // Components and hooks copied from a registry (tablecn, Dice UI; packages/ui/components.json names them), kept
-      // as published.
+      // Components and hooks copied from a registry (shadcn, tablecn, Dice UI; packages/ui/components.json names them)
+      // and changed here since: held to the ban like everyone else's, in a list of their own.
       "files": [
         "packages/ui/src/components/action-bar.tsx",
         "packages/ui/src/components/chart.tsx",

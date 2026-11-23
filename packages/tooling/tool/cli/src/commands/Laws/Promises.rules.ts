@@ -18,21 +18,28 @@
  * (`tsrs-lint`), and each finding is refused the same way:
  *
  * - `typescript/no-floating-promises` (with `void` not excusing one): a Promise-typed value made and left;
- * - `typescript/promise-function-async`: a function whose type returns a Promise, however it made one; with `async`
- *   refused by name, no function may return a Promise;
  * - `typescript/no-misused-promises`: a Promise where a condition, a spread or a callback that returns nothing is;
  * - `typescript/await-thenable`: an `await` of what is not one.
  *
- * What stays open: a Promise-typed value bound to a name and never returned, awaited, floated or passed where a
- * callback returns nothing (`const kept = g.Promise.resolve(2)`). No rule oxlint or `tsrs-lint` has refuses a value for
- * its type alone; that needs the TypeScript checker run by this repository over each project, which is not built. A
- * file with no project is read by no typed rule: the deprecated-API law refuses such a file. The profile is held as
- * written: any other rule, option or exception is refused.
+ * `typescript/promise-function-async` is not run: it refuses the edge this law prescribes (`Effect.tryPromise({ try:
+ * () => … })`, `Effect.promise(() => …)`, `lazy(() => import(…))`) and, since React 19's `ReactNode` includes a
+ * Promise, every component that returns one; the name half refuses `async` already.
  *
- * Three lists, each by name. `promiseEntryPoints`: where a platform calls in and takes a Promise, which may run an
- * Effect as one and name the type. `promisesVendored`: components copied from a registry as published, with where each
- * came from. `promisesListed`: the files that use Promises today; it may only shrink. A listed file with no use left
- * is refused until its line is taken off, and `test/Promises.test.ts` holds the list at its length.
+ * What stays open is wide, and is said as it is. A Promise made by a call that names no Promise (a library's function,
+ * `globalThis["Prom" + "ise"].resolve(1)`, a function of ours that returns one) passes both halves wherever it is
+ * not left floating, awaited, put in a condition or a spread, or handed where a callback returns nothing: bound to a
+ * name, passed as an argument, put in an object, an array or a class's field, exported, or used in an expression. No
+ * rule oxlint or `tsrs-lint` has refuses a value for its type alone; closing it needs the TypeScript checker run by
+ * this repository over each project, which is not built. A file with no project is read by no typed rule: the
+ * deprecated-API law refuses such a file. The profile is held as written: any other rule, option or exception is
+ * refused.
+ *
+ * Two lists, each by name. `promiseEntryPoints`: where a platform calls in and takes a Promise, which may run an
+ * Effect as one and name the type. `promisesListed`: the files that use Promises today, each with how many places,
+ * which only falls (`internal/ledger.ts`): a listed file that gains a use is refused, one that loses one is refused
+ * until its number is lowered, one with none comes off. The components and hooks under `packages/ui/` came from
+ * registries, but every one has been changed here since it was first committed and nothing holds it to its registry,
+ * so they are read and listed like any other file.
  *
  * As for the `try` law, a file nested too deep, too large, or one the parser reads with errors is refused as a whole,
  * once, at the line being read; and "every file git would commit" is git's answer, so this asks git.
@@ -52,6 +59,7 @@ import { err, type Line, out } from "../../Report.schema.ts"
 import { unreadSentence } from "./internal/budget.ts"
 import { silencings } from "./internal/directives.ts"
 import { heldAs } from "./internal/held.ts"
+import { type Ledger, standingOf, standingWords } from "./internal/ledger.ts"
 import { type PromiseUse, readPromises } from "./internal/promiseCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Promises.rules")
@@ -61,16 +69,10 @@ const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSom
 
 /**
  * What is not read, each from the root, a folder with its closing slash: the agent skills, copied as published and run
- * by nothing; the scratchpad, where this law applies when an experiment graduates into a package; the vendored
- * shadcn components, kept as published (`packages/ui/src/components/ui/`); and the Alchemy packages kept as files,
- * which no one edits (`vendor/`).
+ * by nothing; the scratchpad, where this law applies when an experiment graduates into a package; and the Alchemy
+ * packages kept as files, held byte for byte to their source by `bun run alchemy:check` (`vendor/`).
  */
-export const promisesLeftOut: ReadonlyArray<string> = [
-  ".agents/",
-  `${scratchpadFolder}/`,
-  "packages/ui/src/components/ui/",
-  "vendor/"
-]
+export const promisesLeftOut: ReadonlyArray<string> = [".agents/", `${scratchpadFolder}/`, "vendor/"]
 
 /**
  * Where a platform calls in and takes a Promise, with what calls it: the only files that may run an Effect as a
@@ -85,118 +87,92 @@ export const promiseEntryPoints: Readonly<Record<string, string>> = {
 const atAnEntry: ReadonlyArray<PromiseUse> = ["run", "type"]
 
 /**
- * Components copied from a registry as published, by where each came from (`packages/ui/components.json` names the
- * registries; `docs/kit.md` says what each is for). Their Promises are the registry's; a change goes there first.
- */
-export const promisesVendored: Readonly<Record<string, string>> = {
-  "packages/ui/src/components/data-grid/data-grid-cell-variants.tsx": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/data-grid-context-menu.tsx": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/data-grid-data-cell.tsx": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/data-grid-features.ts": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/data-grid-utils.ts": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/data-grid.tsx": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-grid/use-data-grid.ts": "tablecn's data-grid (@tablecn registry)",
-  "packages/ui/src/components/data-table/data-table-toolbar.tsx": "tablecn's data-table (@tablecn registry)",
-  "packages/ui/src/components/data-table/data-table.tsx": "tablecn's data-table (@tablecn registry)",
-  "packages/ui/src/components/faceted.tsx": "Dice UI's faceted, installed with tablecn's data-table (@diceui registry)",
-  "packages/ui/src/components/field.tsx": "shadcn's field (@shadcn registry)",
-  "packages/ui/src/components/file-upload.tsx": "Dice UI's file-upload (@diceui registry)",
-  "packages/ui/src/components/stepper.tsx": "Dice UI's stepper (@diceui registry)"
-}
-
-/**
  * The files that use Promises today, each read as a whole: this list may only shrink. Its owner takes a file off when
  * its last use is gone, and the law refuses a listed file that has none left.
  */
-export const promisesListed: ReadonlyArray<string> = [
-  "apps/inventory/scripts/auth-schema.mjs",
-  "apps/inventory/scripts/dev-accounts.mjs",
-  "apps/inventory/scripts/grid-keys.mjs",
-  "apps/inventory/scripts/telemetry.mjs",
-  "apps/inventory/src/server/App.ts",
-  "apps/inventory/src/server/security.ts",
-  "apps/inventory/src/web/App.tsx",
-  "apps/inventory/src/web/Workspace.tsx",
-  "apps/inventory/src/web/components/app/AppSidebar.tsx",
-  "apps/inventory/src/web/components/app/SignedIn.tsx",
-  "apps/inventory/src/web/lib/api.ts",
-  "apps/inventory/src/web/lib/otlp.ts",
-  "apps/inventory/src/web/lib/telemetry.ts",
-  "apps/inventory/src/web/pages/ActivityPage.tsx",
-  "apps/inventory/src/web/preload.ts",
-  "apps/inventory/test/server/AuthSchema.test.ts",
-  "apps/inventory/test/server/Docs.test.ts",
-  "apps/inventory/test/server/Pwned.test.ts",
-  "apps/inventory/test/server/RequestTelemetry.test.ts",
-  "apps/inventory/test/server/Telemetry.slow.test.ts",
-  "apps/inventory/test/server/Telemetry.test.ts",
-  "apps/inventory/test/server/support/app.ts",
-  "apps/inventory/test/web/gridCallbacks.test.ts",
-  "apps/inventory/test/web/root.test.ts",
-  "apps/inventory/test/web/session.test.ts",
-  "apps/inventory/test/web/support/page.ts",
-  "apps/inventory/test/web/traceContext.test.ts",
-  "apps/inventory/test/web/workspace.test.ts",
-  "packages/access/host/src/SignIn.route.ts",
-  "packages/access/host/src/internal/authOptions.ts",
-  "packages/access/web/src/People.screen.tsx",
-  "packages/access/web/src/Session.atoms.ts",
-  "packages/access/web/src/SignIn.screen.tsx",
-  "packages/catalog/contract/test/FileProblem.test.ts",
-  "packages/catalog/web/src/Catalog.runtime.ts",
-  "packages/catalog/web/src/Draft.atoms.ts",
-  "packages/catalog/web/src/Draft.machine.ts",
-  "packages/catalog/web/src/ImportPage.screen.tsx",
-  "packages/catalog/web/src/ItemsPage.screen.tsx",
-  "packages/catalog/web/src/MatchStep.screen.tsx",
-  "packages/catalog/web/src/ResultStep.screen.tsx",
-  "packages/catalog/web/src/ReviewDraft.atoms.ts",
-  "packages/catalog/web/src/ReviewStep.screen.tsx",
-  "packages/catalog/web/src/TableAssistant.screen.tsx",
-  "packages/catalog/web/src/Upload.controller.ts",
-  "packages/catalog/web/src/UploadStep.screen.tsx",
-  "packages/catalog/web/src/internal/reader.worker.ts",
-  "packages/catalog/web/src/internal/spreadsheet/index.ts",
-  "packages/catalog/web/src/internal/spreadsheet/read.ts",
-  "packages/catalog/web/test/ImportPage.test.ts",
-  "packages/catalog/web/test/RemoveImport.test.ts",
-  "packages/catalog/web/test/RemoveImportAddress.test.ts",
-  "packages/catalog/web/test/SessionAsked.test.ts",
-  "packages/catalog/web/test/TabRows.test.ts",
-  "packages/catalog/web/test/UploadOwner.test.ts",
-  "packages/catalog/web/test/readInPieces.test.ts",
-  "packages/catalog/web/test/support/catalog.ts",
-  "packages/client/src/ApiRuntime.runtime.ts",
-  "packages/client/src/Early.runtime.ts",
-  "packages/client/src/Http.runtime.ts",
-  "packages/client/src/Tab.atoms.ts",
-  "packages/client/test/Connection.atoms.test.ts",
-  "packages/drivers/better-auth/src/BetterAuth.service.ts",
-  "packages/drivers/d1/src/D1.test-layer.ts",
-  "packages/review/src/ReviewRegion.atoms.ts",
-  "packages/review/src/ReviewRegion.component.tsx",
-  "packages/review/src/SavedProgress.hook.ts",
-  "packages/review/src/internal/ReviewGrid.tsx",
-  "packages/review/src/internal/ReviewQueue.tsx",
-  "packages/review/src/internal/parts.tsx",
-  "packages/ui/src/ListTable.component.tsx",
-  "packages/ui/src/Theme.provider.tsx"
-]
+export const promisesListed: Ledger = {
+  "apps/inventory/scripts/auth-schema.mjs": 2,
+  "apps/inventory/scripts/dev-accounts.mjs": 1,
+  "apps/inventory/scripts/grid-keys.mjs": 23,
+  "apps/inventory/scripts/telemetry.mjs": 5,
+  "apps/inventory/src/server/App.ts": 4,
+  "apps/inventory/src/server/security.ts": 8,
+  "apps/inventory/src/web/Workspace.tsx": 5,
+  "apps/inventory/src/web/components/app/AppSidebar.tsx": 5,
+  "apps/inventory/src/web/lib/otlp.ts": 2,
+  "apps/inventory/src/web/pages/ActivityPage.tsx": 1,
+  "apps/inventory/src/web/preload.ts": 3,
+  "apps/inventory/test/server/AuthSchema.test.ts": 1,
+  "apps/inventory/test/server/Pwned.test.ts": 3,
+  "apps/inventory/test/server/RequestTelemetry.test.ts": 1,
+  "apps/inventory/test/server/Telemetry.slow.test.ts": 2,
+  "apps/inventory/test/server/Telemetry.test.ts": 8,
+  "apps/inventory/test/server/support/app.ts": 2,
+  "apps/inventory/test/web/gridCallbacks.test.ts": 5,
+  "apps/inventory/test/web/root.test.ts": 2,
+  "apps/inventory/test/web/session.test.ts": 11,
+  "apps/inventory/test/web/support/page.ts": 5,
+  "apps/inventory/test/web/traceContext.test.ts": 2,
+  "apps/inventory/test/web/workspace.test.ts": 3,
+  "packages/access/host/src/SignIn.route.ts": 1,
+  "packages/access/host/src/internal/authOptions.ts": 7,
+  "packages/access/web/src/People.screen.tsx": 2,
+  "packages/access/web/src/Session.atoms.ts": 17,
+  "packages/access/web/src/SignIn.screen.tsx": 14,
+  "packages/catalog/contract/test/FileProblem.test.ts": 1,
+  "packages/catalog/web/src/Catalog.runtime.ts": 2,
+  "packages/catalog/web/src/Draft.atoms.ts": 4,
+  "packages/catalog/web/src/Draft.machine.ts": 1,
+  "packages/catalog/web/src/ImportPage.screen.tsx": 3,
+  "packages/catalog/web/src/ItemsPage.screen.tsx": 2,
+  "packages/catalog/web/src/MatchStep.screen.tsx": 1,
+  "packages/catalog/web/src/ResultStep.screen.tsx": 2,
+  "packages/catalog/web/src/ReviewDraft.atoms.ts": 3,
+  "packages/catalog/web/src/ReviewStep.screen.tsx": 3,
+  "packages/catalog/web/src/TableAssistant.screen.tsx": 2,
+  "packages/catalog/web/src/Upload.controller.ts": 14,
+  "packages/catalog/web/src/UploadStep.screen.tsx": 5,
+  "packages/catalog/web/src/internal/reader.worker.ts": 2,
+  "packages/catalog/web/test/ImportPage.test.ts": 2,
+  "packages/catalog/web/test/RemoveImport.test.ts": 1,
+  "packages/catalog/web/test/RemoveImportAddress.test.ts": 1,
+  "packages/catalog/web/test/TabRows.test.ts": 15,
+  "packages/catalog/web/test/UploadOwner.test.ts": 1,
+  "packages/catalog/web/test/readInPieces.test.ts": 1,
+  "packages/catalog/web/test/support/catalog.ts": 1,
+  "packages/client/src/ApiRuntime.runtime.ts": 3,
+  "packages/client/src/Early.runtime.ts": 2,
+  "packages/client/src/Http.runtime.ts": 2,
+  "packages/client/src/Tab.atoms.ts": 4,
+  "packages/client/test/Connection.atoms.test.ts": 1,
+  "packages/review/src/ReviewRegion.atoms.ts": 1,
+  "packages/review/src/ReviewRegion.component.tsx": 1,
+  "packages/review/src/SavedProgress.hook.ts": 3,
+  "packages/review/src/internal/parts.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-cell-variants.tsx": 5,
+  "packages/ui/src/components/data-grid/data-grid-context-menu.tsx": 2,
+  "packages/ui/src/components/data-grid/data-grid-features.ts": 19,
+  "packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx": 1,
+  "packages/ui/src/components/data-grid/data-grid-utils.ts": 6,
+  "packages/ui/src/components/data-grid/data-grid.tsx": 2,
+  "packages/ui/src/components/data-grid/use-data-grid.ts": 6,
+  "packages/ui/src/components/data-table/data-table-toolbar.tsx": 2,
+  "packages/ui/src/components/file-upload.tsx": 7,
+  "packages/ui/src/components/stepper.tsx": 21
+}
 
 /**
  * What the lists are held by, from their contents (`internal/held.ts`): a file swapped for another changes the number,
  * and the law refuses the list until it is recorded again. Recorded only when files came off.
  */
-export const promisesHeld = { listed: -740894762, vendored: -558548379, entryPoints: -1064530232 }
+export const promisesHeld = { listed: -1071579578, entryPoints: -1064530232 }
 
 /** Each list whose files are not the ones it is held by. */
 const changedLists = (): ReadonlyArray<PromiseFinding> =>
   A.getSomes(
     A.map(
       [
-        ["promisesListed", heldAs(promisesListed), promisesHeld.listed],
-        ["promisesVendored", heldAs(R.keys(promisesVendored)), promisesHeld.vendored],
+        ["promisesListed", heldAs(R.keys(promisesListed)), promisesHeld.listed],
         ["promiseEntryPoints", heldAs(R.keys(promiseEntryPoints)), promisesHeld.entryPoints]
       ] as const,
       ([list, now, held]) => (now === held ? O.none() : O.some(PromiseFinding.cases.Changed.make({ list, held, now })))
@@ -210,8 +186,7 @@ export const promisesProfile = ".oxlintrc.promises.json"
 const typedRules = [
   "typescript/no-floating-promises",
   "typescript/await-thenable",
-  "typescript/no-misused-promises",
-  "typescript/promise-function-async"
+  "typescript/no-misused-promises"
 ] as const
 
 /** The profile as it must be. */
@@ -226,9 +201,8 @@ const Profile = S.fromJsonString(
     rules: S.Struct({
       "typescript/no-floating-promises": S.Tuple([S.Literal("error"), S.Struct({ ignoreVoid: S.Literal(false) })]),
       "typescript/await-thenable": S.Literal("error"),
-      "typescript/no-misused-promises": S.Literal("error"),
-      "typescript/promise-function-async": S.Literal("error")
-    }).pipe(S.annotateKey({ description: "The four typed rules, each an error" }))
+      "typescript/no-misused-promises": S.Literal("error")
+    }).pipe(S.annotateKey({ description: "The three typed rules, each an error" }))
   }).pipe($I.annoteSchema("PromisesProfile", { description: "The typed half of the Promise ban, as it must be" }))
 )
 
@@ -255,7 +229,7 @@ const silencesTyped = (rules: ReadonlyArray<string>) =>
 const isLeftOut = (file: string): boolean => A.some(promisesLeftOut, (path) => Str.startsWith(path)(file))
 
 /** The paths not read, as the output names them each time. */
-const notRead = `${A.join(promisesLeftOut, ", ")} are not read; ${A.length(promisesListed)} files are listed and ${R.size(promisesVendored)} vendored`
+const notRead = `${A.join(promisesLeftOut, ", ")} are not read; ${R.size(promisesListed)} files are listed`
 
 const PromiseUseSchema = S.Literals(["async", "await", "new", "static", "type", "chain", "run", "value"])
 
@@ -275,8 +249,9 @@ export const PromiseFinding = S.TaggedUnion({
     place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" })),
     use: PromiseUseSchema.pipe(S.annotateKey({ description: "What the use of a Promise is" }))
   },
-  Settled: {
-    file: S.String.pipe(S.annotateKey({ description: "A listed file that uses no Promise any more" }))
+  Standing: {
+    file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of uses moved" })),
+    words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Typed: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" })),
@@ -347,8 +322,7 @@ export const promiseSentence: (finding: PromiseFinding) => Line = PromiseFinding
   Refused: () => err(`promises:check FAIL  a Promise is written. Write what each line says instead (${notRead}):`),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
   At: ({ place, use }) => err(`${place}  ${insteadOf(use)}`),
-  Settled: ({ file }) =>
-    err(`${file}  is listed in promisesListed but uses no Promise any more: take its line off the list`),
+  Standing: ({ file, words }) => err(`${file}  ${words}`),
   Unread: ({ place, why }) => err(`${place}  ${why}`),
   Typed: ({ note, place }) => err(`${place}  a value typed as a Promise: ${note}. Write the Effect that does the work`),
   Silenced: ({ directive, place }) =>
@@ -382,7 +356,7 @@ const typedUses = Effect.fn("Promises.typedUses")(function* (files: ReadonlyArra
     return {
       places: none,
       problems: A.of<PromiseFinding>(
-        PromiseFinding.cases.Loosened.make({ why: "only the four typed rules, as errors, with void excusing nothing" })
+        PromiseFinding.cases.Loosened.make({ why: "only the three typed rules, as errors, with void excusing nothing" })
       )
     }
   }
@@ -454,9 +428,7 @@ export const promises = Effect.fn("Promises.promises")(function* () {
   )
   // The typed half over every file but the registry's and the platform's entries: a listed file is read too, so it
   // comes off the list only when neither half finds a use in it.
-  const typed = yield* typedUses(
-    A.filter(files, (file) => !R.has(promisesVendored, file) && !R.has(promiseEntryPoints, file))
-  )
+  const typed = yield* typedUses(A.filter(files, (file) => !R.has(promiseEntryPoints, file)))
   const typedIn = (file: string) => A.filter(typed.places, (place) => place.file === file)
   const found = yield* Effect.forEach(
     files,
@@ -473,14 +445,14 @@ export const promises = Effect.fn("Promises.promises")(function* () {
         }
         const allowed = R.has(promiseEntryPoints, file) ? atAnEntry : []
         const uses = A.filter(read.found, ({ use }) => !A.contains(allowed, use))
-        // A vendored file is the registry's; a listed one is passed while it uses a Promise, and refused once it
-        // uses none, so the list shrinks with the code.
-        if (R.has(promisesVendored, file)) return []
         const typedHere = typedIn(file)
-        if (A.contains(promisesListed, file)) {
-          return A.isReadonlyArrayEmpty(uses) && A.isReadonlyArrayEmpty(typedHere)
-            ? A.of(PromiseFinding.cases.Settled.make({ file }))
-            : []
+        // A listed file is held at its number of uses, by name and by type together, which only falls.
+        const standing = standingOf(promisesListed, { file, now: A.length(uses) + A.length(typedHere) })
+        if (O.isSome(standing)) {
+          return O.match(standingWords(standing.value, "promisesListed"), {
+            onNone: () => [],
+            onSome: (words) => A.of(PromiseFinding.cases.Standing.make({ file, words }))
+          })
         }
         return A.appendAll(
           A.map(uses, ({ line, use }) => PromiseFinding.cases.At.make({ place: `${file}:${line}`, use })),

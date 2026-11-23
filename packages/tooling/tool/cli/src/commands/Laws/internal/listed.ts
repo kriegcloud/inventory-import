@@ -1,19 +1,22 @@
 // A law in the shape of the bans that came with a list of today's files: every code file git would commit is read,
 // but the folders it leaves out; each place it refuses is said with what to write instead; a listed file is passed
-// while it still breaks the rule and refused once it no longer does; and the list is held by its contents
-// (`held.ts`), so it only shrinks. The bans differ in what they read and in their words, which a `ListedSpec` gives.
+// at the number of places it breaks the rule, which may only fall (`ledger.ts`); and the list's files are held by a
+// number read from their names (`held.ts`), a guard for the review rather than for the code, since the number sits
+// beside the list and changes in the same commit. The bans differ in what they read and in their words, which a `ListedSpec` gives.
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../../Repo.service.ts"
 import { err, type Line, out } from "../../../Report.schema.ts"
 import { type Stopped, Unread, unreadable, unreadSentence } from "./budget.ts"
 import { heldAs } from "./held.ts"
+import { type Ledger, standingOf, standingWords } from "./ledger.ts"
 import { linesOf } from "./lines.ts"
 import { type Node, parsedAs } from "./tryCode.ts"
 
@@ -35,7 +38,7 @@ export interface ListedSpec {
   readonly instead: string
   /** The list's name, as the law's source declares it. */
   readonly listName: string
-  readonly listed: ReadonlyArray<string>
+  readonly listed: Ledger
   /** The number the list is held by (`held.ts`). */
   readonly held: number
   /** The paths not read, from the root, a folder with its closing slash. */
@@ -58,8 +61,9 @@ export const ListedFinding = S.TaggedUnion({
   At: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" }))
   },
-  Settled: {
-    file: S.String.pipe(S.annotateKey({ description: "A listed file that breaks the rule no more" }))
+  Standing: {
+    file: S.String.pipe(S.annotateKey({ description: "A listed file whose number of places moved" })),
+    words: S.String.pipe(S.annotateKey({ description: "How it moved, and what to do" }))
   },
   Changed: {
     held: S.Finite.pipe(S.annotateKey({ description: "The number the list is held by" })),
@@ -114,13 +118,13 @@ export const readListed: {
  * @category rendering
  */
 export const listedSentence = (spec: ListedSpec): ((finding: ListedFinding) => Line) => {
-  const notRead = `${A.join(spec.leftOut, ", ")} are not read; ${A.length(spec.listed)} files are listed`
+  const notRead = `${A.join(spec.leftOut, ", ")} are not read; ${R.size(spec.listed)} files are listed`
   return ListedFinding.match({
     Clean: () => out(`${spec.check} OK  ${spec.rule} (${notRead})`),
     Refused: () => err(`${spec.check} FAIL  not ${spec.rule}. Write what each line says instead (${notRead}):`),
     Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
     At: ({ place }) => err(`${place}  ${spec.instead}`),
-    Settled: ({ file }) => err(`${file}  is listed in ${spec.listName} but breaks the rule no more: take its line off`),
+    Standing: ({ file, words }) => err(`${file}  ${words}`),
     Changed: ({ held, now }) =>
       err(
         `${spec.listName} names other files than the ones it is held by (${held}): it may only shrink. If files came off it because they are clean, record ${now} beside it; never add one`
@@ -164,14 +168,18 @@ export const listedLaw = Effect.fn("listed.listedLaw")(function* (spec: ListedSp
             })
           )
         }
-        if (A.contains(spec.listed, file)) {
-          return A.isReadonlyArrayEmpty(read.found) ? A.of(ListedFinding.cases.Settled.make({ file })) : []
-        }
-        return A.map(read.found, (line) => ListedFinding.cases.At.make({ place: `${file}:${line}` }))
+        return O.match(standingOf(spec.listed, { file, now: A.length(read.found) }), {
+          onNone: () => A.map(read.found, (line) => ListedFinding.cases.At.make({ place: `${file}:${line}` })),
+          onSome: (standing) =>
+            O.match(standingWords(standing, spec.listName), {
+              onNone: () => [],
+              onSome: (words) => A.of(ListedFinding.cases.Standing.make({ file, words }))
+            })
+        })
       }),
     { concurrency: 1 }
   )
-  const now = heldAs(spec.listed)
+  const now = heldAs(R.keys(spec.listed))
   const changed = now === spec.held ? [] : [ListedFinding.cases.Changed.make({ held: spec.held, now })]
   const problems = A.appendAll(changed, A.flatten(found))
   return A.isReadonlyArrayNonEmpty(problems)

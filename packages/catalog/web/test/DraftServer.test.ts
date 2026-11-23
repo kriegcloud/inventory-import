@@ -79,16 +79,14 @@ const arrived = (view: ImportView): DraftEvent =>
     takenBack: A.map(view.takenBack, (taken) => ({ revision: taken.revision, rows: taken.rows }))
   })
 
-let uploads = 0
-
 /** The file staged by Marcus, and the server's endpoints with Dana's draft driven against them. */
 const opened = Effect.gen(function* () {
   const imports = yield* importsEndpoints
   const { rows, ...head } = table
-  uploads += 1
   const begun = yield* imports
     .beginUpload({
-      payload: { key: UploadKey.make(`draft-server-${uploads}`), head, rowCount: rows.length, chunkCount: 1 }
+      // A version 4 UUID, as the screen makes one for each upload.
+      payload: { key: UploadKey.make(SecureRandom.uuidV4Unsafe()), head, rowCount: rows.length, chunkCount: 1 }
     })
     .pipe(as(marcus))
   const { id } = yield* Effect.fromResult(begun)

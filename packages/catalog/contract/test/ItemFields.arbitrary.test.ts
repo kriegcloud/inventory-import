@@ -3,7 +3,14 @@
 // a discontinued item or a received date. Each schema here draws 100 values with no discard at all, and what it draws
 // is what an item may hold, read off the value itself.
 import { describe, expect, it } from "@effect/vitest"
-import { calendarDayPattern, discontinuedOn, ItemFields, UnitCost, Vendor } from "@inventory/catalog-contract/Item"
+import {
+  calendarDayPattern,
+  discontinuedOn,
+  isoDate,
+  ItemFields,
+  UnitCost,
+  Vendor
+} from "@inventory/catalog-contract/Item"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as BigDecimal from "effect/BigDecimal"
@@ -60,13 +67,15 @@ describe("an item's values", () => {
   }
 
   it.prop(
-    "the calendar's pattern accepts a day exactly when the clock's calendar has it",
+    "the calendar's pattern accepts a day exactly when the clock's calendar has it, as the import's reading does",
     [Arbitrary.schema(DayParts)],
     ([parts]) => {
       const text = `${parts.year}-${twoDigits(`${parts.month}`)}-${twoDigits(`${parts.day}`)}`
       // The clock's calendar rolls the 31st of April over into May: the day it lands on is the day only on the calendar.
       const landsOn = DateTime.getPartUtc(DateTime.makeUnsafe(parts), "day")
       expect(calendarDayPattern.test(text)).toBe(landsOn === parts.day)
+      // The import reads a file's dates with `isoDate`: an edit may store a day exactly when a file may.
+      expect(calendarDayPattern.test(text)).toBe(O.isSome(isoDate(parts)))
     },
     { arbitrary: { runs: 2000 } }
   )

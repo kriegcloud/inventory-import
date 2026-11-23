@@ -95,7 +95,9 @@ export const stage = Effect.fnUntraced(function* (table: StagedTable) {
   const { rows, ...head } = table
   uploads += 1
   const begun = yield* imports.beginUpload({
-    // A version 4 UUID as the screen makes one, its last group the count of uploads so far.
+    // Written out, not drawn: a version 4 UUID as the screen makes one, its last group the count of uploads so far,
+    // so each upload of a test has its own key. An exception to "test data from schemas" until `UploadKey` is a
+    // UUID's schema and can be drawn from.
     payload: {
       key: UploadKey.make(`7a1d3f52-9c4e-4b60-8d21-${Str.padStart(12, "0")(uploads.toString(16))}`),
       head,

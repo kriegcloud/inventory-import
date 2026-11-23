@@ -10,7 +10,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import { AnsweredBy } from "../Answer/AnsweredBy.read.ts"
 import { Change } from "./Change.read.ts"
 import { SavedDecisions, TakenBackKind } from "./Decision.command.ts"
-import { Field, RowNumber } from "../Staging/Staged.read.ts"
+import { Field, maxPart, RowNumber } from "../Staging/Staged.read.ts"
 import { personName } from "../internal/Described.ts"
 import { ConfirmId, ImportId, RowId } from "../Catalog.id.ts"
 import { ItemFields } from "../Item/Item.read.ts"
@@ -68,7 +68,7 @@ export type OutcomeKind = typeof OutcomeKind.Type
 // What every outcome says of its row: where it is in the file and what it is called.
 const outcomeRow = {
   rowNumber: RowNumber.pipe(S.annotateKey({ description: "The row as Excel numbers it", examples: [7] })),
-  part: S.Int.check(S.isBetween({ minimum: 1, maximum: 9999 })).pipe(
+  part: S.Int.check(S.isBetween({ minimum: 1, maximum: maxPart })).pipe(
     absentAsNone({
       description:
         "Which of its row's items this is (1, 2, ...), when the row holds several; left out for a row that is one item"

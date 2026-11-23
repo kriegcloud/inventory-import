@@ -8,7 +8,7 @@
 import { Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
 import { RowDecision, type DecisionDelta } from "@inventory/catalog-contract/Decision"
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
-import { type ConfirmId, ImportId, type ItemId } from "@inventory/catalog-contract/Ids"
+import { type ConfirmId, ImportId, type ItemId, type UploadKey } from "@inventory/catalog-contract/Ids"
 import {
   ChangedItem,
   type ChangeRecord,
@@ -946,7 +946,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
 
     const beginUpload = Effect.fnUntraced(function* (
       actor: Member,
-      key: string,
+      key: UploadKey,
       head: StagedHead,
       counts: { readonly rowCount: number; readonly chunkCount: number }
     ) {

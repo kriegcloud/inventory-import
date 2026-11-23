@@ -5,6 +5,7 @@ import { Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { DecidedBy, decidedByNobody, decidedByPerson } from "@inventory/catalog-contract/Import"
 import { ItemFields } from "@inventory/catalog-contract/Item"
+import { maxPart, RowNumber } from "@inventory/catalog-contract/Staged"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
@@ -36,10 +37,8 @@ export type PlannedStatus = typeof PlannedStatus.Type
 // Where the item is in the file, and what the file calls it. The row and the part are the ones the contract's row id
 // is made of (`rowId`): a row of the file from 1 up, and a part that is 0 for a row of one item.
 const place = {
-  rowNumber: S.Int.check(S.isBetween({ minimum: 1, maximum: 9_999_999 })).pipe(
-    S.annotateKey({ description: "The row of the file" })
-  ),
-  part: S.Int.check(S.isBetween({ minimum: 0, maximum: 9_999 })).pipe(
+  rowNumber: RowNumber.pipe(S.annotateKey({ description: "The row of the file" })),
+  part: S.Int.check(S.isBetween({ minimum: 0, maximum: maxPart })).pipe(
     S.annotateKey({ description: "Which of its row's items it is: 0 when the row is one item" })
   ),
   sku: S.String.pipe(S.annotateKey({ description: "The row's SKU as the review reads it" })),
@@ -52,10 +51,16 @@ const written = {
     S.annotateKey({ description: "The values that differ from the file, for the record of changed values" })
   )
 }
-// Never empty: a row that is left out or skipped always says why, in the result and in the download.
-const reason = S.String.check(S.isNonEmpty()).pipe(
-  S.annotateKey({ description: "Every reason the row is not imported, joined: what the not-imported rows store" })
-)
+/** The most characters a reason may have: what the outcome rows store and the result reads. */
+export const maxReason = 4000
+
+// Never blank: a row that is left out or skipped always says why, in the result and in the download. And never longer
+// than the outcome rows store, so no plan holds a reason the store cannot write.
+const reason = S.String.check(
+  S.isMinLength(1),
+  S.isMaxLength(maxReason),
+  S.isPattern(/\S/, { expected: "a reason with at least one character that is not a space" })
+).pipe(S.annotateKey({ description: "Every reason the row is not imported, joined: what the not-imported rows store" }))
 
 class PlannedReady extends S.Opaque<PlannedReady, { readonly brand: unique symbol }>()(
   S.Struct({ status: S.tag("ready"), ...written }).annotate({

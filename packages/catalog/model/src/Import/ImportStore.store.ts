@@ -3,7 +3,7 @@
 // The one thing not to break: nothing here says how it is stored. The D1 adapter is in `catalog-host`.
 import * as A from "effect/Array"
 import * as S from "effect/Schema"
-import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
+import { ImportId, ConfirmId, ItemId, type UploadKey } from "@inventory/catalog-contract/Ids"
 import { Instant } from "@inventory/kernel/Text"
 import { StoredItem } from "@inventory/catalog-contract/Item"
 import { SavedDecisions, DecisionDelta } from "@inventory/catalog-contract/Decision"
@@ -356,7 +356,7 @@ export class ImportStore extends Context.Service<
      */
     beginUpload(
       actor: Member,
-      key: string,
+      key: UploadKey,
       head: StagedHead,
       counts: { readonly rowCount: number; readonly chunkCount: number }
     ): Effect.Effect<Result.Result<ImportId, FileProblem>>

@@ -8,6 +8,7 @@ import {
   maxNotes,
   maxStagedRows,
   StagedHead,
+  StagedHeadJson,
   StagedNote,
   StagedRow,
   UploadHead
@@ -107,9 +108,10 @@ describe("a staged head's notes", () => {
     ([head, note]) =>
       Effect.gen(function* () {
         const stored = { ...head, notes: [...head.notes, ...copies(maxNotes + 1, note)] }
-        const json = yield* S.encodeEffect(S.fromJsonString(StagedHead))(stored)
-        const read = yield* S.decodeEffect(S.fromJsonString(StagedHead))(json)
+        const json = yield* S.encodeEffect(StagedHeadJson)(stored)
+        const read = yield* S.decodeEffect(StagedHeadJson)(json)
         expect(read.notes.length).toBe(head.notes.length + 1001)
+        expect(read).toEqual(stored)
       }),
     { arbitrary: { runs: 10 } }
   )

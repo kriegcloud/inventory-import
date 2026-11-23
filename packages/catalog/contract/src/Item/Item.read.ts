@@ -111,16 +111,11 @@ export type UnitCost = typeof UnitCost.Type
  */
 export const costDigits = (cost: UnitCost): string => BigDecimal.format(cost)
 const Count = S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(maxCount))
-// A day written year-month-day that is on the calendar: 2024-02-30 and 2024-13-45 have the form and are no day. The
-// import reads a file's dates through the same `isoDate`, so an edit cannot store a day a file could not.
-// Hoisted: the schema below is evaluated before `isoDate` is defined.
-function isCalendarDay(text: string): boolean {
-  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
-  return parts !== null && O.isSome(isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) }))
-}
 // A day on the calendar as one pattern: the 31-day months, the 30-day months, February to the 28th, and the 29th of
-// February in a leap year (every fourth year, a century only when it divides by 400). The pattern is what a test draws
-// from, so every drawn day is a day; the check below is the import's own reading (`isoDate`), which decides.
+// February in a leap year (every fourth year, a century only when it divides by 400). 2024-02-30 and 2024-13-45 have
+// the form and are no day. It accepts exactly the days the import's own reading does (`isoDate`, a test holds the two
+// together), so an edit cannot store a day a file could not; and it is what a test draws from, so every drawn day is
+// a day.
 const yearDigits = "[1-9][0-9]{3}"
 const leapYear = "([1-9][0-9](0[48]|[2468][048]|[13579][26])|([2468][048]|[13579][26])00)"
 /** A year-month-day that is on the calendar, from year 1000 to 9999: what `isoDate` accepts, as a pattern. */
@@ -129,10 +124,7 @@ export const calendarDayPattern = new RegExp(
     `|${leapYear}-02-29)$`
 )
 const IsoDate = S.String.check(
-  S.isPattern(calendarDayPattern, { expected: "a day on the calendar, written year-month-day" }),
-  S.makeFilter((text: string) => isCalendarDay(text), {
-    expected: "a day on the calendar, written year-month-day"
-  })
+  S.isPattern(calendarDayPattern, { expected: "a day on the calendar, written year-month-day" })
 )
 const Measure = S.Finite.check(S.isGreaterThan(0))
 

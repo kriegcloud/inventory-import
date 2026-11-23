@@ -34,10 +34,12 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
 }
 
 /**
- * The reader's notes as staged: all of them when they fit `maxNotes`. Past it, the warnings are kept before the
- * information notes (a total row, a second table, a hidden sheet is a warning, and the review reads the total row's),
- * each in the reader's order, and one more note says how many were not kept. That note is a warning when a warning was
- * among them, so the person is shown it on the Review step; else it is information, as the notes it counts were.
+ * The reader's notes as staged: all of them when they fit `maxNotes`. Past it, they are kept in three tiers, each in
+ * the reader's order: the warnings (a total row, a second table, a hidden sheet; the review reads the total row's),
+ * then every information note but the number-format ones (rows above the heading, blank rows, how dates or spaces
+ * were read), then the notes on a number format Excel shows another way, which a workbook can have thousands of. One more note says how many were not
+ * kept. It is a warning when a warning was among them, so the person is shown it on the Review step; else it is
+ * information, as the notes it counts were.
  *
  * @example keptNotes(notes).length // at most maxNotes
  */
@@ -51,16 +53,16 @@ const keptNotes = (notes: SpreadsheetTable["notes"]): StagedTable["notes"] => {
   if (staged.length <= maxNotes) return staged
   const warnings = A.filter(staged, isWarning)
   const room = maxNotes - 1
-  const keptWarnings = A.take(warnings, room)
-  const kept = A.appendAll(
-    keptWarnings,
-    A.take(
-      A.filter(staged, (note) => !isWarning(note)),
-      room - keptWarnings.length
-    )
+  const kept = A.take(
+    [
+      ...warnings,
+      ...A.filter(staged, (note) => !isWarning(note) && !isFormatNote(note)),
+      ...A.filter(staged, (note) => !isWarning(note) && isFormatNote(note))
+    ],
+    room
   )
   const left = staged.length - kept.length
-  const warningsLeft = warnings.length - keptWarnings.length
+  const warningsLeft = warnings.length - A.filter(kept, isWarning).length
   return A.append(
     kept,
     warningsLeft > 0
@@ -80,6 +82,9 @@ const keptNotes = (notes: SpreadsheetTable["notes"]): StagedTable["notes"] => {
 }
 
 const isWarning = (note: { readonly level: "info" | "warning" }): boolean => note.level === "warning"
+
+// The reader writes one of these for each number format Excel shows another way: the notes a file can have most of.
+const isFormatNote = (note: { readonly kind: string }): boolean => note.kind === "formatNotShown"
 
 /**
  * Why a file cannot be staged, as a `FileProblem` for the person, or null when it can. It takes counts, not rows, so

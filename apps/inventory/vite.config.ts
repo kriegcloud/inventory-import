@@ -1,38 +1,54 @@
-// @effect-diagnostics nodeBuiltinImport:off processEnv:off
-// Build configuration, run by Node: it reads files and the process environment, which app code never does.
+// Build configuration, run by Node. Its settings come from the environment through Vite's own `loadEnv`, only the
+// names below; it reads no file and imports no Node module.
 import { cloudflare } from "@cloudflare/vite-plugin"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import compression from "compression"
 import * as A from "effect/Array"
 import * as Str from "effect/String"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
 import { visualizer } from "rollup-plugin-visualizer"
-import { type Connect, defineConfig, type Plugin, type PluginOption } from "vite"
+import { type Connect, defineConfig, loadEnv, type Plugin, type PluginOption } from "vite"
 import { reachableSources } from "./scripts/reachable-sources.mjs"
 
 // One dev server: Vite serves the React app, and the Cloudflare plugin runs
 // src/server/worker.ts in workerd (the production runtime) for /api/*.
 
-// `bun run dev:https` (scripts/dev-https.mjs) sets these to a local certificate, so the dev server speaks HTTPS the
-// way a deployed copy does. `bun run dev` leaves them unset and serves plain HTTP.
-const certificate = process.env["DEV_HTTPS_CERT"]
-const key = process.env["DEV_HTTPS_KEY"]
-const https =
-  certificate !== undefined && key !== undefined
-    ? { cert: readFileSync(certificate), key: readFileSync(key) }
-    : undefined
+/** A file's path from its `file:` URL, ".." resolved. Written this way, `bun run beep laws screens` reads the list below. */
+const fileURLToPath = (url: URL): string => decodeURIComponent(url.pathname)
+
+/** The settings this file reads from the environment: nothing else in it is read. */
+interface BuildSettings {
+  readonly httpsCertificate: string | undefined
+  readonly httpsKey: string | undefined
+  readonly previewCompression: boolean
+  readonly bundleReport: boolean
+}
+
+const buildSettings = (mode: string): BuildSettings => {
+  const env = loadEnv(mode, fileURLToPath(new URL(".", import.meta.url)), [
+    "INVENTORY_HTTPS_",
+    "PREVIEW_COMPRESSION",
+    "BUNDLE_REPORT"
+  ])
+  return {
+    // `bun run dev:https` (scripts/dev-https.mjs) sets these to a local certificate and key (PEM text), so the dev
+    // server speaks HTTPS the way a deployed copy does. `bun run dev` leaves them unset and serves plain HTTP.
+    httpsCertificate: env["INVENTORY_HTTPS_CERT_PEM"],
+    httpsKey: env["INVENTORY_HTTPS_KEY_PEM"],
+    previewCompression: env["PREVIEW_COMPRESSION"] !== "off",
+    bundleReport: env["BUNDLE_REPORT"] === "1"
+  }
+}
 
 // `bun run preview` compresses what it sends the way Cloudflare does in production (brotli when the browser takes it,
 // else gzip; fonts and images as they are), so Lighthouse on the preview measures the bytes a person downloads.
 // `PREVIEW_COMPRESSION=off bun run preview` sends everything as it is, for a comparison. Registered before the
 // Cloudflare plugin, so it wraps the Worker's answers and the static files alike.
-const compressPreview = (): Plugin => ({
+const compressPreview = (settings: BuildSettings): Plugin => ({
   name: "inventory:compress-preview",
   configurePreviewServer(server) {
     // Typed for Express, which hands it the same Node request and response as Vite's server does.
-    if (process.env["PREVIEW_COMPRESSION"] !== "off") {
+    if (settings.previewCompression) {
       server.middlewares.use(compression() as unknown as Connect.NextHandleFunction)
     }
   }
@@ -41,8 +57,8 @@ const compressPreview = (): Plugin => ({
 // `bun run build:report`: what each chunk of the browser's build is made of, as a treemap
 // (.scratch/bundle/client.html) and as data (.scratch/bundle/client.json), with gzip and brotli sizes. Read it
 // before moving code between chunks; do not guess. The Worker's build is left out: nobody downloads it.
-const bundleReport = (): Array<PluginOption> =>
-  process.env["BUNDLE_REPORT"] === "1"
+const bundleReport = (settings: BuildSettings): Array<PluginOption> =>
+  settings.bundleReport
     ? [
         {
           ...visualizer({
@@ -150,25 +166,39 @@ const readerModules = [
   "effect/encoding/Zip"
 ]
 
-export default defineConfig({
-  plugins: [...bundleReport(), usedSourcesOnly(), compressPreview(), react(), tailwindcss(), cloudflare()],
-  resolve: {
-    alias: { "@": fileURLToPath(new URL("./src/web", import.meta.url)) }
-  },
-  // `cors: false`: Vite's dev and preview servers otherwise answer any localhost origin with
-  // Access-Control-Allow-Origin, so another app on this machine could read this API's answers. The Worker grants no
-  // origin access, and neither do the servers in front of it.
-  server: { port: 5173, strictPort: false, cors: false, ...(https === undefined ? {} : { https }) },
-  preview: { cors: false },
-  // The file reader loads on the first file, so Vite found its dependencies only then, optimised them and reloaded the
-  // page: the first file on a cold dev server was lost. Listed here, they are ready at start: the effect modules
-  // @beep/csv, @beep/xlsx and the vendored kit reach (workspace source, which Vite serves as it is, so their own
-  // imports are what it would otherwise discover late).
-  optimizeDeps: { include: readerModules },
-  // Keep every asset a file. Vite would otherwise inline small font subsets as data: URIs,
-  // which the content security policy (font-src 'self') rightly blocks.
-  build: { assetsInlineLimit: 0 },
-  // The file reader's worker is an ES module, so it loads the CSV reader or the workbook reader as a chunk of its own, only
-  // the one a file needs.
-  worker: { format: "es" }
+export default defineConfig(({ mode }) => {
+  const settings = buildSettings(mode)
+  const https =
+    settings.httpsCertificate !== undefined && settings.httpsKey !== undefined
+      ? { cert: settings.httpsCertificate, key: settings.httpsKey }
+      : undefined
+  return {
+    plugins: [
+      ...bundleReport(settings),
+      usedSourcesOnly(),
+      compressPreview(settings),
+      react(),
+      tailwindcss(),
+      cloudflare()
+    ],
+    resolve: {
+      alias: { "@": fileURLToPath(new URL("./src/web", import.meta.url)) }
+    },
+    // `cors: false`: Vite's dev and preview servers otherwise answer any localhost origin with
+    // Access-Control-Allow-Origin, so another app on this machine could read this API's answers. The Worker grants no
+    // origin access, and neither do the servers in front of it.
+    server: { port: 5173, strictPort: false, cors: false, ...(https === undefined ? {} : { https }) },
+    preview: { cors: false },
+    // The file reader loads on the first file, so Vite found its dependencies only then, optimised them and reloaded the
+    // page: the first file on a cold dev server was lost. Listed here, they are ready at start: the effect modules
+    // @beep/csv, @beep/xlsx and the vendored kit reach (workspace source, which Vite serves as it is, so their own
+    // imports are what it would otherwise discover late).
+    optimizeDeps: { include: readerModules },
+    // Keep every asset a file. Vite would otherwise inline small font subsets as data: URIs,
+    // which the content security policy (font-src 'self') rightly blocks.
+    build: { assetsInlineLimit: 0 },
+    // The file reader's worker is an ES module, so it loads the CSV reader or the workbook reader as a chunk of its own, only
+    // the one a file needs.
+    worker: { format: "es" }
+  }
 })

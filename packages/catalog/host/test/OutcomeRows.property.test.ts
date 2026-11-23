@@ -9,6 +9,7 @@ import {
   OutcomeRow,
   outcomeInsertOf,
   Part,
+  resultReasonLength,
   RowNumber,
   storedOutcome
 } from "@inventory/catalog-host/ImportRows"
@@ -17,14 +18,15 @@ import { DisplayName } from "@inventory/kernel/Text"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 
 const runs = { arbitrary: { runs: 300 } }
 
 /**
  * A row of `importOutcome` as any version of the app may have written it: the table's own columns and checks, with a
- * reason of any form, and who decided and their name in any combination the columns allow.
+ * reason of any form and length (a past version quoted whole cells), and who decided and their name in any
+ * combination the columns allow, drawn as Options and written as the columns hold them (`NULL` for none).
  */
 const StoredByAnyVersion = S.Struct({
   rowNumber: RowNumber,
@@ -32,13 +34,21 @@ const StoredByAnyVersion = S.Struct({
   sku: S.String,
   name: S.String,
   outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]),
-  reason: S.Union([S.Literal(""), S.Literal("  "), S.String.check(S.isMaxLength(4000))]),
-  decidedBy: S.NullOr(S.Literals(["person", "nobody"])),
-  decidedByName: S.NullOr(S.Union([DisplayName, S.Literal(""), S.Literal(" "), S.String]))
+  reason: S.Union([
+    S.Literal(""),
+    S.Literal("  "),
+    S.String.check(S.isMaxLength(resultReasonLength)),
+    S.String.check(S.isMinLength(resultReasonLength + 1), S.isMaxLength(resultReasonLength + 40))
+  ]),
+  decidedBy: S.OptionFromNullOr(S.Literals(["person", "nobody"])),
+  decidedByName: S.OptionFromNullOr(S.Union([DisplayName, S.Literal(""), S.Literal(" "), S.String]))
 })
 
-/** A name a person can read, as the result shows one: some character that is not a space, and at most 200. */
-const readable = (name: string | null): name is string => P.isString(name) && /\S/.test(name) && name.length <= 200
+/**
+ * A name a person can read, as the result shows one: some character that is not a space, and at most 200. Written by
+ * hand on purpose: it is the oracle for `DisplayName`, which the read under test uses, so it does not call it.
+ */
+const readable = (name: string): boolean => /\S/.test(name) && name.length <= 200
 
 describe("the outcome rows a confirm stores", () => {
   it.effect.prop(
@@ -70,7 +80,8 @@ describe("the outcome rows a confirm stores", () => {
     [Arbitrary.schema(StoredByAnyVersion)],
     ([stored]) =>
       Effect.gen(function* () {
-        const read = yield* S.decodeEffect(OutcomeRow)(stored)
+        const columns = yield* S.encodeEffect(StoredByAnyVersion)(stored)
+        const read = yield* S.decodeEffect(OutcomeRow)(columns)
         const shown = storedOutcome(read)
         expect([shown.outcome, shown.rowNumber, shown.sku, shown.name]).toEqual([
           stored.outcome,
@@ -80,12 +91,16 @@ describe("the outcome rows a confirm stores", () => {
         ])
         expect(shown.part).toEqual(stored.part === 0 ? O.none() : O.some(stored.part))
         const hasReason = stored.outcome === "already" || stored.outcome === "notImported"
-        expect(outcomeReasonOf(shown)).toEqual(hasReason ? O.some(stored.reason) : O.none())
+        // A reason as stored; one longer than the result reads, its first characters and "…" (the text drawn is ASCII).
+        const shownReason =
+          stored.reason.length <= resultReasonLength
+            ? stored.reason
+            : `${Str.takeLeft(stored.reason, resultReasonLength - 1)}…`
+        expect(outcomeReasonOf(shown)).toEqual(hasReason ? O.some(shownReason) : O.none())
         if (RowOutcome.guards.notImported(shown)) {
-          const named = DecidedBy.guards.person(shown.decidedBy) ? shown.decidedBy.name : null
-          expect(named).toBe(
-            stored.decidedBy === "person" && readable(stored.decidedByName) ? stored.decidedByName : null
-          )
+          const named = DecidedBy.guards.person(shown.decidedBy) ? O.some(shown.decidedBy.name) : O.none()
+          const byAPerson = O.filter(stored.decidedBy, (who) => who === "person")
+          expect(named).toEqual(O.flatMap(byAPerson, () => O.filter(stored.decidedByName, readable)))
         }
       }),
     runs

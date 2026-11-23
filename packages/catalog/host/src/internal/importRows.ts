@@ -8,10 +8,12 @@ import { DecidedBy, RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } fr
 import { StagedHeadJson } from "@inventory/catalog-contract/Staged"
 import { PlannedRow } from "@inventory/catalog-model/Confirm"
 import { DisplayName } from "@inventory/kernel/Text"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import * as S from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as Str from "effect/String"
 import * as Struct from "effect/Struct"
 import { piece } from "./pieces.ts"
 
@@ -80,13 +82,43 @@ export const ItemInsert = S.Struct({ ...itemInsertFields, skuKey: S.String })
 export const ItemsPiece = piece(ItemInsert).annotate({ description: "Items a confirm writes, as one bound value" })
 
 /**
- * Why a row was left out or found already there, as a confirm writes it: never empty, as the plan's reason never is,
- * and at most the 4,000 characters the result reads. It asks no more of a reason than the plan does, so no plan the
- * review can make is refused at the write; the result and the download of left-out rows show it as it is.
+ * Why a row was left out or found already there, as a confirm writes it: the plan's own reason, so the write asks
+ * exactly what the plan holds (never empty, and within the model's bound on a reason) and no plan the review can make
+ * is refused at the write; the result and the download of left-out rows show it as it is.
  */
-export const OutcomeReason = S.String.check(S.isMinLength(1), S.isMaxLength(4000)).annotate({
-  description: "Why a row was left out or already there, one sentence per problem"
+export const OutcomeReason = PlannedRow.cases.notImported.fields.reason
+
+/**
+ * The longest reason the result reads (the contract's `RowOutcome`): a stored reason longer than this, which a past
+ * version wrote by quoting whole cells, is read cut to it.
+ */
+export const resultReasonLength = 4000
+
+/**
+ * Text cut to at most `max` UTF-16 units, the last of them "…" when anything was cut; never a character cut in two,
+ * so a pair of surrogates is kept whole or left out.
+ *
+ * @example clipped("Packaging crates", 10) // "Packaging…"
+ */
+export const clipped: {
+  (max: number): (text: string) => string
+  (text: string, max: number): string
+} = dual(2, (text: string, max: number): string => {
+  if (text.length <= max) return text
+  const kept = Str.takeLeft(text, max - 1)
+  return `${/[\uD800-\uDBFF]$/.test(kept) ? Str.takeLeft(kept, max - 2) : kept}…`
 })
+
+/**
+ * A reason as `importOutcome` holds it, written by any version: one longer than the result reads reads cut to
+ * `resultReasonLength` with "…", so a past import's Result still answers. Encoding writes it as it is.
+ */
+export const StoredReason = S.String.pipe(
+  S.decodeTo(
+    S.toType(S.String.check(S.isMaxLength(resultReasonLength))),
+    SchemaTransformation.transform({ decode: clipped(resultReasonLength), encode: (reason) => reason })
+  )
+).annotate({ description: "A stored reason, cut to the length the result reads" })
 
 // Where the item is in the file and what it is called, as `importOutcome` keeps it.
 const outcomePlace = { rowNumber: RowNumber, part: Part, sku: S.String, name: S.String }
@@ -151,12 +183,12 @@ export const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
  * it: the stored row is a boundary. A created, replaced or taken-back row holds no reason (`''`) and nobody; a reason
  * written before a rule on its form existed reads as it was written, a blank one too; and who decided is read as an
  * Option, so a row that names a person whose name is not one a person can read (from before names had a rule) says
- * nobody, as the result always said of it. The strict rules are on what is written (`OutcomeInsert`).
+ * nobody, as the result always said of it; a reason longer than the result reads is cut to it. The strict rules are on what is written (`OutcomeInsert`).
  */
 export const OutcomeRow = S.Struct({
   ...outcomePlace,
   outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]),
-  reason: S.String.check(S.isMaxLength(4000)),
+  reason: StoredReason,
   decidedBy: S.OptionFromNullOr(S.Literals(["person", "nobody"])),
   decidedByName: S.OptionFromNullOr(S.String)
 }).annotate({ description: "What the confirms did with one item of the file, as stored by any version" })

@@ -101,15 +101,6 @@
       // Files that hold an assertion today. This list may only shrink: each owner takes a file off when its last
       // assertion is gone.
       "files": [
-        "apps/inventory/src/api/v1/Document.ts",
-        "apps/inventory/src/web/lib/form.ts",
-        "apps/inventory/src/web/pages/gallery/JobsReview.tsx",
-        "apps/inventory/src/web/pages/ReviewGallery.tsx",
-        "apps/inventory/test/server/support/app.ts",
-        "apps/inventory/test/server/Telemetry.test.ts",
-        "apps/inventory/test/server/WriteLimits.slow.test.ts",
-        "apps/inventory/test/web/session.test.ts",
-        "apps/inventory/test/web/workspace.test.ts",
         "apps/inventory/vite.config.ts",
         "packages/access/web/src/People.screen.tsx",
         "packages/catalog/web/src/internal/cellDrafts.ts",
@@ -137,11 +128,6 @@
         "packages/catalog/web/test/xlsxParity.test.ts",
         "packages/client/src/Api.atoms.ts",
         "packages/client/src/ApiRuntime.runtime.ts",
-        "packages/drivers/better-auth/test/BetterAuth.test.ts",
-        "packages/drivers/d1/src/D1.service.ts",
-        "packages/drivers/d1/test/D1Schemas.property.test.ts",
-        "packages/drivers/d1/test/D1.test.ts",
-        "packages/drivers/openrouter/test/OpenRouterSchemas.property.test.ts",
         "packages/foundation/modeling/csv/src/Csv.codec.ts",
         "packages/foundation/modeling/csv/test/CsvSchemas.property.test.ts",
         "packages/foundation/modeling/csv/test/oracle.property.test.ts",

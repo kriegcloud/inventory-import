@@ -1,7 +1,9 @@
 import { LayoutGridIcon } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import * as Str from "effect/String"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -46,7 +48,13 @@ type GalleryState = (typeof states)[number][0]
 
 const readState = (): GalleryState => {
   const wanted = new URLSearchParams(window.location.search).get("state")
-  return states.find(([id]) => id === wanted)?.[0] ?? "default"
+  return O.getOrElse(
+    O.map(
+      A.findFirst(states, ([id]) => id === wanted),
+      ([id]) => id
+    ),
+    (): GalleryState => "default"
+  )
 }
 
 /** Rows whose items are in stock already: nothing is written for them and nothing is asked. */
@@ -85,21 +93,23 @@ const newSupplier: ProblemKind = ProblemKind.make({
 const elsewhereKinds: ReadonlyArray<ProblemKind> = [...problemKinds, newSupplier]
 
 /** Rows whose supplier is not in the list yet, each with its own reason. */
-const elsewhereRows: ReadonlyArray<ReviewRow> = [
-  ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
-  ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
-  ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
-].map(([name = "", sku = "", supplier = ""], index) =>
-  ReviewRow.make({
-    id: `elsewhere-${index + 1}`,
-    line: 183 + index,
-    cells: { name, sku, unit: "pcs", onHand: "10", supplier },
-    problem: {
-      kind: newSupplier.id,
-      column: "supplier",
-      reason: `Supplier ${supplier} is not in your supplier list yet.`
-    }
-  })
+const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(
+  [
+    ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
+    ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
+    ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
+  ],
+  ([name = "", sku = "", supplier = ""], index) =>
+    ReviewRow.make({
+      id: `elsewhere-${index + 1}`,
+      line: 183 + index,
+      cells: { name, sku, unit: "pcs", onHand: "10", supplier },
+      problem: {
+        kind: newSupplier.id,
+        column: "supplier",
+        reason: `Supplier ${supplier} is not in your supplier list yet.`
+      }
+    })
 )
 
 /**
@@ -122,12 +132,12 @@ const monthItems = [
 ]
 
 const belowZero = (month: string, onHand: string) =>
-  onHand.trim().startsWith("-")
+  Str.startsWith("-")(Str.trim(onHand))
     ? Problem.make({ kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` })
     : undefined
 
-const monthRows: ReadonlyArray<ReviewRow> = monthItems.flatMap((item, index) =>
-  item.counts.map((onHand, part) => {
+const monthRows: ReadonlyArray<ReviewRow> = A.flatMap(monthItems, (item, index) =>
+  A.map(item.counts, (onHand, part) => {
     const line = index + 2
     const month = part === 0 ? "Jan" : "Feb"
     const problem = belowZero(month, onHand)
@@ -222,8 +232,16 @@ export default function ReviewGallery() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuRadioGroup value={state} onValueChange={(next) => choose(next as GalleryState)}>
-              {states.map(([id, label]) => (
+            <DropdownMenuRadioGroup
+              value={state}
+              onValueChange={(next) =>
+                O.map(
+                  A.findFirst(states, ([id]) => id === next),
+                  ([id]) => choose(id)
+                )
+              }
+            >
+              {A.map(states, ([id, label]) => (
                 <DropdownMenuRadioItem key={id} value={id}>
                   {label}
                 </DropdownMenuRadioItem>

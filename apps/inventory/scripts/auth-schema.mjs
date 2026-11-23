@@ -1,6 +1,6 @@
 // Prints the SQL Better Auth still needs on top of migrations/, for the next numbered migration.
 //   bun run auth:schema            the missing tables and columns as SQL, or "nothing missing"
-//   bun run auth:schema -- --check exit 1 when anything is missing (test/server/AuthSchema.test.ts checks the same, in `bun run check`)
+//   bun run auth:schema -- --check exit 1 when anything is missing (test/server/AuthSchema.slow.test.ts checks the same on D1, in `bun run check:full`)
 //
 // Better Auth's own CLI cannot reach D1 (it runs in Node; D1 lives in workerd), so this script does what its
 // `generate` command does, against a stand-in: every migrations/*.sql applied in order to an in-memory node:sqlite

@@ -4,6 +4,7 @@
 // really has, measured on the text that is bound, never by the length of what went into it.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 
 /** The most bytes a piece of several values has: half of what D1 takes in one. A value longer on its own goes alone. */
@@ -27,34 +28,52 @@ export const utf8Bytes = (text: string): number => encoder.encode(text).length
  */
 export const piece = <Value, Wire>(of: S.Codec<Value, Wire>) => of.pipe(S.NonEmptyArray, S.fromJsonString)
 
+/** How a list is cut: the codec each value is written by, and the most values a piece holds. */
+export interface PieceCut<Value, Wire> {
+  readonly of: S.Codec<Value, Wire>
+  readonly most: number
+}
+
+/** The pieces a list travels in, each one value or more. */
+export type Pieces<Value> = ReadonlyArray<A.NonEmptyReadonlyArray<Value>>
+
+// The brackets of an empty piece; each value adds its bytes, and a comma before it when it is not the first.
+const emptyWeight = 2
+
 /**
  * Cuts a list into the pieces it travels in, in order: at most `most` values and `pieceBytes` bytes of JSON each (a
  * value longer on its own goes alone), measured on the text each value is encoded as.
  *
- * @example yield* jsonPieces({ of: S.String, most: 5000 })(keys) // [["AAA-0001", "AAA-0002"]]
+ * @example yield* jsonPieces(keys, { of: S.String, most: 5000 }) // [["AAA-0001", "AAA-0002"]]
+ * @example yield* pipe(keys, jsonPieces({ of: S.String, most: 5000 }))
  */
-export const jsonPieces = <Value, Wire>(input: {
-  readonly of: S.Codec<Value, Wire>
-  readonly most: number
-}): ((values: ReadonlyArray<Value>) => Effect.Effect<ReadonlyArray<A.NonEmptyReadonlyArray<Value>>, S.SchemaError>) => {
-  const encode = S.encodeEffect(input.of.pipe(S.fromJsonString, S.Array))
-  return (values) =>
-    Effect.map(encode(values), (texts) => {
-      const groups: Array<A.NonEmptyArray<Value>> = []
+export const jsonPieces: {
+  <Value, Wire>(
+    cut: PieceCut<Value, Wire>
+  ): (values: ReadonlyArray<Value>) => Effect.Effect<Pieces<Value>, S.SchemaError>
+  <Value, Wire>(values: ReadonlyArray<Value>, cut: PieceCut<Value, Wire>): Effect.Effect<Pieces<Value>, S.SchemaError>
+} = dual(
+  2,
+  <Value, Wire>(
+    values: ReadonlyArray<Value>,
+    cut: PieceCut<Value, Wire>
+  ): Effect.Effect<Pieces<Value>, S.SchemaError> =>
+    Effect.map(S.encodeEffect(cut.of.pipe(S.fromJsonString, S.Array))(values), (texts) => {
+      // Built in place, value by value: a list of 50,000 is cut in one pass, never copied.
+      const pieces: Array<A.NonEmptyArray<Value>> = []
       let current: Array<Value> = []
-      // The brackets, then each value with its comma.
-      let weight = 2
+      let weight = emptyWeight
       A.forEach(A.zip(values, texts), ([value, text]) => {
-        const cost = utf8Bytes(text) + 1
-        if (A.isArrayNonEmpty(current) && (current.length >= input.most || weight + cost > pieceBytes)) {
-          groups.push(current)
+        const bytes = utf8Bytes(text)
+        if (A.isArrayNonEmpty(current) && (current.length >= cut.most || weight + 1 + bytes > pieceBytes)) {
+          pieces.push(current)
           current = []
-          weight = 2
+          weight = emptyWeight
         }
+        weight += A.isArrayNonEmpty(current) ? 1 + bytes : bytes
         current.push(value)
-        weight += cost
       })
-      if (A.isArrayNonEmpty(current)) groups.push(current)
-      return groups
+      if (A.isArrayNonEmpty(current)) pieces.push(current)
+      return pieces
     })
-}
+)

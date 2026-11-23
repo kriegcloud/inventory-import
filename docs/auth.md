@@ -104,8 +104,8 @@ are in `.dev.vars.example`.
 Better Auth's performance guide, item by item:
 
 - **Indexes**: every lookup it names is indexed (part 1 of `migrations/0001_init.sql`), and
-  `test/server/AuthIndexes.test.ts`
-  asks SQLite's planner that each one uses its index.
+  `test/server/AuthIndexes.slow.test.ts`
+  asks D1's planner that each one uses its index.
 - **Background tasks**: `advanced.backgroundTasks` hands work after the answer (rate-limit updates, cleanup) to the
   Worker's `waitUntil` (`src/server/worker.ts`).
 - **The session is fetched once** per page load and cached on the client (above).
@@ -145,9 +145,10 @@ Better Auth's command line cannot reach D1, so its tables are migrations like an
    tables, part 2 the shared `organization` and `member`), then `bun run db:reset`. Once a database holds rows that
    must stay, save it as the next `migrations/NNNN_*.sql` instead: a line marked UNSAFE is a required column on a
    table that already has rows, so add it nullable and fill existing rows in the same file.
-4. `bun run check`: `test/server/AuthSchema.test.ts` fails while anything is missing. It also fails when a new Better
-   Auth wants a table or a column the migrations do not make, which is why `better-auth` is held and moved by hand
-   (`bun run deps:update` says how).
+4. `bun run check:full`: `test/server/AuthSchema.slow.test.ts` (on D1, with the migrations applied) fails while
+   anything is missing. It also fails when a new Better Auth wants a table or a column the migrations do not make,
+   which is why `better-auth` is held and moved by hand (`bun run deps:update` says how).
+   `bun run auth:schema -- --check` says the same in a second, without D1.
 
 Better Auth's tables come first in `0001_init.sql`, because `member.userId` references `user`.
 

@@ -19,7 +19,7 @@ import * as SqlClient from "effect/sql/SqlClient"
 import { decisionFromFlags, type RowDecision } from "@inventory/catalog-contract/Decision"
 import { ConfirmId, ImportId, ItemId } from "@inventory/catalog-contract/Ids"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { maxStagedRows, StagedHead } from "@inventory/catalog-contract/Staged"
+import { maxStagedRows, StagedHead, StagedHeadJson } from "@inventory/catalog-contract/Staged"
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
@@ -37,24 +37,35 @@ const longestBound = 2_000_000
 const encoder = new TextEncoder()
 const bytesOf = (value: unknown): number => (P.isString(value) ? encoder.encode(value).length : 0)
 
+/** One statement, refused as it is built when it binds more than the store says any does, or a text D1 would not take. */
+const boundChecked = <A, E, R>(query: Pending<A, E, R>): Pending<A, E, R> =>
+  Effect.tap(query, (built) => {
+    const [text, values] = built.statement.compile()
+    const longest = A.reduce(values, 0, (most, value) => Math.max(most, bytesOf(value)))
+    return values.length > mostBound || longest > longestBound
+      ? Effect.die(`${values.length} values bound, the longest ${longest} bytes, by: ${text}`)
+      : Effect.void
+  })
+
+/**
+ * Each statement of a batch counted as it is built; the tuple keeps the types of the statements as given. The first
+ * signature is stated over the second, which is the one checked: it maps in place, so statement `i` stays at `i`, and
+ * every test below decodes its answers by position (a batch handed on in another order fails all of them).
+ */
+function countedEach<const Queries extends ReadonlyArray<Pending<unknown, unknown, unknown>>>(queries: Queries): Queries
+function countedEach<E, R>(queries: ReadonlyArray<Pending<unknown, E, R>>): ReadonlyArray<Pending<unknown, E, R>> {
+  return A.map(queries, boundChecked)
+}
+
 // D1 as it is, refusing a batch with a statement that binds more than the store says any does, whatever the file, or a
 // text of more bytes than D1 takes.
 const CountedD1 = Layer.effect(
   D1,
   Effect.gen(function* () {
     const d1 = yield* D1
-    const counted = <A, E, R>(query: Pending<A, E, R>): Pending<A, E, R> =>
-      Effect.tap(query, (built) => {
-        const [text, values] = built.statement.compile()
-        const longest = A.reduce(values, 0, (most, value) => Math.max(most, bytesOf(value)))
-        return values.length > mostBound || longest > longestBound
-          ? Effect.die(`${values.length} values bound, the longest ${longest} bytes, by: ${text}`)
-          : Effect.void
-      })
-    // Each statement counted as it is built; the tuple's types are those of the statements as given.
     const batch: D1["Service"]["batch"] = <const Queries extends ReadonlyArray<Pending<unknown, unknown, unknown>>>(
       queries: Queries
-    ) => d1.batch(A.map(queries, counted) as unknown as Queries)
+    ) => d1.batch(countedEach(queries))
     return D1.of({ run: d1.run, batch })
   })
 )
@@ -85,7 +96,7 @@ const head: StagedHead = {
 const choices: ReadonlyArray<MappingChoice> = [{ field: "unitCost", column: listCost, by: "person", at: 1 }]
 const moves: ReadonlyArray<ColumnMove> = [{ field: "unitCost", at: 1, was: unitCost, column: listCost }]
 const Stored = S.Struct({
-  head: S.fromJsonString(StagedHead),
+  head: StagedHeadJson,
   choices: MappingChoice.pipe(S.Array, S.fromJsonString),
   moves: ColumnMove.pipe(S.Array, S.fromJsonString)
 })

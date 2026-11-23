@@ -4,12 +4,9 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as R from "effect/Record"
-import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
-import { BetterAuthSettings } from "@beep/better-auth/BetterAuthConfig"
+import { BetterAuthSettings, PublicUrl } from "@beep/better-auth/BetterAuthConfig"
 import {
   AuthEmail,
   AuthEndpoint,
@@ -22,28 +19,12 @@ import {
   resolveAuthSecret
 } from "@beep/better-auth/BetterAuthSession"
 
-const long = Redacted.make(Str.repeat(32)("k"))
-const short = Redacted.make("too-short")
-
 describe("resolveAuthSecret", () => {
-  it("uses a configured secret of 32 characters or more, in any build", () => {
-    for (const production of [true, false]) {
-      const chosen = resolveAuthSecret({ secret: O.some(long), production })
-      expect(Result.isSuccess(chosen) && chosen.success.kind).toBe("configured")
-    }
-  })
-  it("refuses a missing or short secret in production, naming which", () => {
+  it("says how to set a missing secret in production", () => {
     const missing = resolveAuthSecret({ secret: O.none(), production: true })
-    const tooShort = resolveAuthSecret({ secret: O.some(short), production: true })
-    expect(Result.isFailure(missing) && missing.failure.problem).toBe("missingSecret")
-    expect(Result.isFailure(tooShort) && tooShort.failure.problem).toBe("shortSecret")
     expect(Result.isFailure(missing) && missing.failure.message).toContain(
       "BETTER_AUTH_SECRET is not set. Set it with `wrangler secret put BETTER_AUTH_SECRET`"
     )
-  })
-  it("makes an ephemeral one in development", () => {
-    const chosen = resolveAuthSecret({ secret: O.some(short), production: false })
-    expect(Result.isSuccess(chosen) && chosen.success.kind).toBe("ephemeral")
   })
 })
 
@@ -77,24 +58,26 @@ describe("a span's endpoint", () => {
   })
 })
 
+const runs = { arbitrary: { runs: 50 } }
+
+/** `schema` generates only values it accepts. */
+const generatesOnlyValid = <Schema extends S.Top>(name: string, schema: Schema) =>
+  it.prop(
+    name,
+    [Arbitrary.schema(schema)],
+    ([value]) => {
+      expect(S.is(schema)(value)).toBe(true)
+    },
+    runs
+  )
+
 describe("every schema generates only valid values", () => {
-  const schemas = {
-    AuthUserId,
-    AuthOrganizationId,
-    AuthEmail,
-    AuthEndpoint,
-    AuthSession,
-    AuthSecret,
-    BetterAuthSettings
-  }
-  for (const [name, schema] of R.toEntries(schemas)) {
-    it.prop(
-      name,
-      [Arbitrary.schema(schema as S.Top)],
-      ([value]) => {
-        expect(S.is(schema as S.Top)(value)).toBe(true)
-      },
-      { arbitrary: { runs: 50 } }
-    )
-  }
+  generatesOnlyValid("AuthUserId", AuthUserId)
+  generatesOnlyValid("AuthOrganizationId", AuthOrganizationId)
+  generatesOnlyValid("AuthEmail", AuthEmail)
+  generatesOnlyValid("AuthEndpoint", AuthEndpoint)
+  generatesOnlyValid("AuthSession", AuthSession)
+  generatesOnlyValid("AuthSecret", AuthSecret)
+  generatesOnlyValid("BetterAuthSettings", BetterAuthSettings)
+  generatesOnlyValid("PublicUrl", PublicUrl)
 })

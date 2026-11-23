@@ -4,15 +4,19 @@
 import { D1Instant } from "@beep/d1/D1Instant"
 import { ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
-import { StagedHead } from "@inventory/catalog-contract/Staged"
+import { DecidedBy, RowOutcome, decidedByNobody, decidedByPerson, outcomeOf } from "@inventory/catalog-contract/Import"
+import { StagedHeadJson } from "@inventory/catalog-contract/Staged"
+import { PlannedRow } from "@inventory/catalog-model/Confirm"
+import { DisplayName } from "@inventory/kernel/Text"
+import * as A from "effect/Array"
+import { dual } from "effect/Function"
+import * as O from "effect/Option"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import * as S from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as Str from "effect/String"
 import * as Struct from "effect/Struct"
 import { piece } from "./pieces.ts"
-
-/** The staged file's head, as `importUpload.headJson` and `importDraft.headJson` hold it. */
-export const HeadJson = S.fromJsonString(StagedHead)
 
 /** Who is acting and where: every write is scoped to the actor's organization and names them in the audit line. */
 export const Acting = { org: OrganizationId, actor: MemberId, name: S.String }
@@ -26,7 +30,7 @@ export const UploadInsert = S.Struct({
   id: ImportId,
   key: UploadKey,
   fileName: S.String,
-  headJson: HeadJson,
+  headJson: StagedHeadJson,
   rowCount: S.Int,
   chunkCount: S.Int,
   at: D1Instant
@@ -77,3 +81,171 @@ export const ItemInsert = S.Struct({ ...itemInsertFields, skuKey: S.String })
 
 /** The items one confirm statement writes: a JSON array of one item or more, each with its key. */
 export const ItemsPiece = piece(ItemInsert).annotate({ description: "Items a confirm writes, as one bound value" })
+
+/**
+ * Why a row was left out or found already there, as a confirm writes it: the plan's own reason, so the write asks
+ * exactly what the plan holds (never empty, and within the model's bound on a reason) and no plan the review can make
+ * is refused at the write. The result and the download of left-out rows read it back as `StoredReason` does: as
+ * written when it fits, else with its long quoted values shortened.
+ */
+export const OutcomeReason = PlannedRow.cases.notImported.fields.reason
+
+/**
+ * The longest reason the result reads (the contract's `RowOutcome`): a stored reason longer than this, which a past
+ * version wrote by quoting whole cells, is read cut to it.
+ */
+export const resultReasonLength = 4000
+
+/**
+ * Text cut to at most `max` UTF-16 units, the last of them "…" when anything was cut; never a character cut in two,
+ * so a pair of surrogates is kept whole or left out.
+ *
+ * @example clipped("Packaging crates", 10) // "Packaging…"
+ */
+export const clipped: {
+  (max: number): (text: string) => string
+  (text: string, max: number): string
+} = dual(2, (text: string, max: number): string => {
+  if (text.length <= max) return text
+  const kept = Str.takeLeft(text, max - 1)
+  return `${/[\uD800-\uDBFF]$/.test(kept) ? Str.takeLeft(kept, max - 2) : kept}…`
+})
+
+/** The most of a quoted value a long stored reason keeps: about the first 80 characters, as the review quotes one. */
+export const quotedValueLength = 80
+
+// How many characters a value has, as a person counts them: a pair of surrogates is one.
+const charactersIn = (text: string): string => new Intl.NumberFormat("en-US").format(A.fromIterable(text).length)
+
+/**
+ * A reason whose quoted values (`Category "…"`) are each cut to `quotedValueLength`, with how long the value was
+ * after its closing quote: every problem's sentence stays whole. A value is what stands between a pair of quotes, so
+ * a value with a quote of its own shifts the pairs; a reason still too long is then cut at its end.
+ *
+ * @example quotesShortened(`Category "${"x".repeat(4000)}" is not one of the 5 categories.`)
+ * // `Category "${"x".repeat(79)}…" (4,000 characters) is not one of the 5 categories.`
+ */
+export const quotesShortened = (reason: string): string => {
+  const parts = Str.split(reason, '"')
+  return A.join(
+    A.map(parts, (part, index) =>
+      index % 2 === 1
+        ? clipped(part, quotedValueLength)
+        : O.match(
+            O.filter(A.get(parts, index - 1), (quoted) => quoted.length > quotedValueLength),
+            { onNone: () => part, onSome: (quoted) => ` (${charactersIn(quoted)} characters)${part}` }
+          )
+    ),
+    '"'
+  )
+}
+
+/**
+ * A reason as `importOutcome` holds it, written by any version. One longer than the result reads (a version that
+ * quoted whole cells) reads with its long quoted values shortened, so each problem it names still reads, and is cut
+ * at its end only if it is still too long; a past import's Result and download still answer. Encoding writes it as
+ * it is.
+ */
+export const StoredReason = S.String.pipe(
+  S.decodeTo(
+    S.toType(S.String.check(S.isMaxLength(resultReasonLength))),
+    SchemaTransformation.transform({
+      decode: (reason) =>
+        reason.length <= resultReasonLength ? reason : clipped(quotesShortened(reason), resultReasonLength),
+      encode: (reason) => reason
+    })
+  )
+).annotate({ description: "A stored reason, its long quoted values shortened to fit the length the result reads" })
+
+// Where the item is in the file and what it is called, as `importOutcome` keeps it.
+const outcomePlace = { rowNumber: RowNumber, part: Part, sku: S.String, name: S.String }
+// A row whose item was written: no reason, and nobody who decided it.
+const noReason = { reason: S.Literal(""), decidedBy: S.Null, decidedByName: S.Null }
+// A row that was already there: its reason, and nobody who decided it.
+const alreadyReason = { reason: OutcomeReason, decidedBy: S.Null, decidedByName: S.Null }
+// A row left out by a person, with the name they had then; or one nobody had settled.
+const leftOutByPerson = { reason: OutcomeReason, decidedBy: S.Literal("person"), decidedByName: DisplayName }
+const leftOutByNobody = { reason: OutcomeReason, decidedBy: S.Literal("nobody"), decidedByName: S.Null }
+
+/**
+ * The review's verdict on one item of the file, before the confirm knows whether its item landed. Its columns follow
+ * its status: a row to write has no reason, every other row has one, and only a left-out row says who left it out.
+ */
+export const OutcomeInsert = S.Union([
+  S.Struct({ ...outcomePlace, status: S.Literals(["ready", "update"]), ...noReason }),
+  S.Struct({ ...outcomePlace, status: S.Literal("already"), ...alreadyReason }),
+  S.Struct({ ...outcomePlace, status: S.Literal("notImported"), ...leftOutByPerson }),
+  S.Struct({ ...outcomePlace, status: S.Literal("notImported"), ...leftOutByNobody })
+]).annotate({ description: "The review's verdict on one row, before the confirm knows whether its item landed" })
+
+/**
+ * What the outcome rows store for a planned row: the reason of a row that is not written, and who left it out.
+ *
+ * @example outcomeInsertOf(plannedAlready) // { status: "already", reason: "SKU RJS-3545 is already there.", decidedBy: null, ... }
+ */
+export const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
+  const at = { rowNumber: row.rowNumber, part: row.part, sku: row.sku, name: row.name }
+  const unsettled = { decidedBy: null, decidedByName: null }
+  return PlannedRow.match(row, {
+    ready: (): typeof OutcomeInsert.Type => ({ ...at, status: "ready", reason: "", ...unsettled }),
+    update: (): typeof OutcomeInsert.Type => ({ ...at, status: "update", reason: "", ...unsettled }),
+    already: (already): typeof OutcomeInsert.Type => ({
+      ...at,
+      status: "already",
+      reason: already.reason,
+      ...unsettled
+    }),
+    notImported: (out): typeof OutcomeInsert.Type =>
+      DecidedBy.match(out.decidedBy, {
+        person: (person): typeof OutcomeInsert.Type => ({
+          ...at,
+          status: "notImported",
+          reason: out.reason,
+          decidedBy: "person",
+          decidedByName: person.name
+        }),
+        nobody: (): typeof OutcomeInsert.Type => ({
+          ...at,
+          status: "notImported",
+          reason: out.reason,
+          decidedBy: "nobody",
+          decidedByName: null
+        })
+      })
+  })
+}
+
+/**
+ * What the confirms did with one item of the file, as `importOutcome` holds it, read as any version of the app wrote
+ * it: the stored row is a boundary. A created, replaced or taken-back row holds no reason (`''`) and nobody; a reason
+ * written before a rule on its form existed reads as it was written, a blank one too; and who decided is read as an
+ * Option, so a row that names a person whose name is not one a person can read (from before names had a rule) says
+ * nobody, as the result always said of it; a reason longer than the result reads is cut to it. The strict rules are on what is written (`OutcomeInsert`).
+ */
+export const OutcomeRow = S.Struct({
+  ...outcomePlace,
+  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]),
+  reason: StoredReason,
+  decidedBy: S.OptionFromNullOr(S.Literals(["person", "nobody"])),
+  decidedByName: S.OptionFromNullOr(S.String)
+}).annotate({ description: "What the confirms did with one item of the file, as stored by any version" })
+
+/** The person a stored row names as having left it out: only when it says a person did, by a name a person can read. */
+const leftOutBy = (row: typeof OutcomeRow.Type): O.Option<DisplayName> =>
+  O.flatMap(
+    O.filter(row.decidedBy, (who) => who === "person"),
+    () => O.flatMap(row.decidedByName, S.decodeOption(DisplayName))
+  )
+
+/** What the result says of one stored outcome row: a person who left it out is named, else nobody decided. */
+export const storedOutcome = (row: typeof OutcomeRow.Type): RowOutcome =>
+  outcomeOf({
+    rowNumber: row.rowNumber,
+    // Stored as 0 for a row that is one item, which the answer leaves out.
+    part: row.part === 0 ? O.none() : O.some(row.part),
+    sku: row.sku,
+    name: row.name,
+    outcome: row.outcome,
+    reason: row.reason,
+    decidedBy: O.match(leftOutBy(row), { onNone: () => decidedByNobody, onSome: decidedByPerson })
+  })

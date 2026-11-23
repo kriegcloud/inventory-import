@@ -9,6 +9,7 @@ import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
@@ -24,12 +25,18 @@ vi.mock("sonner", () => ({
 }))
 // Better Auth's client, as the app loads it: a switch of organization the server takes, or refuses.
 // A switch the test holds (`hold`) is answered when the test says.
-const auth = vi.hoisted(() => ({ refuses: false, hold: undefined as Promise<void> | undefined }))
+// Read when the app first loads the client, which a test does after this line has run.
+const auth: {
+  readonly refuses: MutableRef.MutableRef<boolean>
+  readonly hold: MutableRef.MutableRef<O.Option<Promise<void>>>
+} = { refuses: MutableRef.make(false), hold: MutableRef.make(O.none()) }
 vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
   authClient: {
     organization: {
       setActive: () =>
-        auth.refuses ? Promise.reject(new Error("Not a member.")) : (auth.hold ?? Promise.resolve(undefined))
+        MutableRef.get(auth.refuses)
+          ? Promise.reject(new Error("Not a member."))
+          : O.getOrElse(MutableRef.get(auth.hold), () => Promise.resolve(undefined))
     }
   },
   orThrow: (answer: unknown) => answer
@@ -41,15 +48,18 @@ const settle = Effect.sleep("30 millis")
 
 /** A page of the app: its modules loaded afresh, its root registry made, and the session asked for the first time. */
 const load = (options: Parameters<typeof openPage>[0] = {}) =>
-  Effect.promise(() => {
+  Effect.suspend(() => {
     const page = openPage(options)
     vi.resetModules()
-    return Promise.all([
-      import("../../src/web/lib/root.ts"),
-      import("@inventory/access-web/Session"),
-      import("@inventory/client/MemberAtoms"),
-      import("@inventory/ui/Route")
-    ]).then(([root, session, member, route]) => ({ page, root, session, member, route }))
+    return Effect.all(
+      [
+        Effect.promise(() => import("../../src/web/lib/root.ts")),
+        Effect.promise(() => import("@inventory/access-web/Session")),
+        Effect.promise(() => import("@inventory/client/MemberAtoms")),
+        Effect.promise(() => import("@inventory/ui/Route"))
+      ],
+      { concurrency: "unbounded" }
+    ).pipe(Effect.map(([root, session, member, route]) => ({ page, root, session, member, route })))
   }).pipe(
     Effect.tap(() => settle),
     Effect.map((loaded) => {
@@ -214,12 +224,12 @@ describe("the person's own switch of organization", () => {
 
   it.live("refused by the server: still the same member, and certain again", () =>
     Effect.gen(function* () {
-      auth.refuses = true
+      MutableRef.set(auth.refuses, true)
       const t = yield* loadAs(signedInAs("dana"))
       t.pick("org_northline")
       yield* settle
       expect([t.who(), t.asked(), t.page.asked.length]).toEqual(["mem_dana/org_prairie", false, 1])
-      auth.refuses = false
+      MutableRef.set(auth.refuses, false)
     })
   )
 
@@ -278,16 +288,17 @@ describe("a write pressed on the page", () => {
     Effect.gen(function* () {
       const page = openPage()
       vi.resetModules()
-      const [root, api, member, http, HttpClient, HttpClientRequest, HttpClientResponse] = yield* Effect.promise(() =>
-        Promise.all([
-          import("../../src/web/lib/root.ts"),
-          import("@inventory/client/Api"),
-          import("@inventory/client/MemberAtoms"),
-          import("../../src/web/lib/ofThisPage.ts"),
-          import("effect/http/HttpClient"),
-          import("effect/http/HttpClientRequest"),
-          import("effect/http/HttpClientResponse")
-        ])
+      const [root, api, member, http, HttpClient, HttpClientRequest, HttpClientResponse] = yield* Effect.all(
+        [
+          Effect.promise(() => import("../../src/web/lib/root.ts")),
+          Effect.promise(() => import("@inventory/client/Api")),
+          Effect.promise(() => import("@inventory/client/MemberAtoms")),
+          Effect.promise(() => import("../../src/web/lib/ofThisPage.ts")),
+          Effect.promise(() => import("effect/http/HttpClient")),
+          Effect.promise(() => import("effect/http/HttpClientRequest")),
+          Effect.promise(() => import("effect/http/HttpClientResponse"))
+        ],
+        { concurrency: "unbounded" }
       )
       const sent: Array<string> = []
       const answers = { status: 401 }
@@ -337,15 +348,16 @@ describe("what is typed, chosen or open", () => {
   it.live("is one member's: kept when the same member is asked again, and gone in another organization", () =>
     Effect.gen(function* () {
       const t = yield* loadAs(signedInAs("dana"))
-      const [people, activity, upload, uploading, assistant, machine] = yield* Effect.promise(() =>
-        Promise.all([
-          import("@inventory/access-web/People"),
-          import("../../src/web/pages/ActivityPage.tsx"),
-          import("@inventory/catalog-web/UploadStep"),
-          import("@inventory/catalog-web/Upload"),
-          import("@inventory/catalog-web/TableAssistant"),
-          import("@inventory/catalog-web/UploadMachine")
-        ])
+      const [people, activity, upload, uploading, assistant, machine] = yield* Effect.all(
+        [
+          Effect.promise(() => import("@inventory/access-web/People")),
+          Effect.promise(() => import("../../src/web/pages/ActivityPage.tsx")),
+          Effect.promise(() => import("@inventory/catalog-web/UploadStep")),
+          Effect.promise(() => import("@inventory/catalog-web/Upload")),
+          Effect.promise(() => import("@inventory/catalog-web/TableAssistant")),
+          Effect.promise(() => import("@inventory/catalog-web/UploadMachine"))
+        ],
+        { concurrency: "unbounded" }
       )
       const { registry } = t
       /** A state of a screen that is drawn: what the person put in it, and whether it is there. */
@@ -384,7 +396,7 @@ describe("what is typed, chosen or open", () => {
 })
 
 describe("the workspace", () => {
-  /** What the sign-in gate draws: the workspace, under which key, or something else. */
+  /** What the sign-in gate draws: the workspace, with the key it is drawn under (if any), or none for anything else. */
   const gate = Effect.fnUntraced(function* (t: { readonly registry: AtomRegistry.AtomRegistry }) {
     const { SignedIn } = yield* Effect.promise(() => import("../../src/web/components/app/SignedIn.tsx"))
     const seen: { drawn: ReactNode } = { drawn: undefined }
@@ -396,15 +408,15 @@ describe("the workspace", () => {
     renderToStaticMarkup(createElement(RegistryContext, { value: t.registry }, createElement(Probe)))
     const { drawn } = seen
     return isValidElement<{ readonly children?: ReactNode }>(drawn) && drawn.props.children === "WORKSPACE"
-      ? `workspace of ${drawn.key ?? "nobody"}`
-      : "not the workspace"
+      ? O.some(O.fromNullOr(drawn.key))
+      : O.none()
   })
 
   it.live("stays drawn, the same one, while who is signed in is asked again and when it could not be read", () =>
     Effect.gen(function* () {
       const t = yield* load()
       const first = yield* gate(t)
-      expect(first).toBe("not the workspace")
+      expect(first).toEqual(O.none())
       t.page.asked[0]?.answer(signedInAs("dana"))
       yield* settle
       const answered = yield* gate(t)
@@ -414,7 +426,7 @@ describe("the workspace", () => {
       t.page.asked[1]?.fail()
       yield* settle
       const unread = yield* gate(t)
-      expect([answered, asking, unread]).toEqual(A.makeBy(3, () => "workspace of mem_dana/org_prairie"))
+      expect([answered, asking, unread]).toEqual(A.makeBy(3, () => O.some(O.some("mem_dana/org_prairie"))))
     })
   )
 
@@ -426,7 +438,7 @@ describe("the workspace", () => {
       t.page.asked[1]?.answer(signedInAs("dana", "northline"))
       yield* settle
       const there = yield* gate(t)
-      expect(there).toBe("workspace of mem_dana/org_northline")
+      expect(there).toEqual(O.some(O.some("mem_dana/org_northline")))
     })
   )
 })
@@ -446,20 +458,21 @@ const browserWithServer = Effect.fnUntraced(function* () {
   const page = openPage()
   vi.resetModules()
   const [root, api, member, session, http, HttpClient, HttpClientRequest, HttpClientResponse, Headers] =
-    yield* Effect.promise(() =>
-      Promise.all([
-        import("../../src/web/lib/root.ts"),
-        import("@inventory/client/Api"),
-        import("@inventory/client/MemberAtoms"),
-        import("@inventory/access-web/Session"),
-        import("../../src/web/lib/ofThisPage.ts"),
-        import("effect/http/HttpClient"),
-        import("effect/http/HttpClientRequest"),
-        import("effect/http/HttpClientResponse"),
-        import("effect/http/Headers")
-      ])
+    yield* Effect.all(
+      [
+        Effect.promise(() => import("../../src/web/lib/root.ts")),
+        Effect.promise(() => import("@inventory/client/Api")),
+        Effect.promise(() => import("@inventory/client/MemberAtoms")),
+        Effect.promise(() => import("@inventory/access-web/Session")),
+        Effect.promise(() => import("../../src/web/lib/ofThisPage.ts")),
+        Effect.promise(() => import("effect/http/HttpClient")),
+        Effect.promise(() => import("effect/http/HttpClientRequest")),
+        Effect.promise(() => import("effect/http/HttpClientResponse")),
+        Effect.promise(() => import("effect/http/Headers"))
+      ],
+      { concurrency: "unbounded" }
     )
-  const server = { cookie: "mem_dana/org_prairie", done: [] as Array<string>, named: [] as Array<string> }
+  const server = { cookie: "mem_dana/org_prairie", done: A.empty<string>(), named: A.empty<string>() }
   const client = http.ofThisPage(
     HttpClient.make((request) =>
       Effect.sync(() => {
@@ -600,7 +613,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
   it.live("is hers when that ask answers in the organization she chose: nothing is left, and nothing reloaded", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      auth.hold = held.promise
+      MutableRef.set(auth.hold, O.some(held.promise))
       const t = yield* loadAs(signedInAs("dana"))
       t.ask()
       yield* settle
@@ -611,7 +624,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       expect([t.page.left, t.who()]).toEqual([[], "mem_dana/org_northline"])
       held.resolve()
-      auth.hold = undefined
+      MutableRef.set(auth.hold, O.none())
       yield* settle
       t.page.asked[2]?.answer(signedInAs("dana", "northline"))
       yield* settle
@@ -622,7 +635,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
   it.live("answered there for somebody else's account: the page is left", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      auth.hold = held.promise
+      MutableRef.set(auth.hold, O.some(held.promise))
       const t = yield* loadAs(signedInAs("dana"))
       t.ask()
       yield* settle
@@ -632,14 +645,14 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       expect(t.page.left).toEqual(["/"])
       held.resolve()
-      auth.hold = undefined
+      MutableRef.set(auth.hold, O.none())
     })
   )
 
   it.live("a write she pressed for the organization she left is said as not sent, in words", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      auth.hold = held.promise
+      MutableRef.set(auth.hold, O.some(held.promise))
       const t = yield* browserWithServer()
       const { sayError } = yield* Effect.promise(() => import("@inventory/client/SayError"))
       const pick = () => {
@@ -652,7 +665,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       t.server.cookie = "mem_dana/org_northline"
       held.resolve()
-      auth.hold = undefined
+      MutableRef.set(auth.hold, O.none())
       yield* settle
       t.page.asked[1]?.answer(signedInAs("dana", "northline"))
       yield* settle

@@ -1,4 +1,3 @@
-// @effect-diagnostics newSchemaClass:off
 // One act of the review, decided across the import and the row it names, and recorded on both or on neither. The
 // import says whether it is open, what its matching is, which act on a group was its last and what number the act
 // gets; the row says what decision it holds. An act is taken only from a screen that has the import's last group act
@@ -19,30 +18,28 @@
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Match from "effect/Match"
 import * as S from "effect/Schema"
 import { CurrentActor, Session } from "../Actor/Actor.context.ts"
 import {
   ActCounted,
   ConfirmedSince,
   Import,
-  isOpen,
+  ImportState,
   MatchedSince,
   NotOpen,
-  NotPermitted
+  NotPermitted,
+  ImportEvent
 } from "../Import/Import.aggregate.ts"
 import {
   CUT,
-  isDecided,
-  isUntouched,
   leavesAsItIs,
   MOST_BELOW,
   NO_DECISION,
   onItsMatching,
   Row,
   RowDecided,
-  type RowState,
-  seal
+  seal,
+  RowState
 } from "../Row/Row.aggregate.ts"
 import { Change, Flags, ImportKey, RowKey, Step } from "./Change.schema.ts"
 
@@ -145,12 +142,6 @@ export class DecideRow extends Domain.Command(
   { description: "Decide one row of an import's review, naming the decision the sender saw there" }
 ) {}
 
-type DecidingEvent = RowDecided | ActCounted
-const yes = (): boolean => true
-const no = (): boolean => false
-const isActCounted = (event: DecidingEvent): event is ActCounted =>
-  Match.value(event).pipe(Match.tag("ActCounted", yes), Match.orElse(no))
-
 /**
  * The act would leave the row reading as it reads: on a row a group in force covers since its own decision, as its
  * sender says (`asItReads`); on any other, its text and its matching are what the row's own instance holds.
@@ -170,7 +161,7 @@ const changesNothing = (act: {
 
 /** The act's sender has seen what the row holds: its decision, by the number of the change, or that it has none. */
 const sawIt = (act: { readonly row: RowState; readonly command: { readonly saw: number } }): boolean =>
-  isDecided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
+  RowState.guards.Decided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
 
 /**
  * The row holds this very act already: this step, from this person, with this text on the matching it was made on. A
@@ -183,7 +174,7 @@ const holdsThisAct = (act: {
   readonly flags: string
   readonly madeOn: number
 }): boolean =>
-  isDecided(act.row) &&
+  RowState.guards.Decided(act.row) &&
   act.row.step === act.step &&
   act.row.by === act.by &&
   onItsMatching(act.row) === onItsMatching(act)
@@ -196,16 +187,16 @@ export class Deciding extends Domain.Decision(
     keyOf: (cmd: DecideRow) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
     decide: Effect.fn("Deciding.decide")(function* ({ life, row }, cmd) {
       const actor = yield* CurrentActor
-      if (!isOpen(life.state)) return yield* new NotOpen({})
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       // A row instance belongs to one import of one organization, for good.
       if (
-        !isUntouched(row.state) &&
+        !RowState.guards.Untouched(row.state) &&
         (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
       ) {
-        return yield* new NotPermitted({})
+        return yield* NotPermitted.make({})
       }
       // The same press sent again: the row holds this very act already, and it is written once. Its sender is answered
       // as the first time, with nothing new, whatever landed on the import between the two sendings: a confirm and a
@@ -218,7 +209,7 @@ export class Deciding extends Domain.Decision(
         ) {
           return []
         }
-        return yield* new ConfirmedSince({})
+        return yield* ConfirmedSince.make({})
       }
       if (cmd.sawGroup !== life.state.lastGroup) {
         if (
@@ -226,7 +217,7 @@ export class Deciding extends Domain.Decision(
         ) {
           return []
         }
-        return yield* new GroupedSince({})
+        return yield* GroupedSince.make({})
       }
       // `covered` is asked once, and each side makes its own checks: the prover takes both sides of every question it
       // cannot settle, each time it is asked, and with `covered` asked again after the checks the relation of a row
@@ -235,7 +226,7 @@ export class Deciding extends Domain.Decision(
         // A group in force covers the row: what it reads as is the sender's word, so the act is no change only from
         // a screen that has seen the row's decision and the matching now. From one that is behind it is refused and
         // held, not lost as "no change" (2026-11-22: "Same: hold, show both").
-        if (isDecided(row.state)) {
+        if (RowState.guards.Decided(row.state)) {
           if (cmd.saw !== row.state.change) {
             // The same press sent again: the row holds this very act already, and it is written once.
             if (row.state.step === cmd.step && row.state.by === actor.memberId && row.state.flags === cmd.flags) {
@@ -243,14 +234,14 @@ export class Deciding extends Domain.Decision(
             }
             // What the sender saw was taken back and an older decision is there again, or someone decided since.
             if (cmd.saw > row.state.change) {
-              return yield* new PutBackSince({ by: row.state.by, change: row.state.change })
+              return yield* PutBackSince.make({ by: row.state.by, change: row.state.change })
             }
-            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
+            return yield* DecidedSince.make({ by: row.state.by, change: row.state.change })
           }
         } else if (cmd.saw !== 0) {
-          return yield* new NoLongerThere({})
+          return yield* NoLongerThere.make({})
         }
-        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+        if (cmd.madeOn !== life.state.matching) return yield* MatchedSince.make({ matching: life.state.matching })
         if (cmd.asItReads) return []
       } else {
         // No group covers the row, by its sender's word: what the row's own instance says already, made on the same
@@ -265,28 +256,28 @@ export class Deciding extends Domain.Decision(
           // this person, with this text on the matching it was made on). It is answered as the first time, with
           // nothing new, not told it was made on an older matching.
           if (
-            isDecided(row.state) &&
+            RowState.guards.Decided(row.state) &&
             row.state.step === cmd.step &&
             row.state.by === actor.memberId &&
             onItsMatching(row.state) === onItsMatching(cmd)
           ) {
             return []
           }
-          return yield* new MatchedSince({ matching: life.state.matching })
+          return yield* MatchedSince.make({ matching: life.state.matching })
         }
-        if (isDecided(row.state)) {
+        if (RowState.guards.Decided(row.state)) {
           if (cmd.saw !== row.state.change) {
             if (onItsMatching(row.state) === onItsMatching(cmd) && row.state.change > life.state.lastGroup) return []
             if (cmd.saw > row.state.change) {
-              return yield* new PutBackSince({ by: row.state.by, change: row.state.change })
+              return yield* PutBackSince.make({ by: row.state.by, change: row.state.change })
             }
-            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
+            return yield* DecidedSince.make({ by: row.state.by, change: row.state.change })
           }
           if (onItsMatching(row.state) === onItsMatching(cmd)) return []
         } else {
           if (cmd.saw !== 0) {
             if (cmd.flags === NO_DECISION && life.state.lastGroup === 0) return []
-            return yield* new NoLongerThere({})
+            return yield* NoLongerThere.make({})
           }
           if (cmd.flags === NO_DECISION) return []
         }
@@ -295,12 +286,12 @@ export class Deciding extends Domain.Decision(
       // it held before the decision taken back, so a press drawn before it (a late copy of the very press that was
       // taken back, too) names what the row holds and would be written again. It is refused and held.
       if (cmd.sawUndone !== row.state.undone.change) {
-        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })
+        return yield* UndoneSince.make({ by: row.state.undone.by, change: row.state.undone.change })
       }
       const change = life.state.changes + 1
       return [
         row.record(
-          new RowDecided({
+          RowDecided.make({
             importId: cmd.importId,
             organizationId: life.state.organizationId,
             change,
@@ -312,7 +303,7 @@ export class Deciding extends Domain.Decision(
           })
         ),
         life.record(
-          new ActCounted({
+          ActCounted.make({
             change,
             step: cmd.step,
             row: cmd.row,
@@ -327,12 +318,13 @@ export class Deciding extends Domain.Decision(
       ]
     }),
     transitions: {
-      ARowIsDecidedOnlyOnAnOpenImport: ({ before }) => isOpen(before.life),
+      ARowIsDecidedOnlyOnAnOpenImport: ({ before }) => ImportState.guards.Open(before.life),
       // An act is taken only in the opening it was made in: one made before a confirm is not taken after a reopen.
-      AnActIsOfThisOpening: ({ before, command }) => isOpen(before.life) && command.opening === before.life.confirms,
+      AnActIsOfThisOpening: ({ before, command }) =>
+        ImportState.guards.Open(before.life) && command.opening === before.life.confirms,
       // A row's act is made on a screen that has the import's last act on a group.
       ARowsActSawTheLastGroupAct: ({ before, command }) =>
-        isOpen(before.life) && command.sawGroup === before.life.lastGroup,
+        ImportState.guards.Open(before.life) && command.sawGroup === before.life.lastGroup,
       // A decision is replaced only by an act whose sender saw it, by the number of the change that recorded it.
       ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) => sawIt({ row: before.row, command }),
       // And only by one whose sender has the row's last undo: the change it took back names it.
@@ -341,80 +333,96 @@ export class Deciding extends Domain.Decision(
       // Whatever it decides, an act is made on the import's matching now; one made on an older matching is not
       // applied.
       AnActIsMadeOnTheMatchingNow: ({ before, command }) =>
-        isOpen(before.life) && command.madeOn === before.life.matching,
+        ImportState.guards.Open(before.life) && command.madeOn === before.life.matching,
       // An act that would leave the row's decision as it is records nothing: the row and the import are unchanged.
       AnActThatChangesNothingLeavesTheImport: ({ before, after, command }) =>
         !changesNothing({ row: before.row, command }) ||
-        !isOpen(before.life) ||
-        !isOpen(after.life) ||
+        !ImportState.guards.Open(before.life) ||
+        !ImportState.guards.Open(after.life) ||
         after.life.changes === before.life.changes,
       AnActThatChangesNothingLeavesTheRow: ({ before, after, command }) =>
         !changesNothing({ row: before.row, command }) ||
-        !isDecided(before.row) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(before.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.change === before.row.change,
       // Any other act is recorded as its sender said, and gets the import's next number on the row and on the import.
       AnyOtherActIsRecorded: ({ before, after, command }) =>
-        changesNothing({ row: before.row, command }) || isDecided(after.row),
+        changesNothing({ row: before.row, command }) || RowState.guards.Decided(after.row),
       WithItsText: ({ before, after, command }) =>
-        changesNothing({ row: before.row, command }) || !isDecided(after.row) || after.row.flags === command.flags,
+        changesNothing({ row: before.row, command }) ||
+        !RowState.guards.Decided(after.row) ||
+        after.row.flags === command.flags,
       OnItsMatching: ({ before, after, command }) =>
-        changesNothing({ row: before.row, command }) || !isDecided(after.row) || after.row.madeOn === command.madeOn,
+        changesNothing({ row: before.row, command }) ||
+        !RowState.guards.Decided(after.row) ||
+        after.row.madeOn === command.madeOn,
       UnderItsStep: ({ before, after, command }) =>
-        changesNothing({ row: before.row, command }) || !isDecided(after.row) || after.row.step === command.step,
+        changesNothing({ row: before.row, command }) ||
+        !RowState.guards.Decided(after.row) ||
+        after.row.step === command.step,
       AsItsSenders: Effect.fn("Deciding.AsItsSenders")(function* ({ before, after, command }) {
-        if (changesNothing({ row: before.row, command }) || !isDecided(after.row)) return true
+        if (changesNothing({ row: before.row, command }) || !RowState.guards.Decided(after.row)) return true
         const actor = yield* CurrentActor
         return after.row.by === actor.memberId
       }),
       AndGetsTheNextNumber: ({ before, after, command }) =>
         changesNothing({ row: before.row, command }) ||
-        !isOpen(before.life) ||
-        !isOpen(after.life) ||
+        !ImportState.guards.Open(before.life) ||
+        !ImportState.guards.Open(after.life) ||
         after.life.changes === before.life.changes + 1,
       OnTheRowToo: ({ before, after, command }) =>
         changesNothing({ row: before.row, command }) ||
-        !isOpen(after.life) ||
-        !isDecided(after.row) ||
+        !ImportState.guards.Open(after.life) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.change === after.life.changes,
       // The import's event says what the row now holds, and whose it is.
       TheImportsEventSaysWhichDecisionTheRowHolds: ({ after, events }) =>
-        A.every(events, (e) => !isActCounted(e) || !isDecided(after.row) || e.holds === after.row.change),
+        A.every(
+          events,
+          (e) =>
+            !ImportEvent.guards.ActCounted(e) || !RowState.guards.Decided(after.row) || e.holds === after.row.change
+        ),
       TheImportsEventSaysWhose: ({ after, events }) =>
-        A.every(events, (e) => !isActCounted(e) || !isDecided(after.row) || e.by === after.row.by),
+        A.every(
+          events,
+          (e) => !ImportEvent.guards.ActCounted(e) || !RowState.guards.Decided(after.row) || e.by === after.row.by
+        ),
       TheImportsEventSaysItsText: ({ after, events }) =>
-        A.every(events, (e) => !isActCounted(e) || !isDecided(after.row) || e.flags === after.row.flags),
+        A.every(
+          events,
+          (e) => !ImportEvent.guards.ActCounted(e) || !RowState.guards.Decided(after.row) || e.flags === after.row.flags
+        ),
       // And who acted.
       TheImportsEventSaysWhoActed: Effect.fn("Deciding.TheImportsEventSaysWhoActed")(function* ({ events }) {
         const actor = yield* CurrentActor
-        return A.every(events, (e) => !isActCounted(e) || e.actor === actor.memberId)
+        return A.every(events, (e) => !ImportEvent.guards.ActCounted(e) || e.actor === actor.memberId)
       }),
       // The decision an act replaces is kept under it.
       AnActKeepsWhichDecisionItReplaces: ({ before, after, command }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         changesNothing({ row: before.row, command }) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.under.change === before.row.change,
       AndWhose: ({ before, after, command }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         changesNothing({ row: before.row, command }) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.under.by === before.row.by,
       AndItsText: ({ before, after, command }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         changesNothing({ row: before.row, command }) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.under.flags === before.row.flags,
       AndItsMatching: ({ before, after, command }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         changesNothing({ row: before.row, command }) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.under.madeOn === before.row.madeOn,
       // What was below that stays below it, sealed, unless the history is let go.
       AndWhatWasBelowStaysBelow: ({ before, after, command }) =>
-        !isDecided(before.row) ||
+        !RowState.guards.Decided(before.row) ||
         changesNothing({ row: before.row, command }) ||
-        !isDecided(after.row) ||
+        !RowState.guards.Decided(after.row) ||
         after.row.below ===
           (before.row.under.change === 0
             ? ""
@@ -428,7 +436,7 @@ export class Deciding extends Domain.Decision(
       OnlyItsOwnOrganizationChangesTheRow: Effect.fn("Deciding.OnlyItsOwnOrganizationChangesTheRow")(function* ({
         before
       }) {
-        if (isUntouched(before.row)) return true
+        if (RowState.guards.Untouched(before.row)) return true
         const actor = yield* CurrentActor
         return actor.organizationId === before.row.organizationId
       }),

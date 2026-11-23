@@ -120,7 +120,7 @@ const refusalOf = (result: AsyncResult.AsyncResult<void, AuthRefused>): string |
       })
 
 /** The first screen when nobody is signed in: the test accounts in one click, sign in, or create an account. */
-export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn: () => void }) {
+export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: () => void }) {
   const id = useId()
   const [current, setMode] = useAtom(mode)
   const [email, setEmail] = useAtom(emailTyped)
@@ -131,9 +131,9 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
   const submit = useAtomSet(submitAttempt, { mode: "promiseExit" })
   const reset = useAtomSet(submitAttempt)
   const [last, setLast] = useAtom(lastAttempt)
-  const testAccounts = props.features === undefined ? null : O.getOrNull(props.features.testAccounts)
+  const testAccounts = O.flatMap(props.features, (features) => features.testAccounts)
   // Until the features are known nothing is offered that may then be refused.
-  const offer = props.features === undefined ? "closed" : props.features.signUp
+  const offer = O.match(props.features, { onNone: () => "closed" as const, onSome: (features) => features.signUp })
 
   const send = (attempt: Attempt) => {
     setLast(O.some(attempt))
@@ -156,7 +156,7 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
 
   return (
     <div
-      className={`mx-auto grid w-full gap-6 ${testAccounts === null ? "max-w-sm" : "max-w-3xl md:grid-cols-2 md:items-start"}`}
+      className={`mx-auto grid w-full gap-6 ${O.isNone(testAccounts) ? "max-w-sm" : "max-w-3xl md:grid-cols-2 md:items-start"}`}
       // Fetch Better Auth's client as soon as the person reaches for the page, so the press itself does not wait.
       onPointerEnter={() => void authClient()}
       onFocus={() => void authClient()}
@@ -218,7 +218,7 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
                 {signUp && (
                   <FieldDescription>
                     At least 12 characters.
-                    {props.features?.pwnedPasswordCheck === true
+                    {O.exists(props.features, (features) => features.pwnedPasswordCheck)
                       ? " Checked against passwords from known data breaches; only the start of its hash leaves the app."
                       : ""}
                   </FieldDescription>
@@ -262,51 +262,56 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
         </CardContent>
       </Card>
 
-      {testAccounts !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <h2 className="text-base font-semibold">Test accounts</h2>
-            </CardTitle>
-            <CardDescription>
-              Each signs in with one click. Local only: their password is{" "}
-              <code className="font-mono text-foreground">{testAccounts.password}</code>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {testAccounts.accounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                This database has none. <code className="font-mono">bun run dev</code> writes them into the local
-                database.
-              </p>
-            ) : (
-              <div role="list" className="flex flex-col gap-2">
-                {testAccounts.accounts.map((account) => (
-                  <Item key={account.email} role="listitem" variant="outline" size="sm">
-                    <ItemContent className="min-w-0">
-                      <ItemTitle>{account.name}</ItemTitle>
-                      {membershipsOf(account).map((line) => (
-                        <ItemDescription key={line}>{line}</ItemDescription>
-                      ))}
-                    </ItemContent>
-                    <ItemActions>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={pending}
-                        onClick={() => send(Attempt.SignIn({ email: account.email, password: testAccounts.password }))}
-                      >
-                        {pendingEmail === account.email ? <Spinner /> : null}
-                        Sign in<span className="sr-only"> as {account.name}</span>
-                      </Button>
-                    </ItemActions>
-                  </Item>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {O.match(testAccounts, {
+        onNone: () => null,
+        onSome: (testAccounts) => (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2 className="text-base font-semibold">Test accounts</h2>
+              </CardTitle>
+              <CardDescription>
+                Each signs in with one click. Local only: their password is{" "}
+                <code className="font-mono text-foreground">{testAccounts.password}</code>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {testAccounts.accounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  This database has none. <code className="font-mono">bun run dev</code> writes them into the local
+                  database.
+                </p>
+              ) : (
+                <div role="list" className="flex flex-col gap-2">
+                  {testAccounts.accounts.map((account) => (
+                    <Item key={account.email} role="listitem" variant="outline" size="sm">
+                      <ItemContent className="min-w-0">
+                        <ItemTitle>{account.name}</ItemTitle>
+                        {membershipsOf(account).map((line) => (
+                          <ItemDescription key={line}>{line}</ItemDescription>
+                        ))}
+                      </ItemContent>
+                      <ItemActions>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() =>
+                            send(Attempt.SignIn({ email: account.email, password: testAccounts.password }))
+                          }
+                        >
+                          {pendingEmail === account.email ? <Spinner /> : null}
+                          Sign in<span className="sr-only"> as {account.name}</span>
+                        </Button>
+                      </ItemActions>
+                    </Item>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }

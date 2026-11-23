@@ -9,14 +9,32 @@ import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
+import { PublicUrl } from "@beep/better-auth/BetterAuthConfig"
 import { signUpRuleOf } from "@inventory/access-model/SignUp"
+import { testAccountPassword } from "./internal/TestAccounts.ts"
 
-/** An address setting: unset or blank is none, anything else must be a URL. */
+/** An address setting: unset or blank is none, anything else must be an http(s) origin (`PublicUrl`). */
 const optionalUrl = (name: string) =>
-  Config.schema(S.Union([S.Literal(""), S.URL]), name).pipe(
+  Config.schema(S.Union([S.Literal(""), PublicUrl]), name).pipe(
     Config.withDefault(""),
     Config.map((url) => (url === "" ? O.none() : O.some(url)))
   )
+
+/**
+ * A deployed stage's own password for its test accounts: any text but the password written in the repository. That
+ * one opens the test accounts on every developer's machine, so a stage given it would open them to anyone who has read
+ * the README. Blank stays allowed here: blank is no password at all (`present`).
+ *
+ * @category settings
+ */
+export const StagePassword = S.String.check(
+  S.makeFilter((password: string) => password !== testAccountPassword, {
+    identifier: "StagePassword",
+    title: "Not the repository's password",
+    description: "A stage's own password for its test accounts, never the one written in the repository",
+    expected: "a password other than the one written in the repository"
+  })
+).annotate({ description: "A deployed stage's own password for its test accounts" })
 
 /** A secret that is set but blank is the same as none. */
 const present = (key: O.Option<Redacted.Redacted<string>>) =>
@@ -29,7 +47,7 @@ const present = (key: O.Option<Redacted.Redacted<string>>) =>
  *
  * - `BETTER_AUTH_SECRET`: secret. Signs the session cookies; at least 32 characters (`openssl rand -base64 32`).
  *   Required in production. In development `bun run dev` writes one into `.dev.vars` when there is none.
- * - `BETTER_AUTH_URL`: the address people open the app at (`https://app.example.com`). Unset locally: each request's
+ * - `BETTER_AUTH_URL`: the address people open the app at, an http(s) origin (`https://app.example.com`). Unset locally: each request's
  *   own origin is used, so any dev or preview port works. When set it is the only trusted origin, and cookies are
  *   Secure exactly when it is `https:`.
  * - `PWNED_PASSWORD_CHECK`: `true` or `false`. Refuse a new password found in known breaches (Have I Been Pwned).
@@ -39,7 +57,8 @@ const present = (key: O.Option<Redacted.Redacted<string>>) =>
  *   writes them, so a deployed database has none whatever this says.
  * - `TEST_ACCOUNT_PASSWORD`: secret. A deployed test or preview stage's own password for its test accounts, minted by
  *   its stack. Set, it opens the seeded test accounts, the password written in the repository is refused for every
- *   account, and the sign-in page offers no test account in one click. Unset on a developer's machine and in production.
+ *   account, and the sign-in page offers no test account in one click. The repository's own password is refused
+ *   here. Unset on a developer's machine and in production.
  * - `SIGN_UP`: who may make an account. `open`, `closed`, or the emails that may, separated by commas. Default:
  *   closed in a production build, open in development. A value that is not `open` never opens it.
  *
@@ -51,7 +70,10 @@ export const authSettings = (build: { readonly production: boolean }) =>
     publicUrl: optionalUrl("BETTER_AUTH_URL"),
     pwnedPasswordCheck: Config.Boolean("PWNED_PASSWORD_CHECK").pipe(Config.withDefault(build.production)),
     testAccounts: Config.Boolean("TEST_ACCOUNTS").pipe(Config.withDefault(!build.production)),
-    testAccountPassword: Config.Redacted("TEST_ACCOUNT_PASSWORD").pipe(Config.option, Config.map(present)),
+    testAccountPassword: Config.schema(S.Redacted(StagePassword), "TEST_ACCOUNT_PASSWORD").pipe(
+      Config.option,
+      Config.map(present)
+    ),
     signUp: Config.String("SIGN_UP").pipe(
       Config.withDefault(build.production ? "closed" : "open"),
       Config.map(signUpRuleOf)

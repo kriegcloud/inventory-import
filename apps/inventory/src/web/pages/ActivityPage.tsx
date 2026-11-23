@@ -38,10 +38,7 @@ export function ActivityPage() {
     data: read.pipe(AsyncResult.value, O.getOrUndefined),
     error: AsyncResult.isFailure(read) && !read.waiting ? read.cause.pipe(Cause.squash) : null,
     updating: read.waiting,
-    refetch: () => {
-      refetch()
-      return Promise.resolve()
-    }
+    refetch
   })
   const changes = shapeOf(changesRead, askChangesAgain)
   const eventsRead = useAtomValue(auditEvents)
@@ -76,7 +73,7 @@ export function ActivityPage() {
             <AlertTitle>The activity could not be loaded</AlertTitle>
             <AlertDescription>
               {sayError(failed).sentence}
-              <Button variant="outline" size="sm" onClick={() => void shown.refetch()}>
+              <Button variant="outline" size="sm" onClick={() => shown.refetch()}>
                 Try again
               </Button>
             </AlertDescription>

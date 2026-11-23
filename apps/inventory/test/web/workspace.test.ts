@@ -16,7 +16,10 @@ import { openPage, signedInAs } from "./support/page.ts"
 // A cold start of the app's modules, on a busy machine.
 
 // Drawn on a server, where no effect runs: what a component mounts is told as it is drawn.
-const drawing = vi.hoisted(() => ({ mounted: [] as Array<unknown> }))
+const drawing = vi.hoisted(() => {
+  const mounted: Array<unknown> = []
+  return { mounted }
+})
 vi.mock("@effect/atom-react", (original) =>
   original<typeof import("@effect/atom-react")>().then((all) => ({
     ...all,
@@ -46,25 +49,26 @@ const removed =
 const load = Effect.fnUntraced(function* (at: string, kept: Record<string, string> = {}) {
   const page = openPage({ at, kept, tab: { "inventory:tab": "tab-1" } })
   vi.resetModules()
-  const [root, atomReact, workspace, imports, member] = yield* Effect.promise(() =>
-    Promise.all([
-      import("../../src/web/lib/root.ts"),
-      import("@effect/atom-react"),
-      import("../../src/web/Workspace.tsx"),
-      import("@inventory/catalog-web/Imports"),
-      import("@inventory/client/MemberAtoms")
-    ])
+  const [root, atomReact, workspace, imports, member] = yield* Effect.all(
+    [
+      Effect.promise(() => import("../../src/web/lib/root.ts")),
+      Effect.promise(() => import("@effect/atom-react")),
+      Effect.promise(() => import("../../src/web/Workspace.tsx")),
+      Effect.promise(() => import("@inventory/catalog-web/Imports")),
+      Effect.promise(() => import("@inventory/client/MemberAtoms"))
+    ],
+    { concurrency: "unbounded" }
   )
   const registry = root.rootRegistry({ api: Layer.empty })
   yield* settle
   page.asked[0]?.answer(signedInAs("dana"))
   yield* settle
-  const drawn = Effect.promise(() => {
+  const drawn = Effect.suspend(() => {
     drawing.mounted.length = 0
-    return prerender(
-      createElement(atomReact.RegistryContext, { value: registry }, createElement(workspace.default))
-    ).then(({ prelude }) => new Response(prelude).text())
-  })
+    return Effect.promise(() =>
+      prerender(createElement(atomReact.RegistryContext, { value: registry }, createElement(workspace.default)))
+    )
+  }).pipe(Effect.flatMap(({ prelude }) => Effect.promise(() => new Response(prelude).text())))
   return { page, registry, imports, member, drawn }
 })
 

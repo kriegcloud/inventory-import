@@ -34,7 +34,7 @@ import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { decodeJsonc, entriesOf, objectOf, renderObject } from "../../Sync.rules.ts"
 import { scratchpadFiles } from "./Scratch.config.ts"
-import { decideFileLine, diagnosticDirective, filesOf, Template, templates } from "./Scratch.templates.ts"
+import { diagnosticDirective, filesOf, Template, templates } from "./Scratch.templates.ts"
 
 const $I = $RepoCliId.create("commands/Scratch/Scratch.rules")
 
@@ -338,27 +338,19 @@ export const bunTypes: Install = Effect.gen(function* () {
 })
 
 /**
- * Where a file turns an Effect diagnostic off, and whether it may (decision 33 of the Alchemy brief, 2026-11-22: "`new`
- * only in decide files"). The prover knows an event or a rejection only by `new`, so a decide file (`*.aggregate.ts`,
- * `*.decision.ts`) may turn `newSchemaClass` off on its first line, and on no other; no other file may turn anything
- * off. Each line is a refusal, with its line number from 1.
+ * Where a file turns an Effect diagnostic off. No file may: the one line a decide file once held (decision 33 of the
+ * Alchemy brief) went when the prover came to read `.make` (its reversal, 2026-11-22). Each line is a refusal, with its
+ * line number from 1.
  *
  * @example
- * diagnosticLines("Shelf.aggregate.ts")(decideFileLine) // []
- * diagnosticLines("Shelf.ts")(decideFileLine) // [1]
+ * diagnosticLines("export const count = 1\n") // []
  *
  * @category rules
  */
-export const diagnosticLines =
-  (file: string) =>
-  (text: string): ReadonlyArray<number> => {
-    const decideFile = /\.(aggregate|decision)\.ts$/.test(file)
-    return A.flatMap(Str.split("\n")(Str.replace(/\r/g, "")(text)), (line, index) =>
-      Str.includes(diagnosticDirective)(line) && !(decideFile && index === 0 && Str.trim(line) === decideFileLine)
-        ? [index + 1]
-        : []
-    )
-  }
+export const diagnosticLines = (text: string): ReadonlyArray<number> =>
+  A.flatMap(Str.split("\n")(Str.replace(/\r/g, "")(text)), (line, index) =>
+    Str.includes(diagnosticDirective)(line) ? [index + 1] : []
+  )
 
 /**
  * The two comments that silence the `leakingRequirements` diagnostic: the first on a service's declaration, the
@@ -817,7 +809,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
   const state = yield* reading()
   const problem = (where: string, message: string): ScratchFinding =>
     ScratchFinding.cases.Problem.make({ where, message })
-  // A diagnostic turned off: only `newSchemaClass`, only on the first line of a decide file. Read in the files the
+  // A diagnostic turned off, which no file may. Read in the files the
   // compiler itself says it reads, so a file it reaches by an import or through a linked folder is read here too,
   // whatever its folder is called, and a file it never loads (JavaScript, a cache nothing imports) is not.
   const program = yield* files
@@ -889,10 +881,10 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     (path) =>
       Effect.map(repo.text(repo.join(repo.root, path)), (text) =>
         A.flatten([
-          A.map(diagnosticLines(path)(text), (line) =>
+          A.map(diagnosticLines(text), (line) =>
             problem(
               `${path}:${line}`,
-              `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+              `turns an Effect diagnostic off. No file may: remove the line and fix what the diagnostic then says (an event or a rejection is built with \`.make\`, which the prover reads)`
             )
           ),
           A.map(uncheckedLines(path)(text), (line) =>

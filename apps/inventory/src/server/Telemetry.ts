@@ -10,7 +10,6 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as Tracer from "effect/Tracer"
 import * as SecureRandom from "effect/crypto/SecureRandom"
-import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpMiddleware from "effect/http/HttpMiddleware"
@@ -80,25 +79,20 @@ export const routeOf = (path: string): string => {
  */
 let collectorMissedAt = Number.NEGATIVE_INFINITY
 
-/** The exporters' HTTP client: `fetch`, marking a miss when the collector cannot be reached at all. */
-const collectorClient = Layer.effect(
-  HttpClient.HttpClient,
-  Effect.map(
-    HttpClient.HttpClient,
-    HttpClient.tapError((error) =>
-      error.reason instanceof HttpClientError.TransportError
-        ? Effect.map(Clock.currentTimeMillis, (now) => {
-            collectorMissedAt = Number(now)
-          })
-        : Effect.void
-    )
+/** The exporters' HTTP client: the app's own, marking a miss when the collector cannot be reached at all. */
+const collectorClient = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
+  HttpClient.tapError(client, (error) =>
+    error.reason instanceof HttpClientError.TransportError
+      ? Effect.map(Clock.currentTimeMillis, (now) => {
+          collectorMissedAt = Number(now)
+        })
+      : Effect.void
   )
-).pipe(Layer.provide(FetchHttpClient.layer))
 
 /**
  * The collector's exporters for one request, from the settings: traces, metrics and the log lines (the console keeps
  * getting them too). None while OTEL_EXPORTER_OTLP_ENDPOINT is unset. Exported only when the request is done, never on
- * a timer that would outlive it.
+ * a timer that would outlive it, through the `HttpClient` the Worker's entry provides (fetch; a stand-in in tests).
  */
 export const collector = (build: { readonly production: boolean }) =>
   Layer.effect(
@@ -110,6 +104,7 @@ export const collector = (build: { readonly production: boolean }) =>
       // isolate's counters carry the same labels, and a collector sees one series that keeps starting over.
       const random = yield* SecureRandom.SecureRandom
       const instance = yield* random.uuidV4()
+      const client = yield* Effect.map(HttpClient.HttpClient, collectorClient)
       return O.map(settings.endpoint, (endpoint) => {
         const base = Str.endsWith("/")(endpoint.href) ? endpoint.href : `${endpoint.href}/`
         const url = (signal: string) => new URL(`v1/${signal}`, base).href
@@ -128,7 +123,7 @@ export const collector = (build: { readonly production: boolean }) =>
         ).pipe(
           Layer.provideMerge(OtlpExporter.layerFlusher),
           Layer.provide(OtlpSerialization.layerJson),
-          Layer.provide(collectorClient)
+          Layer.provide(Layer.succeed(HttpClient.HttpClient, client))
         )
         // `Tracer.Tracer` is a reference: read from a context that lacks it, it is the native tracer, which exports
         // nothing. So the tracer is taken from the context that built it. Within thirty seconds of a miss, nothing.
@@ -180,7 +175,8 @@ const withRouter = HttpRouter.use
 /**
  * The browser's telemetry. `GET /api/otlp/status` says whether it is on (always answered, so the page asks once with
  * no failed request). When a collector is configured, `POST /api/otlp/v1/{traces,logs,metrics}` forwards a batch
- * unchanged to it: taken only from this app's own pages, at most 1 MiB. Not traced or logged itself.
+ * unchanged to it, through the app's `HttpClient`: taken only from this app's own pages, at most 1 MiB. Not traced or
+ * logged itself.
  */
 export const OtlpProxyRoute = withRouter(
   Effect.fn(function* (router) {
@@ -223,4 +219,4 @@ export const OtlpProxyRoute = withRouter(
       )
     }
   })
-).pipe(Layer.provide(FetchHttpClient.layer))
+)

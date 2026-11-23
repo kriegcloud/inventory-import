@@ -87,23 +87,25 @@ const isWarning = (note: { readonly level: "info" | "warning" }): boolean => not
 const isFormatNote = (note: { readonly kind: string }): boolean => note.kind === "formatNotShown"
 
 /**
- * Why a file cannot be staged, as a `FileProblem` for the person, or null when it can. It takes counts, not rows, so
+ * Why a file cannot be staged, as a `FileProblem` for the person, or none when it can. It takes counts, not rows, so
  * the reader asks before anything is sent, the server asks again when an upload begins (before any row arrives) and
  * once more when it finishes, and the words are the same wherever it is refused.
  *
- * @example stagingProblem({ fileName: "items.csv", rowCount: 50001, columnCount: 10 })?.problem
- * // '"items.csv" has 50001 rows. Up to 50000 can be imported at a time.'
+ * @example stagingProblem({ fileName: "items.csv", rowCount: 50001, columnCount: 10 })
+ * // O.some of the problem '"items.csv" has 50001 rows. Up to 50000 can be imported at a time.'
  */
 export const stagingProblem = (input: {
   readonly fileName: string
   readonly rowCount: number
   readonly columnCount: number
-}): FileProblem | null => {
+}): O.Option<FileProblem> => {
   const { fileName, rowCount, columnCount } = input
-  if (rowCount <= 0) return fileProblem.noRows({ fileName })
-  if (rowCount > maxStagedRows) return fileProblem.tooManyRows({ fileName, rows: rowCount, limit: maxStagedRows })
-  if (columnCount > maxColumns) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
-  return null
+  if (rowCount <= 0) return O.some(fileProblem.noRows({ fileName }))
+  if (rowCount > maxStagedRows) {
+    return O.some(fileProblem.tooManyRows({ fileName, rows: rowCount, limit: maxStagedRows }))
+  }
+  if (columnCount > maxColumns) return O.some(fileProblem.tooManyColumns({ fileName, columns: columnCount }))
+  return O.none()
 }
 
 /**

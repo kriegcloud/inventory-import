@@ -21,8 +21,12 @@ describe("the page's registry", () => {
     Effect.gen(function* () {
       const page = openPage()
       vi.resetModules()
-      const [root, member] = yield* Effect.promise(() =>
-        Promise.all([import("../../src/web/Root.tsx"), import("@inventory/client/MemberAtoms")])
+      const [root, member] = yield* Effect.all(
+        [
+          Effect.promise(() => import("../../src/web/Root.tsx")),
+          Effect.promise(() => import("@inventory/client/MemberAtoms"))
+        ],
+        { concurrency: "unbounded" }
       )
       yield* settle
       page.asked[0]?.answer(signedInAs("dana"))
@@ -36,8 +40,12 @@ describe("the page's registry", () => {
       ]).toEqual([true, "mem_dana/org_prairie", true])
       expect([/Registry/.test(mainSource), Str.includes("<Root />")(mainSource)]).toEqual([false, true])
       // The first screen's code, which the answer started, has loaded before the test ends.
-      yield* Effect.promise(() =>
-        Promise.all([import("../../src/web/Workspace.tsx"), import("@inventory/catalog-web/ImportPage")])
+      yield* Effect.all(
+        [
+          Effect.promise(() => import("../../src/web/Workspace.tsx")),
+          Effect.promise(() => import("@inventory/catalog-web/ImportPage"))
+        ],
+        { concurrency: "unbounded" }
       )
     })
   )

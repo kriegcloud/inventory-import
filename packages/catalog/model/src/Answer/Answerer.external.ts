@@ -107,9 +107,6 @@ export class Answerer extends Context.Service<
     )
 }
 
-/** True when a model can be asked. */
-export const modelIsOn = (status: ModelAvailability): boolean => status === "on"
-
 /**
  * The last step of every feature: when no model could answer, the caller's non-AI result, marked as the rules' answer
  * with the reason, so the screen can say which one answered.

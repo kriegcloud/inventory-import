@@ -86,6 +86,38 @@ const decodeEach = Effect.fnUntraced(function* (
 })
 
 /**
+ * Runs statements as one atomic batch on `client`, then decodes each statement's rows by that statement's own Result,
+ * in order. The first signature is the one callers see: one answer per statement, typed by its Result. TypeScript
+ * cannot carry the element types of a tuple through a map that runs, so that signature is stated over the second,
+ * which is the one checked: answer `i` is always decoded by the Result of statement `i`, and nothing else is returned.
+ */
+function batchOn<const Queries extends ReadonlyArray<Pending<unknown, unknown, unknown>>>(
+  client: D1Client.D1Client,
+  queries: Queries
+): Effect.Effect<Answers<Queries>, ErrorOf<Queries[number]> | D1Error, ServicesOf<Queries[number]>>
+function batchOn<E, R>(
+  client: D1Client.D1Client,
+  queries: ReadonlyArray<Pending<unknown, E, R>>
+): Effect.Effect<ReadonlyArray<unknown>, E | D1Error, R> {
+  return Effect.gen(function* () {
+    const built = yield* Effect.forEach(
+      queries,
+      (query, index) =>
+        query.pipe(
+          Effect.mapError((error) =>
+            S.is(D1Error)(error) ? D1Error.make({ stage: error.stage, statement: index, cause: error.cause }) : error
+          )
+        ),
+      { concurrency: 1 }
+    )
+    const results = yield* client
+      .batch(A.map(built, (query) => query.statement))
+      .pipe(Effect.mapError(failed("execute", 0)))
+    return yield* decodeEach(built, results)
+  }).pipe(Effect.withSpan("D1.batch", { attributes: { "db.batch.size": queries.length } }))
+}
+
+/**
  * D1 through Effect SQL: one statement on its own (`run`), or several as one atomic batch (`batch`), each encoded and
  * decoded by its own Schemas.
  *
@@ -148,30 +180,8 @@ export class D1 extends Context.Service<
             Effect.flatMap((rows) => built.decode(rows).pipe(Effect.mapError(failed("decode", 0))))
           )
         ).pipe(Effect.withSpan("D1.run"))
-      const batch = <const Queries extends ReadonlyArray<Pending<unknown, unknown, unknown>>>(
-        queries: Queries
-      ): Effect.Effect<Answers<Queries>, ErrorOf<Queries[number]> | D1Error, ServicesOf<Queries[number]>> =>
-        Effect.gen(function* () {
-          const built = yield* Effect.forEach(
-            queries as ReadonlyArray<Pending<unknown, ErrorOf<Queries[number]>, ServicesOf<Queries[number]>>>,
-            (query, index) =>
-              query.pipe(
-                Effect.mapError((error) =>
-                  S.is(D1Error)(error)
-                    ? D1Error.make({ stage: error.stage, statement: index, cause: error.cause })
-                    : error
-                )
-              ),
-            { concurrency: 1 }
-          )
-          const results = yield* client
-            .batch(A.map(built, (query) => query.statement))
-            .pipe(Effect.mapError(failed("execute", 0)))
-          const answers = yield* decodeEach(built, results as ReadonlyArray<ReadonlyArray<unknown>>)
-          // The tuple's element types are the statements' Result types, decoded in order above; the type system
-          // cannot follow a mapped tuple through `forEach`, so the answers are named once here.
-          return answers as unknown as Answers<Queries>
-        }).pipe(Effect.withSpan("D1.batch", { attributes: { "db.batch.size": queries.length } }))
+      const batch = <const Queries extends ReadonlyArray<Pending<unknown, unknown, unknown>>>(queries: Queries) =>
+        batchOn(client, queries)
       return D1.of({ run, batch })
     })
   )

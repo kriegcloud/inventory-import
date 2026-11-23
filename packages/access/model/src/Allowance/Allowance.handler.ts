@@ -15,7 +15,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as SecureRandom from "effect/crypto/SecureRandom"
-import { windowStart, usedUpSentence } from "./Allowance.rules.ts"
+import { usedUpSentence } from "./Allowance.rules.ts"
 import { AllowanceStore, Reservation } from "./AllowanceStore.store.ts"
 
 /**
@@ -36,7 +36,6 @@ export const takeModelCall = Effect.fnUntraced(function* (purpose: ModelCallPurp
       actor: actor.id,
       purpose,
       at: now,
-      since: windowStart(now),
       limit: dailyModelCalls
     })
   )

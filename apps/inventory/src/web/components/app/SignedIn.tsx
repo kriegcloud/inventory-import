@@ -1,5 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Effect from "effect/Effect"
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
@@ -42,14 +43,18 @@ class DevelopmentSignInFailed extends S.TaggedError<DevelopmentSignInFailed, { r
 
 const developmentSignIn = Atom.make((get) => {
   const view = get(sessionView)
-  const offer = view.features === undefined ? undefined : O.getOrUndefined(view.features.testAccounts)
-  const first = offer?.accounts[0]
-  if (!import.meta.env.DEV || view.status !== "signed-out" || offer === undefined || first === undefined) {
+  // The first test account the answer offers, with the password they share.
+  const first = O.flatMap(
+    O.flatMap(view.features, (features) => features.testAccounts),
+    (offer) => O.map(A.head(offer.accounts), (account) => ({ email: account.email, password: offer.password }))
+  )
+  if (!import.meta.env.DEV || view.status !== "signed-out" || O.isNone(first)) {
     return Effect.succeed("idle" as const)
   }
   if (signedOutHere()) return Effect.succeed("idle" as const)
+  const { email, password } = first.value
   return Effect.tryPromise({
-    try: () => signInWithPassword({ email: first.email, password: offer.password }),
+    try: () => signInWithPassword({ email, password }),
     catch: (cause) => DevelopmentSignInFailed.make({ cause })
   }).pipe(
     Effect.andThen(Effect.sync(() => get.set(refreshSession, undefined))),
@@ -104,7 +109,7 @@ export function SignedIn(props: { title: string; children: ReactNode }) {
       ) : status === "signed-out" ||
         // In development the first test account is about to sign in: the placeholder, not a form that vanishes.
         (status === "loading" && probablySignedOut && !(import.meta.env.DEV && !signedOutHere())) ? (
-        // Until the answer comes, `features` is undefined: the test accounts appear with it.
+        // Until the answer comes, `features` is none: the test accounts appear with it.
         <>
           {sessionEnded() ? <Ended /> : null}
           <SignIn features={features} onSignedIn={() => refresh()} />

@@ -50,6 +50,7 @@
     "@hookform/resolvers": "^7.0.6",
     "@inventory/access-contract": "workspace:*",
     "@inventory/access-host": "workspace:*",
+    "@inventory/access-model": "workspace:*",
     "@inventory/access-web": "workspace:*",
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/catalog-host": "workspace:*",

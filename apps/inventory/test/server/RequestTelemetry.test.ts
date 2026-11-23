@@ -2,6 +2,7 @@ import { expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Scope from "effect/Scope"
@@ -10,9 +11,9 @@ import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { toTracedFetch } from "../../src/server/App.ts"
+import { toTracedServe } from "../../src/server/App.ts"
 import { Collector, RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
-import { inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
+import { afterAnswerInto, inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
 
 // Tracing that leaves the Worker is built per request (src/server/RequestTelemetry.ts): each request gets its own
 // exporters, its handler's spans go to them, and they are closed (which sends what they hold) only after the answer,
@@ -36,8 +37,8 @@ type Exported = { spans: Array<string>; ended: number; closed: boolean }
 const serving = (collector: O.Option<(scope: Scope.Scope) => Effect.Effect<Tracer.Tracer>>) =>
   Effect.acquireRelease(
     Effect.sync(() => {
-      const pending: Array<Promise<unknown>> = []
-      const served = toTracedFetch({
+      const pending: Array<Fiber.Fiber<void>> = []
+      const served = toTracedServe({
         app,
         telemetry: RequestTelemetry.layer.pipe(
           Layer.provide(
@@ -52,14 +53,14 @@ const serving = (collector: O.Option<(scope: Scope.Scope) => Effect.Effect<Trace
           ),
           Layer.provide(settingsLayer(testSettings))
         ),
-        waitUntil: (promise) => pending.push(promise)
+        afterAnswer: afterAnswerInto(pending)
       })
       return { ...served, pending }
     }),
-    (served) => Effect.promise(() => served.dispose())
+    (served) => served.dispose
   )
 
-it.effect("gives each request its own exporters, and closes them after the answer, once its spans have ended", () =>
+it.live("gives each request its own exporters, and closes them after the answer, once its spans have ended", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const exports: Array<Exported> = []
@@ -90,7 +91,7 @@ it.effect("gives each request its own exporters, and closes them after the answe
         )
       )
       for (const path of ["/api/v1/identity/me", "/api/v1/activity", "/api/v1/system/status"]) {
-        const answer = yield* Effect.promise(() => served.fetch(new Request(`${testOrigin}${path}`)))
+        const answer = yield* served.serve(new Request(`${testOrigin}${path}`))
         expect(answer.status).toBe(200)
       }
       // Three requests, three exporters, each with its own request's spans and nobody else's.
@@ -115,11 +116,11 @@ it.effect("gives each request its own exporters, and closes them after the answe
   )
 )
 
-it.effect("off, the default: nothing is built, and the request answers as before", () =>
+it.live("off, the default: nothing is built, and the request answers as before", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const served = yield* serving(O.none())
-      const answer = yield* Effect.promise(() => served.fetch(new Request(`${testOrigin}/api/v1/identity/me`)))
+      const answer = yield* served.serve(new Request(`${testOrigin}/api/v1/identity/me`))
       expect(answer.status).toBe(200)
       expect(answer.headers.get("cache-control")).toBe("no-store")
       yield* settled(served.pending)

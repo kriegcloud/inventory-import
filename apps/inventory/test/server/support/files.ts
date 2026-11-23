@@ -1,14 +1,8 @@
-// @effect-diagnostics nodeBuiltinImport:off
-// The sample files, read through the reader the browser uses and trimmed the way the browser stages them.
-import { readFileSync } from "node:fs"
+// Files made in a test, read through the reader the browser uses and trimmed the way the browser stages them.
 import * as Effect from "effect/Effect"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import { stageTable } from "@inventory/catalog-model/Staging"
-
-/** A file from `public/samples/`, as the browser would hold it after the person chose it. */
-export const sample = (name: string): File =>
-  new File([readFileSync(new URL(`../../../public/samples/${name}`, import.meta.url))], name)
 
 /** A CSV made in the test, named items.csv. */
 export const textFile = (text: string): File => new File([text], "items.csv")

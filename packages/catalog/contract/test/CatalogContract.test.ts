@@ -9,7 +9,7 @@ import { ConfirmId, ImportId, ItemId, RowId, SuggestionId, UploadKey } from "@in
 import { DecidedBy, RowOutcome, TakeBackState } from "@inventory/catalog-contract/Import"
 import { Category, Dimensions, Stocking, UnitCost, Uom } from "@inventory/catalog-contract/Item"
 import { ColumnMatch, MappingChoice, UnusedColumn } from "@inventory/catalog-contract/Mapping"
-import { Field, StagedCell, StagedColumn } from "@inventory/catalog-contract/Staged"
+import { Field, fieldLabels, fields, StagedCell, StagedColumn } from "@inventory/catalog-contract/Staged"
 import {
   Suggestion,
   suggestedByModel,
@@ -119,4 +119,12 @@ describe("the wire", () => {
       expect(changeFromStored(changeToStored(change))).toEqual(change)
     })
   )
+})
+
+describe("the fields of an item", () => {
+  // A value worked out for each field is worked out in the order of the labels (the review does so, and lists its
+  // changes in that order): the labels are written in the order the screens list the fields.
+  it("have their labels in the order the screens list them", () => {
+    expect(R.keys(fieldLabels)).toEqual(fields)
+  })
 })

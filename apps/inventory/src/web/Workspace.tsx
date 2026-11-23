@@ -20,6 +20,8 @@ import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
 import { KeptNotices } from "@inventory/catalog-web/KeptNotices"
 import { askBeforeLeaving, importViewShown } from "@inventory/catalog-web/Imports"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { contentBelow } from "@inventory/ui/ContentWidth"
@@ -131,9 +133,12 @@ export default function Workspace() {
   // The browser asks before the page is left while an import has rows still to be sent, whatever page is shown.
   useAtomMount(askBeforeLeaving)
   // An address that names no page shows the first one, as before.
-  const current = appPages.find((page) => page.path === path) ?? appPages[0]
-  if (current === undefined) return null
-  return <WorkspaceFrame current={current} path={path} params={params} />
+  const current = O.orElse(
+    A.findFirst(appPages, (page) => page.path === path),
+    () => A.head(appPages)
+  )
+  if (O.isNone(current)) return null
+  return <WorkspaceFrame current={current.value} path={path} params={params} />
 }
 
 /**

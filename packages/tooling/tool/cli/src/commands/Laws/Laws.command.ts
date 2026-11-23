@@ -10,6 +10,7 @@ import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
 import { assertions, assertionsLedger, assertionsSentence } from "./Assertions.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
+import { defaults, defaultsSentence } from "./Defaults.rules.ts"
 import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
 import { diagnostics, diagnosticsSentence } from "./Diagnostics.rules.ts"
 import { effectImports } from "./EffectImports.rules.ts"
@@ -124,12 +125,32 @@ export const effectImportsCommand = Command.make("effect-imports", { write, chec
   Effect.flatMap(effectImports(flags.write, flags.files), emit(effectImportsSentence))
 ).pipe(Command.withDescription("Every Effect import comes from its module's own path under its one name"))
 
+/**
+ * `beep-cli laws defaults [--write] [file...]`: no file holds more fallbacks, comparisons with null or undefined,
+ * Options turned back into missing values, or clean-ups outside a schema than the baseline allows. Given files it
+ * reads only those, which is how an edit is answered at once.
+ */
+export const defaultsCommand = Command.make(
+  "defaults",
+  {
+    write: Flag.Boolean("write").pipe(
+      Flag.withDescription("Lower the baseline to what the tree holds; it is never raised"),
+      Flag.withDefault(false)
+    ),
+    files
+  },
+  (flags) => Effect.flatMap(defaults(flags.write, flags.files), emit(defaultsSentence))
+).pipe(
+  Command.withDescription("Absence, starting values and clean-ups are a schema's: no file holds more than its baseline")
+)
+
 /** The `laws` group. */
 export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
   Command.withSubcommands([
     assertionsCommand,
     boundariesCommand,
+    defaultsCommand,
     deprecatedApisCommand,
     diagnosticsCommand,
     dualCommand,

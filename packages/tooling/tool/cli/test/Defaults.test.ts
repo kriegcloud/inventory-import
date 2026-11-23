@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import { baselineFile, defaults, defaultsSentence } from "../src/commands/Laws/Defaults.rules.ts"
-import { readDefaults } from "../src/commands/Laws/internal/defaultsCode.ts"
+import { readDefaults, whatIsCounted } from "../src/commands/Laws/internal/defaultsCode.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { inTree, json, onMain, printed, type Tree } from "./support/tree.ts"
@@ -27,8 +27,10 @@ const run = Effect.fn("run")(function* (write: boolean, only: ReadonlyArray<stri
   return printed(render(defaultsSentence)(found))
 })
 
-const baseline = (files: Readonly<Record<string, ReadonlyArray<number>>>) =>
-  json({ counts: ["fallback", "absence", "unwrap", "normalise"], files })
+const baseline = (
+  files: Readonly<Record<string, ReadonlyArray<number>>>,
+  reads: ReadonlyArray<string> = whatIsCounted
+) => json({ counts: ["fallback", "absence", "unwrap", "normalise"], reads, files })
 
 const held = "packages/a/src/held.ts"
 const twoFallbacks = `export const a = (x?: number, y?: number) => (x ?? 0) + (y ?? 0)\n`
@@ -287,7 +289,10 @@ describe("--write", () => {
       deepStrictEqual(said.first, ["out: defaults:check OK  defaults-baseline.json lowered: it names 1 files"])
       strictEqual(
         said.stored,
-        `{\n  "counts": ["fallback", "absence", "unwrap", "normalise"],\n  "files": {\n    "${held}": [2, 0, 0, 0]\n  }\n}\n`
+        `{\n  "counts": ["fallback", "absence", "unwrap", "normalise"],\n  "reads": [\n    ${A.join(
+          A.map(whatIsCounted, (one) => `"${one}"`),
+          ",\n    "
+        )}\n  ],\n  "files": {\n    "${held}": [2, 0, 0, 0]\n  }\n}\n`
       )
       strictEqual(Str.includes(`"${held}": [1, 0, 0, 0]`)(said.after), true)
       strictEqual(
@@ -296,6 +301,43 @@ describe("--write", () => {
       )
       strictEqual(said.kept, said.after)
     })
+  )
+
+  it.effect(
+    "a baseline written before the reader counted more is said, written anew, and not held to the old one",
+    () =>
+      Effect.gen(function* () {
+        // Main's baseline was written when only \`??\` was counted: one place. The reader counts two here.
+        const older = ["??"]
+        const source = `export const a = (x?: number, y?: string) => [x ?? 0, y || ""]\n`
+        const said = yield* inTree(
+          { [held]: source, [baselineFile]: baseline({ [held]: [1, 0, 0, 0] }, older) },
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* onMain()
+            const beforeFound = yield* defaults(false, [])
+            const before = printed(render(defaultsSentence)(beforeFound))
+            const wroteFound = yield* defaults(true, [])
+            const wrote = printed(render(defaultsSentence)(wroteFound))
+            const stored = yield* repo.text(repo.join(repo.root, baselineFile))
+            const afterFound = yield* defaults(false, [])
+            const after = printed(render(defaultsSentence)(afterFound))
+            return { before, wrote, stored, after }
+          })
+        )
+        strictEqual(
+          A.some(said.before, (line) =>
+            Str.startsWith(`err: ${baselineFile} was written before the law counted what it counts now`)(line)
+          ),
+          true
+        )
+        deepStrictEqual(said.wrote, ["out: defaults:check OK  defaults-baseline.json lowered: it names 1 files"])
+        strictEqual(Str.includes(`"${held}": [2, 0, 0, 0]`)(said.stored), true)
+        // Main still holds the file at 1, of fewer things: the count of 2 is not refused as raised.
+        deepStrictEqual(said.after, [
+          "out: defaults:check OK  1 files hold to the baseline (still held: 2 fallback, 0 absence, 0 unwrap, 0 normalise)"
+        ])
+      })
   )
 
   it.effect("takes no file", () =>

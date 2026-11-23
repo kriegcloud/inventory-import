@@ -76,6 +76,22 @@ const cleanUps = ["trim", "trimStart", "trimEnd", "toLowerCase", "toUpperCase"]
 // A schema's own clean-up is where the rule wants it.
 const schemaModules = ["SchemaGetter", "SchemaTransformation"]
 
+/**
+ * What is counted, in the reader's own words. A baseline says which of these it was written for, so one written
+ * before the reader counted more is known for what it is and is not held against the fuller one.
+ */
+export const whatIsCounted: ReadonlyArray<string> = [
+  "??",
+  "??=",
+  "|| value",
+  "||= value",
+  ...fallbacks,
+  "null",
+  "undefined",
+  ...unwraps,
+  ...cleanUps
+]
+
 const kindOf = (node: Node): O.Option<DefaultsKind> => {
   const operator = text(node, "operator")
   const is = (written: string): boolean => O.exists(operator, (own) => own === written)

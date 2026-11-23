@@ -1,5 +1,21 @@
 {
   "counts": ["fallback", "absence", "unwrap", "normalise"],
+  "reads": [
+    "??",
+    "??=",
+    "|| value",
+    "||= value",
+    "getOrElse",
+    "null",
+    "undefined",
+    "getOrUndefined",
+    "getOrNull",
+    "trim",
+    "trimStart",
+    "trimEnd",
+    "toLowerCase",
+    "toUpperCase"
+  ],
   "files": {
     "apps/inventory/src/api/v1/Document.ts": [6, 7, 0, 0],
     "apps/inventory/src/server/SameOrigin.ts": [2, 0, 0, 0],

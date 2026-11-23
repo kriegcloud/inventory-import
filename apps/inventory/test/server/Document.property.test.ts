@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect"
 import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
+import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { describeDocument } from "../../src/api/v1/Document.ts"
@@ -76,7 +77,7 @@ const listsAsObjects = (drawn: Drawn): Drawn =>
 /** The part written out with its keys sorted, or nothing when JSON cannot hold it. */
 const written = (drawn: Drawn): O.Option<string> =>
   Match.valueTags(drawn, {
-    Leaf: (leaf) => O.some(leaf.value === null ? "null" : `${typeof leaf.value}:${leaf.value}`),
+    Leaf: (leaf) => O.some(P.isNull(leaf.value) ? "null" : `${typeof leaf.value}:${leaf.value}`),
     Odd: () => O.none(),
     List: (list) => O.map(O.all(A.map(list.items, written)), (items) => `[${A.join(items, ",")}]`),
     Object: (object) =>

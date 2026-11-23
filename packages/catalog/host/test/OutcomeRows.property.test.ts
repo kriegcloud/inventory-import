@@ -17,8 +17,8 @@ import { DisplayName } from "@inventory/kernel/Text"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 
 const runs = { arbitrary: { runs: 300 } }
 
@@ -38,7 +38,7 @@ const StoredByAnyVersion = S.Struct({
 })
 
 /** A name a person can read, as the result shows one: some character that is not a space, and at most 200. */
-const readable = (name: string | null): name is string => name !== null && Str.trim(name) !== "" && name.length <= 200
+const readable = (name: string | null): name is string => P.isString(name) && /\S/.test(name) && name.length <= 200
 
 describe("the outcome rows a confirm stores", () => {
   it.effect.prop(
@@ -78,9 +78,9 @@ describe("the outcome rows a confirm stores", () => {
           stored.sku,
           stored.name
         ])
-        expect(O.getOrNull(shown.part)).toBe(stored.part === 0 ? null : stored.part)
+        expect(shown.part).toEqual(stored.part === 0 ? O.none() : O.some(stored.part))
         const hasReason = stored.outcome === "already" || stored.outcome === "notImported"
-        expect(O.getOrNull(outcomeReasonOf(shown))).toBe(hasReason ? stored.reason : null)
+        expect(outcomeReasonOf(shown)).toEqual(hasReason ? O.some(stored.reason) : O.none())
         if (RowOutcome.guards.notImported(shown)) {
           const named = DecidedBy.guards.person(shown.decidedBy) ? shown.decidedBy.name : null
           expect(named).toBe(

@@ -23,19 +23,17 @@ export const formProblems = <F extends string>(checks: {
   })
 
 /**
- * The sentence for one field, or undefined: what a field's `FieldError` shows. Data first or in a pipe.
+ * The sentence for one field, when it has a problem: what a field's `FieldError` shows. Data first or in a pipe.
  *
  * @example pipe(formProblems({ action: "Say what was done.", detail: undefined }), problemOf("action"))
- * // "Say what was done."
+ * // O.some("Say what was done.")
  */
 export const problemOf: {
-  <F extends string>(field: F): (problems: ReadonlyArray<FieldProblem<F>>) => string | undefined
-  <F extends string>(problems: ReadonlyArray<FieldProblem<F>>, field: F): string | undefined
-} = dual(2, <F extends string>(problems: ReadonlyArray<FieldProblem<F>>, field: F): string | undefined =>
-  O.getOrUndefined(
-    O.map(
-      A.findFirst(problems, (problem) => problem.field === field),
-      (problem) => problem.sentence
-    )
+  <F extends string>(field: F): (problems: ReadonlyArray<FieldProblem<F>>) => O.Option<string>
+  <F extends string>(problems: ReadonlyArray<FieldProblem<F>>, field: F): O.Option<string>
+} = dual(2, <F extends string>(problems: ReadonlyArray<FieldProblem<F>>, field: F): O.Option<string> =>
+  O.map(
+    A.findFirst(problems, (problem) => problem.field === field),
+    (problem) => problem.sentence
   )
 )

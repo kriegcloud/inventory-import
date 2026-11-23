@@ -153,14 +153,14 @@ const secured = (request: Request) => (response: Response) =>
 const servedIn = <R, ER>(
   edge: ManagedRuntime.ManagedRuntime<R | Digest.Digest, ER>,
   answer: (request: Request) => Effect.Effect<Response, never, R>,
-  dispose: () => Promise<void>
+  dispose: Effect.Effect<void>
 ): Served => ({
   serve: (request) =>
     edge.contextEffect.pipe(
       Effect.flatMap((context) => Effect.provideContext(Effect.flatMap(answer(request), secured(request)), context)),
       Effect.orDie
     ),
-  dispose: Effect.all([Effect.promise(dispose), edge.disposeEffect], { concurrency: "unbounded", discard: true })
+  dispose: Effect.all([dispose, edge.disposeEffect], { concurrency: "unbounded", discard: true })
 })
 
 /**
@@ -171,7 +171,11 @@ export const toServe = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>): S
   const memoMap = Layer.makeMemoMapUnsafe()
   const { dispose, handler } = HttpRouter.toWebHandler(app, { memoMap })
   const edge = ManagedRuntime.make(Digest.layerWebCrypto, { memoMap })
-  return servedIn(edge, (request) => Effect.promise(() => handler(request)), dispose)
+  return servedIn(
+    edge,
+    (request) => Effect.promise(() => handler(request)),
+    Effect.promise(() => dispose())
+  )
 }
 
 /**
@@ -195,5 +199,9 @@ export const toTracedServe = <E, TE>(options: {
     yield* options.afterAnswer(scope.done)
     return response
   })
-  return servedIn(edge, answer, dispose)
+  return servedIn(
+    edge,
+    answer,
+    Effect.promise(() => dispose())
+  )
 }

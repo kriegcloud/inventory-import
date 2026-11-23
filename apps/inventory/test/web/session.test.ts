@@ -9,6 +9,7 @@ import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
@@ -24,15 +25,15 @@ vi.mock("sonner", () => ({
 }))
 // Better Auth's client, as the app loads it: a switch of organization the server takes, or refuses.
 // A switch the test holds (`hold`) is answered when the test says.
-const auth = vi.hoisted(() => {
-  const held: { refuses: boolean; hold: Promise<void> | undefined } = { refuses: false, hold: undefined }
-  return held
-})
+// Read when the app first loads the client, which a test does after this line has run.
+const auth = { refuses: MutableRef.make(false), hold: MutableRef.make<Promise<void> | undefined>(undefined) }
 vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
   authClient: {
     organization: {
       setActive: () =>
-        auth.refuses ? Promise.reject(new Error("Not a member.")) : (auth.hold ?? Promise.resolve(undefined))
+        MutableRef.get(auth.refuses)
+          ? Promise.reject(new Error("Not a member."))
+          : (MutableRef.get(auth.hold) ?? Promise.resolve(undefined))
     }
   },
   orThrow: (answer: unknown) => answer
@@ -220,12 +221,12 @@ describe("the person's own switch of organization", () => {
 
   it.live("refused by the server: still the same member, and certain again", () =>
     Effect.gen(function* () {
-      auth.refuses = true
+      MutableRef.set(auth.refuses, true)
       const t = yield* loadAs(signedInAs("dana"))
       t.pick("org_northline")
       yield* settle
       expect([t.who(), t.asked(), t.page.asked.length]).toEqual(["mem_dana/org_prairie", false, 1])
-      auth.refuses = false
+      MutableRef.set(auth.refuses, false)
     })
   )
 
@@ -609,7 +610,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
   it.live("is hers when that ask answers in the organization she chose: nothing is left, and nothing reloaded", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      auth.hold = held.promise
+      MutableRef.set(auth.hold, held.promise)
       const t = yield* loadAs(signedInAs("dana"))
       t.ask()
       yield* settle
@@ -620,7 +621,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       expect([t.page.left, t.who()]).toEqual([[], "mem_dana/org_northline"])
       held.resolve()
-      auth.hold = undefined
+      MutableRef.set(auth.hold, undefined)
       yield* settle
       t.page.asked[2]?.answer(signedInAs("dana", "northline"))
       yield* settle
@@ -631,7 +632,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
   it.live("answered there for somebody else's account: the page is left", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      auth.hold = held.promise
+      MutableRef.set(auth.hold, held.promise)
       const t = yield* loadAs(signedInAs("dana"))
       t.ask()
       yield* settle
@@ -641,14 +642,14 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       expect(t.page.left).toEqual(["/"])
       held.resolve()
-      auth.hold = undefined
+      MutableRef.set(auth.hold, undefined)
     })
   )
 
   it.live("a write she pressed for the organization she left is said as not sent, in words", () =>
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
-      auth.hold = held.promise
+      MutableRef.set(auth.hold, held.promise)
       const t = yield* browserWithServer()
       const { sayError } = yield* Effect.promise(() => import("@inventory/client/SayError"))
       const pick = () => {
@@ -661,7 +662,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       t.server.cookie = "mem_dana/org_northline"
       held.resolve()
-      auth.hold = undefined
+      MutableRef.set(auth.hold, undefined)
       yield* settle
       t.page.asked[1]?.answer(signedInAs("dana", "northline"))
       yield* settle

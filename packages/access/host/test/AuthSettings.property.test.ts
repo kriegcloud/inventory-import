@@ -12,7 +12,6 @@ import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 
 const runs = { arbitrary: { runs: 200 } }
 
@@ -62,7 +61,7 @@ describe("the sign-in settings as read", () => {
         expect(Result.isFailure(settings)).toBe(given === testAccountPassword)
         if (Result.isSuccess(settings)) {
           const stage = O.map(settings.success.testAccountPassword, Redacted.value)
-          expect(O.isNone(stage)).toBe(Str.trim(given) === "")
+          expect(O.isNone(stage)).toBe(/^\s*$/.test(given))
           if (O.isSome(stage)) {
             const opened = passwordToVerify({ stage, repository: testAccountPassword, typed: testAccountPassword })
             expect(O.isNone(opened)).toBe(true)

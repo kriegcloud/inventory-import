@@ -8,6 +8,7 @@
 import * as A from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
@@ -554,7 +555,7 @@ export const ImportStoreD1 = Layer.effect(
     //
     // A list given a revision is put only while the draft is at it, before anything in the batch moves it: at another
     // one there is nothing to write from, so nothing of the save is written.
-    const putList = <Value, Wire>(list: ListName, of: S.Codec<Value, Wire>) =>
+    const putListOf = <Value, Wire>(of: S.Codec<Value, Wire>, list: ListName) =>
       D1.statement({
         Request: S.Struct({
           org: OrganizationId,
@@ -570,12 +571,18 @@ export const ImportStoreD1 = Layer.effect(
           SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
           WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}${r.expectedSaves === null ? sql`` : sql` AND saves = ${r.expectedSaves}`}`
       })
-    const putSets = putList("sets", DecisionEntry)
-    const putClears = putList("clears", S.String)
-    const putKeys = putList("keys", S.String)
-    const putItems = putList("items", ItemRead)
-    const putCreated = putList("created", CreatedRead)
-    const putSuggestions = putList("suggestions", S.String)
+    // The statement that puts the pieces of one list, written by `of`: `putList(of, "keys")` or
+    // `of.pipe(putList("keys"))`.
+    const putList: {
+      (list: ListName): <Value, Wire>(of: S.Codec<Value, Wire>) => ReturnType<typeof putListOf<Value, Wire>>
+      <Value, Wire>(of: S.Codec<Value, Wire>, list: ListName): ReturnType<typeof putListOf<Value, Wire>>
+    } = dual(2, putListOf)
+    const putSets = DecisionEntry.pipe(putList("sets"))
+    const putClears = S.String.pipe(putList("clears"))
+    const putKeys = S.String.pipe(putList("keys"))
+    const putItems = ItemRead.pipe(putList("items"))
+    const putCreated = CreatedRead.pipe(putList("created"))
+    const putSuggestions = S.String.pipe(putList("suggestions"))
     const dropLists = D1.statement({
       Request: S.Struct({ org: OrganizationId, write: S.String }),
       Result: NoRows,

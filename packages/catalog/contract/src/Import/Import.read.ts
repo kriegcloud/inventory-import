@@ -1,14 +1,16 @@
 // An import as the screens read it: its view, its result row by row, its history of confirms and take-backs, what
 // a take-back would do, the open and the past imports, and the changed values the activity view lists. Every number
 // here is read back from what is stored.
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { AnsweredBy } from "../Answer/AnsweredBy.read.ts"
 import { Change } from "./Change.read.ts"
 import { SavedDecisions, TakenBackKind } from "./Decision.command.ts"
-import { Field } from "../Staging/Staged.read.ts"
+import { Field, RowNumber } from "../Staging/Staged.read.ts"
 import { personName } from "../internal/Described.ts"
 import { ConfirmId, ImportId, RowId } from "../Catalog.id.ts"
 import { ItemFields } from "../Item/Item.read.ts"
@@ -65,8 +67,8 @@ export type OutcomeKind = typeof OutcomeKind.Type
 
 // What every outcome says of its row: where it is in the file and what it is called.
 const outcomeRow = {
-  rowNumber: S.Int.pipe(S.annotateKey({ description: "The row as Excel numbers it", examples: [7] })),
-  part: S.Int.pipe(
+  rowNumber: RowNumber.pipe(S.annotateKey({ description: "The row as Excel numbers it", examples: [7] })),
+  part: S.Int.check(S.isBetween({ minimum: 1, maximum: 9999 })).pipe(
     absentAsNone({
       description:
         "Which of its row's items this is (1, 2, ...), when the row holds several; left out for a row that is one item"
@@ -160,39 +162,128 @@ export const outcomeOf = (stored: {
   })
 }
 
-/** What a confirmed import did, row by row, counted from the stored rows. Kept with the import, so it survives a reload. */
-export const ImportResult = S.Struct({
+// A count of rows: never negative.
+const RowCount = S.Natural
+
+/**
+ * The five counts of a result, each the rows that have its outcome: what `ImportResult` must say, and how its
+ * generator says it.
+ *
+ * @example resultCounts([]) // { created: 0, updated: 0, already: 0, notImported: 0, takenBack: 0 }
+ */
+export const resultCounts = (rows: ReadonlyArray<RowOutcome>) => ({
+  created: A.filter(rows, RowOutcome.isAnyOf(["created"])).length,
+  updated: A.filter(rows, RowOutcome.isAnyOf(["updated"])).length,
+  already: A.filter(rows, RowOutcome.isAnyOf(["already"])).length,
+  notImported: A.filter(rows, RowOutcome.isAnyOf(["notImported"])).length,
+  takenBack: A.filter(rows, RowOutcome.isAnyOf(["takenBack"])).length
+})
+
+const resultFields = {
   importedBy: personName("Who confirmed the import"),
   importedAt: Instant.pipe(S.annotateKey({ description: "When it was confirmed" })),
-  created: S.Int.annotateKey({ description: "Rows whose item this import created and still has", examples: [11] }),
-  updated: S.Int.annotateKey({
+  rows: S.Array(RowOutcome).annotateKey({
+    description: "Every row of the file with what happened to it; the five counts add up to these"
+  })
+}
+
+const fixedRows = RowCount.annotateKey({ description: "Rows written with at least one value a form-only rule changed" })
+
+// The wire's form of a result: every count sent, so a reader of the document need not count.
+const ImportResultWire = S.Struct({
+  importedBy: resultFields.importedBy,
+  importedAt: resultFields.importedAt,
+  created: RowCount.annotateKey({ description: "Rows whose item this import created and still has", examples: [11] }),
+  updated: RowCount.annotateKey({
     description: "Rows that replaced a stored item with the same SKU, because the person chose to",
     examples: [1]
   }),
-  already: S.Int.annotateKey({
+  already: RowCount.annotateKey({
     description: "Rows whose SKU the organization already had: nothing was written for them",
     examples: [154]
   }),
-  notImported: S.Int.annotateKey({
+  notImported: RowCount.annotateKey({
     description: "Rows left out, by a person or because nobody had settled them",
     examples: [45]
   }),
-  takenBack: S.Int.annotateKey({
+  takenBack: RowCount.annotateKey({
     description:
       "Rows whose item this import created and a take-back removed, or whose replace of a stored item a take-back undid",
     examples: [0]
   }),
   fixed: S.Struct({
-    rows: S.Int.annotateKey({ description: "Rows written with at least one value a form-only rule changed" }),
-    cells: S.Int.annotateKey({ description: "Values a form-only rule changed, in all" })
+    rows: fixedRows,
+    cells: RowCount.annotateKey({
+      description: "Values a form-only rule changed, in all: never fewer than the rows they are in"
+    })
   }).annotateKey({
     description:
       'What the form-only rules changed without the person, counted from the changed values the confirms stored (`how` "applied by a rule")'
   }),
-  rows: S.Array(RowOutcome).annotateKey({
-    description: "Every row of the file with what happened to it; the five counts add up to these"
-  })
-}).annotate({ identifier: "ImportResult", description: "What the confirms of an import did with each row of its file" })
+  rows: resultFields.rows
+})
+type ImportResultShape = typeof ImportResultWire.Type
+
+const isWire = S.is(ImportResultWire)
+
+/** True when the counts are the rows of their outcomes, and the values a rule changed fill at least their rows. */
+const addsUp = (result: ImportResultShape): boolean => {
+  const counted = resultCounts(result.rows)
+  return (
+    result.created === counted.created &&
+    result.updated === counted.updated &&
+    result.already === counted.already &&
+    result.notImported === counted.notImported &&
+    result.takenBack === counted.takenBack &&
+    result.fixed.rows <= result.fixed.cells
+  )
+}
+
+// What a generated result is drawn from: the rows, and how many more changed values there are than rows that hold
+// them. The counts are then counted, so every result generated adds up.
+const ImportResultSource = S.Struct({
+  importedBy: resultFields.importedBy,
+  importedAt: resultFields.importedAt,
+  fixedRows,
+  moreCells: RowCount,
+  rows: resultFields.rows
+})
+
+const CountedResult = S.declare((input: unknown): input is ImportResultShape => isWire(input) && addsUp(input), {
+  identifier: "CountedResult",
+  description: "A result whose five counts are the rows of their outcomes",
+  expected: "a result whose counts are the rows of each outcome, and whose fixed cells are at least its fixed rows",
+  toCodecArbitrary: () =>
+    S.link<ImportResultShape>()(
+      ImportResultSource,
+      SchemaTransformation.transform({
+        decode: (source) => ({
+          importedBy: source.importedBy,
+          importedAt: source.importedAt,
+          ...resultCounts(source.rows),
+          fixed: { rows: source.fixedRows, cells: source.fixedRows + source.moreCells },
+          rows: source.rows
+        }),
+        encode: (result) => ({
+          importedBy: result.importedBy,
+          importedAt: result.importedAt,
+          fixedRows: result.fixed.rows,
+          moreCells: result.fixed.cells - result.fixed.rows,
+          rows: result.rows
+        })
+      })
+    )
+})
+
+/**
+ * What a confirmed import did, row by row, counted from the stored rows. Kept with the import, so it survives a
+ * reload. The five counts are the Result screen's numbers, so they must be the rows of each outcome and add up to the
+ * rows of the file (the import rules: "the outcomes add up"); a result that says otherwise is refused, never shown.
+ */
+export const ImportResult = ImportResultWire.pipe(S.decodeTo(CountedResult)).annotate({
+  identifier: "ImportResult",
+  description: "What the confirms of an import did with each row of its file"
+})
 /** The decoded value of `ImportResult`: what a confirmed import did, row by row, counted from the stored rows. */
 export type ImportResult = typeof ImportResult.Type
 

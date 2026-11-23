@@ -72,9 +72,9 @@ import { UndoGroup } from "../src/Review/UndoingGroup.decision.ts"
 import { letGo, Level, noLevel, Row, RowDecided, seal, StepUndone } from "../src/Row/Row.aggregate.ts"
 
 const story = Story.make(Catalog)
-const id = ImportId.make("0190a5c2-7b1e-7c3a-9f10-4d2e8b6a1c55")
+const id = ImportId.make("0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c55")
 // Another import of the same organization: a row instance kept under its id is not this import's.
-const otherImport = "0190a5c2-7b1e-7c3a-9f10-4d2e8b6a1c56"
+const otherImport = "0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c56"
 const life = Import.ref(id)
 const row3 = Row.ref(`${id}/row-3`)
 const row7 = Row.ref(`${id}/row-7`)

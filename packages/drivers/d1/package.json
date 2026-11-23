@@ -11,7 +11,8 @@
     ".": "./src/index.ts",
     "./D1": "./src/D1.service.ts",
     "./D1Error": "./src/D1.errors.ts",
-    "./D1Test": "./src/D1.test-layer.ts"
+    "./D1Test": "./src/D1.test-layer.ts",
+    "./D1Instant": "./src/D1Instant.schema.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

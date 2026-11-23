@@ -16,6 +16,7 @@ import { SuggestionStore, StoreSuggestions } from "@inventory/catalog-model/Sugg
 import * as SqlClient from "effect/sql/SqlClient"
 import * as SqlSchema from "effect/sql/SqlSchema"
 import { D1 } from "@beep/d1/D1"
+import { D1Instant } from "@beep/d1/D1Instant"
 import { auditLine, lineOf } from "./internal/auditLine.ts"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { LiteralKit } from "@beep/schema/LiteralKit"
@@ -58,7 +59,7 @@ export const SuggestionStoreD1 = Layer.effect(
         org: OrganizationId,
         importId: S.String,
         actor: MemberId,
-        at: S.String,
+        at: D1Instant,
         row: Stored
       }),
       Result: S.Array(S.Struct({ id: S.String })),

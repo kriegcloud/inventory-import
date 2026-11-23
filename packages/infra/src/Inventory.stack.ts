@@ -25,7 +25,7 @@ import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
 import { secretNamesOf } from "./OpReferences.rules.ts"
 import { opEnvReferences } from "./OpReferences.secrets.ts"
-import type { SettingSource } from "./Stage.schema.ts"
+import type { StagePlan } from "./Stage.schema.ts"
 import {
   givenTestPassword,
   modelKeyFor,
@@ -48,7 +48,7 @@ const secretOf = (variable: string) =>
     Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
   )
 
-const textFrom = Effect.fnUntraced(function* (source: SettingSource) {
+const textFrom = Effect.fnUntraced(function* (source: StagePlan["signUp"]) {
   if (source.from === "nowhere") return O.none()
   return yield* Config.option(Config.String(source.variable))
 })

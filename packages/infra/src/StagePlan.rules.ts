@@ -20,11 +20,14 @@ import {
   PersonalStageName,
   PreviewPlan,
   PreviewStageName,
+  production,
   ProductionPlan,
+  ProductionStageName,
   type SettingSource,
   StageKind,
   type StagePlan,
   StagingPlan,
+  StagingStageName,
   TestPlan,
   TestStageName,
   type TestPassword
@@ -33,9 +36,7 @@ import { $InfraId } from "./internal/identity.ts"
 
 const $I = $InfraId.create("StagePlan")
 
-import { production } from "./Stage.schema.ts"
-
-export { production }
+export { production } from "./Stage.schema.ts"
 
 /**
  * The stage name is none of: `prod`, `staging`, `pr-<number>`, `test_<user>`, `dev_<user>`.
@@ -55,8 +56,8 @@ export class UnknownStage extends S.TaggedError<UnknownStage, { readonly brand: 
 
 // Each kind's names, as its case of the plan holds them: the schema is the one place a name pattern is written.
 const kinds: ReadonlyArray<readonly [(stage: string) => boolean, StageKind]> = [
-  [(stage) => stage === "prod", "production"],
-  [(stage) => stage === "staging", "staging"],
+  [S.is(ProductionStageName), "production"],
+  [S.is(StagingStageName), "staging"],
   [S.is(PreviewStageName), "preview"],
   [S.is(TestStageName), "test"],
   [S.is(PersonalStageName), "personal"]

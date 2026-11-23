@@ -40,8 +40,9 @@ export const diagnosticsLeftOut: ReadonlyArray<string> = [".agents/", "vendor/",
  * The files that hold a directive today: this list may only shrink. Its owner takes a file off when its last
  * directive is gone, and the law refuses a listed file that has none left. `packages/infra/src/OpReferences.secrets.ts`
  * stays until Alchemy types a secrets layer's failure: its `SecretsLayer` is `Layer<never, unknown, …>`, so the fix
- * goes there first. The five decide files of `packages/catalog/model` hold decision 33's `newSchemaClass:off`, which
- * Benjamin is asked about.
+ * goes there first. The five decide files of `packages/catalog/model` and the three of `packages/patches/test` hold
+ * decision 33's `newSchemaClass:off`: Benjamin chose to teach the prover `.make` (2026-11-22), and the prover's patch
+ * takes them off. No file is excepted for its name.
  */
 export const diagnosticsListed: ReadonlyArray<string> = [
   "apps/inventory/test/server/AuthIndexes.test.ts",

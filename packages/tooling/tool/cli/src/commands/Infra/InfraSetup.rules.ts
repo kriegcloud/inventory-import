@@ -1293,11 +1293,7 @@ const tokenChecked = Effect.gen(function* () {
       `cf says the token ${localEnvFile} names for the previews' account is "${verified.success.status}", not active (\`cf accounts tokens verify\`). Check ${previewTokenName} there, or the token in the dashboard. Nothing was changed.`
     )
   }
-  if (!/^[0-9a-f]{32}$/.test(verified.success.id)) {
-    return yield* stop(
-      "`cf accounts tokens verify` answered a token id that is not 32 hexadecimal characters, so its permissions cannot be asked for. Nothing was changed."
-    )
-  }
+  // The token's id is a CloudflareId by the time it is read: one that is not was refused as unreadable above.
   const needs = A.join(previewTokenNeeds, ", ")
   const getCall = `cf accounts tokens get ${verified.success.id}`
   const permitted = yield* heard(Permitted, asPreviews(getCall), `\`${getCall}\``)

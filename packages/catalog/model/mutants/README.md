@@ -85,7 +85,8 @@ all and gives every rule of the import as "not read", which is no rule noticing.
 
 The sample is the turbo task `mutants:sample` (`bun run --cwd packages/catalog/model mutants:sample`), part of
 `bun run check:full` and of CI's proofs job, replayed until what the mutants read changes. All of them are the task
-`mutants`, which the nightly workflow runs in a job of its own (`.github/workflows/proofs-nightly.yml`, four at a time).
+`mutants`, which the nightly workflow runs in a job of its own (`.github/workflows/proofs-nightly.yml`, four at a time),
+with the one slow mutant left out of it and run alone in another job (below, "What it costs").
 Neither is in `bun run check` or in CI's main job.
 
 ## Commands
@@ -94,17 +95,22 @@ From `packages/catalog/model` (the runner finds its paths from its own place, so
 
 ```sh
 python3 -I mutants/run.py --sample              # nine fast mutants, about 25 s
-python3 -I mutants/run.py --all --jobs 4        # all 184
+python3 -I mutants/run.py --all --jobs 4        # all 192
+python3 -I mutants/run.py --all --except row-open   # all but the ones named
 python3 -I mutants/run.py --only confirm-sum,group-madeon
 python3 -I mutants/run.py --list                # every mutant, and nothing run
 ```
 
 Flags: `--jobs N` (mutants at once, default 2), `--keep` (keep each copy in `.mutants/<key>/`, with its
 `result.json` and `vitest.log`), `--no-baseline`, `--nice N` (default 10), `--timeout S` (seconds before a run is
-stopped, default 3600). It needs `bun install` to have run (it uses the repository's `node_modules/.bin/vitest`) and
+stopped, default 3600), `--except key1,key2` (leave these out; a run left with nothing fails), `--proof-limit S`
+(seconds a proof test may take, set in each copy only; it must be below `--timeout`, since a run stopped from outside
+leaves no result to read). It needs `bun install` to have run (it uses the repository's `node_modules/.bin/vitest`) and
 `node` on the path, and nothing else: Python 3, standard library only.
 
-What a run does: every chosen mutant is first checked to apply to the package's text; then, for each proof file the
+What a run does: every chosen mutant is first checked to apply to the package's text, and one kept as held by a
+rule to record each of its rules as violated (a `trialRules` entry on any other standing is refused: the prover giving
+up holds nothing); then, for each proof file the
 chosen mutants use, the unchanged copy is run once (`baseline`; when it fails the run stops with exit 2, since every
 mutant would look held). Then each mutant: the package's `src/`, `test/`, `package.json`, `tsconfig*.json` and
 `vitest.config.ts` copied to `.mutants/<key>/` (the two configs' `../../../` made two levels deeper), the change made,
@@ -119,30 +125,40 @@ and a `weaker` one with the rules no longer named. A mutant held by a rule where
 
 ## What it costs
 
-Measured on 2026-11-22 on a 64-core workstation busy with other work (load average 34 to 112), `--nice 5`, ten at a
-time: the 179 mutants there were then.
+Measured on 2026-11-22 on a 64-core workstation busy with other work (load average 18 to 40), `--nice 5`, ten at a
+time: one run of all 190.
 
 | Target | Mutants | Test time | Longest |
 | --- | --- | --- | --- |
-| import | 60 | 397 s | 9 s |
-| DecideGroup | 24 | 65 s | 4 s |
-| UndoGroup | 17 | 107 s | 10 s |
-| UndoRowStep | 28 | 1,080 s | 82 s |
-| DecideRow | 50 | 8,367 s | 1,504 s (`row-open`) |
+| import | 60 | 360 s | 8 s |
+| DecideGroup | 24 | 64 s | 6 s |
+| UndoGroup | 17 | 115 s | 10 s |
+| UndoRowStep | 33 | 1,266 s | 75 s |
+| DecideRow | 56 | 7,953 s | 1,544 s (`row-open`) |
 
-- `--all --jobs 10`: 10,016 s of test time in 1,598 s of wall time (27 minutes), the baselines included. DecideRow
+- `--all --jobs 10`: 9,757 s of test time in 1,622 s of wall time (27 minutes), the baselines included. DecideRow
   is most of it: a mutant that breaks one of its rules takes the prover minutes to confirm the counterexample, and
   one that breaks none takes ten seconds. The wall time is bounded below by `row-open` alone.
-- `row-open` (the check that the import is open, removed) is the slow one: about 25 minutes on that machine. In
-  that run it passed the 25 minutes its proof test then had, and was counted as nothing and failed, as a test out
-  of time must be. The proof's limit is 50 minutes since; run again alone at a load of 40 to 55 it took 1,531 s and
-  was held by its five rules. On a slower machine it may still run out, and the run then fails and says so.
+- `row-open` (the check that the import is open, removed) is the slow one: 1,544 s in that run, held by its five
+  rules (1,531 s run alone). In an earlier run at a load near 100 it passed the 25 minutes its proof test then
+  had, and was counted as nothing and failed, as a test out of time must be. The
+  proof test's limit stays 50 minutes, below the hour a run is given, and the nightly runs this mutant apart: the
+  job of all mutants leaves it out (`--except row-open`), and a job of its own runs it alone with the proof's limit
+  made 100 minutes in its copy (`--only row-open --jobs 1 --proof-limit 6000 --timeout 6600`), so that
+  running out of time there fails that job, named for it, and says nothing of the other 191. On GitHub's runner,
+  at about half this machine's speed, it would take about 51 minutes: an estimate, not measured there. A run that
+  only ran out of time still fails, as it must: nothing is known of the mutant then.
 - `--sample`: about 25 s of wall time, each mutant 1 to 4 s.
 
-The result, of that run and of the reruns of what changed after it (38 mutants, the five added since among them),
-not of one run of all 184: none held by neither, none out of time. Held by a rule violated: 124. By the proof's own
-numbers or its "not decided" and "not read", with a story failing too: 32. By a story only: 28. Every mutant kept as
-held by a rule is held by every rule recorded for it, each given as violated.
+The result of that one run: all 190 as recorded, none held by neither, none out of time. Held by a rule violated:
+124. By the proof's own numbers or its "not decided" and "not read", with a story failing too: 38. By a story only:
+28. Every mutant kept as held by a rule is held by every rule recorded for it, each given as violated.
+
+Two mutants were added after that run, so there are 192: `undo-undone`, the check that a row's undo is made on a
+screen that has the row's last undo, and `gundo-seen`, the check that a group's undo is made on a screen that has
+every change, each held by its rule violated. The mutants of the two undos were run again with them, four at a
+time, and all came out as recorded (the 34 of a row's undo and 17 of a group's with the first, 371 s of wall time;
+the 18 of a group's undo with the second, 25 s); the other 140 were not run again.
 
 ## The sample
 

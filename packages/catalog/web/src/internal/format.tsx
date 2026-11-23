@@ -27,6 +27,29 @@ export const importWords = {
  */
 export const reviewStepWords: Partial<ReviewWords> = { stored: importWords.already, all: importWords.all }
 
+const wholeNumber = new Intl.NumberFormat()
+
+/**
+ * What is left to do on an open import, for its card on the Upload step: the rows that wait for a decision and the
+ * rows that cannot be imported as written, each under its own name and with the number the review shows for it.
+ * They were once one number called "need a decision", which the review then showed as two.
+ *
+ * @example leftToDecide({ decision: 24, cannot: 21, rows: 200 }) // "24 of 200 rows need a decision, 21 cannot be imported"
+ */
+export const leftToDecide = (progress: {
+  readonly decision: number
+  readonly cannot: number
+  readonly rows: number
+}): string => {
+  const of = `of ${wholeNumber.format(progress.rows)} ${progress.rows === 1 ? "row" : "rows"}`
+  const decision = wholeNumber.format(progress.decision)
+  const cannot = wholeNumber.format(progress.cannot)
+  if (progress.decision === 0 && progress.cannot === 0) return "Nothing left to decide"
+  if (progress.decision === 0) return `${cannot} ${of} cannot be imported`
+  const needs = `${decision} ${of} ${progress.decision === 1 ? "needs" : "need"} a decision`
+  return progress.cannot === 0 ? needs : `${needs}, ${cannot} cannot be imported`
+}
+
 /**
  * What the Review step says when a confirm was not made: nothing was imported, and why. Until the newer picture is
  * read it says only that it is being read (the totals below are not the import's yet); then how many rows it decides

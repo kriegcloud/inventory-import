@@ -1,6 +1,7 @@
 // What the catalog keeps about imports, as its handlers ask for it: uploads and their pieces, drafts and their
 // decisions, the confirm and the take-back (each one atomic write), and what is read back from what they stored.
 // The one thing not to break: nothing here says how it is stored. The D1 adapter is in `catalog-host`.
+import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
 import { Instant } from "@inventory/kernel/Text"
@@ -24,7 +25,7 @@ import {
   RowOutcome
 } from "@inventory/catalog-contract/Import"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { ConfirmPlan } from "../Confirm/Confirm.rules.ts"
+import { ConfirmPlan, PlannedRow } from "../Confirm/Confirm.rules.ts"
 import { type CompareAtMatch, ItemsAsRead } from "./Rematch.rules.ts"
 import { Activity } from "@inventory/kernel/Activity"
 import { LiteralKit } from "@beep/schema/LiteralKit"
@@ -64,7 +65,7 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
     draft: ImportId,
     fileName: S.String.pipe(S.annotateKey({ description: "The import's file, for the audit line" })),
     confirm: ConfirmId,
-    expected: S.Int.pipe(
+    expected: S.Int.check(S.isGreaterThanOrEqualTo(0)).pipe(
       S.annotateKey({
         description:
           "The draft's revision the plan was worked out from: the confirm is written only while the draft is still at it"
@@ -87,7 +88,15 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
     audit: Activity.pipe(
       S.annotateKey({ description: '"Imported items": its detail is filled in by the batch from what it counted' })
     )
-  }).annotate({ identifier: "ConfirmWrite", description: "One confirm of an import, as it is written" })
+  })
+    // A store pairs the rows the plan creates with the ids in order, and a pairing stops at the shorter list: with
+    // an id missing, a ready row would be left out of the write without a word.
+    .check(
+      S.makeFilter((write) => write.itemIds.length === A.filter(write.plan.rows, PlannedRow.guards.ready).length, {
+        description: "One id for each row the plan creates"
+      })
+    )
+    .annotate({ identifier: "ConfirmWrite", description: "One confirm of an import, as it is written" })
 ) {}
 
 /** What a confirm's write did. */

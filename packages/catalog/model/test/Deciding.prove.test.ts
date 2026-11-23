@@ -22,13 +22,13 @@ layer(NodeServices.layer)("Deciding", (it) => {
       expect(notProved(standings(report)), said).toEqual([])
       // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
       // are there, and the ones about who may change a row or a group it states itself.
-      expect(missingRules({ report, records: ["RowDecided", "ActCounted"] }), said).toEqual([])
+      expect(missingRules({ report, decision: Deciding }), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.
       expect(report.accepted, said).toBe(true)
       // Past 4,096 paths the prover proves nothing: a rule or a check that adds paths shows here first.
-      expect(report.paths, said).toBe(222)
+      expect(report.paths, said).toBe(234)
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.
       expect(report.unread).toEqual([])
       expect(report.unkept).toEqual([])

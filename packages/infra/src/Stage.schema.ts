@@ -5,7 +5,6 @@
  * @packageDocumentation
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as Tuple from "effect/Tuple"
 import { $InfraId } from "./internal/identity.ts"
@@ -13,13 +12,46 @@ import { $InfraId } from "./internal/identity.ts"
 const $I = $InfraId.create("Stage")
 
 /**
- * A stage's name as Alchemy accepts one: lower-case letters, digits, `-` and `_`, starting with a letter or digit.
+ * The name of a pull request's preview: `pr-` and the pull request's number.
  *
  * @category schemas
  */
-export const StageName = S.String.check(S.isMaxLength(64), S.isPattern(/^[a-z0-9][-_a-z0-9]*$/)).pipe(
-  $I.annoteSchema("StageName", { description: "A stage's name: lower-case letters, digits, - and _" })
+export const PreviewStageName = S.String.check(S.isPattern(/^pr-[1-9][0-9]{0,8}$/)).pipe(
+  $I.annoteSchema("PreviewStageName", { description: "A preview's stage name: pr- and the pull request's number" })
 )
+
+/**
+ * The name of a test stage, deployed by hand: `test_` and its owner's user name.
+ *
+ * @category schemas
+ */
+export const TestStageName = S.String.check(S.isPattern(/^test_[a-z0-9][-_a-z0-9]{0,40}$/)).pipe(
+  $I.annoteSchema("TestStageName", { description: "A test stage's name: test_ and its owner's user name" })
+)
+
+/**
+ * The name of a personal stage, one developer's machine: `dev_` and the user name.
+ *
+ * @category schemas
+ */
+export const PersonalStageName = S.String.check(S.isPattern(/^dev_[a-z0-9][-_a-z0-9]{0,40}$/)).pipe(
+  $I.annoteSchema("PersonalStageName", { description: "A personal stage's name: dev_ and the user name" })
+)
+
+/**
+ * A stage's name, as this app has them: `prod`, `staging`, `pr-<number>`, `test_<user>` or `dev_<user>`. Alchemy
+ * takes any name of lower-case letters, digits, `-` and `_`; a name of none of the five kinds is refused, `live_<user>`
+ * among them, which is what a deploy without `--stage` would use.
+ *
+ * @category schemas
+ */
+export const StageName = S.Union([
+  S.Literal("prod"),
+  S.Literal("staging"),
+  PreviewStageName,
+  TestStageName,
+  PersonalStageName
+]).pipe($I.annoteSchema("StageName", { description: "A stage's name: one of the app's five kinds of stage" }))
 
 /**
  * Runtime type of {@link StageName}.
@@ -182,30 +214,122 @@ export const SettingSource = LiteralKit(["nowhere", "environment"])
 export type SettingSource = typeof SettingSource.Type
 
 /**
- * Everything that differs between stages, decided once from the stage's name.
+ * The address people open production at, and the zone it is on.
+ *
+ * @category constants
+ */
+export const production = { hostname: "inventory.beep-effect.com", zone: "beep-effect.com" } as const
+
+/** Production's own address: the real host name on its zone, and no other. */
+const ProductionAddress = S.Struct({
+  at: S.tag("hostname"),
+  hostname: S.tag(production.hostname).pipe(S.annotateKey({ description: "The address people open" })),
+  zone: S.tag(production.zone).pipe(S.annotateKey({ description: "The zone the host name is on" }))
+}).pipe($I.annoteSchema("ProductionAddress", { description: "Production's host name on its zone" }))
+
+/** A variable of the deploying process that production reads, named once here. */
+const fromVariable = <const Name extends string>(variable: Name, description: string) =>
+  S.Struct({ from: S.tag("environment"), variable: S.tag(variable) }).pipe(S.annotateKey({ description }))
+
+/** What every stage but production is seeded with: the two test organizations, then the test accounts. */
+const rehearsalSeeds = S.Tuple([S.Literal("organizations"), S.Literal("accounts")]).pipe(
+  S.annotateKey({ description: "The seed files applied after the migrations, in order" })
+)
+
+/** The fields of a stage that is a rehearsal: on workers.dev, the test accounts, no model key, sign-up closed. */
+const rehearsal = {
+  address: OnWorkersDev.pipe(S.annotateKey({ description: "Where the stage answers" })),
+  seeds: rehearsalSeeds,
+  modelKey: NotGiven.pipe(S.annotateKey({ description: "No model key: the rules answer" })),
+  signUp: NotGiven.pipe(S.annotateKey({ description: "Sign-up is closed to everyone" }))
+}
+
+/**
+ * Production: the real address on its zone, never seeded, its model key and sign-up list read at deploy.
  *
  * @category models
  */
-export class StagePlan extends S.Opaque<StagePlan, { readonly brand: unique symbol }>()(
+export class ProductionPlan extends S.Opaque<ProductionPlan, { readonly brand: unique symbol }>()(
   S.Struct({
-    stage: StageName.pipe(S.annotateKey({ description: "The stage's name" })),
-    kind: StageKind.pipe(S.annotateKey({ description: "What the stage is for" })),
-    address: StageAddress.pipe(S.annotateKey({ description: "Where the stage answers" })),
-    seeds: S.Array(Seed.annotateKey({ description: "One seed file" }))
-      .check(S.isUnique())
-      .pipe(
-        S.annotateKey({ description: "The seed files applied after the migrations, in order" }),
-        S.withConstructorDefault(Effect.succeed([])),
-        S.withDecodingDefaultTypeKey(Effect.succeed([]))
-      ),
-    modelKey: SettingSource.pipe(
-      S.annotateKey({ description: "Where the model's key comes from; nowhere means the rules answer" })
-    ),
-    signUp: SettingSource.pipe(
-      S.annotateKey({ description: "Where the emails that may sign up come from; nowhere means sign-up is closed" })
-    ),
-    deployed: S.Boolean.pipe(
-      S.annotateKey({ description: "Whether the stage is deployed to Cloudflare at all; a personal stage is not" })
-    )
-  }).pipe($I.annoteSchema("StagePlan", { description: "What one stage gets" }))
+    kind: S.tag("production"),
+    stage: S.tag("prod").pipe(S.annotateKey({ description: "The stage's name" })),
+    address: ProductionAddress.pipe(S.annotateKey({ description: "Where the stage answers" })),
+    seeds: S.Tuple([]).pipe(S.annotateKey({ description: "No seed file: production holds people's own data" })),
+    modelKey: fromVariable("OPENROUTER_API_KEY", "The model's key, read from this variable at deploy"),
+    signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy"),
+    deployed: S.tag(true)
+  }).pipe($I.annoteSchema("ProductionPlan", { description: "What production gets" }))
 ) {}
+
+/**
+ * Staging, main's head once its check passed: a rehearsal, deployed.
+ *
+ * @category models
+ */
+export class StagingPlan extends S.Opaque<StagingPlan, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("staging"),
+    stage: S.tag("staging").pipe(S.annotateKey({ description: "The stage's name" })),
+    ...rehearsal,
+    deployed: S.tag(true)
+  }).pipe($I.annoteSchema("StagingPlan", { description: "What staging gets" }))
+) {}
+
+/**
+ * A pull request's preview: a rehearsal, deployed.
+ *
+ * @category models
+ */
+export class PreviewPlan extends S.Opaque<PreviewPlan, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("preview"),
+    stage: PreviewStageName.pipe(S.annotateKey({ description: "The stage's name" })),
+    ...rehearsal,
+    deployed: S.tag(true)
+  }).pipe($I.annoteSchema("PreviewPlan", { description: "What a preview gets" }))
+) {}
+
+/**
+ * A test stage, deployed by hand: a rehearsal, deployed.
+ *
+ * @category models
+ */
+export class TestPlan extends S.Opaque<TestPlan, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("test"),
+    stage: TestStageName.pipe(S.annotateKey({ description: "The stage's name" })),
+    ...rehearsal,
+    deployed: S.tag(true)
+  }).pipe($I.annoteSchema("TestPlan", { description: "What a test stage gets" }))
+) {}
+
+/**
+ * A personal stage: a rehearsal on one developer's machine, never deployed.
+ *
+ * @category models
+ */
+export class PersonalPlan extends S.Opaque<PersonalPlan, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("personal"),
+    stage: PersonalStageName.pipe(S.annotateKey({ description: "The stage's name" })),
+    ...rehearsal,
+    deployed: S.tag(false)
+  }).pipe($I.annoteSchema("PersonalPlan", { description: "What a personal stage gets" }))
+) {}
+
+/**
+ * Everything that differs between stages, decided once from the stage's name: one case per kind, so a plan of one
+ * kind cannot hold another's values (production seeded, a preview with a model key, a personal stage deployed).
+ *
+ * @category schemas
+ */
+export const StagePlan = StageKind.mapMembers(() =>
+  Tuple.make(PersonalPlan, TestPlan, PreviewPlan, StagingPlan, ProductionPlan)
+).pipe(S.toTaggedUnion("kind"), $I.annoteSchema("StagePlan", { description: "What one stage gets" }))
+
+/**
+ * Runtime type of {@link StagePlan}.
+ *
+ * @category models
+ */
+export type StagePlan = typeof StagePlan.Type

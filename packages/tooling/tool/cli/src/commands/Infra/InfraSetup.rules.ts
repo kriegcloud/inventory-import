@@ -19,8 +19,10 @@
  *   person: a program given a terminal passes it. So the rule that no agent runs this is a rule for agents, the
  *   command shows nothing secret itself (a test stage's minted password is left out of its deploy), and everything
  *   it makes waits for a yes.
- * - The account a yes is about is the account deployed into: each profile's own account is read and compared with
- *   the one named before anything is made with it.
+ * - What the command tells its owner and what its children use come from one place. A variable that would outrank
+ *   a profile or a 1Password reference, set in the shell or the root `.env`, stops the run before its first tool;
+ *   each profile's own account is read and compared with the one named before anything is made with it; and every
+ *   question that makes something names the account, by id, that it is about.
  * - A run again changes nothing it was not asked to: production's sign-up list is the flag's or the one GitHub
  *   already holds, never a default.
  * - Decision I4 holds until the owner says otherwise: production and the previews are two Cloudflare accounts, and
@@ -31,8 +33,12 @@
 import { $RepoCliId } from "@beep/identity/packages"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
+import * as Config from "effect/Config"
+import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
 import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { RepoError } from "../../Cli.errors.ts"
@@ -77,6 +83,47 @@ export const previewPasswordName = "PREVIEW_TEST_ACCOUNT_PASSWORD"
 
 /** The variable production's model key comes from. */
 export const modelKeyName = "OPENROUTER_API_KEY"
+
+/**
+ * The repository on GitHub whose settings the repository's stack writes (`repository` in
+ * `packages/infra/src/GitHub.stack.ts`; kept in step by hand, since nothing in the tooling may import the stack).
+ * Every question this command puts to GitHub names it, so an answer never comes from a fork or another remote.
+ */
+export const gitHubRepository = "kriegcloud/inventory-import"
+
+/**
+ * Variables that would be used in place of what this command checks and says, were they set outside it. Alchemy
+ * takes a provider's credentials from the process's environment and the root `.env` before it looks at any profile
+ * (its `resolveProviderConfig`: "CI or not, selected profile or not"), for `plan`, `deploy` and `state bootstrap`
+ * alike, and a stack's secret set in the shell wins over the reference 1Password is asked for. A GitHub host set
+ * there sends gh's questions and Alchemy's GitHub calls to another server than the one the questions name, with that
+ * server's own token. So the command stops before its first tool when one is set: what it tells its owner then is
+ * what its children will use, because nothing else is left to use.
+ */
+export const outranking = (sizes: ReadonlyArray<SetupSize>): ReadonlyArray<string> => [
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_API_KEY",
+  "CLOUDFLARE_EMAIL",
+  "CLOUDFLARE_ACCOUNT_EMAIL",
+  ...(A.contains(sizes, "staging") || A.contains(sizes, "production")
+    ? [
+        modelKeyName,
+        previewPasswordName,
+        previewTokenName,
+        previewAccountIdName,
+        "OP_SERVICE_ACCOUNT_TOKEN",
+        "GITHUB_ACCESS_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "GH_HOST",
+        "GITHUB_BASE_URL",
+        "GITHUB_API_URL",
+        "GH_ENTERPRISE_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN"
+      ]
+    : [])
+]
 
 /** The zone production's address is on: the account that holds it is production's (decision I9). */
 export const productionZone = "beep-effect.com"
@@ -290,6 +337,37 @@ export const referenceState = (input: { readonly text: string; readonly name: st
 }
 
 /**
+ * Which file gives a stack a variable's reference, and whether the line it takes is one. The stacks read `op.env`
+ * and then the owner's `op.env.local` as one text and take the last line of a name, a reference or not
+ * (`referencesIn` in `@beep/infra`, which tooling may not import, so its rule is written again here and held to the
+ * same cases by this package's tests): a name his own file has is that file's, and within a file the last line wins
+ * over the ones above it. What this command says of a reference, and what it gives a deploy beside it, is read from
+ * that same line.
+ *
+ * @example
+ * referenceGiven({ committed: "A=op://v/i/f\n", own: "A=op://<vault>/<item>/<field>\nA=op://w/j/g\n", name: "A" })
+ * // { state: "reference", file: localEnvFile }
+ */
+export const referenceGiven = (input: {
+  readonly committed: string
+  readonly own: string
+  readonly name: string
+}): { readonly state: ReferenceState; readonly file: string } => {
+  const lastOf = (text: string) => A.findLast(linesOf(text), Str.startsWith(`${input.name}=`))
+  const taken = O.match(lastOf(input.own), {
+    onSome: (line) => O.some({ line, file: localEnvFile }),
+    onNone: () => O.map(lastOf(input.committed), (line) => ({ line, file: opEnvFile }))
+  })
+  return O.match(taken, {
+    onNone: () => ({ state: "missing", file: opEnvFile }),
+    onSome: ({ line, file }) => ({
+      state: isReference(Str.slice(input.name.length + 1)(line)) ? "reference" : "not-a-reference",
+      file
+    })
+  })
+}
+
+/**
  * `op.env` with one variable's reference written: in place of its commented line when there is one, else at the end.
  *
  * @example
@@ -315,13 +393,36 @@ export const withReference = (input: {
 }
 
 /**
+ * An id Cloudflare gives an account or a token: 32 lower-case hexadecimal digits. Read from cf's answers and written
+ * into `op.env` lines and GitHub variables, so nothing but those digits may pass: a newline, a `/` or a quote in one
+ * would add a line or redirect a reference.
+ *
+ * @category schemas
+ */
+export const CloudflareId = S.String.check(S.isPattern(/^[0-9a-f]{32}$/)).pipe(
+  $I.annoteSchema("CloudflareId", { description: "A Cloudflare account's or token's id: 32 lower-case hex digits" })
+)
+
+/**
+ * An id 1Password gives a vault or an item: 26 lower-case letters and digits. A reference this command writes is
+ * built from two of them (`op://<vault>/<item>/password`), so nothing else may pass.
+ *
+ * @category schemas
+ */
+export const OnePasswordId = S.String.check(S.isPattern(/^[a-z0-9]{26}$/)).pipe(
+  $I.annoteSchema("OnePasswordId", {
+    description: "A 1Password vault's or item's id: 26 lower-case letters and digits"
+  })
+)
+
+/**
  * A Cloudflare account as `cf auth whoami` names it.
  *
  * @category schemas
  */
 export class Account extends S.Class<Account, { readonly brand: unique symbol }>($I`Account`)(
   {
-    id: S.String.pipe(S.annotateKey({ description: "The account's id, which a stack and a token name it by" })),
+    id: CloudflareId.pipe(S.annotateKey({ description: "The account's id, which a stack and a token name it by" })),
     name: S.String.pipe(S.annotateKey({ description: "The account's name, as its owner reads it" }))
   },
   $I.annote("Account", { description: "One Cloudflare account the logged-in person can use" })
@@ -333,29 +434,158 @@ const WhoAmI = S.Struct({
   accounts: S.Array(Account)
 }).pipe($I.annoteSchema("WhoAmI", { description: "What `cf auth whoami` answers, as far as the setup reads it" }))
 
-const Zone = S.Struct({ account: S.Struct({ id: S.String }) }).pipe(
+// Cloudflare's published schema of a zone gives its account an id and a name, both optional; one with no id names
+// no account and is not read, one with no name is called by its id.
+const Zone = S.Struct({
+  account: S.Struct({ id: CloudflareId, name: S.String.pipe(S.NullOr, S.optionalKey) })
+}).pipe(
   $I.annoteSchema("Zone", {
     description: "A zone as `cf zones list` names it: the account that holds it, nothing else"
   })
 )
 
-const Named = S.Struct({ id: S.String, name: S.String }).pipe(
+/** The question that names production's account: the one zone of that name that is active, in any account cf sees. */
+const zoneCall: Call = { command: "cf", args: ["zones", "list", "--name", productionZone, "--status", "active"] }
+
+const Named = S.Struct({ id: OnePasswordId, name: S.String }).pipe(
   $I.annoteSchema("Named", { description: "A 1Password vault: its id and name, nothing it holds" })
 )
 
-const Titled = S.Struct({ id: S.String, title: S.String }).pipe(
+const Titled = S.Struct({ id: OnePasswordId, title: S.String }).pipe(
   $I.annoteSchema("Titled", { description: "A 1Password item: its id and title, none of its fields" })
 )
 
-/** A tool's JSON answer through a schema; none when it did not answer or answered something else. */
-const read = Effect.fn("InfraSetup.read")(function* <Sch extends S.ConstraintDecoder<unknown>>(
+/**
+ * Whether a failed call's error lines are 1Password's own: `op` writes `[ERROR] <date> <time> <what>`, and a client
+ * that never reached the app says "error initializing client". Read from op's error format, not seen in a test here.
+ *
+ * @example
+ * onePasswordSaid("[ERROR] 2026/11/22 10:00:00 error initializing client: connecting to desktop app: read: connection reset") // true
+ */
+export const onePasswordSaid = (stderr: string): boolean =>
+  A.some(linesOf(stderr), (line) => Str.startsWith("[ERROR] ")(line) || Str.includes("error initializing client")(line))
+
+const reasonOf = (answer: { readonly stdout: string; readonly stderr: string }) => {
+  const said = Str.trim(answer.stderr) === "" ? Str.trim(answer.stdout) : Str.trim(answer.stderr)
+  return said === "" ? "no reason given" : said
+}
+
+/**
+ * Whether op's lines say its client never reached the 1Password app, as in Benjamin's run ("error initializing
+ * client: connecting to desktop app").
+ *
+ * @example
+ * onePasswordUnreachable("[ERROR] 2026/11/22 10:00:00 error initializing client: connecting to desktop app: read: connection reset") // true
+ * onePasswordUnreachable('[ERROR] 2026/11/22 10:00:00 could not read secret "op://v/i/f": no item matched') // false
+ */
+export const onePasswordUnreachable = (stderr: string): boolean =>
+  A.some(
+    linesOf(stderr),
+    (line) => Str.includes("error initializing client")(line) || Str.includes("connecting to desktop app")(line)
+  )
+
+/** How a failure of op reads: the app never reached, the app reached and not letting the call through, a reference
+ * it refused, or words that settle none of them. */
+export const OnePasswordFailure = LiteralKit(["unreachable", "held", "refused", "unclear"]).pipe(
+  $I.annoteSchema("OnePasswordFailure", {
+    description:
+      "How a failure of op reads: the app never reached, the app not letting the call through, a reference refused, or none of these said"
+  })
+)
+export type OnePasswordFailure = typeof OnePasswordFailure.Type
+
+// op's words for an app that is locked, a CLI that is not signed in, and an approval prompt dismissed or left to
+// time out ("You are not currently signed in", "authorization prompt dismissed"). None was seen on this machine,
+// so a line with none of these words and none of a reference's is said as either, never guessed.
+const heldWords = ["not signed in", "not currently signed in", "is locked", "prompt dismissed", "timed out", "timeout"]
+// op's words for a reference it read and could not fill: no such vault, item or field.
+// Both lists are matched outside the names op quotes ("Cloudflare timeout token", 'op://v/i/f'): a vault, item or
+// field may be named with any of these words, and its name says nothing about why op failed.
+const refusedWords = [
+  "isn't a vault",
+  "isn't an item",
+  "isn't a field",
+  "could not resolve item",
+  "no item matched",
+  "invalid secret reference"
+]
+
+/**
+ * Which failure op's lines say: an app never reached, one that did not let the call through (locked, signed out, a
+ * prompt dismissed or timed out), a reference refused, or none of these said. The advice follows from it, so a
+ * locked app is never sent to look at references that are fine.
+ *
+ * @example
+ * onePasswordFailure("[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, please try again") // "held"
+ * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "x" isn\'t an item in the "v" vault') // "refused"
+ * onePasswordFailure('[ERROR] 2026/11/22 10:00:00 "Cloudflare timeout token" isn\'t an item in the "v" vault') // "refused"
+ */
+export const onePasswordFailure = (stderr: string): OnePasswordFailure => {
+  // A quoted name ends at its own kind of quote followed by what op writes after one (a colon, a space, a comma, a
+  // full stop or the end of the line): an apostrophe inside a double-quoted name ("James' token") or inside a
+  // reference ('op://Benjamin's vault/…') does not end it early.
+  const unquoted = A.map(
+    linesOf(Str.toLowerCase(stderr)),
+    Str.replaceAll(/".*?"(?=[\s:,.]|$)|'op:\/\/.*?'(?=[\s:,.]|$)/g, '""')
+  )
+  const says = (words: ReadonlyArray<string>) =>
+    A.some(unquoted, (line) => A.some(words, (word) => Str.includes(word)(line)))
+  if (onePasswordUnreachable(stderr)) return "unreachable"
+  if (says(heldWords)) return "held"
+  if (says(refusedWords)) return "refused"
+  return "unclear"
+}
+
+/** Where to look when 1Password answered and refused: the reference a run fills, or the vault it lists or writes. */
+const referencesRefused = `the references in ${localEnvFile} it fills (each names a vault, an item and a field that exist, with no template line left)`
+
+/** What to do about an app op did not reach or that did not let a call through. */
+const theApp = `open the 1Password app and unlock it, approve its prompt when it asks, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal`
+
+/**
+ * The stop for a call 1Password failed: what op said (its error lines carry no value) and where to look, as
+ * `onePasswordFailure` reads it. Where op's words settle nothing, both places are named. Nothing about the token or
+ * the account is said, since nobody asked Cloudflare anything.
+ */
+const onePasswordFailed = (what: string, stderr: string, refused: string) => {
+  const words = reasonOf({ stdout: "", stderr })
+  return stop(
+    OnePasswordFailure.match(onePasswordFailure(stderr), {
+      unreachable: () =>
+        `1Password did not answer, so ${what} was never asked: ${words}. To fix it, ${theApp}. Nothing was changed.`,
+      held: () => `1Password did not let ${what} through: ${words}. To fix it, ${theApp}. Nothing was changed.`,
+      refused: () => `1Password refused ${what}: ${words}. Check ${refused}, then run this again. Nothing was changed.`,
+      unclear: () =>
+        `1Password stopped ${what}: ${words}. Either the app was locked or its prompt went unanswered (${theApp}), or it refused (check ${refused}). Nothing was changed.`
+    })
+  )
+}
+
+/** Whether a failed call under `op-human` failed in 1Password: any failure of op itself, or op's lines from `op run`. */
+const failedInOnePassword = (call: Call, stderr: string) =>
+  call.command === "op-human" && (call.args[0] !== "run" || onePasswordSaid(stderr))
+
+/**
+ * A tool's JSON answer through a schema. 1Password not answering stops the run with op's words; a tool that answered
+ * with an error, or with something the schema does not read, is a failure carrying a sentence that says which.
+ */
+const heard = Effect.fn("InfraSetup.heard")(function* <Sch extends S.ConstraintDecoder<unknown>>(
   schema: Sch,
-  call: Call
+  call: Call,
+  what: string,
+  refused: string = referencesRefused
 ) {
   const workstation = yield* Workstation
   const answer = yield* workstation.ask(call.command, call.args)
-  if (answer.code !== 0) return O.none<Sch["Type"]>()
-  return S.decodeOption(S.fromJsonString(schema))(answer.stdout)
+  const failure = (why: string): Result.Result<Sch["Type"], string> => Result.fail(why)
+  if (answer.code !== 0) {
+    if (failedInOnePassword(call, answer.stderr)) return yield* onePasswordFailed(what, answer.stderr, refused)
+    return failure(`${what} failed: ${reasonOf(answer)}`)
+  }
+  return O.match(S.decodeOption(S.fromJsonString(schema))(answer.stdout), {
+    onNone: () => failure(`${what} answered something this command cannot read`),
+    onSome: (value): Result.Result<Sch["Type"], string> => Result.succeed(value)
+  })
 })
 
 /** What the steps before one found, for the steps after it. */
@@ -367,6 +597,10 @@ export interface Found {
   readonly previewByToken: boolean
   /** Who may open an account in production, settled before the first step: the flag, or what GitHub already holds. */
   readonly signUp: O.Option<string>
+  /** The account that holds production's zone, when cf could tell: production's, whoever is asked. */
+  readonly zoneHolder: O.Option<Account>
+  /** The id of the account each role's profile deploys into, once read from the profile itself. */
+  readonly held: { readonly preview: O.Option<string>; readonly production: O.Option<string> }
 }
 
 const nothingFound: Found = {
@@ -374,11 +608,31 @@ const nothingFound: Found = {
   production: O.none(),
   approver: O.none(),
   previewByToken: false,
-  signUp: O.none()
+  signUp: O.none(),
+  zoneHolder: O.none(),
+  held: { preview: O.none(), production: O.none() }
 }
 
 const accountOf = (found: Found, role: Role) =>
   Role.match(role, { preview: () => found.preview, production: () => found.production })
+
+/**
+ * The account a question is about, by the id its profile deploys into, with its name when cf gave one. Every
+ * question that makes something says this, so a yes is always about an account he can tell from his others.
+ */
+const accountSaid = (found: Found, role: Role): string => {
+  const id = Role.match(role, { preview: () => found.held.preview, production: () => found.held.production })
+  const name = O.map(accountOf(found, role), (account) => `"${account.name}"`)
+  const which = role === "preview" ? "the previews'" : "production's"
+  return O.match(id, {
+    onNone: () => O.match(name, { onNone: () => `${which} account`, onSome: (said) => `the account ${said}` }),
+    onSome: (held) =>
+      O.match(name, {
+        onNone: () => `the account ${held} (${which})`,
+        onSome: (said) => `the account ${said} (${held})`
+      })
+  })
+}
 
 /** Variables a deploy is given beside the references 1Password fills: names, ids and a flag, none of them secret. */
 export const givenFor = (input: {
@@ -434,7 +688,7 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
       `  when ${localEnvFile} names ${previewTokenName} and ${previewAccountIdName}: the previews' account is that one, with no login; its profile is connected under \`op-human run --env-file ${localEnvFile}\` after \`cf accounts tokens verify\` and \`get\` say what the token allows`,
       "  cf auth whoami",
       "  cf auth login   (only when not logged in)",
-      `  cf zones list --name ${productionZone}   (the account that holds it is production's; you are shown both roles and asked)`
+      `  ${shown(zoneCall)}   (the account that holds it is production's; you are shown both roles and asked. With --staging or --production, a run stops when cf cannot name that account)`
     ],
     Profile: (step) => {
       const name = profileOf(options, step.role)
@@ -448,7 +702,7 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     },
     StateStore: (step) => [
       `The state store in the ${step.role} account: asks first, then makes it or adopts the one that is there.`,
-      `  bunx alchemy state bootstrap --profile ${profileOf(options, step.role)}`
+      `  bunx alchemy state bootstrap --profile ${profileOf(options, step.role)}   (an account with no workers.dev subdomain yet fails here; the stop says so)`
     ],
     GitHubLogin: () => [
       "GitHub: who approves a production deploy. Logs in only when gh is not logged in.",
@@ -480,30 +734,98 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     }
   })
 
+/**
+ * One argument as a POSIX shell reads it back: in single quotes, each single quote inside written `'\''`.
+ *
+ * @example
+ * shellQuoted("printf 'a' x") // "'printf '\\''a'\\'' x'"
+ */
+export const shellQuoted = (argument: string): string => `'${Str.replaceAll("'", "'\\''")(argument)}'`
+
+/** Which file a stack takes a variable's line from, and whether that line is a reference (`referenceGiven`). */
+type TakenLine = ReturnType<typeof referenceGiven>
+
+/**
+ * The stop a run makes before step 1 on what op.env and op.env.local hold, if it makes one: a line of op.env that is
+ * not a reference, his token's names taken from op.env, one of the two names without the other or not a reference,
+ * and staging without them. The run stops with it and the dry run says it, so the two never differ.
+ */
+export const filesStop = (input: {
+  readonly committed: string
+  readonly token: TakenLine
+  readonly accountId: TakenLine
+  readonly previewByToken: boolean
+  readonly sizes: ReadonlyArray<SetupSize>
+}): O.Option<string> => {
+  const { token, accountId } = input
+  // The tracked file holds comments and references and nothing else: a value typed there in any form would be
+  // committed with the reference this command writes, so any other line stops the run before it writes or says so.
+  const stray = strayLines(input.committed)
+  if (A.isReadonlyArrayNonEmpty(stray)) {
+    return O.some(
+      `${opEnvFile} is tracked by git and holds only comments and lines NAME=op://vault/item/field. Line ${A.join(A.map(stray, String), ", ")} is neither. If a value was typed there, take it out (and change it wherever it came from if the file was ever committed), then run this again. Nothing was started; no line was printed.`
+    )
+  }
+  // His token's references are his own: the commands that use them read op.env.local alone, and op.env is public.
+  const misplaced = A.filterMap(
+    [
+      [previewTokenName, token],
+      [previewAccountIdName, accountId]
+    ] as const,
+    ([name, given]) => (given.file === opEnvFile && given.state !== "missing" ? Result.succeed(name) : Result.failVoid)
+  )
+  if (A.isReadonlyArrayNonEmpty(misplaced)) {
+    const one = misplaced.length === 1
+    return O.some(
+      `${opEnvFile} names ${A.join(misplaced, " and ")}, and the repository's stack would take ${one ? "it" : "them"} from there. Your own token's references go in ${localEnvFile} (git ignores it): move ${one ? "that line" : "both lines"} there, then run this again. Nothing was started.`
+    )
+  }
+  if (
+    (token.state === "missing") !== (accountId.state === "missing") ||
+    token.state === "not-a-reference" ||
+    accountId.state === "not-a-reference"
+  ) {
+    return O.some(
+      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither; the last line of each name is the one taken. Nothing was started; no line was printed.`
+    )
+  }
+  if (!input.previewByToken && has(input.sizes, "staging")) {
+    return O.some(
+      `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
+    )
+  }
+  return O.none()
+}
+
 /** What `--dry-run` prints: every step in order, and that nothing was started. */
 export const dryRun = (input: {
   readonly options: SetupOptions
   /** Whether his own file names the previews' token: a run then asks cf nothing about that account. */
   readonly previewByToken: boolean
+  /** The stop a run would make before step 1 on the two files as they are (`filesStop`). */
+  readonly stopsBefore?: O.Option<string>
 }): ReadonlyArray<string> => {
   const { options, previewByToken } = input
   return [
     "Dry run: nothing is started and nothing is written. A run would do these steps, in this order:",
-    ...(has(options.sizes, "staging") && !previewByToken
-      ? [
-          `As things are, a run stops before step 1: ${localEnvFile} does not name ${previewTokenName} and ${previewAccountIdName}, which the repository's stack needs.`
-        ]
-      : []),
+    `A run stops before its first tool when one of these is set in your shell or named in the root .env, since a deploy would use it in place of what the run checks: ${A.join(outranking(options.sizes), ", ")}.`,
+    ...O.match(input.stopsBefore ?? O.none(), {
+      onNone: () => [],
+      onSome: (said) => [`As things are, a run stops before step 1: ${said}`]
+    }),
     ...(previewByToken
       ? [
           `Before step 1, the previews' token (${localEnvFile}) is checked, and the previews' account is asked of cf in no step:`,
           `  op-human run --env-file ${localEnvFile} -- sh -c 'CLOUDFLARE_API_TOKEN="$${previewTokenName}" CLOUDFLARE_ACCOUNT_ID="$${previewAccountIdName}" cf accounts tokens verify'`,
           `  op-human run --env-file ${localEnvFile} -- sh -c '… cf accounts tokens get <token id>'`,
+          `  ${shown({ command: subdomainCall.command, args: A.take(subdomainCall.args, 6) })} ${shellQuoted(A.last(subdomainCall.args).pipe(O.getOrElse(() => "")))}   (the account's workers.dev subdomain, which Alchemy's state store needs: a run stops when there is none yet)`,
           `  and the previews' profile is connected with: op-human run --env-file ${localEnvFile} -- bunx alchemy profile edit --profile ${options.previewProfile} --add Cloudflare --method stored --set apiToken=env:${previewTokenName} --set accountId=env:${previewAccountIdName}`
         ]
       : []),
     ...(has(options.sizes, "staging") || has(options.sizes, "production")
-      ? ["Before step 1 too, when `--sign-up` is not given: gh variable get SIGN_UP --env production"]
+      ? [
+          `Before step 1 too, when \`--sign-up\` is not given: gh variable get SIGN_UP --env production --repo ${gitHubRepository}`
+        ]
       : []),
     ...A.flatMap(stepsFor(options.sizes), (step, index) => {
       const [first, ...rest] = described(options)(step)
@@ -537,17 +859,102 @@ const signUpFor = Effect.fn("InfraSetup.signUpFor")(function* (options: SetupOpt
     yield* workstation.say(`Sign-up in production: ${options.signUp.value} (\`--sign-up\`).`)
     return options.signUp
   }
-  const held = yield* workstation.ask("gh", ["variable", "get", "SIGN_UP", "--env", "production"])
+  const held = yield* workstation.ask("gh", [
+    "variable",
+    "get",
+    "SIGN_UP",
+    "--env",
+    "production",
+    "--repo",
+    gitHubRepository
+  ])
   const value = Str.trim(held.stdout)
   if (held.code !== 0 || value === "") {
     return yield* stop(
-      "Say who may open an account in production with `--sign-up`: emails separated by commas (yours first), or `closed`. GitHub holds no list yet (or gh could not read it), and this command never picks one. Nothing was started."
+      `Say who may open an account in production with \`--sign-up\`: emails separated by commas (yours first), or \`closed\`. ${gitHubRepository} holds no list yet (or gh could not read it), and this command never picks one. Nothing was started.`
     )
   }
   yield* workstation.say(
-    `Sign-up in production: ${value}, as GitHub's production environment already holds it (no \`--sign-up\`). It is kept.`
+    `Sign-up in production: ${value}, as the production environment of ${gitHubRepository} already holds it (no \`--sign-up\`). It is kept.`
   )
   return O.some(value)
+})
+
+/**
+ * The names a `.env` file sets, whatever it sets them to.
+ *
+ * @example
+ * namesIn("# c\nA=1\nexport B = 2\n") // ["A", "B"]
+ */
+export const namesIn = (dotenv: string): ReadonlyArray<string> =>
+  A.flatMap(linesOf(dotenv), (line) =>
+    O.match(Str.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/)(line), {
+      onNone: () => [],
+      onSome: (found) => [`${found[1]}`]
+    })
+  )
+
+/**
+ * The root's env files that `bun run` loads into this command's environment before it starts, as Bun 1.4 does with no
+ * `env` setting in `bunfig.toml`: `.env`, the one for `NODE_ENV` (development when it is unset), and `.env.local`
+ * except under test. Alchemy reads the root `.env` itself too. A variable set in the shell is kept over a file's.
+ *
+ * @example
+ * envFilesFor(O.none()) // [".env", ".env.development", ".env.local"]
+ */
+export const envFilesFor = (nodeEnv: O.Option<string>): ReadonlyArray<string> => {
+  const mode = O.getOrElse(
+    O.filter(nodeEnv, (value) => value !== ""),
+    () => "development"
+  )
+  return [".env", `.env.${mode}`, ...(mode === "test" ? [] : [".env.local"])]
+}
+
+/**
+ * Stops when a variable that would outrank what this command checks is set in the shell or in a root env file
+ * (`outranking`). It names each variable and where it is set, and never reads a value into a line: a variable that
+ * is set and empty is named too, since what a tool makes of one differs from tool to tool. A name a file sets is
+ * said to be that file's, not the shell's: Bun put it in the environment, and `env -u` cannot take it out, because
+ * Bun loads the file again.
+ */
+const outside = Effect.fn("InfraSetup.outside")(function* (options: SetupOptions) {
+  const repo = yield* Repo
+  const names = outranking(options.sizes)
+  const shell = ConfigProvider.fromEnv({ preserveEmptyStrings: true })
+  const variable = (name: string) =>
+    Config.String(name)
+      .pipe(Config.option)
+      .parse(shell)
+      .pipe(Effect.orElseSucceed(() => O.none<string>()))
+  const nodeEnv = yield* variable("NODE_ENV")
+  const files = envFilesFor(nodeEnv)
+  const inFiles = yield* Effect.forEach(
+    files,
+    (file) =>
+      Effect.gen(function* () {
+        const path = repo.join(repo.root, file)
+        const text = (yield* repo.exists(path)) ? yield* repo.text(path) : ""
+        return { file, names: namesIn(text) }
+      }),
+    { concurrency: 1 }
+  )
+  const placed = yield* Effect.forEach(
+    names,
+    (name) =>
+      Effect.gen(function* () {
+        const where = A.flatMap(inFiles, (one) => (A.contains(one.names, name) ? [`the root ${one.file}`] : []))
+        if (A.isReadonlyArrayNonEmpty(where)) return [`${name} (${A.join(where, ", ")})`]
+        const inShell = yield* variable(name)
+        return O.isSome(inShell) ? [`${name} (your shell)`] : []
+      }),
+    { concurrency: 1 }
+  )
+  const set = A.flatten(placed)
+  if (A.isReadonlyArrayNonEmpty(set)) {
+    return yield* stop(
+      `Set outside this command: ${A.join(set, ", ")}. Alchemy uses credentials from the environment and the root .env before any profile, and a secret set there before the one 1Password is asked for, so the deploy would not use what this command checks and tells you. Take ${set.length === 1 ? "it" : "them"} out of the file named (Bun loads a root env file into every \`bun run\`, so \`env -u\` cannot), or unset ${set.length === 1 ? "it" : "them"} in your shell for this run (\`env -u NAME ... bun run beep infra setup ...\`), then run this again. Nothing was started; no value was printed.`
+    )
+  }
 })
 
 /**
@@ -640,14 +1047,47 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   const workstation = yield* Workstation
   if (found.previewByToken) {
     yield* workstation.say(
-      `Cloudflare: the previews' account is the one ${localEnvFile} names a token and an id for. No login to it is needed, and cf is not asked about it.`
+      `Cloudflare: the previews' account is the one ${localEnvFile} names a token and an id for. No login to it is needed: cf is asked only, if it is logged in, which account holds the zone ${productionZone}.`
     )
   }
   const roles = found.previewByToken ? A.filter(wantedRoles, (role) => role !== "preview") : wantedRoles
-  if (!A.isReadonlyArrayNonEmpty(roles)) return found
-  const whoAmI = read(WhoAmI, { command: "cf", args: ["auth", "whoami"] })
-  const asked = yield* whoAmI
-  const first = loggedIn(asked)
+  // cf logged out answers with an error, so any failure here is read as not logged in, and a login is started.
+  const whoAmI = heard(WhoAmI, { command: "cf", args: ["auth", "whoami"] }, "`cf auth whoami`").pipe(
+    Effect.map(Result.getSuccess)
+  )
+  // Which account holds the zone, or why cf could not say: an error is shown in cf's words, not as "in no account".
+  const zoneAsked = heard(S.Array(Zone), zoneCall, `\`${shown(zoneCall)}\``)
+  const holderOf = (asked: Result.Result<ReadonlyArray<typeof Zone.Type>, string>) =>
+    pipe(
+      Result.getSuccess(asked),
+      O.flatMap((zones) => (zones.length === 1 ? A.head(zones) : O.none())),
+      O.map(({ account }) =>
+        Account.make({ id: account.id, name: O.getOrElse(O.fromNullishOr(account.name), () => account.id) })
+      )
+    )
+  const unheard = (asked: Result.Result<ReadonlyArray<typeof Zone.Type>, string>) =>
+    O.match(Result.getFailure(asked), { onNone: () => "", onSome: (why) => ` (${why})` })
+  if (!A.isReadonlyArrayNonEmpty(roles)) {
+    // No account is asked of cf here, and no login is started for it. If cf happens to be logged in, though, it can
+    // say which account holds production's zone, which is what the token's account is then held against.
+    const looked = yield* whoAmI
+    const zone = pipe(looked, loggedIn, O.isSome) ? yield* Effect.asSome(zoneAsked) : O.none()
+    const holder = O.flatMap(zone, holderOf)
+    const failed = O.match(zone, { onNone: () => "", onSome: unheard })
+    yield* workstation.say(
+      O.match(holder, {
+        onSome: (account) =>
+          `Cloudflare: cf says "${account.name}" (${account.id}) holds the zone ${productionZone}: that one is production's account.`,
+        onNone: () =>
+          failed === ""
+            ? `Cloudflare: cf is not logged in to an account that holds the zone ${productionZone}, so it cannot say which account is production's.`
+            : `Cloudflare: cf could not say which account holds the zone ${productionZone}${failed}.`
+      })
+    )
+    return { ...found, zoneHolder: holder }
+  }
+  const looked = yield* whoAmI
+  const first = loggedIn(looked)
   if (O.isNone(first)) {
     yield* workstation.say("Cloudflare: cf is not logged in. Starting `cf auth login`: approve it in the browser.")
     const code = yield* workstation.hand("cf", ["auth", "login"])
@@ -665,19 +1105,23 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   yield* workstation.say(
     `Cloudflare: cf is logged in and sees ${accounts.length === 1 ? "one account" : `${accounts.length} accounts`}: ${named(accounts)}.`
   )
-  const zones = yield* read(S.Array(Zone), { command: "cf", args: ["zones", "list", "--name", productionZone] })
-  const holder = O.flatMap(zones, (found) =>
-    found.length === 1
-      ? A.findFirst(accounts, (account) => A.some(found, (zone) => zone.account.id === account.id))
-      : O.none()
-  )
+  const asked = yield* zoneAsked
+  const holder = holderOf(asked)
   yield* workstation.say(
     O.match(holder, {
       onSome: (account) =>
         `Cloudflare: "${account.name}" holds the zone ${productionZone}, so it is production's account.`,
-      onNone: () => `Cloudflare: cf could not tell which account holds the zone ${productionZone}.`
+      onNone: () => `Cloudflare: cf could not tell which account holds the zone ${productionZone}${unheard(asked)}.`
     })
   )
+  // Production's address is on the zone, so production's account is the one that holds it. When cf cannot name that
+  // account (logged in to another one, or the zone is active in none it sees), nothing here can tell production's
+  // account from the previews', and decision I4 rests on telling them apart: the run stops instead of guessing.
+  if (A.contains(roles, "production") && O.isNone(holder)) {
+    return yield* stop(
+      `cf cannot name the account that holds the zone ${productionZone} (\`${shown(zoneCall)}\` found it active in none of the accounts it sees, or did not answer${unheard(asked)}). That account is production's, and the setup of production or of the repository's stack does not go on without it: log cf in to the account that holds the zone (\`cf auth login\`), then run this again. Nothing was made.`
+    )
+  }
   const both = A.contains(roles, "preview") && A.contains(roles, "production")
   const sameAccount =
     "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account, so in one account every pull request's run could change or remove production."
@@ -705,7 +1149,7 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
         "Stopped: the accounts were not confirmed. Name them with `--production-account` and `--preview-account`."
       )
     }
-    return { ...found, preview: O.some(previews), production: holder }
+    return { ...found, preview: O.some(previews), production: holder, zoneHolder: holder }
   }
   const preview = A.contains(roles, "preview")
     ? yield* pick({ role: "preview", wanted: options.previewAccount, accounts, holder }).pipe(Effect.asSome)
@@ -728,7 +1172,7 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
     )
     if (!yes) return yield* stop("Stopped: the accounts were not confirmed.")
   }
-  return { ...found, preview, production }
+  return { ...found, preview, production, zoneHolder: holder }
 })
 
 /** Each profile `alchemy profile list` names, with the providers it is connected to. */
@@ -756,7 +1200,7 @@ const asPreviews = (script: string): Call => ({
   ]
 })
 
-const Verified = S.Struct({ id: S.String, status: S.String }).pipe(
+const Verified = S.Struct({ id: CloudflareId, status: S.String }).pipe(
   $I.annoteSchema("Verified", { description: "What `cf accounts tokens verify` answers: the token's id and status" })
 )
 
@@ -765,40 +1209,126 @@ const Permitted = S.Struct({
 }).pipe($I.annoteSchema("Permitted", { description: "A token's policies: what each allows, by permission group" }))
 
 /**
- * Whether the previews' token works and is allowed what a deploy needs, said before anything is made with it. A
- * token that cannot show its own permissions, or lacks one, is his to go on with or not.
+ * The question that asks Cloudflare for the previews' account's workers.dev subdomain, the one Alchemy's state store
+ * asks (`GET /accounts/{id}/workers/subdomain`, in `resolveAccountId`) before it says the account "can't" be
+ * accessed whatever the cause. cf has no command for it, so curl asks, under 1Password like the other calls of that
+ * account; the token goes to curl on its input through the shell's own printf, never in an argument.
+ */
+export const subdomainCall: Call = {
+  command: "op-human",
+  args: [
+    "run",
+    "--env-file",
+    localEnvFile,
+    "--",
+    "sh",
+    "-c",
+    `printf 'Authorization: Bearer %s\\n' "$${previewTokenName}" | curl -sS -H @- "https://api.cloudflare.com/client/v4/accounts/$${previewAccountIdName}/workers/subdomain"`
+  ]
+}
+
+const Answered = S.Struct({
+  success: S.Boolean,
+  errors: S.Array(S.Struct({ code: S.Int, message: S.String })),
+  result: S.Struct({ subdomain: S.String }).pipe(S.NullOr, S.optionalKey)
+}).pipe(
+  $I.annoteSchema("Answered", {
+    description: "Cloudflare's answer to the workers.dev subdomain question: the subdomain, or its errors by code"
+  })
+)
+
+/** Cloudflare's code for an account with no workers.dev subdomain yet (cf's own source reads it so). */
+const noSubdomainYet = 10007
+/** Cloudflare's code for a request the token is not allowed. */
+const notAuthorized = 10000
+
+/**
+ * What a run says of the previews' workers.dev subdomain, from Cloudflare's answer: none yet, a token not allowed to
+ * ask, or Cloudflare's own words. A new account has none until he picks one, and Alchemy then reports only that the
+ * account cannot be accessed.
+ *
+ * @example
+ * subdomainSaid({ success: false, errors: [{ code: 10007, message: "workers.api.error.subdomain_not_found" }] }) // Result.fail("… no workers.dev subdomain yet …")
+ */
+export const subdomainSaid = (answer: typeof Answered.Type): Result.Result<string, string> => {
+  const subdomain = O.map(O.fromNullishOr(answer.result), (result) => result.subdomain)
+  if (answer.success && O.isSome(subdomain)) {
+    return Result.succeed(
+      `Cloudflare: the previews' account has its workers.dev subdomain, ${subdomain.value}.workers.dev.`
+    )
+  }
+  const codes = A.map(answer.errors, (error) => error.code)
+  if (A.contains(codes, noSubdomainYet)) {
+    return Result.fail(
+      "The previews' account has no workers.dev subdomain yet, and Alchemy's state store and every preview and test stage live on one; without it the state store says only that the account cannot be accessed. Pick one in the Cloudflare dashboard: open the previews' account, Workers & Pages, and choose its workers.dev subdomain. Then run this again. Nothing was changed."
+    )
+  }
+  if (A.contains(codes, notAuthorized)) {
+    return Result.fail(
+      `Cloudflare answered ${notAuthorized} (not authorized): the previews' token may not read the account's workers.dev subdomain, which takes the Workers Scripts permission (Read, or the Write a deploy needs) on that account. Give the token Workers Scripts Write on the previews' account in the dashboard, then run this again. Nothing was changed.`
+    )
+  }
+  const words = A.map(answer.errors, (error) => `${error.code}: ${error.message}`)
+  return Result.fail(
+    `Cloudflare would not give the previews' account's workers.dev subdomain: ${A.isReadonlyArrayNonEmpty(words) ? A.join(words, "; ") : "no reason given"}. Nothing was changed.`
+  )
+}
+
+/**
+ * Whether the previews' token works and is allowed what a deploy needs, and its account has the workers.dev
+ * subdomain the state store needs, said before anything is made with it. A token that cannot show its own
+ * permissions, or lacks one, is his to go on with or not; an account with no subdomain stops the run.
  */
 const tokenChecked = Effect.gen(function* () {
   const workstation = yield* Workstation
-  const verified = yield* read(Verified, asPreviews("cf accounts tokens verify"))
-  if (O.isNone(verified) || verified.value.status !== "active" || !/^[0-9a-f]{32}$/.test(verified.value.id)) {
+  const verified = yield* heard(Verified, asPreviews("cf accounts tokens verify"), "`cf accounts tokens verify`")
+  if (Result.isFailure(verified)) {
     return yield* stop(
-      `The token ${localEnvFile} names for the previews' account did not verify as active (\`cf accounts tokens verify\`). Check ${previewTokenName} and ${previewAccountIdName} there. Nothing was changed.`
+      `The token ${localEnvFile} names for the previews' account was not verified: ${verified.failure}. That decides nothing about the token: if cf's words are about it, check ${previewTokenName} and ${previewAccountIdName} there; if they are about the network or cf itself, run this again. Nothing was changed.`
+    )
+  }
+  if (verified.success.status !== "active") {
+    return yield* stop(
+      `cf says the token ${localEnvFile} names for the previews' account is "${verified.success.status}", not active (\`cf accounts tokens verify\`). Check ${previewTokenName} there, or the token in the dashboard. Nothing was changed.`
+    )
+  }
+  if (!/^[0-9a-f]{32}$/.test(verified.success.id)) {
+    return yield* stop(
+      "`cf accounts tokens verify` answered a token id that is not 32 hexadecimal characters, so its permissions cannot be asked for. Nothing was changed."
     )
   }
   const needs = A.join(previewTokenNeeds, ", ")
-  const permitted = yield* read(Permitted, asPreviews(`cf accounts tokens get ${verified.value.id}`))
-  const lacking = O.map(permitted, (token) => {
+  const getCall = `cf accounts tokens get ${verified.success.id}`
+  const permitted = yield* heard(Permitted, asPreviews(getCall), `\`${getCall}\``)
+  const lacking = Result.map(permitted, (token) => {
     const allowed = A.flatMap(token.policies, (policy) =>
       policy.effect === "allow" ? A.map(policy.permission_groups, (group) => group.name) : []
     )
     return A.filter(previewTokenNeeds, (need) => !A.contains(allowed, need))
   })
-  if (O.isSome(lacking) && !A.isReadonlyArrayNonEmpty(lacking.value)) {
-    return yield* workstation.say(
-      `Cloudflare: the previews' token is active and allows what a deploy needs (${needs}).`
+  if (Result.isSuccess(lacking) && !A.isReadonlyArrayNonEmpty(lacking.success)) {
+    yield* workstation.say(`Cloudflare: the previews' token is active and allows what a deploy needs (${needs}).`)
+  } else {
+    yield* workstation.say(
+      Result.match(lacking, {
+        onFailure: (why) =>
+          `Cloudflare: the previews' token is active, but its permissions were not shown (${why}), so they were not checked. A deploy needs: ${needs}.`,
+        onSuccess: (missing) =>
+          `Cloudflare: the previews' token is active and lacks: ${A.join(missing, ", ")}. A deploy needs: ${needs}. Add them to the token in the dashboard, or go on if the names differ there.`
+      })
+    )
+    const yes = yield* workstation.confirm("Go on with this token?")
+    if (!yes) return yield* stop("Stopped at the previews' token. Nothing was changed.")
+  }
+  const subdomain = yield* heard(Answered, subdomainCall, "Cloudflare's workers.dev subdomain question")
+  if (Result.isFailure(subdomain)) {
+    return yield* stop(
+      `Cloudflare could not be asked for the previews' account's workers.dev subdomain: ${subdomain.failure}. Nothing was changed.`
     )
   }
-  yield* workstation.say(
-    O.match(lacking, {
-      onNone: () =>
-        `Cloudflare: the previews' token is active, but it may not read its own permissions, so they were not checked. A deploy needs: ${needs}.`,
-      onSome: (missing) =>
-        `Cloudflare: the previews' token is active and lacks: ${A.join(missing, ", ")}. A deploy needs: ${needs}. Add them to the token in the dashboard, or go on if the names differ there.`
-    })
-  )
-  const yes = yield* workstation.confirm("Go on with this token?")
-  if (!yes) return yield* stop("Stopped at the previews' token. Nothing was changed.")
+  const said = subdomainSaid(subdomain.success)
+  if (Result.isFailure(said)) return yield* stop(said.failure)
+  yield* workstation.say(said.success)
 })
 
 const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
@@ -858,7 +1388,14 @@ const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
       "--set",
       `accountId=env:${previewAccountIdName}`
     ])
-    if (stored !== 0) return yield* stop(`Connecting profile "${name}" did not finish; what it said is above.`)
+    if (stored !== 0) {
+      return yield* stop(
+        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR] …"), Alchemy was never started. When they say op never reached the app ("error initializing client"), that it is locked or not signed in, or that a prompt was dismissed or timed out, ${theApp}. When they say ${A.join(
+          A.map(refusedWords, (word) => `"${word}"`),
+          ", "
+        )}, 1Password refused a reference: check ${referencesRefused}. Any other line of 1Password's may be either: try both, then run this again.`
+      )
+    }
     const now = yield* listed
     if (!O.exists(now, (one) => connected(one.providers, "Cloudflare"))) {
       return yield* stop(`Profile "${name}" is still not connected to Cloudflare. Run this again.`)
@@ -913,10 +1450,12 @@ export const accountIn = (shown: string): O.Option<string> => {
 }
 
 /**
- * Stops unless the profile deploys into the account the questions name. Every bootstrap and deploy runs with
- * `--profile`, so it is the profile's own account that is deployed into, whatever `cf` or a token says; a profile
- * connected to another account would have him say yes to one account and deploy into the other. With `strict`, the
- * two roles' profiles must also be two accounts (decision I4).
+ * Stops unless the profile deploys into the account the questions name, and hands on the id it deploys into. Every
+ * bootstrap and deploy runs with `--profile`, and nothing in the environment outranks the profile (`outside`), so
+ * the profile's own account is the one deployed into. The previews' account must not be the one that holds
+ * production's zone: a test stage alone may share it after a yes to a question that says so, and a run with
+ * `--staging` or `--production` stops (decision I4), as it does when the two profiles deploy into one account or
+ * the other profile's account cannot be read.
  */
 const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(function* (
   role: Role,
@@ -936,8 +1475,11 @@ const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(func
       `Could not read which Cloudflare account profile "${name}" deploys into (\`bunx alchemy profile show --profile ${name}\`), so nothing is made with it.`
     )
   }
-  if (role === "preview" && found.previewByToken) {
-    // The id is compared inside the one process 1Password fills it for: this command never holds it.
+  const byToken = role === "preview" && found.previewByToken
+  // The id is compared inside the one process 1Password fills it for: this command never holds it. Alchemy keeps an
+  // id trimmed and in lower case, so the field is compared the same way. Exit 3 is "they differ"; anything else is
+  // the comparison itself failing (1Password locked or declined), which is not a wrong account.
+  const tokenAccountIs = Effect.fn("InfraSetup.tokenAccountIs")(function* (id: string) {
     const same = yield* workstation.ask("op-human", [
       "run",
       "--env-file",
@@ -945,29 +1487,97 @@ const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(func
       "--",
       "sh",
       "-c",
-      `test "$${previewAccountIdName}" = "$1"`,
+      `v="$(printf %s "$${previewAccountIdName}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"; [ "$v" = "$1" ] || exit 3`,
       "sh",
-      held.value
+      id
     ])
-    if (same.code !== 0) {
+    // The script exits 0 or 3 only, so any other code is 1Password's: op ran nothing, or could not fill the id.
+    if (same.code !== 0 && same.code !== 3) {
+      return yield* onePasswordFailed(
+        `the comparison of profile "${name}"'s account with the id ${localEnvFile} names`,
+        same.stderr,
+        referencesRefused
+      )
+    }
+    return same.code === 0
+  })
+  if (byToken && !(yield* tokenAccountIs(held.value))) {
+    return yield* stop(
+      `Profile "${name}" deploys into the account ${held.value}, which is not the one ${localEnvFile} names for the previews. ${reconnect}`
+    )
+  }
+  const namedAccount = byToken ? O.none<Account>() : accountOf(found, role)
+  if (O.isSome(namedAccount) && namedAccount.value.id !== held.value) {
+    return yield* stop(
+      `Profile "${name}" deploys into the account ${held.value}, not "${namedAccount.value.name}" (${namedAccount.value.id}), the one named for ${role}: a yes to the questions would be about one account and the deploy would go into the other. ${reconnect}`
+    )
+  }
+  const strict = has(options.sizes, "staging") || has(options.sizes, "production")
+  const twoAccounts =
+    "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account."
+  // A run with `--staging` or `--production` has production's account already, the one that holds the zone (the
+  // Cloudflare step stops when cf cannot name it), so the previews' profile is held against that account.
+  if (strict && role === "preview" && O.exists(found.production, (production) => production.id === held.value)) {
+    return yield* stop(
+      `Profile "${name}" deploys into the account ${held.value}, which is production's: it holds the zone ${productionZone}. ${twoAccounts} Give the previews an account of their own, then run this again.`
+    )
+  }
+  // By his token nothing asked cf about this account, so it is asked here whether it is production's.
+  if (role === "preview" && O.exists(found.zoneHolder, (holder) => holder.id === held.value)) {
+    if (byToken) {
+      const yes = yield* workstation.confirm(
+        `The previews' account by your token is ${held.value}. It holds the zone ${productionZone}, so it is production's account: a test stage here shares it. Use it?`
+      )
+      if (!yes) return yield* stop("Stopped: no Cloudflare account for preview.")
+    }
+  }
+  if (byToken && O.isNone(found.zoneHolder)) {
+    yield* workstation.say(
+      `Cloudflare: nothing here could say whether the account ${held.value} holds the zone ${productionZone}. If it is production's account, stop at the next question.`
+    )
+  }
+  const otherName = profileOf(options, role === "preview" ? "production" : "preview")
+  if (strict) {
+    const listing = yield* workstation.ask("bunx", ["alchemy", "profile", "list"])
+    if (listing.code !== 0) {
       return yield* stop(
-        `Profile "${name}" deploys into another Cloudflare account than the one ${localEnvFile} names for the previews. ${reconnect}`
+        `Could not list the Alchemy profiles (\`bunx alchemy profile list\`), so "${name}"'s account cannot be told apart from profile "${otherName}"'s. ${twoAccounts}`
+      )
+    }
+    const otherThere = A.some(
+      profilesOf(listing.stdout),
+      (one) => one.name === otherName && connected(one.providers, "Cloudflare")
+    )
+    // Production's profile with no previews' profile beside it is held against the previews' account his own file
+    // names instead: the previews' profile may be under another name, or not made yet.
+    if (!otherThere && role === "production" && found.previewByToken && (yield* tokenAccountIs(held.value))) {
+      return yield* stop(
+        `Profile "${name}" deploys into the account ${held.value}, the one ${localEnvFile} names for the previews. ${twoAccounts} ${reconnect}`
+      )
+    }
+    if (!otherThere && role === "production" && !found.previewByToken) {
+      yield* workstation.say(
+        `Alchemy: no profile "${otherName}" is connected to Cloudflare and ${localEnvFile} names no previews' account, so production's account is held against no previews' account here.`
+      )
+    }
+    const other = otherThere ? yield* heldBy(otherName) : O.none<string>()
+    if (otherThere && O.isNone(other)) {
+      return yield* stop(
+        `Could not read which Cloudflare account profile "${otherName}" deploys into (it may need its login again: \`bunx alchemy profile show --profile ${otherName}\`), so it cannot be told apart from "${name}"'s. ${twoAccounts}`
+      )
+    }
+    if (O.exists(other, (id) => id === held.value)) {
+      return yield* stop(
+        `Profiles "${options.previewProfile}" and "${options.productionProfile}" both deploy into the account ${held.value}. ${twoAccounts} Connect the previews' profile to the second account (its token and id in ${localEnvFile}), then run this again.`
       )
     }
   }
-  const namedAccount = found.previewByToken && role === "preview" ? O.none<Account>() : accountOf(found, role)
-  if (O.isSome(namedAccount) && namedAccount.value.id !== held.value) {
-    return yield* stop(
-      `Profile "${name}" deploys into another Cloudflare account than "${namedAccount.value.name}", the one named for ${role}: a yes to the questions would be about one account and the deploy would go into the other. ${reconnect}`
-    )
-  }
-  yield* workstation.say(`Alchemy: profile "${name}" deploys into the account named for ${role}. Checked.`)
-  const strict = has(options.sizes, "staging") || has(options.sizes, "production")
-  const other = yield* heldBy(profileOf(options, role === "preview" ? "production" : "preview"))
-  if (strict && O.exists(other, (id) => id === held.value)) {
-    return yield* stop(
-      `Profiles "${options.previewProfile}" and "${options.productionProfile}" deploy into the same Cloudflare account. Production and the previews are two accounts (decision I4): a preview's deploy token covers its whole account. Connect the previews' profile to the second account (its token and id in ${localEnvFile}), then run this again.`
-    )
+  yield* workstation.say(
+    `Alchemy: profile "${name}" deploys into the account ${held.value}. Checked against the one named for ${role}.`
+  )
+  return {
+    ...found,
+    held: role === "preview" ? { ...found.held, preview: held } : { ...found.held, production: held }
   }
 })
 
@@ -977,54 +1587,71 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
   found: Found
 ) {
   yield* profileConnected(step, options, found)
-  yield* profileAccountChecked(step.role, options, found)
-  return found
+  return yield* profileAccountChecked(step.role, options, found)
 })
+
+/**
+ * What a failed `state bootstrap` says. Alchemy reports any failure to read the account's workers.dev subdomain as
+ * the credentials not reaching the account, and a new account has none. By his token that is asked before step 1;
+ * by a login nothing here may ask it (cf has no command for it, and the login's token is Alchemy's), so the stop
+ * names it as the likely cause when Alchemy said so.
+ */
+export const stateStoreFailed = (profile: string) =>
+  `\`bunx alchemy state bootstrap --profile ${profile}\` failed; what it said is above. If it says the current credentials "can't access" the account, the account most likely has no workers.dev subdomain yet: pick one in the Cloudflare dashboard under that account, Workers & Pages, and run this again.`
 
 const stateStore = Effect.fn("InfraSetup.stateStore")(function* (role: Role, options: SetupOptions, found: Found) {
   const workstation = yield* Workstation
   const name = profileOf(options, role)
-  const account = O.match(accountOf(found, role), {
-    onNone: () => `the ${role} account`,
-    onSome: (one) => `the account "${one.name}"`
-  })
+  const account = accountSaid(found, role)
   yield* workstation.say(
     `State store: Alchemy keeps what it deployed in a small Worker in ${account}. \`state bootstrap\` makes it, or adopts the one that is there (one an older build of Alchemy made is upgraded, one way).`
   )
   const yes = yield* workstation.confirm(`Make sure the state store exists in ${account}?`)
   if (!yes) return yield* stop(`Stopped before the state store in ${account}. Nothing was made there by this step.`)
   const code = yield* workstation.hand("bunx", ["alchemy", "state", "bootstrap", "--profile", name])
-  if (code !== 0)
-    return yield* stop(`\`bunx alchemy state bootstrap --profile ${name}\` failed; what it said is above.`)
+  if (code !== 0) return yield* stop(stateStoreFailed(name))
   return found
 })
 
 const opFailed = (what: string, said: string) =>
   stop(`1Password: ${what} failed: ${Str.trim(said)}. Nothing was written to ${opEnvFile}.`)
 
+/** The owner's own references file as it stands, or nothing when he has none. */
+const ownText = Effect.gen(function* () {
+  const repo = yield* Repo
+  const file = repo.join(repo.root, localEnvFile)
+  return (yield* repo.exists(file)) ? yield* repo.text(file) : ""
+})
+
 const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (options: SetupOptions, found: Found) {
   const workstation = yield* Workstation
   const repo = yield* Repo
   const file = repo.join(repo.root, opEnvFile)
   const text = yield* repo.text(file)
-  const state = referenceState({ text, name: previewPasswordName })
-  if (state === "reference") {
+  const mine = yield* ownText
+  const given = referenceGiven({ committed: text, own: mine, name: previewPasswordName })
+  if (given.state === "reference") {
     yield* workstation.say(
-      `1Password: ${opEnvFile} already names a reference for ${previewPasswordName}. Left as it is.`
+      `1Password: ${given.file} already names a reference for ${previewPasswordName}, and previews and staging take their password from it. Left as it is.`
     )
     return found
   }
-  if (state === "not-a-reference") {
+  if (given.state === "not-a-reference") {
     return yield* stop(
-      `${opEnvFile} has a line for ${previewPasswordName} that is not an op:// reference. That file holds references only: put the line right, or remove it, and run this again. The line was not printed.`
+      `${given.file} has a line for ${previewPasswordName} that is not an op:// reference. That file holds references only: put the line right, or remove it, and run this again. The line was not printed.`
     )
   }
   yield* workstation.say(
     `1Password: ${opEnvFile} names no ${previewPasswordName}. Looking for the item "${previewPasswordItem}"; 1Password may ask you to unlock.`
   )
-  const vaults = yield* read(S.Array(Named), { command: "op-human", args: ["vault", "list", "--format", "json"] })
-  if (O.isNone(vaults)) return yield* opFailed("`op-human vault list`", "it gave no list of vaults")
-  const all = vaults.value
+  const vaults = yield* heard(
+    S.Array(Named),
+    { command: "op-human", args: ["vault", "list", "--format", "json"] },
+    "`op-human vault list`",
+    "that your 1Password account is signed in and may see its vaults"
+  )
+  if (Result.isFailure(vaults)) return yield* opFailed("`op-human vault list`", vaults.failure)
+  const all = vaults.success
   if (!A.isReadonlyArrayNonEmpty(all)) return yield* opFailed("`op-human vault list`", "no vault is visible")
   const vault = yield* O.match(options.vault, {
     onSome: (wanted) =>
@@ -1053,10 +1680,19 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
         )
     }
   })
-  const items = read(S.Array(Titled), {
-    command: "op-human",
-    args: ["item", "list", "--vault", vault.id, "--format", "json"]
-  }).pipe(Effect.map(O.map(A.filter((item) => item.title === previewPasswordItem))))
+  const items = heard(
+    S.Array(Titled),
+    { command: "op-human", args: ["item", "list", "--vault", vault.id, "--format", "json"] },
+    "`op-human item list`",
+    `that your account may read the vault "${vault.name}" (or name another with \`--vault\`)`
+  ).pipe(
+    Effect.flatMap(
+      Result.match({
+        onFailure: (why) => opFailed("`op-human item list`", why),
+        onSuccess: (listed) => Effect.succeedSome(A.filter(listed, (item) => item.title === previewPasswordItem))
+      })
+    )
+  )
   const before = yield* items
   if (O.isNone(before)) return yield* opFailed("`op-human item list`", "it gave no list of items")
   if (before.value.length > 1) {
@@ -1079,7 +1715,13 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
       vault.id,
       "--generate-password"
     ])
-    if (made.code !== 0) return yield* opFailed("`op-human item create`", made.stderr)
+    if (made.code !== 0) {
+      return yield* onePasswordFailed(
+        "`op-human item create`",
+        made.stderr,
+        `that your account may make items in the vault "${vault.name}" (or name another with \`--vault\`)`
+      )
+    }
   } else {
     yield* workstation.say(`1Password: the item is in the vault "${vault.name}". Using it; its password is not read.`)
   }
@@ -1125,16 +1767,19 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
   const workstation = yield* Workstation
   const repo = yield* Repo
   const stage = stageOf(options, target)
-  const text = target === "test-stage" ? "" : yield* repo.text(repo.join(repo.root, opEnvFile))
-  const modelKey = referenceState({ text, name: modelKeyName })
+  const committed = target === "test-stage" ? "" : yield* repo.text(repo.join(repo.root, opEnvFile))
+  const own = target === "test-stage" ? "" : yield* ownText
+  const key = referenceGiven({ committed, own, name: modelKeyName })
+  const modelKey = key.state
   if (target !== "test-stage") {
     yield* workstation.say(
       modelKey === "reference"
-        ? `Model key: ${opEnvFile} names a reference for ${modelKeyName}. The stack asks 1Password for it at the deploy, and the app asks you to authorize; this command never reads it.`
-        : `Model key: ${opEnvFile} names none, so this deploys with DEPLOY_WITHOUT_MODEL_KEY=true: production runs without a model and its rules answer. To use a model, fill in that line and run this again.`
+        ? `Model key: ${key.file} names a reference for ${modelKeyName}. The stack asks 1Password for it at the deploy, and the app asks you to authorize; this command never reads it.`
+        : `Model key: ${key.file} names none, so this deploys with DEPLOY_WITHOUT_MODEL_KEY=true: production runs without a model and its rules answer. To use a model, write a reference for ${modelKeyName} there and run this again.`
     )
-    if (target === "repository" && referenceState({ text, name: previewPasswordName }) !== "reference") {
-      return yield* stop(`${opEnvFile} names no reference for ${previewPasswordName}.`)
+    const password = referenceGiven({ committed, own, name: previewPasswordName })
+    if (target === "repository" && password.state !== "reference") {
+      return yield* stop(`${password.file} names no reference for ${previewPasswordName}.`)
     }
   }
   const given = givenFor({ target, found, options, modelKey })
@@ -1147,7 +1792,13 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
   yield* workstation.say(`Plan for ${what}: \`${shown(plan)}\`. It changes nothing. Read it.`)
   const planned = yield* workstation.hand(plan.command, plan.args, given)
   if (planned !== 0) return yield* stop(`The plan for ${what} failed; what it said is above. Nothing was deployed.`)
-  const yes = yield* workstation.confirm(`Deploy ${what} as that plan says?`)
+  const into = Target.match(target, {
+    "test-stage": () => ` into ${accountSaid(found, "preview")}`,
+    repository: () =>
+      ` (to ${gitHubRepository} on GitHub, and one token in ${accountSaid(found, "production")}; previews and staging then deploy into ${accountSaid(found, "preview")} with your token)`,
+    production: () => ` into ${accountSaid(found, "production")}`
+  })
+  const yes = yield* workstation.confirm(`Deploy ${what}${into} as that plan says?`)
   if (!yes) return yield* stop(`Stopped: ${what} was not deployed.`)
   const call = deployCall(options, target, "deploy")
   yield* workstation.say(`Deploying ${what}: \`${shown(call)}\`.`)
@@ -1185,14 +1836,22 @@ const perform = (
  * Runs the setup: a dry run prints its steps and starts nothing; a real run refuses anything but a person at a
  * terminal, then does each step in order and stops at the first one that cannot go on.
  */
-export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOptions) {
+export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOptions) {
   const workstation = yield* Workstation
+  // A dry run with no size prints the steps of all three, so the command the agents' rule names prints steps.
+  const unsized = !A.isReadonlyArrayNonEmpty(given.sizes)
+  const stageName = /^[a-z0-9][-_a-z0-9]*$/
+  // Nobody asked for a test stage, so a name this machine's user does not make is shown as the placeholder.
+  const options: SetupOptions =
+    unsized && given.dryRun
+      ? { ...given, sizes: SetupSize.literals, user: stageName.test(given.user) ? given.user : "<user>" }
+      : given
   if (!A.isReadonlyArrayNonEmpty(options.sizes)) {
     return yield* stop(
       "Say how much to set up: `--test-stage` (a test stage and its address), `--staging` (the repository's stack) or `--production`. `--dry-run` prints the steps and starts nothing."
     )
   }
-  if (has(options.sizes, "test-stage") && !/^[a-z0-9][-_a-z0-9]*$/.test(options.user)) {
+  if (has(options.sizes, "test-stage") && !stageName.test(options.user) && !(unsized && options.dryRun)) {
     return yield* stop(
       `"test_${options.user}" is not a stage name (lower-case letters, digits, - and _). Pass \`--user <name>\`.`
     )
@@ -1200,39 +1859,26 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
   const repo = yield* Repo
   const local = repo.join(repo.root, localEnvFile)
   const own = (yield* repo.exists(local)) ? yield* repo.text(local) : ""
-  const token = referenceState({ text: own, name: previewTokenName })
-  const accountId = referenceState({ text: own, name: previewAccountIdName })
-  const previewByToken = token === "reference" && accountId === "reference"
+  const committed = yield* repo.text(repo.join(repo.root, opEnvFile))
+  // Read as the repository's stack reads them: the last line of a name across op.env and then op.env.local.
+  const token = referenceGiven({ committed, own, name: previewTokenName })
+  const accountId = referenceGiven({ committed, own, name: previewAccountIdName })
+  const previewByToken =
+    token.state === "reference" &&
+    accountId.state === "reference" &&
+    token.file === localEnvFile &&
+    accountId.file === localEnvFile
+  const stopsBefore = filesStop({ committed, token, accountId, previewByToken, sizes: options.sizes })
   if (options.dryRun) {
-    return yield* Effect.forEach(dryRun({ options, previewByToken }), workstation.say, {
+    const said = unsized ? ["No size was given, so these are the steps of all three sizes at once."] : []
+    return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken, stopsBefore })], workstation.say, {
       concurrency: 1,
       discard: true
     })
   }
   yield* ownerOnly
-  // The tracked file holds comments and references and nothing else: a value typed there in any form would be
-  // committed with the reference this command writes, so any other line stops the run before it writes or says so.
-  const committed = yield* repo.text(repo.join(repo.root, opEnvFile))
-  const stray = strayLines(committed)
-  if (A.isReadonlyArrayNonEmpty(stray)) {
-    return yield* stop(
-      `${opEnvFile} is tracked by git and holds only comments and lines NAME=op://vault/item/field. Line ${A.join(A.map(stray, String), ", ")} is neither. If a value was typed there, take it out (and change it wherever it came from if the file was ever committed), then run this again. Nothing was started; no line was printed.`
-    )
-  }
-  if (
-    (token === "missing") !== (accountId === "missing") ||
-    token === "not-a-reference" ||
-    accountId === "not-a-reference"
-  ) {
-    return yield* stop(
-      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither. Nothing was started; no line was printed.`
-    )
-  }
-  if (!previewByToken && has(options.sizes, "staging")) {
-    return yield* stop(
-      `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
-    )
-  }
+  yield* outside(options)
+  if (O.isSome(stopsBefore)) return yield* stop(stopsBefore.value)
   const signUp = yield* signUpFor(options)
   // Before the first step, so a token that will not do is said before anything is made with it or beside it.
   if (previewByToken) yield* tokenChecked

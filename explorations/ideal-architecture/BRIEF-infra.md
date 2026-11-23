@@ -14,7 +14,7 @@ questions, and round three (13, 15, 16) only where a deploy needs them.
 Benjamin answered I1 to I9 with the recommended option of each and said "The brief matches (Recommended)"
 ([DECISIONS.md](DECISIONS.md), 2026-11-19). The goal is opened only after the Effect-imports migration is merged to
 main, and is then built and checked on this machine only, stopping before the first step that touches anything
-outside it. The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY` is reserved for a later
+outside it. The 1Password reference for `TYPESAFE_AI_API_KEY` is reserved for a later
 confidence-score goal: no stage gets it.
 
 Nothing here is built. No account was opened, no login command run, no DNS record, GitHub setting or secret read or
@@ -94,7 +94,7 @@ Could not be verified, and the goal must prove each before production relies on 
   "The zone must already exist in the account".
 - Whether `@alchemy.run/test` runs under Vitest on Node, which this repository's rule requires.
 - Whether a GitHub Actions job's required-check name is its `name`, today "Check, test and build".
-- What `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY` is for. It is the one reference named for this work. No
+- What the 1Password reference for `TYPESAFE_AI_API_KEY` is for. It is the one reference named for this work. No
   setting of the app is called that: the Worker reads `OPENROUTER_API_KEY` and `AI_GATEWAY_API_KEY`
   (`apps/inventory/src/server/Settings.ts`). No agent resolved it, and none may.
 
@@ -295,7 +295,7 @@ using the deployed app, and for him as the one who pays for and runs it.
   code from a pull request.
 
 Whichever is chosen, the brief needs to know from him which service
-`op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY` belongs to, since the app reads no setting of that name.
+the 1Password reference for `TYPESAFE_AI_API_KEY` belongs to, since the app reads no setting of that name.
 
 ### I6. Does the app send email now? (23)
 

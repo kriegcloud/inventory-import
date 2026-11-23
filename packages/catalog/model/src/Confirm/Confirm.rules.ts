@@ -33,10 +33,15 @@ export const PlannedStatus = LiteralKit(["ready", "update", "already", "notImpor
 /** The decoded value of `PlannedStatus`. */
 export type PlannedStatus = typeof PlannedStatus.Type
 
-// Where the item is in the file, and what the file calls it.
+// Where the item is in the file, and what the file calls it. The row and the part are the ones the contract's row id
+// is made of (`rowId`): a row of the file from 1 up, and a part that is 0 for a row of one item.
 const place = {
-  rowNumber: S.Int.pipe(S.annotateKey({ description: "The row of the file" })),
-  part: S.Int.pipe(S.annotateKey({ description: "Which of its row's items it is: 0 when the row is one item" })),
+  rowNumber: S.Int.check(S.isBetween({ minimum: 1, maximum: 9_999_999 })).pipe(
+    S.annotateKey({ description: "The row of the file" })
+  ),
+  part: S.Int.check(S.isBetween({ minimum: 0, maximum: 9_999 })).pipe(
+    S.annotateKey({ description: "Which of its row's items it is: 0 when the row is one item" })
+  ),
   sku: S.String.pipe(S.annotateKey({ description: "The row's SKU as the review reads it" })),
   name: S.String.pipe(S.annotateKey({ description: "The row's name as the review reads it" }))
 }
@@ -47,7 +52,8 @@ const written = {
     S.annotateKey({ description: "The values that differ from the file, for the record of changed values" })
   )
 }
-const reason = S.String.pipe(
+// Never empty: a row that is left out or skipped always says why, in the result and in the download.
+const reason = S.String.check(S.isNonEmpty()).pipe(
   S.annotateKey({ description: "Every reason the row is not imported, joined: what the not-imported rows store" })
 )
 

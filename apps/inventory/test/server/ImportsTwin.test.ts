@@ -100,15 +100,16 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           )
         ).toBe(true)
 
-        // The same file again: 154 already there, row 55 waits with its proposal, row 18 is the one new item.
+        // The same file again: all 155 already there, row 55 (stored after its accept) among them, and row 18 is the
+        // one new item.
         const again = yield* upload({ client, table })
-        expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
+        expect(again.progress).toMatchObject({ ready: 1, needs: 44 })
         const second = yield* client.imports.commit({
           params: { id: again.id },
           payload: { revision: again.revision, madeOn: {}, set: {}, clear: [] }
         })
         const secondResult = O.getOrThrow(second.result)
-        expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 154, 45])
+        expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 155, 44])
 
         // Taking the first import back removes its 155 and keeps the second's one.
         const back = yield* client.imports.takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })

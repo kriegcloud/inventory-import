@@ -649,6 +649,14 @@
       "Catalog.NoGroupInForceIsLaterThanTheLastInForce": {
         "kind": "model invariant",
         "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !isDecidedGroup(group.state) ||\n              group.state.importId !== life.id ||\n              isRemoved(life.state) ||\n              isUnstaged(life.state) ||\n              group.state.undoneAt !== 0 ||\n              group.state.change <= life.state.topGroup\n          )\n        )"
+      },
+      "UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        command.sawUndone === before.row.undone.change"
+      },
+      "UndoGroup.AGroupsUndoIsMadeOnEveryChange": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        isOpen(before.life) && command.seen === before.life.changes"
       }
     }
   }

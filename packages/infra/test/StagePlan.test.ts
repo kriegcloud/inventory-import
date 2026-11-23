@@ -106,8 +106,11 @@ describe("the plan of a stage", () => {
     }
   )
 
-  it.prop("the plan schema generates only valid values", [Arbitrary.schema(StagePlan)], ([value]) => {
-    expect(S.is(StagePlan)(value)).toBe(true)
+  // A plan the schema allows is exactly the plan its own stage name gives: no kind can hold another's values, so
+  // production is never seeded or given test accounts, and a personal stage is never deployed.
+  it.prop("every plan the schema allows is the one its stage name gives", [Arbitrary.schema(StagePlan)], ([value]) => {
+    expect(planFor(value.stage)).toEqual(Result.succeed(value))
+    expect(testPasswordOf(value) === "none").toBe(value.kind === "production" || value.kind === "personal")
   })
 
   describe("the password a stage's test accounts take", () => {
@@ -159,7 +162,10 @@ describe("the plan of a stage", () => {
           "not set, so no pull request could get a preview and main could not reach staging. Write the references " +
           'PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>" and ' +
           'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local (git ' +
-          "ignores it) and deploy the stack again; it asks 1Password for both."
+          "ignores it) and deploy the stack again; it asks 1Password for both. If they are written there already, " +
+          "one of three things kept 1Password's answer out: CI is set in your shell (the stack then asks 1Password " +
+          "for nothing, as in a workflow: unset it), the 1Password field is empty, or PREVIEW_CLOUDFLARE_API_TOKEN is " +
+          "exported empty in your shell (an empty one is used before 1Password's answer: unset it)."
       )
     })
   })

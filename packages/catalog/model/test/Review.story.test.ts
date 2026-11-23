@@ -72,9 +72,9 @@ import { UndoGroup } from "../src/Review/UndoingGroup.decision.ts"
 import { letGo, Level, noLevel, Row, RowDecided, seal, StepUndone } from "../src/Row/Row.aggregate.ts"
 
 const story = Story.make(Catalog)
-const id = ImportId.make("0190a5c2-7b1e-7c3a-9f10-4d2e8b6a1c55")
+const id = ImportId.make("0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c55")
 // Another import of the same organization: a row instance kept under its id is not this import's.
-const otherImport = "0190a5c2-7b1e-7c3a-9f10-4d2e8b6a1c56"
+const otherImport = "0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c56"
 const life = Import.ref(id)
 const row3 = Row.ref(`${id}/row-3`)
 const row7 = Row.ref(`${id}/row-7`)
@@ -129,6 +129,7 @@ const undo = (input: {
   readonly next?: Level
   readonly below?: string
   readonly madeOn?: number
+  readonly sawUndone?: number
 }) =>
   UndoRowStep.make({
     importId: id,
@@ -138,6 +139,7 @@ const undo = (input: {
     sawGroup: input.sawGroup ?? 0,
     covered: input.covered ?? false,
     madeOn: input.madeOn ?? 0,
+    sawUndone: input.sawUndone ?? 0,
     opening: input.opening ?? 0,
     next: input.next ?? noLevel,
     below: input.below ?? ""
@@ -189,6 +191,7 @@ const undone = (input: {
   readonly by: string
   readonly flags: string
   readonly madeOn?: number
+  readonly actor?: string
 }) =>
   ActCounted.make({
     change: input.change,
@@ -197,7 +200,7 @@ const undone = (input: {
     label: "undo",
     holds: input.holds,
     by: input.by,
-    actor: "ana",
+    actor: input.actor ?? "ana",
     flags: input.flags,
     madeOn: input.madeOn ?? 0
   })
@@ -341,7 +344,7 @@ it.effect("an admin of another organization changes nothing in this one's import
     Story.rejected(NotPermitted.make({})),
     Story.when(group({ step: "g2", seen: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({}))
   )
 )
@@ -380,7 +383,7 @@ it.effect("a viewer changes nothing: no match, suggestion, confirm, remove, row 
     Story.rejected(NotPermitted.make({})),
     Story.when(group({ step: "g2", seen: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({}))
   )
 )
@@ -427,9 +430,9 @@ it.effect("a row or a group kept under another organization's or import's name i
     Story.rejected(NotPermitted.make({})),
     Story.when(undo({ row: "row-3", undo: 1, step: "a5", sawGroup: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g2", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g2", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({}))
   )
 )
@@ -463,7 +466,7 @@ it.effect(
       Story.rejected(NotOpen.make({})),
       Story.when(group({ step: "g2", seen: 3, opening: 1 })),
       Story.rejected(NotOpen.make({})),
-      Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 1 })),
+      Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 1, seen: 2 })),
       Story.rejected(NotOpen.make({})),
       Story.when(ReopenImport.make({ importId: id, seen: 3 })),
       Story.then(life, ImportReopened.make({ change: 4, by: "ana" }))
@@ -1019,7 +1022,13 @@ it.effect("undos go down every level exactly as it was, and end at none", () =>
     ),
     Story.then(life, undone({ change: 5, row: "row-12", step: "u1", holds: 3, by: "ana", flags: "3" })),
     Story.when(
-      undo({ row: "row-12", undo: 3, step: "u2", next: level({ change: 1, by: "ana", step: "a1", flags: "1" }) })
+      undo({
+        row: "row-12",
+        undo: 3,
+        step: "u2",
+        sawUndone: 4,
+        next: level({ change: 1, by: "ana", step: "a1", flags: "1" })
+      })
     ),
     Story.then(
       row12,
@@ -1032,10 +1041,10 @@ it.effect("undos go down every level exactly as it was, and end at none", () =>
       })
     ),
     Story.then(life, undone({ change: 6, row: "row-12", step: "u2", holds: 2, by: "ana", flags: "2" })),
-    Story.when(undo({ row: "row-12", undo: 2, step: "u3" })),
+    Story.when(undo({ row: "row-12", undo: 2, step: "u3", sawUndone: 3 })),
     Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u3", by: "ana" })),
     Story.then(life, undone({ change: 7, row: "row-12", step: "u3", holds: 1, by: "ana", flags: "1" })),
-    Story.when(undo({ row: "row-12", undo: 1, step: "u4" })),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u4", sawUndone: 2 })),
     Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u4", by: "ana" })),
     Story.then(life, undone({ change: 8, row: "row-12", step: "u4", holds: 0, by: "", flags: "", madeOn: -1 })),
     // A row with no decision has no step to undo.
@@ -1163,7 +1172,40 @@ it.effect(
       Story.rejected(MatchedSince.make({ matching: 1 })),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      Story.rejected(MatchedSince.make({ matching: 1 })),
+      // And so is her own step with another text: that is not the press the row holds.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: leftOut })),
       Story.rejected(MatchedSince.make({ matching: 1 }))
+    )
+)
+it.effect(
+  "a press sent twice is answered as the first time when the import was confirmed and opened again between: Dana's keep on row 12, sent again from the first opening",
+  () =>
+    story(
+      Story.given(
+        life,
+        staged,
+        counted({ change: 1, step: "d1", row: "row-12", by: "dana", flags: kept }),
+        confirmed(2),
+        ImportTakenBack.make({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+        ImportReopened.make({ change: 4, by: "dana" })
+      ),
+      Story.given(row12, decided({ change: 1, by: "dana", step: "d1", flags: kept })),
+      // The row holds this very keep, recorded in the first opening: its copy records nothing, and is not refused.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept, opening: 0 })),
+      Story.then(row12),
+      Story.then(life),
+      // Any other press made in the first opening is refused: under a new step, with another text, or from
+      // someone else.
+      Story.when(act({ row: "row-12", step: "d2", saw: 0, flags: kept, opening: 0 })),
+      Story.rejected(ConfirmedSince.make({})),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: leftOut, opening: 0 })),
+      Story.rejected(ConfirmedSince.make({})),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept, opening: 0 })),
+      Story.rejected(ConfirmedSince.make({}))
     )
 )
 it.effect(
@@ -1222,6 +1264,34 @@ it.effect("an undo that puts back another person's decision stops there", () =>
   )
 )
 it.effect(
+  "a row's undo from a screen that has neither another person's decision over its sender's nor that person's undo is held, not applied: Dana keeps row 12, Ana leaves it out and takes that back, and Dana, whose screen has neither, takes her keep back",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      ...recorded(row12, "row-12", { change: 1, by: "dana", step: "d1", flags: kept }),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 1, flags: leftOut })),
+      ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a1", flags: leftOut }),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "ana" })),
+      Story.then(life, undone({ change: 3, row: "row-12", step: "u1", holds: 1, by: "dana", flags: kept })),
+      // The row holds Dana's keep again, as her screen shows it, and her undo names it. It is refused with who took
+      // the undo her screen has not received and of which change, and nothing is recorded.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-12", undo: 1, step: "u2" })),
+      Story.rejected(UndoneSince.make({ by: "ana", change: 2 })),
+      // Once her screen has Ana's undo, the same press is taken.
+      Story.when(undo({ row: "row-12", undo: 1, step: "u2", sawUndone: 2 })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u2", by: "dana" })),
+      Story.then(
+        life,
+        undone({ change: 4, row: "row-12", step: "u2", holds: 0, by: "", flags: "", madeOn: -1, actor: "dana" })
+      )
+    )
+)
+it.effect(
   "a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
   () =>
     story(
@@ -1240,7 +1310,7 @@ it.effect(
       Story.when(undo({ row: "row-12", undo: 6, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: letGo, below: "", undo: 6, step: "u1", by: "ana" })),
       Story.then(life, undone({ change: 7, row: "row-12", step: "u1", holds: 5, by: "ana", flags: "5" })),
-      Story.when(undo({ row: "row-12", undo: 5, step: "u2" })),
+      Story.when(undo({ row: "row-12", undo: 5, step: "u2", sawUndone: 6 })),
       Story.rejected(HistoryEnds.make({}))
     )
 )

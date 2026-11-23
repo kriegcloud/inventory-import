@@ -14,25 +14,28 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import {
-  FromEnvironment,
   NotGiven,
-  OnHostname,
   OnWorkersDev,
-  StagePlan,
+  PersonalPlan,
+  PersonalStageName,
+  PreviewPlan,
+  PreviewStageName,
+  ProductionPlan,
   type SettingSource,
   StageKind,
+  type StagePlan,
+  StagingPlan,
+  TestPlan,
+  TestStageName,
   type TestPassword
 } from "./Stage.schema.ts"
 import { $InfraId } from "./internal/identity.ts"
 
 const $I = $InfraId.create("StagePlan")
 
-/**
- * The address people open production at, and the zone it is on.
- *
- * @category constants
- */
-export const production = { hostname: "inventory.beep-effect.com", zone: "beep-effect.com" } as const
+import { production } from "./Stage.schema.ts"
+
+export { production }
 
 /**
  * The stage name is none of: `prod`, `staging`, `pr-<number>`, `test_<user>`, `dev_<user>`.
@@ -50,12 +53,13 @@ export class UnknownStage extends S.TaggedError<UnknownStage, { readonly brand: 
   }
 }
 
-const kinds: ReadonlyArray<readonly [RegExp, StageKind]> = [
-  [/^prod$/, "production"],
-  [/^staging$/, "staging"],
-  [/^pr-[1-9][0-9]{0,8}$/, "preview"],
-  [/^test_[a-z0-9][-_a-z0-9]{0,40}$/, "test"],
-  [/^dev_[a-z0-9][-_a-z0-9]{0,40}$/, "personal"]
+// Each kind's names, as its case of the plan holds them: the schema is the one place a name pattern is written.
+const kinds: ReadonlyArray<readonly [(stage: string) => boolean, StageKind]> = [
+  [(stage) => stage === "prod", "production"],
+  [(stage) => stage === "staging", "staging"],
+  [S.is(PreviewStageName), "preview"],
+  [S.is(TestStageName), "test"],
+  [S.is(PersonalStageName), "personal"]
 ]
 
 /**
@@ -65,7 +69,7 @@ const kinds: ReadonlyArray<readonly [RegExp, StageKind]> = [
  * @example kindOf("live_ben") // Result.fail(UnknownStage)
  */
 export const kindOf = (stage: string): Result.Result<StageKind, UnknownStage> => {
-  for (const [pattern, kind] of kinds) if (pattern.test(stage)) return Result.succeed(kind)
+  for (const [isOf, kind] of kinds) if (isOf(stage)) return Result.succeed(kind)
   return Result.fail(UnknownStage.make({ stage }))
 }
 
@@ -78,33 +82,27 @@ const nowhere = NotGiven.make({})
  * @example planFor("pr-42") // preview: workers.dev, the test organizations and accounts, sign-up closed, no model key
  */
 export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =>
-  Result.map(kindOf(stage), (kind) => {
+  Result.map(kindOf(stage), (kind): StagePlan => {
     // A stage that is not production: the test organizations and accounts, sign-up closed, no model key.
-    const rehearsal = (deployed: boolean): StagePlan =>
-      StagePlan.make({
-        stage,
-        kind,
-        address: OnWorkersDev.make({}),
-        seeds: ["organizations", "accounts"],
-        modelKey: nowhere,
-        signUp: nowhere,
-        deployed
-      })
+    const rehearsal = {
+      stage,
+      address: OnWorkersDev.make({}),
+      seeds: ["organizations", "accounts"] as const,
+      modelKey: nowhere,
+      signUp: nowhere
+    }
     return StageKind.match(kind, {
       production: () =>
-        StagePlan.make({
-          stage,
-          kind,
-          address: OnHostname.make(production),
+        ProductionPlan.make({
+          address: { at: "hostname", ...production },
           seeds: [],
-          modelKey: FromEnvironment.make({ variable: "OPENROUTER_API_KEY" }),
-          signUp: FromEnvironment.make({ variable: "SIGN_UP" }),
-          deployed: true
+          modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
+          signUp: { from: "environment", variable: "SIGN_UP" }
         }),
-      preview: () => rehearsal(true),
-      staging: () => rehearsal(true),
-      test: () => rehearsal(true),
-      personal: () => rehearsal(false)
+      preview: () => PreviewPlan.make(rehearsal),
+      staging: () => StagingPlan.make({ ...rehearsal, stage: "staging" }),
+      test: () => TestPlan.make(rehearsal),
+      personal: () => PersonalPlan.make(rehearsal)
     })
   })
 
@@ -212,7 +210,10 @@ export class MissingPreviewToken extends S.TaggedError<MissingPreviewToken, { re
       `The repository's stack has no Cloudflare token for previews and staging: ${this.variable} is not set, so no ` +
       `pull request could get a preview and main could not reach staging. Write the references ` +
       `${this.variable}="op://<vault>/<item>/<field>" and ${previewAccountVariable}="op://<vault>/<item>/<field>" ` +
-      `in packages/infra/env/op.env.local (git ignores it) and deploy the stack again; it asks 1Password for both.`
+      `in packages/infra/env/op.env.local (git ignores it) and deploy the stack again; it asks 1Password for both. ` +
+      `If they are written there already, one of three things kept 1Password's answer out: CI is set in your shell ` +
+      `(the stack then asks 1Password for nothing, as in a workflow: unset it), the 1Password field is empty, or ` +
+      `${this.variable} is exported empty in your shell (an empty one is used before 1Password's answer: unset it).`
     )
   }
 }
@@ -274,7 +275,7 @@ export class MissingModelKey extends S.TaggedError<MissingModelKey, { readonly b
  */
 export const modelKeyFor = <Key>(input: {
   readonly stage: string
-  readonly source: SettingSource
+  readonly source: SettingSource | StagePlan["modelKey"]
   readonly key: O.Option<Key>
   readonly withoutOnPurpose: boolean
 }): Result.Result<O.Option<Key>, MissingModelKey> => {

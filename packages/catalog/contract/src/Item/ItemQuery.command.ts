@@ -1,6 +1,11 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as A from "effect/Array"
+import * as BigDecimal from "effect/BigDecimal"
+import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as S from "effect/Schema"
-import { StoredItem } from "./Item.read.ts"
+import * as SchemaGetter from "effect/SchemaGetter"
+import { categories, Category, maxCount, StoredItem, UnitCost, Uom, uoms } from "./Item.read.ts"
 import { ItemSearchText } from "./ItemSearch.read.ts"
 import { nullAsNone } from "@inventory/kernel/Wire"
 
@@ -165,34 +170,138 @@ export const ItemPage = S.Struct({
 /** The decoded value of `ItemPage`: one page of items, and how many pages and items the same filters give in all. */
 export type ItemPage = typeof ItemPage.Type
 
-const Count = S.Struct({
-  value: S.String.annotateKey({ description: "The value as stored" }),
-  count: S.Int.annotateKey({ description: "How many items have it" })
-}).annotate({ description: "One value in use, and how many items have it" })
-const Range = S.Struct({
-  min: S.Finite.pipe(nullAsNone({ description: "The lowest value; null when no item has one" })),
-  max: S.Finite.pipe(nullAsNone({ description: "The highest value; null when no item has one" }))
-}).annotate({ description: "The lowest and highest value; null when no item has one" })
+// One value a facet offers: only a value an item can have. The type stays text, the form the host reads from SQL;
+// the check holds it to the list, and generates from it.
+const facetValue = (values: ReadonlyArray<string>, description: string) =>
+  S.String.check(S.isPattern(new RegExp(`^(${A.join(values, "|")})$`))).annotateKey({ description })
+
+// How many items have a value: one at least, since a value no item has is left out.
+const itemCount = S.Int.check(S.isBetween({ minimum: 1, maximum: maxCount })).annotateKey({
+  description: "How many items have it: one at least, since a value no item has is left out"
+})
+
+const facetCounts = (values: ReadonlyArray<string>, description: string) =>
+  S.Array(
+    S.Struct({ value: facetValue(values, "The value as stored"), count: itemCount }).annotate({
+      description: "One value in use, and how many items have it"
+    })
+  )
+    .check(S.isMaxLength(values.length))
+    .annotateKey({ description })
+
+const switchValues = ["true", "false"] as const
+
+// The ends of a range: both there when the organization has items, both null when it has none.
+const range = <End extends S.Top>(end: End, description: string) =>
+  S.Struct({
+    min: end.pipe(nullAsNone({ description: "The lowest value; null when no item has one" })),
+    max: end.pipe(nullAsNone({ description: "The highest value; null when no item has one" }))
+  }).annotateKey({ description })
+
+// A unit cost as the host's range reads it: dollars as a number, never below zero, no higher than a cost can be.
+const costEnd = S.Finite.check(S.isBetween({ minimum: 0, maximum: 1_000_000_000_000 }))
+const quantityEnd = S.Int.check(S.isBetween({ minimum: 0, maximum: maxCount }))
+
+const ItemFacetsWire = S.Struct({
+  total: S.Int.check(S.isBetween({ minimum: 0, maximum: maxCount })).annotateKey({
+    description: "How many items the organization has, unfiltered"
+  }),
+  category: facetCounts(categories, "Each category in use, and how many items have it"),
+  uom: facetCounts(uoms, "Each unit of measure in use, and how many items have it"),
+  isActive: facetCounts(
+    switchValues,
+    'How many items are active ("true") and how many are not ("false"); a value no item has is left out'
+  ),
+  lotTracked: facetCounts(
+    switchValues,
+    'How many items are lot tracked ("true") and how many are not ("false"); a value no item has is left out'
+  ),
+  quantityOnHand: range(quantityEnd, "The lowest and highest quantity on hand; null with no items"),
+  unitCost: range(costEnd, "The lowest and highest unit cost, in dollars; null with no items")
+})
+type ItemFacetsShape = typeof ItemFacetsWire.Type
+type Listed = ItemFacetsShape["category"]
+type Range = ItemFacetsShape["unitCost"]
+
+const isFacetsWire = S.is(ItemFacetsWire)
+
+/** True when the list counts every one of `total` items once, each value once. */
+const countsAll = (listed: Listed, total: number): boolean =>
+  A.reduce(listed, 0, (n, entry) => n + entry.count) === total &&
+  A.dedupe(A.map(listed, (entry) => entry.value)).length === listed.length
+
+/** True when the range has both ends exactly when there are items, the lowest first. */
+const spans = (ends: Range, total: number): boolean =>
+  O.isSome(ends.min) && O.isSome(ends.max)
+    ? total > 0 && ends.min.value <= ends.max.value
+    : O.isNone(ends.min) && O.isNone(ends.max) && total === 0
+
+/** True when the facets are what some list of items would give: every count adds up, every range in order. */
+const describesItems = (facets: ItemFacetsShape): boolean =>
+  countsAll(facets.category, facets.total) &&
+  countsAll(facets.uom, facets.total) &&
+  countsAll(facets.isActive, facets.total) &&
+  countsAll(facets.lotTracked, facets.total) &&
+  spans(facets.quantityOnHand, facets.total) &&
+  spans(facets.unitCost, facets.total)
+
+// What generated facets are counted from: the items themselves, as the host counts them in SQL.
+const FacetItems = S.Array(
+  S.Struct({
+    category: Category,
+    uom: Uom,
+    isActive: S.Boolean,
+    lotTracked: S.Boolean,
+    quantityOnHand: quantityEnd,
+    unitCost: UnitCost
+  })
+)
+type FacetItem = (typeof FacetItems.Type)[number]
+
+const countsOf = (items: ReadonlyArray<FacetItem>, valueOf: (item: FacetItem) => string): Listed =>
+  A.map(A.dedupe(A.map(items, valueOf)), (value) => ({
+    value,
+    count: A.filter(items, (item) => valueOf(item) === value).length
+  }))
+
+const rangeOf = (ends: ReadonlyArray<number>): Range => {
+  const sorted = A.sort(ends, Order.Number)
+  return { min: A.head(sorted), max: A.last(sorted) }
+}
+
+const facetsOf = (items: ReadonlyArray<FacetItem>): ItemFacetsShape => ({
+  total: items.length,
+  category: countsOf(items, (item) => item.category),
+  uom: countsOf(items, (item) => item.uom),
+  isActive: countsOf(items, (item) => `${item.isActive}`),
+  lotTracked: countsOf(items, (item) => `${item.lotTracked}`),
+  quantityOnHand: rangeOf(A.map(items, (item) => item.quantityOnHand)),
+  unitCost: rangeOf(A.map(items, (item) => BigDecimal.toNumberUnsafe(item.unitCost)))
+})
+
+const CountedFacets = S.declare(
+  (input: unknown): input is ItemFacetsShape => isFacetsWire(input) && describesItems(input),
+  {
+    identifier: "CountedFacets",
+    description: "Facets whose every list counts each item once and whose ranges are there exactly when items are",
+    expected:
+      "facets whose lists each add up to the total, and whose ranges have both ends, lowest first, when there are items",
+    // Arbitrary facets are counted from arbitrary items, as the host counts its own: they always describe items.
+    toCodecArbitrary: () =>
+      S.link<ItemFacetsShape>()(FacetItems, {
+        decode: SchemaGetter.transform(facetsOf),
+        encode: SchemaGetter.forbiddenEncoding
+      })
+  }
+)
 
 /**
  * What the filters can offer for this organization's items: each category and unit of measure in use with how many
  * items have it, and the lowest and highest quantity on hand and unit cost (dollars). Counted over all the items, not
- * the filtered ones.
+ * the filtered ones. Every item has a category, a unit and both switches, so each list adds up to `total`; and a range
+ * has both ends exactly when there are items. Facets that say otherwise are refused.
  */
-export const ItemFacets = S.Struct({
-  total: S.Int.annotateKey({ description: "How many items the organization has, unfiltered" }),
-  category: S.Array(Count).annotateKey({ description: "Each category in use, and how many items have it" }),
-  uom: S.Array(Count).annotateKey({ description: "Each unit of measure in use, and how many items have it" }),
-  isActive: S.Array(Count).annotateKey({
-    description: 'How many items are active ("true") and how many are not ("false"); a value no item has is left out'
-  }),
-  lotTracked: S.Array(Count).annotateKey({
-    description:
-      'How many items are lot tracked ("true") and how many are not ("false"); a value no item has is left out'
-  }),
-  quantityOnHand: Range.annotateKey({ description: "The lowest and highest quantity on hand; null with no items" }),
-  unitCost: Range.annotateKey({ description: "The lowest and highest unit cost, in dollars; null with no items" })
-}).annotate({
+export const ItemFacets = ItemFacetsWire.pipe(S.decodeTo(CountedFacets)).annotate({
   identifier: "ItemFacets",
   description:
     "What the filters can offer for this organization's items: each category and unit in use with how many items have it, and the lowest and highest quantity on hand and unit cost"

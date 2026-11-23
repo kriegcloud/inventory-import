@@ -173,15 +173,21 @@ export type ItemPage = typeof ItemPage.Type
 
 // One value a facet offers: only a value an item can have. The type stays text, the form the host reads from SQL;
 // the check holds it to the list, and generates from it.
-const facetValue = (values: ReadonlyArray<string>, description: string) =>
+const facetValueSchema = (values: ReadonlyArray<string>, description: string) =>
   S.String.check(S.isPattern(new RegExp(`^(${A.join(values, "|")})$`))).annotateKey({ description })
+const facetValue: {
+  (description: string): (values: ReadonlyArray<string>) => ReturnType<typeof facetValueSchema>
+  (values: ReadonlyArray<string>, description: string): ReturnType<typeof facetValueSchema>
+} = dual(2, facetValueSchema)
 
 // How many items have a value: one at least, since a value no item has is left out.
 const itemCount = S.Int.check(S.isBetween({ minimum: 1, maximum: maxCount })).annotateKey({
   description: "How many items have it: one at least, since a value no item has is left out"
 })
 
-const facetCounts = (values: ReadonlyArray<string>, description: string) =>
+// Each value in use and how many items have it. A value is listed once at most (the facets' own check), so the list
+// is bounded by the values before that check reads it.
+const facetCountsSchema = (values: ReadonlyArray<string>, description: string) =>
   S.Array(
     S.Struct({ value: facetValue(values, "The value as stored"), count: itemCount }).annotate({
       description: "One value in use, and how many items have it"
@@ -189,15 +195,23 @@ const facetCounts = (values: ReadonlyArray<string>, description: string) =>
   )
     .check(S.isMaxLength(values.length))
     .annotateKey({ description })
+const facetCounts: {
+  (description: string): (values: ReadonlyArray<string>) => ReturnType<typeof facetCountsSchema>
+  (values: ReadonlyArray<string>, description: string): ReturnType<typeof facetCountsSchema>
+} = dual(2, facetCountsSchema)
 
 const switchValues = ["true", "false"] as const
 
 // The ends of a range: both there when the organization has items, both null when it has none.
-const range = <End extends S.Top>(end: End, description: string) =>
+const rangeSchema = <End extends S.Top>(end: End, description: string) =>
   S.Struct({
     min: end.pipe(nullAsNone({ description: "The lowest value; null when no item has one" })),
     max: end.pipe(nullAsNone({ description: "The highest value; null when no item has one" }))
   }).annotateKey({ description })
+const range: {
+  (description: string): <End extends S.Top>(end: End) => ReturnType<typeof rangeSchema<End>>
+  <End extends S.Top>(end: End, description: string): ReturnType<typeof rangeSchema<End>>
+} = dual(2, rangeSchema)
 
 // A unit cost as the host's range reads it: dollars as a number, never below zero, no higher than a cost can be.
 const costEnd = S.Finite.check(S.isBetween({ minimum: 0, maximum: 1_000_000_000_000 }))

@@ -16,7 +16,10 @@ import { openPage, signedInAs } from "./support/page.ts"
 // A cold start of the app's modules, on a busy machine.
 
 // Drawn on a server, where no effect runs: what a component mounts is told as it is drawn.
-const drawing = vi.hoisted(() => ({ mounted: [] as Array<unknown> }))
+const drawing = vi.hoisted(() => {
+  const mounted: Array<unknown> = []
+  return { mounted }
+})
 vi.mock("@effect/atom-react", (original) =>
   original<typeof import("@effect/atom-react")>().then((all) => ({
     ...all,

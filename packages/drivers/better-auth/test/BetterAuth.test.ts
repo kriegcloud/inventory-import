@@ -4,10 +4,9 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { BetterAuthSettings } from "@beep/better-auth/BetterAuthConfig"
+import { BetterAuthSettings, PublicUrl } from "@beep/better-auth/BetterAuthConfig"
 import {
   AuthEmail,
   AuthEndpoint,
@@ -59,24 +58,26 @@ describe("a span's endpoint", () => {
   })
 })
 
+const runs = { arbitrary: { runs: 50 } }
+
+/** `schema` generates only values it accepts. */
+const generatesOnlyValid = <Schema extends S.Top>(name: string, schema: Schema) =>
+  it.prop(
+    name,
+    [Arbitrary.schema(schema)],
+    ([value]) => {
+      expect(S.is(schema)(value)).toBe(true)
+    },
+    runs
+  )
+
 describe("every schema generates only valid values", () => {
-  const schemas = {
-    AuthUserId,
-    AuthOrganizationId,
-    AuthEmail,
-    AuthEndpoint,
-    AuthSession,
-    AuthSecret,
-    BetterAuthSettings
-  }
-  for (const [name, schema] of R.toEntries(schemas)) {
-    it.prop(
-      name,
-      [Arbitrary.schema(schema as S.Top)],
-      ([value]) => {
-        expect(S.is(schema as S.Top)(value)).toBe(true)
-      },
-      { arbitrary: { runs: 50 } }
-    )
-  }
+  generatesOnlyValid("AuthUserId", AuthUserId)
+  generatesOnlyValid("AuthOrganizationId", AuthOrganizationId)
+  generatesOnlyValid("AuthEmail", AuthEmail)
+  generatesOnlyValid("AuthEndpoint", AuthEndpoint)
+  generatesOnlyValid("AuthSession", AuthSession)
+  generatesOnlyValid("AuthSecret", AuthSecret)
+  generatesOnlyValid("BetterAuthSettings", BetterAuthSettings)
+  generatesOnlyValid("PublicUrl", PublicUrl)
 })

@@ -36,8 +36,8 @@ const endpoint = "http://collector.test"
  * usual. Each test starts it afresh with `collectorSeen.reset()`.
  */
 const collectorSeen = {
-  sent: [] as Array<string>,
-  bodies: [] as Array<string>,
+  sent: A.empty<string>(),
+  bodies: A.empty<string>(),
   answer: (): Promise<Response> =>
     Promise.resolve(new Response("{}", { status: 200, headers: { "content-type": "application/json" } })),
   reset() {

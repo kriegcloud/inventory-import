@@ -2,6 +2,7 @@ import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import * as S from "effect/Schema"
 import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -22,8 +23,12 @@ import {
   reviewJobs
 } from "../../../../../../packages/review/test/fixtures/jobs.ts"
 
-type View = "jobs" | "questions"
-type JobFilter = "waiting" | "ready" | "out" | "all"
+/** The two views of the jobs page: the jobs themselves, or the questions they wait on. */
+const View = S.Literals(["jobs", "questions"])
+type View = typeof View.Type
+/** Which jobs the list shows. */
+const JobFilter = S.Literals(["waiting", "ready", "out", "all"])
+type JobFilter = typeof JobFilter.Type
 
 const jobs = makeJobs()
 const whole = new Intl.NumberFormat("en-US")
@@ -119,7 +124,7 @@ export function JobsReview() {
           aria-label="View"
           value={view}
           onValueChange={(next) => {
-            if (next !== "") setView(next as View)
+            if (S.is(View)(next)) setView(next)
           }}
         >
           <ToggleGroupItem value="jobs">
@@ -137,7 +142,7 @@ export function JobsReview() {
             aria-label="Show jobs"
             value={filter}
             onValueChange={(next) => {
-              if (next !== "") setFilter(next as JobFilter)
+              if (S.is(JobFilter)(next)) setFilter(next)
             }}
           >
             {filters.map((entry) => (

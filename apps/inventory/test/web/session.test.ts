@@ -24,7 +24,10 @@ vi.mock("sonner", () => ({
 }))
 // Better Auth's client, as the app loads it: a switch of organization the server takes, or refuses.
 // A switch the test holds (`hold`) is answered when the test says.
-const auth = vi.hoisted(() => ({ refuses: false, hold: undefined as Promise<void> | undefined }))
+const auth = vi.hoisted(() => {
+  const held: { refuses: boolean; hold: Promise<void> | undefined } = { refuses: false, hold: undefined }
+  return held
+})
 vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
   authClient: {
     organization: {
@@ -459,7 +462,7 @@ const browserWithServer = Effect.fnUntraced(function* () {
         import("effect/http/Headers")
       ])
     )
-  const server = { cookie: "mem_dana/org_prairie", done: [] as Array<string>, named: [] as Array<string> }
+  const server = { cookie: "mem_dana/org_prairie", done: A.empty<string>(), named: A.empty<string>() }
   const client = http.ofThisPage(
     HttpClient.make((request) =>
       Effect.sync(() => {

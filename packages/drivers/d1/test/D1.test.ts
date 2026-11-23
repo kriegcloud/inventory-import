@@ -5,6 +5,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
+import * as Str from "effect/String"
 import * as SqlSchema from "effect/sql/SqlSchema"
 import { D1, NoRows } from "@beep/d1/D1"
 import { D1Error } from "@beep/d1/D1Error"
@@ -19,6 +20,8 @@ const Database = D1Test.layer(
 )
 
 const NoteId = S.String.check(S.isMinLength(1)).pipe(S.brand("NoteId"))
+// A note's text as a statement binds it: at most 200 characters, so a request can be refused before any SQL runs.
+const Body = S.String.check(S.isMaxLength(200))
 const Note = S.Struct({ id: NoteId, body: S.String, tag: S.String })
 
 layer(Database)("D1", (it) => {
@@ -26,7 +29,7 @@ layer(Database)("D1", (it) => {
 
   const insert = Effect.map(sql, (client) =>
     D1.statement({
-      Request: S.Struct({ id: NoteId, body: S.String }),
+      Request: S.Struct({ id: NoteId, body: Body }),
       Result: NoRows,
       execute: (r) => client`INSERT INTO note (id, body) VALUES (${r.id}, ${r.body})`
     })
@@ -98,7 +101,7 @@ layer(Database)("D1", (it) => {
         const error = yield* Effect.flip(
           d1.batch([
             make({ id: NoteId.make("five"), body: "Fifth" }),
-            make({ id: "" as typeof NoteId.Type, body: "x" })
+            make({ id: NoteId.make("six"), body: Str.repeat(201)("x") })
           ])
         )
         expect(S.is(D1Error)(error)).toBe(true)

@@ -28,7 +28,7 @@ import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
 import { signIn } from "@inventory/access-host/SignIn"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
-import { MemberId, type OrganizationId } from "@inventory/kernel/Ids"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
@@ -124,7 +124,7 @@ const seededLines = (at: DateTime.Utc): ReadonlyArray<Activity> =>
   A.map(["org_prairie", "org_northline"] as const, (org, index) =>
     Activity.make({
       id: ActivityId.make(`00000000-0000-4000-8000-00000000000${index}`),
-      organizationId: org as OrganizationId,
+      organizationId: OrganizationId.make(org),
       actorId: MemberId.make(org === "org_prairie" ? "mem_dana" : "mem_elena"),
       actorName: "Seeded",
       action: "Uploaded a file",

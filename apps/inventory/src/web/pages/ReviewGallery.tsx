@@ -1,5 +1,6 @@
 import { LayoutGridIcon } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
@@ -222,7 +223,15 @@ export default function ReviewGallery() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuRadioGroup value={state} onValueChange={(next) => choose(next as GalleryState)}>
+            <DropdownMenuRadioGroup
+              value={state}
+              onValueChange={(next) =>
+                O.map(
+                  A.findFirst(states, ([id]) => id === next),
+                  ([id]) => choose(id)
+                )
+              }
+            >
               {states.map(([id, label]) => (
                 <DropdownMenuRadioItem key={id} value={id}>
                   {label}

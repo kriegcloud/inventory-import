@@ -51,6 +51,28 @@ export const fieldLabels: Readonly<Record<Field, string>> = {
   vendors: "Vendors"
 }
 
+/**
+ * Each field as a sentence names it after its first word ("Type the unit of measure", "quantity on hand is a whole
+ * number"): `fieldLabels` in lower case, written out so no code changes a label's case. SKU keeps its capitals.
+ */
+export const fieldWords: Readonly<Record<Field, string>> = {
+  sku: "SKU",
+  name: "name",
+  description: "description",
+  category: "category",
+  uom: "unit of measure",
+  unitCost: "unit cost",
+  quantityOnHand: "quantity on hand",
+  reorderPoint: "reorder point",
+  isActive: "active",
+  lotTracked: "lot tracked",
+  tags: "tags",
+  firstReceivedOn: "first received",
+  discontinuedOn: "discontinued on",
+  dimensions: "dimensions",
+  vendors: "vendors"
+}
+
 /** Fields an item must have. A file with no column for one of these cannot produce a ready row. */
 export const requiredFields: ReadonlyArray<Field> = ["sku", "name", "category", "uom", "unitCost"]
 

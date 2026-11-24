@@ -8,7 +8,7 @@ import { plural } from "../Words.rules.ts"
 import { type Review, type ReviewedRow } from "../Review/Review.rules.ts"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
-import { filledAt } from "../Review/CellRules.rules.ts"
+import { cellValue, filledAt, isBlank, nameFromDescription, wordsIn } from "../Review/CellRules.rules.ts"
 import {
   type NewSuggestion,
   Suggestion,
@@ -35,7 +35,7 @@ export const SuggestAnswer = S.Struct({
   names: S.Array(
     S.Struct({
       rowNumber: S.Int.annotateKey({ description: "A rowNumber from rowsWithoutName" }),
-      name: S.String.annotateKey({
+      name: S.Trim.annotateKey({
         description: "A short name for the item, taken from its description: the thing itself, in title case"
       })
     })
@@ -43,7 +43,7 @@ export const SuggestAnswer = S.Struct({
   categories: S.Array(
     S.Struct({
       rowNumber: S.Int.annotateKey({ description: "A rowNumber from rowsWithoutCategory" }),
-      category: S.String.annotateKey({ description: "One value copied from the categories list, exactly as written" })
+      category: S.Trim.annotateKey({ description: "One value copied from the categories list, exactly as written" })
     })
   ),
   columns: S.Array(
@@ -82,7 +82,7 @@ export const digest = (source: SuggestSource) => {
   const rows = source.review.rows
   const nameless = A.filter(
     rows,
-    (row) => open(row, "missing", "name") && Str.trim(row.file.description) !== "" && !has(source, row, "name")
+    (row) => open(row, "missing", "name") && !isBlank(row.file.description) && !has(source, row, "name")
   )
   const uncategorised = A.filter(rows, (row) => open(row, "category", "category") && !has(source, row, "category"))
   const unmatched = A.filter(
@@ -94,15 +94,15 @@ export const digest = (source: SuggestSource) => {
   return {
     rowsWithoutName: A.map(A.take(nameless, suggestCap), (row) => ({
       rowNumber: row.rowNumber,
-      sku: Str.slice(0, 40)(Str.trim(row.file.sku)),
-      description: Str.slice(0, 200)(Str.trim(row.file.description)),
+      sku: Str.slice(0, 40)(cellValue(row.file.sku)),
+      description: Str.slice(0, 200)(cellValue(row.file.description)),
       category: Str.slice(0, 40)(row.values.category)
     })),
     rowsWithoutCategory: A.map(A.take(uncategorised, suggestCap), (row) => ({
       rowNumber: row.rowNumber,
-      written: Str.slice(0, 60)(Str.trim(row.file.category)),
-      name: Str.slice(0, 120)(Str.trim(row.values.name)),
-      description: Str.slice(0, 200)(Str.trim(row.file.description))
+      written: Str.slice(0, 60)(cellValue(row.file.category)),
+      name: Str.slice(0, 120)(cellValue(row.values.name)),
+      description: Str.slice(0, 200)(cellValue(row.file.description))
     })),
     categories,
     fieldsWithoutColumn: A.map(unmatched, (match) => ({ field: match.field, label: fieldLabels[match.field] })),
@@ -129,27 +129,6 @@ export const questions = (input: SuggestDigest): number =>
   input.rowsWithoutName.length +
   input.rowsWithoutCategory.length +
   (input.unusedHeadings.length === 0 ? 0 : input.fieldsWithoutColumn.length)
-
-const words = (text: string): ReadonlyArray<string> =>
-  A.filter(Str.split(/[^a-z0-9/]+/)(Str.toLowerCase(text)), (word) => word !== "")
-
-/**
- * A name read from a description by rule: its words before " for ", a comma or a full stop, each starting with a
- * capital. None when that leaves nothing or more than a name holds.
- *
- * @example nameFromDescription("Nylon coil for general use.") // O.some("Nylon Coil")
- */
-export const nameFromDescription = (description: string): O.Option<string> => {
-  const lead = Str.trim(Str.split(/\s+for\s+|[,.;:](?:\s|$)/i)(Str.trim(description))[0] ?? "")
-  const name = A.join(
-    A.map(
-      A.filter(Str.split(/\s+/)(lead), (word) => word !== ""),
-      (word) => `${Str.toUpperCase(Str.slice(0, 1)(word))}${Str.slice(1)(word)}`
-    ),
-    " "
-  )
-  return name === "" || name.length > maxNameLength ? O.none() : O.some(name)
-}
 
 /**
  * The fixed rules' own answer, for when no model can be asked: a name from each description, and nothing else. A
@@ -194,7 +173,7 @@ export const guard = (input: {
   const names = A.map(
     A.dedupeWith(input.answer.names, (a, b) => a.rowNumber === b.rowNumber),
     (entry): Judged => {
-      const to = Str.trim(entry.name)
+      const to = entry.name
       const what = `Name "${Str.slice(0, 60)(to)}" for row ${entry.rowNumber}`
       const row = O.filter(rowOf(entry.rowNumber), (found) =>
         A.some(asked.rowsWithoutName, (shown) => shown.rowNumber === found.rowNumber)
@@ -205,10 +184,10 @@ export const guard = (input: {
         return no(what, `It is ${to.length} characters long. A name has at most ${maxNameLength}.`)
       }
       if (!suggestionFits({ kind: "name", to, file: row.value.file })) return no(what, "The row has a name.")
-      const description = Str.trim(row.value.file.description)
-      const told = words(description)
+      const description = cellValue(row.value.file.description)
+      const told = wordsIn(description)
       // Medium only when every word of the name is a word of the description: then it says nothing the file does not.
-      const drawn = SuggestionBy.guards.model(by) && A.every(words(to), (word) => A.contains(told, word))
+      const drawn = SuggestionBy.guards.model(by) && A.every(wordsIn(to), (word) => A.contains(told, word))
       return yes({
         kind: "name",
         rowId: row.value.id,
@@ -236,22 +215,21 @@ export const guard = (input: {
         A.some(asked.rowsWithoutCategory, (shown) => shown.rowNumber === found.rowNumber)
       )
       if (O.isNone(row)) return no(what, "It is not a row whose category is off the list.")
-      const to = A.findFirst(categories, (category) => category === Str.trim(entry.category))
+      const to = A.findFirst(categories, (category) => category === entry.category)
       if (O.isNone(to) || !suggestionFits({ kind: "category", to: to.value, file: row.value.file })) {
         return no(what, `It is not one of the ${categories.length} categories.`)
       }
       // The evidence a person would look at: the other rows whose name starts with the same word, and what they say.
-      const first = words(row.value.values.name)[0] ?? ""
+      const first = A.head(wordsIn(row.value.values.name))
       const kin = A.filter(
         rows,
         (other) =>
           other.id !== row.value.id &&
-          first !== "" &&
-          words(other.values.name)[0] === first &&
+          O.exists(first, (word) => O.exists(A.head(wordsIn(other.values.name)), (theirs) => theirs === word)) &&
           isCategory(other.values.category)
       )
       const agree = A.filter(kin, (other) => other.values.category === to.value).length
-      const written = Str.trim(row.value.file.category)
+      const written = cellValue(row.value.file.category)
       return yes({
         kind: "category",
         rowId: row.value.id,

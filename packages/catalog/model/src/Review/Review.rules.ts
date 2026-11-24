@@ -9,7 +9,15 @@
  *
  * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
  */
-import { Field, StagedRow, StagedTable, fields, fieldLabels, requiredFields } from "@inventory/catalog-contract/Staged"
+import {
+  Field,
+  StagedRow,
+  StagedTable,
+  fields,
+  fieldLabels,
+  fieldWords,
+  requiredFields
+} from "@inventory/catalog-contract/Staged"
 import { Confidence, Change, typedChange, acceptedProposal, appliedByRule } from "@inventory/catalog-contract/Change"
 import { RowId } from "@inventory/catalog-contract/Ids"
 import {
@@ -31,7 +39,6 @@ import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import {
   canonicalTags,
@@ -48,8 +55,6 @@ import {
   itemText,
   isUom,
   isCategory,
-  categoryKey,
-  booleanWord,
   twoDigitYear,
   thousandsComma,
   decimalComma,
@@ -64,7 +69,23 @@ import {
   suggestionField as suggestionFieldOf,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
-import { cellAt, filledAt, reviewText } from "./CellRules.rules.ts"
+import {
+  canonical,
+  cellAt,
+  cellValue,
+  DateField,
+  discontinuedYetActive,
+  filledAt,
+  hasSpacesRound,
+  inCapitals,
+  isBlank,
+  isBooleanField,
+  isCountField,
+  isDateField,
+  reviewText,
+  ruleFor,
+  sameValues
+} from "./CellRules.rules.ts"
 import { keepSome, matchColumns, totalRowNumbers } from "./Mapping.rules.ts"
 import { plural } from "../Words.rules.ts"
 import {
@@ -323,99 +344,11 @@ export type Review = {
   }
 }
 
-const DateField = Field.pick(["firstReceivedOn", "discontinuedOn"])
-type DateField = typeof DateField.Type
-const isDateField = S.is(DateField)
-const isCountField = S.is(Field.pick(["quantityOnHand", "reorderPoint"]))
-const isBooleanField = S.is(Field.pick(["isActive", "lotTracked"]))
-
-/**
- * What a typed value is stored as. A person who types "bx" means BX and one who types "yes" means true, so their own
- * typing is read through the same word lists; a value from the file is changed only through a proposal that says so.
- */
-const canonical = (field: Field, text: string): string => {
-  const trimmed = Str.trim(text)
-  if (field === "description") return text
-  if (field === "sku") return skuPattern.test(Str.toUpperCase(trimmed)) ? Str.toUpperCase(trimmed) : trimmed
-  if (field === "uom") return isUom(Str.toUpperCase(trimmed)) ? Str.toUpperCase(trimmed) : trimmed
-  if (field === "category") return isCategory(categoryKey(trimmed)) ? categoryKey(trimmed) : trimmed
-  if (isBooleanField(field)) return O.getOrElse(booleanWord(trimmed), () => trimmed)
-  if (field === "tags") return canonicalTags(trimmed)
-  return trimmed
-}
-
 /**
  * One value for each field of an item, worked out field by field in the order the screens list them (`fieldLabels` is
  * written in that order, which the contract's `CatalogContract.test.ts` holds).
  */
 const ofEachField = <V>(of: (field: Field) => V): Record<Field, V> => R.map(fieldLabels, (_label, field) => of(field))
-
-/** True when the row says it is discontinued and active at once: a date that reads, and Active true or left empty. */
-const discontinuedYetActive = (values: Readonly<Record<Field, string>>): boolean =>
-  O.isSome(readDate(values.discontinuedOn)) && (Str.trim(values.isActive) === "" || values.isActive === "true")
-
-/**
- * The fixed rules' form-only reading of one cell that does not read as written, or none: spaces round a SKU or a
- * name, a listed unit or category in other capitals, a "$" before a cost, a word that can only mean true or false,
- * tags in capitals or repeated, a date written out with one reading. Each says the same thing in the form an item
- * stores, and has no second reading.
- *
- * @example ruleFor({ field: "uom", text: "bx" }) // Some({ to: "BX", rule: "the same unit in capitals" })
- */
-export const ruleFor = (input: {
-  readonly field: Field
-  readonly text: string
-}): O.Option<{ readonly to: string; readonly rule: string }> => {
-  const { field, text } = input
-  const trimmed = Str.trim(text)
-  if (trimmed === "") return O.none()
-  if (field === "sku") {
-    return text !== trimmed && skuPattern.test(trimmed)
-      ? O.some({ to: trimmed, rule: "spaces around the value" })
-      : O.none()
-  }
-  if (field === "name") {
-    return text !== trimmed && trimmed.length <= maxNameLength
-      ? O.some({ to: trimmed, rule: "spaces around the value" })
-      : O.none()
-  }
-  if (field === "uom") {
-    const upper = Str.toUpperCase(trimmed)
-    return !isUom(text) && isUom(upper) ? O.some({ to: upper, rule: "the same unit in capitals" }) : O.none()
-  }
-  if (field === "category") {
-    const key = categoryKey(text)
-    return !isCategory(text) && isCategory(key)
-      ? O.some({ to: key, rule: "the same category in the list's own form" })
-      : O.none()
-  }
-  if (field === "unitCost") {
-    const bare = Str.trim(Str.replace(/^\$/, "")(trimmed))
-    return Str.startsWith("$")(trimmed) && O.isSome(readDecimal(bare))
-      ? O.some({ to: bare, rule: "the same amount without the $" })
-      : O.none()
-  }
-  if (isBooleanField(field)) {
-    return text === "true" || text === "false"
-      ? O.none()
-      : O.map(booleanWord(text), (to) => ({ to, rule: `a usual way to write ${to}` }))
-  }
-  if (field === "tags") {
-    const to = canonicalTags(text)
-    return to !== text && to !== "" ? O.some({ to, rule: "lower case, each tag once" }) : O.none()
-  }
-  // A year written with two digits is a guess at the century: never a form-only fix, and never proposed at all.
-  if (isDateField(field) && O.isNone(readDate(text)) && !twoDigitYear(text)) {
-    const { dayFirst, monthFirst } = dateReadings(text)
-    if (O.isSome(dayFirst) && O.isNone(monthFirst)) {
-      return O.some({ to: dayFirst.value, rule: "the same date written year-month-day" })
-    }
-    if (O.isNone(dayFirst) && O.isSome(monthFirst)) {
-      return O.some({ to: monthFirst.value, rule: "the same date written year-month-day" })
-    }
-  }
-  return O.none()
-}
 
 /** One item of the file before any decision: where it is, and its values by field. */
 type FileRow = {
@@ -507,7 +440,7 @@ const makeContext = (input: {
   const orderOf = (field: DateField) => {
     // Only dates written in numbers say which comes first: "Jun 19, 2024" has one reading and settles nothing.
     const readings = A.map(
-      A.filter(rows, (row) => /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(Str.trim(row.file[field]))),
+      A.filter(rows, (row) => /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(cellValue(row.file[field]))),
       (row) => dateReadings(row.file[field])
     )
     return {
@@ -525,7 +458,7 @@ const makeContext = (input: {
     countOf,
     filledOf,
     dateOrder: { firstReceivedOn: orderOf("firstReceivedOn"), discontinuedOn: orderOf("discontinuedOn") },
-    pointCosts: A.filter(rows, (row) => /^\d+\.\d+$/.test(Str.trim(row.file.unitCost))).length,
+    pointCosts: A.filter(rows, (row) => /^\d+\.\d+$/.test(cellValue(row.file.unitCost))).length,
     suggestions: input.suggestions ?? [],
     totals: A.filter(input.table.rows, (row) => A.contains(totalNumbers, row.rowNumber)),
     unusedColumns: A.map(
@@ -620,8 +553,7 @@ const proposeStored = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
 
 const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Proposal> => {
   const text = row.file[field]
-  const trimmed = Str.trim(text)
-  const label = fieldLabels[field]
+  const trimmed = cellValue(text)
   const rows = plural(ctx.countOf(field, text), "row", "rows")
   const rule = ruleFor({ field, text })
   if (O.isSome(rule)) {
@@ -651,7 +583,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
   }
   if (trimmed === "" && field !== "isActive") return O.none()
   if (field === "sku") {
-    const upper = Str.toUpperCase(trimmed)
+    const upper = inCapitals(trimmed)
     if (!skuPattern.test(trimmed) && skuPattern.test(upper)) {
       const also = ctx.countOf("sku", upper)
       return O.some(
@@ -684,7 +616,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
     }
   }
   if (field === "unitCost" && O.isNone(readDecimal(text))) {
-    const bare = Str.trim(Str.replace(/^\$/, "")(trimmed))
+    const bare = cellValue(Str.replace(/^\$/, "")(trimmed))
     if (thousandsComma.test(bare)) {
       const digits = Str.replaceAll(",", "")(bare)
       const asDecimal = Str.replace(",", ".")(bare)
@@ -743,7 +675,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
         to: digits,
         lossless: false,
         confidence: "medium",
-        basis: `${said(trimmed)} on ${rows} reads as ${named(digits)} with a comma between thousands: ${Str.toLowerCase(label)} is a whole number, so the comma is not a decimal one.`,
+        basis: `${said(trimmed)} on ${rows} reads as ${named(digits)} with a comma between thousands: ${fieldWords[field]} is a whole number, so the comma is not a decimal one.`,
         group: `${field}:thousands`
       })
     )
@@ -813,7 +745,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
   // Discontinued and active at once: one question on the row, asked on Active, with two ways out and neither taken
   // for the person. The second reading is a value of another cell (an empty Discontinued on), so `targets` names it.
   if (field === "isActive" && discontinuedYetActive(row.file)) {
-    const date = Str.trim(row.file.discontinuedOn)
+    const date = cellValue(row.file.discontinuedOn)
     return O.some(
       proposal({
         field,
@@ -878,11 +810,10 @@ type Wrong = {
 const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string>>): Wrong | undefined => {
   const text = values[field]
   const label = fieldLabels[field]
-  const lower = Str.toLowerCase(label)
   // What the edit button names: "SKU" keeps its capitals.
-  const asked = field === "sku" ? label : lower
+  const asked = fieldWords[field]
   const hasColumn = A.some(ctx.mapping, (match) => match.field === field && O.isSome(matchedColumn(match)))
-  const empty = Str.trim(text) === ""
+  const empty = isBlank(text)
   const required = A.contains(requiredFields, field)
   if (!hasColumn && required && empty) {
     return { kind: "column", message: `The file has no column for ${label}.`, ask: `Type the ${asked}` }
@@ -892,7 +823,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (field === "isActive" && (empty || text === "true") && discontinuedYetActive(values)) {
     return {
       kind: "discontinued",
-      message: `Discontinued on ${named(Str.trim(values.discontinuedOn))}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
+      message: `Discontinued on ${named(cellValue(values.discontinuedOn))}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
       ask: "Choose not active",
       choices: ["true", "false"]
     }
@@ -900,17 +831,16 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (empty) return undefined
   if (field === "sku") {
     if (skuPattern.test(text)) return undefined
-    return text !== Str.trim(text) && skuPattern.test(Str.trim(text))
+    return hasSpacesRound(text) && skuPattern.test(cellValue(text))
       ? { kind: "spaces", message: `SKU ${said(text)} has spaces around it.`, ask: null }
       : {
           kind: "sku",
-          message: `SKU ${said(Str.trim(text))} is not three capital letters, a hyphen and four digits, like BLT-0042.`,
+          message: `SKU ${said(cellValue(text))} is not three capital letters, a hyphen and four digits, like BLT-0042.`,
           ask: "Type the SKU"
         }
   }
   if (field === "name") {
-    if (text !== Str.trim(text))
-      return { kind: "spaces", message: `Name ${said(text)} has spaces around it.`, ask: null }
+    if (hasSpacesRound(text)) return { kind: "spaces", message: `Name ${said(text)} has spaces around it.`, ask: null }
     return text.length > maxNameLength
       ? {
           kind: "name",
@@ -941,7 +871,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   }
   if (field === "unitCost") {
     if (O.isSome(readDecimal(text))) return undefined
-    const shown = Str.trim(text)
+    const shown = cellValue(text)
     return {
       kind: "cost",
       message: /^-\s*\$?[\d.,]+$/.test(shown)
@@ -954,7 +884,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   }
   if (isCountField(field)) {
     if (O.isSome(readCount(text))) return undefined
-    const shown = Str.trim(text)
+    const shown = cellValue(text)
     return {
       kind: "number",
       message: /^\d+\.\d+$/.test(shown)
@@ -962,7 +892,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
         : /^-\d/.test(shown)
           ? `${label} ${said(shown)} is below zero.`
           : `${label} ${said(shown)} is not a whole number written as digits.`,
-      ask: `Type the ${lower}`
+      ask: `Type the ${asked}`
     }
   }
   if (isBooleanField(field)) {
@@ -970,7 +900,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "boolean",
-          message: `${label} ${said(Str.trim(text))} is not true or false.`,
+          message: `${label} ${said(cellValue(text))} is not true or false.`,
           ask: "Choose true or false",
           choices: ["true", "false"]
         }
@@ -986,11 +916,11 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "date",
-          message: /^\d{4}-\d{2}-\d{2}$/.test(Str.trim(text))
-            ? `${label} ${said(Str.trim(text))} is not a day on the calendar.`
+          message: /^\d{4}-\d{2}-\d{2}$/.test(cellValue(text))
+            ? `${label} ${said(cellValue(text))} is not a day on the calendar.`
             : twoDigitYear(text)
-              ? `${label} “${Str.trim(text)}” has a two-digit year; type it as year-month-day.`
-              : `${label} ${said(Str.trim(text))} is not written as year-month-day.`,
+              ? `${label} “${cellValue(text)}” has a two-digit year; type it as year-month-day.`
+              : `${label} ${said(cellValue(text))} is not written as year-month-day.`,
           ask: "Type the date"
         }
   }
@@ -1029,9 +959,6 @@ const inForce = (proposed: Proposal, decision: RowDecision): boolean =>
 const typedValue = (decision: RowDecision, field: Field): O.Option<string> => R.get(decision.edits, field)
 
 type Rival = { readonly id: string; readonly place: string; readonly same: boolean }
-
-const sameValues = (a: Readonly<Record<Field, string>>, b: Readonly<Record<Field, string>>): boolean =>
-  A.every(fields, (field) => Str.trim(a[field]) === Str.trim(b[field]))
 
 /** Kinds that are a choice between things the screen already shows, even with no proposal attached. */
 const choiceKinds: ReadonlyArray<ProblemKindId> = ["clash", "duplicate", "changed", "discontinued"]
@@ -1081,7 +1008,7 @@ const problemsOf = (
             kind: "stored",
             tone: "blocker",
             field: "sku",
-            message: `SKU ${named(Str.trim(values.sku))} is already there: an item your organization has uses it.`,
+            message: `SKU ${named(cellValue(values.sku))} is already there: an item your organization has uses it.`,
             ask: "Type another SKU",
             choices: [],
             note: null,
@@ -1110,7 +1037,7 @@ const problemsOf = (
             field: "sku",
             message: copies
               ? `This row is a copy of row ${where}.`
-              : `SKU ${named(Str.toUpperCase(Str.trim(values.sku)))} is also on row ${where} with different values. Keep one row, or leave one out.`,
+              : `SKU ${named(inCapitals(cellValue(values.sku)))} is also on row ${where} with different values. Keep one row, or leave one out.`,
             ask: "Type another SKU",
             choices: [],
             note: `${copies ? "copy of" : "also"} row ${where}`,
@@ -1141,7 +1068,7 @@ export const readsAsItem = (values: Readonly<Record<Field, string>>): boolean =>
  * defaults: quantity on hand 0, active true, lot tracked false.
  */
 const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
-  const blank = (field: Field): boolean => Str.trim(values[field]) === ""
+  const blank = (field: Field): boolean => isBlank(values[field])
   const category = A.findFirst(categories, (candidate) => candidate === values.category)
   const uom = A.findFirst(uoms, (candidate) => candidate === values.uom)
   const cost = readUnitCost(values.unitCost)
@@ -1165,7 +1092,7 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
   if (
     !skuPattern.test(values.sku) ||
     values.name === "" ||
-    values.name !== Str.trim(values.name) ||
+    hasSpacesRound(values.name) ||
     values.name.length > maxNameLength ||
     O.isNone(category) ||
     O.isNone(uom) ||
@@ -1216,7 +1143,7 @@ const stockValue = (rows: ReadonlyArray<ReviewedRow>): string =>
   unitsToDecimal(
     A.reduce(rows, 0n, (total, row) => {
       const cost = readUnitCost(row.values.unitCost)
-      const quantity = Str.trim(row.values.quantityOnHand) === "" ? O.some(0) : readCount(row.values.quantityOnHand)
+      const quantity = isBlank(row.values.quantityOnHand) ? O.some(0) : readCount(row.values.quantityOnHand)
       return O.isSome(cost) && O.isSome(quantity) ? total + decimalUnits(cost.value) * BigInt(quantity.value) : total
     })
   )
@@ -1340,7 +1267,7 @@ export const review = (input: {
     // Kept wins over a twin still in the file only for the first row the person kept.
     const keptFirst =
       hasKeep(entry.decision) && !A.some(live, (other) => hasKeep(other.decision) && other.row.order < entry.row.order)
-    const sku = Str.trim(entry.values.sku)
+    const sku = cellValue(entry.values.sku)
     const changed: Problem | null =
       entry.differs && StoredChoice.guards.undecided(entry.decision.stored)
         ? {

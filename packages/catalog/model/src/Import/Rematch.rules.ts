@@ -5,12 +5,13 @@
 // confirm that was on its way, and the two stores agree.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import { dual } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import * as Struct from "effect/Struct"
 import { ItemId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { type MatchTakeBack, takenBackRowsNamed } from "@inventory/catalog-contract/Import"
@@ -110,6 +111,35 @@ export const movesOfMatch = (input: {
     }
   )
 }
+
+/** Revision 0: the import as it was staged, before anybody acted on it. */
+export const stagedRevision = 0
+
+/**
+ * The revision a row was decided on, as a save or a confirm names it in `madeOn`. A row it leaves out counts as made
+ * on revision 0, the import as staged: `SaveRequest.madeOn` says so to every client.
+ *
+ * @example madeOnOf({ "row-12": 7 }, "row-12") // 7
+ * madeOnOf({ "row-12": 7 }, "row-3") // 0
+ */
+export const madeOnOf: {
+  (rowId: string): (madeOn: Readonly<Record<string, number>>) => number
+  (madeOn: Readonly<Record<string, number>>, rowId: string): number
+} = dual(2, (madeOn: Readonly<Record<string, number>>, rowId: string): number =>
+  O.match(R.get(madeOn, rowId), { onNone: () => stagedRevision, onSome: identity })
+)
+
+/**
+ * The revision a stored decision was saved at, from what the store keeps (`savedAt`). A decision stored before that was
+ * kept reads as saved at revision 0, the import as staged: before any save. No decision of Benjamin's backs this; it is
+ * what the code did, and is listed in the goal's "Defaults nobody decided".
+ */
+export const savedAtOf: {
+  (rowId: string): (savedAt: Readonly<Record<string, number>>) => number
+  (savedAt: Readonly<Record<string, number>>, rowId: string): number
+} = dual(2, (savedAt: Readonly<Record<string, number>>, rowId: string): number =>
+  O.match(R.get(savedAt, rowId), { onNone: () => stagedRevision, onSome: identity })
+)
 
 /**
  * Whether a field began to read another column after revision `made`: by a choice stamped later, or by a later move
@@ -221,7 +251,7 @@ export const comparisonQuestions = (input: {
   readonly set: SavedDecisions
 }): ReadonlyArray<ComparisonQuestion> =>
   A.flatMap(R.toEntries(input.set), ([rowId, decision]) => {
-    const made = O.getOrElse(R.get(input.madeOn, rowId), () => 0)
+    const made = madeOnOf(input.madeOn, rowId)
     const stale = matchedAfter(input)(made)
     if (StoredChoice.guards.undecided(decision.stored) || stale("sku")) return []
     const moved = A.filter(otherFields, (field) => stale(field))
@@ -262,7 +292,7 @@ export const withoutStaleDecisions = (input: {
     judgeRow({
       rowId,
       decision,
-      stale: matchedAfter(input)(O.getOrElse(R.get(input.madeOn, rowId), () => 0)),
+      stale: matchedAfter(input)(madeOnOf(input.madeOn, rowId)),
       changed: (field) => HashSet.has(changed, changedKey({ rowId, field }))
     })
   )
@@ -414,10 +444,8 @@ export const comparisonsChanged = (input: {
   const aloneOf = A.groupBy(alone, ({ question }) => question.rowId)
   const named = A.getSomes(
     A.map(changed, ({ question, pins }) => {
-      const own = A.flatMap(
-        O.getOrElse(R.get(aloneOf, question.rowId), (): ReadonlyArray<Judged> => []),
-        (row) => row.pins
-      )
+      // The row judged alone, when it was: read as none or one list of judgements.
+      const own = A.flatMap(R.get(aloneOf, question.rowId).pipe(A.fromOption, A.flatten), (row) => row.pins)
       return O.map(
         O.orElse(
           A.findFirst(pins, (pin) => A.some(own, (one) => one.field === pin.field)),
@@ -646,18 +674,12 @@ export type CompareAtMatch = (asked: {
 /** A match that does not have the file's review at hand: no Replace is taken back for a column other than the SKU. */
 export const noComparison: CompareAtMatch = () => Effect.succeed({ changed: [], read: noItemsRead })
 
-// A row id's place in the file: its row's number, then its part. A key that is not a row id goes last.
-const placeInFile = (rowId: string): readonly [number, number] => {
-  const found = /^row-(\d+)(?:\.(\d+))?$/.exec(rowId)
-  return found === null ? [Number.MAX_SAFE_INTEGER, 0] : [Number(found[1] ?? "0"), Number(found[2] ?? "0")]
-}
-const fileOrder: Order.Order<string> = Order.mapInput(Order.Tuple([Order.Number, Order.Number]), placeInFile)
+// A row id's place in the file, for a `RowId` ("row-8", "row-8.2"): its row's number, then its part, a row of one item
+// (no part) before its row's second item.
+const placeInFile = (rowId: RowId): ReadonlyArray<number> =>
+  A.map(Str.split(".")(Str.substring("row-".length)(rowId)), Number)
+const fileOrder: Order.Order<RowId> = Order.mapInput(A.makeOrder(Order.Number), placeInFile)
 const kindOrder = TakenBackKind.literals
-const indexIn = <A>(list: ReadonlyArray<A>, value: A): number =>
-  O.getOrElse(
-    A.findFirstIndex(list, (candidate) => candidate === value),
-    () => list.length
-  )
 
 /**
  * What one match took back, as the view names it: one entry per field that reads another column since (or none) and
@@ -682,44 +704,38 @@ export const takenBackOfMatch = (input: {
 }): ReadonlyArray<MatchTakeBack> => {
   const isRowId = S.is(RowId)
   const groups = A.groupBy(input.notApplied, (taken) => `${taken.kind}:${taken.field}`)
-  const entries = A.getSomes(
-    A.map(R.values(groups), (group) => {
-      const first = A.headNonEmpty(group)
-      // Only rows the entry can name are counted, so `count` and `rows` always agree; a stored key that names no row
-      // of a file is no row the screen can show.
-      const rows = A.dedupe(
-        A.filter(
-          A.map(group, (taken) => taken.rowId),
-          isRowId
+  // In the item's order of fields, each field's kinds in their order: the order every screen names them in. A group of
+  // a field the file has no such name for is no take-back anyone can be shown.
+  return A.flatMap(fields, (field) =>
+    A.flatMap(kindOrder, (kind) =>
+      A.flatMap(A.fromOption(R.get(groups, `${kind}:${field}`)), (group): ReadonlyArray<MatchTakeBack> => {
+        // Only rows the entry can name are counted, so `count` and `rows` always agree; a stored key that names no row
+        // of a file is no row the screen can show.
+        const rows = A.dedupe(
+          A.filter(
+            A.map(group, (taken) => taken.rowId),
+            isRowId
+          )
         )
-      )
-      const named = A.take(A.sort(rows, fileOrder), takenBackRowsNamed)
-      return O.flatMap(
-        A.findFirst(fields, (known) => known === first.field),
-        (field): O.Option<MatchTakeBack> =>
-          rows.length === 0
-            ? O.none()
-            : O.some({
+        const named = A.take(A.sort(rows, fileOrder), takenBackRowsNamed)
+        return rows.length === 0
+          ? []
+          : [
+              {
                 revision: input.revision,
                 by: input.by,
                 field,
                 matched: input.matched,
                 reads: input.reads(field),
-                kind: first.kind,
+                kind,
                 count: rows.length,
                 rows: named,
                 saved: R.fromEntries(
                   A.getSomes(A.map(named, (rowId) => O.map(R.get(input.savedAt, rowId), (at) => [rowId, at] as const)))
                 )
-              })
-      )
-    })
-  )
-  return A.sort(
-    entries,
-    Order.mapInput(
-      Order.Tuple([Order.Number, Order.Number]),
-      (entry: MatchTakeBack) => [indexIn(fields, entry.field), indexIn(kindOrder, entry.kind)] as const
+              }
+            ]
+      })
     )
   )
 }
@@ -814,7 +830,7 @@ export const planMatch = Effect.fnUntraced(function* (input: {
     comparisonQuestions({ choices, moves, madeOn, set: input.decisions }),
     (question): ComparisonQuestion => ({
       ...question,
-      decided: O.getOrElse(R.get(input.savedAt, question.rowId), () => 0),
+      decided: savedAtOf(input.savedAt, question.rowId),
       fields: A.map(question.fields, (asked) => {
         const knownFrom = unkept(asked.field)
         return knownFrom === 0 ? asked : { ...asked, made: knownFrom - 1 }

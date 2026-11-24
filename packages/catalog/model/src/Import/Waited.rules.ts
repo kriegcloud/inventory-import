@@ -24,7 +24,7 @@ import {
 import type { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import type { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { type Field, fields } from "@inventory/catalog-contract/Staged"
-import { matchedAfter, sameDecision, withoutStaleDecisions } from "./Rematch.rules.ts"
+import { madeOnOf, matchedAfter, sameDecision, withoutStaleDecisions } from "./Rematch.rules.ts"
 
 /** For each row that waited, the decisions the server may hold of it; none for no decision. */
 export type Over = Readonly<Record<string, ReadonlyArray<O.Option<RowDecision>>>>
@@ -45,9 +45,12 @@ export const overOfSave = (save: {
 }
 
 const nothingSaid = nothingDecided
-// A decision that says nothing (a row put back, or one a match took everything of) and no decision are the same.
-const said = (decision: O.Option<RowDecision>): RowDecision => O.getOrElse(decision, () => nothingSaid)
-const alike = (a: O.Option<RowDecision>, b: O.Option<RowDecision>): boolean => sameDecision(said(a), said(b))
+// A decision that says nothing (a row put back, or one a match took everything of) and no decision are the same: each
+// reads as none here.
+const saying = (decision: O.Option<RowDecision>): O.Option<RowDecision> =>
+  O.filter(decision, (one) => !sameDecision(one, nothingSaid))
+const alike = (a: O.Option<RowDecision>, b: O.Option<RowDecision>): boolean =>
+  O.makeEquivalence(sameDecision)(saying(a), saying(b))
 
 /**
  * What the rows that waited are judged by: the draft's columns, the revision each row was decided on, what is stored
@@ -205,10 +208,8 @@ const leftByMatches = (
   const asked = !StoredChoice.guards.undecided(decision.stored) && !stale("sku")
   const moved: ReadonlyArray<Field> = asked ? A.filter(otherFields, (field) => stale(field)) : []
   const after = (field: Field): ReadonlyArray<Taken> =>
-    A.filter(
-      O.getOrElse(R.get(record.taken, keyOf(field, rowId)), (): ReadonlyArray<Taken> => []),
-      (taken) => taken.at > made
-    )
+    // What the matches took of this field of the row, when they took any: read as none or one list.
+    A.filter(R.get(record.taken, keyOf(field, rowId)).pipe(A.fromOption, A.flatten), (taken) => taken.at > made)
   const unsure = A.some(moved, (field) =>
     A.some(after(field), (taken) => !O.exists(taken.from, (from) => from === saved))
   )
@@ -295,17 +296,14 @@ export const decidedSince = (
   return A.getSomes(
     A.map(R.toEntries(input.over), ([rowId, named]) => {
       const stored = R.get(input.stored, rowId)
-      const made = O.getOrElse(R.get(input.madeOn, rowId), () => 0)
+      const made = madeOnOf(input.madeOn, rowId)
       const theirs = O.some({ rowId, theirs: O.filter(stored, (decision) => !sameDecision(decision, nothingSaid)) })
       // What is stored is as somebody last saved it, no match since having taken a part of it: then, and only then, it
       // is a decision a person made, and can be named as it reads. A save that changed nothing counts: the person who
       // sent it decided the row as it then read.
       const lastSaved = O.isSome(R.get(input.lastSavedBy, rowId)) ? R.get(input.lastSavedOn, rowId) : O.none<number>()
-      const since = Math.max(
-        made,
-        O.getOrElse(R.get(input.savedAt, rowId), () => 0),
-        O.getOrElse(lastSaved, () => 0)
-      )
+      // The latest of the revision the row was made on and of the saves known of it.
+      const since = A.reduce(A.getSomes([R.get(input.savedAt, rowId), lastSaved]), made, Math.max)
       const asItWasSaved = !takenAfter(input.takenBack, rowId, since) && !hiddenIn(input.takenBack, rowId, since)
       // Her own decision, which she both decided and last saved, is also what each match after that save took from it,
       // whatever revision her screen was at: a decision she sent and named is hers as it was saved, as well as as the

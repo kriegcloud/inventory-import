@@ -7,6 +7,7 @@ import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ViewRequest } from "@inventory/catalog-contract/ViewRequest"
 import { ViewOutcome, ViewCommand } from "@inventory/catalog-contract/TableView"
 import { readByRules, checkCommand } from "./TableView.rules.ts"
+import { identity } from "effect/Function"
 import * as A from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -33,6 +34,9 @@ export const usedUpSentence = (words: string): string => `${words}, so the rules
  */
 /** The rules answered, and why no model did. */
 const answeredByRules = (reason: string): AnsweredBy => AnsweredBy.cases.Rules.make({ reason })
+
+/** What the assistant says when the model changed nothing and gave no words of its own for why. */
+const nothingToChange = "The model found nothing in that request to change in the view."
 
 export const answerByRules = (input: { readonly request: ViewRequest; readonly why: string }): ViewOutcome => {
   const { request, why } = input
@@ -130,7 +134,8 @@ export const view = Effect.fn("TableAssistant.view")(function* (request: ViewReq
   }
   if (checked.success.length === 0) {
     return Result.fail({
-      reason: O.getOrElse(cannot, () => "The model found nothing in that request to change in the view."),
+      // The model's own words for what it could not do, when it gave any.
+      reason: O.match(cannot, { onNone: () => nothingToChange, onSome: identity }),
       answeredBy,
       note: O.none()
     })

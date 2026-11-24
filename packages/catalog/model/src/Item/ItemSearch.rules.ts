@@ -74,11 +74,10 @@ export const closeMatches = (word: string): ReadonlyArray<string> => {
   const dropped = A.map(indices(0, n - 1), (i) => join([...before(i), ...after(i + 1)]))
   const wrong = A.map(indices(1, n - 2), (i) => join([...before(i), "_", ...after(i + 1)]))
   const missing = A.map(indices(1, n - 1), (i) => join([...before(i), "_", ...after(i)]))
-  const swapped = A.flatMap(indices(0, n - 2), (i) => {
-    const a = letters[i] ?? ""
-    const b = letters[i + 1] ?? ""
-    return a === b ? [] : [join([...before(i), b, a, ...after(i + 2)])]
-  })
+  // Each letter with the one after it.
+  const swapped = A.flatMap(A.zip(letters, A.drop(letters, 1)), ([a, b], i) =>
+    a === b ? [] : [join([...before(i), b, a, ...after(i + 2)])]
+  )
   return A.dedupe([...dropped, ...wrong, ...missing, ...swapped])
 }
 

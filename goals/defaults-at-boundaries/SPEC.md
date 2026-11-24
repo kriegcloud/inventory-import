@@ -87,6 +87,8 @@ the value moves.
 | `contract/src/Import/Mapping.read.ts` | `ColumnMove.knownFrom` left out | read as revision 0 in `Rematch.rules.ts` | 0 | none in the sample |
 | `model/src/Item/ItemEdit.rules.ts` | an empty Quantity on hand box in the item editor | `0` | not an import path; the import's empty quantity is decided ("Defaults to 0") | the editor, Quantity box cleared |
 | `model/src/Catalog.memory.ts` | the in-memory twin's allowance | `40` calls | none (test twin); 40 is the decided allowance | `catalogMemory()` |
+| `model/src/Import/Rematch.rules.ts` `savedAtOf` | a stored decision with no `savedAt` (kept before saves were dated) | revision 0 | 0 (rows stored before `savedAt` was kept) | none in the sample |
+| `model/src/Confirm/Confirm.rules.ts` | who decided a row nobody is recorded for, and a stored name too long or empty to show | the confirming person's name | 0 on a fresh import: every decision of the sample's review records its author | none in the sample |
 
 ## What the law should count, beyond today
 

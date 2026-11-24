@@ -10,11 +10,9 @@ import {
   stockingOf
 } from "@inventory/catalog-contract/Item"
 import * as A from "effect/Array"
-import * as BigDecimal from "effect/BigDecimal"
 import * as Data from "effect/Data"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { readUnitCost, readCount, readDate } from "../Review/CellReading.rules.ts"
 export type ItemForm = {
@@ -79,55 +77,67 @@ export const readItemForm = (input: { readonly form: ItemForm; readonly revision
   const reorder = optional(form.reorderPoint, readCount)
   const received = optional(form.firstReceivedOn, readDate)
   const discontinued = optional(form.discontinuedOn, readDate)
-  const found: ReadonlyArray<readonly [keyof ItemFormProblems, string | undefined]> = [
+  const found: ReadonlyArray<readonly [keyof ItemFormProblems, O.Option<string>]> = [
     [
       "name",
       name === ""
-        ? "Name is empty. Every item needs a name."
+        ? O.some("Name is empty. Every item needs a name.")
         : name.length > maxNameLength
-          ? `Name is longer than ${maxNameLength} characters. Shorten it.`
-          : undefined
+          ? O.some(`Name is longer than ${maxNameLength} characters. Shorten it.`)
+          : O.none()
     ],
     [
       "description",
       // The one limit the edit's schema has that a box lets through: said here, with the number, before anything is sent.
       description.length > maxDescriptionLength
-        ? `Description is ${count.format(description.length)} characters long. It can hold ${count.format(maxDescriptionLength)}: shorten it.`
-        : undefined
+        ? O.some(
+            `Description is ${count.format(description.length)} characters long. It can hold ${count.format(maxDescriptionLength)}: shorten it.`
+          )
+        : O.none()
     ],
     [
       "unitCost",
       O.isNone(cost)
-        ? "Unit cost is not an amount in dollars with up to 4 decimals. Write it as digits, for example 12.50."
-        : undefined
+        ? O.some("Unit cost is not an amount in dollars with up to 4 decimals. Write it as digits, for example 12.50.")
+        : O.none()
     ],
     [
       "quantityOnHand",
-      O.isNone(quantity) ? "Quantity on hand is not a whole number. Write it as digits, for example 120." : undefined
+      O.isNone(quantity)
+        ? O.some("Quantity on hand is not a whole number. Write it as digits, for example 120.")
+        : O.none()
     ],
     [
       "reorderPoint",
-      O.isNone(reorder) ? "Reorder point is not a whole number. Write it as digits, or leave it empty." : undefined
+      O.isNone(reorder)
+        ? O.some("Reorder point is not a whole number. Write it as digits, or leave it empty.")
+        : O.none()
     ],
     [
       "firstReceivedOn",
-      O.isNone(received) ? "First received is not a date. Write it as year, month and day: 2026-03-04." : undefined
+      O.isNone(received)
+        ? O.some("First received is not a date. Write it as year, month and day: 2026-03-04.")
+        : O.none()
     ],
     [
       "discontinuedOn",
-      O.isNone(discontinued) ? "Discontinued on is not a date. Write it as year, month and day: 2026-03-04." : undefined
+      O.isNone(discontinued)
+        ? O.some("Discontinued on is not a date. Write it as year, month and day: 2026-03-04.")
+        : O.none()
     ],
     [
       "isActive",
       form.isActive && Str.trim(form.discontinuedOn) !== ""
-        ? "A discontinued item cannot be active. Switch Active off, or clear the discontinued date."
-        : undefined
+        ? O.some("A discontinued item cannot be active. Switch Active off, or clear the discontinued date.")
+        : O.none()
     ]
   ]
-  const problems = A.filterMap(found, ([field, message]) =>
-    message === undefined ? Result.failVoid : Result.succeed([field, message] as const)
-  )
-  if (A.isReadonlyArrayNonEmpty(problems)) return ItemFormReading.Problems({ problems: R.fromEntries(problems) })
+  const problems = A.getSomes(A.map(found, ([field, message]) => O.map(message, (said) => [field, said] as const)))
+  // Every box read: none when one of them could not be, and then its problem is among `problems`.
+  const read = O.all({ cost, quantity, reorder, received, discontinued })
+  if (A.isReadonlyArrayNonEmpty(problems) || O.isNone(read)) {
+    return ItemFormReading.Problems({ problems: R.fromEntries(problems) })
+  }
   return ItemFormReading.Edit({
     edit: {
       revision: input.revision,
@@ -135,12 +145,12 @@ export const readItemForm = (input: { readonly form: ItemForm; readonly revision
       description: description === "" ? O.none() : O.some(description),
       category: form.category,
       uom: form.uom,
-      unitCost: O.getOrElse(cost, () => BigDecimal.fromBigInt(0n)),
-      quantityOnHand: O.getOrElse(quantity, () => 0),
-      reorderPoint: O.flatten(reorder),
-      stocking: stockingOf({ isActive: form.isActive, discontinuedOn: O.flatten(discontinued) }),
+      unitCost: read.value.cost,
+      quantityOnHand: read.value.quantity,
+      reorderPoint: read.value.reorder,
+      stocking: stockingOf({ isActive: form.isActive, discontinuedOn: read.value.discontinued }),
       lotTracked: form.lotTracked,
-      firstReceivedOn: O.flatten(received)
+      firstReceivedOn: read.value.received
     }
   })
 }

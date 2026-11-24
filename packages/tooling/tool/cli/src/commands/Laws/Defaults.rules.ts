@@ -89,6 +89,31 @@ export const exemptions: ReadonlyArray<DefaultsExemption> = [
     file: "packages/catalog/contract/src/Item/SkuKey.rules.ts",
     kinds: ["normalise"],
     why: "the key two rows are compared by, never shown as a fix; pure callers need it at once, and a schema decode would need S.decodeSync (Benjamin, 2026-11-23)"
+  },
+  {
+    file: "packages/catalog/model/src/Assistant/TableView.rules.ts",
+    kinds: ["normalise"],
+    why: "the table assistant's words: compares words or headings the person typed or the file holds, never storing the cleaned text; a decode would leave an Option with no meaning to fall back from (Benjamin, 2026-11-23)"
+  },
+  {
+    file: "packages/catalog/model/src/Item/ItemSearch.rules.ts",
+    kinds: ["normalise"],
+    why: "the search's words: compares words or headings the person typed or the file holds, never storing the cleaned text; a decode would leave an Option with no meaning to fall back from (Benjamin, 2026-11-23)"
+  },
+  {
+    file: "packages/catalog/model/src/Catalog.memory.ts",
+    kinds: ["normalise"],
+    why: "the in-memory twin's search and filters, as the D1 adapter reads them: compares words or headings the person typed or the file holds, never storing the cleaned text; a decode would leave an Option with no meaning to fall back from (Benjamin, 2026-11-23)"
+  },
+  {
+    file: "packages/catalog/model/src/Reading/SheetLayout.rules.ts",
+    kinds: ["normalise"],
+    why: "a sheet's header cells, read to find the header row: compares words or headings the person typed or the file holds, never storing the cleaned text; a decode would leave an Option with no meaning to fall back from (Benjamin, 2026-11-23)"
+  },
+  {
+    file: "packages/catalog/model/src/Review/Mapping.rules.ts",
+    kinds: ["normalise"],
+    why: "a heading's key, matched to a field ignoring case, spaces and punctuation: compares words or headings the person typed or the file holds, never storing the cleaned text; a decode would leave an Option with no meaning to fall back from (Benjamin, 2026-11-23)"
   }
 ]
 

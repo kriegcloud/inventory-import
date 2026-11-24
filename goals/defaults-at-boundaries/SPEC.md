@@ -68,8 +68,8 @@ packages' boundaries are listed at the start of each lane (PLAN.md), as part of 
 | File cells the person reviews | `Review/CellReading.rules.ts`, and the cell reading in `Review.rules.ts` and `Suggest.rules.ts` | Small readers that return a value or a reason | Exempt for clean-ups (decided). Their fallbacks and absence checks: question 1 below |
 | JSON inside a cell (vendors, dimensions) | `DimensionsCell`, `VendorCell` in `CellReading.rules.ts` | `S.fromJsonString` | Optional keys become `Option` (`S.OptionFromOptionalKey`, `S.OptionFromOptionalNullOr` where `null` is real) |
 | Model output | `Suggest.rules.ts` `SuggestAnswer`; the assistant's `ViewCommand` | `LanguageModel` with the schema | One decode; a name guess is a proposal, never written |
-| Search text | `ItemQuery.search` → `ItemSearch.rules.ts` | none today: `searchWords` lower-cases and trims in the model | A `SearchText` schema whose decoded side is the words (SF-3); the model takes the words |
-| Item editor form | `ItemForm` → `readItemForm` | none: the model trims each box | The boxes are trimmed by `ItemForm`'s schema (no person reviews a box's clean-up); `readItemForm` takes the clean form |
+| Search text | `ItemQuery.search` → `ItemSearch.rules.ts` | `searchWords` lower-cases and trims in the model | `ItemSearch.rules.ts` is on `exemptions` for clean-ups: it compares words and stores none (decided). A number filter's text is trimmed by `TypedNumberText` in the contract, decoded in the D1 adapter |
+| Item editor form | `ItemForm` → `readItemForm` | the cell readers, `cellValue` and `isBlank` | A box is read as a cell is (decided; the file said so already), so its trims live in the exempt `CellRules.rules.ts` |
 | Settings, session | `CurrentActor` | access context | Not in these packages |
 
 ## Defaults nobody decided
@@ -143,7 +143,7 @@ added with its reason when found.
 
 ## Questions put to Benjamin
 
-All three answered on 2026-11-23, each as recommended
+All answered on 2026-11-23, each as recommended
 ([decision](../../explorations/ideal-architecture/DECISIONS.md)):
 
 1. A cell reader's fallbacks and absence checks are **not** exempt; only its clean-ups are. The JSON in a cell is
@@ -151,6 +151,11 @@ All three answered on 2026-11-23, each as recommended
 2. The cell reading in `Review.rules.ts` and `Suggest.rules.ts` moves to `Review/CellRules.rules.ts`, on `exemptions`
    for clean-ups.
 3. `skuKey` moves to `Item/SkuKey.rules.ts`, on `exemptions` for clean-ups.
+4. Code that compares words or headings (`TableView`, `ItemSearch`, `Catalog.memory`, `SheetLayout`, `Mapping`) goes
+   on `exemptions` for clean-ups. The query's number filters are trimmed by `TypedNumberText`, and the editor reads
+   its boxes with the cell readers.
+5. A dimensions cell with no unit reads as cm, as before.
+6. The other defaults nobody decided above keep their behaviour and stay listed here.
 
 ## Acceptance
 

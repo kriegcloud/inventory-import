@@ -12,7 +12,8 @@ import {
   ItemFilter,
   ItemFilterVariant,
   itemFilterVariants,
-  ItemQuery
+  ItemQuery,
+  TypedNumberText
 } from "@inventory/catalog-contract/ItemQuery"
 import { ItemRow, itemColumns, storedItem } from "./internal/itemRow.ts"
 import * as A from "effect/Array"
@@ -77,20 +78,24 @@ type Narrowed = {
   readonly filters: O.Option<Statement.Fragment>
 }
 
+// A number typed into a filter, its spaces taken off by its schema.
+const typedNumber = S.decodeUnknownOption(TypedNumberText)
+
 /**
  * Dollars as typed into a unit cost filter ("12.50", "12", ".5", "$4"), or none, which drops the filter. The stored
  * cost is exact text; a filter and an order compare it as a number, which is enough to narrow and sort by.
  */
-const dollarsOf = (text: string): O.Option<number> => {
-  const cleaned = Str.replace(/^\$/, "")(Str.trim(text))
-  return /^(?:\d{1,12}(?:\.\d{0,4})?|\.\d{1,4})$/.test(cleaned) ? O.some(Number(cleaned)) : O.none()
-}
+const dollarsOf = (text: string): O.Option<number> =>
+  O.flatMap(typedNumber(text), (typed) => {
+    const cleaned = Str.replace(/^\$/, "")(typed)
+    return /^(?:\d{1,12}(?:\.\d{0,4})?|\.\d{1,4})$/.test(cleaned) ? O.some(Number(cleaned)) : O.none()
+  })
 
 /** A quantity as typed into a filter ("12", "2.5", ".5"), or none, which drops the filter. */
-const quantityOf = (text: string): O.Option<number> => {
-  const cleaned = Str.trim(text)
-  return /^(?:\d{1,12}(?:\.\d*)?|\.\d+)$/.test(cleaned) ? O.some(Number(cleaned)) : O.none()
-}
+const quantityOf = (text: string): O.Option<number> =>
+  O.flatMap(typedNumber(text), (cleaned) =>
+    /^(?:\d{1,12}(?:\.\d*)?|\.\d+)$/.test(cleaned) ? O.some(Number(cleaned)) : O.none()
+  )
 
 // "Contains" as a LIKE pattern: the value's own %, _ and \ are escaped, so "50%" finds the text "50%" and not "50"
 // followed by anything. SQLite's LIKE ignores case for ASCII letters only, so "bolt" finds "Bolt" but "é" does not
@@ -342,7 +347,10 @@ export const ItemStoreD1 = Layer.effect(
       if (operator === "isBetween") {
         if (typeof value === "string" || value.length !== 2) return O.none()
         // An empty end is open. Both empty is no range at all, and an end that is not an amount spoils the range.
-        const end = (text: string) => (Str.trim(text) === "" ? O.some(O.none<number>()) : O.map(read(text), O.some))
+        const end = (text: string) =>
+          O.flatMap(typedNumber(text), (typed) =>
+            typed === "" ? O.some(O.none<number>()) : O.map(read(typed), O.some)
+          )
         const ends = O.flatMap(O.all([A.get(value, 0), A.get(value, 1)]), ([low, high]) => O.all([end(low), end(high)]))
         return O.flatMap(ends, ([from, to]) => {
           const clauses = [

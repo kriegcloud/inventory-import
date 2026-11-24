@@ -105,6 +105,16 @@ export type ItemFilterVariant = typeof ItemFilterVariant.Type
 
 const FilterText = S.String.check(S.isMaxLength(200))
 
+/**
+ * A number as a person typed it into a filter's box, read without the spaces round it: "  12 " filters as 12. A box
+ * that is only spaces reads as empty, which leaves that end of a range open.
+ *
+ * @example S.decodeUnknownOption(TypedNumberText)(" 12.50 ") // O.some("12.50")
+ */
+export const TypedNumberText = S.Trim.annotate({
+  description: "A number typed into a filter, without the spaces round it"
+})
+
 /** One column of the order: its id, and whether it runs from high to low. */
 export const ItemSort = S.Struct({
   id: ItemSortColumn,

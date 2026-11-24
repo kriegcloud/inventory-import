@@ -25,8 +25,8 @@ Places by package on 2026-11-23, from the baseline:
 | --- | --- | --- | --- | --- |
 | 0 | The packet; `emptyWhenLeftOut` in `@inventory/kernel/Wire` | — | this session | done |
 | 1 | `packages/catalog/contract` (src and tests) | 41 | this session, by hand | done: `skuKey` in its own exempt file, `Item/SkuKey.rules.ts` (SPEC, question 3) |
-| 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | doing: no fallback, absence or unwrap left in src or tests; 40 clean-ups in src wait on Benjamin (below). The text a file cell gives the review is read in `Review/CellRules.rules.ts`, exempt for clean-ups only (SPEC, questions 1 and 2) |
-| 3 | `packages/catalog/host` | 20 | this session, by hand | doing: as the model, 3 clean-ups (`ItemStore.adapter.ts`'s query trims) wait on Benjamin |
+| 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | done: no line of the baseline names it. The text a file cell gives the review is read in `Review/CellRules.rules.ts`; it and five files that compare words are exempt for clean-ups only (SPEC, questions 1, 2 and 4) |
+| 3 | `packages/catalog/host` | 20 | this session, by hand | done: the number filters' trim is `TypedNumberText`'s, a contract schema |
 | 4 | Agent files, `CLAUDE.md`, the skills README, `docs/patterns.md` and `docs/kit.md` examples | — | this session | done: `backend.md` has the boundary shape from `ImportStore.adapter.ts`; the README has the paths that stand in |
 | 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | todo |
 | 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | todo |
@@ -40,12 +40,11 @@ Places by package on 2026-11-23, from the baseline:
 | 14 | `packages/infra` | 7 | Codex lane | todo |
 | 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | todo |
 
-## Current blocker
+## Where the pilot stands
 
-One question for Benjamin, put with the "Defaults nobody decided" round: a trim or a change of case in pure code that
-reads no file cell (the table assistant's words, the search's words, the item editor's typed values, a heading's key,
-the sheet layout's header keys, the twin's filters, the D1 adapter's search). As a schema transformation each needs a
-decode in pure code, which `S.decodeSync` would do and the type-check refuses (`schemaSync`). 43 places in the pilot, in 7 files.
+Baseline: 1,687 places in 204 files, down from 2,120 in 248; no line names the catalog's contract, model or host.
+Benjamin answered the last round on 2026-11-23 (SPEC, questions 4 to 6). Checked: `bun run check`, the two slow
+tests that write 50,000 rows (`WriteLimits`, `MatchAtomic`), and the rest is in the line below once it has run.
 
 ## Choices made along the way
 
@@ -92,6 +91,10 @@ decode in pure code, which `S.decodeSync` would do and the type-check refuses (`
 - **A regular expression's group is read as an Option** (`groupAt` in `CellReading.rules.ts`, `groupOf` in
   `TableView.rules.ts`): `O.fromUndefinedOr(found[i])`, so a group the text left out is none and a group that must be
   there is joined with `O.all`.
+
+- **A group's rows are read where they are, never copied.** `A.fromOption` then `A.flatten` over a group copied it
+  on every row, which took a review of 50,000 rows from 1.2 s to 70 s and the slow tests past their limit. `O.match`
+  to the group itself, with `A.empty` for none, brought it back to 1.2 s (measured against a copy of `main`).
 
 ## Evidence
 

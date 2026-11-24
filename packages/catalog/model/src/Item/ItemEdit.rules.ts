@@ -13,8 +13,8 @@ import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as Str from "effect/String"
 import { readUnitCost, readCount, readDate } from "../Review/CellReading.rules.ts"
+import { cellValue, isBlank } from "../Review/CellRules.rules.ts"
 export type ItemForm = {
   readonly name: string
   readonly description: string
@@ -67,13 +67,14 @@ const count = new Intl.NumberFormat("en-US")
  */
 export const readItemForm = (input: { readonly form: ItemForm; readonly revision: number }): ItemFormReading => {
   const { form } = input
-  const name = Str.trim(form.name)
-  const description = Str.trim(form.description)
+  // A box is read as a file's cell is, so its spaces come off where a cell's would.
+  const name = cellValue(form.name)
+  const description = cellValue(form.description)
   const cost = readUnitCost(form.unitCost)
   // None: the box holds something that cannot be read. Some(none): the box is empty, which an optional value may be.
   const optional = <A>(text: string, read: (text: string) => O.Option<A>): O.Option<O.Option<A>> =>
-    Str.trim(text) === "" ? O.some(O.none()) : O.map(read(text), O.some)
-  const quantity = Str.trim(form.quantityOnHand) === "" ? O.some(0) : readCount(form.quantityOnHand)
+    isBlank(text) ? O.some(O.none()) : O.map(read(text), O.some)
+  const quantity = isBlank(form.quantityOnHand) ? O.some(0) : readCount(form.quantityOnHand)
   const reorder = optional(form.reorderPoint, readCount)
   const received = optional(form.firstReceivedOn, readDate)
   const discontinued = optional(form.discontinuedOn, readDate)
@@ -127,7 +128,7 @@ export const readItemForm = (input: { readonly form: ItemForm; readonly revision
     ],
     [
       "isActive",
-      form.isActive && Str.trim(form.discontinuedOn) !== ""
+      form.isActive && !isBlank(form.discontinuedOn)
         ? O.some("A discontinued item cannot be active. Switch Active off, or clear the discontinued date.")
         : O.none()
     ]

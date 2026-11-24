@@ -1912,3 +1912,28 @@ Answer: I chose each; the agent recommended the same each time.
 
 Also: the main checkout is mine while the sweep runs; the sweep works in `.claude/worktrees/defaults-check` on
 `feat/defaults-contract-step`, and the branches are joined when I say so.
+
+### 2026-11-23 — the defaults sweep's pilot: word comparers, and the defaults nobody decided
+
+Question: 43 trims and changes of case in the pilot sit in pure code that reads no file cell: the table assistant's
+words, the search's words, the in-memory twin's filters, a sheet's header keys, a heading's key, the item editor's
+boxes and the D1 adapter's number filters. And the defaults nobody decided (SPEC), which the pilot kept as they were
+and moved onto schemas.
+Answer: I chose each; the agent recommended the same each time.
+
+- Files that compare words or headings go on `exemptions` for clean-ups only: `Assistant/TableView.rules.ts`,
+  `Item/ItemSearch.rules.ts`, `Catalog.memory.ts`, `Reading/SheetLayout.rules.ts`, `Review/Mapping.rules.ts`. They
+  never store the cleaned text. Rejected: every one a schema transformation; leaving them counted.
+- The item query's number filters are trimmed by a contract schema, `TypedNumberText` (`ItemQuery.command.ts`), which
+  the D1 adapter decodes. The item editor's boxes are read with the cell readers (`cellValue`, `isBlank` in
+  `CellRules.rules.ts`), because the editor reads a box exactly as the import reads a cell, which its file already
+  says. That is not the schema the recommendation named: a schema there would decode a string that cannot fail and
+  hand back an Option with nothing to fall back to.
+- The question's premise was only half right. `S.decodeSync` is refused in pure code (`schemaSync`), but
+  `S.decodeUnknownOption` is not: `CellReading.rules.ts` already uses it. The reason the word comparers stay as they
+  are is that last point (an Option where nothing can be absent), not that a decode is impossible.
+- A dimensions cell that names no unit reads as cm, as it did (root DECISIONS.md). The other defaults nobody decided
+  keep their behaviour and stay listed in SPEC: Confirm's credit to the decider, a stored value before a kept one,
+  and `recheckRow`'s empty field. None touches a row of the messy sample. Rejected: putting each one to me now.
+
+Reverse: taking a file off `exemptions` counts its places again, and they move onto a schema in the same commit.

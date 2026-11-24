@@ -29,10 +29,10 @@ import {
   isActive,
   type ItemEdit,
   type ItemFields,
-  skuKey,
   Stocking,
   type StoredItem
 } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"

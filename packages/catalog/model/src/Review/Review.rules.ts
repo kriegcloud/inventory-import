@@ -24,7 +24,6 @@ import {
   ItemFields,
   skuPattern,
   maxNameLength,
-  skuKey,
   categories,
   uoms,
   stockingOf,
@@ -32,6 +31,7 @@ import {
   decimalUnits,
   Vendor
 } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { ColumnMatch, UnusedColumn, MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"

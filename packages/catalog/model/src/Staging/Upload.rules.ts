@@ -1,4 +1,5 @@
 import * as A from "effect/Array"
+import * as Num from "effect/Number"
 import * as O from "effect/Option"
 import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import type { StagedRow } from "@inventory/catalog-contract/Staged"
@@ -44,7 +45,7 @@ export const rowsAbout = (input: {
 export const savedRows = (input: {
   readonly chunkSizes: ReadonlyArray<number>
   readonly acknowledged: ReadonlyArray<number>
-}): number => A.reduce(A.dedupe(input.acknowledged), 0, (sum, seq) => sum + (input.chunkSizes[seq] ?? 0))
+}): number => Num.sumAll(A.getSomes(A.map(A.dedupe(input.acknowledged), (seq) => A.get(input.chunkSizes, seq))))
 
 /**
  * The rows of a staged file in the pieces they travel and are stored in, in order.
@@ -78,6 +79,6 @@ export const chunkProblem = (input: {
   if (!A.every(chunks, (chunk, index) => chunk.seq === index)) return missing
   const rows = A.flatMap(chunks, (chunk) => chunk.rows)
   if (rows.length !== rowCount) return missing
-  const rising = A.every(rows, (row, index) => index === 0 || (rows[index - 1]?.rowNumber ?? 0) < row.rowNumber)
+  const rising = A.every(A.zip(rows, A.drop(rows, 1)), ([before, row]) => before.rowNumber < row.rowNumber)
   return rising ? O.none() : O.some(fileProblem.incomplete({ fileName, how: "order" }))
 }

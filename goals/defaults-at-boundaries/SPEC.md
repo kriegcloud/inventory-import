@@ -136,26 +136,16 @@ inconvenient finding becomes one more exception: 273 of them.
 Files where a constructor default would hide a value from the Verify prover keep it written out. None yet; each is
 added with its reason when found.
 
-## Open questions for Benjamin
+## Questions put to Benjamin
 
-1. Are a cell reader's fallbacks and absence checks exempt too, as its clean-ups are? `CellReading.rules.ts` holds 12
-   and 14: regex groups read as `parts[1] ?? "0"`, and the vendors and dimensions JSON in a cell read key by key
-   (`vendor.vendor_name ?? ""`, `length === undefined`). Recommended: no. The JSON is decoded by its schema with
-   `Option` fields, and a regex group is read as an `Option`; only the trim and the change of case stay in the
-   reader. No row's outcome changes.
-2. Where does the cell reading in `Review.rules.ts` (41 clean-ups) and `Suggest.rules.ts` (15) go? Nearly all of it
-   is the problem rules (`fault`, `proposeFor`) quoting and checking a cell's text. Options: a new file
-   `Review/CellRules.rules.ts` holding each rule's check and proposal for one field, added to `exemptions` for
-   clean-ups (recommended: the exemption stays narrow, and `Review.rules.ts` keeps the fold, the counts and the
-   decisions with no clean-up); `Review.rules.ts` and `Suggest.rules.ts` themselves on the list (least churn, but a
-   new clean-up anywhere in 1,575 lines would pass); or everything into `CellReading.rules.ts` (no new file on the
-   list, about 1,000 lines).
-3. Where does `skuKey` (`Item.read.ts`) go? It is the key two rows are compared by (spaces out, upper case), never
-   shown as a fix, and every caller (the review, the in-memory twin, the host's row writer, 22 places) needs it at
-   once in pure code. As a schema transformation it would need `S.decodeSync`, which the type-check refuses. Options:
-   move it to its own file `Item/SkuKey.rules.ts` on `exemptions` for clean-ups (recommended: one function, its
-   reason written beside it); or decode the key once where a SKU enters (each staged row and each stored item
-   carries `skuKey: SkuKey`), which changes the staged and stored row shapes. No row's outcome changes either way.
+All three answered on 2026-11-23, each as recommended
+([decision](../../explorations/ideal-architecture/DECISIONS.md)):
+
+1. A cell reader's fallbacks and absence checks are **not** exempt; only its clean-ups are. The JSON in a cell is
+   decoded by its schema with `Option` fields, a regex group is read as an `Option`.
+2. The cell reading in `Review.rules.ts` and `Suggest.rules.ts` moves to `Review/CellRules.rules.ts`, on `exemptions`
+   for clean-ups.
+3. `skuKey` moves to `Item/SkuKey.rules.ts`, on `exemptions` for clean-ups.
 
 ## Acceptance
 

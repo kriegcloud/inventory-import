@@ -28,7 +28,8 @@ import {
   storedUndecided,
   TakenBackKind
 } from "@inventory/catalog-contract/Decision"
-import { type ItemFields, skuKey } from "@inventory/catalog-contract/Item"
+import { type ItemFields } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { matchColumns } from "../Review/Mapping.rules.ts"
 import {

@@ -53,7 +53,8 @@ import {
   type StaleAccept
 } from "@inventory/catalog-contract/Decision"
 import { review, carryDecisions, ruleFixes, firstDecisions } from "../Review/Review.rules.ts"
-import { skuKey, fieldsOf } from "@inventory/catalog-contract/Item"
+import { fieldsOf } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { ImportView, type MatchTakeBack, openImportsShown, pastImportsShown } from "@inventory/catalog-contract/Import"
 import {
   ImportNotFound,

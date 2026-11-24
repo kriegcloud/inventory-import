@@ -1891,3 +1891,24 @@ and 14, and the law still counts them. Reverse, for parameter defaults: take the
 baseline's `reads` no longer matches, so it is written anew). Reverse, for an exemption: taking a file off
 `exemptions` counts its places again, and the baseline does not rise to hold them, so they move onto a schema in the
 same commit. That is what the reversal means: those cells no longer keep their reader.
+
+### 2026-11-23 — the defaults sweep's pilot: cell readers, cell rules and the SKU key
+
+Question: three things the pilot reached that the law's first entry left open or did not foresee: whether a cell
+reader's fallbacks and absence checks are exempt as its clean-ups are; where the cell reading in `Review.rules.ts`
+and `Suggest.rules.ts` goes; and where `skuKey` goes, since as a schema transformation it would need
+`S.decodeSync`, which the type-check refuses (`schemaSync`).
+Answer: I chose each; the agent recommended the same each time.
+
+- A cell reader is exempt for clean-ups only. Its fallbacks and absence checks move like any other: the vendors and
+  dimensions JSON in a cell is decoded by its schema with `Option` fields, and a regex group is read as an `Option`.
+  `CellReading.rules.ts` keeps its trims and changes of case, and nothing else. Rejected: all four kinds exempt.
+- The cell reading in `Review.rules.ts` and `Suggest.rules.ts` moves to a new `Review/CellRules.rules.ts`, each
+  field's check and proposal, and that file goes on `exemptions` for clean-ups. `Review.rules.ts` keeps the fold,
+  the counts and the decisions with no clean-up. Rejected: listing `Review.rules.ts` and `Suggest.rules.ts`
+  themselves; moving everything into `CellReading.rules.ts`.
+- `skuKey` moves to its own file, `Item/SkuKey.rules.ts`, on `exemptions` for clean-ups, its reason beside it.
+  Rejected: decoding a `SkuKey` once where a SKU enters, which changes the staged and stored row shapes.
+
+Also: the main checkout is mine while the sweep runs; the sweep works in `.claude/worktrees/defaults-check` on
+`feat/defaults-contract-step`, and the branches are joined when I say so.

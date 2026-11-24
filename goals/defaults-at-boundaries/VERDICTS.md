@@ -73,7 +73,7 @@ holds in the code.
 | `ItemFields`, `StoredItem`, `ItemEdit` | optional fields | Absent, *as is* | `description`, `reorderPoint`, `firstReceivedOn`, `dimensions` decode with `nullAsNone` |
 | | `stocking` | State, *as is* | `Active`/`Inactive`/`Discontinued` |
 | | `tags`, `vendors` | Required | every stored item states its lists; an import's empty cell is decided as empty by the review, not by this schema |
-| `skuKey({ sku })` | — | Normalised, *open* | the key two rows are compared by. A `SkuKey` brand made by a schema transformation was tried: every caller is pure code that needs the key at once, and `S.decodeSync` is refused by the type-check (`schemaSync`), so it stays a function until Benjamin rules (SPEC, open question 3) |
+| `skuKey({ sku })` | — | Normalised, *exempt* | the key two rows are compared by, never shown as a fix. A schema transformation would need `S.decodeSync`, which the type-check refuses, and every caller is pure code that needs the key at once; Benjamin ruled it its own file, `Item/SkuKey.rules.ts`, on the law's `exemptions` for clean-ups (SPEC, question 3) |
 | `ItemFilter` | `filterId` | Absent | the table kit's own optional key; kept at its boundary |
 | `rangeSchema` | `min`, `max` | Absent, *as is* | |
 | `ItemQuery` | `search` | Normalised | the words of the search decoded once (`SearchText`), not split in the model |

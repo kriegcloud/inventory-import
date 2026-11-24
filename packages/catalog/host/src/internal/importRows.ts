@@ -3,7 +3,8 @@
 // `D1Instant`, so `createdAt < before` in SQL is a comparison in time, and every id is the brand the row holds.
 import { D1Instant } from "@beep/d1/D1Instant"
 import { ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
-import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
+import { ItemFields } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import {
   DecidedBy,
   maxReason,

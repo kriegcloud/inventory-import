@@ -79,8 +79,8 @@ export const checkCommand = (input: {
       checked.push({ ...change, values: [] })
       continue
     }
-    if (change.values.length === 0)
-      return Result.fail(`The filter on ${column.label} had nothing to compare with, ${nothing}`)
+    const head = A.head(change.values)
+    if (O.isNone(head)) return Result.fail(`The filter on ${column.label} had nothing to compare with, ${nothing}`)
     if (column.type === "select") {
       const spelled: Array<string> = []
       for (const value of change.values) {
@@ -93,7 +93,7 @@ export const checkCommand = (input: {
       checked.push({ ...change, values: A.dedupe(spelled) })
       continue
     }
-    const first = Str.trim(change.values[0] ?? "")
+    const first = Str.trim(head.value)
     if (column.type === "boolean" && first !== "true" && first !== "false") {
       return Result.fail(`${column.label} is yes or no, and the answer said ${quoted(first)}, ${nothing}`)
     }
@@ -184,13 +184,23 @@ const flagNamed = (columns: ColumnCatalog, words: string): O.Option<ViewChange> 
 const descending = /\s+(descending|desc|reversed|in reverse|high to low|largest first|z to a|newest first)$/
 const ascending = /\s+(ascending|asc|low to high|smallest first|a to z|oldest first)$/
 
+/**
+ * The text a pattern's first group found in a clause, or none when the clause does not match it.
+ *
+ * @example groupOf(/^hide (.+)$/)("hide the note") // O.some("the note")
+ */
+const groupOf =
+  (pattern: RegExp) =>
+  (clause: string): O.Option<string> =>
+    O.flatMap(Str.match(pattern)(clause), (found) => O.fromUndefinedOr(found[1]))
+
 const readClause = (clause: string, columns: ColumnCatalog): O.Option<ViewChange> => {
   if (/^(clear|reset)( all| everything| the view| it)?$/.test(clause) || /^show (all|everything)$/.test(clause)) {
     return O.some({ kind: "clear", what: "everything" })
   }
-  const clearPart = Str.match(/^(?:clear|reset) (?:the )?(filters?|sort|sorting|order|search|columns)$/)(clause)
+  const clearPart = groupOf(/^(?:clear|reset) (?:the )?(filters?|sort|sorting|order|search|columns)$/)(clause)
   if (O.isSome(clearPart)) {
-    const part = clearPart.value[1] ?? ""
+    const part = clearPart.value
     return O.some({
       kind: "clear",
       what: Str.startsWith("filter")(part)
@@ -204,11 +214,11 @@ const readClause = (clause: string, columns: ColumnCatalog): O.Option<ViewChange
   }
   // "Find the steel brackets", "search for gaskets", "look for BRK-04": the words after go into the table's search box,
   // which matches each of them in any order. A table without a search box refuses it in `checkCommand`.
-  const find = Str.match(/^(?:find|search(?: for)?|look for|look up)\s+(?:(?:all|every)\s+)?(?:the\s+)?(.+)$/)(clause)
-  if (O.isSome(find)) return O.some({ kind: "search", text: find.value[1] ?? "" })
-  const sort = Str.match(/^(?:sort|order)(?: it| them| the items| items| the rows| rows| the table)? by (.+)$/)(clause)
+  const find = groupOf(/^(?:find|search(?: for)?|look for|look up)\s+(?:(?:all|every)\s+)?(?:the\s+)?(.+)$/)(clause)
+  if (O.isSome(find)) return O.some({ kind: "search", text: find.value })
+  const sort = groupOf(/^(?:sort|order)(?: it| them| the items| items| the rows| rows| the table)? by (.+)$/)(clause)
   if (O.isSome(sort)) {
-    const rest = sort.value[1] ?? ""
+    const rest = sort.value
     const desc = descending.test(rest)
     const named = Str.replace(ascending, "")(Str.replace(descending, "")(rest))
     return O.map(
@@ -216,22 +226,24 @@ const readClause = (clause: string, columns: ColumnCatalog): O.Option<ViewChange
       (column): ViewChange => ({ kind: "sort", column: column.id, direction: desc ? "desc" : "asc" })
     )
   }
-  const hide = Str.match(/^hide (.+)$/)(clause)
+  const hide = groupOf(/^hide (.+)$/)(clause)
   if (O.isSome(hide)) {
     return O.map(
-      O.filter(columnNamed(columns, hide.value[1] ?? ""), (column) => column.hideable),
+      O.filter(columnNamed(columns, hide.value), (column) => column.hideable),
       (column): ViewChange => ({ kind: "hide", column: column.id })
     )
   }
-  const show = Str.match(/^show (.+)$/)(clause)
+  const show = groupOf(/^show (.+)$/)(clause)
   if (O.isSome(show)) {
-    const column = columnNamed(columns, show.value[1] ?? "")
+    const column = columnNamed(columns, show.value)
     if (O.isSome(column)) return O.some({ kind: "show", column: column.value.id })
   }
-  const weDo = Str.match(/^(?:show |list )?(?:only )?(?:the )?(?:items|rows) (?:that )?we (\w+)$/)(clause)
-  const only = Str.match(/^(?:show |keep )?(?:only|just) (.+)$/)(clause)
-  const wanted = O.isSome(weDo) ? (weDo.value[1] ?? "") : O.isSome(only) ? (only.value[1] ?? "") : ""
-  if (wanted === "") return O.none()
+  const asked = O.orElse(
+    groupOf(/^(?:show |list )?(?:only )?(?:the )?(?:items|rows) (?:that )?we (\w+)$/)(clause),
+    () => groupOf(/^(?:show |keep )?(?:only|just) (.+)$/)(clause)
+  )
+  if (O.isNone(asked)) return O.none()
+  const wanted = asked.value
   const flag = flagNamed(columns, wanted)
   if (O.isSome(flag)) return O.some(flag.value)
   const valued = A.findFirst(

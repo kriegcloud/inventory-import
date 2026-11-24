@@ -16,6 +16,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
+import { noComparison, noItemsRead } from "@inventory/catalog-model/Rematch"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -168,7 +169,7 @@ const marcusSaves = (
   set: Readonly<Record<string, RowDecisionFlags.Encoded>>
 ) =>
   Effect.flatMap(store.find(prairie, id), (draft) =>
-    store.decide(marcusAsMember, O.getOrThrow(draft), { set: flags(set), clear: [] })
+    store.decide(marcusAsMember, O.getOrThrow(draft), { set: flags(set), clear: [] }, noItemsRead, O.none())
   )
 
 /** The messy sample staged by Marcus, and the column Dana's matches give the unit cost: the reorder point's. */
@@ -337,7 +338,8 @@ layer(App)("a match and another person's write that fall into each other", (it) 
               danaAsMember,
               O.getOrThrow(draft),
               { field: "unitCost", column: O.some(other.index) },
-              "unit cost"
+              "unit cost",
+              noComparison
             )
           )
         )

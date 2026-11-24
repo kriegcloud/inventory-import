@@ -10,6 +10,7 @@ import { AlreadyImported, DraftBusy, ImportNotFound, RevisionAhead } from "@inve
 import type { Field, StagedTable } from "@inventory/catalog-contract/Staged"
 import { MatchTakeBack, takenBackRowsNamed } from "@inventory/catalog-contract/Import"
 import { decisionsMoved, draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { noItemsRead } from "@inventory/catalog-model/Rematch"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { ItemsOfRow } from "@inventory/catalog-model/ItemsOfRow"
 import { type ItemsOfRow as ItemsOfRowShape, itemsOfRow } from "@inventory/catalog-model/Review"
@@ -26,27 +27,16 @@ import * as Ref from "effect/Ref"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { as, dana, elena, marcus, priya, stage } from "./support.ts"
+import { as, dana, elena, marcus, priya, stage, stagedTableOf } from "./support.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const headings = ["sku", "name", "category", "uom", "unit_cost", "quantity_on_hand", "Alt code", "Net cost"] as const
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
 type Line = Partial<Record<(typeof headings)[number], string>>
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
-const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
-  fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
-  notes: [],
-  rows: A.map(lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
-  }))
-})
+const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable =>
+  stagedTableOf({ fileName, headings, lines })
 
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 const stocked = tableOf("stocked.csv", [
@@ -976,10 +966,10 @@ describe("what lands between a save's comparison and its write", () => {
           dana,
           draft,
           { set: flags({ "row-4": { out: true } }), clear: [] },
-          undefined,
+          noItemsRead,
           at
         )
-        const nothing = yield* store.decide(dana, draft, { set: {}, clear: [] }, undefined, at)
+        const nothing = yield* store.decide(dana, draft, { set: {}, clear: [] }, noItemsRead, at)
         expect([refused, nothing]).toEqual([decisionsMoved, decisionsMoved])
         const now = yield* stored(["row-4"])
         expect(now).toEqual([O.none()])
@@ -1443,7 +1433,7 @@ describe("a row that waited, and who last saved what is stored", () => {
         dana,
         draft,
         { set: flags({ "row-2": { out: true } }), clear: [] },
-        undefined,
+        noItemsRead,
         O.some({ revision: draft.revision, saves: held.saves })
       )
       expect(refused).toEqual(decisionsMoved)

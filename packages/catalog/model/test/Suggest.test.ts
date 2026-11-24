@@ -2,7 +2,7 @@
 // a field still has no column. Never for a file with nothing a suggestion could settle.
 import { describe, expect, it } from "@effect/vitest"
 import { digest, offersSuggestions, questions } from "@inventory/catalog-model/Suggest"
-import { review } from "@inventory/catalog-model/Review"
+import { review, noHistory } from "@inventory/catalog-model/Review"
 import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { matchedByHeading } from "@inventory/catalog-contract/Mapping"
 import * as A from "effect/Array"
@@ -18,7 +18,7 @@ const renamed = (table: StagedTable, from: string, to: string): StagedTable => (
 })
 
 const offered = (table: StagedTable) => {
-  const current = review({ table, choices: [], decisions: {}, storedItems: [] })
+  const current = review({ ...noHistory, table, choices: [], decisions: {}, storedItems: [] })
   return {
     cannot: current.counts.cannot,
     offered: offersSuggestions({
@@ -54,7 +54,7 @@ describe("Suggest fixes is offered", () => {
       columns: [...table.columns, { index: table.columns.length, letter: "H", label: "Internal Notes" }],
       rows: A.map(table.rows, (row) => ({ ...row, cells: [...row.cells, { text: "ask purchasing", shown: O.none() }] }))
     }
-    const current = review({ table: noted, choices: [], decisions: {}, storedItems: [] })
+    const current = review({ ...noHistory, table: noted, choices: [], decisions: {}, storedItems: [] })
     expect(A.map(current.unusedColumns, (column) => column.label)).toEqual(["Internal Notes"])
     // This small file has no column for tags, vendors and the rest: a heading could be one of them.
     expect(offersSuggestions({ cannot: 0, mapping: current.mapping, unusedColumns: current.unusedColumns })).toBe(true)

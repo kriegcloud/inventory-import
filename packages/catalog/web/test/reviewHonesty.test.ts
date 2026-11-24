@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
-import { firstDecisions, review } from "@inventory/catalog-model/Review"
+import { firstDecisions, itemsOfRow, noHistory, review } from "@inventory/catalog-model/Review"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
@@ -57,8 +57,8 @@ const stage = (file: File): Effect.Effect<StagedTable> =>
 // As the screen opens a file: the draft a new import starts with (the rules' own fixes held back as proposals).
 const sampleRows = (name = "items_messy.csv", storedItems: ReadonlyArray<ItemFields> = []) =>
   Effect.map(stage(sample(name)), (table) => {
-    const decisions = firstDecisions({ table, choices: [], mode: "propose" })
-    const current = review({ table, choices: [], decisions, storedItems })
+    const decisions = firstDecisions({ table, choices: [], mode: "propose", itemsOf: itemsOfRow })
+    const current = review({ ...noHistory, table, choices: [], decisions, storedItems })
     return { current, decisions, rows: toRegionRows(current, decisions) }
   })
 
@@ -108,11 +108,11 @@ describe("a second load after a confirm that took accepted proposals", () => {
           },
           decisionFromFlags
         )
-        const first = review({ table, choices: [], decisions: accepted, storedItems: [] })
-        const stored = A.flatMap(first.rows, (each) => (each.item === null ? [] : [each.item]))
+        const first = review({ ...noHistory, table, choices: [], decisions: accepted, storedItems: [] })
+        const stored = A.flatMap(first.rows, (each) => A.fromOption(each.item))
         expect([first.counts.ready, stored.length]).toEqual([161, 161])
         // The same file again, nothing decided: each of the six is offered its proposal no more, its item is stored.
-        const current = review({ table, choices: [], decisions: {}, storedItems: stored })
+        const current = review({ ...noHistory, table, choices: [], decisions: {}, storedItems: stored })
         expect([current.counts.already, current.counts.decision, current.counts.cannot, current.counts.ready]).toEqual([
           161, 18, 21, 0
         ])
@@ -161,9 +161,9 @@ describe("every row says why", () => {
       const noFix = A.filter(open, (view) => view.problem?.fix === undefined)
       expect(noFix.length).toBeGreaterThan(0)
       for (const view of open) {
-        const domain = O.getOrUndefined(A.findFirst(current.rows, (row) => row.id === view.row.id))
+        const domain = O.getOrThrow(A.findFirst(current.rows, (row) => row.id === view.row.id))
         // The first problem's sentence, and how many more the row has behind it.
-        expect(reasonOf({ view, kinds })).toBe(reasonShown(domain?.reason ?? "", domain?.reasons.length ?? 0))
+        expect(reasonOf({ view, kinds })).toBe(reasonShown(O.getOrThrow(domain.reason), domain.reasons.length))
       }
     })
   )
@@ -231,7 +231,7 @@ describe("a button that could do nothing is never offered", () => {
     Effect.gen(function* () {
       // Every item of the clean sample is stored, as after a first import of every row.
       const first = yield* sampleRows("items_clean.csv")
-      const items = A.flatMap(first.current.rows, (each) => (each.item === null ? [] : [each.item]))
+      const items = A.flatMap(first.current.rows, (each) => A.fromOption(each.item))
       expect(items.length).toBe(25)
       const { rows } = yield* sampleRows("items_clean.csv", items)
       const counts = count(viewRows({ rows, state: emptyState }))
@@ -342,7 +342,7 @@ describe("a cost, the dimensions and the vendors in the review", () => {
     Effect.map(
       Effect.map(stage(sample("items_messy.csv")), (table) => ({
         table,
-        current: review({ table, choices: [], decisions: {}, storedItems: [] })
+        current: review({ ...noHistory, table, choices: [], decisions: {}, storedItems: [] })
       })),
       ({ table, current }) => {
         const cost = O.getOrUndefined(

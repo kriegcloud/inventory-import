@@ -84,7 +84,7 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     width: 80,
     align: "right",
     // One of several items on its row says which ("8 · 2"); a row that is one item shows its number alone.
-    cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: O.getOrUndefined(O.map(row.part, String)) }),
+    cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: O.map(row.part, String) }),
     sort: (row) => row.rowNumber * 1000 + O.getOrElse(row.part, () => 0)
   }
 ]
@@ -249,7 +249,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
                   ? [
                       {
                         rowNumber: row.rowNumber,
-                        ...O.match(row.part, { onNone: () => ({}), onSome: (part) => ({ label: String(part) }) }),
+                        label: O.map(row.part, String),
                         reason: row.reason
                       }
                     ]

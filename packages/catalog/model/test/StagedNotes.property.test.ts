@@ -82,8 +82,7 @@ describe("a staged file's notes", () => {
     ],
     ([table, staged, kinds, message, totalRows, aim, drawn, shift, only]) => {
       const counts = countsOf(aim, drawn, shift, only)
-      const kindAt = (n: number): typeof LayoutKind.Type =>
-        O.getOrElse(A.get(kinds, n % kinds.length), () => A.headNonEmpty(kinds))
+      const kindAt = (n: number): typeof LayoutKind.Type => O.getOrThrow(A.get(kinds, n % kinds.length))
       const warnings: ReadonlyArray<Note> = A.map(
         tier(counts.warning, (n) => ({ kind: kindAt(n), level: "warning" }), message),
         // The first warning is a total row, naming its rows: the review reads them.

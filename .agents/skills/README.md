@@ -17,7 +17,14 @@ Copied as they stand from Benjamin's own monorepo, [beep-effect](https://github.
 `sparql-expert` and the ontology set (`ontology-scout`, `ontology-requirements`, `ontology-conceptualizer`,
 `ontology-architect`, `ontology-mapper`, `ontology-validator`, `ontology-curator`, `ontology-foundational-auditor`).
 They still name beep-effect's standards and paths in places; those are corrected as this repository takes on that
-layout. `grilling`, `grill-me` and `unslop` began as the vendored skills in the table below and keep their licences.
+layout. The paths they name that are not here, and what stands in (checked 2026-11-23):
+
+| Named in the skill | Here |
+| --- | --- |
+| `standards/effect-first-development.md` (`effect-first-development`, `schema-first-development`, `crispen`) | `CLAUDE.md` "Effect (version 4)" and `docs/standards/effect-imports.md` |
+| `standards/schema-first.inventory.jsonc`, an inventory of accepted exceptions | none on purpose: `defaults-baseline.json`, whose numbers only fall, and the law's `exemptions` (`packages/tooling/tool/cli/src/commands/Laws/Defaults.rules.ts`), each Benjamin's decision |
+| `packages/tooling/tool/cli/src/commands/Lint/SchemaFirst.ts`, the schema-first lint | `bun run beep laws defaults` (`defaults:check` in `bun run check`), with `docs/standards/schema-first.md` (SF-1 to SF-9) for the standard |
+| `standards/architecture/DECISIONS.md` | `explorations/ideal-architecture/DECISIONS.md` for architecture, `DECISIONS.md` at the root for product | `grilling`, `grill-me` and `unslop` began as the vendored skills in the table below and keep their licences.
 
 ## Vendored, with their licences
 

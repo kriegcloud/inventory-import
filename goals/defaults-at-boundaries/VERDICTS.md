@@ -106,10 +106,12 @@ holds in the code.
 | Schema or type | Field | Verdict | Reason |
 | --- | --- | --- | --- |
 | `Review.rules.ts` `Proposal` | `suggestionId` | Absent | only a proposal from a stored suggestion has one |
-| | `alternatives`, `labels`, `targets` | Empty (`[]`) | `proposal()` fills each with `[]`: a schema with constructor defaults replaces the helper |
-| `Review.rules.ts` `ReviewedRow` | `part`, `partLabel` | Absent, together: `part: O.Option<{ part, label }>` | "absent for a row that is one item"; a row of several items always has both |
-| `Review.rules.ts` `review` input | `createdIds`, `suggestions` | Empty (`[]`) | "when not given": a schema-made input with constructor defaults |
-| | `itemsOf` | Empty (`itemsOfRow`) | the usual reading of a row; `ItemsOfRow.context.ts` already names it |
+| | `alternatives`, `labels`, `targets` | Empty (`[]`), a named constant | `oneReading`, spread by each proposal with one value to take; a plain type, not a schema, since a schema's `make` would check every proposal of every row on each review |
+| `Review.rules.ts` `ReviewedRow`, `RowItem`, `FileRow` | `part`, `partLabel` / `label` | Absent, together: `part: O.Option<RowPart>`, `RowPart = { number, label }` | "absent for a row that is one item"; `RowItem`'s own doc gives a row of several items both |
+| `Review.rules.ts` `ReviewedRow` | `item`, `reason` | Absent | "none unless it is ready", "none when ready" |
+| `Review.rules.ts` `Problem` | `proposal` | Absent | `field`, `ask`, `note` stay `\| null`: only the screen compares them, and it is not in the pilot |
+| `recheckRow` result | — | Absent | the first problem a row still has, or none; the screen turns none into the region's `undefined` at its last step |
+| `Review.rules.ts` `review` input | `createdIds`, `suggestions`, `itemsOf` | Required; `noHistory` is the named value of all three for a file nothing has happened to | a plain type, not a schema: it holds a function, and a schema's `make` would check every row of the table on each review. `recheckRow`, `firstDecisions` and `carryDecisions` take `itemsOf` the same way |
 | `Review.rules.ts` `Wrong` | `choices` | Empty (`[]`) | read as `wrong.choices ?? []` |
 | `Review.rules.ts` `fault` result | — | Absent | `Wrong \| undefined` becomes `O.Option<Wrong>` |
 | `rowPlace({ label })` | `label` | Absent | `string \| null \| undefined` and `""` all mean "one item": one `Option` |
@@ -118,24 +120,24 @@ holds in the code.
 | `Rematch.rules.ts` `ItemsAsRead` | `asked` | Required | which reads a save was judged against: neither value is the usual one |
 | | `keys`, `items`, `created`, `suggestions` | Empty (`[]`) | `noItemsRead` is the empty read; the store's parameter default moves onto the schema |
 | `Rematch.rules.ts` `ColumnsAsked` | `reads` | Absent per entry (`OptionFromNullOr`) | |
-| `Spreadsheet.rules.ts` `Cell` | `shown`, `formula` | Absent | a CSV cell has neither |
+| `Spreadsheet.rules.ts` `Cell` | `shown`, `formula` | Absent, kept as a key left out and read with `shownOf`, `formulaOf` | a CSV cell has neither. The table crosses the reader's worker as plain structured-clone values (`web/src/internal/protocol.ts`), where an Option loses its prototype, so the Option is taken where the cell is read |
 | `Spreadsheet.rules.ts` `Row` | `extra` | Empty (`[]`) | cells past the last column; most rows have none |
 | | `hidden` | Empty (`false`) | a row is shown unless Excel hides it |
 | `CellReading.rules.ts` `DimensionsCell` | `length`, `width`, `height`, `unit` | Absent | "all three measurements together" is a reason for the person, read from the Options |
 | `CellReading.rules.ts` `VendorCell` | `vendor_name`, `unit_cost` | Absent | a vendor with no name or cost is a reason for the person |
-| | `vendor_sku`, `lead_time_days` | Absent (`null` or left out) | |
+| | `vendor_sku`, `lead_time_days` | Absent (`null` or left out), read with `O.fromNullishOr` | the schema keeps `null` apart from a key left out: `withPreferred` gives the cell back as written but for the flag it changes |
 | | `is_preferred` | Empty (`false`) | a vendor is not preferred unless the cell says so |
 | `ImportStore.store.ts` `Draft` | `importedBy`, `importedAt` | Absent, *as is* | |
-| `ImportStore.store.ts` `decide(…, read?, expected?)` | `read` | Empty (`noItemsRead`) | as `ItemsAsRead` |
-| | `expected` | Absent | no comparison asked |
-| `ImportStore.store.ts` `rematch(…, compare?)` | `compare` | Empty (`noComparison`) | |
+| `ImportStore.store.ts` `decide(…, read, expected)` | `read` | Required; `noItemsRead` is the empty read | as `ItemsAsRead`; the port, the twin and the adapter no longer default it |
+| | `expected` | Absent, required (`O.none()` asks no comparison) | |
+| `ImportStore.store.ts` `matchColumn(…, compare)` | `compare` | Required; `noComparison` compares nothing | |
 | `Imports.handler.ts` `known?`, `unsaved?`, `also = 0` | | Absent (`known`, `unsaved`), Empty (`also`) | `known` is a table already read, else read here; both become explicit `Option`s |
 | `ItemEdit.rules.ts` `ItemForm` | every text box | Normalised (`S.Trim`) | the editor's boxes are not file cells: nobody reviews their clean-up |
 | | `quantityOnHand` | Empty (`0`) when the box is empty | listed under "Defaults nobody decided" |
 | `ItemSearch.rules.ts` search text | — | Normalised (`SearchText`) | lower case, accents off, edges dropped, each word once |
 | `TableView.rules.ts` the assistant's words | — | Normalised | the request's words are compared lower-cased; no person reviews them |
 | `SheetLayout.rules.ts` headings | — | Normalised (`HeadingKey`) | a heading matched to a field is compared without case or spaces |
-| `Catalog.memory.ts` `catalogMemory(options?)` | `answerer`, `calls` | Empty (`Answerer.off`, `40`) | the test twin's usual setting; 40 is the decided allowance |
+| `Catalog.memory.ts` `catalogMemoryWith(options)` | `answerer`, `calls` | Required; `offline` holds `Answerer.off` and `40`, and `catalogMemory` is the twin set up with it | the test twin's usual setting; 40 is the decided allowance |
 | aggregates (`Import`, `Row`, `Group`) and the four decisions | all | Required, State *as is* | each state's `make` writes every field out, which the prover reads; no default added there |
 | `Confirm.rules.ts` `Planned*`, `ConfirmPlan`; `ImportStore.store.ts` results; `Suggest.rules.ts` `SuggestAnswer` | all but the two below | State / Required, *as is* | |
 | `Suggest.rules.ts` `SuggestAnswer` | `names[].name`, `categories[].category` | Normalised (`S.Trim`) | a model's answer is decoded, so its spaces come off there; the guard used to trim them in code |

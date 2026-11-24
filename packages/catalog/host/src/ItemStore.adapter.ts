@@ -341,10 +341,10 @@ export const ItemStoreD1 = Layer.effect(
       if (operator === "isNotEmpty") return O.some(sql`(${column} IS NOT NULL)`)
       if (operator === "isBetween") {
         if (typeof value === "string" || value.length !== 2) return O.none()
-        const [low = "", high = ""] = value
         // An empty end is open. Both empty is no range at all, and an end that is not an amount spoils the range.
         const end = (text: string) => (Str.trim(text) === "" ? O.some(O.none<number>()) : O.map(read(text), O.some))
-        return O.flatMap(O.all([end(low), end(high)]), ([from, to]) => {
+        const ends = O.flatMap(O.all([A.get(value, 0), A.get(value, 1)]), ([low, high]) => O.all([end(low), end(high)]))
+        return O.flatMap(ends, ([from, to]) => {
           const clauses = [
             ...O.match(from, { onNone: () => [], onSome: (cents) => [sql`${column} >= ${cents}`] }),
             ...O.match(to, { onNone: () => [], onSome: (cents) => [sql`${column} <= ${cents}`] })
@@ -456,14 +456,10 @@ export const ItemStoreD1 = Layer.effect(
         flagCountsOf("lotTracked")(organizationId),
         totals(organizationId)
       ])
-      // An aggregate without GROUP BY always answers one row; the fallback is for the type, not a real case.
-      const summary = O.getOrElse(A.head(summaries), () => ({
-        total: 0,
-        quantityMin: null,
-        quantityMax: null,
-        costMin: null,
-        costMax: null
-      }))
+      // An aggregate without GROUP BY always answers one row.
+      const answered = A.head(summaries)
+      if (O.isNone(answered)) return yield* Effect.die("the totals answered no row")
+      const summary = answered.value
       return {
         total: summary.total,
         category: A.map(category, (row) => ({ value: row.value, count: row.n })),

@@ -22,7 +22,7 @@ import { Member } from "@inventory/kernel/Member"
 import { type Draft, DraftEffect, DraftEvent, emptyDraft, shown, step, waiting } from "../src/Draft.machine.ts"
 import { keptForm } from "../src/internal/storedWaiting.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const member = (id: string, name: string): Member =>
   Member.make({

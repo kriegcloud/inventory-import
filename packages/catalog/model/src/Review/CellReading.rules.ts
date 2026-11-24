@@ -1,17 +1,10 @@
 // How one cell of a file is read: a cost, a count, a day, a size, the vendors, the tags, and the other readings a
 // cell may have. These keep their trims and case changes on purpose: here a trimmed or re-cased value is a proposal
 // the person sees as before and after, never a silent decode.
-/**
- * A cost written as plain digits ("12.33", "9.3", "4") as the decimal string an item stores, read from the digits and
- * never through a float: leading zeros and trailing decimal zeros dropped, so "012.50" and "12.5" are one cost. None
- * for anything else: a "$", a comma, a sign, a word or a fifth decimal is the review's to ask about.
- *
- * @example readDecimal("12.50") // O.some("12.5")
- * @example readDecimal("35,82") // O.none()
- */
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
 import * as Data from "effect/Data"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import {
@@ -28,13 +21,44 @@ import {
 } from "@inventory/catalog-contract/Item"
 import * as S from "effect/Schema"
 import { Field } from "@inventory/catalog-contract/Staged"
-export const readDecimal = (text: string): O.Option<string> => {
-  const parts = /^(\d{1,12})(?:\.(\d{1,4}))?$/.exec(Str.trim(text))
-  if (parts === null) return O.none()
-  const whole = Str.replace(/^0+(?=\d)/, "")(parts[1] ?? "0")
-  const fraction = Str.replace(/0+$/, "")(parts[2] ?? "")
-  return O.some(fraction === "" ? whole : `${whole}.${fraction}`)
-}
+
+/**
+ * The text of an empty cell, and of a cell its row ends before: a row of a CSV may stop short of the last column, and
+ * what it leaves out reads as empty, as a spreadsheet shows it. It is also the text of a value an item leaves out.
+ */
+export const emptyText = ""
+
+/**
+ * The text a pattern's group found, or none for a group the text left out (an optional part, as the decimals of
+ * "12"): a regular expression's match holds `undefined` there, read here once as an Option.
+ *
+ * @example groupAt("12".match(/^(\d+)(?:\.(\d+))?$/)!, 2) // O.none()
+ */
+const groupAt = (found: RegExpMatchArray, index: number): O.Option<string> => O.fromUndefinedOr(found[index])
+
+/**
+ * A value an item may leave out, as the text a file's cell holds: its text, or an empty cell.
+ *
+ * @example asCellText(O.none()) // ""
+ */
+const asCellText = (value: O.Option<string>): string => O.match(value, { onNone: () => emptyText, onSome: identity })
+
+/**
+ * A cost written as plain digits ("12.33", "9.3", "4") as the decimal string an item stores, read from the digits and
+ * never through a float: leading zeros and trailing decimal zeros dropped, so "012.50" and "12.5" are one cost. None
+ * for anything else: a "$", a comma, a sign, a word or a fifth decimal is the review's to ask about.
+ *
+ * @example readDecimal("12.50") // O.some("12.5")
+ * @example readDecimal("35,82") // O.none()
+ */
+export const readDecimal = (text: string): O.Option<string> =>
+  O.flatMap(Str.match(/^(\d{1,12})(?:\.(\d{1,4}))?$/)(Str.trim(text)), (parts) =>
+    O.map(groupAt(parts, 1), (digits) => {
+      const whole = Str.replace(/^0+(?=\d)/, "")(digits)
+      const fraction = O.filter(O.map(groupAt(parts, 2), Str.replace(/0+$/, "")), Str.isNonEmpty)
+      return O.match(fraction, { onNone: () => whole, onSome: (decimals) => `${whole}.${decimals}` })
+    })
+  )
 
 /**
  * The cost a cell of digits says, or none: `readDecimal`, as the decimal the item holds.
@@ -62,11 +86,12 @@ export const readCount = (text: string): O.Option<number> => {
  * @example readDate("2026-03-04") // O.some("2026-03-04")
  * @example readDate("03/04/2026") // O.none()
  */
-export const readDate = (text: string): O.Option<string> => {
-  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(Str.trim(text))
-  if (parts === null) return O.none()
-  return isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) })
-}
+export const readDate = (text: string): O.Option<string> =>
+  O.flatMap(Str.match(/^(\d{4})-(\d{2})-(\d{2})$/)(Str.trim(text)), (parts) =>
+    O.flatMap(O.all([groupAt(parts, 1), groupAt(parts, 2), groupAt(parts, 3)]), ([year, month, day]) =>
+      isoDate({ year: Number(year), month: Number(month), day: Number(day) })
+    )
+  )
 
 /** Whether the text is one of the listed categories, exactly as listed. */
 export const isCategory = S.is(Category)
@@ -110,25 +135,27 @@ export const canonicalTags = (text: string): string =>
 /** The tags a cell lists, split at "|", the empty ones dropped. */
 export const tagsOf = (text: string): ReadonlyArray<string> => A.filter(Str.split("|")(text), (tag) => tag !== "")
 
-// The dimensions cell as the file writes it: JSON with the brief's own keys. Each measurement may be missing here, so
-// the review can say which one is, instead of only "not readable".
+// The dimensions cell as the file writes it: JSON with the brief's own keys. Each measurement may be missing here, an
+// Option once decoded, so the review can say which one is, instead of only "not readable".
 const DimensionsCell = S.fromJsonString(
   S.Struct({
-    length: S.optionalKey(S.Finite),
-    width: S.optionalKey(S.Finite),
-    height: S.optionalKey(S.Finite),
-    unit: S.optionalKey(S.String)
+    length: S.OptionFromOptionalKey(S.Finite),
+    width: S.OptionFromOptionalKey(S.Finite),
+    height: S.OptionFromOptionalKey(S.Finite),
+    unit: S.OptionFromOptionalKey(S.String)
   })
 )
 const decodeDimensions = S.decodeUnknownOption(DimensionsCell)
 const encodeDimensions = S.encodeOption(DimensionsCell)
 
 // One vendor as the file writes it, in the brief's own keys. A cost is a JSON number there, or the same digits in
-// quotes ("7.50"): both are read from the digits by `readDecimal`, so a quoted cost is not a cell "cut off".
+// quotes ("7.50"): both are read from the digits by `readDecimal`, so a quoted cost is not a cell "cut off". A name or
+// a cost left out is an Option once decoded. A vendor SKU and a lead time keep null apart from a key left out, because
+// `withPreferred` gives the cell back as it was written but for the one flag it changes.
 const VendorCell = S.Struct({
-  vendor_name: S.optionalKey(S.String),
+  vendor_name: S.OptionFromOptionalKey(S.String),
   vendor_sku: S.String.pipe(S.NullOr, S.optionalKey),
-  unit_cost: S.optionalKey(S.Union([S.Finite, S.String])),
+  unit_cost: S.OptionFromOptionalKey(S.Union([S.Finite, S.String])),
   lead_time_days: S.Finite.pipe(S.NullOr, S.optionalKey),
   is_preferred: S.optionalKey(S.Boolean)
 })
@@ -213,25 +240,30 @@ export const named = (value: string): string => {
  *
  * @example readDimensions('{"length":31.2,"width":41.4,"unit":"cm"}') // bad: "Dimensions has no height. ..."
  */
-export const readDimensions = (text: string): Read<Dimensions | null> => {
-  if (Str.trim(text) === "") return ok(null)
+export const readDimensions = (text: string): Read<O.Option<Dimensions>> => {
+  if (Str.trim(text) === "") return ok(O.none())
   const cell = decodeDimensions(text)
   if (O.isNone(cell)) {
     return bad("Dimensions cannot be read: the cell is cut off or is not length, width, height and unit.")
   }
   const { length, width, height, unit } = cell.value
-  const missing = A.getSomes([
-    length === undefined ? O.some("length") : O.none(),
-    width === undefined ? O.some("width") : O.none(),
-    height === undefined ? O.some("height") : O.none()
-  ])
-  if (length === undefined || width === undefined || height === undefined) {
+  const measured = O.all({ length, width, height })
+  if (O.isNone(measured)) {
+    const missing = A.filter(["length", "width", "height"] as const, (key) => O.isNone(cell.value[key]))
     return bad(`Dimensions has no ${A.join(missing, " and no ")}. Give all three measurements together, or none.`)
   }
-  if (length <= 0 || width <= 0 || height <= 0) return bad("Dimensions has a measurement that is not above zero.")
-  if (unit !== undefined && unit !== "cm" && unit !== "in")
-    return bad(`Dimensions has the unit ${said(unit)}, not cm or in.`)
-  return ok({ length, width, height, unit: unit === "in" ? "in" : "cm" })
+  const sizes = measured.value
+  if (sizes.length <= 0 || sizes.width <= 0 || sizes.height <= 0) {
+    return bad("Dimensions has a measurement that is not above zero.")
+  }
+  // A cell that names no unit is read in centimetres, as before the unit was a column of its own.
+  return O.match(unit, {
+    onNone: () => ok(O.some({ ...sizes, unit: "cm" as const })),
+    onSome: (written) =>
+      written === "cm" || written === "in"
+        ? ok(O.some({ ...sizes, unit: written }))
+        : bad(`Dimensions has the unit ${said(written)}, not cm or in.`)
+  })
 }
 
 /**
@@ -245,24 +277,27 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
   if (cell.value.length > 3) return bad(`Vendors lists ${cell.value.length} vendors. An item has at most 3.`)
   const read = A.map(cell.value, (vendor, index): Read<Vendor> => {
     const place = `Vendor ${index + 1}`
-    const name = Str.trim(vendor.vendor_name ?? "")
-    if (name === "") return bad(`${place} has no name.`)
-    if (vendor.unit_cost === undefined) return bad(`${place} (${named(name)}) has no unit cost.`)
-    const cost = readUnitCost(`${vendor.unit_cost}`)
+    const given = O.filter(O.map(vendor.vendor_name, Str.trim), Str.isNonEmpty)
+    if (O.isNone(given)) return bad(`${place} has no name.`)
+    const name = given.value
+    const written = vendor.unit_cost
+    if (O.isNone(written)) return bad(`${place} (${named(name)}) has no unit cost.`)
+    const cost = readUnitCost(`${written.value}`)
     if (O.isNone(cost)) {
       return bad(
-        `${place} (${named(name)}) has the unit cost ${named(`${vendor.unit_cost}`)}, not 0 or more with up to 4 decimals.`
+        `${place} (${named(name)}) has the unit cost ${named(`${written.value}`)}, not 0 or more with up to 4 decimals.`
       )
     }
-    const lead = vendor.lead_time_days ?? null
-    if (lead !== null && (!Number.isInteger(lead) || lead < 0)) {
-      return bad(`${place} (${named(name)}) has the lead time ${lead}, not a whole number of days.`)
+    const lead = O.fromNullishOr(vendor.lead_time_days)
+    const wrongLead = O.filter(lead, (days) => !Number.isInteger(days) || days < 0)
+    if (O.isSome(wrongLead)) {
+      return bad(`${place} (${named(name)}) has the lead time ${wrongLead.value}, not a whole number of days.`)
     }
     return ok({
       vendorName: name,
       vendorSku: O.fromNullishOr(vendor.vendor_sku),
       unitCost: cost.value,
-      leadTimeDays: O.fromNullOr(lead),
+      leadTimeDays: lead,
       isPreferred: vendor.is_preferred === true
     })
   })
@@ -286,35 +321,43 @@ export const withPreferred = (input: { readonly text: string; readonly keep: num
 export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => ({
   sku: item.sku,
   name: item.name,
-  description: O.getOrElse(item.description, () => ""),
+  description: asCellText(item.description),
   category: item.category,
   uom: item.uom,
   unitCost: costDigits(item.unitCost),
   quantityOnHand: `${item.quantityOnHand}`,
-  reorderPoint: O.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
+  reorderPoint: asCellText(O.map(item.reorderPoint, (point) => `${point}`)),
   isActive: `${isActive(item.stocking)}`,
   lotTracked: `${item.lotTracked}`,
   tags: A.join(item.tags, "|"),
-  firstReceivedOn: O.getOrElse(item.firstReceivedOn, () => ""),
-  discontinuedOn: O.getOrElse(discontinuedOn(item.stocking), () => ""),
-  dimensions: O.getOrElse(O.flatMap(item.dimensions, encodeDimensions), () => ""),
+  firstReceivedOn: asCellText(item.firstReceivedOn),
+  discontinuedOn: asCellText(discontinuedOn(item.stocking)),
+  dimensions: asCellText(
+    O.flatMap(item.dimensions, (sizes) =>
+      encodeDimensions({
+        length: O.some(sizes.length),
+        width: O.some(sizes.width),
+        height: O.some(sizes.height),
+        unit: O.some(sizes.unit)
+      })
+    )
+  ),
   vendors:
     item.vendors.length === 0
-      ? ""
-      : O.getOrElse(
+      ? emptyText
+      : asCellText(
           encodeVendors(
             A.map(item.vendors, (vendor) => ({
-              vendor_name: vendor.vendorName,
+              vendor_name: O.some(vendor.vendorName),
               ...O.match(vendor.vendorSku, { onNone: () => ({}), onSome: (vendor_sku) => ({ vendor_sku }) }),
-              unit_cost: Number(costDigits(vendor.unitCost)),
+              unit_cost: O.some(Number(costDigits(vendor.unitCost))),
               ...O.match(vendor.leadTimeDays, {
                 onNone: () => ({}),
                 onSome: (lead_time_days) => ({ lead_time_days })
               }),
               is_preferred: vendor.isPreferred
             }))
-          ),
-          () => ""
+          )
         )
 })
 
@@ -339,25 +382,32 @@ export const dateReadings = (
   text: string
 ): { readonly dayFirst: O.Option<string>; readonly monthFirst: O.Option<string> } => {
   const trimmed = Str.trim(text)
-  const numeric = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})$/.exec(trimmed)
-  if (numeric !== null) {
-    const a = Number(numeric[1])
-    const b = Number(numeric[2])
-    const year = fullYear(numeric[3] ?? "")
+  const numeric = O.flatMap(Str.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})$/)(trimmed), (parts) =>
+    O.all([groupAt(parts, 1), groupAt(parts, 2), groupAt(parts, 3)])
+  )
+  if (O.isSome(numeric)) {
+    const [first, second, yearText] = numeric.value
+    const a = Number(first)
+    const b = Number(second)
+    const year = fullYear(yearText)
     return {
       dayFirst: isoDate({ year, month: b, day: a }),
       monthFirst: a === b ? O.none() : isoDate({ year, month: a, day: b })
     }
   }
-  const dayMonth = /^(\d{1,2})[\s-]+([a-z]+)\.?,?[\s-]+(\d{4})$/i.exec(trimmed)
-  if (dayMonth !== null) {
-    const day = isoDate({ year: Number(dayMonth[3]), month: monthOf(dayMonth[2] ?? ""), day: Number(dayMonth[1]) })
-    return { dayFirst: day, monthFirst: O.none() }
+  const dayMonth = O.flatMap(Str.match(/^(\d{1,2})[\s-]+([a-z]+)\.?,?[\s-]+(\d{4})$/i)(trimmed), (parts) =>
+    O.all([groupAt(parts, 1), groupAt(parts, 2), groupAt(parts, 3)])
+  )
+  if (O.isSome(dayMonth)) {
+    const [day, month, year] = dayMonth.value
+    return { dayFirst: isoDate({ year: Number(year), month: monthOf(month), day: Number(day) }), monthFirst: O.none() }
   }
-  const monthDay = /^([a-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/i.exec(trimmed)
-  if (monthDay !== null) {
-    const day = isoDate({ year: Number(monthDay[3]), month: monthOf(monthDay[1] ?? ""), day: Number(monthDay[2]) })
-    return { dayFirst: day, monthFirst: O.none() }
+  const monthDay = O.flatMap(Str.match(/^([a-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/i)(trimmed), (parts) =>
+    O.all([groupAt(parts, 1), groupAt(parts, 2), groupAt(parts, 3)])
+  )
+  if (O.isSome(monthDay)) {
+    const [month, day, year] = monthDay.value
+    return { dayFirst: isoDate({ year: Number(year), month: monthOf(month), day: Number(day) }), monthFirst: O.none() }
   }
   return { dayFirst: O.none(), monthFirst: O.none() }
 }

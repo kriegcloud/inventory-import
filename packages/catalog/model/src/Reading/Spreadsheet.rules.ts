@@ -4,6 +4,7 @@
 // type it was in the file; anything the reader skipped or noticed is a Note the screen can show, never a console line.
 
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 
 /** The two formats the importer reads. `.xls` (Excel 97-2003) is refused with a way out (`fileProblem.oldExcel`). */
@@ -46,6 +47,18 @@ export const Cell = S.Struct({
 })
 /** A decoded `Cell`, as the reader hands it to the review. */
 export type Cell = typeof Cell.Type
+
+/**
+ * What a cell shows when it differs from its text, as an Option. A table crosses the reader's worker as plain
+ * structured-clone values (an Option would lose its prototype there), so a cell keeps `shown` as a key left out, and
+ * code that reads the cell takes it as an Option here.
+ *
+ * @example shownOf({ type: "number", text: "123", shown: "00123" }) // O.some("00123")
+ */
+export const shownOf = (cell: Cell): O.Option<string> => O.fromUndefinedOr(cell.shown)
+
+/** A cell's formula, as an Option: as `shownOf`, for a key the reader leaves out when a cell has none. */
+export const formulaOf = (cell: Cell): O.Option<string> => O.fromUndefinedOr(cell.formula)
 
 /** A column of the table, named by the header row. Columns are positions; two may share a name. */
 export const Column = S.Struct({

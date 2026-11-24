@@ -52,7 +52,7 @@ import {
   type DecidedSince,
   type StaleAccept
 } from "@inventory/catalog-contract/Decision"
-import { review, carryDecisions, ruleFixes, firstDecisions } from "../Review/Review.rules.ts"
+import { review, carryDecisions, ruleFixes, firstDecisions, noHistory } from "../Review/Review.rules.ts"
 import { fieldsOf } from "@inventory/catalog-contract/Item"
 import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { ImportView, type MatchTakeBack, openImportsShown, pastImportsShown } from "@inventory/catalog-contract/Import"
@@ -220,7 +220,7 @@ export const importsEndpoints = Effect.gen(function* () {
     choices: ReadonlyArray<MappingChoice>,
     decisions: ReadonlyArray<RowDecision>
   ) {
-    const blank = review({ table, choices, decisions: {}, storedItems: [], itemsOf })
+    const blank = review({ ...noHistory, table, choices, decisions: {}, storedItems: [], itemsOf })
     const typed = A.getSomes(A.map(decisions, (decision) => R.get(decision.edits, "sku")))
     const keys = A.dedupe(
       A.filter(
@@ -736,6 +736,8 @@ export const importsEndpoints = Effect.gen(function* () {
         choices: [],
         decisions: firstDecisions({ table, choices: [], mode: ruleFixes, itemsOf }),
         storedItems: [],
+        createdIds: [],
+        suggestions: [],
         itemsOf
       })
       yield* imports.finishUpload(actor, upload, start.counts.needs)

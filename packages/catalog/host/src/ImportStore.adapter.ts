@@ -8,7 +8,7 @@
 import * as A from "effect/Array"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
-import { dual } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
@@ -80,7 +80,6 @@ import {
   type CompareAtMatch,
   type ItemsAsRead,
   noItemsRead,
-  noComparison,
   planMatch,
   takenBackOfMatch,
   takenBackWords,
@@ -129,7 +128,7 @@ const ChangeInsert = S.Struct({
   part: S.Int,
   sku: S.String,
   update: S.Boolean,
-  decidedByName: S.NullOr(S.String)
+  decidedByName: S.OptionFromNullOr(S.String)
 }).annotate({ description: "One value a confirm writes that differs from the file" })
 
 // The pieces the long lists travel in (`internal/pieces.ts`): as many values as a statement reads well, and never more
@@ -172,7 +171,7 @@ const BatchRow = S.Struct({
   notImported: S.Int,
   takenBackByName: S.OptionFromNullOr(S.String),
   takenBackAt: S.OptionFromNullOr(Instant),
-  takeBackId: S.NullOr(S.String),
+  takeBackId: S.OptionFromNullOr(S.String),
   removed: S.Int,
   restored: S.Int,
   kept: S.Int
@@ -226,7 +225,7 @@ export const ImportStoreD1 = Layer.effect(
         decidedById: S.String,
         decidedByName: S.String,
         savedRevision: S.Int,
-        lastSavedById: S.NullOr(S.String),
+        lastSavedById: S.OptionFromNullOr(S.String),
         lastSavedRevision: S.Int
       }),
       execute: ({ org, id }) =>
@@ -517,7 +516,7 @@ export const ImportStoreD1 = Layer.effect(
         savedAt: R.fromEntries(A.map(rows, (row) => [row.rowId, row.savedRevision] as const)),
         // A row stored before who last saved it was kept has no name: it cannot say, and is never the sender's.
         lastSavedBy: R.fromEntries(
-          A.flatMap(rows, (row) => (row.lastSavedById === null ? [] : [[row.rowId, row.lastSavedById] as const]))
+          A.flatMap(rows, (row) => A.map(A.fromOption(row.lastSavedById), (id) => [row.rowId, id] as const))
         ),
         lastSavedOn: R.fromEntries(A.map(rows, (row) => [row.rowId, row.lastSavedRevision] as const)),
         saves: O.match(A.head(saves), { onNone: () => 0, onSome: (row) => row.saves })
@@ -534,7 +533,8 @@ export const ImportStoreD1 = Layer.effect(
     //
     // What each statement of those three batches binds, for a file of any length:
     //
-    //   a piece put (putPiece)        6 = write, list, seq, piece, org, import; 7 with the revision it is put at
+    //   a piece put (putPiece)        8 = write, list, seq, piece, org, import, the revision and the saves it is put
+    //                                     at (each null when the piece holds at any)
     //   the guard (itemsAsRead)      20 = items under the keys 5 (org, keys 3, found), each item read 3, created rows
     //                                     counted 3 and each 3, suggestions counted 3 and each 3
     //   openChoices                  22 = the guard 20, org, import
@@ -563,13 +563,15 @@ export const ImportStoreD1 = Layer.effect(
           write: S.String,
           seq: S.Int,
           piece: piece(of),
-          expected: S.NullOr(S.Int),
-          expectedSaves: S.NullOr(S.Int)
+          expected: S.OptionFromNullOr(S.Int),
+          expectedSaves: S.OptionFromNullOr(S.Int)
         }),
         Result: NoRows,
+        // A revision or a count of saves that is none holds at any: NULL leaves the column compared with itself.
         execute: (r) => sql`INSERT INTO importWriteList (organizationId, importId, writeId, list, seq, piece)
           SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
-          WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}${r.expectedSaves === null ? sql`` : sql` AND saves = ${r.expectedSaves}`}`
+          WHERE organizationId = ${r.org} AND id = ${r.id} AND revision = coalesce(${r.expected}, revision)
+            AND saves = coalesce(${r.expectedSaves}, saves)`
       })
     // The statement that puts the pieces of one list, written by `of`: `putList(of, "keys")` or
     // `of.pipe(putList("keys"))`.
@@ -622,17 +624,17 @@ export const ImportStoreD1 = Layer.effect(
       read: ItemsAsRead
     ) {
       if (!read.asked) return []
+      // What a judgement read is put whatever the draft's revision: the guard that reads it is what holds the save.
+      const atAnyRevision = { expected: O.none<number>(), expectedSaves: O.none<number>() }
       const keys = yield* textPieces(read.keys)
       const items = yield* itemReadPieces(read.items)
       const created = yield* createdReadPieces(read.created)
       const suggestions = yield* textPieces(read.suggestions)
       return [
-        ...A.map(keys, (piece, seq) => putKeys({ ...scope, seq, piece, expected: null, expectedSaves: null })),
-        ...A.map(items, (piece, seq) => putItems({ ...scope, seq, piece, expected: null, expectedSaves: null })),
-        ...A.map(created, (piece, seq) => putCreated({ ...scope, seq, piece, expected: null, expectedSaves: null })),
-        ...A.map(suggestions, (piece, seq) =>
-          putSuggestions({ ...scope, seq, piece, expected: null, expectedSaves: null })
-        )
+        ...A.map(keys, (piece, seq) => putKeys({ ...scope, seq, piece, ...atAnyRevision })),
+        ...A.map(items, (piece, seq) => putItems({ ...scope, seq, piece, ...atAnyRevision })),
+        ...A.map(created, (piece, seq) => putCreated({ ...scope, seq, piece, ...atAnyRevision })),
+        ...A.map(suggestions, (piece, seq) => putSuggestions({ ...scope, seq, piece, ...atAnyRevision }))
       ]
     })
     // What the judgement read of import `id` is still so: the organization's items under those keys exactly the ones
@@ -765,8 +767,8 @@ export const ImportStoreD1 = Layer.effect(
       actor: Member,
       draft: Draft,
       delta: DecisionDelta,
-      read: ItemsAsRead = noItemsRead,
-      expected: O.Option<ComparedAt> = O.none()
+      read: ItemsAsRead,
+      expected: O.Option<ComparedAt>
     ) {
       const at = yield* now
       const org = actor.organizationId
@@ -787,8 +789,8 @@ export const ImportStoreD1 = Layer.effect(
       const save = { ...scope, choices, ...guardOf(write, read) }
       const put = {
         ...scope,
-        expected: O.getOrNull(O.map(expected, (at) => at.revision)),
-        expectedSaves: O.getOrNull(O.map(expected, (at) => at.saves))
+        expected: O.map(expected, (at) => at.revision),
+        expectedSaves: O.map(expected, (at) => at.saves)
       }
       const reads = yield* putRead(scope, read)
       // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
@@ -812,16 +814,18 @@ export const ImportStoreD1 = Layer.effect(
         dropLists({ org, write })
       ])
       // Only the two reads answer rows: the open draft's, before the revision was moved and after.
-      const [before, after] = A.flatten(answers)
-      return before === undefined || after === undefined
-        ? decisionsClosed
-        : before.choicesJson !== choices
-          ? decisionsRematched
-          : movedOn(before)
-            ? decisionsMoved
-            : before.itemsSame !== 1
-              ? decisionsItemsChanged
-              : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
+      const found = A.flatten(answers)
+      return O.match(O.all([A.get(found, 0), A.get(found, 1)]), {
+        onNone: () => decisionsClosed,
+        onSome: ([before, after]) =>
+          before.choicesJson !== choices
+            ? decisionsRematched
+            : movedOn(before)
+              ? decisionsMoved
+              : before.itemsSame !== 1
+                ? decisionsItemsChanged
+                : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
+      })
     }, Effect.orDie)
 
     const ReopenRequest = S.Struct({
@@ -1028,7 +1032,7 @@ export const ImportStoreD1 = Layer.effect(
       draft: Draft,
       choice: { readonly field: Field; readonly column: O.Option<number> },
       detail: string,
-      compare: CompareAtMatch = noComparison
+      compare: CompareAtMatch
     ) {
       const org = actor.organizationId
       // Worked out from the draft, its decisions and the stored items its review read, and written in one atomic batch
@@ -1076,7 +1080,8 @@ export const ImportStoreD1 = Layer.effect(
             detail: `${detail}${takenBackWords(took)}`,
             at
           }
-          const read = O.getOrElse(plan.read, () => noItemsRead)
+          // A match that compared nothing read nothing: its guard holds over the empty read.
+          const read = O.match(plan.read, { onNone: () => noItemsRead, onSome: identity })
           const reads = yield* putRead({ org, id: draft.id, write: activity }, read)
           const rewrites = yield* decisionPieces(plan.rewrites)
           const answers = yield* batch([
@@ -1357,7 +1362,7 @@ export const ImportStoreD1 = Layer.effect(
         A.flatMap(written, (row) =>
           A.map(row.changes, (entry) => ({
             ...changeToStored(entry.change),
-            decidedByName: O.getOrNull(entry.decidedByName),
+            decidedByName: entry.decidedByName,
             rowNumber: row.rowNumber,
             part: row.part,
             sku: row.sku,
@@ -1555,8 +1560,9 @@ export const ImportStoreD1 = Layer.effect(
       // One take-back can reverse several confirms of the import. It is one event, and its numbers are the sums
       // over every confirm it reversed, so "removed" is every item that take-back removed, not the last confirm's.
       const sameTakeBack = (row: (typeof confirms)[number]) =>
-        A.filter(confirms, (other) => other.takeBackId !== null && other.takeBackId === row.takeBackId)
-      const firstOf = (row: (typeof confirms)[number]): boolean => sameTakeBack(row)[0]?.id === row.id
+        A.filter(confirms, (other) => O.exists(other.takeBackId, (id) => O.contains(row.takeBackId, id)))
+      const firstOf = (row: (typeof confirms)[number]): boolean =>
+        O.exists(A.head(sameTakeBack(row)), (first) => first.id === row.id)
       const events = A.flatMap(confirms, (row): ReadonlyArray<ImportEvent> => [
         ImportEvent.cases.Confirmed.make({
           batchId: row.id,

@@ -14,18 +14,13 @@ import {
   canonicalTags,
   categoryKey,
   dateReadings,
+  emptyText,
   isCategory,
   isUom,
   readDate,
   readDecimal,
   twoDigitYear
 } from "./CellReading.rules.ts"
-
-/**
- * The text of an empty cell, and of a cell its row ends before: a row of a CSV may stop short of the last column, and
- * what it leaves out reads as empty, as a spreadsheet shows it.
- */
-export const emptyText = ""
 
 /**
  * The cell at a column of a row, when the row reaches that column.

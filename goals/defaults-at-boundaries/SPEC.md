@@ -86,9 +86,12 @@ the value moves.
 | `contract/src/Import/Import.read.ts` | `MatchTakeBack.matched`, `reads`, `saved` on an entry stored before each was kept | to be read from their readers when moved | 0 | none in the sample |
 | `contract/src/Import/Mapping.read.ts` | `ColumnMove.knownFrom` left out | read as revision 0 in `Rematch.rules.ts` | 0 | none in the sample |
 | `model/src/Item/ItemEdit.rules.ts` | an empty Quantity on hand box in the item editor | `0` | not an import path; the import's empty quantity is decided ("Defaults to 0") | the editor, Quantity box cleared |
-| `model/src/Catalog.memory.ts` | the in-memory twin's allowance | `40` calls | none (test twin); 40 is the decided allowance | `catalogMemory()` |
+| `model/src/Catalog.memory.ts` | the in-memory twin's allowance | `40` calls (`offline`) | none (test twin); 40 is the decided allowance, written again because the model package does not depend on the access context | `catalogMemory` |
+| `model/src/Catalog.memory.ts` `leftOutText`, `sortsFirst` | an item's left-out value in the twin's filters and sort | compared as `""`; sorted before every value | none (test twin); it copies what the D1 adapter's SQL does with a column that is NULL | a filter "Description does not contain glue" keeps an item with no description |
 | `model/src/Import/Rematch.rules.ts` `savedAtOf` | a stored decision with no `savedAt` (kept before saves were dated) | revision 0 | 0 (rows stored before `savedAt` was kept) | none in the sample |
 | `model/src/Confirm/Confirm.rules.ts` | who decided a row nobody is recorded for, and a stored name too long or empty to show | the confirming person's name | 0 on a fresh import: every decision of the sample's review records its author | none in the sample |
+| `model/src/Review/Review.rules.ts` `recheckRow` | a field the screen's row sends no value for, as the person types | `""`, an empty cell (`emptyText`) | not an import path: the screen sends every field of a row | none in the sample |
+| `model/src/Review/CellReading.rules.ts` `readDimensions` | the unit of a dimensions cell that names none | `cm` | 0: every dimensions cell of the sample names its unit (108 cm, 19 in) | `{"length":31.2,"width":41.4,"height":2}` reads as cm |
 
 ## What the law should count, beyond today
 

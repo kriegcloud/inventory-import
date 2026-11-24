@@ -42,29 +42,18 @@ import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as S from "effect/Schema"
 import * as SecureRandom from "effect/crypto/SecureRandom"
-import { as, dana, marcus } from "./support.ts"
+import { as, dana, marcus, stagedTableOf } from "./support.ts"
 import { stage } from "./support.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const headings = ["sku", "name", "category", "uom", "unit_cost", "quantity_on_hand", "Alt code", "Net cost"] as const
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
 type Line = Partial<Record<(typeof headings)[number], string>>
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
 
-const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
-  fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
-  notes: [],
-  rows: A.map(lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
-  }))
-})
+const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable =>
+  stagedTableOf({ fileName, headings, lines })
 
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 const stocked = tableOf("stocked.csv", [

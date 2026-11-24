@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as Str from "effect/String"
-import { firstDecisions, recheckRow, review } from "@inventory/catalog-model/Review"
+import { firstDecisions, itemsOfRow, noHistory, recheckRow, review } from "@inventory/catalog-model/Review"
 import { changeToStored } from "@inventory/catalog-contract/Change"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -49,16 +49,16 @@ const stage = (file: File): Effect.Effect<StagedTable> =>
 
 /** One screen: the decisions the server would be sent, and the region's own state, kept in step. */
 const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: ReadonlyArray<ItemFields> = []) => {
-  const input = { table, choices: [], storedItems }
+  const input = { ...noHistory, table, choices: [], storedItems }
   const check = recheckRow(input)
   const recheck = (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => {
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
-    if (problem?.kind === "changed" && answered) return asked.row.problem
-    return problem === undefined ? undefined : toRegionProblem(problem)
+    if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
+    return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
   }
   // As the review step holds them: the server's shape, and the region's state restored from the region's shape.
-  let decisions: SavedDecisions = firstDecisions({ table, choices: [], mode })
+  let decisions: SavedDecisions = firstDecisions({ table, choices: [], mode, itemsOf: itemsOfRow })
   let state: ReviewState = restored(toRegionDecisions(decisions))
   const derive = () => {
     const current = review({ ...input, decisions })
@@ -242,9 +242,13 @@ describe("a row discontinued yet active, on the screen", () => {
         expect(O.getOrUndefined(A.findFirst(views, (candidate) => candidate.row.id === "row-45"))?.status, answer).toBe(
           "ready"
         )
-        expect(row?.item?.stocking, answer).toEqual(
-          answer === "Not active" ? { kind: "discontinued", on: "2025-06-30" } : { kind: "active" }
-        )
+        expect(
+          O.map(
+            O.flatMap(O.fromUndefinedOr(row), (found) => found.item),
+            (item) => item.stocking
+          ),
+          answer
+        ).toEqual(O.some(answer === "Not active" ? { kind: "discontinued", on: "2025-06-30" } : { kind: "active" }))
         // Undone, the row asks again on both sides.
         s.press({ type: "undo" as const })
         expect(
@@ -261,8 +265,8 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const table = yield* stage(
         new File([`${heading}\nABC-0001,One,Misc,EA,1.00\nABC-0002,Two,packaging,EA,1.00\n`], "items.csv")
       )
-      const decisions = firstDecisions({ table, choices: [], mode: "propose" })
-      const current = review({ table, choices: [], decisions, storedItems: [] })
+      const decisions = firstDecisions({ table, choices: [], mode: "propose", itemsOf: itemsOfRow })
+      const current = review({ ...noHistory, table, choices: [], decisions, storedItems: [] })
       const rows = toRegionRows(current, decisions)
       const picks = A.filter(rows, (row) => row.problem?.column === "category")
       expect(picks.length).toBe(1)

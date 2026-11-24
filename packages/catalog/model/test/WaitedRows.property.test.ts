@@ -19,32 +19,22 @@ import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Match from "effect/Match"
 import * as MutableRef from "effect/MutableRef"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
-import { as, dana, marcus, stage } from "./support.ts"
+import { as, dana, marcus, stage, stagedTableOf } from "./support.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const headings = ["sku", "name", "category", "uom", "unit_cost", "quantity_on_hand", "Alt code", "Net cost"] as const
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
 type Line = Partial<Record<(typeof headings)[number], string>>
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
-const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
-  fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
-  notes: [],
-  rows: A.map(lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
-  }))
-})
+const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable =>
+  stagedTableOf({ fileName, headings, lines })
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 
 // Each run has SKUs of its own, so an item one run stocks is never another's.
@@ -83,11 +73,10 @@ type Step = typeof Step.Type
 
 const same = S.toEquivalence(RowDecision)
 const nothingSaid = decisionFromFlags({})
-const alike = (a: O.Option<RowDecision>, b: O.Option<RowDecision>): boolean =>
-  same(
-    O.getOrElse(a, () => nothingSaid),
-    O.getOrElse(b, () => nothingSaid)
-  )
+// A row with no decision is alike to one whose decision says nothing.
+const said = (decision: O.Option<RowDecision>): RowDecision =>
+  O.match(decision, { onNone: () => nothingSaid, onSome: identity })
+const alike = (a: O.Option<RowDecision>, b: O.Option<RowDecision>): boolean => same(said(a), said(b))
 
 /**
  * What a person's screen holds: the revision it read, when in the run it read it (`readAt`, the step), what it read of
@@ -218,7 +207,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
     const who = members[step.who]
     const screen = (yield* Ref.get(screens))[step.who]
     const decision = decisionFromFlags(picks[step.pick])
-    const waited = O.getOrElse(R.get(screen.unknown, step.row), (): ReadonlyArray<RowDecision> => [])
+    const waited = R.get(screen.unknown, step.row).pipe(A.fromOption, A.flatten)
     const named: ReadonlyArray<O.Option<RowDecision>> = [
       O.flatten(R.get(screen.read, step.row)),
       ...A.map(waited, O.some)

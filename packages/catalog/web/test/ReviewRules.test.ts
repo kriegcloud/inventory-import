@@ -16,7 +16,7 @@ import {
   stockingOf,
   UnitCost
 } from "@inventory/catalog-contract/Item"
-import { type Review, review } from "@inventory/catalog-model/Review"
+import { noHistory, type Review, review } from "@inventory/catalog-model/Review"
 import { stage, textFile } from "./support/files.ts"
 
 const head =
@@ -54,7 +54,7 @@ const line = (values: {
 
 const reviewed = (rows: ReadonlyArray<string>, storedItems: ReadonlyArray<ItemFields> = []) =>
   Effect.map(stage(textFile(A.join([head, ...rows], "\n"))), (table) =>
-    review({ table, choices: [], decisions: {}, storedItems })
+    review({ ...noHistory, table, choices: [], decisions: {}, storedItems })
   )
 
 const rowOf = (result: Review, rowNumber: number) =>
@@ -66,17 +66,17 @@ describe("a second import", () => {
     () =>
       Effect.gen(function* () {
         const first = yield* reviewed([line({ sku: "AWP-1853" }), line({ sku: "TBD-0002" })])
-        const stored = A.getSomes(A.map(first.rows, (row) => O.fromNullishOr(row.item)))
+        const stored = A.getSomes(A.map(first.rows, (row) => row.item))
         expect(stored.length).toBe(2)
         // The same two SKUs again: one in lower case (its own proposal is open), one with a cost nobody can read.
         const again = yield* reviewed([line({ sku: "awp-1853" }), line({ sku: "TBD-0002", cost: "TBD" })], stored)
         expect([again.counts.already, again.counts.decision, again.counts.cannot]).toEqual([1, 1, 0])
-        expect(rowOf(again, 2).reason).toContain("awp-1853")
+        expect(O.getOrThrow(rowOf(again, 2).reason)).toContain("awp-1853")
         // The item is stored: the row adds nothing, and its unread cost is not asked for.
         expect([rowOf(again, 3).status, rowOf(again, 3).reason, rowOf(again, 3).item]).toEqual([
           "already",
-          "SKU TBD-0002 is already there. It is skipped, not changed.",
-          null
+          O.some("SKU TBD-0002 is already there. It is skipped, not changed."),
+          O.none()
         ])
       })
   )
@@ -87,7 +87,7 @@ describe("a total row", () => {
     Effect.gen(function* () {
       const result = yield* reviewed([line({ name: "Total" }), line({ sku: "", name: "Total" })])
       expect([result.counts.rows, result.counts.ready, result.totalRows]).toEqual([1, 1, [3]])
-      expect(rowOf(result, 2).item?.name).toBe("Total")
+      expect(O.getOrThrow(rowOf(result, 2).item).name).toBe("Total")
     })
   )
 })
@@ -98,8 +98,10 @@ describe("a date whose year has two digits", () => {
       const result = yield* reviewed([line({ received: "13/04/98" })])
       const row = rowOf(result, 2)
       expect([row.outcome, row.values.firstReceivedOn, row.changes]).toEqual(["cannot", "13/04/98", []])
-      expect([row.problems[0]?.proposal, row.proposals]).toEqual([null, []])
-      expect(row.reason).toBe("First received “13/04/98” has a two-digit year; type it as year-month-day.")
+      expect([row.problems[0]?.proposal, row.proposals]).toEqual([O.none(), []])
+      expect(O.getOrThrow(row.reason)).toBe(
+        "First received “13/04/98” has a two-digit year; type it as year-month-day."
+      )
     })
   )
 })
@@ -109,8 +111,11 @@ describe("reasons", () => {
     Effect.gen(function* () {
       const vendors = '"[{""vendor_name"":""Acme Industrial"",""unit_cost"":""7.50"",""is_preferred"":false}]"'
       const result = yield* reviewed([line({ tags: "|" }), line({ sku: "ABC-0002", vendors })])
-      expect([rowOf(result, 2).status, rowOf(result, 2).item?.tags]).toEqual(["ready", []])
-      expect([rowOf(result, 3).status, digits(rowOf(result, 3).item?.vendors[0]?.unitCost)]).toEqual(["ready", "7.5"])
+      expect([rowOf(result, 2).status, O.getOrThrow(rowOf(result, 2).item).tags]).toEqual(["ready", []])
+      expect([rowOf(result, 3).status, digits(O.getOrThrow(rowOf(result, 3).item).vendors[0]?.unitCost)]).toEqual([
+        "ready",
+        "7.5"
+      ])
     })
   )
 })

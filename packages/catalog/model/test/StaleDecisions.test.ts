@@ -35,9 +35,9 @@ import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
-import { as, dana, marcus, stage } from "./support.ts"
+import { as, dana, marcus, stage, stagedTableOf } from "./support.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const headings = [
   "sku",
@@ -53,22 +53,11 @@ const headings = [
   "Pack unit"
 ] as const
 type Line = Partial<Record<(typeof headings)[number], string>>
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
 
-const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
-  fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
-  notes: [],
-  rows: A.map(lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
-  }))
-})
+const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable =>
+  stagedTableOf({ fileName, headings, lines })
 
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 /** What the organization already has: two items, confirmed from a first file. */
@@ -246,7 +235,11 @@ describe("a request's earlier tries, held", () => {
       choices: asked.choices,
       moves: asked.moves,
       questions: [
-        { ...question, fields: [{ field: "unitCost", made: asked.made }], decided: asked.decided ?? question.decided }
+        {
+          ...question,
+          fields: [{ field: "unitCost", made: asked.made }],
+          decided: { decided: question.decided, ...asked }.decided
+        }
       ],
       changed: [{ rowId: "row-3", field: "unitCost" }]
     }).changed
@@ -395,8 +388,9 @@ describe("accepts made before their field's column was matched again, as the sav
     "row-55": { accepted: ["unitCost", "uom"], edits: { name: "Steel Tube 1in" } },
     "row-18": { reverted: ["name"] }
   })
-  const judge = (madeOn: Readonly<Record<string, number>>, decisions = set) =>
+  const judgeWith = (madeOn: Readonly<Record<string, number>>, decisions: typeof set) =>
     withoutStaleDecisions({ choices, moves, madeOn, set: decisions, changed: [] })
+  const judge = (madeOn: Readonly<Record<string, number>>) => judgeWith(madeOn, set)
 
   it("are taken out and named; the rest of the decision, and every other row, is applied", () => {
     const made = judge({ "row-55": 11, "row-18": 11 })
@@ -425,7 +419,7 @@ describe("accepts made before their field's column was matched again, as the sav
       "row-3": { accepted: ["unitCost"] }
     })
     // Row 9 waited from revision 10, before unit cost was matched again at 12; row 55 was accepted on 12.
-    expect(judge({ "row-55": 12, "row-9": 10 }, three).notApplied).toEqual([
+    expect(judgeWith({ "row-55": 12, "row-9": 10 }, three).notApplied).toEqual([
       { rowId: "row-9", field: "unitCost", kind: "accept" },
       { rowId: "row-3", field: "unitCost", kind: "accept" }
     ])

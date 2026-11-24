@@ -48,8 +48,7 @@ describe("pieces", () => {
         })
       )
     )
-    const [first, second, third] = pieces
-    if (first === undefined || second === undefined || third === undefined) throw new Error("three pieces")
+    const [first, second, third] = O.getOrThrow(O.all([A.get(pieces, 0), A.get(pieces, 1), A.get(pieces, 2)]))
     expect(check([first, first, third])).not.toEqual(O.none())
     // The second piece carries rows of the first again: the count adds up, the order does not.
     const overlapping = { seq: 1, rows: [...first.rows.slice(-1), ...second.rows.slice(0, -1)] }

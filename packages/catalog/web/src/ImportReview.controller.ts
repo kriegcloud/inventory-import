@@ -94,7 +94,7 @@ const storedWords: Readonly<Record<string, string>> = {
 const choicesFor = (
   problem: Problem
 ): { readonly ask: string; readonly choices: ReadonlyArray<Choice> } | undefined => {
-  if (problem.proposal !== null || problem.field === null || problem.choices.length === 0) return undefined
+  if (O.isSome(problem.proposal) || problem.field === null || problem.choices.length === 0) return undefined
   return {
     // Keep or replace is a choice about the stored item, not a value of the SKU the problem sits on.
     ask:
@@ -132,7 +132,7 @@ export const toRegionProblem = (
         ? {}
         : { ask: problem.ask }),
     ...(problem.note === null ? {} : { note: problem.note }),
-    ...(problem.proposal === null ? {} : { fix: toFix(problem.proposal) }),
+    ...O.match(problem.proposal, { onNone: () => ({}), onSome: (proposal) => ({ fix: toFix(proposal) }) }),
     ...(problem.rivals.length === 0 || options.withoutRivals === true ? {} : { rivals: problem.rivals })
   })
 }
@@ -151,7 +151,10 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
   const where = {
     id: row.id,
     line: row.rowNumber,
-    ...(row.partLabel === undefined ? {} : { label: rowPlace({ rowNumber: row.rowNumber, label: row.partLabel }) })
+    ...O.match(row.part, {
+      onNone: () => ({}),
+      onSome: (part) => ({ label: rowPlace({ rowNumber: row.rowNumber, label: O.some(part.label) }) })
+    })
   }
   // Already stored: nothing to decide and nothing written; the region counts it apart under All with its tag.
   if (row.status === "already") return ReviewRow.make({ ...where, cells: row.file, stored: true })
@@ -165,7 +168,7 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
       const message = row.problems.find((problem) => problem.field === proposal.field)?.message
       return toFix(proposal, message === undefined ? undefined : reasonShown(message, row.reasons.length))
     })
-  const open = row.problems.find((problem) => problem.proposal === null || !problem.proposal.lossless)
+  const open = row.problems.find((problem) => !O.exists(problem.proposal, (proposal) => proposal.lossless))
   // The region settles a row with rivals by itself once the row is kept or a rival's SKU was typed. The server is
   // stricter (only the first kept row wins, and a typed SKU can collide again), so where the two would differ the
   // problem is handed over without its rivals and stays open until the domain says it is settled.

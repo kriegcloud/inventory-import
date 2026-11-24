@@ -53,14 +53,19 @@ describe("what a decision must say of whose act it records", () => {
     // The first seven add up, with the two relations, to the rules that must stay proved (`Catalog.verify.test.ts`).
     // A rule's name starts with whose it is; the model's own start with its name, and are told by their kind.
     const owners = A.map(R.toEntries(lock.rules.Catalog), ([name, rule]) => {
-      const owner = O.getOrElse(A.head(Str.split(".")(name)), () => "")
+      const owner = A.headNonEmpty(Str.split(".")(name))
       return owner === "Catalog" ? rule.kind : owner
     })
     const count = (owner: string): number => A.filter(owners, (whose) => whose === owner).length
     // The table's rows as the page has them: the words of the first cell, and the number in the second.
     const rows = A.getSomes(
       A.map(Str.split("\n")(verifyDoc), (line) =>
-        O.map(Str.match(/^\| ([^|]+) \| (\d+) \|/)(line), (found) => `${found[1] ?? ""}: ${found[2] ?? ""}`)
+        O.flatMap(Str.match(/^\| ([^|]+) \| (\d+) \|/)(line), (found) =>
+          O.map(
+            O.all([O.fromUndefinedOr(found[1]), O.fromUndefinedOr(found[2])]),
+            ([words, count]) => `${words}: ${count}`
+          )
+        )
       )
     )
     expect(rows).toEqual([

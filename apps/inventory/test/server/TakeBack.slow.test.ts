@@ -12,7 +12,7 @@ import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
-import { review } from "@inventory/catalog-model/Review"
+import { noHistory, review } from "@inventory/catalog-model/Review"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { ImportEvent } from "@inventory/catalog-contract/Import"
 import { as, TypedApp } from "./support/app.ts"
@@ -72,7 +72,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
     () =>
       Effect.gen(function* () {
         const table = yield* stage(new File([messy], "items_messy.csv"))
-        const rows = review({ table, choices: [], decisions: {}, storedItems: [] }).rows
+        const rows = review({ ...noHistory, table, choices: [], decisions: {}, storedItems: [] }).rows
         const reason = A.join(O.getOrThrow(A.findFirst(rows, (row) => row.rowNumber === 56)).reasons, " ")
         expect([
           Str.includes("vendors are marked preferred")(reason),

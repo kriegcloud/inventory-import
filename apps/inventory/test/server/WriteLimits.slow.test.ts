@@ -23,7 +23,7 @@ import { maxStagedRows, StagedHead, StagedHeadJson } from "@inventory/catalog-co
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
-import { ItemsAsRead, noItemsRead } from "@inventory/catalog-model/Rematch"
+import { ItemsAsRead, noComparison, noItemsRead } from "@inventory/catalog-model/Rematch"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
@@ -208,7 +208,7 @@ layer(App)("the most rows one save may name", (it) => {
         counted(maxStagedRows, (n) => [`row-${n + 2}`, out] as const)
       )
       const clear = counted(maxStagedRows, (n) => `row-${n + 2 + maxStagedRows}`)
-      const saved = yield* store.decide(marcus, draft, { set, clear })
+      const saved = yield* store.decide(marcus, draft, { set, clear }, noItemsRead, O.none())
       const held = yield* savedFor(id)
       expect([saved, held]).toEqual([{ kind: "saved", revision: 2, changed: true }, [[maxStagedRows, 0]]])
     })
@@ -226,7 +226,7 @@ layer(App)("a save of long typed values", (it) => {
       const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
         counted(2000, (n) => [`row-${n + 2}`, typed] as const)
       )
-      const saved = yield* store.decide(marcus, O.getOrThrow(found), { set, clear: [] })
+      const saved = yield* store.decide(marcus, O.getOrThrow(found), { set, clear: [] }, noItemsRead, O.none())
       const held = yield* savedFor(id)
       expect([saved.kind, held]).toEqual(["saved", [[2000, 0]]])
     })
@@ -258,13 +258,14 @@ layer(App)("a save, a match and a confirm of long typed values whose bytes are m
           const set = (by: string): Readonly<Record<string, RowDecision>> =>
             R.fromEntries(counted(2000, (n) => [`row-${n + 2}`, typed(by)] as const))
           const first = yield* draftNow
-          const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] })
+          const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] }, noItemsRead, O.none())
           const second = yield* draftNow
           const matched = yield* store.matchColumn(
             marcus,
             second,
             { field: "uom", column: O.none() },
-            "Unit of measure"
+            "Unit of measure",
+            noComparison
           )
           const third = yield* draftNow
           const confirmed = yield* store.commit(
@@ -415,7 +416,7 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       const store = yield* ImportStore
       const found = yield* store.find(org, id)
       const draft = O.getOrThrow(found)
-      yield* store.decide(marcus, draft, { set: { "row-2": replace }, clear: [] })
+      yield* store.decide(marcus, draft, { set: { "row-2": replace }, clear: [] }, noItemsRead, O.none())
       const answer = yield* store.matchColumn(
         marcus,
         draft,

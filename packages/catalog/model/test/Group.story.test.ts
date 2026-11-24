@@ -69,129 +69,114 @@ const kept = '{"kept":true}'
 const typed = '{"edits":{"name":"Hex bolt M8"}}'
 const typedEight = '{"edits":{"quantityOnHand":"8"}}'
 
-const group = (input: {
-  readonly seen: number
-  readonly step?: string
-  readonly opening?: number
-  readonly madeOn?: number
-  readonly rows?: string
-  readonly count?: number
-  readonly label?: string
-  readonly patch?: string
-}) =>
-  DecideGroup.make({
+// What the story's group act g1 holds unless a story says otherwise: 6,000 rows, opened and made on revision 0.
+const groupStart = { step: "g1", opening: 0, madeOn: 0, rows, count: 6_000, label, patch }
+const group = (input: { readonly seen: number } & Partial<typeof groupStart>) => {
+  const given = { ...groupStart, ...input }
+  return DecideGroup.make({
     importId: id,
-    step: input.step ?? "g1",
-    opening: input.opening ?? 0,
-    seen: input.seen,
-    madeOn: input.madeOn ?? 0,
-    patch: input.patch ?? patch,
-    rows: input.rows ?? rows,
-    count: input.count ?? 6_000,
-    label: input.label ?? label
+    step: given.step,
+    opening: given.opening,
+    seen: given.seen,
+    madeOn: given.madeOn,
+    patch: given.patch,
+    rows: given.rows,
+    count: given.count,
+    label: given.label
   })
-const groupDecided = (input: {
-  readonly change: number
-  readonly step?: string
-  readonly by?: string
-  readonly rows?: string
-  readonly count?: number
-  readonly label?: string
-  readonly madeOn?: number
-  readonly under?: number
-  readonly patch?: string
-}) =>
-  GroupDecided.make({
+}
+// The group as recorded: g1 by Ana, with nothing under it, unless a story says otherwise.
+const groupDecidedStart = { step: "g1", by: "ana", rows, count: 6_000, label, madeOn: 0, under: 0, patch }
+const groupDecided = (input: { readonly change: number } & Partial<typeof groupDecidedStart>) => {
+  const given = { ...groupDecidedStart, ...input }
+  return GroupDecided.make({
     importId: id,
     organizationId: "org_prairie",
-    change: input.change,
-    by: input.by ?? "ana",
-    step: input.step ?? "g1",
-    patch: input.patch ?? patch,
-    rows: input.rows ?? rows,
-    count: input.count ?? 6_000,
-    madeOn: input.madeOn ?? 0,
-    label: input.label ?? label,
-    under: input.under ?? 0
+    change: given.change,
+    by: given.by,
+    step: given.step,
+    patch: given.patch,
+    rows: given.rows,
+    count: given.count,
+    madeOn: given.madeOn,
+    label: given.label,
+    under: given.under
   })
+}
 // The import's count of a group act or its undo; `top` is the last group in force after it, itself by default.
-const groupCounted = (input: {
-  readonly change: number
-  readonly step?: string
-  readonly rows?: number
-  readonly label?: string
-  readonly by?: string
-  readonly top?: number
-}) =>
-  GroupCounted.make({
-    change: input.change,
-    step: input.step ?? "g1",
-    rows: input.rows ?? 6_000,
-    label: input.label ?? label,
-    by: input.by ?? "ana",
-    top: input.top ?? input.change
+const groupCountedStart = { step: "g1", rows: 6_000, label, by: "ana" }
+const groupCounted = (
+  input: { readonly change: number; readonly top?: number } & Partial<typeof groupCountedStart>
+) => {
+  const given = { ...groupCountedStart, top: input.change, ...input }
+  return GroupCounted.make({
+    change: given.change,
+    step: given.step,
+    rows: given.rows,
+    label: given.label,
+    by: given.by,
+    top: given.top
   })
+}
 // `seen`: every change up to this number is on the sender's screen; the group's own change, where no story says more.
-const undoGroup = (input: {
-  readonly undo: number
-  readonly step?: string
-  readonly opening?: number
-  readonly seen?: number
-}) =>
-  UndoGroup.make({
+const undoGroupStart = { step: "g1", opening: 0 }
+const undoGroup = (input: { readonly undo: number; readonly seen?: number } & Partial<typeof undoGroupStart>) => {
+  const given = { ...undoGroupStart, seen: input.undo, ...input }
+  return UndoGroup.make({
     importId: id,
-    step: input.step ?? "g1",
-    undo: input.undo,
-    opening: input.opening ?? 0,
-    seen: input.seen ?? input.undo
+    step: given.step,
+    undo: given.undo,
+    opening: given.opening,
+    seen: given.seen
   })
-const act = (input: {
-  readonly step: string
-  readonly saw: number
-  readonly sawGroup: number
-  readonly covered: boolean
-  readonly asItReads?: boolean
-  readonly flags: string
-  readonly row?: string
-  readonly madeOn?: number
-  readonly sawUndone?: number
-}) =>
-  DecideRow.make({
+}
+// What a row's act holds unless a story says otherwise: row 12, not as it reads, nothing undone seen, made on 0.
+const actStart = { asItReads: false, row: "row-12", madeOn: 0, sawUndone: 0 }
+const act = (
+  input: {
+    readonly step: string
+    readonly saw: number
+    readonly sawGroup: number
+    readonly covered: boolean
+    readonly flags: string
+  } & Partial<typeof actStart>
+) => {
+  const given = { ...actStart, ...input }
+  return DecideRow.make({
     importId: id,
-    row: RowId.make(input.row ?? "row-12"),
-    step: input.step,
-    sawGroup: input.sawGroup,
-    covered: input.covered,
-    asItReads: input.asItReads ?? false,
+    row: RowId.make(given.row),
+    step: given.step,
+    sawGroup: given.sawGroup,
+    covered: given.covered,
+    asItReads: given.asItReads,
     opening: 0,
-    saw: input.saw,
-    sawUndone: input.sawUndone ?? 0,
-    flags: input.flags,
-    madeOn: input.madeOn ?? 0,
+    saw: given.saw,
+    sawUndone: given.sawUndone,
+    flags: given.flags,
+    madeOn: given.madeOn,
     label: "Decide"
   })
-const undo = (input: {
-  readonly undo: number
-  readonly step: string
-  readonly sawGroup: number
-  readonly row?: string
-  readonly covered?: boolean
-  readonly madeOn?: number
-  readonly sawUndone?: number
-}) =>
-  UndoRowStep.make({
+}
+// A row's undo, on row 12 and not covered unless a story says otherwise.
+const undoStart = { row: "row-12", covered: false, madeOn: 0, sawUndone: 0 }
+const undo = (
+  input: { readonly undo: number; readonly step: string; readonly sawGroup: number } & Partial<typeof undoStart>
+) => {
+  const given = { ...undoStart, ...input }
+  return UndoRowStep.make({
     importId: id,
-    row: RowId.make(input.row ?? "row-12"),
-    undo: input.undo,
-    step: input.step,
-    sawGroup: input.sawGroup,
-    covered: input.covered ?? false,
-    madeOn: input.madeOn ?? 0,
-    sawUndone: input.sawUndone ?? 0,
+    row: RowId.make(given.row),
+    undo: given.undo,
+    step: given.step,
+    sawGroup: given.sawGroup,
+    covered: given.covered,
+    madeOn: given.madeOn,
+    sawUndone: given.sawUndone,
     opening: 0,
     next: noLevel,
     below: ""
   })
+}
 const decided = (input: {
   readonly change: number
   readonly by: string
@@ -208,42 +193,43 @@ const decided = (input: {
     madeOn: 0,
     label: "Decide"
   })
-const counted = (input: {
-  readonly change: number
-  readonly step: string
-  readonly by: string
-  readonly flags: string
-  readonly row?: string
-}) =>
-  ActCounted.make({
-    change: input.change,
-    step: input.step,
-    row: input.row ?? "row-12",
+// The row a story's act is on, unless it says otherwise.
+const rowStart = { row: "row-12" }
+const counted = (
+  input: { readonly change: number; readonly step: string; readonly by: string; readonly flags: string } & Partial<
+    typeof rowStart
+  >
+) => {
+  const given = { ...rowStart, ...input }
+  return ActCounted.make({
+    change: given.change,
+    step: given.step,
+    row: given.row,
     label: "Decide",
-    holds: input.change,
-    by: input.by,
-    actor: input.by,
-    flags: input.flags,
+    holds: given.change,
+    by: given.by,
+    actor: given.by,
+    flags: given.flags,
     madeOn: 0
   })
+}
 // A row's undo that leaves the row with nothing, as the import counts it.
-const undoneToNothing = (input: {
-  readonly change: number
-  readonly step: string
-  readonly actor: string
-  readonly row?: string
-}) =>
-  ActCounted.make({
-    change: input.change,
-    step: input.step,
-    row: input.row ?? "row-12",
+const undoneToNothing = (
+  input: { readonly change: number; readonly step: string; readonly actor: string } & Partial<typeof rowStart>
+) => {
+  const given = { ...rowStart, ...input }
+  return ActCounted.make({
+    change: given.change,
+    step: given.step,
+    row: given.row,
     label: "undo",
     holds: 0,
     by: "",
-    actor: input.actor,
+    actor: given.actor,
     flags: "",
     madeOn: -1
   })
+}
 const counts = { created: 155, updated: 0, already: 0, notImported: 49_845 }
 const confirm = (seen: number) =>
   ConfirmImport.make({ importId: id, shown: "155", plan: "155", seen, planAt: seen, ...counts })

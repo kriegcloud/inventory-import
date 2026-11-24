@@ -336,7 +336,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
             inner.matchColumn(
               danaAsMember,
               O.getOrThrow(draft),
-              { field: "unitCost", column: other.index },
+              { field: "unitCost", column: O.some(other.index) },
               "unit cost"
             )
           )

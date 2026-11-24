@@ -84,7 +84,8 @@ import {
   planMatch,
   takenBackOfMatch,
   takenBackWords,
-  withTakeBacks
+  withTakeBacks,
+  sameColumn
 } from "@inventory/catalog-model/Rematch"
 
 const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
@@ -1025,7 +1026,7 @@ export const ImportStoreD1 = Layer.effect(
     const matchColumn = Effect.fn("Imports.matchColumn")(function* (
       actor: Member,
       draft: Draft,
-      choice: { readonly field: Field; readonly column: number | null },
+      choice: { readonly field: Field; readonly column: O.Option<number> },
       detail: string,
       compare: CompareAtMatch = noComparison
     ) {
@@ -1040,7 +1041,7 @@ export const ImportStoreD1 = Layer.effect(
           const current = found.value
           const before = yield* S.decodeEffect(ChoicesJson)(current.choicesJson)
           // Choices that are already so are not a change: no audit line and no new revision.
-          if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
+          if (A.some(before, (old) => old.field === choice.field && sameColumn(old.column, choice.column))) {
             return "same" as const
           }
           const head = yield* S.decodeEffect(StagedHeadJson)(current.headJson)

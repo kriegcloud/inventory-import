@@ -92,7 +92,7 @@ export const matchColumns = (input: {
 }): ReadonlyArray<ColumnMatch> => {
   const { table } = input
   // A column a person gave to one field is not also matched to another by its heading.
-  const taken = keepSome(input.choices, (choice) => O.fromNullishOr(choice.column))
+  const taken = keepSome(input.choices, (choice) => choice.column)
   const picked = A.map(fields, (field) => {
     const choice = A.findLast(input.choices, (candidate) => candidate.field === field)
     const byName = A.findFirst(
@@ -100,9 +100,7 @@ export const matchColumns = (input: {
       (column) => A.contains(headingWords[field], headingKey(column.label)) && !A.contains(taken, column.index)
     )
     const column = O.isSome(choice)
-      ? O.flatMap(O.fromNullishOr(choice.value.column), (index) =>
-          A.findFirst(table.columns, (candidate) => candidate.index === index)
-        )
+      ? O.flatMap(choice.value.column, (index) => A.findFirst(table.columns, (candidate) => candidate.index === index))
       : byName
     const how = O.isSome(choice)
       ? O.isNone(column)

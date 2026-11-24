@@ -212,8 +212,19 @@ describe("a request's earlier tries, held", () => {
   }
   const { rows: _rows, ...head } = reviewed
   const net = column("Net cost")
-  const choice = (index: number, at: number): MappingChoice => ({ field: "unitCost", column: index, by: "person", at })
-  const move = (was: number, index: number, at: number): ColumnMove => ({ field: "unitCost", at, was, column: index })
+  const choice = (index: number, at: number): MappingChoice => ({
+    field: "unitCost",
+    column: O.some(index),
+    by: "person",
+    at
+  })
+  const move = (was: number, index: number, at: number): ColumnMove => ({
+    field: "unitCost",
+    at,
+    was: O.some(was),
+    column: O.some(index),
+    knownFrom: O.none()
+  })
   // A match of unit cost to "Net cost", asked of a draft at revision 4.
   const firstTry = heldToTries({
     earlier: O.none(),
@@ -255,7 +266,7 @@ describe("a request's earlier tries, held", () => {
   })
 
   it("hold it down across another person's pick of the column a field already reads, which changes none", () => {
-    const pinned: MappingChoice = { field: "name", column: column("name"), by: "person", at: 0 }
+    const pinned: MappingChoice = { field: "name", column: O.some(column("name")), by: "person", at: 0 }
     expect(later({ choices: [pinned, choice(net, 6)], moves: [move(column("unit_cost"), net, 6)], made: 5 })).toEqual(
       []
     )
@@ -281,64 +292,88 @@ describe("the column a field read at a past revision, and when it moved", () => 
   const { rows: _rows, ...staged } = reviewed
   it("a field moved off its column by another field's match moves too, stamped with the same revision", () => {
     // Name takes the column headed "uom": the unit has no other heading, so it reads no column from then on.
-    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: column("uom"), by: "person", at: 4 }]
+    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: O.some(column("uom")), by: "person", at: 4 }]
     expect(movesOfMatch({ head: staged, before: [], after, kept: [], at: 4 })).toEqual([
-      { field: "name", at: 4, was: column("name"), column: column("uom") },
-      { field: "uom", at: 4, was: column("uom"), column: null }
+      { field: "name", at: 4, was: O.some(column("name")), column: O.some(column("uom")), knownFrom: O.none() },
+      { field: "uom", at: 4, was: O.some(column("uom")), column: O.none(), knownFrom: O.none() }
     ])
   })
 
   it("a field matched by hand to the column it already reads does not move", () => {
-    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: column("name"), by: "person", at: 4 }]
+    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: O.some(column("name")), by: "person", at: 4 }]
     expect(movesOfMatch({ head: staged, before: [], after, kept: [], at: 4 })).toEqual([])
   })
 
   it("the first move of a field matched before moves were kept says from which revision its `was` is known", () => {
     const before: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("List cost"), by: "person", at: 4 }
+      { field: "unitCost", column: O.some(column("List cost")), by: "person", at: 4 }
     ]
     const choices: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("Net cost"), by: "person", at: 9 }
+      { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 9 }
     ]
     const moves = movesOfMatch({ head: staged, before, after: choices, kept: [], at: 9 })
     expect(moves).toEqual([
-      { field: "unitCost", at: 9, was: column("List cost"), column: column("Net cost"), knownFrom: 4 }
+      {
+        field: "unitCost",
+        at: 9,
+        was: O.some(column("List cost")),
+        column: O.some(column("Net cost")),
+        knownFrom: O.some(4)
+      }
     ])
     const at = columnAt({ choices, moves, now: columnsOf({ head: staged, choices }) })
     // On 3 it read a column nobody kept; from 4 on "List cost", and from 9 on "Net cost".
     expect([at("unitCost", 3), at("unitCost", 4), at("unitCost", 8), at("unitCost", 9)]).toEqual([
       O.none(),
-      O.some(column("List cost")),
-      O.some(column("List cost")),
-      O.some(column("Net cost"))
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("Net cost")))
     ])
     // The next one is known as any move is.
     const next: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("unit_cost"), by: "person", at: 11 }
+      { field: "unitCost", column: O.some(column("unit_cost")), by: "person", at: 11 }
     ]
     expect(movesOfMatch({ head: staged, before: choices, after: next, kept: moves, at: 11 })).toEqual([
-      { field: "unitCost", at: 11, was: column("Net cost"), column: column("unit_cost") }
+      {
+        field: "unitCost",
+        at: 11,
+        was: O.some(column("Net cost")),
+        column: O.some(column("unit_cost")),
+        knownFrom: O.none()
+      }
     ])
   })
 
   it("is exact after several re-matches: the `was` of the first move after the revision, else the column now", () => {
     const choices: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("Net cost"), by: "person", at: 7 }
+      { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 7 }
     ]
     const moves: ReadonlyArray<ColumnMove> = [
-      { field: "unitCost", at: 4, was: column("unit_cost"), column: column("List cost") },
-      { field: "unitCost", at: 7, was: column("List cost"), column: column("Net cost") }
+      {
+        field: "unitCost",
+        at: 4,
+        was: O.some(column("unit_cost")),
+        column: O.some(column("List cost")),
+        knownFrom: O.none()
+      },
+      {
+        field: "unitCost",
+        at: 7,
+        was: O.some(column("List cost")),
+        column: O.some(column("Net cost")),
+        knownFrom: O.none()
+      }
     ]
     const at = columnAt({ choices, moves, now: columnsOf({ head: staged, choices }) })
     expect([at("unitCost", 3), at("unitCost", 4), at("unitCost", 6), at("unitCost", 7), at("name", 0)]).toEqual([
-      O.some(column("unit_cost")),
-      O.some(column("List cost")),
-      O.some(column("List cost")),
-      O.some(column("Net cost")),
-      O.some(column("name"))
+      O.some(O.some(column("unit_cost"))),
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("Net cost"))),
+      O.some(O.some(column("name")))
     ])
     // A choice made after the revision with no move kept (matched before moves were kept): not known.
-    expect(columnAt({ choices, moves: [], now: () => 0 })("unitCost", 3)).toEqual(O.none())
+    expect(columnAt({ choices, moves: [], now: () => O.some(0) })("unitCost", 3)).toEqual(O.none())
   })
 
   it.prop("ColumnMove generates only valid values", [Arbitrary.schema(ColumnMove)], ([move]) => {
@@ -349,12 +384,12 @@ describe("the column a field read at a past revision, and when it moved", () => 
 describe("accepts made before their field's column was matched again, as the save and the confirm judge them", () => {
   // Unit cost matched by hand at 12, the unit at 3; each match kept its move, as the stores write them.
   const choices: ReadonlyArray<MappingChoice> = [
-    { field: "unitCost", column: 7, by: "person", at: 12 },
-    { field: "uom", column: 4, by: "person", at: 3 }
+    { field: "unitCost", column: O.some(7), by: "person", at: 12 },
+    { field: "uom", column: O.some(4), by: "person", at: 3 }
   ]
   const moves: ReadonlyArray<ColumnMove> = [
-    { field: "uom", at: 3, was: 10, column: 4 },
-    { field: "unitCost", at: 12, was: 5, column: 7 }
+    { field: "uom", at: 3, was: O.some(10), column: O.some(4), knownFrom: O.none() },
+    { field: "unitCost", at: 12, was: O.some(5), column: O.some(7), knownFrom: O.none() }
   ]
   const set = flags({
     "row-55": { accepted: ["unitCost", "uom"], edits: { name: "Steel Tube 1in" } },
@@ -398,10 +433,10 @@ describe("accepts made before their field's column was matched again, as the sav
 
   it("are stale too when their field only moved off its column (another field took it), with no choice of its own", () => {
     const made = withoutStaleDecisions({
-      choices: [{ field: "name", column: 4, by: "person", at: 6 }],
+      choices: [{ field: "name", column: O.some(4), by: "person", at: 6 }],
       moves: [
-        { field: "name", at: 6, was: 1, column: 4 },
-        { field: "uom", at: 6, was: 4, column: null }
+        { field: "name", at: 6, was: O.some(1), column: O.some(4), knownFrom: O.none() },
+        { field: "uom", at: 6, was: O.some(4), column: O.none(), knownFrom: O.none() }
       ],
       madeOn: { "row-55": 5 },
       set: flags({ "row-55": { accepted: ["uom"] } }),
@@ -412,7 +447,7 @@ describe("accepts made before their field's column was matched again, as the sav
 })
 
 describe("each kind of decision judged on its row's revision", () => {
-  const choices: ReadonlyArray<MappingChoice> = [{ field: "sku", column: 7, by: "person", at: 5 }]
+  const choices: ReadonlyArray<MappingChoice> = [{ field: "sku", column: O.some(7), by: "person", at: 5 }]
   const set = flags({
     "row-2": { stored: "replace", accepted: ["name"], reverted: ["uom"] },
     "row-4": { kept: true },
@@ -438,7 +473,9 @@ describe("each kind of decision judged on its row's revision", () => {
   })
 
   it("after another field's re-match: a Replace only where `changed` names its row, with that field", () => {
-    const moved: ReadonlyArray<ColumnMove> = [{ field: "unitCost", at: 5, was: 5, column: 8 }]
+    const moved: ReadonlyArray<ColumnMove> = [
+      { field: "unitCost", at: 5, was: O.some(5), column: O.some(8), knownFrom: O.none() }
+    ]
     const both = flags({ "row-2": { stored: "replace" }, "row-3": { stored: "keep" } })
     const made = withoutStaleDecisions({
       choices: [],
@@ -558,12 +595,24 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
           })
           // Both fields matched again after the rows were decided on revision 1.
           const choices: ReadonlyArray<MappingChoice> = [
-            { field: "unitCost", column: column("Net cost"), by: "person", at: 2 },
-            { field: "uom", column: column("Pack unit"), by: "person", at: 3 }
+            { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 2 },
+            { field: "uom", column: O.some(column("Pack unit")), by: "person", at: 3 }
           ]
           const moves = [
-            { field: "unitCost" as const, at: 2, was: column("unit_cost"), column: column("Net cost") },
-            { field: "uom" as const, at: 3, was: column("uom"), column: column("Pack unit") }
+            {
+              field: "unitCost" as const,
+              at: 2,
+              was: O.some(column("unit_cost")),
+              column: O.some(column("Net cost")),
+              knownFrom: O.none()
+            },
+            {
+              field: "uom" as const,
+              at: 3,
+              was: O.some(column("uom")),
+              column: O.some(column("Pack unit")),
+              knownFrom: O.none()
+            }
           ]
           const madeOn = { "row-2": 1, "row-3": 1 }
           const changed = comparisonsChanged({
@@ -590,12 +639,24 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
         ])
         const view = yield* stage(table).pipe(as(marcus))
         const choices: ReadonlyArray<MappingChoice> = [
-          { field: "uom", column: column("Pack unit"), by: "person", at: 2 },
-          { field: "unitCost", column: column("Net cost"), by: "person", at: 3 }
+          { field: "uom", column: O.some(column("Pack unit")), by: "person", at: 2 },
+          { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 3 }
         ]
         const moves = [
-          { field: "uom" as const, at: 2, was: column("uom"), column: column("Pack unit") },
-          { field: "unitCost" as const, at: 3, was: column("unit_cost"), column: column("Net cost") }
+          {
+            field: "uom" as const,
+            at: 2,
+            was: O.some(column("uom")),
+            column: O.some(column("Pack unit")),
+            knownFrom: O.none()
+          },
+          {
+            field: "unitCost" as const,
+            at: 3,
+            was: O.some(column("unit_cost")),
+            column: O.some(column("Net cost")),
+            knownFrom: O.none()
+          }
         ]
         const questions = comparisonQuestions({
           choices,

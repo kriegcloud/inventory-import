@@ -104,7 +104,8 @@ import {
   planMatch,
   takenBackOfMatch,
   takenBackWords,
-  withTakeBacks
+  withTakeBacks,
+  sameColumn
 } from "./Import/Rematch.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
@@ -1134,7 +1135,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
     const matchColumn = Effect.fnUntraced(function* (
       actor: Member,
       draft: Draft,
-      choice: { readonly field: Field; readonly column: number | null },
+      choice: { readonly field: Field; readonly column: O.Option<number> },
       detail: string,
       compare: CompareAtMatch = noComparison
     ) {
@@ -1148,7 +1149,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const entry = found.value
         const before = yield* S.decodeEffect(ChoicesJson)(entry.draft.choicesJson)
         // Choices that are already so are not a change: no audit line and no new revision.
-        if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
+        if (A.some(before, (old) => old.field === choice.field && sameColumn(old.column, choice.column))) {
           return O.some<ChoicesSaved>("same")
         }
         const head = yield* S.decodeEffect(StagedHeadJson)(entry.draft.headJson)

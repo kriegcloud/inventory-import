@@ -391,7 +391,7 @@ describe("a draft that keeps changing under a request", () => {
         const answer = yield* store.matchColumn(
           dana,
           draft,
-          { field: "unitCost", column: column("Net cost") },
+          { field: "unitCost", column: O.some(column("Net cost")) },
           "Unit cost",
           () =>
             Effect.as(

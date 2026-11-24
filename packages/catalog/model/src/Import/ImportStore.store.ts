@@ -462,7 +462,7 @@ export class ImportStore extends Context.Service<
     matchColumn(
       actor: Member,
       draft: Draft,
-      choice: { readonly field: Field; readonly column: number | null },
+      choice: { readonly field: Field; readonly column: O.Option<number> },
       detail: string,
       compare?: CompareAtMatch
     ): Effect.Effect<ChoicesSaved>

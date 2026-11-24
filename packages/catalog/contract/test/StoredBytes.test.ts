@@ -29,7 +29,7 @@ describe("stored JSON", () => {
       yield* sameBytes(Choices, '[{"field":"reorderPoint","column":1,"by":"person","at":12}]')
       // A choice stored before a match named its revision is read as made before every decision.
       const older = yield* S.decodeEffect(Choices)('[{"field":"reorderPoint","column":1,"by":"person"}]')
-      expect(older).toEqual([{ field: "reorderPoint", column: 1, by: "person", at: 0 }])
+      expect(older).toEqual([{ field: "reorderPoint", column: O.some(1), by: "person", at: 0 }])
       yield* sameBytes(S.fromJsonString(StagedHead), headJson)
       yield* sameBytes(S.fromJsonString(StagedRow), rowJson)
     })

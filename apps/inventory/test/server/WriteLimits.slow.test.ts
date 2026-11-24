@@ -93,8 +93,10 @@ const head: StagedHead = {
   columns: A.map(labels, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
   notes: []
 }
-const choices: ReadonlyArray<MappingChoice> = [{ field: "unitCost", column: listCost, by: "person", at: 1 }]
-const moves: ReadonlyArray<ColumnMove> = [{ field: "unitCost", at: 1, was: unitCost, column: listCost }]
+const choices: ReadonlyArray<MappingChoice> = [{ field: "unitCost", column: O.some(listCost), by: "person", at: 1 }]
+const moves: ReadonlyArray<ColumnMove> = [
+  { field: "unitCost", at: 1, was: O.some(unitCost), column: O.some(listCost), knownFrom: O.none() }
+]
 const Stored = S.Struct({
   head: StagedHeadJson,
   choices: MappingChoice.pipe(S.Array, S.fromJsonString),
@@ -258,7 +260,12 @@ layer(App)("a save, a match and a confirm of long typed values whose bytes are m
           const first = yield* draftNow
           const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] })
           const second = yield* draftNow
-          const matched = yield* store.matchColumn(marcus, second, { field: "uom", column: null }, "Unit of measure")
+          const matched = yield* store.matchColumn(
+            marcus,
+            second,
+            { field: "uom", column: O.none() },
+            "Unit of measure"
+          )
           const third = yield* draftNow
           const confirmed = yield* store.commit(
             ConfirmWrite.make({
@@ -409,8 +416,12 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       const found = yield* store.find(org, id)
       const draft = O.getOrThrow(found)
       yield* store.decide(marcus, draft, { set: { "row-2": replace }, clear: [] })
-      const answer = yield* store.matchColumn(marcus, draft, { field: "unitCost", column: unitCost }, "Unit cost", () =>
-        Effect.succeed({ changed: [], read: everything })
+      const answer = yield* store.matchColumn(
+        marcus,
+        draft,
+        { field: "unitCost", column: O.some(unitCost) },
+        "Unit cost",
+        () => Effect.succeed({ changed: [], read: everything })
       )
       const after = yield* store.find(org, id)
       const held = yield* savedFor(id)

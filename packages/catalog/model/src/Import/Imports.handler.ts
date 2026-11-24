@@ -84,7 +84,8 @@ import {
   comparisonsChanged,
   ItemsAsRead,
   noItemsRead,
-  withoutStaleDecisions
+  withoutStaleDecisions,
+  sameColumn
 } from "./Rematch.rules.ts"
 import { decidedSince, type Over, overOfSave } from "./Waited.rules.ts"
 
@@ -764,15 +765,15 @@ export const importsEndpoints = Effect.gen(function* () {
       const draft = yield* find(actor, params.id)
       if (!DraftStatus.is.open(draft.status)) return yield* closed(draft)
       const table = yield* imports.table(actor.organizationId, draft)
-      const asked = O.getOrNull(payload.column)
-      const column = A.findFirst(table.columns, (candidate) => candidate.index === asked)
+      const asked = payload.column
+      const column = O.flatMap(asked, (index) => A.findFirst(table.columns, (candidate) => candidate.index === index))
       if (O.isSome(payload.column) && O.isNone(column)) {
         return yield* ColumnNotFound.make({ reason: `${draft.fileName} has no column at that position.` })
       }
       const before = yield* imports.choices(draft)
       // The same match again (a second press, a retry) is the same match: nothing is taken back, dropped or
       // written to the audit trail a second time.
-      if (A.some(before, (choice) => choice.field === payload.field && choice.column === asked)) {
+      if (A.some(before, (choice) => choice.field === payload.field && sameColumn(choice.column, asked))) {
         return yield* viewOf(actor, draft)
       }
       // One write: the choice, stamped with the revision that write moves the draft to when the field reads another

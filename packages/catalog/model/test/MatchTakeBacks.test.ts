@@ -118,24 +118,24 @@ describe("what a match took back from the stored decisions", () => {
               revision: matched.revision,
               by: "Dana Whitfield",
               field: "sku",
-              matched: "sku",
-              reads: true,
+              matched: O.some("sku"),
+              reads: O.some(true),
               kind: "stored",
               count: 2,
               rows: ["row-2", "row-3"],
               // Which decision each part was taken from: Marcus's save, at the revision it moved the draft to.
-              saved: { "row-2": view.revision + 1, "row-3": view.revision + 1 }
+              saved: O.some({ "row-2": view.revision + 1, "row-3": view.revision + 1 })
             },
             {
               revision: matched.revision,
               by: "Dana Whitfield",
               field: "sku",
-              matched: "sku",
-              reads: true,
+              matched: O.some("sku"),
+              reads: O.some(true),
               kind: "twin",
               count: 2,
               rows: ["row-4", "row-5"],
-              saved: { "row-4": view.revision + 1, "row-5": view.revision + 1 }
+              saved: O.some({ "row-4": view.revision + 1, "row-5": view.revision + 1 })
             }
           ]
           // The match's own answer names them, and so does every later view, whoever reads it.
@@ -328,15 +328,15 @@ describe("which field was matched by hand, and whether the field named reads a c
           .match({ params, payload: { field: "name", column: O.some(column("uom")) } })
           .pipe(as(dana))
         expect(said(displaced.takenBack, displaced.revision)).toEqual([
-          ["name", "name", true],
-          ["uom", "name", false]
+          ["name", O.some("name"), O.some(true)],
+          ["uom", O.some("name"), O.some(false)]
         ])
         yield* accept(displaced.revision)
         const cleared = yield* imports.match({ params, payload: { field: "name", column: O.none() } }).pipe(as(dana))
         // Cleared, Name gives the column back to the unit, which reads it by its heading again.
         expect(said(cleared.takenBack, cleared.revision)).toEqual([
-          ["name", "name", false],
-          ["uom", "name", true]
+          ["name", O.some("name"), O.some(false)],
+          ["uom", O.some("name"), O.some(true)]
         ])
       })
     )
@@ -357,9 +357,9 @@ describe("which field was matched by hand, and whether the field named reads a c
           .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: accepted, clear: [] } })
           .pipe(as(marcus))
         const matched = yield* imports.match({ params, payload: { field: "uom", column: O.none() } }).pipe(as(dana))
-        expect(A.map(matched.takenBack, (entry) => [entry.rows, "matched" in entry, entry.reads])).toEqual([
-          [["row-4"], false, undefined],
-          [["row-2"], true, false]
+        expect(A.map(matched.takenBack, (entry) => [entry.rows, entry.matched, entry.reads])).toEqual([
+          [["row-4"], O.none(), O.none()],
+          [["row-2"], O.some("uom"), O.some(false)]
         ])
       })
     )
@@ -530,7 +530,10 @@ describe("what a draft keeps of its matches' take-backs", () => {
     field: "unitCost",
     kind: "accept",
     count: 1,
-    rows: [RowId.make("row-2")]
+    rows: [RowId.make("row-2")],
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none()
   })
   it("keeps every entry while the import is open: a 101st does not let go of the first", () => {
     const kept = A.makeBy(100, (index) => entry(index + 1))
@@ -554,7 +557,7 @@ describe("what a draft keeps of its matches' take-backs", () => {
       ]
     })
     expect(A.map(entries, (taken) => [taken.field, taken.kind, taken.count, taken.rows, taken.saved])).toEqual([
-      ["sku", "stored", 2, ["row-4", "row-9"], { "row-4": 6, "row-9": 11 }]
+      ["sku", "stored", 2, ["row-4", "row-9"], O.some({ "row-4": 6, "row-9": 11 })]
     ])
   })
 })

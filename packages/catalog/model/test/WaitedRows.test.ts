@@ -584,7 +584,8 @@ describe("a row that waited across a match, and the items since", () => {
         Effect.fnUntraced(function* (entry) {
           if (entry.draft.id !== view.id) return entry
           const entries = yield* S.decodeEffect(Entries)(entry.draft.takenBackJson)
-          const old = A.map(entries, ({ saved: _saved, ...rest }) => rest)
+          // As an entry stored before `saved` was kept.
+          const old = A.map(entries, (one) => ({ ...one, saved: O.none() }))
           return { ...entry, draft: { ...entry.draft, takenBackJson: yield* S.encodeEffect(Entries)(old) } }
         }),
         { concurrency: 1 }

@@ -372,12 +372,12 @@ layer(TypedApp)("what a match took back from the stored decisions", (it) => {
           revision: matched.revision,
           by: "Dana Whitfield",
           field: "sku",
-          matched: "sku",
-          reads: true
+          matched: O.some("sku"),
+          reads: O.some(true)
         }
         const named = [
-          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"], saved: { "row-2": at, "row-3": at } },
-          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"], saved: { "row-4": at, "row-5": at } }
+          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"], saved: O.some({ "row-2": at, "row-3": at }) },
+          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"], saved: O.some({ "row-4": at, "row-5": at }) }
         ]
         expect(matched.takenBack).toEqual(named)
         const read = yield* client.imports.get({ params }).pipe(marcus)
@@ -452,7 +452,7 @@ layer(TypedApp)("a Replace whose row one match stops reading under two fields at
         expect(R.get(matched.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
         expect(
           A.map(matched.takenBack, (entry) => [entry.field, entry.matched, entry.reads, entry.kind, entry.rows])
-        ).toEqual([["unitCost", "quantityOnHand", false, "stored", ["row-2"]]])
+        ).toEqual([["unitCost", O.some("quantityOnHand"), O.some(false), "stored", ["row-2"]]])
         const again = yield* save
         expect(again.notApplied).toEqual([{ rowId: "row-2", field: "unitCost", kind: "stored" }])
       })
@@ -480,8 +480,8 @@ layer(TypedApp)("a take-back stored before what was matched and whether it reads
         .pipe(marcus)
       const cleared = yield* client.imports.match({ params, payload: { field: "uom", column: O.none() } }).pipe(dana)
       expect(A.map(cleared.takenBack, (entry) => [entry.rows, entry.matched, entry.reads])).toEqual([
-        [["row-4"], undefined, undefined],
-        [["row-6"], "uom", false]
+        [["row-4"], O.none(), O.none()],
+        [["row-6"], O.some("uom"), O.some(false)]
       ])
     })
   )

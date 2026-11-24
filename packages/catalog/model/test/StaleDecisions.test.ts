@@ -1007,12 +1007,12 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
               revision: further.revision,
               by: "Dana Whitfield",
               field: "unitCost",
-              matched: "unitCost",
-              reads: true,
+              matched: O.some("unitCost"),
+              reads: O.some(true),
               kind: "stored",
               count: 1,
               rows: ["row-2"],
-              saved: { "row-2": saved.revision }
+              saved: O.some({ "row-2": saved.revision })
             }
           ])
         })

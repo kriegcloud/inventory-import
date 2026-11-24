@@ -350,14 +350,18 @@ export const MatchTakeBack = S.Struct({
   }),
   by: personName("Who matched the column"),
   field: Field.annotateKey({ description: "The field that reads another column, or none, since this match" }),
-  matched: Field.pipe(S.optionalKey).annotateKey({
-    description:
-      "The field the person matched by hand: another than `field` when that one lost its column to it. Left out on an entry stored before this was kept"
-  }),
-  reads: S.Boolean.pipe(S.optionalKey).annotateKey({
-    description:
-      "Whether `field` reads a column since this match; false when it was cleared, or lost its only one. Left out on an entry stored before this was kept"
-  }),
+  matched: Field.pipe(
+    absentAsNone({
+      description:
+        "The field the person matched by hand: another than `field` when that one lost its column to it. Left out on an entry stored before this was kept"
+    })
+  ),
+  reads: S.Boolean.pipe(
+    absentAsNone({
+      description:
+        "Whether `field` reads a column since this match; false when it was cleared, or lost its only one. Left out on an entry stored before this was kept"
+    })
+  ),
   kind: TakenBackKind.annotateKey({
     description: "What was taken back: accepts, Replaces or Keep-stored, keeps of one of two, undone fixes"
   }),
@@ -367,11 +371,12 @@ export const MatchTakeBack = S.Struct({
     .annotateKey({ description: "The first rows, in the file's order; `count` says how many there are in all" }),
   saved: S.Record(RowId, S.Int.check(S.isGreaterThanOrEqualTo(0)))
     .check(S.isMaxProperties(takenBackRowsNamed))
-    .pipe(S.optionalKey)
-    .annotateKey({
-      description:
-        "For each row in `rows`, the draft's revision the stored decision the match took the part from was saved at: which decision it was, since a match never changes it and every save of another decision does. Left out on an entry stored before this was kept: such an entry cannot say whose decision it took from"
-    })
+    .pipe(
+      absentAsNone({
+        description:
+          "For each row in `rows`, the draft's revision the stored decision the match took the part from was saved at: which decision it was, since a match never changes it and every save of another decision does. Left out on an entry stored before this was kept: such an entry cannot say whose decision it took from"
+      })
+    )
 }).annotate({
   identifier: "MatchTakeBack",
   description: "Decisions of one kind a match of one field took back from what was stored, with the rows"

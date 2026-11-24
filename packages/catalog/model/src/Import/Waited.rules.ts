@@ -88,7 +88,7 @@ const takenByRow = (entries: ReadonlyArray<MatchTakeBack>): Readonly<Record<stri
       A.map(entry.rows, (rowId) => ({
         key: keyOf(entry.field, rowId),
         at: entry.revision,
-        from: entry.saved === undefined ? O.none<number>() : R.get(entry.saved, rowId)
+        from: O.flatMap(entry.saved, (saved) => R.get(saved, rowId))
       }))
     ),
     (one) => one.key

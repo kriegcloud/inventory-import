@@ -731,13 +731,17 @@ export const takenBackOfMatch = (input: {
                 revision: input.revision,
                 by: input.by,
                 field,
-                matched: input.matched,
-                reads: input.reads(field),
+                matched: O.some(input.matched),
+                reads: O.some(input.reads(field)),
                 kind,
                 count: rows.length,
                 rows: named,
-                saved: R.fromEntries(
-                  A.getSomes(A.map(named, (rowId) => O.map(R.get(input.savedAt, rowId), (at) => [rowId, at] as const)))
+                saved: O.some(
+                  R.fromEntries(
+                    A.getSomes(
+                      A.map(named, (rowId) => O.map(R.get(input.savedAt, rowId), (at) => [rowId, at] as const))
+                    )
+                  )
                 )
               }
             ]

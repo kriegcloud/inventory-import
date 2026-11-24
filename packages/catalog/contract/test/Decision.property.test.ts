@@ -23,13 +23,16 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 
 const runs = { arbitrary: { runs: 200 } }
+// A save always carries what its rows waited over, and each decision in it is drawn under the decision's own checks,
+// which throw some draws away: more of them are allowed than for a schema with no such list.
+const drawnWithWaits = { arbitrary: { runs: 200, maxDiscards: 20_000 } }
 
 const isField = (name: string): boolean => A.contains(fields, name)
 
 /** The row id a key spells, read back from its number and part: the same text only for a key that is a row id. */
 const respelled = (key: string): string => {
-  const [row, part] = Str.split(".")(Str.slice(4)(key))
-  return rowId({ rowNumber: Number(row), ...(part === undefined ? {} : { part: Number(part) }) })
+  const parts = Str.split(".")(Str.slice(4)(key))
+  return rowId({ rowNumber: Number(A.headNonEmpty(parts)), part: O.map(A.get(parts, 1), Number) })
 }
 
 // A text that is no field of an item: a schema of its own, so the junk is generated like everything else.
@@ -57,9 +60,10 @@ describe("a row's decision", () => {
     [Arbitrary.schema(RowDecisionFlags)],
     ([flags]) =>
       Effect.gen(function* () {
-        const accepted = flags.accepted ?? []
-        const both = { ...flags, reverted: A.dedupe([...(flags.reverted ?? []), ...accepted]) }
-        const read = yield* S.decodeEffect(RowDecision)(both)
+        const { accepted } = flags
+        const both = { ...flags, reverted: A.dedupe([...flags.reverted, ...accepted]) }
+        const sent = yield* S.encodeEffect(RowDecisionFlags)(both)
+        const read = yield* S.decodeEffect(RowDecision)(sent)
         expect(read.accepted).toEqual(accepted)
         expect(A.intersection(read.reverted, accepted)).toEqual([])
         expect(decisionFromFlags(both)).toEqual(read)
@@ -73,7 +77,8 @@ describe("a row's decision", () => {
     ([flags, junk, value]) =>
       Effect.gen(function* () {
         const withJunk = { ...flags, edits: { ...flags.edits, [junk]: value } }
-        const decoded = yield* S.decodeEffect(RowDecision)(withJunk)
+        const sent = yield* S.encodeEffect(RowDecisionFlags)(withJunk)
+        const decoded = yield* S.decodeEffect(RowDecision)(sent)
         expect(decisionFromFlags(withJunk)).toEqual(decoded)
         expect(R.has(decisionFromFlags(withJunk).edits, junk)).toBe(false)
       }),
@@ -84,8 +89,8 @@ describe("a row's decision", () => {
     "refuses an accept or an undo of something that is no field",
     [Arbitrary.schema(RowDecisionFlags), junkField],
     ([flags, junk]) => {
-      expect(S.is(RowDecisionFlags)({ ...flags, accepted: [...(flags.accepted ?? []), junk] })).toBe(false)
-      expect(S.is(RowDecisionFlags)({ ...flags, reverted: [...(flags.reverted ?? []), junk] })).toBe(false)
+      expect(S.is(RowDecisionFlags)({ ...flags, accepted: [...flags.accepted, junk] })).toBe(false)
+      expect(S.is(RowDecisionFlags)({ ...flags, reverted: [...flags.reverted, junk] })).toBe(false)
     },
     runs
   )
@@ -95,11 +100,9 @@ describe("a row's decision", () => {
     [Arbitrary.schema(RowDecisionFlags), junkField, Arbitrary.schema(S.String.check(S.isMaxLength(100)))],
     ([flags, junk, value]) =>
       Effect.gen(function* () {
-        const plain = yield* S.decodeEffect(RowDecision)(flags)
-        const withJunk = yield* S.decodeEffect(RowDecision)({
-          ...flags,
-          edits: { ...flags.edits, [junk]: value }
-        })
+        const sent = yield* S.encodeEffect(RowDecisionFlags)(flags)
+        const plain = yield* S.decodeEffect(RowDecision)(sent)
+        const withJunk = yield* S.decodeEffect(RowDecision)({ ...sent, edits: { ...sent.edits, [junk]: value } })
         expect(withJunk).toEqual(plain)
       }),
     runs
@@ -120,11 +123,11 @@ describe("the decisions of a draft", () => {
     "a save names its rows and their revisions by row ids, each spelling its row's number and part",
     [Arbitrary.schema(SaveRequest)],
     ([save]) => {
-      for (const key of [...save.clear, ...R.keys(save.set), ...R.keys(save.madeOn), ...R.keys(save.over ?? {})]) {
+      for (const key of [...save.clear, ...R.keys(save.set), ...R.keys(save.madeOn), ...R.keys(save.over)]) {
         expect(respelled(key)).toBe(key)
       }
     },
-    runs
+    drawnWithWaits
   )
 
   // Each is generated valid, then given a row it also sets to clear, or a row it already clears to clear again.
@@ -144,7 +147,7 @@ describe("the decisions of a draft", () => {
         if (O.isSome(cleared))
           expect(S.is(schema)({ ...request, clear: [...request.clear, cleared.value] })).toBe(false)
       },
-      runs
+      drawnWithWaits
     )
   }
 })

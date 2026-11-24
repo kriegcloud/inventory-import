@@ -15,6 +15,7 @@ import {
 } from "@inventory/catalog-contract/Staged"
 import { chunkRows, UploadChunk, UploadStart } from "@inventory/catalog-contract/Upload"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
@@ -27,7 +28,7 @@ describe("a staged row", () => {
     "is numbered as Excel numbers it, so its row id names it and reads back its number",
     [Arbitrary.schema(StagedRow)],
     ([row]) => {
-      const id = rowId({ rowNumber: row.rowNumber })
+      const id = rowId({ rowNumber: row.rowNumber, part: O.none() })
       expect(id).toBe(`row-${row.rowNumber}`)
       expect(row.rowNumber).toBeGreaterThanOrEqual(1)
     },
@@ -50,7 +51,7 @@ describe("a staged head", () => {
     [Arbitrary.schema(StagedHead)],
     ([head]) => {
       const numbers = [head.headerRowNumber, ...A.flatMap(head.notes, (note) => note.rows)]
-      for (const n of numbers) expect(rowId({ rowNumber: n })).toBe(`row-${n}`)
+      for (const n of numbers) expect(rowId({ rowNumber: n, part: O.none() })).toBe(`row-${n}`)
     },
     runs
   )

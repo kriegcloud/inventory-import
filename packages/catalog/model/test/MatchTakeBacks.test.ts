@@ -80,7 +80,7 @@ const reviewed = tableOf("reviewed.csv", [
   { ...item, sku: "CCC-0001", name: "Hemp Rope", unit_cost: "4", "Alt code": "XXX-0001" }
 ])
 
-const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, decisionFromFlags)
+const flags = (set: Readonly<Record<string, RowDecisionFlags.Encoded>>) => R.map(set, decisionFromFlags)
 
 /** The two items stocked and confirmed, then `table` staged: the import to decide and match on. */
 const seeded = Effect.fn("seeded")(function* (table: StagedTable) {
@@ -108,7 +108,7 @@ describe("what a match took back from the stored decisions", () => {
             "row-6": { edits: { name: "Hemp Rope 10m" } }
           })
           yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           const matched = yield* imports
             .match({ params, payload: { field: "sku", column: O.some(column("Alt code")) } })
@@ -179,7 +179,7 @@ describe("what a match took back from the stored decisions", () => {
             )
           )
           yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           const matched = yield* imports
             .match({ params, payload: { field: "uom", column: O.some(column("Net cost")) } })
@@ -214,7 +214,7 @@ describe("a Replace across a re-match of another column", () => {
           const { imports, view, params } = yield* seeded(reviewed)
           const replace = flags({ "row-3": { stored: "replace" } })
           yield* imports
-            .decide({ params, payload: { madeOn: { "row-3": view.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-3": view.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           const matched = yield* imports
             .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
@@ -225,7 +225,7 @@ describe("a Replace across a re-match of another column", () => {
           ])
           // A save of the same Replace made before the match is refused the same way.
           const saved = yield* imports
-            .decide({ params, payload: { madeOn: { "row-3": view.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-3": view.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           expect(saved.notApplied).toEqual([{ rowId: "row-3", field: "unitCost", kind: "stored" }])
           // A confirm carrying it is refused, in words that name the column matched again and the rows resting on it.
@@ -256,7 +256,12 @@ describe("a Replace across a re-match of another column", () => {
           yield* imports
             .decide({
               params,
-              payload: { madeOn: { "row-2": view.revision }, set: flags({ "row-2": { stored: "keep" } }), clear: [] }
+              payload: {
+                over: {},
+                madeOn: { "row-2": view.revision },
+                set: flags({ "row-2": { stored: "keep" } }),
+                clear: []
+              }
             })
             .pipe(as(marcus))
           const matched = yield* imports
@@ -277,7 +282,7 @@ describe("a Replace across a re-match of another column", () => {
           const replace = flags({ "row-2": { stored: "replace" } })
           const { imports, view, params } = yield* seeded(table)
           yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           // The quantity is pointed at the cost's column: "4.58" is no count, and the cost reads no column.
           const matched = yield* imports
@@ -287,14 +292,14 @@ describe("a Replace across a re-match of another column", () => {
           expect(A.map(matched.takenBack, (entry) => [entry.kind, entry.rows])).toEqual([["stored", ["row-2"]]])
           // A save of the same Replace made before it is refused the same way, after the cost reads a column again too.
           const saved = yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           expect(A.map(saved.notApplied, (taken) => [taken.rowId, taken.kind])).toEqual([["row-2", "stored"]])
           yield* imports
             .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
             .pipe(as(dana))
           const later = yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           expect(A.map(later.notApplied, (taken) => [taken.rowId, taken.kind])).toEqual([["row-2", "stored"]])
         })
@@ -309,7 +314,9 @@ describe("which field was matched by hand, and whether the field named reads a c
         const { imports, view, params } = yield* seeded(reviewed)
         const accepted = flags({ "row-2": { accepted: ["uom", "name"] } })
         const accept = (on: number) =>
-          imports.decide({ params, payload: { madeOn: { "row-2": on }, set: accepted, clear: [] } }).pipe(as(marcus))
+          imports
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": on }, set: accepted, clear: [] } })
+            .pipe(as(marcus))
         const said = (entries: ReadonlyArray<MatchTakeBack>, revision: number) =>
           A.map(
             A.filter(entries, (entry) => entry.revision === revision),
@@ -347,7 +354,7 @@ describe("which field was matched by hand, and whether the field named reads a c
         }))
         const accepted = flags({ "row-2": { accepted: ["uom"] } })
         yield* imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: accepted, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: accepted, clear: [] } })
           .pipe(as(marcus))
         const matched = yield* imports.match({ params, payload: { field: "uom", column: O.none() } }).pipe(as(dana))
         expect(A.map(matched.takenBack, (entry) => [entry.rows, "matched" in entry, entry.reads])).toEqual([
@@ -367,7 +374,12 @@ describe("a draft that keeps changing under a request", () => {
         yield* imports
           .decide({
             params,
-            payload: { madeOn: { "row-3": view.revision }, set: flags({ "row-3": { stored: "replace" } }), clear: [] }
+            payload: {
+              over: {},
+              madeOn: { "row-3": view.revision },
+              set: flags({ "row-3": { stored: "replace" } }),
+              clear: []
+            }
           })
           .pipe(as(marcus))
         const store = yield* ImportStore
@@ -415,7 +427,7 @@ describe("a draft that keeps changing under a request", () => {
         const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, overtaken))
         const saving = yield* Effect.flip(
           imports
-            .decide({ params, payload: { madeOn: {}, set: flags({ "row-2": { out: true } }), clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: {}, set: flags({ "row-2": { out: true } }), clear: [] } })
             .pipe(as(marcus))
         )
         const matching = yield* Effect.flip(
@@ -454,7 +466,7 @@ describe("a draft that keeps changing under a request", () => {
         const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, overtaken))
         const saving = yield* Effect.flip(
           imports
-            .decide({ params, payload: { madeOn: {}, set: flags({ "row-2": { out: true } }), clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: {}, set: flags({ "row-2": { out: true } }), clear: [] } })
             .pipe(as(marcus))
         )
         const confirming = yield* Effect.flip(
@@ -480,7 +492,10 @@ describe("a madeOn key that names no row of the save", () => {
         const { imports, view, params } = yield* seeded(reviewed)
         const set = flags({ "row-2": { out: true } })
         const saved = yield* imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision, "row-99": 999_999 }, set, clear: [] } })
+          .decide({
+            params,
+            payload: { over: {}, madeOn: { "row-2": view.revision, "row-99": 999_999 }, set, clear: [] }
+          })
           .pipe(as(marcus))
         expect(saved.changed).toBe(true)
         const confirmed = yield* imports
@@ -498,7 +513,9 @@ describe("a madeOn key that names no row of the save", () => {
         // A row it does set, named on a revision the draft has not reached, is still refused.
         const { params: other } = yield* seeded(reviewed)
         const ahead = yield* Effect.flip(
-          imports.decide({ params: other, payload: { madeOn: { "row-2": 999_999 }, set, clear: [] } }).pipe(as(marcus))
+          imports
+            .decide({ params: other, payload: { over: {}, madeOn: { "row-2": 999_999 }, set, clear: [] } })
+            .pipe(as(marcus))
         )
         expect(S.is(RevisionAhead)(ahead)).toBe(true)
       })
@@ -631,7 +648,7 @@ describe("what changes between a judgement of the decisions and its write", () =
       Effect.gen(function* () {
         const { imports, view, params, tries } = yield* windowed("decide", "stock")
         const saved = yield* imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         expect([saved.notApplied, MutableRef.get(tries)]).toEqual([[], 2])
         const after = yield* imports.get({ params }).pipe(as(marcus))
@@ -660,7 +677,7 @@ describe("what changes between a judgement of the decisions and its write", () =
       Effect.gen(function* () {
         const { imports, view, params, tries } = yield* windowed("decide", "suggest")
         const saved = yield* imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         expect([saved.notApplied, MutableRef.get(tries)]).toEqual([[], 2])
       })

@@ -1,16 +1,18 @@
 // What the person decided for one row of a file, as code holds it and as it is stored and sent (its flags), the
 // id of one item of a file, and the change to the saved decisions a screen sends.
 import * as A from "effect/Array"
-import { dual } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { RowId, rowIdPattern } from "../Catalog.id.ts"
 import { fields } from "../Staging/Staged.read.ts"
-import { nullAsNone } from "@inventory/kernel/Wire"
+import { emptyWhenLeftOut, nullAsNone } from "@inventory/kernel/Wire"
 
 const bounded = (max: number) => S.String.check(S.isMaxLength(max))
 
@@ -22,6 +24,27 @@ const fieldName = S.String.check(S.isPattern(new RegExp(`^(${A.join(fields, "|")
 // Fields a decision names: each one once.
 const fieldList = S.Array(fieldName).check(S.isUnique(), S.isMaxLength(fields.length))
 
+// Values typed by field: at most one a field.
+const editsByField = S.Record(fieldName, bounded(32767)).check(S.isMaxProperties(fields.length))
+
+// A flag says something only when true, and a list or a record only when it holds something: the stored form leaves
+// the key out otherwise, as it always has, so a draft saved by any build reads, and one saved now looks the same.
+const noFlag = { empty: false, isEmpty: (flag: boolean) => !flag }
+const noFields = { empty: [], isEmpty: A.isReadonlyArrayEmpty }
+const noEdits = { empty: {}, isEmpty: R.isEmptyRecord }
+
+// What the stored `stored` flag can say. Left out, the person has not said (`undecided`).
+const StoredFlag = S.Literals(["keep", "replace"])
+const isStoredFlag = S.is(StoredFlag)
+const StoredFlagRead = S.Literals(["undecided", "keep", "replace"])
+const storedFlag = S.optionalKey(StoredFlag).pipe(
+  S.decodeTo(StoredFlagRead, {
+    decode: SchemaGetter.withDefault<typeof StoredFlagRead.Type>(Effect.succeed("undecided")),
+    encode: SchemaGetter.transformOptional(O.filter(isStoredFlag))
+  }),
+  S.withConstructorDefault(Effect.succeed<typeof StoredFlagRead.Type>("undecided"))
+)
+
 // A row id as text: the key a draft has always held, checked against the row id's form (`RowId`). A key of any other
 // form names no row, so a record drops it and a list refuses it.
 const rowKey = S.String.check(S.isPattern(rowIdPattern))
@@ -32,41 +55,45 @@ const rowKey = S.String.check(S.isPattern(rowIdPattern))
  * SKU is stored with other values, whether the stored item stays or the file's row replaces it.
  */
 export const RowDecisionFlags = S.Struct({
-  out: S.optionalKey(S.Boolean).annotateKey({
+  out: emptyWhenLeftOut(S.Boolean, noFlag).annotateKey({
     description: "True: the person left the row out. Leave the key out for a row that stays in",
     examples: [true]
   }),
-  kept: S.optionalKey(S.Boolean).annotateKey({
+  kept: emptyWhenLeftOut(S.Boolean, noFlag).annotateKey({
     description:
       "True: the person kept this row over another with the same SKU (rows 4 and 10 both say YDR-8742). Leave it out otherwise",
     examples: [true]
   }),
-  accepted: S.optionalKey(fieldList).annotateKey({
+  accepted: emptyWhenLeftOut(fieldList, noFields).annotateKey({
     description:
       "Fields whose proposal the person accepted: a rule's, or a stored suggestion's. Leave it out when none was accepted",
     examples: [["unitCost"]]
   }),
-  reverted: S.optionalKey(fieldList).annotateKey({
+  reverted: emptyWhenLeftOut(fieldList, noFields).annotateKey({
     description:
       "Fields whose fix or proposal the person undid: the file's value stands. Leave it out when nothing was undone. A field also in `accepted` is read as accepted: it was taken again after it was undone",
     examples: [["uom"]]
   }),
-  edits: S.optionalKey(S.Record(fieldName, bounded(32767)).check(S.isMaxProperties(fields.length))).annotateKey({
+  edits: emptyWhenLeftOut(editsByField, noEdits).annotateKey({
     description:
       "Values the person typed, by field. Leave it out when nothing was typed. A key that is no field is not read",
     examples: [{ name: "Steel Tube 1in" }]
   }),
-  stored: S.optionalKey(S.Literals(["keep", "replace"])).annotateKey({
+  stored: storedFlag.annotateKey({
     description:
-      "For a row whose SKU is stored with other values: keep the stored item (the row is skipped) or replace it with the file's row"
+      "For a row whose SKU is stored with other values: keep the stored item (the row is skipped) or replace it with the file's row. Leave it out while the person has not said"
   })
 }).annotate({
   identifier: "RowDecision",
   description:
     "What the person has decided about one row: left out, kept over another row with the same SKU, proposals accepted or undone by field, values typed by field, and stored item kept or replaced"
 })
-/** The stored form of a row's decision: every key left out when it says nothing. */
+/** A row's flags as code reads them: every flag there, false or empty when it says nothing. */
 export type RowDecisionFlags = typeof RowDecisionFlags.Type
+/** A row's flags as they are written and sent: only the flags that say something. */
+export declare namespace RowDecisionFlags {
+  export type Encoded = typeof RowDecisionFlags.Encoded
+}
 
 /** Where a row stands by the person's own word. */
 export const RowPlaceKind = LiteralKit(["open", "kept", "leftOut"]).annotate({
@@ -181,16 +208,17 @@ type DecisionShape = {
 }
 
 /**
- * The flags of a decision: the stored form, every part that says nothing left out. It reads the parts' `kind` as the
- * data the encoding turns into flags (either side of the schema), not a decoded value's case: so by its field.
+ * The flags of a decision; the flags' schema leaves out each one that says nothing when it is stored. It reads the
+ * parts' `kind` as the data the encoding turns into flags (either side of the schema), not a decoded value's case: so
+ * by its field.
  */
 const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
-  ...(parts.place.kind === "leftOut" ? { out: true } : {}),
-  ...(parts.place.kind === "kept" || (parts.place.kind === "leftOut" && parts.place.wasKept) ? { kept: true } : {}),
-  ...(parts.accepted.length === 0 ? {} : { accepted: parts.accepted }),
-  ...(parts.reverted.length === 0 ? {} : { reverted: parts.reverted }),
-  ...(R.isEmptyRecord(parts.edits) ? {} : { edits: parts.edits }),
-  ...(parts.stored.kind === "undecided" ? {} : { stored: parts.stored.kind })
+  out: parts.place.kind === "leftOut",
+  kept: parts.place.kind === "kept" || (parts.place.kind === "leftOut" && parts.place.wasKept),
+  accepted: parts.accepted,
+  reverted: parts.reverted,
+  edits: parts.edits,
+  stored: parts.stored.kind
 })
 
 /**
@@ -211,33 +239,30 @@ const undoneOnly: {
 const isFieldName = S.is(fieldName)
 
 /**
- * The flags read once, where an absent flag becomes an empty part. Flags are the wire's form of a decision, every key
- * optional, and they reach here from three places: the wire and the store (the schema's decode) and the browser's own
- * code, which builds a decision in that form (`decisionFromFlags`). This is the one place an absent flag is read;
- * past it a decision has every part, so the two readers never disagree. A value typed under a key that names no field
- * is not read, as the decision's record of edits drops it.
+ * The flags read once. Flags are the wire's form of a decision, and they reach here from three places: the wire and
+ * the store (the schema's decode, where a flag left out is read as empty) and the browser's own code, which builds a
+ * decision in that form (`decisionFromFlags`, through the flags' `make`, which starts each flag empty). Past this a
+ * decision has every part, so the readers never disagree. A value typed under a key that names no field is not read,
+ * as the decision's record of edits drops it.
  */
-const partsOfFlags = (flags: RowDecisionFlags) => {
-  const accepted = flags.accepted ?? []
-  const stored: typeof StoredChoiceKind.Type = flags.stored ?? "undecided"
-  return {
-    out: flags.out === true,
-    kept: flags.kept === true,
-    stored,
-    accepted,
-    reverted: undoneOnly(flags.reverted ?? [], accepted),
-    edits: R.filter(flags.edits ?? {}, (_value, field) => isFieldName(field))
-  }
-}
+const partsOfFlags = (flags: RowDecisionFlags) => ({
+  out: flags.out,
+  kept: flags.kept,
+  stored: flags.stored,
+  accepted: flags.accepted,
+  reverted: undoneOnly(flags.reverted, flags.accepted),
+  edits: R.filter(flags.edits, (_value, field) => isFieldName(field))
+})
 
 // A decision as code holds it. Every part is there, empty when the person said nothing about it, and no field is
 // both accepted and undone.
+// A decision made in code starts with nothing said: open, the stored item undecided, nothing accepted, undone or typed.
 const RowDecisionParts = S.Struct({
-  place: RowPlace,
-  stored: StoredChoice,
-  accepted: fieldList,
-  reverted: fieldList,
-  edits: S.Record(fieldName, bounded(32767)).check(S.isMaxProperties(fields.length))
+  place: RowPlace.pipe(S.withConstructorDefault(Effect.succeed(placeOpen))),
+  stored: StoredChoice.pipe(S.withConstructorDefault(Effect.succeed(storedUndecided))),
+  accepted: fieldList.pipe(S.withConstructorDefault(Effect.succeed([]))),
+  reverted: fieldList.pipe(S.withConstructorDefault(Effect.succeed([]))),
+  edits: editsByField.pipe(S.withConstructorDefault(Effect.succeed({})))
 }).check(
   S.makeFilter((parts) => A.isReadonlyArrayEmpty(A.intersection(parts.accepted, parts.reverted)), {
     expected: "a decision with no field both accepted and undone"
@@ -275,33 +300,44 @@ export const RowDecision = RowDecisionFlags.pipe(
 export type RowDecision = typeof RowDecision.Type
 
 /**
- * A decision from the parts that say something; the rest are empty.
+ * A decision from the parts that say something; the rest start empty.
  *
  * @example decisionOf({ accepted: ["uom"] }).place.kind // "open"
  */
-export const decisionOf = (parts: Partial<RowDecision> = {}): RowDecision => ({
-  place: parts.place ?? placeOpen,
-  stored: parts.stored ?? storedUndecided,
-  accepted: parts.accepted ?? [],
-  reverted: parts.reverted ?? [],
-  edits: parts.edits ?? {}
-})
+export const decisionOf = (parts: (typeof RowDecisionParts)["~type.make.in"]): RowDecision =>
+  RowDecisionParts.make(parts)
+
+/** The decision of a row the person has said nothing about. */
+export const nothingDecided: RowDecision = decisionOf({})
+
+/**
+ * A row's decision in a draft: a row the draft does not name has decided nothing. Said once here, so every reader of a
+ * draft agrees what a missing row means.
+ *
+ * @example decisionOfRow({}, "row-7").place.kind // "open"
+ */
+export const decisionOfRow: {
+  (rowId: string): (decisions: SavedDecisions) => RowDecision
+  (decisions: SavedDecisions, rowId: string): RowDecision
+} = dual(2, (decisions: SavedDecisions, rowId: string): RowDecision =>
+  O.match(R.get(decisions, rowId), { onNone: () => nothingDecided, onSome: identity })
+)
 
 /**
  * A decision as its stored flags: the inverse of `decisionFromFlags`.
  *
- * @example decisionToFlags(decisionOf({ accepted: ["uom"] })) // { accepted: ["uom"] }
+ * @example decisionToFlags(decisionOf({ accepted: ["uom"] })).accepted // ["uom"]
  */
 export const decisionToFlags = (decision: RowDecision): RowDecisionFlags => flagsOf(decision)
 
 /**
  * The decision the flags say, read as the wire's are (`partsOfFlags`): for the browser's code that builds a decision
- * in the wire's form, and for tests.
+ * in the wire's form, and for tests. A flag left out starts empty.
  *
  * @example decisionFromFlags({ out: true, kept: true }).place // { kind: "leftOut", wasKept: true }
  */
-export const decisionFromFlags = (flags: RowDecisionFlags): RowDecision => {
-  const parts = partsOfFlags(flags)
+export const decisionFromFlags = (flags: (typeof RowDecisionFlags)["~type.make.in"]): RowDecision => {
+  const parts = partsOfFlags(RowDecisionFlags.make(flags))
   return {
     place: parts.out ? placeLeftOut(parts.kept) : parts.kept ? placeKept : placeOpen,
     stored: parts.stored === "keep" ? storedKeep : parts.stored === "replace" ? storedReplace : storedUndecided,
@@ -324,12 +360,18 @@ export type SavedDecisions = typeof SavedDecisions.Type
  * always was; the second item of row 8 is "row-8.2", well inside the 40 characters a decision's key may have.
  *
  * @example
- * rowId({ rowNumber: 56 }) // "row-56"
- * rowId({ rowNumber: 8, part: 2 }) // "row-8.2"
+ * rowId({ rowNumber: 56, part: O.none() }) // "row-56"
+ * rowId({ rowNumber: 8, part: O.some(2) }) // "row-8.2"
  */
-export const rowId = (input: { readonly rowNumber: number; readonly part?: number | undefined }): RowId =>
+export const rowId = (input: { readonly rowNumber: number; readonly part: O.Option<number> }): RowId =>
   RowId.make(
-    input.part === undefined || input.part === 0 ? `row-${input.rowNumber}` : `row-${input.rowNumber}.${input.part}`
+    O.match(
+      O.filter(input.part, (part) => part > 0),
+      {
+        onNone: () => `row-${input.rowNumber}`,
+        onSome: (part) => `row-${input.rowNumber}.${part}`
+      }
+    )
   )
 
 // A row is either decided again or taken back in one change, never both: the screens make a change from one record
@@ -461,7 +503,11 @@ export type DecidedSince = typeof DecidedSince.Type
  * difference only, so two screens deciding different rows do not collide; what they were made on, so a decision made
  * before a column it rests on was matched again is not applied; and for rows that waited, what they may be written over.
  */
-export const SaveRequest = S.Struct({ madeOn, over: over.pipe(S.optionalKey), ...DecisionDelta.fields })
+export const SaveRequest = S.Struct({
+  madeOn,
+  over: emptyWhenLeftOut(over, noEdits),
+  ...DecisionDelta.fields
+})
   .check(clearsNoRowItSets)
   .annotate({
     identifier: "SaveRequest",

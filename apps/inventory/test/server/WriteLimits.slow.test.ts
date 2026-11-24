@@ -185,7 +185,7 @@ layer(App)("a save of every row of a file of 50,000", (it) => {
           counted(maxStagedRows, (n) => [`row-${n + 2}`, n === 0 ? replace : out] as const)
         )
         const saved = yield* client.imports
-          .decide({ params: { id }, payload: { madeOn: R.map(set, () => 0), set, clear: [] } })
+          .decide({ params: { id }, payload: { over: {}, madeOn: R.map(set, () => 0), set, clear: [] } })
           .pipe(as("mem_marcus"))
         expect([saved.notApplied, saved.changed, saved.revision]).toEqual([[], true, 2])
         const held = yield* savedFor(id)
@@ -300,7 +300,7 @@ layer(App)("a save of 50,000 rows that waited", (it) => {
       )
       const theirs = decisionFromFlags({ edits: { name: "Pine Crate" } })
       yield* client.imports
-        .decide({ params: { id }, payload: { madeOn: { "row-9": 1 }, set: { "row-9": theirs }, clear: [] } })
+        .decide({ params: { id }, payload: { over: {}, madeOn: { "row-9": 1 }, set: { "row-9": theirs }, clear: [] } })
         .pipe(as("mem_dana"))
       const saved = yield* client.imports
         .decide({

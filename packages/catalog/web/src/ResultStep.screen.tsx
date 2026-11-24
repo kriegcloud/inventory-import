@@ -420,12 +420,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         caption={`What happened to each row of ${view.fileName}`}
         columns={columns}
         rows={shown}
-        rowKey={(row) =>
-          rowId({
-            rowNumber: row.rowNumber,
-            ...O.match(row.part, { onNone: () => ({}), onSome: (part) => ({ part }) })
-          })
-        }
+        rowKey={(row) => rowId({ rowNumber: row.rowNumber, part: row.part })}
         empty={
           <>
             No rows here.{" "}

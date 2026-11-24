@@ -73,7 +73,7 @@ holds in the code.
 | `ItemFields`, `StoredItem`, `ItemEdit` | optional fields | Absent, *as is* | `description`, `reorderPoint`, `firstReceivedOn`, `dimensions` decode with `nullAsNone` |
 | | `stocking` | State, *as is* | `Active`/`Inactive`/`Discontinued` |
 | | `tags`, `vendors` | Required | every stored item states its lists; an import's empty cell is decided as empty by the review, not by this schema |
-| `skuKey({ sku })` | — | Normalised | the key two rows are compared by: a `SkuKey` brand made by a schema transformation (spaces out, upper case), so a comparison cannot be handed a raw SKU |
+| `skuKey({ sku })` | — | Normalised, *open* | the key two rows are compared by. A `SkuKey` brand made by a schema transformation was tried: every caller is pure code that needs the key at once, and `S.decodeSync` is refused by the type-check (`schemaSync`), so it stays a function until Benjamin rules (SPEC, open question 3) |
 | `ItemFilter` | `filterId` | Absent | the table kit's own optional key; kept at its boundary |
 | `rangeSchema` | `min`, `max` | Absent, *as is* | |
 | `ItemQuery` | `search` | Normalised | the words of the search decoded once (`SearchText`), not split in the model |
@@ -87,7 +87,8 @@ holds in the code.
 | `StagedTable` | `sheet` | Absent, *as is* | |
 | `FileProblem` | all | Required, *as is* | |
 | `fileProblem.*` inputs (built by code) | `todo` | Empty: the usual sentence of each kind, written once in the maker's input schema | the two kinds whose sentence a caller may replace |
-| | `where`, `sheet` | Absent | "a file of no bytes (no `where`)"; a CSV has no sheet |
+| | `where` | State: `emptyFile` (a file of no bytes) and `noValues` (nothing in the place read, `where` required) | "a file of no bytes (no `where`)" was a second kind of problem in one maker |
+| | `sheet` | Absent (`O.Option<string>`) | a CSV has no sheet; the caller already holds it as an Option |
 | `UploadStart*`, `UploadChunk`, `UploadDiscarded`/`NothingToDiscard` | all | Required / State, *as is* | |
 
 ### `Suggestion/Suggestion.read.ts`, `Assistant/*`, `Answer/*`
@@ -96,7 +97,7 @@ holds in the code.
 | --- | --- | --- | --- |
 | `SuggestedByModel`/`ByRule`, `Name`/`Category`/`ColumnSuggestion` | all | State, *as is* | |
 | `StoredSuggestionRow` (a D1 row) | `rowNumber`, `column`, `model` | Absent on the row (`OptionFromNullOr`) | `suggestionFromStored` compares with `null`; the case is read from `kind` |
-| `suggestionFits` | `to`, `file.name` | Normalised | the guard compares the trimmed text: a `Trimmed` input decoded by the guard's schema; the person's cell itself is not cleaned |
+| `suggestionFits` | `to`, `file.name` | Required, checked by schemas | nothing is cleaned: a proposed name is one `S.Trimmed` with something in it and at most 120 characters, and the row's name is blank when it holds only spaces (`S.isPattern`), both `S.is` guards beside the function |
 | `ViewAnswer`, `ViewRefusal` | `note` | Absent, *as is* | |
 | the rest | | Required | |
 

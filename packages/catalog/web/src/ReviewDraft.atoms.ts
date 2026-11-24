@@ -235,7 +235,7 @@ const perform = (input: {
     Send: ({ delta, id: sent, madeOn, over }) =>
       onceSignedInKnown(registry, () => {
         if (!signedInAs({ registry, owner })) return happened(DraftEvent.SaveSignedOut({ id: sent }))
-        const payload = { madeOn, ...(R.isEmptyReadonlyRecord(over) ? {} : { over }), ...delta }
+        const payload = { madeOn, over, ...delta }
         void callWrite((api) => api.imports.decide({ params: { id }, payload })).then(
           ({ changed, decidedSince, notApplied, revision }) => {
             answered(registry, id)

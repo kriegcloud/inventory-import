@@ -186,7 +186,7 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       fileProblem.noHeaderRow({
         fileName: input.fileName,
         rows: headerSearchRows,
-        ...O.match(input.sheetName, { onNone: () => ({}), onSome: (sheet) => ({ sheet }) })
+        sheet: input.sheetName
       })
     )
   }

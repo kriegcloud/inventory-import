@@ -89,7 +89,7 @@ const world = (id: ImportId) => {
           Effect.suspend(() => {
             const answer = Deferred.makeUnsafe<Saved, Refusal>()
             // What it was made on is kept beside the rows, so a test of the rows reads the rows.
-            const { madeOn, ...delta } = request.payload
+            const { madeOn, over: _over, ...delta } = request.payload
             saves.push({ delta, madeOn, answer })
             return Deferred.await(answer)
           })

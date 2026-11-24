@@ -175,10 +175,10 @@ describe("an import, over the twins", () => {
           const params = { id: view.id }
           const set = { "row-2": decisionFromFlags({ out: true }) }
           const first = yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           const second = yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           expect(second.revision).toBe(first.revision)
           // The answer says which save moved the draft: the first did, the same one again did not.
@@ -186,7 +186,7 @@ describe("an import, over the twins", () => {
           const after = yield* imports.get({ params }).pipe(as(marcus))
           expect(after.progress.ready).toBe(2)
           const cleared = yield* imports
-            .decide({ params, payload: { madeOn: {}, set: {}, clear: ["row-2"] } })
+            .decide({ params, payload: { over: {}, madeOn: {}, set: {}, clear: ["row-2"] } })
             .pipe(as(marcus))
           expect(cleared.revision).toBe(first.revision + 1)
           expect(cleared.changed).toBe(true)
@@ -211,6 +211,7 @@ describe("an import, over the twins", () => {
             .decide({
               params,
               payload: {
+                over: {},
                 madeOn: { "row-2": view.revision },
                 set: { "row-2": decisionFromFlags({ out: true }) },
                 clear: []
@@ -420,7 +421,7 @@ describe("a revision the draft has not reached", () => {
           const accept = { "row-2": decisionFromFlags({ out: true }) }
           const save = yield* Effect.flip(
             imports
-              .decide({ params, payload: { madeOn: { "row-2": view.revision + 1 }, set: accept, clear: [] } })
+              .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision + 1 }, set: accept, clear: [] } })
               .pipe(as(marcus))
           )
           const confirm = yield* Effect.flip(
@@ -454,7 +455,7 @@ describe("an accept made before its column was matched again, over the twins", (
           expect(matched.revision).toBe(view.revision + 1)
           const accept = { "row-2": decisionFromFlags({ accepted: ["unitCost"] }) }
           const saved = yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: accept, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: accept, clear: [] } })
             .pipe(as(marcus))
           expect(saved.notApplied).toEqual([{ rowId: "row-2", field: "unitCost", kind: "accept" }])
           const after = yield* imports.get({ params }).pipe(as(marcus))

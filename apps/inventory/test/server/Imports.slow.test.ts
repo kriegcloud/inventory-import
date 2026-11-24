@@ -46,6 +46,7 @@ layer(TypedApp)("an import of items", (it) => {
         const decisions = {
           params: { id: staged.id },
           payload: {
+            over: {},
             madeOn: { "row-55": staged.revision, "row-18": staged.revision },
             set: {
               "row-55": decisionFromFlags({ accepted: ["unitCost"] }),

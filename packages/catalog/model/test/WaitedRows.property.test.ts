@@ -59,7 +59,7 @@ const picks = {
   replace: { stored: "replace" },
   keep: { stored: "keep" },
   both: { stored: "replace", accepted: ["unitCost"] }
-} satisfies Record<string, RowDecisionFlags>
+} satisfies Record<string, RowDecisionFlags.Encoded>
 
 const Step = S.Struct({
   kind: S.Literals([
@@ -202,6 +202,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
         .decide({
           params,
           payload: {
+            over: {},
             madeOn: { [step.row]: now.revision },
             set: { [step.row]: decisionFromFlags(picks[step.pick]) },
             clear: []

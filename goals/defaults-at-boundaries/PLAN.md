@@ -23,8 +23,8 @@ Places by package on 2026-11-23, from the baseline:
 
 | # | Package | Places | Owner | Status |
 | --- | --- | --- | --- | --- |
-| 0 | The packet; `emptyWhenLeftOut` in `@inventory/kernel/Wire` | — | this session | doing |
-| 1 | `packages/catalog/contract` (src and tests) | 41 | this session, by hand | todo |
+| 0 | The packet; `emptyWhenLeftOut` in `@inventory/kernel/Wire` | — | this session | done |
+| 1 | `packages/catalog/contract` (src and tests) | 41 | this session, by hand | doing: 1 place left (`skuKey`, open question 3) |
 | 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | todo |
 | 3 | `packages/catalog/host` | 20 | this session, by hand | todo |
 | 4 | Agent files, `CLAUDE.md`, the skills README, `docs/patterns.md` and `docs/kit.md` examples | — | this session | todo |
@@ -46,6 +46,21 @@ None for the contract and host. Two questions wait on Benjamin (SPEC, "Open ques
 model wait on them, and everything else proceeds.
 
 ## Choices made along the way
+
+- **A save's `over` is always there in code.** `SaveRequest.over` decodes to `{}` when left out and is left out of
+  the wire while empty, so the handler, `overOfSave` and the browser's save read it with no fallback. A test that
+  calls the handler or the client directly states `over: {}`, as a decoded request has it. Two properties that draw a
+  `SaveRequest` now draw an `over` on every run, and each decision in it is drawn under the decision's own checks, so
+  they allow 20,000 discarded draws instead of fast-check's 2,000 (`drawnWithWaits` in `Decision.property.test.ts`);
+  six runs in a row passed.
+- **Flags as written have a name.** `RowDecisionFlags` is the decoded type, every flag there; `RowDecisionFlags.Encoded`
+  is the form a draft stores and a test writes (only the flags that say something). Tests that built partial flags
+  use the second.
+- **A file-problem's usual sentence is on its maker's input schema** (`NotASpreadsheetInput`, `UnreadableInput`, with
+  `withConstructorDefault`), and a file of no bytes is its own maker (`emptyFile`) instead of `noValues` with no
+  `where`.
+- **`skuKey` stays a function for now.** As a schema transformation it needs `S.decodeSync` in pure code, which the
+  type-check refuses (`schemaSync`); SPEC, open question 3.
 
 - **`emptyWhenLeftOut`** (`@inventory/kernel/Wire`): a key decoded always present, left out of the encoded form while
   it holds its empty value. The kit's `ArrayKeyDefaultEmpty` encodes the key even when empty, which would change what

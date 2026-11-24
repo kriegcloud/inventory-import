@@ -138,7 +138,7 @@ describe("the region beside the draft", () => {
       page.said.length = 0
       t.leaveOut("row-2")
       yield* settle
-      expect([t.saves, t.region()]).toEqual([[{ set: { "row-2": out }, clear: [] }], [["row-2"], 1]])
+      expect([t.saves, t.region()]).toEqual([[{ over: {}, set: { "row-2": out }, clear: [] }], [["row-2"], 1]])
       // Somebody else left row 5 out.
       t.give(t.at({ revision: 12, decisions: { "row-2": out, "row-5": out } }))
       yield* settle
@@ -195,7 +195,7 @@ describe("the region beside the draft", () => {
         yield* settle
         // Sent once, failed: the row is still what the region shows, and the person is told it is not saved yet.
         expect([t.saves, t.region()[0], page.said]).toEqual([
-          [{ set: { "row-2": out }, clear: [] }],
+          [{ over: {}, set: { "row-2": out }, clear: [] }],
           ["row-2"],
           ["Not saved yet"]
         ])
@@ -211,7 +211,7 @@ describe("the region beside the draft", () => {
         page.actions[0]?.()
         yield* settle
         expect(t.saves).toEqual([
-          { set: { "row-2": out }, clear: [] },
+          { over: {}, set: { "row-2": out }, clear: [] },
           { over: { "row-2": [O.none(), O.some(out)] }, set: { "row-2": out }, clear: [] }
         ])
         expect([t.registry.get(rowsNotSaved(id)), page.said]).toEqual([0, ["Not saved yet"]])

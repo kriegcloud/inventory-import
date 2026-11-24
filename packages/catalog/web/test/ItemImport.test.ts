@@ -20,7 +20,7 @@ import { stage } from "./support/files.ts"
 // Decisions are written here as the flags a draft stores, and read through `decisionFromFlags`.
 const reviewOf = (
   table: StagedTable,
-  decisions: Readonly<Record<string, RowDecisionFlags>> = {},
+  decisions: Readonly<Record<string, RowDecisionFlags.Encoded>> = {},
   storedItems: ReadonlyArray<ItemFields> = []
 ) => review({ table, choices: [], decisions: R.map(decisions, decisionFromFlags), storedItems })
 

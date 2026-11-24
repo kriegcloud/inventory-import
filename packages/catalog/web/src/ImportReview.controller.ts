@@ -23,7 +23,7 @@ import {
 } from "@inventory/catalog-model/Review"
 import {
   decisionFromFlags,
-  decisionOf,
+  nothingDecided,
   decisionToFlags,
   hasKeep,
   type SavedDecisions
@@ -170,7 +170,7 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
   // problem is handed over without its rivals and stays open until the domain says it is settled.
   const stricter =
     open !== undefined &&
-    ((decisions[row.id] !== undefined && hasKeep(decisions[row.id] ?? decisionOf())) ||
+    ((decisions[row.id] !== undefined && hasKeep(decisions[row.id] ?? nothingDecided)) ||
       open.rivals.some((id) => decisions[id]?.edits["sku"] !== undefined))
   return ReviewRow.make({
     ...where,
@@ -226,7 +226,7 @@ export const toRegionDecisions = (decisions: SavedDecisions): RegionDecisions =>
       const { stored, ...flags } = decisionToFlags(decision)
       return [
         id,
-        fromFlags(stored === undefined ? flags : { ...flags, edits: { ...flags.edits, [storedChoice]: stored } })
+        fromFlags(stored === "undecided" ? flags : { ...flags, edits: { ...flags.edits, [storedChoice]: stored } })
       ]
     })
   )

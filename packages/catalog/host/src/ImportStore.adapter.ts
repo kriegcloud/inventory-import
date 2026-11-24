@@ -118,8 +118,8 @@ const storedChange = {
   source: ChangeSource,
   decidedBy: S.Literals(["person", "rule"]),
   how: S.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]),
-  basis: S.NullOr(S.String),
-  confidence: S.NullOr(Confidence)
+  basis: S.OptionFromNullOr(S.String),
+  confidence: S.OptionFromNullOr(Confidence)
 }
 
 const ChangeInsert = S.Struct({

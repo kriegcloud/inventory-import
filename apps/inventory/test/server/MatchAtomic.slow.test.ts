@@ -159,10 +159,14 @@ const person = (id: string, name: string, role: "admin" | "editor") =>
 const marcusAsMember = person("mem_marcus", "Marcus Oyelaran", "editor")
 const danaAsMember = person("mem_dana", "Dana Whitfield", "admin")
 
-const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, decisionFromFlags)
+const flags = (set: Readonly<Record<string, RowDecisionFlags.Encoded>>) => R.map(set, decisionFromFlags)
 
 /** Marcus saves `set` straight through the store, on the draft as it is now: the other person's write. */
-const marcusSaves = (store: ImportStore["Service"], id: string, set: Readonly<Record<string, RowDecisionFlags>>) =>
+const marcusSaves = (
+  store: ImportStore["Service"],
+  id: string,
+  set: Readonly<Record<string, RowDecisionFlags.Encoded>>
+) =>
   Effect.flatMap(store.find(prairie, id), (draft) =>
     store.decide(marcusAsMember, O.getOrThrow(draft), { set: flags(set), clear: [] })
   )
@@ -305,6 +309,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .decide({
             params,
             payload: {
+              over: {},
               madeOn: { "row-55": view.revision + 1 },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
@@ -340,6 +345,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .decide({
             params,
             payload: {
+              over: {},
               madeOn: { "row-55": view.revision },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
@@ -363,6 +369,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .decide({
             params,
             payload: {
+              over: {},
               madeOn: { "row-55": view.revision },
               set: flags({ "row-55": { accepted: ["unitCost"] } }),
               clear: []
@@ -418,7 +425,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           "row-5": { reverted: ["uom"] }
         })
         yield* client.imports
-          .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
           .pipe(as("mem_dana"))
         yield* around([
           {
@@ -478,7 +485,12 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         yield* client.imports
           .decide({
             params,
-            payload: { madeOn: { "row-3": view.revision }, set: flags({ "row-3": { stored: "replace" } }), clear: [] }
+            payload: {
+              over: {},
+              madeOn: { "row-3": view.revision },
+              set: flags({ "row-3": { stored: "replace" } }),
+              clear: []
+            }
           })
           .pipe(as("mem_marcus"))
         // Once Dana's match has asked the review (the stored item was there), the first import is taken back: no item
@@ -524,7 +536,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         }).pipe(as("mem_marcus"))
         const params = { id: view.id }
         yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Once Dana's match has asked the review, the item is stocked and Marcus leaves row 3 out.
         const stock = client.imports
@@ -581,7 +593,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         }).pipe(as("mem_marcus"))
         const params = { id: view.id }
         yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Once Dana's match has asked the review, Marcus matches the cost to "List cost" and decides the Replace again.
         const theirs = client.imports
@@ -639,7 +651,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         // written, the stocking import is confirmed.
         yield* around([{ before: stock }, {}])
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Two batches: the first found an item it was not judged against, the second is the save worked out again.
         // Only an item changed, not a column: what the first try found stands, and the Replace with it.
@@ -755,7 +767,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         })
         yield* around([{ before: stored }, {}])
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         expect([MutableRef.get(sent), saved.notApplied]).toEqual([2, []])
       })
@@ -826,7 +838,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           {}
         ])
         yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": reopened.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": reopened.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         // Two batches: the first found the import's created rows otherwise than its judgement read them.
         expect(MutableRef.get(sent)).toBe(2)
@@ -875,7 +887,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           {}
         ])
         const saved = yield* client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
         expect([MutableRef.get(sent), saved.notApplied]).toEqual([
           2,
@@ -1013,8 +1025,9 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
         expect([R.get(after.decisions, "row-3"), R.get(after.decisions, "row-4")]).toEqual([O.none(), O.none()])
         yield* around([{ before: Effect.orDie(marcusSaves(store, view.id, { "row-5": { out: true } })) }, {}])
-        const { over: _over, ...live } = waited(view)
-        const saved = yield* client.imports.decide({ params, payload: live }).pipe(as("mem_dana"))
+        const saved = yield* client.imports
+          .decide({ params, payload: { ...waited(view), over: {} } })
+          .pipe(as("mem_dana"))
         expect([saved.changed, MutableRef.get(sent)]).toEqual([true, 1])
       })
   )
@@ -1079,7 +1092,10 @@ layer(App)("a take-back of the import itself between a save's comparison of a ro
       const open = yield* client.imports.reopen({ params }).pipe(as("mem_marcus"))
       const mine = decisionFromFlags({ stored: "replace", edits: { name: "Sack" } })
       yield* client.imports
-        .decide({ params, payload: { madeOn: { "row-2": open.revision }, set: { "row-2": mine }, clear: [] } })
+        .decide({
+          params,
+          payload: { over: {}, madeOn: { "row-2": open.revision }, set: { "row-2": mine }, clear: [] }
+        })
         .pipe(as("mem_dana"))
       const match = yield* client.imports
         .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })

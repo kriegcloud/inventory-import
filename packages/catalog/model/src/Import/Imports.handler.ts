@@ -246,7 +246,7 @@ export const importsEndpoints = Effect.gen(function* () {
       choices: asked.choices,
       moves: asked.moves,
       storedItems: A.map(found, fieldsOf),
-      createdIds: A.map(created, rowId),
+      createdIds: A.map(created, (row) => rowId({ rowNumber: row.rowNumber, part: O.some(row.part) })),
       suggestions,
       itemsOf,
       questions: asked.questions
@@ -364,7 +364,7 @@ export const importsEndpoints = Effect.gen(function* () {
       unsaved === undefined ? held : withUnsaved(held, { delta: unsaved, author: actor.name, authorId: actor.id })
     const storedItems = yield* storedFor(actor, table, choices, stored.decisions)
     const created = yield* imports.createdRows(actor.organizationId, draft.id)
-    const createdIds = A.map(created, rowId)
+    const createdIds = A.map(created, (row) => rowId({ rowNumber: row.rowNumber, part: O.some(row.part) }))
     // The rows behind them, as the view has always said them: one number per row, however many items it holds.
     const createdRows = A.dedupe(A.map(created, (item) => item.rowNumber))
     const decisions = carryDecisions({ table, choices, decisions: stored.decisions, mode: ruleFixes, itemsOf })

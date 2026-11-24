@@ -78,6 +78,7 @@ import {
   rowId,
   RowDecision,
   decisionOf,
+  nothingDecided,
   SavedDecisions,
   isLeftOut,
   hasKeep,
@@ -507,7 +508,7 @@ const makeContext = (input: {
     rowNumber: row.rowNumber,
     part: item.part,
     label: item.part === 0 ? null : item.label,
-    id: rowId({ rowNumber: row.rowNumber, part: item.part }),
+    id: rowId({ rowNumber: row.rowNumber, part: O.some(item.part) }),
     order,
     file: item.file
   }))
@@ -1040,7 +1041,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   return undefined
 }
 
-const emptyDecision: RowDecision = decisionOf()
+const emptyDecision: RowDecision = nothingDecided
 
 /** Whether a proposal is in force for a row: the person accepted it, or it is a form-only rule fix nobody undid. */
 const inForce = (proposed: Proposal, decision: RowDecision): boolean =>
@@ -1273,7 +1274,7 @@ export const review = (input: {
 }): Review => {
   const ctx = makeContext(input)
   const created = HashSet.fromIterable(input.createdIds ?? [])
-  const decisionOf = (row: FileRow): RowDecision => O.getOrElse(R.get(input.decisions, rowId(row)), () => emptyDecision)
+  const decisionOf = (row: FileRow): RowDecision => O.getOrElse(R.get(input.decisions, row.id), () => emptyDecision)
 
   const first = A.map(ctx.rows, (row) => {
     const decision = decisionOf(row)

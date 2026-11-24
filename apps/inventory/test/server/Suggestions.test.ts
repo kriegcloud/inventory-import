@@ -25,7 +25,7 @@ import { stage } from "./support/files.ts"
 
 const sourceOf = (
   suggestions: ReadonlyArray<Suggestion> = [],
-  flags: Readonly<Record<string, RowDecisionFlags>> = {}
+  flags: Readonly<Record<string, RowDecisionFlags.Encoded>> = {}
 ) =>
   Effect.map(stage(new File([messy], "items_messy.csv")), (table): SuggestSource => ({
     table,

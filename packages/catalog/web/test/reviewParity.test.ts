@@ -13,7 +13,7 @@ import * as Order from "effect/Order"
 import * as Str from "effect/String"
 import { firstDecisions, recheckRow, review } from "@inventory/catalog-model/Review"
 import { changeToStored } from "@inventory/catalog-contract/Change"
-import { decisionToFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import {
@@ -331,7 +331,7 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         s.press({ type: "edit" as const, rowId: "row-2", column: storedChoice, value: answer })
         // As the server stores it: the one flag, and nothing else said about the row.
         const sent = s.decisions["row-2"]
-        expect(sent === undefined ? sent : decisionToFlags(sent)).toEqual({ stored: answer })
+        expect(sent).toEqual(decisionFromFlags({ stored: answer }))
         const { current } = s.agree()
         expect(current.rows[0]?.status).toBe(answer === "keep" ? "already" : "ready")
         expect(current.rows[0]?.update).toBe(answer === "replace")

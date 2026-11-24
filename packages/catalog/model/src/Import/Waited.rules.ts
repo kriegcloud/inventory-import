@@ -14,7 +14,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import {
   type DecidedSince,
-  decisionOf,
+  nothingDecided,
   hasKeep,
   RowDecision,
   type SavedDecisions,
@@ -36,15 +36,15 @@ export type Over = Readonly<Record<string, ReadonlyArray<O.Option<RowDecision>>>
  * @example overOfSave({ over: { "row-2": [O.none()], "row-9": [O.none()] }, set: { "row-2": decision }, clear: [] }) // { "row-2": [O.none()] }
  */
 export const overOfSave = (save: {
-  readonly over?: Over
+  readonly over: Over
   readonly set: SavedDecisions
   readonly clear: ReadonlyArray<string>
 }): Over => {
   const cleared = HashSet.fromIterable(save.clear)
-  return R.filter(save.over ?? {}, (_named, rowId) => R.has(save.set, rowId) || HashSet.has(cleared, rowId))
+  return R.filter(save.over, (_named, rowId) => R.has(save.set, rowId) || HashSet.has(cleared, rowId))
 }
 
-const nothingSaid = decisionOf()
+const nothingSaid = nothingDecided
 // A decision that says nothing (a row put back, or one a match took everything of) and no decision are the same.
 const said = (decision: O.Option<RowDecision>): RowDecision => O.getOrElse(decision, () => nothingSaid)
 const alike = (a: O.Option<RowDecision>, b: O.Option<RowDecision>): boolean => sameDecision(said(a), said(b))

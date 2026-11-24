@@ -102,7 +102,7 @@ const opened = Effect.gen(function* () {
     sends.length = 0
     const payload = {
       madeOn: send.madeOn,
-      ...(R.isEmptyReadonlyRecord(send.over) ? {} : { over: send.over }),
+      over: send.over,
       ...send.delta
     }
     const answer = yield* imports.decide({ params, payload }).pipe(as(dana))
@@ -122,7 +122,7 @@ const opened = Effect.gen(function* () {
   const elsewhere = Effect.fnUntraced(function* (row: string, decision: SavedDecisions[string]) {
     const now = yield* read
     return yield* imports
-      .decide({ params, payload: { madeOn: { [row]: now.revision }, set: { [row]: decision }, clear: [] } })
+      .decide({ params, payload: { over: {}, madeOn: { [row]: now.revision }, set: { [row]: decision }, clear: [] } })
       .pipe(as(marcus))
   })
   const look = Effect.map(read, (view) => happen(arrived(view)))

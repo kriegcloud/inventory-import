@@ -68,7 +68,7 @@ describe("a plan a confirm can be handed", () => {
     [ConfirmPlan],
     ([plan]) => {
       for (const row of plan.rows) {
-        expect(rowId({ rowNumber: row.rowNumber, part: row.part })).toBe(
+        expect(rowId({ rowNumber: row.rowNumber, part: O.some(row.part) })).toBe(
           row.part === 0 ? `row-${row.rowNumber}` : `row-${row.rowNumber}.${row.part}`
         )
       }

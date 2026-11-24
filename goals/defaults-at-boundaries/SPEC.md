@@ -150,6 +150,12 @@ added with its reason when found.
    decisions with no clean-up); `Review.rules.ts` and `Suggest.rules.ts` themselves on the list (least churn, but a
    new clean-up anywhere in 1,575 lines would pass); or everything into `CellReading.rules.ts` (no new file on the
    list, about 1,000 lines).
+3. Where does `skuKey` (`Item.read.ts`) go? It is the key two rows are compared by (spaces out, upper case), never
+   shown as a fix, and every caller (the review, the in-memory twin, the host's row writer, 22 places) needs it at
+   once in pure code. As a schema transformation it would need `S.decodeSync`, which the type-check refuses. Options:
+   move it to its own file `Item/SkuKey.rules.ts` on `exemptions` for clean-ups (recommended: one function, its
+   reason written beside it); or decode the key once where a SKU enters (each staged row and each stored item
+   carries `skuKey: SkuKey`), which changes the staged and stored row shapes. No row's outcome changes either way.
 
 ## Acceptance
 

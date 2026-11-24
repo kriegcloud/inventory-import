@@ -25,7 +25,8 @@ export type ReadMessage = Data.TaggedEnum<{
     /** Every sheet of a workbook and the one that was read, so the person can pick another; null for a CSV. */
     readonly workbook: { readonly sheets: ReadonlyArray<SheetSummary>; readonly chosen: SheetChoice } | null
   }
-  Chunk: { readonly seq: number; readonly rows: ReadonlyArray<StagedRow> }
+  /** The rows in the form the wire carries them: a cell's `shown` is an `Option`, which does not survive the copy. */
+  Chunk: { readonly seq: number; readonly rows: ReadonlyArray<typeof StagedRow.Encoded> }
   Done: {}
   /** The file's problem as its plain fields: a class does not survive the copy between threads. */
   Refused: { readonly problem: Pick<FileProblem, "kind" | "fileName" | "problem" | "todo"> }

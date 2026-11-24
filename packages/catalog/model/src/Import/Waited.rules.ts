@@ -9,6 +9,7 @@
 // became, whatever it reads, only one she named as it is: a save that sends exactly what is stored changes nothing of
 // it but is his decision of the row too. Where the record does not say, the row is not written.
 import * as A from "effect/Array"
+import { identity } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -209,7 +210,10 @@ const leftByMatches = (
   const moved: ReadonlyArray<Field> = asked ? A.filter(otherFields, (field) => stale(field)) : []
   const after = (field: Field): ReadonlyArray<Taken> =>
     // What the matches took of this field of the row, when they took any: read as none or one list.
-    A.filter(R.get(record.taken, keyOf(field, rowId)).pipe(A.fromOption, A.flatten), (taken) => taken.at > made)
+    A.filter(
+      O.match(R.get(record.taken, keyOf(field, rowId)), { onNone: A.empty, onSome: identity }),
+      (taken) => taken.at > made
+    )
   const unsure = A.some(moved, (field) =>
     A.some(after(field), (taken) => !O.exists(taken.from, (from) => from === saved))
   )

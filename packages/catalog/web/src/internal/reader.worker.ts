@@ -4,9 +4,12 @@ import { stringify } from "@inventory/ui/Json"
 // so the content security policy's `script-src 'self'` covers it; never a blob: worker, which the policy blocks (a
 // library that made one hung here). It runs the same `readSpreadsheet` the tests run, then trims the table to what
 // the server stages and hands it to the page in the chunks the server stores. Every file takes this path.
+import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Result from "effect/Result"
+import * as S from "effect/Schema"
+import { StagedRow } from "@inventory/catalog-contract/Staged"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
 import { readSpreadsheet } from "./spreadsheet/read.ts"
@@ -14,6 +17,15 @@ import { ReadMessage, type ReadRequest } from "./protocol.ts"
 import { stageTable, stagingProblem } from "@inventory/catalog-model/Staging"
 
 const post = (message: ReadMessage) => self.postMessage(message)
+
+// An Option loses its prototype in the copy between threads (protocol.ts), so a chunk crosses in the form the wire
+// carries, and the page decodes it with the same schema.
+const encodeChunk = S.encodeOption(S.Array(StagedRow))
+
+const crashed = (file: File) =>
+  ReadMessage.Crashed({
+    message: `"${file.name}" could not be read. Try again, and reload the page if it keeps happening.`
+  })
 
 /** The file cannot be staged: its problem goes to the page as plain fields. */
 const refuse = (problem: FileProblem) =>
@@ -49,7 +61,10 @@ const read = ({ file, sheet }: ReadRequest) =>
         columnCount: head.columns.length
       })
       if (O.isSome(problem)) return refuse(problem.value)
-      const chunks = uploadChunks({ rows })
+      const encoded = O.all(A.map(uploadChunks({ rows }), (chunk) => encodeChunk(chunk)))
+      // Rows the reader made always encode: a chunk that does not is the reader's own failure, not the file's.
+      if (O.isNone(encoded)) return post(crashed(file))
+      const chunks = encoded.value
       // The server refuses a chunk or a head over this size with the same words; saying it here sends nothing.
       if (stringify(head).length > maxChunkChars) {
         return refuse(fileProblem.tooLong({ fileName: head.fileName, part: "headings" }))
@@ -73,11 +88,5 @@ const read = ({ file, sheet }: ReadRequest) =>
 
 self.onmessage = (event: MessageEvent<ReadRequest>) => {
   // The reader itself broke (not the file): a sentence about the page, not a problem with the file.
-  read(event.data).catch(() =>
-    post(
-      ReadMessage.Crashed({
-        message: `"${event.data.file.name}" could not be read. Try again, and reload the page if it keeps happening.`
-      })
-    )
-  )
+  read(event.data).catch(() => post(crashed(event.data.file)))
 }

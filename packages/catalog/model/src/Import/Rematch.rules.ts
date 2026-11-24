@@ -451,7 +451,10 @@ export const comparisonsChanged = (input: {
   const named = A.getSomes(
     A.map(changed, ({ question, pins }) => {
       // The row judged alone, when it was: read as none or one list of judgements.
-      const own = A.flatMap(R.get(aloneOf, question.rowId).pipe(A.fromOption, A.flatten), (row) => row.pins)
+      const own = A.flatMap(
+        O.match(R.get(aloneOf, question.rowId), { onNone: A.empty, onSome: identity }),
+        (row) => row.pins
+      )
       return O.map(
         O.orElse(
           A.findFirst(pins, (pin) => A.some(own, (one) => one.field === pin.field)),

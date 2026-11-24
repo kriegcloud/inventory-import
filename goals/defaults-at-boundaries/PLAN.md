@@ -42,9 +42,22 @@ Places by package on 2026-11-23, from the baseline:
 
 ## Where the pilot stands
 
-Baseline: 1,687 places in 204 files, down from 2,120 in 248; no line names the catalog's contract, model or host.
-Benjamin answered the last round on 2026-11-23 (SPEC, questions 4 to 6). Checked: `bun run check`, the two slow
-tests that write 50,000 rows (`WriteLimits`, `MatchAtomic`), and the rest is in the line below once it has run.
+Done on 2026-11-23. Baseline: 1,687 places in 204 files, down from 2,120 in 248; no line names the catalog's
+contract, model or host. Benjamin answered the last round the same day (SPEC, questions 4 to 6).
+
+Checked: `bun run check` and `bun run check:full` on the final tree, the Verify lock equal to `main`'s, the two slow
+tests that write 50,000 rows, and on screen on a fresh database: `items_messy.csv` reviewed as 24 Needs a decision,
+21 Cannot import and 155 Ready of 200; "Import 155 items" stored 155; the result reads Imported 155, Not imported 45,
+Already there 0; the Items page says "155 items"; D1 holds 155 for Example Works (test). A read-only review of the
+diff on four lenses (behaviour, performance, SQL, tests), each finding put to a skeptic, confirmed nothing.
+
+Not checked: a number filter typed with spaces round it ("  12 ") on screen; the slow tests cover the filter.
+
+**The app was broken between commits.** From `9f3a850f` to `9bc8f64e` every upload failed with "The file was not
+saved": a staged cell's `shown` became an Option, and the reader worker's `postMessage` drops what makes it one. No
+test crossed the worker, so every check passed. The fix encodes a chunk in the worker and decodes it in the page;
+`ChunkCrossing.test.ts` holds the round trip. Each lane after this one runs an import on screen before it commits a
+change to a schema that the browser sends.
 
 ## Choices made along the way
 
@@ -95,6 +108,10 @@ tests that write 50,000 rows (`WriteLimits`, `MatchAtomic`), and the rest is in 
 - **A group's rows are read where they are, never copied.** `A.fromOption` then `A.flatten` over a group copied it
   on every row, which took a review of 50,000 rows from 1.2 s to 70 s and the slow tests past their limit. `O.match`
   to the group itself, with `A.empty` for none, brought it back to 1.2 s (measured against a copy of `main`).
+
+- **What crosses `postMessage` is in the wire's form.** An Option, a class or a Data value loses its prototype in a
+  structured clone. The head's sheet crossed as a name or null; a chunk of rows now crosses encoded by `StagedRow`'s
+  schema and is decoded in `Upload.controller.ts`.
 
 ## Evidence
 

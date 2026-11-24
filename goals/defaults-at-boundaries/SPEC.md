@@ -164,13 +164,13 @@ All answered on 2026-11-23, each as recommended
       with its reason.
 - [ ] SF-3's, SF-4's and SF-5's own checks (their `rg` lines) find nothing in any package in scope outside schema
       definitions and named exemptions.
-- [ ] `bun run check:full` passes; `git diff main -- packages/catalog/model/test/Catalog.lock.json` is empty, or
+- [x] `bun run check:full` passes; `git diff main -- packages/catalog/model/test/Catalog.lock.json` is empty, or
       changed only on Benjamin's word.
-- [ ] The messy sample stores 155 items through Confirm, and the result screen, the Items table and the stored rows
+- [x] The messy sample stores 155 items through Confirm, and the result screen, the Items table and the stored rows
       agree, seen on screen.
-- [ ] `.claude/agents/backend.md`, `.claude/agents/frontend.md` and `CLAUDE.md` state the rule and name the law;
+- [x] `.claude/agents/backend.md`, `.claude/agents/frontend.md` and `CLAUDE.md` state the rule and name the law;
       `.agents/skills/README.md` says which of the skills' paths do not exist here and what stands in for each.
-- [ ] VERDICTS.md matches the code; "Defaults nobody decided" has been put to Benjamin; PLAN.md says what was done,
+- [x] VERDICTS.md matches the code; "Defaults nobody decided" has been put to Benjamin; PLAN.md says what was done,
       what was checked and what was not.
 
 ## Decisions

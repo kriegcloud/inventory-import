@@ -50,7 +50,8 @@ const table: StagedTable = {
   rows: A.map(["BBB-0001", "BBB-0002", "BBB-0003"], (sku, index) => ({
     rowNumber: index + 2,
     cells: A.map(headings, (heading) => ({
-      text: heading === "sku" ? sku : heading === "name" ? `Rope ${index}` : heading === "category" ? "packaging" : "1"
+      text: heading === "sku" ? sku : heading === "name" ? `Rope ${index}` : heading === "category" ? "packaging" : "1",
+      shown: O.none()
     }))
   }))
 }

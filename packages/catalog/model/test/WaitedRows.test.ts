@@ -44,7 +44,7 @@ const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => (
   notes: [],
   rows: A.map(lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
+    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
   }))
 })
 

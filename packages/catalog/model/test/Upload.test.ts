@@ -7,13 +7,13 @@ import * as S from "effect/Schema"
 import { chunkProblem, uploadChunks } from "../src/Staging/Upload.rules.ts"
 import { chunkRows, piecesCarry } from "@inventory/catalog-contract/Upload"
 describe("pieces", () => {
-  const rows = A.makeBy(1_201, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}` }] }))
+  const rows = A.makeBy(1_201, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}`, shown: O.none() }] }))
 
   it.prop(
     "splits any file into pieces of at most 500, in order, losing none, that the server accepts as a whole",
     { count: S.Int.check(S.isBetween({ minimum: 1, maximum: 3_000 })) },
     ({ count }) => {
-      const file = A.makeBy(count, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}` }] }))
+      const file = A.makeBy(count, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}`, shown: O.none() }] }))
       const pieces = uploadChunks({ rows: file })
       expect(A.every(pieces, (piece) => piece.length >= 1 && piece.length <= chunkRows)).toBe(true)
       expect(A.flatten(pieces)).toEqual(file)

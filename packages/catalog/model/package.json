@@ -33,6 +33,7 @@
     "./Staging": "./src/Staging/Staging.rules.ts",
     "./Mapping": "./src/Review/Mapping.rules.ts",
     "./CellReading": "./src/Review/CellReading.rules.ts",
+    "./CellRules": "./src/Review/CellRules.rules.ts",
     "./NotImported": "./src/Review/NotImported.rules.ts",
     "./ItemSearch": "./src/Item/ItemSearch.rules.ts",
     "./ItemEdit": "./src/Item/ItemEdit.rules.ts",

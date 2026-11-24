@@ -8,6 +8,7 @@ import { plural } from "../Words.rules.ts"
 import { type Review, type ReviewedRow } from "../Review/Review.rules.ts"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
+import { filledAt } from "../Review/CellRules.rules.ts"
 import {
   type NewSuggestion,
   Suggestion,
@@ -113,12 +114,7 @@ export const digest = (source: SuggestSource) => {
             filled: column.filled,
             examples: A.take(
               A.dedupe(
-                A.filter(
-                  A.map(source.table.rows, (row) =>
-                    Str.slice(0, 40)(Str.trim(row.cells[column.index]?.shown ?? row.cells[column.index]?.text ?? ""))
-                  ),
-                  (text) => text !== ""
-                )
+                A.map(A.getSomes(A.map(source.table.rows, (row) => filledAt(row, column.index))), Str.slice(0, 40))
               ),
               3
             )

@@ -1,7 +1,9 @@
 // A file as it is staged for review: the fields of an item a column can fill, and the table of typed cells, its
 // columns and its notes. The one thing not to break: a staged cell is what the file said, never a corrected value.
+import { identity } from "effect/Function"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { nullAsNone } from "@inventory/kernel/Wire"
+import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
 import { MAX_COLUMN } from "@beep/xlsx/XlsxAddress"
 
 /** The fields of an item, in the order the screens list them. */
@@ -105,9 +107,9 @@ export const maxPart = 9_999
 /** One cell as the reader found it: `text` with nothing coerced, and `shown` when Excel displays it differently. */
 export const StagedCell = S.Struct({
   text: bounded(32767).annotateKey({ description: "The cell's value as text, nothing coerced", examples: ["120"] }),
-  shown: S.optionalKey(bounded(32767)).annotateKey({
-    description: "What Excel displays, when that differs from the value; left out otherwise"
-  })
+  shown: bounded(32767).pipe(
+    absentAsNone({ description: "What Excel displays, when that differs from the value; left out otherwise" })
+  )
 }).annotate({
   identifier: "StagedCell",
   description:
@@ -115,6 +117,15 @@ export const StagedCell = S.Struct({
 })
 /** The decoded value of `StagedCell`: one cell as the reader found it. */
 export type StagedCell = typeof StagedCell.Type
+
+/**
+ * What a cell shows the person: what Excel displays when that differs from its value, else its value. A CSV cell has
+ * no display of its own, so it shows its text.
+ *
+ * @example shownText({ text: "45306", shown: O.some("2024-01-15") }) // "2024-01-15"
+ */
+export const shownText = (cell: StagedCell): string =>
+  O.match(cell.shown, { onNone: () => cell.text, onSome: identity })
 
 /**
  * One data row of the file. `rowNumber` is the row the person sees in Excel: a row's identity, and, with its part,

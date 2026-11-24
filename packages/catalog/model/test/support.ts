@@ -52,7 +52,7 @@ export const tableOf = (input: { readonly fileName: string; readonly lines: Read
   notes: [],
   rows: A.map(input.lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
+    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
   }))
 })
 

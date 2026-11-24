@@ -81,6 +81,11 @@ export const exemptions: ReadonlyArray<DefaultsExemption> = [
     why: "a file cell's reader: its clean-up is a proposal the person sees as before and after"
   },
   {
+    file: "packages/catalog/model/src/Review/CellRules.rules.ts",
+    kinds: ["normalise"],
+    why: "the text a file cell gives the review: its trim is a proposal the person sees as before and after (Benjamin, 2026-11-23)"
+  },
+  {
     file: "packages/catalog/contract/src/Item/SkuKey.rules.ts",
     kinds: ["normalise"],
     why: "the key two rows are compared by, never shown as a fix; pure callers need it at once, and a schema decode would need S.decodeSync (Benjamin, 2026-11-23)"

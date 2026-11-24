@@ -6,6 +6,7 @@ import { review } from "@inventory/catalog-model/Review"
 import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { matchedByHeading } from "@inventory/catalog-contract/Mapping"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import { fiveLines, type Line, tableOf } from "./support.ts"
 
 const ready: ReadonlyArray<Line> = A.take(fiveLines, 3)
@@ -51,7 +52,7 @@ describe("Suggest fixes is offered", () => {
     const noted: StagedTable = {
       ...table,
       columns: [...table.columns, { index: table.columns.length, letter: "H", label: "Internal Notes" }],
-      rows: A.map(table.rows, (row) => ({ ...row, cells: [...row.cells, { text: "ask purchasing" }] }))
+      rows: A.map(table.rows, (row) => ({ ...row, cells: [...row.cells, { text: "ask purchasing", shown: O.none() }] }))
     }
     const current = review({ table: noted, choices: [], decisions: {}, storedItems: [] })
     expect(A.map(current.unusedColumns, (column) => column.label)).toEqual(["Internal Notes"])

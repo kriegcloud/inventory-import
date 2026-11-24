@@ -40,9 +40,12 @@ const table: StagedTable = {
   rows: [
     {
       rowNumber: 2,
-      cells: A.map(["AAA-0001", "Oak Crate", longCategory, "XX", "12.50", "10"], (text) => ({ text }))
+      cells: A.map(["AAA-0001", "Oak Crate", longCategory, "XX", "12.50", "10"], (text) => ({ text, shown: O.none() }))
     },
-    { rowNumber: 3, cells: A.map(["AAA-0002", "Steel Bolt", "packaging", "EA", "3", "4"], (text) => ({ text })) }
+    {
+      rowNumber: 3,
+      cells: A.map(["AAA-0002", "Steel Bolt", "packaging", "EA", "3", "4"], (text) => ({ text, shown: O.none() }))
+    }
   ]
 }
 const marcus = as("mem_marcus")
@@ -115,10 +118,16 @@ layer(TypedApp)("a row whose cell is thousands of characters long", (it) => {
             ...table,
             fileName: "long-place.csv",
             rows: [
-              { rowNumber: 2, cells: A.map([longSku, longName, "packaging", "XX", "1", "1"], (text) => ({ text })) },
+              {
+                rowNumber: 2,
+                cells: A.map([longSku, longName, "packaging", "XX", "1", "1"], (text) => ({ text, shown: O.none() }))
+              },
               {
                 rowNumber: 3,
-                cells: A.map(["AAA-0003", "Steel Nut", "packaging", "EA", "3", "4"], (text) => ({ text }))
+                cells: A.map(["AAA-0003", "Steel Nut", "packaging", "EA", "3", "4"], (text) => ({
+                  text,
+                  shown: O.none()
+                }))
               }
             ]
           }

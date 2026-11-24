@@ -23,11 +23,11 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
     columns: A.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
     rows: A.map(table.rows, (row) => ({
       rowNumber: row.rowNumber,
-      cells: A.map(row.cells, (cell) =>
-        cell.shown === undefined || cell.shown === cell.text
-          ? { text: cell.text }
-          : { text: cell.text, shown: cell.shown }
-      )
+      // What Excel shows is kept only where it differs from the value.
+      cells: A.map(row.cells, (cell) => ({
+        text: cell.text,
+        shown: O.filter(O.fromUndefinedOr(cell.shown), (shown) => shown !== cell.text)
+      }))
     })),
     notes: keptNotes(table.notes)
   }

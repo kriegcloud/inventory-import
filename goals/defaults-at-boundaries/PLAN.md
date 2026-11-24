@@ -25,7 +25,7 @@ Places by package on 2026-11-23, from the baseline:
 | --- | --- | --- | --- | --- |
 | 0 | The packet; `emptyWhenLeftOut` in `@inventory/kernel/Wire` | — | this session | done |
 | 1 | `packages/catalog/contract` (src and tests) | 41 | this session, by hand | done: `skuKey` in its own exempt file, `Item/SkuKey.rules.ts` (SPEC, question 3) |
-| 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | doing |
+| 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | doing: the text a file cell gives the review is read in `Review/CellRules.rules.ts`, exempt for clean-ups only (SPEC, questions 1 and 2) |
 | 3 | `packages/catalog/host` | 20 | this session, by hand | todo |
 | 4 | Agent files, `CLAUDE.md`, the skills README, `docs/patterns.md` and `docs/kit.md` examples | — | this session | todo |
 | 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | todo |

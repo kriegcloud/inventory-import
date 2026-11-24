@@ -9,15 +9,7 @@
  *
  * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
  */
-import {
-  Field,
-  StagedRow,
-  StagedTable,
-  fields,
-  fieldLabels,
-  requiredFields,
-  StagedCell
-} from "@inventory/catalog-contract/Staged"
+import { Field, StagedRow, StagedTable, fields, fieldLabels, requiredFields } from "@inventory/catalog-contract/Staged"
 import { Confidence, Change, typedChange, acceptedProposal, appliedByRule } from "@inventory/catalog-contract/Change"
 import { RowId } from "@inventory/catalog-contract/Ids"
 import {
@@ -72,7 +64,8 @@ import {
   suggestionField as suggestionFieldOf,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
-import { keepSome, matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
+import { cellAt, filledAt, reviewText } from "./CellRules.rules.ts"
+import { keepSome, matchColumns, totalRowNumbers } from "./Mapping.rules.ts"
 import { plural } from "../Words.rules.ts"
 import {
   rowId,
@@ -84,21 +77,6 @@ import {
   hasKeep,
   StoredChoice
 } from "@inventory/catalog-contract/Decision"
-
-/** Fields read from a cell's stored text, not from what Excel shows: a cost from the digits, a date cell as ISO. */
-const storedTextFields: ReadonlyArray<Field> = ["unitCost", "firstReceivedOn", "discontinuedOn"]
-
-/**
- * The text of a cell as the review reads it. A cost is read from the stored digits, so a cost Excel shows as
- * "$3.65" but stores as 3.6549 is held, not rounded, and a date cell from its stored date (ISO), whatever format
- * Excel shows it in. Everything else is what the person sees: a SKU stored as 123 with a five-digit format is
- * "00123". Spaces round a value are kept: trimming them is a proposal.
- */
-const cellText = (field: Field, cell: StagedCell | undefined): string => {
-  const text = cell === undefined ? "" : A.contains(storedTextFields, field) ? cell.text : (cell.shown ?? cell.text)
-  // A cell holding only spaces is an empty cell: the screen then says "Empty" instead of showing nothing.
-  return Str.trim(text) === "" ? "" : text
-}
 
 const preferredOf = (vendors: ReadonlyArray<Vendor>): ReadonlyArray<Vendor> =>
   A.filter(vendors, (vendor) => vendor.isPreferred)
@@ -478,23 +456,24 @@ const makeContext = (input: {
   readonly suggestions?: ReadonlyArray<Suggestion> | undefined
 }): Context & { readonly totals: ReadonlyArray<StagedRow>; readonly unusedColumns: ReadonlyArray<UnusedColumn> } => {
   const mapping = matchColumns(input)
-  const columnOf = (field: Field): number | null =>
-    O.getOrNull(
-      O.map(
-        O.flatMap(
-          A.findFirst(mapping, (match) => match.field === field),
-          matchedColumn
-        ),
-        (column) => column.index
+  const columns = ofEachField((field): O.Option<number> =>
+    O.map(
+      O.flatMap(
+        A.findFirst(mapping, (match) => match.field === field),
+        matchedColumn
+      ),
+      (column) => column.index
+    )
+  )
+  const totalNumbers = totalRowNumbers({ table: input.table, skuColumn: columns.sku })
+  // A field with no column reads as an empty cell, as a cell the row ends before does.
+  const read = (row: StagedRow): Readonly<Record<Field, string>> =>
+    ofEachField((field) =>
+      reviewText(
+        O.flatMap(columns[field], (index) => cellAt(row, index)),
+        field
       )
     )
-  const totalNumbers = totalRowNumbers({ table: input.table, skuColumn: columnOf("sku") })
-  const columns = R.fromEntries(A.map(fields, (field) => [field, columnOf(field)] as const))
-  const read = (row: StagedRow): Readonly<Record<Field, string>> =>
-    ofEachField((field) => {
-      const column = columns[field]
-      return column === null || column === undefined ? "" : cellText(field, row.cells[column])
-    })
   const itemsOf = input.itemsOf ?? itemsOfRow
   const fileRows = A.filter(input.table.rows, (row) => !A.contains(totalNumbers, row.rowNumber))
   // Each row of the file is behind at least one item: a row that holds none is one entry, part 0, never dropped.
@@ -553,7 +532,7 @@ const makeContext = (input: {
       A.filter(input.table.columns, (column) => !A.contains(used, column.index)),
       (column) => ({
         ...column,
-        filled: A.filter(fileRows, (row) => Str.trim(shownText(row.cells[column.index])) !== "").length
+        filled: A.filter(fileRows, (row) => O.isSome(filledAt(row, column.index))).length
       })
     )
   }

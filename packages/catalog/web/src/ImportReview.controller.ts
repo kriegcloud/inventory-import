@@ -3,6 +3,7 @@
 // *given the decisions so far*, because the region re-checks a row only after the person types, not after they
 // accept a fix.
 import * as O from "effect/Option"
+import { filledAt } from "@inventory/catalog-model/CellRules"
 import {
   Choice,
   Fix,
@@ -276,9 +277,8 @@ const order: ReadonlyArray<Field> = [
 const samplesOf = (table: StagedTable, index: number): ReadonlyArray<string> => {
   const seen: Array<string> = []
   for (const row of table.rows) {
-    const cell = row.cells[index]
-    const text = (cell?.shown ?? cell?.text ?? "").trim()
-    if (text !== "" && !seen.includes(text)) seen.push(text)
+    const text = filledAt(row, index)
+    if (O.isSome(text) && !seen.includes(text.value)) seen.push(text.value)
     if (seen.length === 3) break
   }
   return seen

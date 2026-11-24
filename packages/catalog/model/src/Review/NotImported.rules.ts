@@ -5,7 +5,8 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { StagedTable } from "@inventory/catalog-contract/Staged"
 import { rowPlace } from "./Review.rules.ts"
-import { keepSome, shownText } from "./Mapping.rules.ts"
+import { shownAt } from "./CellRules.rules.ts"
+import { keepSome } from "./Mapping.rules.ts"
 
 const csvCell = (cell: string): string => (/[",\r\n]/.test(cell) ? `"${Str.replaceAll('"', '""')(cell)}"` : cell)
 
@@ -27,7 +28,7 @@ export const notImportedCsv = (input: {
   const byNumber = R.fromEntries(A.map(input.table.rows, (row) => [`${row.rowNumber}`, row] as const))
   const body = keepSome(input.rows, (held) =>
     O.map(R.get(byNumber, `${held.rowNumber}`), (row) => [
-      ...A.map(input.table.columns, (column) => shownText(row.cells[column.index])),
+      ...A.map(input.table.columns, (column) => shownAt(row, column.index)),
       rowPlace(held),
       held.reason
     ])

@@ -39,7 +39,10 @@ const tableOf = (lines: ReadonlyArray<ReadonlyArray<string>>): StagedTable => ({
   headerRowNumber: 1,
   columns: A.map(headings, (label, index) => ({ index, letter: "A", label })),
   notes: [],
-  rows: A.map(lines, (line, index) => ({ rowNumber: index + 2, cells: A.map(line, (text) => ({ text })) }))
+  rows: A.map(lines, (line, index) => ({
+    rowNumber: index + 2,
+    cells: A.map(line, (text) => ({ text, shown: O.none() }))
+  }))
 })
 
 const draft = ImportId.make("00000000-0000-4000-8000-000000000001")

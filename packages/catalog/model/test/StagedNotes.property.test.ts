@@ -100,7 +100,11 @@ describe("a staged file's notes", () => {
           columns: A.map(staged.columns, (column) => ({ ...column, header: column.label })),
           rows: A.map(staged.rows, (row) => ({
             rowNumber: row.rowNumber,
-            cells: A.map(row.cells, (cell) => ({ ...cell, type: "text" as const }))
+            cells: A.map(row.cells, (cell) => ({
+              text: cell.text,
+              type: "text" as const,
+              ...O.match(cell.shown, { onNone: () => ({}), onSome: (shown) => ({ shown }) })
+            }))
           })),
           notes: read
         }

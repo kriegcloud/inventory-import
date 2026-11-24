@@ -54,8 +54,8 @@ here when it is.
 
 ## Current blocker
 
-None. Steps 1 to 13 are done. The remote branch stands at `722b08a1`, as this checkout last saw it; every commit
-after it is local, the CI job for gate 9 among them. The push, and so that job's first run, are Benjamin's.
+None. Steps 1 to 13 are done. Benjamin pushed the branch on 2026-11-23 and it is pull request 8. The CI job for
+gate 9 failed on its first run there; the closing note's last paragraph says why and what was changed.
 
 `origin/main` was merged into this branch on 2026-11-23 (commit `91e1b413`), and six laws that came with it
 refused code this goal wrote: `diagnostics:check` (15 `@effect-diagnostics` directives), `defaults:check` (25
@@ -390,8 +390,8 @@ side's list of no-term reasons is made from the written side's.
 
 - The law keeps its own lists of the helpers' and makers' names; nothing ties them to what the two modules export.
   A helper added under a new name is not seen by rule 6 until the list is edited. Backlog, not fixed.
-- The CI job `reason` has never run on GitHub: the remote branch stands at `722b08a1`, which has no such job, and
-  the commits after it are not pushed.
+- When this note was written the CI job `reason` had never run on GitHub. "After the close", below, has its
+  first run.
 - Not built: SHACL over the stored rows, alignments, any term beyond the thread's, the party slice (SPEC's
   Non-goals; the party slice is the brief's slice 1).
 
@@ -407,3 +407,13 @@ side's list of no-term reasons is made from the written side's.
 - A reviewer that cannot start Java can still review gate 9: its verdicts are decided in `src/Reason.ts`, apart
   from the script that runs the machine. Keeping the decision out of the script is what made it readable and
   testable without ROBOT.
+
+**After the close.** The branch was pushed on 2026-11-23 (pull request 8) and the job `reason` failed on its first
+run, at commit `ceb6abf8`, in 17 seconds: "reason FAIL gate 9, the reasoner stopped: ENOTDIR: not a directory,
+posix_spawn '/usr/lib/jvm/.temurin-11-jdk-amd64.jinfo/bin/java'". GitHub's runner keeps files beside the Javas in
+`/usr/lib/jvm`, the script asks every entry there for its version, and a spawn under a file does not fail as an
+error the script caught: it stopped the run. The script now counts that as a command that did not start, as it
+does one that is missing. Seen here before and after with `JAVA_HOME` set to a file: the same stop before, all five
+runs after. The step-13 print of a stop that is no refusal is what made the log say this in one line. The Preview
+check failed on the same push for a reason outside this goal: the deploy found no Cloudflare token and no preview
+password, which are Benjamin's to set.

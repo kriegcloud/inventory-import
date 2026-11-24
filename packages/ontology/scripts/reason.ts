@@ -84,7 +84,10 @@ const machine = Effect.gen(function* () {
           onSome: (ran) => ran
         })
       ),
-      Effect.catch((error) => Effect.succeed({ code: 1, stdout: "", stderr: "", error: String(error) }))
+      Effect.catch((error) => Effect.succeed({ code: 1, stdout: "", stderr: "", error: String(error) })),
+      // A place that cannot hold a command at all (a file where a folder was expected, as GitHub's runner keeps in
+      // /usr/lib/jvm) stops the spawn itself: that too is a command that did not start, not a stop of the gate.
+      Effect.catchDefect((stopped) => Effect.succeed({ code: 1, stdout: "", stderr: "", error: String(stopped) }))
     )
 
   /** What `java -version` says there, or none when nothing answers. It prints to the error stream. */

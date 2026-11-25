@@ -275,7 +275,7 @@ export class ProductionPlan extends S.Opaque<ProductionPlan, { readonly brand: u
     address: ProductionAddress.pipe(S.annotateKey({ description: "Where the stage answers" })),
     seeds: S.Tuple([]).pipe(S.annotateKey({ description: "No seed file: production holds people's own data" })),
     modelKey: fromVariable("OPENROUTER_API_KEY", "The model's key, read from this variable at deploy"),
-    signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy"),
+    signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy; unset, closed"),
     deployed: S.tag(true)
   }).pipe($I.annoteSchema("ProductionPlan", { description: "What production gets" }))
 ) {}

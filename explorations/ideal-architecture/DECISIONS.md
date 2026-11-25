@@ -427,6 +427,13 @@ This narrows I8 for staging only: an email I name may be stored there. Known: st
 who can push a branch here can reach that person's account on staging; today only I can push. Rejected: share a
 test account's login. Reverse: delete the secret, deploy staging again, and delete the invited account.
 
+### 2026-11-25 — production's sign-up list is a secret
+
+Question: production read its sign-up list from a GitHub variable, which the public deploy log prints. Mine: keep
+the emails out of the log, as on staging. The production job now reads the `production` environment's secret
+`SIGN_UP`; unset, sign-up is closed. The variable the repository's stack writes stays, for the setup command, and no
+deploy reads it. Reverse: point the job at `vars.SIGN_UP` again.
+
 ### 2026-11-19 — infra I9, Workers plan
 
 Question: which Workers plan? Answer: "Workers Paid, $5 a month (Recommended)". Rejected: Workers Free, measure

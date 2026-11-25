@@ -195,6 +195,8 @@ export default Alchemy.Stack(
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: productionAccount
     })
+    // Kept for the setup command, which reads it back as the list a run again keeps; the deploy job reads the
+    // production environment's secret `SIGN_UP` instead, set by hand, so the public log never prints an email.
     yield* GitHub.Variable("ProductionSignUp", {
       ...repository,
       environment: production,

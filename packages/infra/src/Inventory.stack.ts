@@ -50,7 +50,9 @@ const secretOf = (variable: string) =>
 
 const textFrom = Effect.fnUntraced(function* (source: StagePlan["signUp"]) {
   if (source.from === "nowhere") return O.none()
-  return yield* Config.option(Config.String(source.variable))
+  // An empty variable is no list: a workflow writes an unset GitHub variable as "".
+  const given = yield* Config.option(Config.String(source.variable))
+  return O.filter(given, (text) => text !== "")
 })
 
 /**

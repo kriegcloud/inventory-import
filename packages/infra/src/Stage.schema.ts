@@ -245,7 +245,7 @@ const ProductionAddress = S.Struct({
   zone: S.tag(production.zone).pipe(S.annotateKey({ description: "The zone the host name is on" }))
 }).pipe($I.annoteSchema("ProductionAddress", { description: "Production's host name on its zone" }))
 
-/** A variable of the deploying process that production reads, named once here. */
+/** A variable of the deploying process that a stage reads at deploy, named once here. */
 const fromVariable = <const Name extends string>(variable: Name, description: string) =>
   S.Struct({ from: S.tag("environment"), variable: S.tag(variable) }).pipe(S.annotateKey({ description }))
 
@@ -254,7 +254,8 @@ const rehearsalSeeds = S.Tuple([S.Literal("organizations"), S.Literal("accounts"
   S.annotateKey({ description: "The seed files applied after the migrations, in order" })
 )
 
-/** The fields of a stage that is a rehearsal: on workers.dev, the test accounts, no model key, sign-up closed. */
+/** The fields of a stage that is a rehearsal: on workers.dev, the test accounts, no model key, sign-up closed (staging
+ * alone replaces the last with the owner's list). */
 const rehearsal = {
   address: OnWorkersDev.pipe(S.annotateKey({ description: "Where the stage answers" })),
   seeds: rehearsalSeeds,
@@ -280,7 +281,9 @@ export class ProductionPlan extends S.Opaque<ProductionPlan, { readonly brand: u
 ) {}
 
 /**
- * Staging, main's head once its check passed: a rehearsal, deployed.
+ * Staging, main's head once its check passed: a rehearsal, deployed. Unlike the other rehearsals it reads a sign-up
+ * list at deploy, so the owner can let a named person make a real account there (decision "staging, invited
+ * sign-up"); with the variable unset or empty, sign-up stays closed.
  *
  * @category models
  */
@@ -289,6 +292,7 @@ export class StagingPlan extends S.Opaque<StagingPlan, { readonly brand: unique 
     kind: S.tag("staging"),
     stage: S.tag("staging").pipe(S.annotateKey({ description: "The stage's name" })),
     ...rehearsal,
+    signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy; unset, none"),
     deployed: S.tag(true)
   }).pipe($I.annoteSchema("StagingPlan", { description: "What staging gets" }))
 ) {}

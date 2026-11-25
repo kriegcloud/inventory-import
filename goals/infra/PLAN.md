@@ -54,7 +54,8 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   defect with a sentence saying what to type, because a stack's only typed failure is a missing setting.
 - **Nobody signs up on a preview or a test stage** (Benjamin: "Nobody; test accounts only"). Both are seeded with
   the two test organizations and the five test accounts, name no sign-up source, and so run closed; no real email is
-  stored outside production. Only production's GitHub environment holds `SIGN_UP`.
+  stored on them. Production's GitHub environment holds `SIGN_UP`; staging's may, for a person Benjamin invites
+  (decision "staging, invited sign-up").
 - **A deployed stage's test accounts take a password minted for that stage** (Benjamin: "Password minted per
   stage"). The seeded rows keep the hash of the repository's password, so nothing is generated at deploy but one
   random value: the stack mints `TEST_ACCOUNT_PASSWORD` and the Worker decides which password is held against a

@@ -418,6 +418,15 @@ GitHub until deleted there.
 Question: who may make an account on the public address? Answer: "Close sign-up; I add accounts (Recommended)".
 Rejected: leave sign-up open; behind Cloudflare Access. Reverse: open sign-up again in the sign-in settings.
 
+### 2026-11-25 — staging, invited sign-up
+
+Question: may a person I name make a real account on staging, so someone outside can try the app with their own
+login? Mine: "Real account for him". Staging now reads `SIGN_UP` from the `staging` environment at deploy, as
+production does; unset or empty, sign-up stays closed. This narrows I8 for staging only: an email I name may be
+stored there. Known: staging shares the previews' Cloudflare token (2026-11-22, "Keep sharing, say so"), so anyone
+who can push a branch here can reach that person's account on staging; today only I can push. Rejected: share a
+test account's login. Reverse: delete the variable, deploy staging again, and delete the invited account.
+
 ### 2026-11-19 — infra I9, Workers plan
 
 Question: which Workers plan? Answer: "Workers Paid, $5 a month (Recommended)". Rejected: Workers Free, measure

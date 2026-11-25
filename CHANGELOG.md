@@ -1,0 +1,581 @@
+# Releases
+
+## v0.7.0 — 2026-11-25
+
+Added
+
+- staging takes an invited sign-up list, so a named person can make a real account there
+- the defaults law names the files that keep places on purpose, and counts a default on a parameter
+- the defaults law counts getOrElse and || before a value
+- the item table refuses a cost that is not digits and a key that is not its SKU's
+- a law and an edit hook hold absence, starting values and clean-ups to the schemas
+- bun run check refuses a file of screens that exports more than components
+- the prover reads X.make, and every file builds with it
+- bun run check refuses helpers that take their subject last and properties that are not readonly
+- the prover reads a schema's own guards, through a third patch to it
+- bun run check refuses type assertions, Promises and @effect-diagnostics directives
+- a moment as D1 stores it sorts as text the way it does in time
+- previews and staging deploy with the owner's own Cloudflare token, which the repository's stack writes and no longer makes
+- the stacks ask 1Password for their secrets through Alchemy's provider, and no deploy runs under `op run`
+- infra setup takes the previews' account from a token and an id the owner names in a git-ignored file
+- infra setup works out which Cloudflare account is production's from the zone, shows both roles and asks
+- `bun run beep infra setup` does the owner's by-hand deploy steps as one command he runs
+- no try statement anywhere, held by try:check; one module for browser storage
+- patches to a dependency, one file a defect, each with its header and the test that fails without it
+- production deploys after CI on a tagged release branch, checked by main's copy of the guard; an edited pick is accepted and named
+- scratch:check refuses @ts-ignore and lets @ts-expect-error stand
+- production deploys only from a release tag, after its guard and approval; main deploys staging
+- a staging stage, and the repository's stack holds the release rules
+- bun run release cuts a release branch from main and tags it, and a patch tags a fix cherry-picked from main
+- a diagnostic is turned off only by the one line, first in a decide file
+- the scratchpad leaves the workspaces and keeps its own lockfile
+- no home path or private folder may be named in the scratchpad
+- the review of an import as a model, with an act on a group of rows decided as one unit
+- deps:update says what moves each held dependency
+- a scratchpad to try an idea against the repository's packages, with templates that already run
+- nothing may import from the scratchpad, and the laws on how code is written leave it out
+- deps update moves every package's dependencies, and names what is held with its reason
+- version-sync holds every repeated version and date to its one source
+- config-sync writes the configuration that follows from the workspaces
+- a save may say what a row that waited may be written over, and a take-back says what was matched
+- a refused row keeps a closed tab's decision beside it, a tab whose rows were taken up says so, and picking the column a field reads takes nothing back
+- the check refuses a deprecated API, read from every file's types
+- an import not found says which organization it was looked for in, and four answers recorded
+- a match keeps and names what it took back, judges a row that stops reading as changed, and gives up busy in words
+- the view carries what each match took back, madeOn is bounded, and a draft too busy to work out is a typed refusal
+- each tab keeps and sends only its own waiting rows, and takes up rows only from a tab that is gone
+- a re-match takes back the keep-or-replace, keep-one-of-two and undone fix that rested on the column, in the same atomic batch as an accept
+- the decisions held instead of sent are listed above the review, each with its choice
+- what kind of decision a re-match took back travels with each one taken back
+- rows that wait are kept and sent again, a closed import names them, and a save names what it was made on
+- a confirm names the draft it was made on, and is refused when somebody has changed the import since
+- a save of decisions says whether it changed anything, and the screen no longer counts on from one that did not
+- the review region holds its state in atoms, and the atoms lint is on for the review
+- the import's steps, the Items page and the assistant hold their state in atoms, and the atoms lint is on for the catalog
+- ui's own pieces hold their state in atoms, and the atoms lint is on for them
+- a sign-out lets go of every read held, and a switch keeps the person's reads
+- the app's shell holds its state in atoms, and the atoms lint is on for the app
+- a refused edit is taken back at once, and a page opened again shows its rows while it asks again
+- the access screens hold their state in atoms, and the atoms lint is on for them
+- the client keeps each API read per member and shares one record of what changed
+- the client's API, optimistic writes and member as atoms, with the registry at the root
+- every preview's test accounts take one given password, never minted and never printed
+- a production deploy with no model key stops and names the missing reference
+- a deployed stage's test accounts take a password minted for that stage
+- a preview has the test accounts and no sign-up; no real email leaves production
+- laws effect-imports as a command, checking and repairing as the script did; the last script deleted
+- vendor sync as a command, writing the kit byte for byte as the script did; the script deleted
+- quality strict as a command in the six packages that run it; its script deleted
+- vendor check and docs check as commands; their two scripts deleted
+- the app's and the repository's Alchemy stacks, and the deploy workflow; nothing deployed
+- laws boundaries, laws screens and laws keys as commands; their three scripts deleted
+- @beep/repo-cli, the repository's rules as commands, with quality ceilings and laws exports ported and their scripts deleted
+- @beep/infra's stage plan: what each stage gets, decided from its name
+- sign-up is closed in production; the owner names who may make an account
+- the test organizations and accounts are seeds, so a production database starts empty
+- a reader's warning is shown on the Review step, above the table, before the person imports
+- the app reads workbooks through @beep/xlsx; the SheetJS reader is removed
+- the workbook reader over @beep/xlsx, beside the SheetJS reader and equal to it
+- @beep/xlsx reads a workbook, counts its sheets and streams a sheet's rows
+- @beep/xlsx's schemas: addresses, serials, cells, the workbook, options and findings
+- Suggest fixes is offered for a heading no field reads
+- @inventory/access-web holds the session controller, sign-in, People and the audit events
+- @inventory/access-host holds the access context on D1 and Better Auth
+- @inventory/access-model holds the access rules, ports, twins and handlers
+- @inventory/access-contract holds the session, people and audit-trail contract
+- @inventory/client holds the browser's seam to the API; a check holds the package boundaries
+- @inventory/review holds the review region and its saved progress
+- @inventory/ui holds the components, their hooks, the theme and the shared screen pieces
+- @beep/openrouter answers through effect/ai; the Vercel AI SDK is gone
+- @beep/better-auth builds Better Auth and looks sessions up; the app signs in through it
+- @beep/d1 runs every statement through Schemas; the tests use D1Test
+- @inventory/kernel holds the shared language; the app imports it
+- Csv.decodeSchema decodes a byte stream into typed rows through the header view
+- the app reads CSV with @beep/csv; papaparse is removed
+- @beep/csv, a canonical CSV table codec
+- "Why flagged?" explains the flagged rows on screen, each named with every reason and what is proposed
+- the Upload screen lists the files imported before, each a link to its result
+- every confirmed import is reachable from Activity, a clean file's too
+- Activity and People are on the data table, with the search box, sortable headings, quick filters and the column toggle
+
+Fixed
+
+- production reads its sign-up list from a secret
+- staging reads its sign-up list from a secret, so the public deploy log never prints an invited email
+- a decision made again over her own on its way is no live press once a newer picture came, and the server judges it
+- a past reason is read exactly only where that shows everything the pairing showed
+- the defaults law is told its exemptions, so a test in a made-up tree is not failed for this repository's files
+- a ban's ledger line at a moved file's old name is only taken off when the new name has a line of its own
+- a ban's ledger line left at a moved file's old name says where it went, and git's words are trimmed
+- a reason holds room back for its closing count only when a sentence is left off
+- a reason keeps every sentence whenever they fit, and says a long one by its start only when they do not
+- the defaults law lists main's files from the empty tree, reads names git quotes, and takes gone from its own list
+- a long stored reason is quoted again as the review quotes, and one bound holds every reason
+- a move lends its ledger number only while the law lists no file at its old name, and a wider reader still compares with main
+- an exemption is held against the files that are there, and its reversal is said as it is
+- a defaults baseline says what was counted, so one written for less is not held against the fuller one
+- a long stored reason keeps every problem it names, its long quoted values shortened
+- a reason says a long value by its first 80 characters and its length, and a confirm cannot fail on a reason
+- a row with a long cell is written as its plan says, and a past import's long reason reads cut short
+- the Worker's entry is the one place an Effect runs as a Promise, and the files cleaned come off the ledgers
+- the item table holds a SKU only in the contract's form, with itself as its key
+- a piece of a list is cut at the exact bytes of its JSON, and the helpers that cut it take the value first
+- a past import's outcome rows read as any version wrote them, and every plan the review makes is written
+- a signing secret has 32 characters, the public address is an http(s) origin, and a stage never takes the repository's password
+- the allowance's window is the store's to work out from the moment of the call
+- an outcome row's reason and who decided follow its status
+- LEDGER_BASE reaches only the laws in CI and no test, and the defaults baseline refuses a line for a file that is gone
+- the defaults baseline is held against main's, CI's ledger base survives gh failing, and a ledger-only refusal says so
+- CI hands the ledgers only a base HEAD holds, from push runs alone, and the docs say how the base is chosen
+- a push's ledgers are compared with the last passing run, and CLAUDE.md and the scratchpad doc stop prescribing what the bans refuse
+- the ledgers read git's records whole, check every commit of a push, and refuse a shallow checkout
+- the ledgers compare with where the branch left main, and the dual, Promise and readonly readers close the gaps the review found
+- the bans count places and hold their numbers against main's, and read only what is ours
+- the assertion ledger lets go of the four files strict-core cleaned
+- staging keeps the sheet's layout notes before its number-format notes, and its notes are checked whole
+- a confirm's plan holds no reason a store cannot write, and names its bounds once
+- the bans hold each listed file at its count, read edited registry code, and drop the rule that refused the prescribed edge
+- staging keeps the reader's warnings before its information notes, and says so when one is dropped
+- a stored file opens with every note it has, and only an upload's head is held to 1,000 notes
+- the Promise law reads types, and the shape laws read every kind of property and every non-dual helper
+- a staged note may name every row of its file, and staging keeps notes in bounds and says so
+- a staged file's notes are bounded, and an upload's pieces must carry its rows
+- a decision read from its flags in code is what decoding them reads
+- a recorded moment has a four-digit year, so its text sorts as the moments do
+- an item's cost and dates are drawn as values an item may hold, so a generated item never runs out
+- the Promise law reads Promise however it is reached, and the bans hold their profile and lists by contents
+- the review's points on the plan, the sync property and the token check
+- infra setup ends a quoted reference only at the apostrophe before op's colon
+- a saved decision names only fields and row ids, each once, and a junk value cannot change a row's outcome
+- the Items facets count every item once in each list, and a range is there exactly when items are
+- an item is written with its SKU's key, and every JSON piece holds rows its statement's schema accepts
+- an import's result counts are the rows of each outcome and add up to the rows of the file
+- a confirm is a write only with one id for each row its plan creates
+- infra setup reads Cloudflare and 1Password ids only in their own formats
+- an upload's cut-off and every bound moment are instants, its id and key their brands
+- a staged row is numbered from 1, and a staged file's columns, cells, notes and upload counts are bounded
+- a sync plan names files inside the repository and stretches that start before they end and never meet
+- a confirm's plan refuses a row that is not a row of the file, and a left-out or skipped row with no reason
+- a stage's plan is one case per kind, so production can never be seeded or a personal stage deployed
+- infra setup ends a quoted name only at its own kind of quote, so "James' token" stays one name
+- infra setup's quoted names end at a quote op follows with a delimiter, and the profile stop names every refused word
+- infra setup reads op's words outside the names it quotes, and the profile stop calls an unclear line either
+- infra setup tells a locked or unapproved 1Password from a refused reference, and its dry run says every stop a run makes on the two files
+- an accepted proposal counts as the person acting on a stored row, and an open import's card wraps to show both counts
+- a row the person typed a value on or chose to replace is not put away as already there when a cell of it stops reading
+- a row whose SKU reads and is stored is already there on a later load, and an open import's card names what cannot be imported apart
+- infra setup tells 1Password refusing from an app it never reached, and its dry run says what a run would
+- infra setup says who did not answer, and stops on a previews' account with no workers.dev subdomain
+- a group's undo from a screen that has not received every change is held, not applied
+- infra setup's dry run with no size prints every size's steps, and the token's names are read by the stacks' last-line rule
+- a row's undo from a screen that has not received an undo on the row is held, not applied
+- infra setup takes the last line of a name across op.env and op.env.local, as the stacks do
+- infra setup stops a production run when cf cannot name the zone's account, and reads references from the file the stacks take them from
+- infra setup stops before any tool on a variable that would outrank what it checks, and its questions name the account the profile holds
+- the slow mutant's longer limit is set in its copy, and the runner refuses an empty run
+- a press sent twice is answered as the first time after a group act or a reopening, and the checks around it say what they hold
+- infra setup deploys only into the account its questions name, and the stacks' 1Password entry sees a workflow's CI
+- version-sync names a catalogued version once, and scratch:check reads a block comment as the compiler does
+- a press drawn before an undo is held, a copy is answered as the first time, and each rule says what it reads
+- scratch:check reads comments with a parser, and version-sync names a version beside the catalog
+- the model's proofs are a required check, and the pin's check runs in check
+- a mutant is held by a rule only when the proof names the rule
+- an undo sent twice is answered as the first time
+- a refused pick of a draft that closed comes back beside a closed tab's decision of the row, and neither is dropped
+- a patch is proved needed by itself, and no task runs on an install that is behind the patches
+- scratch:check reads a stray file in a workspace's folder and a directive after a tag or `++`
+- five orderings the draft's properties met, each pinned; a refused decision is not sent again from a closed tab
+- the deploy's head checks read only the ref named exactly, and the workflow test holds each guard's whole script
+- the review's model holds five more presses from a screen that is behind, and says what happened
+- the release guard compares every commit with main, the release commit's content, each release under a tag and the branch's own line; production asks again after the approval
+- scratch:check reads every file an experiment owns, and only real directives
+- a press that matches what the row holds is held when its screen is behind a group
+- a save's answer that comes after its draft closed accounts for a row once, on the revision she decided it
+- scratch:check reads the files the compiler lists, and @ts-nocheck in any capitals
+- a retried hang fails the run, the reporter names no cause, the CLI's slow tests keep their own cache, and the documents say what GitHub holds
+- the deploy workflow's test reads the parsed file and runs its shell guards; each deploy waits in its own group; staging deploys only main's head
+- the release guards judge against origin/main, refuse merges and a stale branch, and the deploy guard holds them again on the tagged commit
+- a covered press from a screen that is behind is refused and held, not lost as no change
+- scratch:check reads every file the type-checker reads, and refuses @ts-nocheck
+- a package's fast and slow tests each keep their own vitest module cache, and the scratchpad its own
+- a pick refused as decided since comes back as a line though the draft it went out from has ended
+- a press over a group that leaves the row reading as it reads is no change, and the group's undo applies
+- each package keeps its own vitest module cache, and the merged tests' own limits say what was measured
+- the review while who is signed in is asked again waits for what it looks at, and each test is a new browser
+- each package keeps vitest's module cache in its own folder
+- the scratchpad's experiments each keep their own cache and port, and scratch:test runs only the one named
+- config-sync keeps comments, never repoints a ./ path, and derives only what it can derive
+- version-sync settles in one write, reads no comment as a place, and leaves look-alike values alone
+- a test's own limit says what was measured, the kit and the scratchpad use the shared limits, and the grid step runs after a red check
+- every test that passes only on a later try is named, and a test that ran out of time is not tried again
+- the boundaries law sees every way into the scratchpad, and its cache key changes with what it reads
+- deps:update installs once, after every file is written, and puts them back when the install fails
+- Node's types are held at the Node CI runs, and version-sync names any other major
+- the data grid's browser check migrates the local database before it starts the server
+- a tool's output is read without colour, so CI and a terminal read the same text
+- the draft machine on one model: the server decides whether a row that waited is written, and every line says only what is true
+- a waited row is never written over a decision a colleague saved since, the value already stored included
+- tests that wait in real time are tried again, and CI runs one test worker at a time
+- the tags and refs laws end on any file they can read, and refuse one past their budget in words
+- a move of the Alchemy pin that fails puts its files back, and the state store's upgrade is said as it happens
+- the check runs on four cores as four cores can carry it, and a test's limit is sized for the slowest machine
+- the Verify template runs on the pinned prover
+- a held dependency shows the registry's newest, and a figure is not read as a version
+- syncpack reads every package.json, and the app's wrangler schema is found
+- a page learns at once when somebody else signs in in another tab, and a row that waited is judged from what each match recorded
+- the CLI's start-up budget is held in processor time, so a busy CI runner does not fail it
+- the deprecated-API law reads a disable comment to its end, and its cache hashes what it says it does
+- the data grid's typing is checked for focus, and its browser check runs in CI and cannot pass unseen
+- a row that waited is written only over a decision its sender knew, and a match that moves two fields judges the row whole
+- a page found to be somebody else's is loaded again, the workspace stays drawn while who is signed in is asked, and a review stays when it cannot be read again
+- typing on a data grid cell keeps the key that opens its editor, in every column
+- the deprecated-API law reads every code file, and no comment or profile entry turns it off
+- the data grid lets the browser type the key that opens a cell's editor, document.execCommand being deprecated
+- the deprecated-API law claims only what it holds: an override in its profile is not read
+- the sign-in and the assistant's forms take React's SubmitEvent, FormEvent being deprecated
+- a row put back is never dropped by a save's answer, a row decided elsewhere holds the confirm, and the signed-out note promises only this tab
+- the refs law follows a name once per path, the suggestions guard counts only whole suggestions, and a match's held answers start afresh when the columns change
+- another member's press only redraws, a new owner's rows are kept, a blocked confirm says why, and sends wait for the session's answer
+- the redraw is never a fresh picture, another tab's decision held beside this tab's keeps both, a busy save waits, and no hand tag is exempt
+- a waiting row is checked against a fresh picture before it goes on every path, holds follow the server, and each tab's state lives in atoms
+- rows taken up from a tab that is gone are kept under this tab's key until the server has them
+- a refused save keeps its rows with the reason, a waiting row decided elsewhere is held for the person, and a held-back confirm never waits for a picture nobody brings
+- a confirm never sends its rows to a closed import or drops rows decided while it was out, and each row names its own revision
+- an item edited again before the table is read again is saved on the revision its last save answered with
+- a match is one write with its stamp and the accepts it takes out, and a save is written only on the choices it was checked against
+- the review asks again for an answer no older than the server's answer to its last write, not its sending
+- a refused read shows its failure over a given answer, a late landing keeps another read's hold, and the once more ends no request
+- a read that is out is no longer ended by a save's answer; the answer a screen gives is an atom
+- the review region starts again whenever what the screen shows changes without the person
+- a save that outlives its row is still seen by the row that comes back, and "Edit again" opens on what was typed
+- the items filters list their values again; cells are made once, the filters' values travel on copies
+- the items columns are made once; a read let go while shown asks again; the lint and the plan say what is true
+- a save sends the rows the person changed; the review's draft is one pure transition, tested over every ordering
+- a review that has gone takes its Undo toasts with it; the edit form and the row height read once again
+- a second search or sort in the review reaches the rows again
+- a saved decision no longer asks for the import again, nor works the review out a second time
+- an answer given to a read goes with the read, and a removed import leaves nothing behind
+- an item's editor atoms go with its row
+- the table assistant changes nothing after the person has left the table, and stays where they scrolled
+- an open row editor keeps its place when the Items filters are read again
+- a file dropped beside the upload box is taken, not opened by the browser
+- the review never shows or sends less than was decided, by the person or by someone else
+- an edit whose row leaves the screen is still saved, and leaves nothing marked on its way
+- a step with nothing to open wraps in the Activity panel instead of being cut to one line
+- an edit's description says its limit before saving, and Edit again reopens the editor
+- LiteralKit imports @beep/utils subpaths, so Worker code uses it again
+- the first file on a cold dev server is not lost to a dependency reload
+- bring main's flaw fixes up to the type-check profile
+- a row whose stored item differs asks "Keep or replace", not "Choose sku"
+- taking back an import puts back the stored items it replaced, as they were before
+- Items can be filtered by Active and Lot tracked, its headings read whole, and the review's filter merges spellings that differ only by capitals
+- quantities in the review carry their row's unit, and an empty one shows the default it is imported as
+- a .txt that is not a table, such as a letter with commas in it, is refused with a message
+- on a phone every view of the review is on screen, and a reason shows in full
+- the vendors form opens with what a cut-off cell holds, and the vendors question names vendors instead of showing JSON
+- a name suggested by the model shows who suggested it, Why? and Reject, and a weak guess waits for a typed name
+- a discontinued yet active row offers both answers, not active or no discontinued date
+
+Faster
+
+- the review's rows are drawn without a walk back up the list, and the order is worked out once per change
+
+Changed underneath
+
+- the one reason a plan holds reuses the count's words, the schema's own check and the review's sentence
+- what sign-in offers is an Option from the answer to the screens
+- absence is read through Option or drawn from a schema
+- the staged head is read and written by the contract's codec, and the items a confirm writes generate only valid values
+- a field's problem is an Option, and the tests read absence without unwrapping it
+- a field's problem is read data first or in a pipe
+- the gallery routes, the early answers and the month gallery read text through effect/String
+- the sidebar, the workspace, the form helper and the galleries read lists through effect/Array
+- the Worker's entry chooses fetch, and the tests answer the app's requests out in Effect
+- the Worker's answers are Effects, run only at its entry
+- no type assertions in the hosts, drivers and app
+- the model reads a stored head through the contract's StagedHeadJson
+- the stored head's JSON codec is the contract's StagedHeadJson
+- an item's day is checked against the calendar once
+- a file's staging problem is an Option, and the pieces are checked once, by the contract
+- the review builds a value for each field with no type assertion
+- an upload start's declaration guards with the wire's own check
+- the model tells a literal domain by its kit, and its ports test has no diagnostic turned off
+- no count of an import is negative by its state's schema, not by a rule of its own
+- the model has no type assertion, and one copy of each small helper
+- the review's model tells every case by its schema's own guard
+- infra and tooling hold no @effect-diagnostics directive and no type assertion
+- no type assertion in the kernel and the two contracts
+- the vendored data table is on atoms, held by a lint of its own
+- the review's virtual list and its table are given their options where the lines and rows are worked out, never during a draw
+- the Items toolbar's Category and UoM read their values from an atom, and every cell is a component made once
+- the upload under way and the chosen workbook are atoms, and a package may import only what it declares
+- the row height and the saved progress are atoms the browser's storage is read and written through
+- a tagged value's case is told by its type's own guard or match, and a law refuses a _tag compared by hand
+- the review's facets filter its rows in an Effect atom; the table keeps its sort and search only
+- TanStack Query is gone; every read, write and screen state is an atom
+- what the review region works from is an atom of its caller, and what it shows is derived from atoms
+- the screens law builds its findings with the union's constructors; the sign-in test layer yields its answers
+- the review's tagged enums are told apart by their own guards, and its documents say atoms
+- the list table, the search box, the cell forms and the result's rows are scoped and derived atoms
+- the review region is scoped, derived atoms; its caller passes atoms and reads the decisions there
+- viewRows reads a row's decision as an Option, so A6 has no exception
+- what a chosen file is goes to its reader through one exhaustive match
+- the review's cell marks, column matches, lines and other answers are tagged enums
+- the review's actions are a tagged enum, and its state says absence with Option
+- review decisions read a row's place through the union's guards
+- each rule returns typed findings, a tagged union of its own, and one renderer prints them; output unchanged
+- the Effect imports of the workbook reader's review and tests, each module from its own path
+- the drivers' and the file readers' Effect imports, each module from its own path
+- the kernel, client, review and design system's Effect imports, each module from its own path
+- the catalog packages' Effect imports, each module from its own path under its one name
+- the access packages' Effect imports, each module from its own path under its one name
+- the app's Effect imports, each module from its own path under its one name
+- the Activity page's decisions and imports lists are the catalog screens'
+- a view change is a closed union with show and hide apart, and an upload's state is the screens'
+- the review's rules are four files, and the cell readers and the search rules leave the contract
+- the catalog asks a model, the allowance and its stores through ports
+- the catalog's screens are their own package
+- the catalog's ports, endpoints and D1 adapters leave the app
+- the catalog's rules are their own package
+- the catalog's contract is its own package
+- the catalog's ids are branded, and a malformed one is refused by its schema
+- a unit cost is a decimal in code and its shortest digits on the wire
+- a suggestion is a union by what it is for, and says who made it
+- a changed value is a union by how it came to stand
+- a row's decision has a place and a stored choice in code, and its flags on the wire
+- an edit an item cannot hold is refused by its schema, as a 400 naming the field
+- cancelling an upload answers a union, and removing an import answers 204
+- the table assistant says who answered with the contract's one value
+- how a field's column was found is a union: by its heading, by a person, or not at all
+- a row of the result is a union by outcome, and who decided is its own value
+- an item's stocking is one value: active, inactive or discontinued on a day
+- an absent catalog value is Option in code and null on the wire
+- the catalog's timestamps are instants in the contract and the rows read from SQL
+- the session answer is a union by status; a person carries an id, Option and an instant
+- the components no longer import the app
+- server and browser schema fields carry their words on the key
+- contract fields carry their words on the key
+- domain fields carry their words on the key
+- the browser code imports effect/Schema as S
+- the server imports effect/Schema as S
+- the contract imports effect/Schema as S
+- schemas import effect/Schema as S and annotate struct fields by key
+
+Documents
+
+- CLAUDE.md keeps main's wording outside the model's blocks, and two defaults are recorded as decided
+- the Promise law counts five findings of misused Promises
+- the import's opening note, the patch's class note and the mutant count say what the code does
+- the Promise law no longer names the sidebar among the handlers that return a Promise
+- CLAUDE.md says the test Promise list is examples, and that the defaults baseline is compared with main's
+- CLAUDE.md names the six new bans and reads a binary sample without a diagnostics comment
+- a staging outcome's example names the upload's start as its payload
+- a decision's flags are read in one place, whether they came from the wire or the browser's own code
+- the review's comments name the row the person acted on as the exception to already there
+- a row the person acted on waits when a cell of it does not read, as chosen
+- CLAUDE.md names both differences between proofs:nightly by hand and the nightly, as docs/verify.md does
+- a group's undo is refused ReviewMovedOn only where it would otherwise be taken, and the page says the order
+- CLAUDE.md lets an agent run infra setup with --dry-run only, and says how proofs:nightly differs from the nightly
+- the AI key's 1Password reference is named by its field, not by the vault that holds it
+- the table of rules is read by its test, and a row's undo taken from behind is said as it stands
+- CLAUDE.md says no agent runs `infra setup`, and lists it and `bun run release` with the commands
+- the alchemy-domain brief reads the review's model at 53654e6, with UndoneSince on a row's act, MatchedSince on a row's undo, and every rule name as the lock has it
+- what the mutants cost and how they stand, as measured on the model now
+- the alchemy-domain brief reads the review's model as it stands, 136 rules proved in kind, hold-when-behind built, and says where the live numbers are
+- the alchemy-domain packet carries no suggestions across a deploy, says nothing of what is pushed, and names the two patched limits of the pin
+- the alchemy-domain packet starts empty, with no adoption of stored data, and settles what several people at once leave open by Benjamin's one rule
+- the alchemy-domain packet after main's releases and deploys, with the order of the exits held by two stories and three mutants
+- the alchemy-domain packet on the model of every answer, with the covered press checked before it is no change
+- the vendored kit moves to atoms too, the data table first; the seeded properties take the shared limit
+- releasing and deploying, and what Benjamin does by hand for staging and the first release
+- releases and deploys, as decided: trunk, release branches, tags, staging, approval, the app's version
+- the job's time on the tree with main merged, pinned to four and two cores
+- the no-change answer, the lock with the library's proved list, and the screen's rules for move 3
+- the job's time on the merged tree, pinned to four and two cores
+- the alchemy-domain packet on Benjamin's latest answers, and on what is built at the pin
+- Benjamin's answers on the review's model, and the lock, the fold and the mutants as built
+- the retry decision as he made it, and each hand-set limit with its measurement
+- the answers on the catalog, Node's types and Better Auth, and the scratchpad in CLAUDE.md
+- Benjamin's answers on a keep and its rivals, a group taken back over a changed row, and waiting acts
+- what Verify proves of the review and what tests hold, three rules to break, and the lock file
+- the alchemy-domain packet states the proof split where it gives counts, and its open points by number
+- the alchemy-domain brief describes the model Benjamin chose, proved with a story for every command
+- three answers on the review's model: a can-happen rule for each command, the library's lock file, and where the proofs run in CI
+- the answers on the Alchemy build, where it is kept, the model's names and what is shown on Wednesday
+- how the check runs on CI, what a test's limit is for, and two things the measuring found
+- trying an idea in the scratchpad, and the decisions behind it
+- the three commands that keep versions and configuration in step
+- the alchemy-domain brief names today's code as it is, and the model his answers describe
+- no try statement anywhere in the repository, as decided; not built yet
+- Benjamin's answers on a group of rows and on what the proofs cover
+- what the grid's fix covers, what is not decided, and whose judgement the looser script projects are
+- a group of rows decided as one unit, trialled for decision 7 of the alchemy-domain brief
+- the Replace across two fields, the save tried again and the busy title are no longer known wrong
+- CLAUDE.md names the deprecated-API check, the configuration type-check and the grid's browser check
+- the tags check reads every src and test folder, and refuses a tag built by hand
+- what is known wrong in a review open in two tabs or by two people
+- .agents is left out of the deprecated-API check by decision, and the check says so
+- the alchemy-domain brief on a fourth round of trials, with Benjamin's answers of 2026-11-22
+- the data grid's typing as decided, and what was measured in which browser
+- the data grid's opening-key change is recorded as built and not decided
+- a Replace already saved on an import matched before moves were kept is left as made
+- a saved Replace on an import matched before moves were kept is built as is, and not decided
+- the vendored data grid's execCommand, as decided and as built
+- a held row and a refused row hold the confirm, and earlier take-backs are shown to everyone
+- the deprecated-API check, what it reads and what it cannot see
+- the plan and the decisions say what the code does, and what is built but not decided
+- the alchemy-domain brief on a third round of trials, with the review proved in its hosted shape
+- the third review's round in the plan, the G2 entry as built, and the match's comment and the contract's busy causes as the code does
+- group 3 built, each answer's Built line, and the plan's round for the second review
+- group 3 decided, the seven answers on rematches, kept rows and refused saves
+- what the code does, where the plan, the standard and a comment said otherwise
+- the plan records the save counted from its answer and the match made atomic with the stale-accept check
+- the plan records the merge's groups: what was built, the three faults fixed, and the rule put to the lead
+- the plan's 50,000-row measures, four runs a side, say what they show
+- the plan records the draft review, Benjamin's answers of 2026-11-20, and what the old property did not hold
+- the alchemy-domain brief rewritten on a second round of trials, after its review
+- the review region's guide says when the page's decisions atom outlives the region
+- the plan records step 8 and the goal's final proof on a fresh database
+- the plan and the review table's documents say what the region, the search box and the law are now
+- the brief states Benjamin's two answers on today's contract, and what the model does with each
+- the brief for the app on @alchemy.run/domain, with review-decision saving modelled first
+- the atoms plan says what the rework and the review of step 7 became, with its measures and what was seen
+- the Alchemy domain packet, every concept of the library with how this app would use it
+- the atoms plan says what the step 6 review found and how each was fixed, and the counts it had wrong
+- open the atoms goal, with the lint every moved web package extends
+- the infra plan after Benjamin's three answers: previews, the minted password, the model key
+- the infra brief names the boundaries rule where it now lives
+- Benjamin's answers on the tooling CLI: merged locally, findings as tagged unions, the three differences kept, the kit reworded now
+- the infra plan records the production build seen in the browser
+- atoms A6, the review's actions become a tagged enum when the review package moves
+- the goal tooling-cli opened, and Benjamin's answers T1 to T8 on its brief
+- the brief for a tooling CLI package, and the ten scripts as commands on it; nothing built
+- Benjamin's answers on the Effect import migration; effect/Number is Num and the check accepts only that
+- Benjamin's answers on the atoms brief
+- Benjamin's answers on the infra brief, the Review headings and the order of work
+- the standard for Effect imports, beep-effect's rules: each module whole from its own path under one name
+- the brief for atoms: no React state hooks where an atom can be used, and no useEffect at all
+- the brief for infra, written and not opened
+- the second browser pass for the workbook reader: the three sentences, displayed text, Cancel, dark theme
+- Benjamin's answers on the workbook reader, and the notice that its formats follow SheetJS
+- the goal beep-xlsx closed, with its browser pass and what differs from the brief
+- the xlsx brief matches, X3 answered, and the goal beep-xlsx is open
+- Benjamin's answers on the xlsx brief, with X3 left open
+- the brief for @beep/xlsx, written and not opened
+- the browser pass for what had not been seen, the last proofs, and the goal closed
+- the documents name the catalog packages, and the goal's closing note
+- documents name the access packages where they named the app's files
+- the ui-packages goal is done; documents name the new packages
+- goals ui-packages and contexts opened; Benjamin's answers recorded
+- briefs for the goals ui-packages and contexts (steps 6 and 7)
+- AI is turned off in development by a line appended to a backed-up .dev.vars
+- the goal kernel-drivers is done; SPEC ticked with its proof, PLAN closes it
+- goal kernel-drivers opened; Benjamin's answers recorded
+- BRIEF-kernel-drivers.md for the goal kernel-drivers (step 5)
+- the guides point to the schema-first standard
+- the goal beep-csv is done; SPEC ticked with its proof, PLAN records the choices
+- open the goal beep-csv from its brief
+- the beep-csv brief's sketch follows the schema-first standard
+- the schema-first standard, each rule with its check and a tried example
+- brief for the goal beep-csv, a canonical CSV table codec
+- open the workspace-and-strictness goal and the packet scheme
+- DECISIONS says what was fixed after the hour, what was decided, and what remains
+
+Tests
+
+- her own decision on its way, its answer lost with a reload, may go again though a closed tab was refused the same
+- a closed tab's decision taken up beside her own press no longer makes her next decision of the row wait
+- a past reason cut at a cell's edge is read as the character decides
+- the defaults law's quoted-name and move tests give the law the exemptions of their own repositories
+- the room a reason keeps for its closing count is pinned to the character
+- a rename from a name git quotes, a moved file over its own line, and an empty tree git cannot make each have a test
+- a SKU and a name a full cell long are left out, stored and read back whole
+- the workspace's key and the sample files' names are read with no fallback
+- the batch property runs 30 batches with room for a loaded machine
+- an upload's key in the model's tests is drawn from the contract's UploadKey
+- say what holds the order of the counted batch
+- a numbered component is folded into its original exactly when both say the same thing
+- the breach check's stand-in is installed by name and read from its own record of calls
+- no test reads the disk or opens SQLite itself
+- each answer of a batch is its own statement's rows, decoded by its own result Schema
+- a test upload's key is a fresh version 4 UUID, as the browser's is
+- the note on notes not kept is read for its two numbers exactly
+- the 29th of February is drawn in centuries, in years that divide by 400, and in every fourth year
+- facets counting one item past a stock number's bound are drawn, not one fixed example
+- the Items facets' tops are each refused, and the rules others imply are named
+- a drawn cost and a drawn day are read back without the schema's own checks
+- every rule of the Items facets has a refusal of its own
+- every rule of an import's result is seen to refuse a result that breaks it
+- every rule of the Items facets is seen to refuse facets that break it
+- the fold's rows decide on fields of an item, as a saved decision may only name
+- both begins of the abandoned-upload property fall where their cut-off is a stored moment
+- the model's import ids and upload keys are version 4 UUIDs, as the screen makes them
+- the fold sends presses from a screen that is behind, and a row's undo under a later group
+- the deploy workflow's test holds what every step and job is told, and runs the tag line's exact match
+- the session tests wait on the page's own clock, and a wait that never ends fails by name
+- the rules are held by the lock and by Verify's require.proved, and by no list of ours
+- the scratchpad's template test copies the shared test limits into its temporary repository
+- the model's mutants, each one change to a decide that a proof or a story must notice
+- the fold's property is a task of its own, and says where the model and today's review differ
+- which rules the model has is the lock's; the tests hold how each one stands
+- the Better Auth schema check runs in the loop check
+- the model holds what the review region decides, for one person and for two
+- a session test waits for the save it expects, up to two seconds, not for one fixed 20 ms
+- a save's answer is expected whole, with the rows decided since
+- answer 6 on the screen, the quick return's silence, and the tests whose names said more than they held
+- the request left to land before a write is given a read slow enough for a busy machine
+- main's lines in two review fixtures and tests are back as he wrote them
+- the tags law's refused example builds its keyword, so the search for the statement finds none
+- the twin refuses a confirm another save overtook, and a quick return finds the region started again
+- a read let go after its screen left is not kept again, and removing an import leaves an address that names it
+- a remove empties the import's draft and forgets its workbook, and leaves another import's alone
+- the Worker's test of a save sent twice parses again
+- the region's atom undoes and redoes, a gone region reaches nobody, and the decisions start once
+- the CLI's start-up is held to a budget; the goal tooling-cli closed with its proofs and timings
+- @beep/xlsx's round-trip laws and the SheetJS oracle
+- the review's and the readers' tests live with the catalog screens
+- every port of the catalog has an in-memory twin, and its endpoints are tested over them
+- tests import effect/Schema as S
+
+Upkeep
+
+- the assertion ban's lists after the two merges: eight clean files come off
+- keep @alchemy.run/1password as a file, from the commit already pinned
+- one catalog for the versions more than one package states
+- the CLI's slow test runs without a second vitest configuration
+- moving the Alchemy pin is one command that re-runs what depends on it
+- the check runs version-sync and config-sync, and deps:update is a root script
+- the Alchemy packages are pinned to the head of the library's main and kept as files
+- the three diagnostics the language service added are errors, as in beep-effect's profile
+- the Effect language service moves from 0.70.0 to 0.73.2, and tsrs with it
+- Effect and its packages move from 4.1.4 to 4.1.5
+- every test and configuration file has a TypeScript project a linter or an editor finds
+- AnsweredBy and every finding of the laws are constructors read with match, and the tags, refs and boundaries laws close their holes
+- refs, tags and boundaries laws refuse the forms that slipped past them, and every hand tag is a constructor
+- updating deps
+- a law refuses a ref callback made on each draw (laws ref-callbacks, refs:check)
+- the atoms lint refuses the hooks that do not come from react by the usual names
+- the vendored kit's provenance lines, READMEs and records name the vendor commands, not the deleted scripts
+- bun run check fails on a wrong Effect import
+- a check and a repair for Effect imports (imports:check, imports:fix), not yet part of bun run check
+- the check holds every package with screens to both stylesheet lists
+- the Drizzle agent skill is removed
+- the vendored kit carries MIT, as its LICENSE files in beep-effect say
+- restore the skills from beep-effect, and scan for keys at the root
+- clear the timed-build tooling and rename the starter to inventory
+
+Other
+
+- the app's screens are type-checked with every Effect rule on
+- the Vite configuration reads its settings through loadEnv and imports no Node module
+- the fold and the mutant sample join the model's job, and every mutant runs every night
+- the model's proofs and search have a job of their own, and run every night with nothing replayed
+- Record the csv brief, schema form and kit licence decisions
+- vendor the used subset of beep-effect's kit packages, hash-checked
+- Record the packet and CSV decisions
+- adopt beep-effect's type-check profile, staged
+- move the app to apps/inventory in a bun + Turborepo workspace
+- Record four more architecture decisions
+- Add the ideal-architecture exploration
+- Add skills from beep-effect
+- Inventory import, as submitted for a one-hour take-home (v0.6.1)

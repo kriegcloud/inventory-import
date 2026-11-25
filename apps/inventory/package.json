@@ -1,6 +1,6 @@
 {
   "name": "@inventory/app",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "description": "Bulk import of inventory items from a messy .csv or .xlsx, with a review you can trust",
   "type": "module",

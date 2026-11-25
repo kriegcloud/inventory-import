@@ -607,8 +607,12 @@ const hasDecision = (several: ReadonlyArray<O.Option<RowDecision>>, one: O.Optio
 
 // -- The parts of a decision a match takes back, and when each was made ----------------------------------------------
 
-/** Which of a decision's parts rest on a column: each accept and undone fix by its field, the stored answer, the keep. */
-const partsOf = (change: O.Option<RowDecision>): ReadonlyArray<string> =>
+/**
+ * Which of a decision's parts rest on a column: each accept and undone fix by its field, the stored answer, the keep.
+ *
+ * @example partsOf(O.some(decisionFromFlags({ accepted: ["unitCost"], out: true }))) // ["accept:unitCost"]
+ */
+export const partsOf = (change: O.Option<RowDecision>): ReadonlyArray<string> =>
   O.match(change, {
     onNone: () => [],
     onSome: (decision) => [
@@ -637,8 +641,12 @@ const withParts = (change: O.Option<RowDecision>, stays: (part: string) => boole
     place: !hasKeep(decision) || stays("twin") ? decision.place : isLeftOut(decision) ? placeLeftOut(false) : placeOpen
   }))
 
-/** Which parts of each row's decision the server named as not applied. */
-const partsNamed = (taken: ReadonlyArray<StaleAccept>): ((rowId: string) => (part: string) => boolean) => {
+/**
+ * Which parts of each row's decision the server named as not applied.
+ *
+ * @example partsNamed([{ rowId: "row-55", field: "unitCost" }])("row-55")("accept:unitCost") // true
+ */
+export const partsNamed = (taken: ReadonlyArray<StaleAccept>): ((rowId: string) => (part: string) => boolean) => {
   const byRow = A.groupBy(taken, (one) => one.rowId)
   return (rowId) => {
     const named = A.flatMap(
@@ -721,9 +729,19 @@ const heldDecisions = (draft: Draft): SavedDecisions =>
 /** The decisions the server is known to hold: the picture held, with what answers have said since over it. */
 const known = (draft: Draft): SavedDecisions => over(heldDecisions(draft), landedRows(draft))
 
-/** What the server is known to hold of one row. */
-const knownOf = (draft: Draft, rowId: string): O.Option<RowDecision> =>
-  O.getOrElse(R.get(landedRows(draft), rowId), () => R.get(heldDecisions(draft), rowId))
+/**
+ * What the server is known to hold of one row: what an answer has said of it since the picture held, or that picture.
+ *
+ * @example knownOf(emptyDraft, "row-55") // none: no picture is held
+ */
+export const knownOf: {
+  (rowId: string): (draft: Draft) => O.Option<RowDecision>
+  (draft: Draft, rowId: string): O.Option<RowDecision>
+} = dual(
+  2,
+  (draft: Draft, rowId: string): O.Option<RowDecision> =>
+    O.getOrElse(R.get(landedRows(draft), rowId), () => R.get(heldDecisions(draft), rowId))
+)
 
 /** The revision what is known of a row was said at: by an answer since the picture held, or by that picture. */
 const rowSaidAt = (draft: Draft, rowId: string): number =>
@@ -739,14 +757,22 @@ const knows = (draft: Draft, rowId: string, side: Side): boolean => side.madeOn 
 /** A decision the server did not refuse: it can be sent. */
 const isGood = (side: Side): boolean => O.isNone(side.refused)
 
-/** True when a match took parts of a decision back, and this is what it left of it. */
-const leftByMatch = (before: O.Option<RowDecision>, after: O.Option<RowDecision>): boolean => {
+/**
+ * True when a match took parts of a decision back, and this is what it left of it. A decision is what is left of
+ * itself.
+ *
+ * @example leftByMatch(O.some(decisionFromFlags({ accepted: ["unitCost"], out: true })), O.some(decisionFromFlags({ out: true }))) // true
+ */
+export const leftByMatch: {
+  (after: O.Option<RowDecision>): (before: O.Option<RowDecision>) => boolean
+  (before: O.Option<RowDecision>, after: O.Option<RowDecision>): boolean
+} = dual(2, (before: O.Option<RowDecision>, after: O.Option<RowDecision>): boolean => {
   const left = partsOf(after)
   return sameDecision(
     withParts(before, (part) => A.contains(left, part)),
     after
   )
-}
+})
 
 /**
  * True when what the server holds of a row is, as far as this tab can tell, what this decision stands over: one of the
@@ -1054,7 +1080,7 @@ const lined = (draft: Draft): Draft => {
 // -- Naming ----------------------------------------------------------------------------------------------------------
 
 /** One decision of one row. */
-type OfRow = readonly [rowId: string, decision: O.Option<RowDecision>]
+export type OfRow = readonly [rowId: string, decision: O.Option<RowDecision>]
 
 /**
  * Decisions as they are named: one of each row, what else there was of it beside, each once; and theirs. `unsure`: the
@@ -1087,7 +1113,7 @@ const naming = (decisions: ReadonlyArray<OfRow>, theirs: RowChanges, unsure: Rea
 }
 
 /** The decisions named, one by one: each row's first before what else there was of it. */
-const eachNamed = (named: Named): ReadonlyArray<OfRow> => [
+export const eachNamed = (named: Named): ReadonlyArray<OfRow> => [
   ...R.toEntries(named.rows),
   ...A.flatMap(R.toEntries(named.beside), ([rowId, others]) => A.map(others, (one): OfRow => [rowId, one]))
 ]
@@ -1099,8 +1125,11 @@ const unsureOf = (named: Named): ReadonlyArray<OfRow> =>
     onSome: (unsure) => A.flatMap(R.toEntries(unsure), ([rowId, all]) => A.map(all, (one): OfRow => [rowId, one]))
   })
 
-/** True when a decision of a naming was sent with a fate not known. */
-const isUnsure = (named: Named, [rowId, decision]: OfRow): boolean =>
+/** True when a decision of a naming was sent with a fate not known: the server may hold it. */
+export const isUnsure: {
+  (one: OfRow): (named: Named) => boolean
+  (named: Named, one: OfRow): boolean
+} = dual(2, (named: Named, [rowId, decision]: OfRow): boolean =>
   hasDecision(
     O.getOrElse(
       O.flatMap(O.fromUndefinedOr(named.unsure), R.get(rowId)),
@@ -1108,13 +1137,14 @@ const isUnsure = (named: Named, [rowId, decision]: OfRow): boolean =>
     ),
     decision
   )
+)
 
 /**
  * True when the server may hold this decision of hers: a decision of its tab sent before, whose fate is not known, is
  * among what it stands over, as sent or with parts a match took back (what the server writes of it then). Never said to
  * be not sent.
  */
-const maySaved = (side: Side): boolean => {
+export const maySaved = (side: Side): boolean => {
   const parts = partsOf(side.decision)
   return A.some(
     side.seen,

@@ -175,7 +175,7 @@ for a release branch: no release has been cut.
 ## Staging
 
 `staging` is a rehearsal, like a preview. It is on `workers.dev`, has the two test organizations and the test
-accounts, and has no model key. Sign-up is closed unless the `staging` environment's `SIGN_UP` variable names
+accounts, and has no model key. Sign-up is closed unless the `staging` environment's `SIGN_UP` secret names
 emails (decision "staging, invited sign-up"); an email named there may make a real account. The rules answer, since decision I5 gives a key to production
 only. Its test accounts take the one password the previews share. It runs on the previews' Cloudflare account, from
 the `staging` environment, which only `main` may deploy to. Nobody deploys it until Benjamin has deployed the

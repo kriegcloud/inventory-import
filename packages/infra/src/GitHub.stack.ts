@@ -12,7 +12,7 @@
  * deploys it: a job that could rewrite its own approval rule would have none.
  *
  * Must not break: a preview job holds no model key, no sign-up list and no token for production's account; a staging
- * job holds no model key and no such token, and only the sign-up list Benjamin sets by hand on its environment;
+ * job holds no model key and no such token, and only the sign-up list Benjamin sets by hand as its environment's secret;
  * the previews' password is written as a secret and never printed; only a run whose ref is `main` may use
  * the `production` environment, and nothing reaches production without its reviewer approving that run.
  *

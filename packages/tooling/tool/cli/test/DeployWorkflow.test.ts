@@ -190,8 +190,8 @@ layer(here)("the deploy workflow", (it) => {
           staging: [
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.PREVIEW_TEST_ACCOUNT_PASSWORD",
-            "vars.CLOUDFLARE_ACCOUNT_ID",
-            "vars.SIGN_UP"
+            "secrets.SIGN_UP",
+            "vars.CLOUDFLARE_ACCOUNT_ID"
           ],
           "release-tag": [],
           production: [
@@ -420,7 +420,7 @@ layer(here)("the deploy workflow", (it) => {
         expect(each(jobs, (job) => job.env ?? {})).toEqual({
           preview: { ...account, ...password, ...stage },
           cleanup: { ...account, ...stage },
-          staging: { ...account, ...password, SIGN_UP: "${{ vars.SIGN_UP }}" },
+          staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}" },
           "release-tag": {},
           production: {
             ...account,

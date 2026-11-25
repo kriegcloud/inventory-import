@@ -127,8 +127,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       # Staging's test accounts take the password every preview's do. A secret: never echoed.
       PREVIEW_TEST_ACCOUNT_PASSWORD: ${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}
-      # The emails that may make a real account on staging, from the staging environment's variable; unset, none.
-      SIGN_UP: ${{ vars.SIGN_UP }}
+      # The emails that may make a real account on staging, from the staging environment's secret; unset, none. A
+      # secret, not a variable: this repository's logs are public, and a variable's value is printed in them.
+      SIGN_UP: ${{ secrets.SIGN_UP }}
     steps:
       - uses: actions/checkout@v4
         with:

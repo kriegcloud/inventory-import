@@ -26,7 +26,14 @@ import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import type { BetterAuthSettings } from "./BetterAuth.config.ts"
 import { BetterAuthConfigError, BetterAuthError } from "./BetterAuth.errors.ts"
-import { AuthSecret, AuthSession, AuthSessionAnswer, authEndpointOf, resolveAuthSecret } from "./BetterAuth.schema.ts"
+import {
+  AuthDriverOptions,
+  AuthSecret,
+  AuthSession,
+  AuthSessionAnswer,
+  authEndpointOf,
+  resolveAuthSecret
+} from "./BetterAuth.schema.ts"
 import { $BetterAuthId } from "./internal/identity.ts"
 
 const $I = $BetterAuthId.create("BetterAuth")
@@ -100,7 +107,7 @@ export class BetterAuth extends Context.Service<
           })
         )
         const decodeAnswer = S.decodeUnknownEffect(AuthSessionAnswer)
-        const basePath = auth.options.basePath ?? "/api/auth"
+        const { basePath } = yield* S.decodeEffect(AuthDriverOptions)(auth.options).pipe(Effect.orDie)
 
         return BetterAuth.of({
           publicOrigin,
@@ -119,13 +126,12 @@ export class BetterAuth extends Context.Service<
               catch: failedAt("session")
             })
             const decoded = yield* decodeAnswer(answer).pipe(Effect.mapError(failedAt("session")))
-            yield* Effect.annotateCurrentSpan("auth.signedIn", decoded !== null)
-            if (decoded === null) return O.none()
-            return O.some(
+            yield* Effect.annotateCurrentSpan("auth.signedIn", O.isSome(decoded))
+            return O.map(decoded, (session) =>
               AuthSession.make({
-                userId: decoded.session.userId,
-                email: decoded.user.email,
-                activeOrganizationId: decoded.session.activeOrganizationId
+                userId: session.session.userId,
+                email: session.user.email,
+                activeOrganizationId: session.session.activeOrganizationId
               })
             )
           })

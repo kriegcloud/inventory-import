@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // Prints the SQL Better Auth still needs on top of migrations/, for the next numbered migration.
 //   bun run auth:schema            the missing tables and columns as SQL, or "nothing missing"
 //   bun run auth:schema -- --check exit 1 when anything is missing (test/server/AuthSchema.slow.test.ts checks the same on D1, in `bun run check:full`)
@@ -21,7 +22,17 @@ for (const file of readdirSync(new URL("migrations/", root))
   db.exec(readFileSync(new URL(`migrations/${file}`, root), "utf8"))
 }
 
-const options = authOptions({ database: db, secret: "x".repeat(32) })
+const options = authOptions({
+  baseURL: O.none(),
+  secureCookies: false,
+  pwnedPasswordCheck: false,
+  rateLimit: true,
+  mayCreateAccount: O.none(),
+  passwordToVerify: O.none(),
+  backgroundTasks: O.none(),
+  database: db,
+  secret: "x".repeat(32)
+})
 const plan = await getMigrations(options, { throwOnUnsafe: false })
 const sql = await plan.compileMigrations()
 const missing = plan.toBeCreated.length + plan.toBeAdded.length + plan.toBeAddedIndexes.length

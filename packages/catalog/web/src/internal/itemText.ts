@@ -1,6 +1,19 @@
+import * as A from "effect/Array"
 import * as O from "effect/Option"
-import { parse } from "@inventory/ui/Json"
+import * as P from "effect/Predicate"
+import * as S from "effect/Schema"
 import { costDigits, type UnitCost } from "@inventory/catalog-contract/Item"
+
+/** Regex captures of a decimal cell: the whole text, required whole digits and optional fractional digits. */
+const AmountParts = S.Tuple([
+  S.String.annotateKey({ description: "The whole matched amount" }),
+  S.String.annotateKey({ description: "Whole digits, guaranteed by the reader's expression" }),
+  S.OptionFromUndefinedOr(S.String).annotateKey({
+    description: "Fractional digits when the amount contains a decimal point"
+  })
+]).annotate({ description: "A money cell's regex captures; no decimal point means no fractional digits" })
+const amountParts = S.decodeUnknownOption(AmountParts)
+
 // How an item's values read on screen, in one place: the Items table, the editor and the review show a cost, the
 // dimensions and the vendors the same way. The one thing not to break: nothing here decides anything. Text that is
 // not what the field expects comes back as the file has it, so the person sees what is wrong with it.
@@ -14,11 +27,17 @@ import { costDigits, type UnitCost } from "@inventory/catalog-contract/Item"
  * @example costText("TBD") // "TBD"
  */
 export const costText = (text: string): string => {
-  const parts = /^(\d+)(?:\.(\d{1,4}))?$/.exec(text.trim())
-  if (parts === null) return text
-  const dollars = (parts[1] ?? "0").replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+$)/g, ",")
-  const decimals = (parts[2] ?? "").replace(/0+$/, "").padEnd(2, "0")
-  return `$${dollars}.${decimals}`
+  const parts = amountParts(/^(\d+)(?:\.(\d{1,4}))?$/.exec(text.trim()))
+  return O.match(parts, {
+    onNone: () => text,
+    onSome: ([, whole, fractional]) => {
+      const dollars = whole.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+$)/g, ",")
+      return O.match(fractional, {
+        onNone: () => `$${dollars}.00`,
+        onSome: (digits) => `$${dollars}.${digits.replace(/0+$/, "").padEnd(2, "0")}`
+      })
+    }
+  })
 }
 
 /**
@@ -53,12 +72,21 @@ export const countText = (text: string): string =>
  * @example totalText("40259038.2675") // "$40,259,038.27"
  */
 export const totalText = (text: string): string => {
-  const parts = /^(\d+)(?:\.(\d+))?$/.exec(text.trim())
-  if (parts === null) return text
-  const decimals = (parts[2] ?? "").padEnd(3, "0")
-  const cents = BigInt(`${parts[1] ?? "0"}${decimals.slice(0, 2)}`) + (Number(decimals[2]) >= 5 ? 1n : 0n)
-  const digits = cents.toString().padStart(3, "0")
-  return `$${digits.slice(0, -2).replace(/\B(?=(\d{3})+$)/g, ",")}.${digits.slice(-2)}`
+  const parts = amountParts(/^(\d+)(?:\.(\d+))?$/.exec(text.trim()))
+  return O.match(parts, {
+    onNone: () => text,
+    onSome: ([, whole, fractional]) => {
+      const cents = O.match(fractional, {
+        onNone: () => BigInt(whole) * 100n,
+        onSome: (fractional) => {
+          const decimals = fractional.padEnd(3, "0")
+          return BigInt(`${whole}${decimals.slice(0, 2)}`) + (Number(decimals[2]) >= 5 ? 1n : 0n)
+        }
+      })
+      const digits = cents.toString().padStart(3, "0")
+      return `$${digits.slice(0, -2).replace(/\B(?=(\d{3})+$)/g, ",")}.${digits.slice(-2)}`
+    }
+  })
 }
 
 /** An item's dimensions as stored: three measurements and their unit. */
@@ -91,17 +119,18 @@ export type VendorShown = { readonly name: string; readonly preferred: boolean }
  * // "2 · Ridgeline Metals and Acme Industrial preferred"
  */
 export const vendorsText = (vendors: ReadonlyArray<VendorShown>): string => {
-  const preferred = vendors.filter((vendor) => vendor.preferred).map((vendor) => vendor.name)
+  const preferred = A.map(
+    A.filter(vendors, (vendor) => vendor.preferred),
+    (vendor) => vendor.name
+  )
   const names =
     preferred.length <= 2 ? preferred.join(" and ") : `${preferred.slice(0, -1).join(", ")} and ${preferred.at(-1)}`
   return `${vendors.length} · ${preferred.length === 0 ? "none preferred" : `${names} preferred`}`
 }
 
 /** The cell's JSON, or nothing where it is not JSON: the cell then stays as the file has it. */
-const parsed = (text: string): unknown => O.getOrUndefined(O.liftThrowable(parse)(text))
-
-const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const parsed = S.decodeUnknownOption(S.fromJsonString(S.Unknown))
+const isObject = P.isObject
 
 /**
  * A file's dimensions cell (JSON in one cell) as the Items table shows dimensions. A cell that is not three numbers
@@ -109,13 +138,15 @@ const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
  *
  * @example dimensionsCellText('{"length":97.4,"width":6.9,"height":4.4,"unit":"cm"}') // "97.4 × 6.9 × 4.4 cm"
  */
-export const dimensionsCellText = (text: string): string => {
-  const value = parsed(text)
-  if (!isObject(value)) return text
-  const { length, width, height, unit } = value
-  if (typeof length !== "number" || typeof width !== "number" || typeof height !== "number") return text
-  return dimensionsText({ length, width, height, unit: typeof unit === "string" ? unit : "cm" })
-}
+export const dimensionsCellText = (text: string): string =>
+  O.match(O.filter(parsed(text), isObject), {
+    onNone: () => text,
+    onSome: (value) => {
+      const { length, width, height, unit } = value
+      if (typeof length !== "number" || typeof width !== "number" || typeof height !== "number") return text
+      return dimensionsText({ length, width, height, unit: typeof unit === "string" ? unit : "cm" })
+    }
+  })
 
 /**
  * A file's vendors cell (a JSON list in one cell) as the Items table shows vendors. A cell that was cut off says so,
@@ -125,19 +156,26 @@ export const dimensionsCellText = (text: string): string => {
  * // "1 · Acme Industrial preferred"
  * @example vendorsCellText('[{"vendor_name":"Keystone Components","vendor_sku":"KE-61') // "Cut off · Keystone Components"
  */
-export const vendorsCellText = (text: string): string => {
-  const value = parsed(text)
-  if (!Array.isArray(value)) {
-    const names = [...text.matchAll(/"vendor_name"\s*:\s*"([^"]+)"/g)].map((found) => found[1] ?? "")
-    return text.trimStart().startsWith("[") && names.length > 0 ? `Cut off · ${names.join(", ")}` : text
-  }
-  const vendors: Array<VendorShown> = []
-  for (const entry of value as ReadonlyArray<unknown>) {
-    if (!isObject(entry) || typeof entry["vendor_name"] !== "string") return text
-    vendors.push({ name: entry["vendor_name"], preferred: entry["is_preferred"] === true })
-  }
-  return vendors.length === 0 ? text : vendorsText(vendors)
-}
+export const vendorsCellText = (text: string): string =>
+  O.match(
+    O.filter(parsed(text), (value): value is Array<unknown> => A.isArray(value)),
+    {
+      onNone: () => {
+        const names = A.getSomes(
+          A.map(A.fromIterable(text.matchAll(/"vendor_name"\s*:\s*"([^"]+)"/g)), (found) => O.fromUndefinedOr(found[1]))
+        )
+        return text.trimStart().startsWith("[") && names.length > 0 ? `Cut off · ${names.join(", ")}` : text
+      },
+      onSome: (values) => {
+        const vendors: Array<VendorShown> = []
+        for (const entry of values) {
+          if (!isObject(entry) || typeof entry["vendor_name"] !== "string") return text
+          vendors.push({ name: entry["vendor_name"], preferred: entry["is_preferred"] === true })
+        }
+        return vendors.length === 0 ? text : vendorsText(vendors)
+      }
+    }
+  )
 
 /**
  * A file's tags cell (values separated by |) with a comma between them.

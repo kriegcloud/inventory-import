@@ -20,19 +20,19 @@ export const pieceChars = 256 * 1024
 
 /** Reads a CSV the person chose into a table. `bytes` are the whole file. */
 export const readCsv = Effect.fn("readCsv")(function* (input: {
-  fileName: string
-  bytes: Uint8Array
-  notes: ReadonlyArray<Note>
-  onProgress?: (progress: ReadProgress) => void
+  readonly fileName: string
+  readonly bytes: Uint8Array
+  readonly notes: ReadonlyArray<Note>
+  readonly onProgress: (progress: ReadProgress) => void
   /** Characters per piece; tests vary it to prove pieces never change the result. */
-  pieceChars?: number
+  readonly pieceChars: number
 }) {
   const report = input.onProgress
   const result = Csv.parseBytesInPiecesResult(input.bytes, {
     options: CsvReadOptions.default,
-    pieceChars: input.pieceChars ?? pieceChars,
+    pieceChars: input.pieceChars,
     onPiece: (rowsRead, charsRead, charsTotal) =>
-      report?.({ rowsRead, rowsAbout: rowsAbout({ rowsRead, charsRead, charsTotal }), exact: charsRead >= charsTotal })
+      report({ rowsRead, rowsAbout: rowsAbout({ rowsRead, charsRead, charsTotal }), exact: charsRead >= charsTotal })
   })
   if (Result.isFailure(result)) {
     const first = A.headNonEmpty(result.failure.diagnostics).finding

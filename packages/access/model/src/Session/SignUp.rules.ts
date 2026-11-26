@@ -8,6 +8,7 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import { dual } from "effect/Function"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
@@ -46,36 +47,57 @@ export const SignUpRule = LiteralKit(["open", "invited"])
  */
 export type SignUpRule = typeof SignUpRule.Type
 
-/**
- * The rule the `SIGN_UP` setting names: `open`, `closed`, or emails separated by commas or spaces. Anything that is
- * not `open` closes sign-up to all but the emails in it, so a mistyped value never opens it.
- *
- * @example signUpRuleOf("ada@example.com, Bo@Example.com") // invited: ada@example.com, bo@example.com
- * @example signUpRuleOf("closed") // invited: nobody
- */
-export const signUpRuleOf = (setting: string): SignUpRule => {
-  const words = A.filter(
-    A.map(Str.split(/[\s,]+/)(setting), (word) => Str.toLowerCase(Str.trim(word))),
-    (word) => word !== ""
-  )
-  if (words.length === 1 && words[0] === "open") return SignUpOpen.make({})
-  return SignUpInvited.make({ emails: A.dedupe(A.filter(words, (word) => Str.includes("@")(word))) })
-}
+const SignUpWords = S.Trim.pipe(
+  S.decode(SchemaTransformation.toLowerCase()),
+  S.decodeTo(
+    S.Array(S.String),
+    SchemaTransformation.transform({
+      decode: (setting): ReadonlyArray<string> => A.filter(Str.split(/[\s,]+/)(setting), (word) => word !== ""),
+      encode: (words: ReadonlyArray<string>) => A.join(words, ",")
+    })
+  ),
+  $I.annoteSchema("SignUpWords", { description: "The sign-up setting's lower-case words" })
+)
+
+/** The normalized email key used to decide account admission. */
+export const SignUpEmail = S.Trim.pipe(
+  S.decode(SchemaTransformation.toLowerCase()),
+  S.check(S.isTrimmed(), S.isLowercased()),
+  S.brand("SignUpEmail"),
+  $I.annoteSchema("SignUpEmail", { description: "An email compared for sign-up, with edges dropped and case folded" })
+)
+
+/** The normalized email key accepted by the admission rule. */
+export type SignUpEmail = typeof SignUpEmail.Type
+
+/** Decodes the SIGN_UP setting into its complete admission rule. */
+export const SignUpSetting = SignUpWords.pipe(
+  S.decodeTo(
+    SignUpRule,
+    SchemaTransformation.transform({
+      decode: (
+        words
+      ): { readonly kind: "open" } | { readonly kind: "invited"; readonly emails: ReadonlyArray<string> } =>
+        words.length === 1 && words[0] === "open"
+          ? { kind: "open" }
+          : { kind: "invited", emails: A.dedupe(A.filter(words, (word) => Str.includes("@")(word))) },
+      encode: (
+        rule: { readonly kind: "open" } | { readonly kind: "invited"; readonly emails: ReadonlyArray<string> }
+      ): ReadonlyArray<string> => (rule.kind === "open" ? ["open"] : rule.emails)
+    })
+  ),
+  $I.annoteSchema("SignUpSetting", { description: "The SIGN_UP setting decoded into an account admission rule" })
+)
 
 /**
- * Whether an email may make an account under a rule. Emails are compared whatever their case.
+ * Whether a schema-normalized email key may make an account under a rule.
  *
- * @example mayCreateAccount(signUpRuleOf("ada@example.com"), "Ada@Example.com") // true
- * @example mayCreateAccount(signUpRuleOf("closed"), "ada@example.com") // false
+ * @example mayCreateAccount(SignUpOpen.make({}), SignUpEmail.make("ada@example.com")) // true
  */
 export const mayCreateAccount: {
-  (email: string): (rule: SignUpRule) => boolean
-  (rule: SignUpRule, email: string): boolean
-} = dual(
-  2,
-  (rule: SignUpRule, email: string): boolean =>
-    rule.kind === "open" || A.contains(rule.emails, Str.toLowerCase(Str.trim(email)))
-)
+  (email: SignUpEmail): (rule: SignUpRule) => boolean
+  (rule: SignUpRule, email: SignUpEmail): boolean
+} = dual(2, (rule: SignUpRule, email: SignUpEmail): boolean => rule.kind === "open" || A.contains(rule.emails, email))
 
 /**
  * What the sign-in page is told of a rule: `open` (offer sign-up), `invited` (offer it, saying it is for invited

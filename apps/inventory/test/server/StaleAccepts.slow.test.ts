@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // A save and a confirm name the revision of the draft their decisions were made on, and the server does not apply
 // an accept made before its field's column was matched again (DECISIONS.md: "Server refuses, screen says so"). On
 // the real handlers and SQL, a fresh D1: the save applies the rest and names the accept; the confirm writes nothing.
@@ -7,7 +8,6 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
@@ -29,9 +29,9 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
         const params = { id: staged.id }
         // Dana matches the unit cost to another column (the reorder point's): the draft moves on.
         const table = yield* client.imports.table({ params }).pipe(dana)
-        const other = O.getOrThrow(
-          A.findFirst(table.columns, (column) => Str.includes("reorder")(Str.toLowerCase(column.label)))
-        )
+        const otherOption = A.findFirst(table.columns, (column) => column.label === "Reorder Pt")
+        assertTrue(O.isSome(otherOption), "expected other to be present")
+        const other = otherOption.value
         const matched = yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
           .pipe(dana)

@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The review's draft against the server's own handler, over the in-memory twins: a save of hers partly written (a part
 // not applied, or one a match took back since) whose answer was lost goes again over what this tab sent, and the server
 // finds it as hers, in either order and after a reload. Where the server still cannot tell (a decision sent before a
@@ -11,7 +12,7 @@ import * as R from "effect/Record"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportEvent, type ImportView } from "@inventory/catalog-contract/Import"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { UploadKey } from "@inventory/catalog-contract/Ids"
 import type { Field, StagedTable } from "@inventory/catalog-contract/Staged"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
@@ -62,6 +63,7 @@ const out = decisionFromFlags({ out: true })
 /** A view of the import as the screen hands it to the draft. */
 const arrived = (view: ImportView): DraftEvent =>
   DraftEvent.ViewArrived({
+    waiting: false,
     revision: view.revision,
     decisions: view.decisions,
     open: view.status === "open",
@@ -99,7 +101,9 @@ const opened = Effect.gen(function* () {
   }
   /** The last save the draft asked for reaches the server; its answer reaches the draft when `arrives` is run. */
   const taken = Effect.fnUntraced(function* () {
-    const send = O.getOrThrow(A.last(sends))
+    const expectedSome1 = A.last(sends)
+    assertTrue(O.isSome(expectedSome1), "expected A.last(sends)")
+    const send = expectedSome1.value
     sends.length = 0
     const payload = {
       madeOn: send.madeOn,
@@ -134,7 +138,7 @@ const opened = Effect.gen(function* () {
   happen(DraftEvent.Opened({ kept: O.none() }))
   yield* look
   return {
-    id: id as ImportId,
+    id: ImportId.make(id),
     happen,
     taken,
     save,

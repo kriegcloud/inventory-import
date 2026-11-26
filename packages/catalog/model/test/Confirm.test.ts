@@ -12,7 +12,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { marcus, tableOf } from "./support.ts"
+import { tableOf } from "./support.ts"
 
 const Line = S.Struct({
   sku: S.Literals(["AAA-0001", "AAA-0002", "aaa-0003", "AAA-0004", ""]),
@@ -39,7 +39,7 @@ describe("confirmPlan", () => {
         )
       )
       const current = review({ ...noHistory, table, choices: [], decisions, storedItems: [] })
-      const plan = confirmPlan({ draft, review: current, authors: {}, actor: marcus })
+      const plan = confirmPlan({ draft, review: current, authors: {} })
       const count = (status: PlannedRow["status"]) => A.filter(plan.rows, PlannedRow.isAnyOf([status])).length
       const reviewed = (status: string) => A.filter(current.rows, (row) => row.status === status).length
       expect(A.map(plan.rows, (row) => row.rowNumber)).toEqual(A.map(current.rows, (row) => row.rowNumber))
@@ -49,6 +49,8 @@ describe("confirmPlan", () => {
       // A row the person left out says who; a row nobody settled says nobody.
       const deciders = A.map(A.filter(plan.rows, PlannedRow.guards.notImported), (row) => row.decidedBy)
       expect(A.filter(deciders, DecidedBy.guards.person).length).toBe(reviewed("out"))
+      // No author is recorded for any row here, so none is named: the person who confirms never stands in.
+      expect(A.every(A.filter(deciders, DecidedBy.guards.person), (person) => O.isNone(person.name))).toBe(true)
       // A row that is written carries an item; nothing else does.
       expect(A.every(plan.rows, (row) => PlannedRow.isAnyOf(["ready", "update"])(row) === "item" in row)).toBe(true)
       // The plan is one a store can be handed with an id for each row it creates, and with one id short it is not.

@@ -11,7 +11,6 @@ import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { marcus } from "./support.ts"
 
 // The sample file's own headings, one for each field of an item.
 const headings = [
@@ -50,7 +49,7 @@ const draft = ImportId.make("00000000-0000-4000-8000-000000000001")
 const longest = (lines: ReadonlyArray<ReadonlyArray<string>>): number => {
   const current = review({ ...noHistory, table: tableOf(lines), choices: [], decisions: {}, storedItems: [] })
   // The plan is made, and is one a store can be handed: no reason in it is past the bound.
-  const plan = confirmPlan({ draft, review: current, authors: {}, actor: marcus })
+  const plan = confirmPlan({ draft, review: current, authors: {} })
   expect(S.is(ConfirmPlan)(plan)).toBe(true)
   return Math.max(0, ...A.map(current.rows, (row) => A.join(row.reasons, " ").length))
 }

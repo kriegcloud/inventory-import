@@ -116,7 +116,16 @@ table and the stored rows agree.
 - **Product decisions are Benjamin's.** What a rule means, which outcome a kind of row gets, who may do what, a
   threshold, how an ambiguous value is read, what a second load does to a changed record: each is his, not a default,
   even one that only holds rows back.
-- **Never** commit a secret, push or deploy unless Benjamin asks in that message.
+- **Finished work becomes a pull request, without being asked** (Benjamin, 2026-11-26). Work is done on a branch,
+  never on `main`. When it is done and `bun run check` passes, push the branch (`git push -u origin <branch>`) and
+  open a pull request into `main` with `gh pr create`: a title in the commit style, and a body that says what
+  changed, what was checked and what was not. A branch that already has a pull request is pushed again, not given a
+  second one. A branch built on another unmerged branch says so in its body. Say the pull request's address in the
+  hand-back. Opening one starts CI and, by the deploy workflow, the pull request's preview (`docs/releasing.md`):
+  that is the workflow's deploy, not the agent's. A sub-agent given a lane of a split commits and hands back; the
+  agent that owns the branch pushes and opens the pull request.
+- **Never** commit a secret. Never push to `main` or a `release/*` branch, force-push, push a tag, merge a pull
+  request or deploy unless Benjamin asks in that message.
 
 ## Skills
 
@@ -236,7 +245,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), the Alchemy packages kept as files against their recorded hashes (`alchemy:check`; needs python3), which package may import which (`boundaries:check`), every mark on a record made by the vocabulary's typed helpers where a gate reads it, and only the ontology package loading the vocabulary (`ontology-terms:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no file holding more fallbacks, comparisons with null or undefined or clean-ups outside a schema than its baseline allows, the baseline compared with main's so its numbers only fall, unless the law itself counts more than when main's was written, which the baseline's `reads` says (`defaults:check`), no type assertion (`assertions:check`), no Promise (`promises:check`), no `@effect-diagnostics` comment (`diagnostics:check`), every helper that names the value it acts on taking it first and `dual` (`dual:check`), every property `readonly` (`readonly:check`), every file of screens exporting components only (`fast-refresh:check`), each of those six with a ledger of today's files whose numbers only fall, compared with the ledger at the branch's base: where it left main, or on a push the last push whose run passed (`packages/tooling/tool/cli/ledgers/`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and a test of its own, for what is installed, and needed: its test fails with that one patch left out (`patches:check`, `patches:prove`), with every task that runs code waiting until what is installed holds the patches (`patches:installed`; `docs/patches.md`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), the Alchemy packages kept as files against their recorded hashes (`alchemy:check`; needs python3), which package may import which (`boundaries:check`), every mark on a record made by the vocabulary's typed helpers where a gate reads it, and only the ontology package loading the vocabulary (`ontology-terms:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no file holding more fallbacks (including zero-argument synchronous onNone expression arrows returning numbers, empty strings, empty arrays, empty objects, null or undefined in contract/model/host, and Result.getOrThrow or Effect.runSync member calls in src outside tests), absence checks (including Option/Result/Exit if or ternary guards in tests and unwrapped S.optionalKey in contract/model/host), Option unwraps or clean-ups outside a schema than its baseline allows, the baseline compared with main's so its numbers only fall, unless the law itself counts more than when main's was written, which the baseline's `reads` says (`defaults:check`), no type assertion and no `x!` (`assertions:check`), no Promise (`promises:check`), no `@effect-diagnostics` comment (`diagnostics:check`), every helper that names the value it acts on taking it first and `dual` (`dual:check`), every property `readonly` (`readonly:check`), every file of screens exporting components only (`fast-refresh:check`), each of those six with a ledger of today's files whose numbers only fall, compared with the ledger at the branch's base: where it left main, or on a push the last push whose run passed (`packages/tooling/tool/cli/ledgers/`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and a test of its own, for what is installed, and needed: its test fails with that one patch left out (`patches:check`, `patches:prove`), with every task that runs code waiting until what is installed holds the patches (`patches:installed`; `docs/patches.md`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs), the property that holds the model against the review region (`fold`: a minute and a half), a sample of the model's mutants (`mutants:sample`: under a minute), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in), the reasoner on the vocabulary (`reason`, a task of `@inventory/ontology` that is never replayed: it needs Java 17 on the machine, and fetches the pinned ROBOT jar into the user's cache folder the first time) and the production build. The model's tasks are replayed by turbo until what they read changes |
 | `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants, and without the reasoner (`reason`: it needs Java and a jar no install brings, so CI runs it in the job `reason` of `ci.yml`). CI runs the model's four in a job of their own (`proofs` in `ci.yml`, the tasks of `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`.github/workflows/proofs-nightly.yml`; `bun run proofs:nightly` runs the same four tasks by hand with nothing replayed, with two differences: turbo starts the four at once on one machine, so the first mutants share it with the proofs, Verify's search and the fold, where the nightly runs those three in one job and the mutants on runners of their own; and every mutant runs in one task, two at a time, with `row-open` given 50 minutes beside another mutant where the nightly runs it alone with 100: `docs/verify.md`) |
@@ -337,7 +346,7 @@ packages/ontology/       @inventory/ontology: what is made from the vocabulary a
                         writer (generated/ holds the OWL and SKOS Turtle, never edited by hand: `bun run
                         ontology:write`), the lift of a record to triples, the competency questions and their fixtures,
                         and seven of the vocabulary's nine gates as tests, the last a reasoner (`scripts/reason.ts`,
-                        pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goal is goals/erp-vocabulary.
+                        pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goals are goals/erp-vocabulary and goals/party-slice.
 packages/infra/          @beep/infra: what is deployed, per stage. The stage plan as a schema and a pure function
                         (`StagePlan.rules.ts`: what each stage gets, decided from its name), the app's Alchemy stack
                         (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:
@@ -359,7 +368,8 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
                         and write a CSV and an Excel workbook as Effect Schema codecs, and beep-effect's kit, vendored:
                         @beep/types (primitive/), @beep/identity, @beep/schema and @beep/utils (modeling/). Also this repository's own
                         @beep/vocabulary (modeling/vocabulary): the model a vocabulary is written in, its coherence
-                        rules and the makers of the typed helpers; it knows no term of the ERP. Never edit
+                        rules and the makers of the typed helpers; it knows no term of the ERP. `@beep/unsafe-assert` (typing/) holds
+                        the sole explicit compiler claim for approved library typing gaps. Never edit
                         the kit: each vendor.json
                         records its beep-effect commit and file hashes, and `bun run vendor:check` fails on a change.
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
@@ -529,7 +539,8 @@ profile, its copied tests included, with no override.
   `O.getOrUndefined` or `O.getOrNull`, no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema, and
   in a `.ts` file no default on a parameter or a destructured name (`(n = 0) =>`). Two things stay on purpose
   (Benjamin, 2026-11-23). A React component's optional prop stays `?:` and takes its default in the destructuring
-  (`{ size = "sm" }`), never with `??` in the body; `Option` is for data that came through a schema. And a cell of a
+  (`{ size = "sm" }`), never with `??` in the body. A strict `=== undefined` or `!== undefined`
+  comparison on that component's own props in `.tsx` may distinguish omission from explicit null; `Option` is for data that came through a schema. And a cell of a
   file the person reviews keeps its reader: its trim or change of case is a proposal shown as before and after, so
   code that reads a cell lives in a file the law names (`exemptions` in `Laws/Defaults.rules.ts`, each with its
   kinds and its reason) and nowhere else. Adding a file to that list is Benjamin's decision.
@@ -549,6 +560,16 @@ profile, its copied tests included, with no override.
   happens). `return yield*` a failure; `yield*`, never a bare `yield`.
 - **Every service and error is accounted for**: a missing Layer shows as a type error in `worker.ts`; no `any` or
   `unknown` in an error or requirement channel; no type assertion that hides one.
+- **Type assertions**: decode application values with a Schema, narrow with a guard, or use a checked type annotation.
+  The only compiler claim written here is inside `unsafeAssert<T>(value, "reason")` from `@beep/unsafe-assert`
+  (`packages/foundation/typing/unsafe-assert`), a dependency-free foundation package owned here, outside the hashed
+  kit. Use it only for a library typing gap that cannot be expressed by the library's types. It performs no runtime
+  check. Each call needs an approved, nonempty string-literal reason in
+  `packages/tooling/tool/cli/ledgers/unsafe-asserts.json`, counted by file and exact reason. `assertions:check` refuses
+  unlisted calls, stale entries, indirect helper values and counts or reasons added against the branch's base, even when source and ledger
+  change together. The first ledger is a proposal for Benjamin's approval; later approvals only decrease. Fewer than
+  15 calls are allowed. The old `assertions.json` stays as a migration receipt; an own file removed from the old
+  override must hold zero assertions. The vendored kit and registry lists retain their existing accounting.
 - **Failures stay typed**: errors a caller can act on are `Schema.TaggedError`s (no class extending `Error`); no
   `try/catch` in a generator, no `async` function, no `new Promise`; `Effect.try` and `Effect.tryPromise` always have
   a `catch` that returns a typed error.

@@ -7,7 +7,11 @@
  *   reads the clear case: a helper declared with a name (`const f = (…) =>`, `function f(…)`), of two values or more,
  *   that names one `cause`, `error`, `self` or `input` and is not written `dual(…)`, wherever that one stands. A
  *   helper of two values that names none of them is not read: which one it acts on is not in its words. A function
- *   handed to a call as an argument is not read: the call sets its order.
+ *   handed to a call as an argument is not read: the call sets its order. Service contracts declared with
+ *   `Context.Service<Self, Shape>()` are ours: their multi-value methods require data-first (`self` first) and
+ *   data-last signatures. Inline shapes and local interfaces/object aliases are read, imported types are not.
+ *   Methods on the exact objects supplied through `Layer.effect` or `Layer.succeed` must use Effect Function's
+ *   `dual`, including local shorthand implementations and memory layers.
  * - Properties are `readonly` (2026-11-22: "All object types & interfaces should have readonly properties in the bast
  *   majority of cases"), React props among them. The law refuses, without `readonly`: a property of an object type
  *   or an interface, an index signature, a class's field, a mapped type's properties, and an array type (`T[]`,
@@ -38,9 +42,9 @@ export const shapesLeftOut: ReadonlyArray<string> = [".agents/", ".codex/", `${s
 /** What the dual-helper law is. */
 export const dualSpec: ListedSpec = {
   check: "dual:check",
-  rule: "every helper declared with two values or more that names the one it acts on takes it first and is dual",
+  rule: "helpers naming their subject and multi-value service methods are dual, with self first and data-last calls",
   instead:
-    "a helper that names the value it acts on (cause, error, self, input) and is not dual: put that value first and write the helper with dual from effect/Function, data-last form included",
+    "a helper or multi-value service method is not dual: put the subject first (self for a service), declare matching data-first and data-last signatures, and implement with dual from effect/Function. Write: readonly method: { (query: Query): (self: Self) => Effect.Effect<Result>; (self: Self, query: Query): Effect.Effect<Result> }; method: dual(2, (self: Self, query: Query) => body)",
   ledger: `${ledgersFolder}/dual.json`,
   leftOut: shapesLeftOut,
   leavesHashedKit: true,

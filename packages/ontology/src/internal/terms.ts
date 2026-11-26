@@ -1,7 +1,7 @@
 // What gate 5 and the lift both read from the vocabulary and from a schema's own annotations: a CURIE's local name,
 // the class, scheme or property a local name is, and the term a schema points at. One home, so the gate that checks a
 // mark and the lift that follows it cannot read a mark differently.
-import { type RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
+import { type RangeTarget, type Vocabulary, type XsdDatatype } from "@beep/vocabulary/Model"
 import { MarkReading, readSchemaMark } from "@beep/vocabulary/Pointer"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
@@ -9,7 +9,10 @@ import * as R from "effect/Record"
 import type * as SchemaAST from "effect/SchemaAST"
 import * as Str from "effect/String"
 
-/** A property of the vocabulary as the rules read it: its key, its domain, and for a relation its range. */
+/**
+ * A property of the vocabulary as the rules read it: its key, its domain, for a relation its range, and for an attribute
+ * the datatype its literals are written as.
+ */
 export type Property =
   | {
       readonly kind: "object"
@@ -17,7 +20,12 @@ export type Property =
       readonly domain: O.Option<string>
       readonly range: RangeTarget
     }
-  | { readonly kind: "datatype"; readonly key: string; readonly domain: O.Option<string> }
+  | {
+      readonly kind: "datatype"
+      readonly key: string
+      readonly domain: O.Option<string>
+      readonly datatype: XsdDatatype
+    }
 
 /** A CURIE's local name when it carries the vocabulary's prefix. */
 export const localOf =
@@ -31,6 +39,17 @@ export const classOf: {
   (vocabulary: Vocabulary, local: string): O.Option<string>
 } = dual(2, (vocabulary: Vocabulary, local: string): O.Option<string> =>
   R.has(vocabulary.classes, local) ? O.some(local) : O.none()
+)
+
+/**
+ * Whether the class of that local name stores no id (decision 135): a record of it names it on its own annotations
+ * alone, and the lift mints no node of it. False for a class that stores one, and for a name that is no class.
+ */
+export const storesNoId: {
+  (local: string): (vocabulary: Vocabulary) => boolean
+  (vocabulary: Vocabulary, local: string): boolean
+} = dual(2, (vocabulary: Vocabulary, local: string): boolean =>
+  O.exists(R.get(vocabulary.classes, local), (term) => !term.storesId)
 )
 
 /** A local name when the vocabulary has a scheme of that name. */
@@ -57,7 +76,8 @@ export const propertyOf: {
       O.map(R.get(vocabulary.datatypeProperties, local), (term): Property => ({
         kind: "datatype",
         key: local,
-        domain: term.domain
+        domain: term.domain,
+        datatype: term.datatype
       }))
   )
 )

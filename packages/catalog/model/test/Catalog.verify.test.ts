@@ -85,7 +85,8 @@ layer(NodeServices.layer)("Catalog", (it) => {
       // apart: a proof holds for every actor the schema allows, and says nothing of who is let in.
       expect(report.assumptions).toEqual([
         "whole numbers are exact: a number stays within ±2^53, and a bigint has no limit",
-        "a list an input holds has up to 2 items more than its schema asks for",
+        "a duration an input holds is a whole number of milliseconds",
+        "a list, a hash set or a hash map an input holds has up to 2 items more than its schema asks for",
         "an external system answers what its schema allows, and nothing else",
         "middleware lets every caller in: who sends a command is anyone its request context allows",
         "what a projection writes, and what a stream or a query gives, is not checked: only what a projection is given",

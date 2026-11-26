@@ -12,7 +12,8 @@ import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as Eq from "effect/Equal"
 import { MAX_COLUMN, MAX_ROW, XlsxAddress, XlsxColumn, XlsxRange, XlsxRowNumber } from "./XlsxAddress.schema.ts"
 import { XlsxCell, XlsxNumberFormat, holdsSomething } from "./XlsxCell.schema.ts"
 import { XlsxDateSystem } from "./XlsxSerial.schema.ts"
@@ -40,7 +41,7 @@ export type XlsxSheetState = typeof XlsxSheetState.Type
 
 const uniqueBy = <T>(key: (value: T) => unknown, expected: string) =>
   S.makeFilter<ReadonlyArray<T>>(
-    (values) => A.dedupeWith(values, (a, b) => key(a) === key(b)).length === values.length,
+    (values) => A.dedupeWith(values, (a, b) => Eq.equals(key(a), key(b))).length === values.length,
     {
       expected,
       arbitraryConstraint: { uniqueBy: key }
@@ -90,6 +91,19 @@ export const XlsxSheetName = S.String.check(
   S.isMaxLength(255),
   S.makeFilter((name: string) => isXmlSafe(name), { expected: "a name without control characters" })
 ).pipe($I.annoteSchema("XlsxSheetName", { description: "A sheet's name" }))
+
+/**
+ * Case-insensitive sheet comparison key. Decode both names; the workbook keeps its original spelling.
+ *
+ * @category schemas
+ */
+export const XlsxSheetNameKey = S.String.pipe(
+  S.decode(SchemaTransformation.toLowerCase()),
+  $I.annoteSchema("XlsxSheetNameKey", { description: "A sheet name used only for case-insensitive comparison" })
+)
+
+/** The decoded comparison key. @category models */
+export type XlsxSheetNameKey = typeof XlsxSheetNameKey.Type
 
 const forbiddenInName = /[:\\/?*[\]]/
 
@@ -319,7 +333,7 @@ export class XlsxWorkbook extends S.Opaque<XlsxWorkbook, { readonly brand: uniqu
     sheets: S.NonEmptyArray(XlsxWorksheet.annotateKey({ description: "One sheet" }))
       .check(
         uniqueBy(
-          (sheet: { readonly info: { readonly name: string } }) => Str.toLowerCase(sheet.info.name),
+          (sheet: { readonly info: { readonly name: string } }) => S.decodeOption(XlsxSheetNameKey)(sheet.info.name),
           "sheets with no name twice, whatever the case"
         )
       )
@@ -390,7 +404,9 @@ export class XlsxWorkbook extends S.Opaque<XlsxWorkbook, { readonly brand: uniqu
     workbook: Pick<XlsxWorkbook, "sheets">,
     name: string
   ): O.Option<XlsxWorkbook["sheets"][number]> =>
-    A.findFirst(workbook.sheets, (sheet) => Str.toLowerCase(sheet.info.name) === Str.toLowerCase(name))
+    A.findFirst(workbook.sheets, (sheet) =>
+      Eq.equals(S.decodeOption(XlsxSheetNameKey)(sheet.info.name), S.decodeOption(XlsxSheetNameKey)(name))
+    )
 
   /** The sheets a person sees in Excel's tabs. */
   static readonly visible = (workbook: Pick<XlsxWorkbook, "sheets">): ReadonlyArray<XlsxWorkbook["sheets"][number]> =>

@@ -43,7 +43,7 @@ import {
 } from "@inventory/review/ReviewTypes"
 
 const runs = { arbitrary: { runs: 50 } }
-const schemas = {
+const schemas: Record<string, S.Top> = {
   RowKey,
   ColumnKey,
   CellText,
@@ -85,9 +85,9 @@ describe("every exported schema generates only valid values", () => {
   for (const [name, schema] of R.toEntries(schemas)) {
     it.prop(
       name,
-      [Arbitrary.schema(schema as S.Top)],
+      [Arbitrary.schema(schema)],
       ([value]) => {
-        expect(S.is(schema as S.Top)(value)).toBe(true)
+        expect(S.is(schema)(value)).toBe(true)
       },
       runs
     )
@@ -101,7 +101,7 @@ describe("stored forms round-trip", () => {
     ([decision]) =>
       Effect.gen(function* () {
         const flags = yield* S.encodeEffect(ReviewDecisionFromFlags)(decision)
-        expect(S.is(DecisionFlags)(flags)).toBe(true)
+        expect(S.is(S.toEncoded(DecisionFlags))(flags)).toBe(true)
         const back = yield* S.decodeEffect(ReviewDecisionFromFlags)(flags)
         const again = yield* S.encodeEffect(ReviewDecisionFromFlags)(back)
         expect(again).toEqual(flags)

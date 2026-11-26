@@ -9,7 +9,7 @@
 // became, whatever it reads, only one she named as it is: a save that sends exactly what is stored changes nothing of
 // it but is his decision of the row too. Where the record does not say, the row is not written.
 import * as A from "effect/Array"
-import { identity } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -104,10 +104,16 @@ const takenByRow = (entries: ReadonlyArray<MatchTakeBack>): Readonly<Record<stri
  * never saw that her colleague decided the row. Taking the same revision as after can only name a row that could have
  * been written, and so ask her; taking it as before could write over his decision unasked.
  */
-const savedSinceByAnother = (input: Judging, rowId: string, made: number): boolean =>
-  R.has(input.stored, rowId) &&
-  !O.exists(R.get(input.lastSavedBy, rowId), (by) => by === input.sender) &&
-  !O.exists(R.get(input.lastSavedOn, rowId), (on) => on < made)
+const savedSinceByAnother: {
+  (rowId: string, made: number): (input: Judging) => boolean
+  (input: Judging, rowId: string, made: number): boolean
+} = dual(
+  3,
+  (input: Judging, rowId: string, made: number): boolean =>
+    R.has(input.stored, rowId) &&
+    !O.exists(R.get(input.lastSavedBy, rowId), (by) => by === input.sender) &&
+    !O.exists(R.get(input.lastSavedOn, rowId), (on) => on < made)
+)
 
 /** The part a take-back names, by kind and the field it rests on; a Replace or Keep-stored and a keep of one of two by kind alone. */
 const partKey = (kind: MatchTakeBack["kind"], field: string): string =>
@@ -144,11 +150,15 @@ const sameKeys = (a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean =
  * before revisions were kept: 0 says nothing of when). A colleague's decision saved after the row's revision is none of
  * them, whatever it reads, and so is a row with nothing stored.
  */
-const namedAsStored = (input: Judging, rowId: string, made: number): O.Option<number> =>
+const namedAsStored: {
+  (rowId: string, made: number): (input: Judging) => O.Option<number>
+  (input: Judging, rowId: string, made: number): O.Option<number>
+} = dual(3, (input: Judging, rowId: string, made: number): O.Option<number> =>
   O.filter(
     R.get(input.savedAt, rowId),
     (saved) => O.exists(R.get(input.deciders, rowId), (by) => by === input.sender) || (saved >= 1 && saved <= made)
   )
+)
 
 /**
  * What a decision named became when it was saved at `saved`: as named, when that is at or before the row's revision
@@ -158,30 +168,43 @@ const namedAsStored = (input: Judging, rowId: string, made: number): O.Option<nu
  * of another field rests on how the row compared with the items then, which is not kept: both readings are hers, kept
  * and taken. Only matches before the save count.
  */
-const asSaved = (
-  input: Judging,
-  row: { readonly rowId: string; readonly made: number; readonly saved: number },
-  decision: RowDecision
-): ReadonlyArray<RowDecision> => {
-  if (row.saved <= row.made) return [decision]
-  const before = {
-    choices: A.filter(input.choices, (choice) => choice.at < row.saved),
-    moves: A.filter(input.moves, (move) => move.at < row.saved)
+const asSaved: {
+  (
+    row: { readonly rowId: string; readonly made: number; readonly saved: number },
+    decision: RowDecision
+  ): (input: Judging) => ReadonlyArray<RowDecision>
+  (
+    input: Judging,
+    row: { readonly rowId: string; readonly made: number; readonly saved: number },
+    decision: RowDecision
+  ): ReadonlyArray<RowDecision>
+} = dual(
+  3,
+  (
+    input: Judging,
+    row: { readonly rowId: string; readonly made: number; readonly saved: number },
+    decision: RowDecision
+  ): ReadonlyArray<RowDecision> => {
+    if (row.saved <= row.made) return [decision]
+    const before = {
+      choices: A.filter(input.choices, (choice) => choice.at < row.saved),
+      moves: A.filter(input.moves, (move) => move.at < row.saved)
+    }
+    const stale = matchedAfter(before)(row.made)
+    const moved = A.filter(otherFields, (field) => stale(field))
+    const judged = (changed: ReadonlyArray<Field>) =>
+      R.get(
+        withoutStaleDecisions({
+          ...before,
+          madeOn: { [row.rowId]: row.made },
+          set: { [row.rowId]: decision },
+          changed: A.map(changed, (field) => ({ rowId: row.rowId, field }))
+        }).applied,
+        row.rowId
+      )
+    return A.getSomes([judged([]), judged(moved)])
   }
-  const stale = matchedAfter(before)(row.made)
-  const moved = A.filter(otherFields, (field) => stale(field))
-  const judged = (changed: ReadonlyArray<Field>) =>
-    R.get(
-      withoutStaleDecisions({
-        ...before,
-        madeOn: { [row.rowId]: row.made },
-        set: { [row.rowId]: decision },
-        changed: A.map(changed, (field) => ({ rowId: row.rowId, field }))
-      }).applied,
-      row.rowId
-    )
-  return A.getSomes([judged([]), judged(moved)])
-}
+)
 
 /**
  * A decision as the matches since `made` left it, the decision stored saved at `saved`: the parts no comparison
@@ -194,68 +217,91 @@ const asSaved = (
  * kept), a match whose take-backs are not kept (at or before `takenBackFrom`), or an entry that names only its first
  * rows and not this one.
  */
-const leftByMatches = (
-  input: Judging,
-  record: {
-    readonly taken: Readonly<Record<string, ReadonlyArray<Taken>>>
-    readonly partial: ReadonlyArray<MatchTakeBack>
-    readonly all: ReadonlyArray<MatchTakeBack>
-  },
-  row: { readonly rowId: string; readonly made: number; readonly saved: number },
-  decision: RowDecision
-): O.Option<RowDecision> => {
-  const { rowId, made, saved } = row
-  const stale = matchedAfter(input)(made)
-  const asked = !StoredChoice.guards.undecided(decision.stored) && !stale("sku")
-  const moved: ReadonlyArray<Field> = asked ? A.filter(otherFields, (field) => stale(field)) : []
-  const after = (field: Field): ReadonlyArray<Taken> =>
-    // What the matches took of this field of the row, when they took any: read as none or one list.
-    A.filter(
-      O.match(R.get(record.taken, keyOf(field, rowId)), { onNone: A.empty, onSome: identity }),
-      (taken) => taken.at > made
+const leftByMatches: {
+  (
+    record: {
+      readonly taken: Readonly<Record<string, ReadonlyArray<Taken>>>
+      readonly partial: ReadonlyArray<MatchTakeBack>
+      readonly all: ReadonlyArray<MatchTakeBack>
+    },
+    row: { readonly rowId: string; readonly made: number; readonly saved: number },
+    decision: RowDecision
+  ): (input: Judging) => O.Option<RowDecision>
+  (
+    input: Judging,
+    record: {
+      readonly taken: Readonly<Record<string, ReadonlyArray<Taken>>>
+      readonly partial: ReadonlyArray<MatchTakeBack>
+      readonly all: ReadonlyArray<MatchTakeBack>
+    },
+    row: { readonly rowId: string; readonly made: number; readonly saved: number },
+    decision: RowDecision
+  ): O.Option<RowDecision>
+} = dual(
+  4,
+  (
+    input: Judging,
+    record: {
+      readonly taken: Readonly<Record<string, ReadonlyArray<Taken>>>
+      readonly partial: ReadonlyArray<MatchTakeBack>
+      readonly all: ReadonlyArray<MatchTakeBack>
+    },
+    row: { readonly rowId: string; readonly made: number; readonly saved: number },
+    decision: RowDecision
+  ): O.Option<RowDecision> => {
+    const { rowId, made, saved } = row
+    const stale = matchedAfter(input)(made)
+    const asked = !StoredChoice.guards.undecided(decision.stored) && !stale("sku")
+    const moved: ReadonlyArray<Field> = asked ? A.filter(otherFields, (field) => stale(field)) : []
+    const after = (field: Field): ReadonlyArray<Taken> =>
+      // What the matches took of this field of the row, when they took any: read as none or one list.
+      A.filter(
+        O.match(R.get(record.taken, keyOf(field, rowId)), { onNone: A.empty, onSome: identity }),
+        (taken) => taken.at > made
+      )
+    const unsure = A.some(moved, (field) =>
+      A.some(after(field), (taken) => !O.exists(taken.from, (from) => from === saved))
     )
-  const unsure = A.some(moved, (field) =>
-    A.some(after(field), (taken) => !O.exists(taken.from, (from) => from === saved))
-  )
-  const changed = A.filter(moved, (field) => A.isReadonlyArrayNonEmpty(after(field)))
-  const matchesAfter = (field: Field): ReadonlyArray<number> => [
-    ...A.map(
-      A.filter(input.moves, (move) => move.field === field && move.at > made),
-      (move) => move.at
-    ),
-    ...A.map(
-      A.filter(input.choices, (choice) => choice.field === field && choice.at > made),
-      (choice) => choice.at
+    const changed = A.filter(moved, (field) => A.isReadonlyArrayNonEmpty(after(field)))
+    const matchesAfter = (field: Field): ReadonlyArray<number> => [
+      ...A.map(
+        A.filter(input.moves, (move) => move.field === field && move.at > made),
+        (move) => move.at
+      ),
+      ...A.map(
+        A.filter(input.choices, (choice) => choice.field === field && choice.at > made),
+        (choice) => choice.at
+      )
+    ]
+    // Every match after `takenBackFrom` kept a move (migration 0006 set it to each draft's revision, past every match
+    // made before moves were kept), so a match is recorded exactly when it is after it.
+    const unknown =
+      unsure ||
+      (changed.length === 0 &&
+        (A.some(moved, (field) => A.some(matchesAfter(field), (at) => at <= input.takenBackFrom)) ||
+          A.some(record.partial, (entry) => entry.revision > made && A.contains(moved, entry.field))))
+    if (unknown) return O.none()
+    const left = R.get(
+      withoutStaleDecisions({
+        choices: input.choices,
+        moves: input.moves,
+        madeOn: { [rowId]: made },
+        set: { [rowId]: decision },
+        changed: A.map(changed, (field) => ({ rowId, field }))
+      }).applied,
+      rowId
     )
-  ]
-  // Every match after `takenBackFrom` kept a move (migration 0006 set it to each draft's revision, past every match
-  // made before moves were kept), so a match is recorded exactly when it is after it.
-  const unknown =
-    unsure ||
-    (changed.length === 0 &&
-      (A.some(moved, (field) => A.some(matchesAfter(field), (at) => at <= input.takenBackFrom)) ||
-        A.some(record.partial, (entry) => entry.revision > made && A.contains(moved, entry.field))))
-  if (unknown) return O.none()
-  const left = R.get(
-    withoutStaleDecisions({
-      choices: input.choices,
-      moves: input.moves,
-      madeOn: { [rowId]: made },
-      set: { [rowId]: decision },
-      changed: A.map(changed, (field) => ({ rowId, field }))
-    }).applied,
-    rowId
-  )
-  // The decision the matches took from was this one: each part a match recorded it took from the row is a part of it,
-  // and each part the rule takes of it was recorded taken. A part the record does not hold (a match whose take-backs
-  // are not kept, an entry that names only its first rows) is not known taken, and the row is not written.
-  if (hiddenIn(record.all, rowId, made)) return O.none()
-  const recorded = A.map(
-    A.filter(record.all, (entry) => entry.revision > made && A.contains(entry.rows, rowId)),
-    (entry) => partKey(entry.kind, entry.field)
-  )
-  return O.filter(left, (after) => sameKeys(partsTaken(decision, after), recorded))
-}
+    // The decision the matches took from was this one: each part a match recorded it took from the row is a part of it,
+    // and each part the rule takes of it was recorded taken. A part the record does not hold (a match whose take-backs
+    // are not kept, an entry that names only its first rows) is not known taken, and the row is not written.
+    if (hiddenIn(record.all, rowId, made)) return O.none()
+    const recorded = A.map(
+      A.filter(record.all, (entry) => entry.revision > made && A.contains(entry.rows, rowId)),
+      (entry) => partKey(entry.kind, entry.field)
+    )
+    return O.filter(left, (after) => sameKeys(partsTaken(decision, after), recorded))
+  }
+)
 
 /** Whether a match after `made` took something back of the row, as far as its entries name rows. */
 const takenAfter = (entries: ReadonlyArray<MatchTakeBack>, rowId: string, made: number): boolean =>

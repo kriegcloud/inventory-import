@@ -16,11 +16,14 @@ import { Forbidden } from "@inventory/kernel/AccessError"
 import { MemberId } from "@inventory/kernel/Ids"
 import { as, TypedApp } from "./support/app.ts"
 
-const signedUp = Effect.fn("signedUp")(function* (id: string, name: string, email: string, memberId: string | null) {
+const signedUp = Effect.fn("signedUp")(function* (id: string, name: string, email: string, memberId: O.Option<string>) {
   const sql = yield* SqlClient.SqlClient
   yield* sql`INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
     VALUES (${id}, ${name}, ${email}, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
-  if (memberId !== null) yield* sql`UPDATE member SET userId = ${id} WHERE id = ${memberId}`
+  yield* O.match(memberId, {
+    onNone: () => Effect.void,
+    onSome: (memberId) => sql`UPDATE member SET userId = ${id} WHERE id = ${memberId}`
+  })
 }, Effect.orDie)
 
 /** Runs a request that must be refused, and checks that its refusal is one of `refusal`'s class. */
@@ -33,17 +36,17 @@ layer(TypedApp)("people", (it) => {
   it.effect("an admin adds a person who has signed up; nobody else can, and no organization loses its last admin", () =>
     Effect.gen(function* () {
       const client = yield* HttpApiTest.groups(Api, ["people", "activity"])
-      yield* signedUp("usr_dana", "Dana Whitfield", "dana@example-works.test", "mem_dana")
-      yield* signedUp("usr_marcus", "Marcus Oyelaran", "marcus@example-works.test", "mem_marcus")
-      yield* signedUp("usr_sam", "Sam Okafor", "Sam@Example.test", null)
+      yield* signedUp("usr_dana", "Dana Whitfield", "dana@example-works.test", O.some("mem_dana"))
+      yield* signedUp("usr_marcus", "Marcus Oyelaran", "marcus@example-works.test", O.some("mem_marcus"))
+      yield* signedUp("usr_sam", "Sam Okafor", "Sam@Example.test", O.none())
       const dana = as("mem_dana")
 
       // Everyone in the organization can see who is in it; only an admin can change it.
       const seen = yield* client.people.list().pipe(as("mem_priya"))
-      expect(A.map(seen, (person) => [person.name, person.role, O.getOrNull(person.email)])).toEqual([
-        ["Dana Whitfield", "admin", "dana@example-works.test"],
-        ["Marcus Oyelaran", "editor", "marcus@example-works.test"],
-        ["Priya Raman", "viewer", null]
+      expect(A.map(seen, (person) => [person.name, person.role, person.email])).toEqual([
+        ["Dana Whitfield", "admin", O.some("dana@example-works.test")],
+        ["Marcus Oyelaran", "editor", O.some("marcus@example-works.test")],
+        ["Priya Raman", "viewer", O.none()]
       ])
       const add = { payload: AddPerson.make({ email: AccountEmail.make("sam@example.test"), role: "editor" }) }
       yield* client.people.add(add).pipe(as("mem_priya"), refusedWith(Forbidden))
@@ -51,7 +54,7 @@ layer(TypedApp)("people", (it) => {
 
       // The email is matched whatever its case. An email nobody signed up with is refused in a sentence.
       const sam = yield* client.people.add(add).pipe(dana, Effect.flatMap(Effect.fromResult))
-      expect([sam.name, sam.role, O.getOrNull(sam.email)]).toEqual(["Sam Okafor", "editor", "Sam@Example.test"])
+      expect([sam.name, sam.role, sam.email]).toEqual(["Sam Okafor", "editor", O.some("Sam@Example.test")])
       // Adding them again with the same role is the same add (a second press); with another role it is the email's
       // problem, answered as data the form shows.
       const again = yield* client.people.add(add).pipe(dana, Effect.flatMap(Effect.fromResult))
@@ -101,9 +104,10 @@ layer(TypedApp)("people", (it) => {
       const left = yield* client.people.list().pipe(samIs)
       expect(A.map(left, (person) => person.name)).toEqual(["Priya Raman", "Sam Okafor"])
       const sql = yield* SqlClient.SqlClient
-      const gone = yield* sql<{ userId: string | null; removedAt: string | null }>`
+      const gone = yield* sql<{ readonly userId: string | null; readonly removedAt: string | null }>`
         SELECT userId, removedAt FROM member WHERE id = 'mem_dana'`.pipe(Effect.orDie)
-      expect([gone[0]?.userId, gone[0]?.removedAt === null]).toEqual([null, false])
+      expect(gone[0]?.userId).toBeNull()
+      expect(gone[0]?.removedAt).not.toBeNull()
       // A removed member cannot be removed twice, and the last admin still cannot remove themselves.
       yield* client.people
         .remove({ params: { memberId: MemberId.make("mem_dana") } })

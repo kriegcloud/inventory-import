@@ -3,6 +3,7 @@
 // value that names nothing (a junk field, a junk row) is never read as something the person said. All data here is
 // generated from the schemas; the oracle is the list of fields and the row number a row id spells.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import {
   ConfirmRequest,
   decisionFromFlags,
@@ -142,10 +143,15 @@ describe("the decisions of a draft", () => {
       ([request]) => {
         expect(S.is(schema)(request)).toBe(true)
         const set = A.head(R.keys(request.set))
-        if (O.isSome(set)) expect(S.is(schema)({ ...request, clear: [...request.clear, set.value] })).toBe(false)
+        if (R.keys(request.set).length > 0) {
+          assertTrue(O.isSome(set), "expected the tested value to be present")
+          expect(S.is(schema)({ ...request, clear: [...request.clear, set.value] })).toBe(false)
+        }
         const cleared = A.head(request.clear)
-        if (O.isSome(cleared))
+        if (request.clear.length > 0) {
+          assertTrue(O.isSome(cleared), "expected the tested value to be present")
           expect(S.is(schema)({ ...request, clear: [...request.clear, cleared.value] })).toBe(false)
+        }
       },
       drawnWithWaits
     )

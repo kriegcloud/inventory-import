@@ -10,6 +10,7 @@
   ],
   "exports": {
     "./package.json": "./package.json",
+    "./StorageTwin": "./test/support/Storage.twin.ts",
     "./components/accordion": "./src/components/accordion.tsx",
     "./components/action-bar": "./src/components/action-bar.tsx",
     "./components/alert-dialog": "./src/components/alert-dialog.tsx",
@@ -153,6 +154,7 @@
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@beep/schema": "workspace:*",
+    "@beep/unsafe-assert": "workspace:*",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/modifiers": "catalog:",
     "@dnd-kit/sortable": "catalog:",

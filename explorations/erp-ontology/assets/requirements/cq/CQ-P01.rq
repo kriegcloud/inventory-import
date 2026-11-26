@@ -1,0 +1,18 @@
+# CQ-P01: Which organizations does our tenant both buy from and sell to? (decision 34)
+# Both flags are read on one record, the tenant's own record of the organization, so one tenant's customer and another
+# tenant's vendor is no answer. "Our tenant" is a value of ?tenant; a record of a person is never an organization.
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT ?tenant ?organization
+WHERE {
+  ?record rdf:type/rdfs:subClassOf* inv:SourceRecord ;
+          inv:inTenant ?tenant ;
+          inv:recordOf ?organization ;
+          inv:isCustomer true ;
+          inv:isVendor true .
+  ?organization rdf:type/rdfs:subClassOf* inv:Organization .
+}
+ORDER BY ?tenant ?organization

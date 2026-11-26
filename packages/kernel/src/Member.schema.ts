@@ -7,7 +7,7 @@ import * as S from "effect/Schema"
 import { MemberId, OrganizationId } from "./Ids.id.ts"
 import { $KernelId } from "./internal/identity.ts"
 import { hasRole, Role } from "./Role.schema.ts"
-import { aboutClass, aboutPath, aboutProperty, noTerm } from "./Terms.pointer.ts"
+import { aboutClass, aboutPath, aboutProperty } from "./Terms.pointer.ts"
 import { DisplayName } from "./Text.schema.ts"
 
 const $I = $KernelId.create("Member")
@@ -17,8 +17,10 @@ const $I = $KernelId.create("Member")
  * is scoped to `organizationId`.
  *
  * It points at `inv:Member` (report 14 section 3.3): `id` is the subject's id, `organizationId` fills `membershipIn`,
- * `role` is lifted to one `Grant` at the organization's scope, and the two names are for the screen. A mark is an
- * annotation and changes nothing a value decodes to.
+ * `role` is lifted to one `Grant` at the organization's scope, `name` is the person's `name` and `organizationName` the
+ * tenant's (report 18 section 7). The lift writes the tenant's name on the node `organizationId` names (decision 161)
+ * and nothing for the person's, which no record identifies (decisions 133 and 155). A mark is an annotation and
+ * changes nothing a value decodes to.
  *
  * **Example** (May this member write?)
  *
@@ -38,7 +40,7 @@ export class Member extends S.Opaque<Member, { readonly brand: unique symbol }>(
     name: DisplayName.pipe(
       S.annotateKey({
         description: "The name people read. Not unique and can change, so it never decides a permission.",
-        ...noTerm("screen")
+        ...aboutPath([{ property: "inv:membershipOf", node: "inv:Person" }, { property: "inv:name" }])
       })
     ),
     role: Role.pipe(
@@ -59,7 +61,10 @@ export class Member extends S.Opaque<Member, { readonly brand: unique symbol }>(
       S.annotateKey({ description: "The organization the member acts in", ...aboutProperty("inv:membershipIn") })
     ),
     organizationName: DisplayName.pipe(
-      S.annotateKey({ description: "The organization's name, for the screen.", ...noTerm("screen") })
+      S.annotateKey({
+        description: "The organization's name, for the screen.",
+        ...aboutPath([{ property: "inv:membershipIn", node: "inv:Tenant" }, { property: "inv:name" }])
+      })
     )
   }).pipe(
     $I.annoteSchema("Member", {

@@ -1,0 +1,20 @@
+# The fixture of CQ-P09's party half (report 04 section 3.1, report 18 section 10): one source record held by one
+# tenant, one held by none and one held by two. Nothing here is a record of this app, and every name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+
+<fixture/Organization/test_HeldCo> a inv:Organization .
+
+<fixture/SourceRecord/test_HeldOnce> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_HeldCo> .
+
+<fixture/SourceRecord/test_HeldNowhere> a inv:SourceRecord ;
+  inv:recordOf <fixture/Organization/test_HeldCo> .
+
+<fixture/SourceRecord/test_HeldTwice> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> , <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:recordOf <fixture/Organization/test_HeldCo> .

@@ -7,7 +7,7 @@
  * take the page's ink (`--foreground`) and paper (`--background`), so the mark reads in both themes. Decorative beside
  * the app's name, so it is hidden from screen readers. Size it with a class (`size-7`).
  */
-export function BrandMark(props: { className?: string }) {
+export function BrandMark(props: { readonly className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden className={props.className}>
       <g className="stroke-brand" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">

@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // An import of inventory items through the real handlers and SQL, on a fresh D1 database: staged, decided, confirmed,
 // counted back from what is stored, loaded a second time, a stored item replaced only when the person says so, and
 // taken back. The claims are the screens': the result's numbers add up to the rows of the file and are read from the
@@ -66,7 +67,9 @@ layer(TypedApp)("an import of items", (it) => {
             payload: { revision: saved.revision, madeOn: {}, set: {}, clear: [] }
           })
           .pipe(marcus)
-        const result = O.getOrThrow(confirmed.result)
+        const resultOption = confirmed.result
+        assertTrue(O.isSome(resultOption), "expected result to be present")
+        const result = resultOption.value
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
         const outcomeOf = (n: number) => A.findFirst(result.rows, (row) => row.rowNumber === n)
@@ -77,8 +80,15 @@ layer(TypedApp)("an import of items", (it) => {
         // What landed, as any member reads it: nested values decoded, the cost as the digits said.
         const stored = yield* client.items.list().pipe(as("mem_priya"))
         expect(stored.length).toBe(155)
-        const bySku = (sku: string) => O.getOrThrow(A.findFirst(stored, (item) => item.sku === sku))
-        const comma = O.getOrThrow(outcomeOf(55))
+        const bySku = (sku: string) => {
+          const valueOption = A.findFirst(stored, (item) => item.sku === sku)
+          assertTrue(O.isSome(valueOption), "expected value to be present")
+          const value = valueOption.value
+          return value
+        }
+        const commaOption = outcomeOf(55)
+        assertTrue(O.isSome(commaOption), "expected comma to be present")
+        const comma = commaOption.value
         expect([comma.outcome, digits(bySku(comma.sku).unitCost)]).toEqual(["created", "35.82"])
         const crate = bySku("XRR-0266")
         expect(crate).toMatchObject({
@@ -89,7 +99,9 @@ layer(TypedApp)("an import of items", (it) => {
           dimensions: O.some({ length: 97.4, width: 6.9, height: 4.4, unit: "cm" })
         })
         // A cost is compared by its digits: a decimal caches its shortest form once it has been written.
-        const vendor = O.getOrThrow(A.get(crate.vendors, 1))
+        const vendorOption = A.get(crate.vendors, 1)
+        assertTrue(O.isSome(vendorOption), "expected vendor to be present")
+        const vendor = vendorOption.value
         expect({ ...vendor, unitCost: digits(vendor.unitCost) }).toEqual({
           vendorName: "Tidewater Fasteners",
           vendorSku: O.none(),
@@ -98,9 +110,7 @@ layer(TypedApp)("an import of items", (it) => {
           isPreferred: false
         })
         // "Internal Notes" was never stored: no item carries the text.
-        expect(A.some(stored, (item) => Str.includes("purchasing")(O.getOrElse(item.description, () => "")))).toBe(
-          false
-        )
+        expect(A.some(stored, (item) => O.exists(item.description, Str.includes("purchasing")))).toBe(false)
 
         // The Items table's questions run in SQL: a cost filter, a select, a search and the facets.
         const page = yield* client.items
@@ -137,11 +147,10 @@ layer(TypedApp)("an import of items", (it) => {
             payload: { revision: again.revision, madeOn: {}, set: {}, clear: [] }
           })
           .pipe(marcus)
-        expect([
-          O.getOrUndefined(second.result)?.created,
-          O.getOrUndefined(second.result)?.already,
-          O.getOrUndefined(second.result)?.notImported
-        ]).toEqual([1, 155, 44])
+        const secondResultOption = second.result
+        assertTrue(O.isSome(secondResultOption), "expected secondResult to be present")
+        const secondResult = secondResultOption.value
+        expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 155, 44])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(156)
 
         // A file whose row says something else than a stored item: it waits, and only "replace" changes the item.
@@ -168,13 +177,14 @@ layer(TypedApp)("an import of items", (it) => {
             }
           })
           .pipe(marcus)
-        expect([
-          O.getOrUndefined(replaced.result)?.updated,
-          O.getOrUndefined(replaced.result)?.already,
-          O.getOrUndefined(replaced.result)?.created
-        ]).toEqual([1, 24, 0])
+        const replacedResultOption = replaced.result
+        assertTrue(O.isSome(replacedResultOption), "expected replacedResult to be present")
+        const replacedResult = replacedResultOption.value
+        expect([replacedResult.updated, replacedResult.already, replacedResult.created]).toEqual([1, 24, 0])
         const after = yield* client.items.list().pipe(marcus)
-        const insert = O.getOrThrow(A.findFirst(after, (item) => item.sku === "SHH-9574"))
+        const insertOption = A.findFirst(after, (item) => item.sku === "SHH-9574")
+        assertTrue(O.isSome(insertOption), "expected insert to be present")
+        const insert = insertOption.value
         expect([insert.name, insert.revision, after.length]).toEqual(["Oak Foam Insert XL", 2, 181])
 
         // An edit by hand, then the take-back of the clean import: 24 removed, the replaced item kept and named.
@@ -207,11 +217,10 @@ layer(TypedApp)("an import of items", (it) => {
         const taken = yield* client.imports
           .takeBack({ params: { id: first.id }, payload: { confirms: before.takeBack.confirms } })
           .pipe(marcus)
-        expect([
-          taken.status,
-          O.getOrUndefined(taken.result)?.takenBack,
-          O.getOrUndefined(taken.result)?.created
-        ]).toEqual(["takenBack", 24, 1])
+        const takenResultOption = taken.result
+        assertTrue(O.isSome(takenResultOption), "expected takenResult to be present")
+        const takenResult = takenResultOption.value
+        expect([taken.status, takenResult.takenBack, takenResult.created]).toEqual(["takenBack", 24, 1])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(157)
       })
   )

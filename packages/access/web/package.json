@@ -19,13 +19,13 @@
     "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint"
   },
   "dependencies": {
+    "@beep/better-auth": "workspace:*",
     "@beep/identity": "workspace:*",
     "@effect/atom-react": "catalog:",
     "@inventory/access-contract": "workspace:*",
     "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "@inventory/ui": "workspace:*",
-    "better-auth": "catalog:",
     "effect": "catalog:",
     "sonner": "catalog:"
   },

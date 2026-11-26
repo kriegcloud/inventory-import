@@ -86,7 +86,8 @@ export const promisesLeftOut: ReadonlyArray<string> = [".agents/", `${scratchpad
  */
 export const promiseEntryPoints: Readonly<Record<string, string>> = {
   "apps/inventory/src/server/worker.ts": "the Worker's exported fetch, which Cloudflare calls and awaits",
-  "apps/inventory/src/web/main.tsx": "the browser's root, which starts the app"
+  "apps/inventory/src/web/main.tsx": "the browser's root, which starts the app",
+  "packages/drivers/better-auth/src/BetterAuth.hooks.ts": "Better Auth's hooks, which it calls and awaits"
 }
 
 /** The uses an entry point may make: an Effect run as a Promise, and the Promise type it hands the platform. */

@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { expect, it } from "@effect/vitest"
 import { betterAuth } from "better-auth"
 import { memoryAdapter } from "better-auth/adapters/memory"
@@ -20,6 +21,11 @@ const breached = "password1234"
 const authWith = (pwnedPasswordCheck: boolean) =>
   betterAuth(
     authOptions({
+      baseURL: O.none(),
+      secureCookies: false,
+      mayCreateAccount: O.none(),
+      passwordToVerify: O.none(),
+      backgroundTasks: O.none(),
       database: memoryAdapter({
         user: [],
         session: [],

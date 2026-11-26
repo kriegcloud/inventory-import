@@ -1,6 +1,7 @@
 /**
  * Gate 9, the reasoner (report 14 section 6.9; decisions 112, 113 and 121): the pin of the two tools it needs, the
- * five runs, and what each run must come to. The machine it runs on is a port, `Machine`, so the checks that come
+ * runs, and what each run must come to: the thread's five, and one for each hand-written fixture of the party slice
+ * with the refusal of decision 34 (PLAN step 13). The machine it runs on is a port, `Machine`, so the checks that come
  * before a run are tested with no Java and no jar: `scripts/reason.ts` gives the real one.
  *
  * Do not break: the gate fails, never skips. No Java of the pinned major version, a jar that cannot be fetched and a
@@ -24,6 +25,17 @@ import entryIsPerson from "../fixtures/reason/entry-is-person.ttl?raw"
 import entryIsTenant from "../fixtures/reason/entry-is-tenant.ttl?raw"
 import entryNamesMember from "../fixtures/reason/entry-names-member.ttl?raw"
 import personIsTenant from "../fixtures/reason/person-is-tenant.ttl?raw"
+import recordIsOrganization from "../fixtures/reason/record-is-organization.ttl?raw"
+import bareTypeFixture from "../../../explorations/erp-ontology/assets/requirements/cq/bare-type.fixture.ttl?raw"
+import tradingFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P01.fixture.ttl?raw"
+import rolelessFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P02.fixture.ttl?raw"
+import tenancyFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P09.fixture.ttl?raw"
+import identityFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P04.fixture.ttl?raw"
+import samenessFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P05.fixture.ttl?raw"
+import modelCallFixture from "../../../explorations/erp-ontology/assets/requirements/cq/model-call.ttl?raw"
+import stewardshipFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P07.fixture.ttl?raw"
+import contactsFixture from "../../../explorations/erp-ontology/assets/requirements/cq/CQ-P03.fixture.ttl?raw"
+import suttonPartyFixture from "../../../explorations/erp-ontology/assets/requirements/cq/sutton-party.ttl?raw"
 import lock from "../robot.lock.json" with { type: "json" }
 import { $OntologyId } from "./internal/identity.ts"
 
@@ -181,7 +193,11 @@ export type Verdict = typeof Verdict.Type
 export class Run extends S.Opaque<Run, { readonly brand: unique symbol }>()(
   S.Struct({
     name: S.String.pipe(S.annotateKey({ description: "What the run is called in the gate's output" })),
-    ban: S.String.pipe(S.annotateKey({ description: "The forbidden conclusion it stands for, and which side of it" })),
+    ban: S.String.pipe(
+      S.annotateKey({
+        description: "The forbidden conclusion it stands for and which side of it, or the fixture it holds consistent"
+      })
+    ),
     files: S.Array(S.String).pipe(S.annotateKey({ description: "The Turtle texts it joins, the ontology first" })),
     must: Verdict.pipe(S.annotateKey({ description: "What the reasoner must find for the gate to pass" }))
   }).pipe($I.annoteSchema("Run", { description: "One run of the reasoner and what it must come to" }))
@@ -190,8 +206,18 @@ export class Run extends S.Opaque<Run, { readonly brand: unique symbol }>()(
 const thread: ReadonlyArray<string> = [ontology, graph]
 
 /**
- * The five runs (the goal's forbidden conclusions 1 and 2): two that must be consistent and three that must not.
- * Each is the generated ontology and the thread's graph, the three refusals and one near miss with one file more.
+ * Where the party slice's fixtures live (decision 148), from the repository's root: a run of one of them is named by
+ * its path, so the name leads to the file. The package's own `fixtures/cq/` holds the thread's, which is not one of
+ * them.
+ */
+export const packetFolder = "explorations/erp-ontology/assets/requirements/cq/"
+
+/**
+ * The runs. First the thread's five (the goal's forbidden conclusions 1 and 2): two that must be consistent and three
+ * that must not, each the generated ontology and the thread's graph, the three refusals and one near miss with one
+ * file more. Then the party slice's eleven (PLAN step 13): each hand-written fixture with the generated ontology and
+ * nothing else, the closure decision 28 names, CQ-P05's beside CQ-P04's as its question reads it; and decision 34's
+ * refusal, a tenant's record also typed an organization, beside CQ-P01's fixture, whose own run is its near miss.
  */
 export const runs: ReadonlyArray<Run> = [
   Run.make({
@@ -223,6 +249,72 @@ export const runs: ReadonlyArray<Run> = [
     ban: "ban 2, refused: an audit entry is the organization it is about",
     files: [...thread, entryIsTenant],
     must: "inconsistent"
+  }),
+  Run.make({
+    name: `${packetFolder}bare-type.fixture.ttl`,
+    ban: "slice 1, step 5's fixture: a node typed only a tenant",
+    files: [ontology, bareTypeFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P01.fixture.ttl`,
+    ban: "decision 34, the near miss: each tenant's record of an organization is of it, and is not it",
+    files: [ontology, tradingFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P02.fixture.ttl`,
+    ban: "slice 1, CQ-P02's fixture: records that state no trading role, and the open reading, which states no flag",
+    files: [ontology, rolelessFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P09.fixture.ttl`,
+    ban: "slice 1, CQ-P09's fixture: a record held by one tenant, one held by none and one held by two",
+    files: [ontology, tenancyFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P04.fixture.ttl`,
+    ban: "slice 1, CQ-P04's fixture: a tenant's decisions on its records, each at its date-time",
+    files: [ontology, identityFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P05.fixture.ttl`,
+    ban: "slice 1, CQ-P05's fixture beside CQ-P04's: two records stated the same, the way identity is never stated",
+    files: [ontology, identityFixture, samenessFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}model-call.ttl`,
+    ban: "slice 1, model-call.ttl: one model call of each purpose",
+    files: [ontology, modelCallFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P07.fixture.ttl`,
+    ban: "slice 1, CQ-P07's fixture: a tenant with an active admin, one whose only admin is revoked, one with no members",
+    files: [ontology, stewardshipFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}CQ-P03.fixture.ttl`,
+    ban: "slice 1, CQ-P03's fixture: contacts at two accounts, each for its purpose",
+    files: [ontology, contactsFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: `${packetFolder}sutton-party.ttl`,
+    ban: "slice 1, sutton-party.ttl: one record of each Sutton type the coverage table places",
+    files: [ontology, suttonPartyFixture],
+    must: "consistent"
+  }),
+  Run.make({
+    name: "fixtures/reason/record-is-organization.ttl",
+    ban: "decision 34, refused: a tenant's record of an organization is that organization",
+    files: [ontology, tradingFixture, recordIsOrganization],
+    must: "inconsistent"
   })
 ]
 
@@ -240,11 +332,17 @@ export const majorOf = (version: string): O.Option<number> =>
     O.filter((major) => Number.isSafeInteger(major) && major > 0)
   )
 
-/** The first Java of the pinned major version, or the refusal naming every place looked at. */
+/** The first Java of the pinned major version, with the version it said it is, or the refusal naming every place
+ * looked at. */
 const pinnedJava = Effect.fnUntraced(function* (pin: RobotLock) {
   const machine = yield* Machine
   const found = yield* machine.javas
-  const pinned = A.findFirst(found, (java) => O.contains(O.flatMap(java.version, majorOf), pin.javaMajor))
+  const pinned = A.findFirst(found, (java) =>
+    O.map(
+      O.filter(java.version, (version) => O.contains(majorOf(version), pin.javaMajor)),
+      (version) => ({ where: java.where, version })
+    )
+  )
   if (O.isNone(pinned)) {
     return yield* JavaNotPinned.make({
       major: pin.javaMajor,
@@ -254,7 +352,7 @@ const pinnedJava = Effect.fnUntraced(function* (pin: RobotLock) {
       )
     })
   }
-  return pinned.value.where
+  return pinned.value
 })
 
 /** Holds the jar to the pin: fetched when the machine has none, and refused when its bytes are not the approved ones. */
@@ -323,21 +421,22 @@ const reasonOne = Effect.fnUntraced(function* (java: string, run: Run) {
 })
 
 /**
- * Gate 9: reads the pin, holds Java and the jar to it, and makes the five runs. Answers the lines of its report,
- * one for the tools and one for each run, each naming the forbidden conclusion it stands for.
+ * Gate 9: reads the pin, holds Java and the jar to it, and makes every run. Answers the lines of its report, one for
+ * the tools, naming the version the Java that ran said it is, and one for each run, each naming the forbidden
+ * conclusion or the fixture it stands for.
  *
  * It fails with `JavaNotPinned`, `JarNotFetched`, `JarNotPinned` or `RunRefused`, and with the pin's own decoding
  * error when `robot.lock.json` is not a pin.
  *
- * @example reason() // six lines when the machine has Java 17 and the approved jar
+ * @example reason() // seventeen lines when the machine has Java 17 and the approved jar
  */
 export const reason = Effect.fn("ontology.reason")(function* () {
   const pin = yield* robotPin
   const java = yield* pinnedJava(pin)
   const fetched = yield* pinnedJar(pin)
-  const lines = yield* Effect.forEach(runs, (run) => reasonOne(java, run), { concurrency: 1 })
+  const lines = yield* Effect.forEach(runs, (run) => reasonOne(java.where, run), { concurrency: 1 })
   return [
-    `ROBOT ${pin.release} (sha256 ${pin.sha256}${fetched ? ", fetched now" : ""}) with HermiT under the Java at ${java}`,
+    `ROBOT ${pin.release} (sha256 ${pin.sha256}${fetched ? ", fetched now" : ""}) with HermiT under Java ${java.version} at ${java.where}`,
     ...lines
   ]
 })

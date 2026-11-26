@@ -28,22 +28,23 @@ Places by package on 2026-11-23, from the baseline:
 | 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | done: no line of the baseline names it. The text a file cell gives the review is read in `Review/CellRules.rules.ts`; it and five files that compare words are exempt for clean-ups only (SPEC, questions 1, 2 and 4) |
 | 3 | `packages/catalog/host` | 20 | this session, by hand | done: the number filters' trim is `TypedNumberText`'s, a contract schema |
 | 4 | Agent files, `CLAUDE.md`, the skills README, `docs/patterns.md` and `docs/kit.md` examples | — | this session | done: `backend.md` has the boundary shape from `ImportStore.adapter.ts`; the README has the paths that stand in |
-| 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | todo |
-| 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | todo |
-| 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | todo |
-| 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | todo |
-| 9 | `packages/review` | 586 | Codex lane | todo |
-| 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | todo |
-| 11 | `packages/catalog/web` | 572 | Codex lane | todo |
-| 12 | `packages/access/web` | 37 | Codex lane | todo |
-| 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | todo |
-| 14 | `packages/infra` | 7 | Codex lane | todo |
-| 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | todo |
+| 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | done: items 1 to 3 counted (a test's branch on an Option, Result or Exit; a literal `onNone`; an unwrapped `optionalKey`). The 74 places they named in the pilot packages and the ontology's tests are cleared but for `Cell.shown` and `Cell.formula`. Decided 2026-11-25 and in a second lane: `onNone` narrowed to data stand-ins, `getOrThrow` and `runSync` counted, `Spreadsheet.rules.ts` exempt for absence |
+| 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | done in two rounds: the first cleared the law with `Result.getOrThrow` decodes and was refused. Left as on main: the session hook's null context and `undefined` result in `internal/authOptions.ts` (2 places, Better Auth's own API; an exemption candidate for row 15) |
+| 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | done in two rounds: a model policy and a script's options are stated by every caller; no line of the baseline names them |
+| 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | partly, in two lanes: 88 places cleared, 81 exempt in eleven files that read bytes and markup (decided 2026-11-26), 17 left in the two codecs and the xlsx schema files (sheet and column names compared without case; a codec's own cell reading) |
+| 9 | `packages/review` | 586 | Codex lane | partly, in four lanes (the fourth made a row's cells total; 110 places left, see the evidence below): the region's optional data are Options from `ReviewRow` to the last step of each screen (321 of 474 source places), the tests narrow with asserts (74 of 94), and the browser's reads are in `internal/browser.ts` (exempt for absence, decided 2026-11-26). Left: about 120 in source, most in `internal/ReviewGrid.tsx` (50) and `ReviewRegion.atoms.ts` (19): sparse cell lookups (`view.cells[id] ?? ""`), counters, and a component's own optional props, which stay counted (decided 2026-11-26); 20 in two test fixtures the gallery imports, which cannot use the test asserts |
+| 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | partly, in three lanes: every caller states its reactivity keys, `keep`, toast lead and `sayError` fields; the browser's reads are in `client/src/Storage.browser.ts` and `ui/src/internal/browser.ts` (exempt for absence). Left: about 55, named in VERDICTS: `Effect.runSync` in `Json.codec.ts` and `Api.atoms.ts`, `ListTable`'s facet counts and search clean-ups, `SayError`'s path wording, and components' own optional props |
+| 11 | `packages/catalog/web` | 572 | Codex lane | done but for 19 places in its tests and two in source: 292 of 324 source places cleared, the editor is Closed or Open, worker messages cross encoded; five files that show or repair a reviewed cell are exempt for clean-ups and `internal/browser.ts` for absence (decided 2026-11-26). Left in source: the table hook's page count before the first read (`ItemsPage.screen.tsx`) and a ReactNode check in `ImportPage.screen.tsx` |
+| 12 | `packages/access/web` | 37 | Codex lane | done: no line of the baseline names it but the two exempt edges (`Session.atoms.ts`, `internal/authClient.ts`: the browser's and Better Auth's own APIs, decided 2026-11-26). The slug of a new organization is a schema's (`OrganizationSlugStem`), compared with the old helper on five names; not seen on screen, since sign-up is closed in development |
+| 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | partly: tests 95 to 4 (a first round that read `.valueOrUndefined` was refused and redone; the law now counts it), source 51 to 18. Left: the OpenAPI document's JSON (`api/v1/Document.ts`), `SameOrigin`'s header reads, and gallery pages |
+| 14 | `packages/infra` | 7 | Codex lane | done: 15 places under the new reader, all cleared; the stage plan is unchanged and no alchemy command was run. Two `onFailure: () => []` branches stay, which the law does not count |
+| 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | done: the edges are on `exemptions` as Benjamin decided each (2026-11-25, 2026-11-26 twice): the byte readers, Better Auth's and the browser's APIs, the reviewed cell's display files, four browser-edge modules. The Items example a new feature copies (CLAUDE.md, "Adding a feature") was run through the law: `Item.read.ts`, `ItemQuery.command.ts`, `Items.handler.ts`, `ItemStore.adapter.ts` and `ItemEditor.screen.tsx` hold no counted place; `ItemsPage.screen.tsx` holds one, the page count the vendored table hook wants before the first read |
 
 ## Where the pilot stands
 
 Done on 2026-11-23. Baseline: 1,687 places in 204 files, down from 2,120 in 248; no line names the catalog's
-contract, model or host. Benjamin answered the last round the same day (SPEC, questions 4 to 6).
+contract, model or host. Merged as pull request 9 on 2026-11-26; the lanes after it (rows 5 to 15 above) are
+tracked in issue 13, which replaces issue 5. Benjamin answered the last round the same day (SPEC, questions 4 to 6).
 
 Checked: `bun run check` and `bun run check:full` on the final tree, the Verify lock equal to `main`'s, the two slow
 tests that write 50,000 rows, and on screen on a fresh database: `items_messy.csv` reviewed as 24 Needs a decision,
@@ -113,6 +114,102 @@ change to a schema that the browser sends.
   structured clone. The head's sheet crossed as a name or null; a chunk of rows now crosses encoded by `StagedRow`'s
   schema and is decoded in `Upload.controller.ts`.
 
+## Where the lanes stand
+
+2026-11-26, on `feat/defaults-sweep` (worktree `.claude/worktrees/defaults-sweep`, from `main` at `8d5accaa`): rows 5,
+6 and 7 merged. `bun run check:full` passes on the merged tree (112 tasks) and the Verify lock equals `main`'s. Not
+seen on screen: no lane so far changed a schema the browser sends or receives.
+
+2026-11-26, after rows 8 (first lane), 12 and 14 merged, on port 5174 from a fresh database, signed in as Dana
+Whitfield: pressed "Use items_messy.csv"; Review read Needs a decision 24, Cannot import 21, Ready 155, All 200;
+pressed "Import 155, skip 45", the dialog read "Import 155 items?" with "Fixed by a rule 17, Unchanged from the file
+138"; pressed "Import 155 items"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items read
+"155 items"; People read "Example Works (test) · 3 people" with each person's email. Screenshot
+`.scratch/shots/sweep-1-result.png`.
+
+2026-11-26, after rows 9, 10, 11 and 13 and the browser-edge lane merged: the baseline names 55 files and 333
+places (main: 1,687). `bun run check:full` passed on the tree before the browser-edge lane (112 tasks) and the Verify
+lock equals `main`'s. On port 5174 from a fresh database, signed in as Dana Whitfield: pressed Continue on the open
+`items_messy.csv`; Review read Needs a decision 24, Cannot import 21, Ready 155, All 200; pressed "Leave out 2" on
+the SKU group and "Undo: 2 rows left out", and it read the same; pressed "Import 155, skip 45", the dialog read
+"Import 155 items?" (Fixed by a rule 17, Unchanged from the file 138); pressed "Import 155 items"; Result read Not
+imported 45, Imported 155, Already there 0, All 200; Items read "155 items". Opened "Edit Brass Washer M6", typed
+2456 in Qty on hand, pressed Save: the row reads 2,456 BX. Pressed "Use items_messy.csv" again: Needs a decision 25,
+Cannot import 21, Ready 0, Already there 154, All 200 (the changed item asks keep or replace). After the browser-edge
+lane: pressed "Leave out 2" there, it read Needs a decision 21, Ready 2, Left out 2; reloaded the page, it read the
+same and offered "Undo: 2 rows left out".
+
+
+2026-11-26, the sweep's last state, at `744ce47c`: the baseline names 50 files and 295 places (136 fallback, 108
+absence, 2 unwrap, 49 clean-up; main: 1,687). `bun run check:full` passes (112 tasks) and the Verify lock equals
+`main`'s. On port 5174 from a fresh database: pressed "Use items_messy.csv"; Review read Needs a decision 24, Cannot
+import 21, Ready 155, All 200; pressed "Import 155, skip 45", then "Import 155 items" in the dialog "Import 155
+items?"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items read "155 items". Screenshot
+`.scratch/shots/sweep-3-result.png`. Not seen on screen: Match (the sample needs none), the table assistant, People
+after the last lanes, sign-up, and a phone width.
+
+2026-11-26, after a second round of six lanes run one after the other (app, foundation, review, ui and client, the
+review region's total cells, catalog/web's last pass), at `54149b01`: the baseline names 34 files and 162 places (70
+fallback, 68 absence, 1 unwrap, 23 clean-up; main: 1,687). By package: review 98 in source and 12 in tests, catalog/web
+2 and 19, ui 16, apps/inventory 7 and 1, the csv and xlsx codecs 5, client 2. A review row's cells are a complete
+record for the region's columns, built once where rows enter (decided 2026-11-26); drawing the grid for the 200-row
+sample measured +0.6% unpinned and -2.0% pinned over 21 paired runs. What review still holds is mostly counters and
+groupings whose folds measured 10% to 52% slower and were left, layout and navigation absence, and a component's own
+optional props. No `!` non-null assertion is left in our own code; the four `schemaSync:off` comments are gone (seven
+`@effect-diagnostics` comments remain: six tests that read a binary file, one in `packages/infra`). `bun run
+check:full` passes (112 tasks) and the Verify lock equals `main`'s. On port 5174 from a fresh database: pressed "Use
+items_messy.csv"; Review read Needs a decision 24, Cannot import 21, Ready 155, All 200; pressed "Import 155, skip
+45", then "Import 155 items" in the dialog "Import 155 items?"; Result read Not imported 45, Imported 155, Already
+there 0, All 200; Items read "155 items". Pressed "Use items_messy.csv" again: Needs a decision 24, Cannot import 21,
+Ready 0, Already there 155, All 200; pressed "Leave out 2": Needs a decision 20, Ready 2, Left out 2; pressed Undo:
+the first counts again. Screenshot `.scratch/shots/sweep-4-result.png`. Not seen on screen: typing in a cell, Match,
+the item editor, the table assistant, People, Activity, and a phone width.
+
+Found on the way, and not the sweep's: the generated property "with reloads, sign-outs and closed tabs taken up" in
+`packages/catalog/web/test/Draft.machine.test.ts` has a rare counterexample that also fails on `main` (a 13-step
+ordering after which row c is said to be decided since by someone else when only this tab wrote it). Its replay token
+is in `VERDICTS.md`, in the review package's fourth lane. Nothing was changed for it.
+
+2026-11-26, the five bans that followed the sweep, on the same branch (decisions in
+`explorations/ideal-architecture/DECISIONS.md`, same date). `x!` is refused by `assertions:check` with no list. Every
+property of our own code is `readonly` (862 places in 91 files; the ledger holds the registry's components only). No
+`@effect-diagnostics` comment is left and its ledger is empty: a test's binary file is read through Vite
+(`packages/catalog/web/test/support/fixture.ts`), and the two parity tests record through scripts
+(`apps/inventory/scripts/record-csv-parity.mjs`, `record-xlsx-parity.mjs`). A `Context.Service` method of two or more
+arguments is dual with the record first, and `dual:check` reads service shapes (34 methods in seven services, 17
+helpers). No type assertion is left in our own code (124 removed); five claims go through `unsafeAssert` of
+`@beep/unsafe-assert`, each with its reason in `packages/tooling/tool/cli/ledgers/unsafe-asserts.json`, waiting for
+Benjamin's approval. `bun run check:full` passed (114 tasks, the Verify lock equal to `main`'s) before the fix below,
+and `bun run check` (107 tasks) after it.
+
+Looking found what the tests did not: with the cast gone from the review region's facet control, the column handed
+to `DataTableFacetedFilter` was a spread of the table's column, which drops `table` (not an own property), and the
+Review step drew nothing ("Cannot read properties of undefined (reading 'atoms')"). Fixed by naming `table` in the
+object. Seen after the fix, on port 5174 from a fresh database: "Use items_messy.csv", Review read Needs a decision
+24, Cannot import 21, Ready 155, All 200; opened Category and picked Component, the control read "Category Component";
+"Import 155, skip 45", "Import 155 items"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items
+read "155 items"; "Edit Brass Washer M6" opened with 26.99 and 2455; People listed three members; Activity listed the
+import's changes. Screenshot `.scratch/shots/followups-result.png`. Not seen: typing in a review cell, Match, the
+table assistant, a save in the editor, a phone width. No test draws the review region's facet control with a real
+table: that gap is open.
+
+What the lanes taught, beyond the pilot's list:
+
+- **Two lanes that rewrite the same files conflict on every line both reshaped.** The review lane and the catalog/web
+  lane each changed the tests the other's types forced; the merge took a lane of its own, briefed with what each side
+  did. Cut such lanes one after the other, not side by side.
+- **A lane wraps a value in `O.fromNullishOr` at each use when the owning type is another lane's.** The second pass
+  over a package's tests, after its source carries Options, removes them.
+
+- **A lane clears the law by renaming the question unless it is told not to.** `Result.getOrThrow(S.decodeResult(…))`
+  for a fallback, a schema built inside a function to hold a default, an encode to get `undefined` back, a double
+  negation for an `O.match`. Every brief now carries the forms refused and the forms wanted, and each diff is read
+  for them before it is merged.
+- **Codex cannot commit from its sandbox** (git's metadata is read-only even with the common dir added): a lane
+  leaves its tree dirty and the orchestrator commits after reading the diff.
+- **A third-party API's optional properties are spread with `R.getSomes`** (`...R.getSomes({ baseURL })`), and an
+  Option sorts with `O.makeOrder`: no fallback is written for either.
+
 ## Evidence
 
 - beep-effect lints study, 2026-11-23, at beep-effect `92be3a06`: read by a Codex lane from source, each claim with
@@ -120,3 +217,55 @@ change to a schema that the browser sends.
   beep-effect paths at length) in the session's `.scratch/defaults/port-study.md`.
 - `typescript/no-unnecessary-condition`, type-aware, run on the catalog's contract, model and host: one finding,
   `model/src/Suggestion/Suggest.rules.ts:147`.
+
+## New-kind pilot follow-up, 2026-11-25
+
+The catalog pilot had 69 newly counted places: 34 literal `onNone` fallbacks, 28 test guards and seven unwrapped
+optional keys. Ontology added five test guards. The follow-up removes 72 of those 74 places. Two remain:
+`Cell.shown` and `Cell.formula` in `Reading/Spreadsheet.rules.ts`, plain optional keys crossing `postMessage`.
+They are exemption candidates for Benjamin; the exemptions and baseline are unchanged. The other packages' lanes
+remain open; this does not complete the goal or shrink the saved baseline.
+
+- Empty arrays use `A.empty`; existing Option-of-array folds return the held array itself. Empty optional model
+  arguments to the external driver use `Record.getSomes` at that edge.
+- Nullable vendor cell keys retain an outer Option around their nullable wire value, so changing preference keeps
+  null distinct from a missing key. Row extra/hidden defaults use `emptyWhenLeftOut`; `Row.make` constructs the
+  reader's output and the affected staged-note fixture.
+- `StoredDecisions.saves`, the twin's missing-update sort key and the reader's unnamed location carry their old values
+  on schemas. Aggregate SQL count queries with no row die as an invariant defect. `MappingChoice.at` still uses the
+  existing `stagedRevision` value; no Verify rule text changed.
+- Expected test branches narrow with `assertTrue` from `@effect/vitest/utils`. Properties that include inapplicable
+  input states name the domain precondition (for example a nonempty stock count or a list with an unused value), then
+  assert presence. Helper state transitions fold their success/failure explicitly.
+
+Evidence on this follow-up:
+
+- The scoped defaults law reads filenames (passing directories reads no files). It holds the pilot files to zero
+  fallback/test-guard findings and the two optional-key candidates above.
+- Parent's independent existing `ImportsTwin.test.ts` passed: the messy sample reviews as 24 Needs a decision,
+  21 Cannot import and 155 Ready and stores 155. The existing `Imports.slow.test.ts` passed on fresh D1, covering
+  review, confirm, stored rows, reload, replace and take-back. Logs: `/tmp/defaults-pilot-twin-final.log` and
+  `/tmp/defaults-pilot-d1-final.log`; these are local proof, not a hosted deployment or a new screen observation.
+- Parent's separate Verify project passed again on the final source: one test in 175.72 s,
+  `/tmp/defaults-pilot-verify-final.log`.
+- `BoundaryDefaults.test.ts` checks omitted-key Row encoding/defaults and structured clone, full Row round-trip,
+  vendor missing/null preservation through `withPreferred`, reader location text and StoredDecisions generation.
+- The changed decoded Row shape forced three web test adaptations: `csvDifferential.test.ts` and
+  `xlsxParity.test.ts` now encode the table before comparing the historical wire snapshots; `readSpreadsheet.test.ts`
+  asserts an empty decoded `extra` array instead of an omitted key. All snapshot files remain unchanged. Their
+  targeted runs pass (24 workbook parity cases, 12 CSV parity cases, 37 reader cases), as do the two
+  `ChunkCrossing.test.ts` cases. `/tmp/pilot-parity.log` and `/tmp/pilot-web-forced.log` hold these checks.
+- The four `BoundaryDefaults.test.ts` checks passed, `/tmp/pilot-boundary.log`.
+- Final `bun run check --env-mode=loose` passed: 105/105 tasks, 3m1.004s, with no cached tasks. It includes
+  catalog contract 100 tests, model 275 tests and five proof tests, ontology 132 tests, and catalog web 401 tests.
+  No web test needed a second try. Log: `/tmp/pilot-check-final.log`.
+  Temporary Bun install/cache and Wrangler registry paths were used because managed writable roots reject the
+  workstation's default caches. The first completed check found the three forced web test adaptations above; after
+  those were corrected, the final full check passed. No historical CSV/XLSX snapshot was re-recorded.
+- `bun run docs:check` and `git diff --check` passed. The baseline SHA-256 remains
+  `5bec5d1953f057216a8932febe38ea08157a27c290f16920372fb97c075741db`; the Verify lock remains
+  `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`.
+  No new browser observation or hosted deployment was performed.
+
+Needs the person: decide whether to approve the two Cell optional-key exemption candidates; the existing undecided
+fallback list retains its prior behavior.

@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // A confirm names the revision of the draft its screen showed, and the server writes it only while the draft is
 // still at that revision (DECISIONS.md: "Refuse, show, confirm again"). What must not break: a confirm made on an
 // older picture writes nothing at all, not an item and not the confirming person's own unsent rows, so nothing is
@@ -83,7 +84,9 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
             }
           })
           .pipe(marcus)
-        const result = O.getOrThrow(confirmed.result)
+        const resultOption = confirmed.result
+        assertTrue(O.isSome(resultOption), "expected result to be present")
+        const result = resultOption.value
         expect([confirmed.status, result.created, result.notImported]).toEqual(["imported", 155, 45])
         expect(A.sort(R.keys(confirmed.decisions), Order.String)).toEqual(["row-18", "row-55"])
         // One revision on, so the confirmed import is never taken for the open one it was made from.
@@ -169,7 +172,12 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
       const passed = A.filter(answers, Result.isSuccess)
       const failed = A.filter(answers, Result.isFailure)
       expect([passed.length, A.map(failed, (answer) => S.is(AlreadyImported)(answer.failure))]).toEqual([1, [true]])
-      const made = O.getOrThrow(O.getOrThrow(A.head(passed)).success.result)
+      const passedAnswerOption = A.head(passed)
+      assertTrue(O.isSome(passedAnswerOption), "expected passedAnswer to be present")
+      const passedAnswer = passedAnswerOption.value
+      const madeOption = passedAnswer.success.result
+      assertTrue(O.isSome(madeOption), "expected made to be present")
+      const made = madeOption.value
       expect(made.created).toBe(25)
       expect((yield* client.items.list().pipe(marcus)).length).toBe(before + 25)
     })

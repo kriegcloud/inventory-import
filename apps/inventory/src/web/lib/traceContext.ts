@@ -1,6 +1,7 @@
+import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as HttpClient from "effect/http/HttpClient"
-import { publicSettings } from "./settings.ts"
+import { BrowserSettings, publicSettings } from "./settings.ts"
 
 // THE PAGE'S TRACE CONTEXT. A request gets a span, and sends its trace context (`traceparent`), only once the
 // exporters are plugged in (./telemetry.ts). The first requests of a page leave before they are: their spans would
@@ -19,7 +20,7 @@ export const sendTraceContext = () => {
 }
 
 /** Until `sendTraceContext`, the page's requests make no span and send no trace context (unless DevTools is on). */
-export const traceContextGate = Layer.succeed(
+export const traceContextGate = Layer.effect(
   HttpClient.TracerDisabledWhen,
-  () => !sending && !(import.meta.env.DEV && publicSettings.effectDevTools)
-)
+  Effect.map(BrowserSettings, (settings) => () => !sending && !(import.meta.env.DEV && settings.effectDevTools))
+).pipe(Layer.provide(publicSettings))

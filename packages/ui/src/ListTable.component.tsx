@@ -1,3 +1,9 @@
+import { unsafeAssert } from "@beep/unsafe-assert"
+import * as R from "effect/Record"
+import * as O from "effect/Option"
+import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as A from "effect/Array"
 import { createColumnHelper, type ColumnDef, type FilterFn, type RowData } from "@tanstack/react-table"
 import * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
@@ -10,7 +16,7 @@ import { createDataTableConfig } from "@inventory/ui/components/data-table/data-
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
 import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table-toolbar"
-import type { ColumnSelectOption, DataTableColumnConfig } from "@inventory/ui/components/data-table/data-table-types"
+import type { ColumnSelectOption } from "@inventory/ui/components/data-table/data-table-types"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import { useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
@@ -25,17 +31,17 @@ export type ListColumn<Row> = {
   readonly id: string
   readonly label: string
   /** Pixels. Leave it out on one column to give it the room that is left. */
-  readonly width?: number
+  readonly width: O.Option<number>
   readonly align?: "right"
   /**
    * What the column sorts, filters and is searched by. Left out, the column only shows its cells (a column of row
    * buttons): it does not sort, filter, hide or take part in the search.
    */
-  readonly value?: (row: Row) => string | number
+  readonly value: O.Option<(row: Row) => string | number>
   /** What the cell shows. Left out, the value as text. */
-  readonly cell?: (row: Row) => ReactNode
+  readonly cell: O.Option<(row: Row) => ReactNode>
   /** Shown on hover. Left out, a cell that is plain text shows its own text: the column may be too narrow for it. */
-  readonly title?: (row: Row) => string
+  readonly title: O.Option<(row: Row) => string>
   /** True when this row has nothing in this column: a phone card then leaves the line out. */
   readonly blank?: (row: Row) => boolean
   /** False for a column whose heading does not sort (a pair of values, a sentence). */
@@ -63,24 +69,30 @@ const leastFlexible = 160
  * The search box's rule for a held list: every word typed, in any order, is somewhere in the row's visible columns
  * that are searched, ignoring case. "rule cost" finds a cost decided by a rule.
  */
-const everyWord: FilterFn<DataTableFeatures, RowData> = (row, _columnId, filterValue) => {
-  const words = (typeof filterValue === "string" ? filterValue : "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((word) => word !== "")
-  if (words.length === 0) return true
+const SearchKey = S.String.pipe(S.decode(SchemaTransformation.toLowerCase())).annotate({
+  description: "Case-insensitive list search comparison key."
+})
+const readSearchKey = S.decodeOption(SearchKey)
+
+const everyWord = <Row extends RowData>(...args: Parameters<FilterFn<DataTableFeatures, Row>>): boolean => {
+  const [row, _columnId, filterValue] = args
+  const words = O.map(readSearchKey(typeof filterValue === "string" ? filterValue : ""), (text) =>
+    text.split(/\s+/).filter((word) => word !== "")
+  )
+  if (O.exists(words, (words) => words.length === 0)) return true
   // The row's text is put together each time it is asked for, and nothing of it is kept: these lists are held whole
   // and are short (the server sends at most a few thousand rows), and the table keeps each cell's value itself.
-  const found = row.table
-    .getVisibleLeafColumns()
-    .filter((column) => column.getCanGlobalFilter())
-    .map((column) => {
-      const value = row.getValue(column.id)
-      return typeof value === "string" || typeof value === "number" ? String(value) : ""
-    })
-    .join(" ")
-    .toLowerCase()
-  return words.every((word) => found.includes(word))
+  const found = readSearchKey(
+    row.table
+      .getVisibleLeafColumns()
+      .filter((column) => column.getCanGlobalFilter())
+      .map((column) => {
+        const value = row.getValue(column.id)
+        return typeof value === "string" || typeof value === "number" ? String(value) : ""
+      })
+      .join(" ")
+  )
+  return O.exists(words, (words) => O.exists(found, (found) => words.every((word) => found.includes(word))))
 }
 
 /** Every value a column has in these rows, with how many rows have it, for its quick filter. */
@@ -88,17 +100,17 @@ const optionsOf = <Row,>(rows: ReadonlyArray<Row>, value: (row: Row) => string |
   const counts: Record<string, number> = {}
   for (const row of rows) {
     const text = String(value(row))
-    counts[text] = (Object.hasOwn(counts, text) ? (counts[text] ?? 0) : 0) + 1
+    counts[text] = O.match(R.get(counts, text), { onNone: () => 1, onSome: (count) => count + 1 })
   }
-  return Object.keys(counts)
-    .sort((a, b) => a.localeCompare(b))
-    .map((text) => ({ label: text === "" ? "Not set" : text, value: text, count: counts[text] ?? 0 }))
+  return Object.entries(counts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([text, count]) => ({ label: text === "" ? "Not set" : text, value: text, count }))
 }
 
 type ListInput<Row extends RowData> = {
   readonly columns: Atom.Atom<ReadonlyArray<ListColumn<Row>>>
   readonly rows: Atom.Atom<ReadonlyArray<Row>>
-  readonly maxWidth: number | undefined
+  readonly maxWidth: number
 }
 
 /**
@@ -110,30 +122,39 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
   // The column without a width takes the room the others leave, never less than `leastFlexible`: only then does
   // the table scroll sideways inside its frame.
   const flexible = Atom.readable((get) => {
-    const room = Math.min(get(contentWidth), input.maxWidth ?? Number.POSITIVE_INFINITY)
-    const fixed = get(input.columns).reduce((total, column) => total + (column.width ?? 0), 0)
+    const room = Math.min(get(contentWidth), input.maxWidth)
+    const fixed = A.reduce(get(input.columns), 0, (total, column) =>
+      O.match(column.width, { onNone: () => total, onSome: (width) => total + width })
+    )
     return Math.max(leastFlexible, room - chrome - fixed)
   })
   // The config follows the columns' ids and what each does, not the array itself: columns made anew (their cells
   // follow the page's state) keep the table's order, its filters and its page.
-  const shape = Atom.map(input.columns, (columns) =>
-    columns
-      .map(
-        (column) =>
-          `${column.id}:${column.value !== undefined && column.sortable !== false ? "sort" : ""}:${column.value !== undefined && column.facet === true ? "facet" : ""}`
-      )
-      .join("|")
+  const shape = Atom.withEquality(
+    Atom.map(input.columns, (columns) =>
+      columns.map((column) => ({
+        id: column.id,
+        sorts: O.isSome(column.value) && column.sortable !== false,
+        facet: O.isSome(column.value) && column.facet === true
+      }))
+    ),
+    (before, next) =>
+      before.length === next.length &&
+      before.every((entry, index) => {
+        const other = next[index]
+        return entry.id === other?.id && entry.sorts === other.sorts && entry.facet === other.facet
+      })
   )
-  const config = Atom.map(shape, (now) =>
+  const config = Atom.map(shape, (columns) =>
     createDataTableConfig({
       columns: Object.fromEntries(
-        now.split("|").map((entry): [string, DataTableColumnConfig] => {
-          const [id = "", sorts, facet] = entry.split(":")
-          return [
-            id,
-            { ...(sorts === "" ? { enableSorting: false } : {}), ...(facet === "" ? {} : { variant: "select" }) }
-          ]
-        })
+        columns.map((column) => [
+          column.id,
+          {
+            ...(column.sorts ? {} : { enableSorting: false }),
+            ...(column.facet ? { variant: "select" as const } : {})
+          }
+        ])
       ),
       defaultPageSize: pageSizes[1],
       pageSizeOptions: pageSizes,
@@ -146,11 +167,15 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
     const room = get(flexible)
     const col = createColumnHelper<DataTableFeatures, Row>()
     const first = columns[0]?.id
-    return columns.map((column): ColumnDef<DataTableFeatures, Row, unknown> => {
-      const size = column.width ?? room
-      const show = column.cell ?? ((row: Row) => (column.value === undefined ? null : String(column.value(row))))
+    return A.map(columns, (column): ColumnDef<DataTableFeatures, Row, unknown> => {
+      const size = O.match(column.width, { onNone: () => room, onSome: (width) => width })
+      const valueCell = O.match(column.value, {
+        onNone: () => (_row: Row) => null,
+        onSome: (value) => (row: Row) => String(value(row))
+      })
+      const show = O.match(column.cell, { onNone: () => valueCell, onSome: (cell) => cell })
       const value = column.value
-      if (value === undefined) {
+      if (O.isNone(value)) {
         return col.display({
           id: column.id,
           header: column.label,
@@ -158,16 +183,19 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
           meta: { label: column.label },
           enableHiding: false,
           size
-        }) as ColumnDef<DataTableFeatures, Row, unknown>
+        })
       }
-      return col.accessor((row) => value(row), {
+      return col.accessor((row): unknown => value.value(row), {
         id: column.id,
         header: ({ column: header }) => (
           <DataTableColumnHeader column={header} className={column.align === "right" ? "justify-end" : undefined} />
         ),
         cell: ({ row }) => {
           const content = show(row.original)
-          const hover = column.title?.(row.original) ?? (typeof content === "string" ? content : undefined)
+          const hover = O.orElse(
+            O.map(column.title, (title) => title(row.original)),
+            () => O.liftPredicate(content, (content): content is string => typeof content === "string")
+          )
           // The record's name, first, in semibold; numbers at the right in tabular figures.
           const face =
             column.align === "right"
@@ -178,19 +206,19 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
                   ? "block py-1 leading-snug whitespace-normal"
                   : "block truncate"
           return (
-            <span className={face} title={hover}>
+            <span className={face} {...R.getSomes({ title: hover })}>
               {content}
             </span>
           )
         },
         meta: {
           label: column.label,
-          ...(column.facet === true ? { options: optionsOf(rows, value) } : {})
+          ...(column.facet === true ? { options: optionsOf(rows, value.value) } : {})
         },
         enableHiding: column.id !== first,
         enableGlobalFilter: column.searchable !== false,
         size
-      }) as ColumnDef<DataTableFeatures, Row, unknown>
+      })
     })
   })
   return { config, tableColumns }
@@ -223,10 +251,15 @@ type ListTableProps<Row extends RowData> = {
  * A list the page already holds, as a data table the person sorts from its headings, searches, filters by the
  * values a column has, and narrows to the columns they want; on a page as narrow as a phone, the same rows as cards.
  */
-export function ListTable<Row extends RowData>(props: ListTableProps<Row>) {
+export function ListTable<Row extends RowData>({ maxWidth = Number.POSITIVE_INFINITY, ...props }: ListTableProps<Row>) {
   return (
     // One scope serves every kind of row: inside it a row is whatever the columns read.
-    <ListScope.Provider value={{ columns: props.columns, rows: props.rows, maxWidth: props.maxWidth } as never}>
+    <ListScope.Provider
+      value={unsafeAssert<ListInput<RowData>>(
+        { columns: props.columns, rows: props.rows, maxWidth },
+        "This scope is paired with ListBody<Row>; ScopedAtom cannot preserve a component generic across its context."
+      )}
+    >
       <ListBody {...props} />
     </ListScope.Provider>
   )
@@ -238,18 +271,21 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
   const columns = useAtomValue(props.columns)
   const rows = useAtomValue(props.rows)
   const config = useAtomValue(list.config)
-  const tableColumns = useAtomValue(list.tableColumns) as unknown as Array<ColumnDef<DataTableFeatures, Row, unknown>>
-  const first = columns[0]?.id
+  const tableColumns = unsafeAssert<Array<ColumnDef<DataTableFeatures, Row, unknown>>>(
+    useAtomValue(list.tableColumns),
+    "ListScope was created from this ListTable<Row> columns; React context erases the shared row generic."
+  )
+  const pinnedStart = A.map(A.take(columns, 1), (column) => column.id)
   const ends = columns.filter((column) => column.end === true).map((column) => column.id)
   const { table } = useDataTable({
     mode: "client",
-    data: rows as Array<Row>,
+    data: A.fromIterable(rows),
     columns: tableColumns,
     config,
     getRowId: props.rowKey,
-    globalFilterFn: everyWord as FilterFn<DataTableFeatures, Row>,
+    globalFilterFn: everyWord<Row>,
     enableRowSelection: false,
-    initialState: { columnPinning: { start: first === undefined ? [] : [first], end: ends } }
+    initialState: { columnPinning: { start: pinnedStart, end: ends } }
   })
 
   const searched = typeof table.state.globalFilter === "string" ? table.state.globalFilter : ""
@@ -292,7 +328,7 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
     const blanks = Object.fromEntries(columns.map((column) => [column.id, column.blank]))
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        {toolbar === null ? null : <div className="px-3 pb-2">{toolbar}</div>}
+        {rows.length === 0 ? null : <div className="px-3 pb-2">{toolbar}</div>}
         <DataTableCards
           table={table}
           label={props.caption}

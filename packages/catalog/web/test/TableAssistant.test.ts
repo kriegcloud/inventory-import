@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 // When an assistant's answer may still change the table. The request outlives the screen that asked, and the table
 // it would be applied through writes into the address of whatever the person is on by then: so an answer is applied
 // only on the very drawing of the assistant that asked, for the same person in the same organization. The address
@@ -13,14 +14,20 @@ import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
 import { conversationKey, emptyConversation, writeConversation } from "../src/Conversation.machine.ts"
 import { keptColumns } from "../src/ItemsPage.screen.tsx"
-import { askingFrom, assistantPresent, assistantScreen, stillAsked } from "../src/TableAssistant.screen.tsx"
+import {
+  askingFrom,
+  assistantPresent,
+  assistantScreen,
+  stillAsked,
+  useTableView
+} from "../src/TableAssistant.screen.tsx"
 
 // The page's module asks how wide the window is when it is first read: a desk-wide page with no sidebar cookie.
 vi.hoisted(() => {
   const kept: Record<string, string> = {}
   Object.assign(globalThis, {
     localStorage: {
-      getItem: (key: string) => kept[key] ?? null,
+      getItem: (key: string) => StorageTwin.getItem(kept, key),
       setItem: (key: string, value: string) => {
         kept[key] = value
       },
@@ -115,13 +122,42 @@ describe("an assistant's answer", () => {
     })
     // The Items table stays drawn through a switch of organization answered at once.
     t.registry.mount(keptColumns)
-    expect(t.registry.get(keptColumns)).toEqual(hidden)
+    expect(t.registry.get(keptColumns)).toEqual(O.some(hidden))
     t.registry.set(t.signedIn, memberOf("org_lakeside"))
-    expect(t.registry.get(keptColumns)).toEqual({})
+    expect(t.registry.get(keptColumns)).toEqual(O.some({}))
   })
 
   it("is not applied when it was asked with no assistant drawn", () => {
     const t = world()
     expect(t.applies(askingFrom(t.registry, table))).toBe(false)
+  })
+})
+
+describe("the assistant's table state boundary", () => {
+  it("keeps configured filters and leaves malformed values out of its snapshot without changing the table", () => {
+    const valid = {
+      id: "category",
+      value: ["components"],
+      variant: "select" as const,
+      operator: "inArray" as const,
+      filterId: "category-0"
+    }
+    const held: ReadonlyArray<unknown> = [valid, { ...valid, value: 42 }]
+    const view = useTableView(
+      {
+        atoms: {
+          sorting: { get: () => [] },
+          columnFilters: { get: () => held },
+          columnVisibility: { get: () => ({}) }
+        },
+        setSorting: () => undefined,
+        setColumnFilters: () => undefined,
+        setColumnVisibility: () => undefined,
+        setGlobalFilter: () => undefined
+      },
+      false
+    )
+    expect(view.read().filters).toEqual([valid])
+    expect(held).toHaveLength(2)
   })
 })

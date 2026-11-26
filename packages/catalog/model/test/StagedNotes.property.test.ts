@@ -1,3 +1,4 @@
+import { Row } from "../src/Reading/Spreadsheet.rules.ts"
 // A workbook can make the reader write thousands of notes (one for each number format Excel shows another way), and an
 // upload sends at most `maxNotes`: so staging keeps every note when they fit, and past it the warnings first, then
 // every other information note (called layout notes here: rows above the heading, blank rows), then the number-format
@@ -17,6 +18,7 @@ import { stageTable } from "@inventory/catalog-model/Staging"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 
 const LayoutKind = NoteKind.check(
@@ -97,14 +99,16 @@ describe("a staged file's notes", () => {
           fileName: staged.fileName,
           headerRowNumber: staged.headerRowNumber,
           columns: A.map(staged.columns, (column) => ({ ...column, header: column.label })),
-          rows: A.map(staged.rows, (row) => ({
-            rowNumber: row.rowNumber,
-            cells: A.map(row.cells, (cell) => ({
-              text: cell.text,
-              type: "text" as const,
-              ...O.match(cell.shown, { onNone: () => ({}), onSome: (shown) => ({ shown }) })
-            }))
-          })),
+          rows: A.map(staged.rows, (row) =>
+            Row.make({
+              rowNumber: row.rowNumber,
+              cells: A.map(row.cells, (cell) => ({
+                text: cell.text,
+                type: "text" as const,
+                ...R.getSomes({ shown: cell.shown })
+              }))
+            })
+          ),
           notes: read
         }
       })

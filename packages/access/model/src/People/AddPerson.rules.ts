@@ -34,10 +34,11 @@ export const alreadyMember = (found: {
 }): AddPersonProblem =>
   AddPersonProblem.make({
     kind: "alreadyMember",
-    problem: `${found.name} is already in ${found.organization}${O.match(found.existing, {
-      onNone: () => "",
-      onSome: (person) => ` as ${person.role === "viewer" ? "a" : "an"} ${person.role}`
-    })}.`,
+    problem: O.match(found.existing, {
+      onNone: () => `${found.name} is already in ${found.organization}.`,
+      onSome: (person) =>
+        `${found.name} is already in ${found.organization} as ${person.role === "viewer" ? "a" : "an"} ${person.role}.`
+    }),
     todo: "Change their role in the list instead."
   })
 

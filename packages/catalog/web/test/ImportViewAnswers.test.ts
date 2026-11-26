@@ -1,3 +1,9 @@
+import type { SuggestAnswer } from "./support/catalog.ts"
+import { Suggestion, suggestedByRule } from "@inventory/catalog-contract/Suggestion"
+import { SuggestionId, RowId } from "@inventory/catalog-contract/Ids"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import * as A from "effect/Array"
+import { assertTrue } from "@effect/vitest/utils"
 // An answer put into the import's view (suggestions, a match) must change only its own part of what the view holds
 // when the answer arrives. Built from the view as it was at the press, it took back the decisions saved, or the match
 // made, while the request was out: the screen then showed less than the server holds.
@@ -12,12 +18,21 @@ import { importView, matchColumn, suggestFixes } from "../src/Imports.atoms.ts"
 import { importId, registryWith, viewAt } from "./support/catalog.ts"
 
 const settle = Effect.sleep("10 millis")
-const suggestion = { rowId: "row-3" }
+const suggestion = Suggestion.cases.name.make({
+  id: SuggestionId.make("00000000-0000-4000-8000-000000000003"),
+  rowId: RowId.make("row-3"),
+  rowNumber: 3,
+  from: "",
+  to: "Bolt",
+  by: suggestedByRule,
+  confidence: "low",
+  basis: "Description names a bolt"
+})
 
 describe("an answer put into the import's view", () => {
   it.live("suggestions change only the suggestions of the view held when they arrive", () =>
     Effect.gen(function* () {
-      const answer = Deferred.makeUnsafe<{ readonly suggestions: ReadonlyArray<unknown> }>()
+      const answer = Deferred.makeUnsafe<SuggestAnswer>()
       const registry = registryWith({ imports: { suggest: () => Deferred.await(answer) } })
       const read = importView(importId)
       registry.mount(read)
@@ -29,9 +44,16 @@ describe("an answer put into the import's view", () => {
       // Three decisions are saved while the model works: the view moves to revision 13.
       const decisions = { "row-1": decisionFromFlags({ out: true }) }
       registry.set(read, viewAt({ revision: 13, decisions }))
-      yield* Deferred.succeed(answer, { suggestions: [suggestion] })
+      yield* Deferred.succeed(answer, {
+        suggestions: [suggestion],
+        made: [suggestion],
+        answeredBy: AnsweredBy.cases.Rules.make({ reason: "Rules supplied the name" }),
+        lines: []
+      })
       yield* settle
-      const held = registry.get(read).pipe(AsyncResult.value, O.getOrThrow)
+      const expectedSome1 = registry.get(read).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome1), "expected registry.get(read).pipe(AsyncResult.value)")
+      const held = expectedSome1.value
       expect([held.revision, held.decisions, held.suggestions]).toEqual([13, decisions, [suggestion]])
     })
   )
@@ -56,11 +78,17 @@ describe("an answer put into the import's view", () => {
       registry.set(matchColumn, { id: importId, field: "sku", column: O.some(2) })
       yield* settle
       // The second match answers first, with the later revision; the first lands after it.
-      yield* Deferred.succeed(answers[1]!, viewAt({ revision: 12 }))
+      const requiredEntry1 = A.get(answers, 1)
+      assertTrue(O.isSome(requiredEntry1), "expected answers[1]")
+      yield* Deferred.succeed(requiredEntry1.value, viewAt({ revision: 12 }))
       yield* settle
-      yield* Deferred.succeed(answers[0]!, viewAt({ revision: 11 }))
+      const requiredEntry2 = A.get(answers, 0)
+      assertTrue(O.isSome(requiredEntry2), "expected answers[0]")
+      yield* Deferred.succeed(requiredEntry2.value, viewAt({ revision: 11 }))
       yield* settle
-      expect(registry.get(read).pipe(AsyncResult.value, O.getOrThrow).revision).toBe(12)
+      const expectedSome2 = registry.get(read).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome2), "expected registry.get(read).pipe(AsyncResult.value)")
+      expect(expectedSome2.value.revision).toBe(12)
     })
   )
 })

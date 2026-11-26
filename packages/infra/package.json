@@ -22,12 +22,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@alchemy.run/1password": "2.0.0-beta.87-734c27a",
-    "@alchemy.run/cloudflare": "2.0.0-beta.87-734c27a",
-    "@alchemy.run/github": "2.0.0-beta.87-734c27a",
+    "@alchemy.run/1password": "2.0.0-beta.87-e1c3e6d",
+    "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+    "@alchemy.run/github": "2.0.0-beta.87-e1c3e6d",
     "@beep/identity": "workspace:*",
     "@beep/schema": "workspace:*",
-    "alchemy": "2.0.0-beta.87-734c27a",
+    "alchemy": "2.0.0-beta.87-e1c3e6d",
     "effect": "catalog:"
   },
   "devDependencies": {

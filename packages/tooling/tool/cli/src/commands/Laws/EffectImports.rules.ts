@@ -50,7 +50,7 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
   only: ReadonlyArray<string>
 ) {
   const repo = yield* Repo
-  const named = A.map(only, (file) => repo.relative(repo.root, repo.resolve(file)))
+  const named = A.map(only, (file) => repo.relative(repo.resolve(file), repo.root))
   const lines = (text: string) => A.filter(Str.split("\n")(text), (line) => line !== "")
   const tracked = Effect.fn("EffectImports.tracked")(function* (patterns: ReadonlyArray<string>) {
     const answer = yield* repo.run("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...patterns])

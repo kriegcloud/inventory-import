@@ -1,3 +1,6 @@
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
 // The address is the only place the app keeps where the person is: the page in the path, the import and its step
 // in the query. A hard refresh therefore lands on the same screen. The rule this file protects (decision "atoms A5"):
 // the address is one atom over the app's own `navigate`, so a link, the back button and a refresh behave alike.
@@ -15,7 +18,7 @@ export const address: Atom.Atom<string> = Atom.readable((get) => {
   followers = [...followers, follow]
   window.addEventListener("popstate", follow)
   get.addFinalizer(() => {
-    followers = followers.filter((entry) => entry !== follow)
+    followers = A.filter(followers, (entry) => entry !== follow)
     window.removeEventListener("popstate", follow)
   })
   return snapshot()
@@ -25,15 +28,21 @@ export const address: Atom.Atom<string> = Atom.readable((get) => {
 export const location: Atom.Atom<{ readonly path: string; readonly params: URLSearchParams }> = Atom.map(
   address,
   (at) => {
-    const [path = "/", query = ""] = at.split("?")
-    return { path, params: new URLSearchParams(query) }
+    const parts = Str.split(at, "?")
+    return {
+      path: A.headNonEmpty(parts),
+      params: O.match(A.get(parts, 1), {
+        onNone: () => new URLSearchParams(),
+        onSome: (query) => new URLSearchParams(query)
+      })
+    }
   }
 )
 
 /** Goes to an address inside the app without a page load. `replace` keeps the back button on the previous screen. */
-export const navigate = (to: string, options?: { replace?: boolean }) => {
+export const navigate = (to: string, options: { readonly replace: boolean }) => {
   if (to === snapshot()) return
-  if (options?.replace === true) window.history.replaceState(null, "", to)
+  if (options.replace) window.history.replaceState(null, "", to)
   else window.history.pushState(null, "", to)
   for (const follow of followers) follow()
 }
@@ -57,12 +66,17 @@ export const useLocation = (): { readonly path: string; readonly params: URLSear
  * What a link inside the app takes: the address, and a click that goes there without a page load. A click with a
  * modifier key is left to the browser, so "open in a new tab" still works.
  */
-export const linkTo = (to: string, after?: () => void) => ({
+export const linkTo = (to: string, after: O.Option<() => void>) => ({
   href: to,
-  onClick: (event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; preventDefault: () => void }) => {
+  onClick: (event: {
+    readonly metaKey: boolean
+    readonly ctrlKey: boolean
+    readonly shiftKey: boolean
+    readonly preventDefault: () => void
+  }) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey) return
     event.preventDefault()
-    navigate(to)
-    after?.()
+    navigate(to, { replace: false })
+    O.map(after, (run) => run())
   }
 })

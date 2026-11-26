@@ -9,8 +9,11 @@
  * @packageDocumentation
  */
 import { AuditTrail } from "@inventory/access-contract/AuditTrail"
+import { ModelCallPurpose } from "@inventory/access-contract/ModelAllowance"
 import { Person } from "@inventory/access-contract/Person"
+import { Membership, OrganizationChoice } from "@inventory/access-contract/SessionState"
 import { Activity } from "@inventory/kernel/Activity"
+import { AgentRun } from "@inventory/kernel/AgentRun"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
 import type * as S from "effect/Schema"
@@ -20,6 +23,10 @@ const role = "packages/kernel/src/Role.schema.ts#Role"
 const activity = "packages/kernel/src/Activity.schema.ts#Activity"
 const person = "packages/access/contract/src/People/Person.read.ts#Person"
 const auditTrail = "packages/access/contract/src/Activity/AuditTrail.read.ts#AuditTrail"
+const agentRun = "packages/kernel/src/AgentRun.schema.ts#AgentRun"
+const organizationChoice = "packages/access/contract/src/Session/SessionState.read.ts#OrganizationChoice"
+const modelCallPurpose = "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts#ModelCallPurpose"
+const membership = "packages/access/contract/src/Session/SessionState.read.ts#Membership"
 
 /**
  * Each enrolled export by its `file#export`, the key `enrolment.json` gives it: the schema gate 5 reads the marks of.
@@ -29,7 +36,11 @@ export const enrolled: Readonly<Record<string, S.Top>> = {
   [role]: Role,
   [activity]: Activity,
   [person]: Person,
-  [auditTrail]: AuditTrail
+  [auditTrail]: AuditTrail,
+  [agentRun]: AgentRun,
+  [organizationChoice]: OrganizationChoice,
+  [modelCallPurpose]: ModelCallPurpose,
+  [membership]: Membership
 }
 
 /**

@@ -101,7 +101,7 @@ what moves it; to release one, remove the group.
 | bun | `.bun-version` | `packageManager` in the root's `package.json`; a `bun-version:` in a workflow; "Bun 1.4.4" in the standing documents |
 | Node | `engines.node` in the root's `package.json` (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (named, not written: the newest of a major is the registry's to say) |
 | A dependency of the catalog | its entry in the root's `catalog` | every `package.json` that asks for it: `"catalog:"`, never a version of its own |
-| Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.5" in the documents; the versions `vendor sync` writes into a vendored package |
+| Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.6" in the documents; the versions `vendor sync` writes into a vendored package |
 | `@effect/tsgo`, TypeScript, Better Auth | the one version the `package.json` files state | their name followed by a version in the documents |
 | Alchemy | `alchemy` in the `package.json` files; `vendor/alchemy/sources.json` once the packages are kept as files | every `@alchemy.run/*` dependency; with kept files, each dependency's `<version>-<commit>` and each override's file |
 | The Cloudflare compatibility date | `apps/inventory/wrangler.jsonc` | every other `wrangler*.jsonc`; `compatibility: { date }` in a package that declares `alchemy` |
@@ -110,7 +110,7 @@ what moves it; to release one, remove the group.
 | The Effect language service's schema | the installed `@effect/tsgo` | a tsconfig's `$schema` that names the library's repository instead |
 
 The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`. A version is read in
-a sentence only after its own name ("Effect 4.1", "`effect` 4.1.5's source"), and as precisely as the sentence
+a sentence only after its own name ("Effect 4.1", "`effect` 4.1.6's source"), and as precisely as the sentence
 states it: "Effect 4.1" stays two numbers. After a name written small only a whole version is read, so "no effect
 1.5 s later" is left alone.
 

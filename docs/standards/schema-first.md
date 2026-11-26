@@ -11,7 +11,7 @@ as, what it is when the input leaves it out, and which cases it can be, are all 
 around it reads as intent. These rules apply to every new package and to code as it moves into one; the app's existing
 code is measured against them, not yet rewritten.
 
-Every name below was checked in effect 4.1.5's source (`node_modules/effect/src`), and every example compiled and ran
+Every name below was checked in effect 4.1.6's source (`node_modules/effect/src`), and every example compiled and ran
 under the repository's full type-check profile. The sources these rules come from are beep-effect's
 `standards/schema-first-development-prompt.md` and its `schema-first-development`, `effect-first-development`,
 `crispen` and `jsdoc-annotation-specialist` skills, and Effect's `SCHEMA.md` and `ARBITRARY.md`.
@@ -108,6 +108,10 @@ tagged union instead (SF-6).
 
 Check: no decoded type has an optional property: `rg -n 'S\.optionalKey\(|S\.optional\(' <package>/src` finds only
 encoded-side keys wrapped by an `OptionFrom*` or a decoding default.
+
+A React component's own optional props stay `?:`, with defaults in destructuring. In `.tsx`, strict
+`=== undefined` and `!== undefined` comparisons on its props (including destructured names) may distinguish
+omission from explicit null. The defaults law still counts `??`, null comparisons and non-prop absence checks.
 
 ## SF-5. Starting values and missing-input values live on the schema
 

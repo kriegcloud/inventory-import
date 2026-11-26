@@ -1,0 +1,7 @@
+# The fixture of CQ-P05 (report 04 sections 3.1 and 4, report 18 section 10): the one identity CQ-P04's must-fail case
+# states the forbidden way, test_AcmeA and test_AcmeB said to be the same by owl:sameAs. It is read only beside
+# CQ-P04's fixture, with test_Decision1 removed. Every name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+<fixture/SourceRecord/test_AcmeA> owl:sameAs <fixture/SourceRecord/test_AcmeB> .

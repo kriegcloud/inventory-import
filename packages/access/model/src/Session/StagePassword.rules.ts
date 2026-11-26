@@ -14,18 +14,15 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 
 /** Whether two texts are the same, taking the same steps wherever they first differ. */
-const codes = (text: string): ReadonlyArray<number> =>
-  A.map(Str.split("")(text), (char) => O.getOrElse(Str.codePointAt(0)(char), () => 0))
+const codes = (text: string): Array<number> =>
+  A.flatMap(Str.split("")(text), (char) => O.toArray(Str.charCodeAt(char, 0)))
 
-const sameText = (a: string, b: string): boolean => {
-  const right = codes(b)
-  const differences = A.reduce(
-    codes(a),
+const sameText = (a: string, b: string): boolean =>
+  A.reduce(
+    A.zipWith(codes(a), A.pad(codes(b), a.length, 0), (x, y) => x ^ y),
     a.length ^ b.length,
-    (sum, code, index) => sum | (code ^ O.getOrElse(A.get(right, index), () => 0))
-  )
-  return differences === 0
-}
+    (sum, difference) => sum | difference
+  ) === 0
 
 /**
  * What to hold against an account's stored hash for the password a person typed, or none when it is refused

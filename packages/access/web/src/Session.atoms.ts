@@ -9,6 +9,8 @@
 // decided (2026-11-19, "atoms, the reads after a sign-out or a switch"): a switch back shows the rows at once. Every tab
 // of the browser shares one session cookie, so each sign-in, sign-out, switch and session found ended is said to the
 // other tabs (`changedKey` in localStorage), and each of them asks again at once, as it does when it is shown again.
+import { betterAuthClient } from "@beep/better-auth/Client"
+import { type BetterAuthRefused, Credentials } from "@beep/better-auth/ClientSchema"
 import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
@@ -28,6 +30,8 @@ import {
   type SignInFeatures
 } from "@inventory/access-contract/SessionState"
 import type { Member } from "@inventory/kernel/Member"
+import * as A from "effect/Array"
+import { identity } from "effect/Function"
 import * as Cause from "effect/Cause"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
@@ -42,8 +46,6 @@ import { $AccessWebId } from "./internal/identity.ts"
 
 const $I = $AccessWebId.create("Session")
 
-/** Better Auth's browser client, fetched the first time a person signs in, switches or signs out. */
-const loadAuthClient = () => import("./internal/authClient.ts")
 const decoder = import("./internal/Session.decode.ts")
 
 /** What the app tells the session once, before anything is drawn. */
@@ -132,12 +134,13 @@ const takeEnded = (who: O.Option<Member>): O.Option<string> => {
   const kept = tabStorage.read(endedKey)
   // Where the browser refuses to forget it, it is not taken: nothing is said, and the first screen is the landing.
   if (O.isNone(tabStorage.remove(endedKey))) return O.none()
-  const [of = "", at = ""] = Str.split(
-    O.getOrElse(kept, () => ""),
-    "\n"
-  )
-  const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
-  return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
+  return O.flatMap(kept, (text) => {
+    const parts = Str.split(text, "\n")
+    return O.flatMap(O.all({ of: A.get(parts, 0), at: A.get(parts, 1) }), ({ of, at }) => {
+      const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
+      return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
+    })
+  })
 }
 
 /**
@@ -264,15 +267,15 @@ export const signedInAsked: Atom.Atom<boolean> = Atom.readable(
 export interface SessionView {
   /** loading, then signed-out, no-organization or ready (`actor` is set only when ready; once ready, it stays so). */
   readonly status: "loading" | SessionState["status"]
-  readonly actor: Member | undefined
-  readonly email: string | undefined
+  readonly actor: O.Option<Member>
+  readonly email: O.Option<string>
   readonly organizations: ReadonlyArray<OrganizationChoice>
   /** What sign-in offers (test accounts, sign-up), once the answer says: none while it is asked. */
   readonly features: O.Option<SignInFeatures>
   /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
   readonly probablySignedOut: boolean
   /** Why the session could not be read, while it is not being asked again; with a member known, they stay. */
-  readonly error: unknown
+  readonly error: O.Option<unknown>
 }
 
 /**
@@ -281,18 +284,22 @@ export interface SessionView {
  * drawn, with whatever is being typed in it.
  */
 export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): SessionView => {
-  const known = result.pipe(AsyncResult.value, O.getOrUndefined)
-  const state = result.waiting && known?.status !== "ready" ? undefined : known
   // The answer as the shell may show it: a new answer is waited for unless it is already a member's.
   const shown = O.filter(AsyncResult.value(result), (answer) => !result.waiting || answer.status === "ready")
   return {
-    status: state?.status ?? "loading",
-    actor: state?.status === "ready" ? state.actor : undefined,
-    email: state === undefined || state.status === "signed-out" ? undefined : state.email,
-    organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
+    status: O.match(shown, { onNone: () => "loading", onSome: (state) => state.status }),
+    actor: O.flatMap(shown, actorOfSession),
+    email: O.flatMap(shown, emailOf),
+    organizations: O.match(
+      O.map(
+        O.filter(shown, (state) => state.status !== "signed-out"),
+        (state) => state.organizations
+      ),
+      { onNone: A.empty, onSome: identity }
+    ),
     features: O.map(shown, (answer) => answer.features),
-    probablySignedOut: state === undefined && !wasSignedIn(),
-    error: AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
+    probablySignedOut: O.isNone(shown) && !wasSignedIn(),
+    error: AsyncResult.isFailure(result) && !result.waiting ? result.cause.pipe(Cause.squash, O.some) : O.none()
   }
 })
 
@@ -357,14 +364,16 @@ export const switchOrganization = Atom.fn((organizationId: string, get) =>
   settledBeforeOwnSwitch(get.registry).pipe(
     Effect.andThen(Effect.sync(() => get.set(switchingTo, O.some(organizationId)))),
     Effect.andThen(
-      Effect.tryPromise({
-        try: () =>
-          loadAuthClient().then(({ authClient, orThrow }) =>
-            authClient.organization.setActive({ organizationId }).then(orThrow)
-          ),
-        catch: (cause) =>
-          SwitchRefused.make({ message: cause instanceof Error ? cause.message : "The organization was not opened." })
-      })
+      betterAuthClient.setActiveOrganization(organizationId).pipe(
+        Effect.mapError((refused) =>
+          SwitchRefused.make({
+            message: O.match(refused.sentence, {
+              onNone: () => "The organization was not opened.",
+              onSome: (sentence) => sentence
+            })
+          })
+        )
+      )
     ),
     Effect.tapError(() => Effect.sync(() => get.set(switchingTo, O.none()))),
     Effect.andThen(() => {
@@ -380,38 +389,42 @@ export const switchOrganization = Atom.fn((organizationId: string, get) =>
 
 /**
  * Signs in as another account (a test account, from the person's menu): out of this one, into that one, then a full
- * reload, so nothing the previous person saw stays in memory.
+ * reload, so nothing the previous person saw stays in memory. A sign-out Better Auth refused does not stop it: the
+ * sign-in that follows replaces the session either way.
  */
-export const signInAs = (account: { readonly email: string; readonly password: string }): Promise<void> =>
-  loadAuthClient().then(({ authClient, orThrow }) =>
-    authClient
-      .signOut()
-      .then(() => authClient.signIn.email(account))
-      .then(orThrow)
-      .then(() => {
+export const signInAs = (account: {
+  readonly email: string
+  readonly password: string
+}): Effect.Effect<void, BetterAuthRefused> =>
+  betterAuthClient.signOut.pipe(
+    Effect.ignore,
+    Effect.andThen(betterAuthClient.signIn(Credentials.make(account))),
+    Effect.andThen(
+      Effect.sync(() => {
         rememberSignedOut(false)
         sayChanged()
         leavePage()
       })
+    )
   )
 
 /** Signs out, then a full reload: nothing the previous person saw stays in memory for the next one. */
-export const signOut = (): Promise<void> =>
-  loadAuthClient().then(({ authClient, orThrow }) =>
-    authClient
-      .signOut()
-      .then(orThrow)
-      .then(() => {
-        rememberSignedIn(false)
-        rememberSignedOut(true)
-        sayChanged()
-        leavePage()
-      })
+export const signOut: Effect.Effect<void, BetterAuthRefused> = betterAuthClient.signOut.pipe(
+  Effect.andThen(
+    Effect.sync(() => {
+      rememberSignedIn(false)
+      rememberSignedOut(true)
+      sayChanged()
+      leavePage()
+    })
   )
+)
 
 /**
  * Signs in with an email and a password through Better Auth's own sign-in: a real session, the one the sign-in page
  * makes. For the app's development sign-in as the first test account; the page then asks who is signed in again.
  */
-export const signInWithPassword = (account: { readonly email: string; readonly password: string }): Promise<unknown> =>
-  loadAuthClient().then(({ authClient, orThrow }) => authClient.signIn.email(account).then(orThrow))
+export const signInWithPassword = (account: {
+  readonly email: string
+  readonly password: string
+}): Effect.Effect<void, BetterAuthRefused> => betterAuthClient.signIn(Credentials.make(account))

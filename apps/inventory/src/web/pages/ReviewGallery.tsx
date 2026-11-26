@@ -1,9 +1,13 @@
+import { identity } from "effect/Function"
 import { LayoutGridIcon } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Atom from "effect/reactivity/Atom"
 import * as Str from "effect/String"
+import * as S from "effect/Schema"
+import * as Effect from "effect/Effect"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -46,15 +50,26 @@ const states = [
 
 type GalleryState = (typeof states)[number][0]
 
+/** The selected gallery case, including the existing starting view for an absent or unknown URL state. */
+class GallerySelection extends S.Opaque<GallerySelection, { readonly brand: unique symbol }>()(
+  S.Struct({
+    state: S.Literals(A.map(states, ([id]) => id)).pipe(
+      S.annotateKey({ description: "The gallery case selected by its address" }),
+      S.withConstructorDefault(Effect.succeed<GalleryState>("default"))
+    )
+  }).annotate({ description: "The gallery's selected example" })
+) {}
+
 const readState = (): GalleryState => {
   const wanted = new URLSearchParams(window.location.search).get("state")
-  return O.getOrElse(
-    O.map(
-      A.findFirst(states, ([id]) => id === wanted),
-      ([id]) => id
-    ),
-    (): GalleryState => "default"
-  )
+  return GallerySelection.make(
+    R.getSomes({
+      state: O.map(
+        A.findFirst(states, ([id]) => id === wanted),
+        ([id]) => id
+      )
+    })
+  ).state
 }
 
 /** Rows whose items are in stock already: nothing is written for them and nothing is asked. */
@@ -87,29 +102,32 @@ const newSupplier: ProblemKind = ProblemKind.make({
   id: "supplier",
   label: "New supplier",
   tone: "blocker",
-  help: "Add the supplier to your supplier list, then load the file again.",
+  help: O.some("Add the supplier to your supplier list, then load the file again."),
   fixable: false
 })
 const elsewhereKinds: ReadonlyArray<ProblemKind> = [...problemKinds, newSupplier]
 
+/** Every supplier example supplies its name, SKU and supplier. */
+const elsewhereItems: ReadonlyArray<readonly [string, string, string]> = [
+  ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
+  ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
+  ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
+]
+
 /** Rows whose supplier is not in the list yet, each with its own reason. */
-const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(
-  [
-    ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
-    ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
-    ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
-  ],
-  ([name = "", sku = "", supplier = ""], index) =>
-    ReviewRow.make({
-      id: `elsewhere-${index + 1}`,
-      line: 183 + index,
-      cells: { name, sku, unit: "pcs", onHand: "10", supplier },
-      problem: {
+const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(elsewhereItems, ([name, sku, supplier], index) =>
+  ReviewRow.make({
+    id: `elsewhere-${index + 1}`,
+    line: 183 + index,
+    cells: { name, sku, unit: "pcs", onHand: "10", supplier },
+    problem: O.some(
+      Problem.make({
         kind: newSupplier.id,
-        column: "supplier",
-        reason: `Supplier ${supplier} is not in your supplier list yet.`
-      }
-    })
+        column: O.some("supplier"),
+        reason: O.some(`Supplier ${supplier} is not in your supplier list yet.`)
+      })
+    )
+  })
 )
 
 /**
@@ -118,11 +136,18 @@ const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(
  * 3 · Feb out").
  */
 const monthColumns: ReadonlyArray<ReviewColumn> = [
-  ReviewColumn.make({ id: "name", label: "Item", size: "fill", width: 200, core: true }),
-  ReviewColumn.make({ id: "sku", label: "SKU", code: true, search: true, core: true, under: true }),
-  ReviewColumn.make({ id: "month", label: "Month", core: true, context: true, facet: true }),
-  ReviewColumn.make({ id: "unit", label: "Unit", core: true }),
-  ReviewColumn.make({ id: "onHand", label: "On hand", align: "right", core: true, context: true })
+  ReviewColumn.make({ display: identity, id: "name", label: "Item", size: "fill", width: O.some(200), core: true }),
+  ReviewColumn.make({ display: identity, id: "sku", label: "SKU", code: true, search: true, core: true, under: true }),
+  ReviewColumn.make({ display: identity, id: "month", label: "Month", core: true, context: true, facet: true }),
+  ReviewColumn.make({ display: identity, id: "unit", label: "Unit", core: true }),
+  ReviewColumn.make({
+    display: identity,
+    id: "onHand",
+    label: "On hand",
+    align: O.some("right"),
+    core: true,
+    context: true
+  })
 ]
 
 const monthItems = [
@@ -131,10 +156,32 @@ const monthItems = [
   { name: "Weld wire 0.9 mm", sku: "WW-09", unit: "kg", counts: ["15", "12"] }
 ]
 
+/** Comparison text only: the reviewed cell keeps its original spelling in the row and its reason. */
+const MonthComparison = S.Trim.annotate({ description: "Whitespace-insensitive comparison of a monthly stock cell" })
+const readMonthComparison = S.decodeOption(MonthComparison)
+
+/** The monthly recheck's two cells; missing sparse input retains the gallery's existing empty-cell policy. */
+class MonthCheck extends S.Opaque<MonthCheck, { readonly brand: unique symbol }>()(
+  S.Struct({
+    month: S.String.pipe(
+      S.annotateKey({ description: "Month supplied by the recheck, empty when absent" }),
+      S.withConstructorDefault(Effect.succeed(""))
+    ),
+    onHand: S.String.pipe(
+      S.annotateKey({ description: "New stock cell, otherwise the row's stock cell, empty when both are absent" }),
+      S.withConstructorDefault(Effect.succeed(""))
+    )
+  }).annotate({ description: "The complete monthly stock comparison requested by the review" })
+) {}
+
 const belowZero = (month: string, onHand: string) =>
-  Str.startsWith("-")(Str.trim(onHand))
-    ? Problem.make({ kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` })
-    : undefined
+  O.exists(readMonthComparison(onHand), Str.startsWith("-"))
+    ? Problem.makeOption({
+        kind: "below",
+        column: O.some("onHand"),
+        reason: O.some(`On hand "${onHand}" for ${month} is below zero.`)
+      })
+    : O.none()
 
 const monthRows: ReadonlyArray<ReviewRow> = A.flatMap(monthItems, (item, index) =>
   A.map(item.counts, (onHand, part) => {
@@ -144,19 +191,24 @@ const monthRows: ReadonlyArray<ReviewRow> = A.flatMap(monthItems, (item, index) 
     return ReviewRow.make({
       id: `line-${line}.${part + 1}`,
       line,
-      label: `${line} · ${month}`,
+      label: O.some(`${line} · ${month}`),
       cells: { name: item.name, sku: item.sku, month, unit: item.unit, onHand },
-      ...(problem === undefined ? {} : { problem })
+      problem
     })
   })
 )
 
 /** The item's own answer on each of its months: every record of its line goes. An atom, as the region takes it. */
 const leaveItemOut = Atom.make(
-  O.some((row: ReviewRow) => ({
-    label: `Leave ${row.cells.name ?? "the item"} out, every month`,
-    onSelect: () => toast(`Would leave every month of line ${row.line} out`)
-  }))
+  O.some((row: ReviewRow) =>
+    O.some({
+      label: O.match(R.get(row.cells, "name"), {
+        onNone: () => "Leave the item out, every month",
+        onSome: (name) => `Leave ${name} out, every month`
+      }),
+      onSelect: () => toast(`Would leave every month of line ${row.line} out`)
+    })
+  )
 )
 
 /** Which state the gallery shows, first from the address (`?state=`). */
@@ -190,9 +242,15 @@ const galleryLooking = Atom.map(galleryState, (state) => state === "readonly")
 const monthColumnsAtom = Atom.make(monthColumns)
 const monthRowsAtom = Atom.make(monthRows)
 const monthRecheck = Atom.make(
-  O.some((asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) =>
-    belowZero(asked.cells.month ?? "", asked.cells.onHand ?? asked.row.cells.onHand ?? "")
-  )
+  O.some((asked: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => {
+    const check = MonthCheck.make(
+      R.getSomes({
+        month: R.get(asked.cells, "month"),
+        onHand: O.orElse(R.get(asked.cells, "onHand"), () => R.get(asked.row.cells, "onHand"))
+      })
+    )
+    return belowZero(check.month, check.onHand)
+  })
 )
 const monthDecisions = Atom.make(proposing(monthRows))
 

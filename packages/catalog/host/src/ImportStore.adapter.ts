@@ -1,3 +1,4 @@
+import { type ImportListQuery, StoredDecisions } from "@inventory/catalog-model/ImportStore"
 // Storage for imports: the staged file, what each confirm did with each row, the items it created, and taking a
 // confirm back. SQL lives here only; every statement filters on the organization, and goes through a Schema both ways
 // (`SqlSchema` for a read, `D1.statement` from @beep/d1 for a write). The rules not to break: a confirm is the only
@@ -509,7 +510,7 @@ export const ImportStoreD1 = Layer.effect(
           Effect.map(S.decodeEffect(DecisionJson)(row.decisionJson), (decision) => [row.rowId, decision] as const),
         { concurrency: 1 }
       )
-      return {
+      return StoredDecisions.make({
         decisions: R.fromEntries(decoded),
         authors: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedByName] as const)),
         deciders: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedById] as const)),
@@ -519,8 +520,8 @@ export const ImportStoreD1 = Layer.effect(
           A.flatMap(rows, (row) => A.map(A.fromOption(row.lastSavedById), (id) => [row.rowId, id] as const))
         ),
         lastSavedOn: R.fromEntries(A.map(rows, (row) => [row.rowId, row.lastSavedRevision] as const)),
-        saves: O.match(A.head(saves), { onNone: () => 0, onSome: (row) => row.saves })
-      }
+        ...R.getSomes({ saves: O.map(A.head(saves), (row) => row.saves) })
+      })
     }, Effect.orDie)
 
     // -- The lists a write carries --------------------------------------------------------------------------------
@@ -863,7 +864,7 @@ export const ImportStoreD1 = Layer.effect(
       ])
     }, Effect.orDie)
 
-    const listOpen = Effect.fn("Imports.listOpen")(function* (organizationId: OrganizationId, limit: number) {
+    const listOpen = Effect.fn("Imports.listOpen")(function* ({ organizationId, limit }: ImportListQuery) {
       const drafts = yield* findOpen({ org: organizationId, limit })
       const total = yield* countOpen(organizationId)
       return { drafts, total: total.n }
@@ -890,7 +891,7 @@ export const ImportStoreD1 = Layer.effect(
       Result: S.Struct({ n: S.Int }),
       execute: (org) => sql`SELECT COUNT(DISTINCT importId) AS n FROM importBatch WHERE organizationId = ${org}`
     })
-    const listPast = Effect.fn("Imports.listPast")(function* (organizationId: OrganizationId, limit: number) {
+    const listPast = Effect.fn("Imports.listPast")(function* ({ organizationId, limit }: ImportListQuery) {
       const imports = yield* findPast({ org: organizationId, limit })
       const total = yield* countPast(organizationId)
       return { imports, total: total.n }
@@ -1661,8 +1662,14 @@ export const ImportStoreD1 = Layer.effect(
         )
       return {
         confirms: A.map(confirms, (row) => row.id),
-        removable: O.match(A.head(removable), { onNone: () => 0, onSome: (row) => row.n }),
-        restorable: O.match(A.head(restorable), { onNone: () => 0, onSome: (row) => row.n }),
+        removable: yield* O.match(A.head(removable), {
+          onNone: () => Effect.die("removable count returned no row"),
+          onSome: (row) => Effect.succeed(row.n)
+        }),
+        restorable: yield* O.match(A.head(restorable), {
+          onNone: () => Effect.die("restorable count returned no row"),
+          onSome: (row) => Effect.succeed(row.n)
+        }),
         changed: named(changed),
         changedCount: changed.length,
         kept: named(kept),
@@ -1671,34 +1678,67 @@ export const ImportStoreD1 = Layer.effect(
     }, Effect.orDie)
 
     return ImportStore.of({
-      beginUpload,
-      findUpload: Effect.fn("Imports.findUpload")(function* (actor: Member, id: string) {
-        return yield* findUploadRow({ org: actor.organizationId, actor: actor.id, id }).pipe(Effect.orDie)
+      beginUpload: dual(
+        4,
+        (
+          self: StagedHead,
+          actor: Member,
+          key: UploadKey,
+          counts: { readonly rowCount: number; readonly chunkCount: number }
+        ) => beginUpload(actor, key, self, counts)
+      ),
+      findUpload: dual(2, (self: string, actor: Member) => {
+        const perform = Effect.fn("Imports.findUpload")(function* (actor: Member, id: string) {
+          return yield* findUploadRow({ org: actor.organizationId, actor: actor.id, id }).pipe(Effect.orDie)
+        })
+        return perform(actor, self)
       }),
-      putChunk,
-      uploadChunks,
-      finishUpload,
-      discardUpload,
-      table,
-      storedAmong,
-      fixed: Effect.fn("Imports.fixed")(function* (organizationId: OrganizationId, importId: string) {
-        return yield* findFixed({ org: organizationId, id: importId }).pipe(Effect.orDie)
+      putChunk: dual(4, (self: Upload, actor: Member, seq: number, rows: ReadonlyArray<StagedRow>) =>
+        putChunk(actor, self, seq, rows)
+      ),
+      uploadChunks: dual(2, (self: Upload, actor: Member) => uploadChunks(actor, self)),
+      finishUpload: dual(3, (self: Upload, actor: Member, needsAtStart: number) =>
+        finishUpload(actor, self, needsAtStart)
+      ),
+      discardUpload: dual(2, (self: string, actor: Member) => discardUpload(actor, self)),
+      table: dual(2, (self: Draft, organizationId: OrganizationId) => table(organizationId, self)),
+      storedAmong: dual(2, (self: ReadonlyArray<string>, organizationId: OrganizationId) =>
+        storedAmong(organizationId, self)
+      ),
+      fixed: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fn("Imports.fixed")(function* (organizationId: OrganizationId, importId: string) {
+          return yield* findFixed({ org: organizationId, id: importId }).pipe(Effect.orDie)
+        })
+        return perform(organizationId, self)
       }),
       commit,
       takeBack,
-      history,
-      takeBackState,
-      decisions,
-      decide,
-      reopen,
+      history: dual(2, (self: string, organizationId: OrganizationId) => history(organizationId, self)),
+      takeBackState: dual(2, (self: string, organizationId: OrganizationId) => takeBackState(organizationId, self)),
+      decisions: dual(2, (self: string, organizationId: OrganizationId) => decisions(organizationId, self)),
+      decide: dual(
+        5,
+        (self: Draft, actor: Member, delta: DecisionDelta, read: ItemsAsRead, expected: O.Option<ComparedAt>) =>
+          decide(actor, self, delta, read, expected)
+      ),
+      reopen: dual(2, (self: Draft, actor: Member) => reopen(actor, self)),
       listOpen,
       listPast,
-      remove,
+      remove: dual(2, (self: Draft, actor: Member) => remove(actor, self)),
       choices,
       moves,
       takenBack,
-      matchColumn,
-      createdRows,
+      matchColumn: dual(
+        5,
+        (
+          self: Draft,
+          actor: Member,
+          choice: { readonly field: Field; readonly column: O.Option<number> },
+          detail: string,
+          compare: CompareAtMatch
+        ) => matchColumn(actor, self, choice, detail, compare)
+      ),
+      createdRows: dual(2, (self: string, organizationId: OrganizationId) => createdRows(organizationId, self)),
       changes: Effect.fn("Imports.changes")(function* (organizationId: OrganizationId) {
         const rows = yield* findChanges(organizationId).pipe(Effect.orDie)
         return A.map(rows, (row): ChangeRecord => ({
@@ -1714,12 +1754,18 @@ export const ImportStoreD1 = Layer.effect(
           takenBack: row.takenBack
         }))
       }),
-      find: Effect.fn("Imports.find")(function* (organizationId: OrganizationId, id: string) {
-        return yield* findDraft({ org: organizationId, id }).pipe(Effect.orDie)
+      find: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fn("Imports.find")(function* (organizationId: OrganizationId, id: string) {
+          return yield* findDraft({ org: organizationId, id }).pipe(Effect.orDie)
+        })
+        return perform(organizationId, self)
       }),
-      outcomes: Effect.fn("Imports.outcomes")(function* (organizationId: OrganizationId, importId: string) {
-        const rows = yield* findOutcomes({ org: organizationId, id: importId }).pipe(Effect.orDie)
-        return A.map(rows, storedOutcome)
+      outcomes: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fn("Imports.outcomes")(function* (organizationId: OrganizationId, importId: string) {
+          const rows = yield* findOutcomes({ org: organizationId, id: importId }).pipe(Effect.orDie)
+          return A.map(rows, storedOutcome)
+        })
+        return perform(organizationId, self)
       }),
       items: Effect.fn("Imports.items")(function* (organizationId: OrganizationId) {
         return yield* findItems(organizationId).pipe(Effect.map(A.map(storedItem)), Effect.orDie)

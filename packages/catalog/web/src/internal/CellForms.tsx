@@ -38,32 +38,39 @@ const dimensionsCell = (draft: DimensionsDraft): string =>
  * What one open form holds: what was typed (none until something is, the cell's value showing meanwhile) and why
  * the last save was refused. One per form on screen, made in the form's own provider and let go with it.
  */
-const FormScope = ScopedAtom.make(() =>
-  Atom.make<{ readonly typed: O.Option<unknown>; readonly error: string | undefined }>({
-    typed: O.none(),
-    error: undefined
-  })
-)
+const makeFormScope = <Draft,>() =>
+  ScopedAtom.make(() =>
+    Atom.make<{ readonly typed: O.Option<Draft>; readonly error: O.Option<string> }>({
+      typed: O.none(),
+      error: O.none()
+    })
+  )
 
-type CellFormProps = { value: string; onSave: (cell: string) => void }
+const DimensionsScope = makeFormScope<DimensionsDraft>()
+const VendorsScope = makeFormScope<ReadonlyArray<VendorDraft>>()
+
+type CellFormProps = { readonly value: string; readonly onSave: (cell: string) => void }
 
 /** Length, width, height and their unit, saved as the cell's JSON once the three read; or no dimensions at all. */
 export function DimensionsForm(props: CellFormProps) {
   return (
-    <FormScope.Provider>
+    <DimensionsScope.Provider>
       <DimensionsFields {...props} />
-    </FormScope.Provider>
+    </DimensionsScope.Provider>
   )
 }
 
 function DimensionsFields(props: CellFormProps) {
   const id = useId()
-  const [held, setHeld] = useAtom(FormScope.use())
-  const draft = O.getOrElse(held.typed as O.Option<DimensionsDraft>, () => dimensionsDraft(props.value))
+  const [held, setHeld] = useAtom(DimensionsScope.use())
+  const draft = O.match(held.typed, {
+    onNone: () => dimensionsDraft(props.value),
+    onSome: (draft) => draft
+  })
   const { error } = held
-  const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
+  const setError = (message: string) => setHeld((now) => ({ ...now, error: O.some(message) }))
   const set = (key: keyof DimensionsDraft, value: string) =>
-    setHeld({ typed: O.some({ ...draft, [key]: value }), error: undefined })
+    setHeld({ typed: O.some({ ...draft, [key]: value }), error: O.none() })
   return (
     <form
       className="flex flex-col gap-3"
@@ -77,7 +84,9 @@ function DimensionsFields(props: CellFormProps) {
       <div className="grid grid-cols-2 gap-3">
         {(["length", "width", "height"] as const).map((key, index) => (
           <Field key={key}>
-            <FieldLabel htmlFor={`${id}-${key}`}>{`${key.charAt(0).toUpperCase()}${key.slice(1)}`}</FieldLabel>
+            <FieldLabel htmlFor={`${id}-${key}`}>
+              {{ length: "Length", width: "Width", height: "Height" }[key]}
+            </FieldLabel>
             <Input
               id={`${id}-${key}`}
               inputMode="decimal"
@@ -102,7 +111,7 @@ function DimensionsFields(props: CellFormProps) {
           </NativeSelect>
         </Field>
       </div>
-      {error === undefined ? null : <FieldError>{error}</FieldError>}
+      {O.match(error, { onNone: () => null, onSome: (error) => <FieldError>{error}</FieldError> })}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="secondary" size="sm" className="max-md:h-11">
           Save dimensions
@@ -130,22 +139,25 @@ const vendorsCell = (vendors: ReadonlyArray<VendorDraft>): string =>
 /** Up to three vendors, each with a name, its SKU, a unit cost and a lead time, one of them preferred; or none. */
 export function VendorsForm(props: CellFormProps) {
   return (
-    <FormScope.Provider>
+    <VendorsScope.Provider>
       <VendorsFields {...props} />
-    </FormScope.Provider>
+    </VendorsScope.Provider>
   )
 }
 
 function VendorsFields(props: CellFormProps) {
   const id = useId()
-  const [held, setHeld] = useAtom(FormScope.use())
-  const vendors = O.getOrElse(held.typed as O.Option<ReadonlyArray<VendorDraft>>, () => {
-    const found = vendorsDraft(props.value)
-    return found.length === 0 ? [emptyVendor] : found
+  const [held, setHeld] = useAtom(VendorsScope.use())
+  const vendors = O.match(held.typed, {
+    onSome: (vendors) => vendors,
+    onNone: () => {
+      const found = vendorsDraft(props.value)
+      return found.length === 0 ? [emptyVendor] : found
+    }
   })
   const { error } = held
-  const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
-  const change = (next: ReadonlyArray<VendorDraft>) => setHeld({ typed: O.some(next), error: undefined })
+  const setError = (message: string) => setHeld((now) => ({ ...now, error: O.some(message) }))
+  const change = (next: ReadonlyArray<VendorDraft>) => setHeld({ typed: O.some(next), error: O.none() })
   const set = (at: number, key: "name" | "sku" | "cost" | "lead", value: string) =>
     change(vendors.map((vendor, index) => (index === at ? { ...vendor, [key]: value } : vendor)))
   const preferred = vendors.findIndex((vendor) => vendor.preferred)
@@ -223,7 +235,7 @@ function VendorsFields(props: CellFormProps) {
           Add a vendor
         </Button>
       )}
-      {error === undefined ? null : <FieldError>{error}</FieldError>}
+      {O.match(error, { onNone: () => null, onSome: (error) => <FieldError>{error}</FieldError> })}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="secondary" size="sm" className="max-md:h-11">
           Save vendors

@@ -1,11 +1,11 @@
 /**
- * No `@effect-diagnostics` comment is written (Benjamin's rule, 2026-11-22: "`@effect-diagnostics` ignore comments are
- * not allowed"). Such a comment turns one of the Effect language service's rules off for a file or a line, so what
+ * No Effect diagnostic suppression comment is written (Benjamin, 2026-11-26: "I want these banned").
+ * Such a comment turns one of the Effect language service's rules off for a file or a line, so what
  * the type-check says of that code is no longer what it says of every other: the code is changed until the rule
  * holds. A layer is built at the entry point (`Layer.build`, then `Effect.provideContext`, or
  * `Effect.provideServiceEffect`), a file is read through the `FileSystem` service, a request through `HttpClient`.
  *
- * What is refused: `@effect-diagnostics` or `@effect-diagnostics-next-line` followed by a rule and a setting
+ * What is refused: the diagnostic directive, optionally with its next-line suffix, followed by a rule and a setting
  * (`strictEffectProvide:off`), in every code file git would commit. The text is matched, not parsed, because the
  * checker reads the directive in a string too: a test that needs one puts it together (`Scratch.templates.ts`,
  * `diagnosticDirective`), so its file holds none.
@@ -26,6 +26,7 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
+import { diagnosticDirective } from "../Scratch/Scratch.templates.ts"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
@@ -43,7 +44,10 @@ export const diagnosticsLeftOut: ReadonlyArray<string> = [".agents/", "vendor/",
 const isLeftOut = (file: string): boolean => A.some(diagnosticsLeftOut, (path) => Str.startsWith(path)(file))
 
 /** A directive the checker reads: the word, then a rule (or `*`) and a setting. */
-const directive = /@effect-diagnostics(?:-next-line)?\s+[A-Za-z*]+:(?:off|error|warning|message|suggestion|skip-file)/g
+const directive = new RegExp(
+  `${diagnosticDirective}(?:-next-line)?\\s+[A-Za-z*]+:(?:off|error|warning|message|suggestion|skip-file)`,
+  "g"
+)
 
 /**
  * The lines of `text` that hold a directive, from 1.
@@ -94,7 +98,7 @@ export const DiagnosticsFinding = S.TaggedUnion({
   }
 }).pipe(
   $I.annoteSchema("DiagnosticsFinding", {
-    description: "No @effect-diagnostics directive is written, or a refusal and each place one is"
+    description: `No ${diagnosticDirective} directive is written, or a refusal and each place one is`
   })
 )
 
@@ -111,15 +115,16 @@ export type DiagnosticsFinding = typeof DiagnosticsFinding.Type
  * @category rendering
  */
 export const diagnosticsSentence: (finding: DiagnosticsFinding) => Line = DiagnosticsFinding.match({
-  Clean: () => out(`diagnostics:check OK  no @effect-diagnostics directive is written (${notRead})`),
+  Clean: () => out(`diagnostics:check OK  no ${diagnosticDirective} directive is written (${notRead})`),
   Refused: ({ directive }) =>
     directive
       ? err(
-          `diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off. Change the code until it holds (${notRead}):`
+          `diagnostics:check FAIL  an ${diagnosticDirective} directive turns a rule off. Change the code until it holds (${notRead}):`
         )
       : err(`diagnostics:check FAIL  its ledger does not hold (${notRead}):`),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
-  At: ({ place }) => err(`${place}  an @effect-diagnostics directive: remove it and write the code the rule asks for`),
+  At: ({ place }) =>
+    err(`${place}  an ${diagnosticDirective} directive: remove it and write the code the rule asks for`),
   Standing: ({ file, words }) => err(`${file}  ${words}`),
   Ledger: ({ said }) => err(said)
 })

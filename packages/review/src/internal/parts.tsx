@@ -1,5 +1,10 @@
+import { ReviewText } from "./ReviewText.rules.ts"
+import { refCallback } from "./browser.ts"
+import { identity } from "effect/Function"
 import { CellMark } from "@inventory/review/ReviewTypes"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
+import { $ReviewId } from "./identity.ts"
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -89,28 +94,28 @@ const OverlayScope = ScopedAtom.make(() =>
 )
 
 type OverlayProps = {
-  trigger: ReactNode
-  title: string
+  readonly trigger: ReactNode
+  readonly title: string
   /** For the bottom sheet's hidden description. */
-  about: string
+  readonly about: string
   /** Width only (`w-80`): the popover's look is the design system's. */
-  children: ReactNode | ((close: () => void) => ReactNode)
-  align?: "start" | "center" | "end"
-  side?: "top" | "bottom" | "left" | "right"
-  className?: string
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  readonly children: ReactNode | ((close: () => void) => ReactNode)
+  readonly align?: "start" | "center" | "end"
+  readonly side?: "top" | "bottom" | "left" | "right"
+  readonly className?: string
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean) => void
   /**
    * Also opens when a mouse rests on the trigger (after a short delay) and closes when it leaves both. It stays a
    * popover: a click, Enter or a tap opens it as before and keeps it open, and a screen reader meets it as a dialog.
    * Opened by hover it does not take the focus.
    */
-  hover?: boolean
+  readonly hover?: boolean
   /**
    * Drawn as the hover card is: the bordered card alone, with no arrow and no close button (Escape, a click outside
    * or the pointer leaving closes it). For a card that explains; a panel that holds a form keeps its close button.
    */
-  card?: boolean
+  readonly card?: boolean
 }
 
 /** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
@@ -125,7 +130,7 @@ export function Overlay(props: OverlayProps) {
 function OverlayBody(props: OverlayProps) {
   const layout = useAtomValue(regionLayout)
   const [held, setHeld] = useAtom(OverlayScope.use())
-  const open = props.open ?? held.open
+  const { open = held.open, align = "start", side = "bottom" } = props
   const setOpen = (next: boolean) => {
     setHeld((before) => ({ ...before, open: next }))
     props.onOpenChange?.(next)
@@ -212,8 +217,8 @@ function OverlayBody(props: OverlayProps) {
         {props.trigger}
       </PopoverTrigger>
       <PopoverContent
-        align={props.align ?? "start"}
-        side={props.side ?? "bottom"}
+        align={align}
+        side={side}
         sideOffset={props.card === true ? 4 : 6}
         onOpenAutoFocus={(event) => {
           if (byHover) event.preventDefault()
@@ -262,34 +267,36 @@ export const codeFace = (column: ReviewColumn | undefined): string | undefined =
  * A value inside a line of text: a code in its face, anything else as plain text with no element of its own, so a
  * truncated line holds nothing that reaches past its edge.
  */
-export function ColumnText(props: { column: ReviewColumn | undefined; children: ReactNode }) {
-  const face = codeFace(props.column)
-  return face === undefined ? props.children : <span className={face}>{props.children}</span>
+export function ColumnText(props: { readonly column: ReviewColumn | undefined; readonly children: ReactNode }) {
+  return props.column?.code === true ? <span className="font-mono">{props.children}</span> : props.children
 }
 
 /** A mark's source as the shared mark takes it: `unknown` is a source the caller did not name. */
 const markSource = (by: MarkSource): "rule" | "model" | undefined => (by === "unknown" ? undefined : by)
 
 /** The mark beside a value someone other than the person proposed: who it was, as the caller said. */
-export function FixMark(props: { by: MarkSource }) {
+export function FixMark(props: { readonly by: MarkSource }) {
   return <SourceMark source={markSource(props.by)} />
 }
 
 /** The reason a row needs the person: an icon and three words at most. Never colour alone. */
 export function ReasonTag(props: {
-  kind: ProblemKind | undefined
+  readonly kind: O.Option<ProblemKind>
   /** The problem's own tone, over its kind's (`Problem.tone`). */
-  tone?: ProblemKind["tone"] | undefined
-  fallback: string
+  readonly tone: O.Option<ProblemKind["tone"]>
+  readonly fallback: string
 }) {
-  const blocker = (props.tone ?? props.kind?.tone) === "blocker"
+  const blocker = O.contains(
+    O.orElse(props.tone, () => O.map(props.kind, (kind) => kind.tone)),
+    "blocker"
+  )
   return (
     <StatusPill
       tone={blocker ? "danger" : "warning"}
       icon={blocker ? <CircleAlertIcon aria-hidden /> : <TriangleAlertIcon aria-hidden />}
       className="flex-none"
     >
-      {props.kind?.label ?? props.fallback}
+      {O.match(props.kind, { onNone: () => props.fallback, onSome: (kind) => kind.label })}
     </StatusPill>
   )
 }
@@ -298,8 +305,8 @@ export function ReasonTag(props: {
  * What happened to a row that no longer needs the person. The person's own decisions carry a person and an outline;
  * what a rule did carries a wand and a grey fill; an untouched row says Ready.
  */
-export function DecisionTag(props: { view: RowView; words?: ReviewWords }) {
-  const words = props.words ?? defaultReviewWords
+export function DecisionTag(props: { readonly view: RowView; readonly words?: ReviewWords }) {
+  const { words = defaultReviewWords } = props
   if (props.view.status === "stored") {
     return (
       <StatusPill tone="neutral" className="flex-none">
@@ -314,18 +321,20 @@ export function DecisionTag(props: { view: RowView; words?: ReviewWords }) {
       </StatusPill>
     )
   }
-  const decided = props.view.decided
-  if (decided === undefined) return <span className="text-muted-foreground">{words.ready}</span>
-  return decided === "auto" ? (
-    <StatusPill tone="neutral" icon={<WandSparklesIcon aria-hidden />} className="flex-none">
-      {words.auto}
-    </StatusPill>
-  ) : (
-    <StatusPill tone="outline" icon={<UserCheckIcon aria-hidden />} className="flex-none">
-      {/* A value picked from the row's choices was chosen, not edited. */}
-      {decided === "edited" && pickedChoice(props.view) !== undefined ? words.chosen : words[decided]}
-    </StatusPill>
-  )
+  return O.match(props.view.decided, {
+    onNone: () => <span className="text-muted-foreground">{words.ready}</span>,
+    onSome: (decided) =>
+      decided === "auto" ? (
+        <StatusPill tone="neutral" icon={<WandSparklesIcon aria-hidden />} className="flex-none">
+          {words.auto}
+        </StatusPill>
+      ) : (
+        <StatusPill tone="outline" icon={<UserCheckIcon aria-hidden />} className="flex-none">
+          {/* A value picked from the row's choices was chosen, not edited. */}
+          {decided === "edited" && O.isSome(pickedChoice(props.view)) ? words.chosen : words[decided]}
+        </StatusPill>
+      )
+  })
 }
 
 /**
@@ -336,104 +345,108 @@ export const longValue = 8
 
 /** A value with its change, or the plain value. A `low` reading is shown as a question, not as a change. */
 export function CellValue(props: {
-  value: string
-  mark: CellMark | undefined
+  readonly value: string
+  readonly mark: O.Option<CellMark>
   /** How the column shows a value (`ReviewColumn.display`): money as the app shows it. */
-  display?: ((value: string) => string) | undefined
-  accepted?: boolean
-  empty?: ReactNode
+  readonly display?: ((value: string) => string) | undefined
+  readonly accepted?: boolean
+  readonly empty?: ReactNode
   /** The row sits under a group heading that already says what its empty cell becomes ("empty → Foot"). */
-  stated?: boolean
+  readonly stated?: boolean
 }) {
-  const shown = (text: string): string => (props.display === undefined || text === "" ? text : props.display(text))
-  const raw = props.mark
-  if (raw === undefined) return props.value === "" ? (props.empty ?? null) : <>{shown(props.value)}</>
-  const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
-  if (mark.from === mark.to) return <>{mark.to}</>
-  if (isCellMarkProposed(mark) && choicesOf(mark.fix) !== undefined) {
-    // A question, marked with who asks it: a sparkle only when the caller says a model made it.
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        {mark.from === "" ? "empty" : mark.from}
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
-          <FixMark by={mark.by} />
-          {mark.to}?
-        </span>
-      </span>
-    )
-  }
-  // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
-  if (mark.from === "" && isCellMarkApplied(mark)) {
-    return (
-      <span className="inline-flex items-center gap-1">
-        {mark.to}
-        <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-        <span className="sr-only"> (was empty)</span>
-      </span>
-    )
-  }
-  // Nothing to strike through that a person could see: an empty cell under a heading that says "empty", or a value
-  // that only loses the spaces around it. The proposed value stands alone.
-  // A short value that loses its spaces is shown in quotation marks beside the new one (“Foot ” → Foot), so the
-  // change can be seen; a long one (a name) would not fit twice and stands alone.
-  const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
-  const alone = spacesOnly && mark.to.length > longValue
-  if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <ins className="inline-flex max-w-full min-w-0 no-underline">
-            <span className="sr-only">{alone ? "spaces removed, proposed " : "was empty, proposed "}</span>
-            <ProposedChip>
-              {mark.to}
+  const { empty = null, display = identity } = props
+  const shown = (text: string): string => (text === "" ? text : display(text))
+  return O.match(props.mark, {
+    onNone: () => (props.value === "" ? empty : <>{shown(props.value)}</>),
+    onSome: (raw) => {
+      const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
+      if (mark.from === mark.to) return <>{mark.to}</>
+      if (isCellMarkProposed(mark) && O.isSome(choicesOf(mark.fix))) {
+        // A question, marked with who asks it: a sparkle only when the caller says a model made it.
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            {mark.from === "" ? "empty" : mark.from}
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
               <FixMark by={mark.by} />
-            </ProposedChip>
-          </ins>
-        </TooltipTrigger>
-        <TooltipContent>
-          {alone ? `Was ${spellingOf(mark.from)}: the spaces around it are removed` : "Was empty"}
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
-  const state = isCellMarkApplied(mark)
-    ? props.accepted === true && mark.by !== "you"
-      ? "accepted"
-      : "applied"
-    : "proposed"
-  const source = mark.by === "you" ? null : <FixMark by={mark.by} />
-  // The file's value struck through and the value that would be imported beside it, as real `<del>` and `<ins>` with
-  // hidden "was" and "now". Short of room the old value is the part that is cut; its whole spelling is then one hover
-  // or tap away in a hover card, never in a native title.
-  return (
-    <span className="inline-flex max-w-full min-w-0 flex-nowrap items-center gap-x-1.5">
-      <del className="min-w-0 text-muted-foreground decoration-muted-foreground/70">
-        <CutText text={spellingOf(mark.from)}>
-          <span className="sr-only">was </span>
-          {spellingOf(mark.from)}
-        </CutText>
-      </del>
-      {state === "applied" ? (
-        <ins className="inline-flex items-center gap-1 no-underline">
-          <span className="sr-only">now </span>
-          {mark.to}
-          <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-          {source}
-        </ins>
-      ) : (
-        <>
-          <ArrowRightIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-          <ins className="shrink-0 no-underline">
-            <span className="sr-only">{state === "accepted" ? "accepted " : "proposed "}</span>
-            <ProposedChip state={state}>
+              {mark.to}?
+            </span>
+          </span>
+        )
+      }
+      // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
+      if (mark.from === "" && isCellMarkApplied(mark)) {
+        return (
+          <span className="inline-flex items-center gap-1">
+            {mark.to}
+            <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+            <span className="sr-only"> (was empty)</span>
+          </span>
+        )
+      }
+      // Nothing to strike through that a person could see: an empty cell under a heading that says "empty", or a value
+      // that only loses the spaces around it. The proposed value stands alone.
+      // A short value that loses its spaces is shown in quotation marks beside the new one (“Foot ” → Foot), so the
+      // change can be seen; a long one (a name) would not fit twice and stands alone.
+      const spacesOnly = mark.from !== "" && ReviewText.comparison(mark.from) === mark.to
+      const alone = spacesOnly && mark.to.length > longValue
+      if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ins className="inline-flex max-w-full min-w-0 no-underline">
+                <span className="sr-only">{alone ? "spaces removed, proposed " : "was empty, proposed "}</span>
+                <ProposedChip>
+                  {mark.to}
+                  <FixMark by={mark.by} />
+                </ProposedChip>
+              </ins>
+            </TooltipTrigger>
+            <TooltipContent>
+              {alone ? `Was ${spellingOf(mark.from)}: the spaces around it are removed` : "Was empty"}
+            </TooltipContent>
+          </Tooltip>
+        )
+      }
+      const state = isCellMarkApplied(mark)
+        ? props.accepted === true && mark.by !== "you"
+          ? "accepted"
+          : "applied"
+        : "proposed"
+      const source = mark.by === "you" ? null : <FixMark by={mark.by} />
+      // The file's value struck through and the value that would be imported beside it, as real `<del>` and `<ins>` with
+      // hidden "was" and "now". Short of room the old value is the part that is cut; its whole spelling is then one hover
+      // or tap away in a hover card, never in a native title.
+      return (
+        <span className="inline-flex max-w-full min-w-0 flex-nowrap items-center gap-x-1.5">
+          <del className="min-w-0 text-muted-foreground decoration-muted-foreground/70">
+            <CutText text={spellingOf(mark.from)}>
+              <span className="sr-only">was </span>
+              {spellingOf(mark.from)}
+            </CutText>
+          </del>
+          {state === "applied" ? (
+            <ins className="inline-flex items-center gap-1 no-underline">
+              <span className="sr-only">now </span>
               {mark.to}
+              <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
               {source}
-            </ProposedChip>
-          </ins>
-        </>
-      )}
-    </span>
-  )
+            </ins>
+          ) : (
+            <>
+              <ArrowRightIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+              <ins className="shrink-0 no-underline">
+                <span className="sr-only">{state === "accepted" ? "accepted " : "proposed "}</span>
+                <ProposedChip state={state}>
+                  {mark.to}
+                  {source}
+                </ProposedChip>
+              </ins>
+            </>
+          )}
+        </span>
+      )
+    }
+  })
 }
 
 /**
@@ -444,29 +457,33 @@ const CutScope = ScopedAtom.make(() =>
   Atom.readable((get) => {
     const registry = get.registry
     const held = Atom.make({ cut: false, open: false })
-    const measured = (element: HTMLSpanElement | null) => {
-      if (element === null) return undefined
-      const measure = () => {
-        const now = element.scrollWidth > element.clientWidth + 1
-        registry.update(held, (before) => (before.cut === now ? before : { ...before, cut: now }))
-      }
-      measure()
-      const observer = new ResizeObserver(measure)
-      observer.observe(element)
-      return () => observer.disconnect()
-    }
+    const measured = refCallback<HTMLSpanElement, undefined | (() => void)>((element) =>
+      O.match(element, {
+        onNone: () => undefined,
+        onSome: (element) => {
+          const measure = () => {
+            const now = element.scrollWidth > element.clientWidth + 1
+            registry.update(held, (before) => (before.cut === now ? before : { ...before, cut: now }))
+          }
+          measure()
+          const observer = new ResizeObserver(measure)
+          observer.observe(element)
+          return () => observer.disconnect()
+        }
+      })
+    )
     return { held, measured }
   })
 )
 
 type CutTextProps = {
   /** The whole text, for the card. */
-  text: string
+  readonly text: string
   /** What is drawn, when it is more than the text (a code in its face, hidden words for a screen reader). */
-  children?: ReactNode
+  readonly children?: ReactNode
   /** What the card shows, when it is more than the text (an old and a new value). */
-  card?: ReactNode
-  className?: string
+  readonly card?: ReactNode
+  readonly className?: string
 }
 
 /**
@@ -499,11 +516,13 @@ function CutBody(props: CutTextProps) {
           )}
           {...(cut ? { tabIndex: 0, onClick: () => setOpen((before) => !before) } : {})}
         >
-          {props.children ?? props.text}
+          {O.match(O.fromNullishOr(props.children), { onNone: () => props.text, onSome: identity })}
         </span>
       </HoverCardTrigger>
       <HoverCardContent align="start" className="w-auto max-w-sm">
-        <div className="text-sm break-words whitespace-normal">{props.card ?? props.text}</div>
+        <div className="text-sm break-words whitespace-normal">
+          {O.match(O.fromNullishOr(props.card), { onNone: () => props.text, onSome: identity })}
+        </div>
       </HoverCardContent>
     </HoverCard>
   )
@@ -511,16 +530,16 @@ function CutBody(props: CutTextProps) {
 
 /** A group of identical fixes in one line: the file's spellings with their counts, and what they become. */
 export function GroupChange(props: {
-  group: FixGroup
-  applied?: boolean
+  readonly group: FixGroup
+  readonly applied?: boolean
   /** In a table heading of one fixed height: short of room, the file's spellings end in an ellipsis. */
-  oneLine?: boolean
+  readonly oneLine?: boolean
   /** How the column shows a value (`ReviewColumn.display`): vendors as "2 · Acme preferred", not the file's JSON. */
-  display?: ((value: string) => string) | undefined
+  readonly display?: ((value: string) => string) | undefined
 }) {
-  const { group } = props
+  const { group, display = identity } = props
   const choices = choicesOf(group)
-  const variants = variantsText(group, props.display)
+  const variants = variantsText(group, display)
   return (
     <span
       className={cn(
@@ -534,19 +553,25 @@ export function GroupChange(props: {
       {group.mixed === true ? (
         // The rows end in different values: none is named here, each row shows its own.
         <span className="flex-none font-normal text-muted-foreground">each row its own value, shown below</span>
-      ) : choices !== undefined ? (
-        <span>{choices.map((choice) => valueWords(group, choice)).join(" or ")}?</span>
-      ) : props.applied === true ? (
-        <span className="inline-flex items-center gap-1 font-medium">
-          {group.label ?? group.to}
-          <CheckIcon aria-hidden className="size-3 text-muted-foreground" />
-        </span>
-      ) : props.oneLine === true ? (
-        <span className="flex-none">
-          <ProposedChip>{group.label ?? group.to}</ProposedChip>
-        </span>
       ) : (
-        <ProposedChip>{group.label ?? group.to}</ProposedChip>
+        O.match(choices, {
+          onNone: () =>
+            props.applied === true ? (
+              <span className="inline-flex items-center gap-1 font-medium">
+                {O.match(group.label, { onNone: () => group.to, onSome: (label) => label })}
+                <CheckIcon aria-hidden className="size-3 text-muted-foreground" />
+              </span>
+            ) : props.oneLine === true ? (
+              <span className="flex-none">
+                <ProposedChip>
+                  {O.match(group.label, { onNone: () => group.to, onSome: (label) => label })}
+                </ProposedChip>
+              </span>
+            ) : (
+              <ProposedChip>{O.match(group.label, { onNone: () => group.to, onSome: (label) => label })}</ProposedChip>
+            ),
+          onSome: (present) => <span>{present.map((choice) => valueWords(group, choice)).join(" or ")}?</span>
+        })
       )}
     </span>
   )
@@ -557,36 +582,39 @@ export function GroupChange(props: {
  * `brief` keeps it to one line: who is behind it and the reason, without the evidence.
  */
 export function Reason(props: {
-  fix: { by?: MarkSource | undefined; confidence: Fix["confidence"]; why: Fix["why"] }
-  brief?: boolean
-  className?: string
+  readonly fix: { readonly by: Fix["by"]; readonly confidence: Fix["confidence"]; readonly why: Fix["why"] }
+  readonly brief?: boolean
+  readonly className?: string
 }) {
   const { why } = props.fix
-  const by = props.fix.by === undefined ? undefined : markSource(props.fix.by)
   return (
     // The whole reason on hover: in a heading of one line it is the part that is cut.
     <span className={cn("text-muted-foreground", props.className)}>
       <span className="font-medium text-foreground">
-        {sourceAndConfidence({ by, confidence: O.getOrUndefined(props.fix.confidence) })}.
+        {sourceAndConfidence({
+          by: props.fix.by,
+          confidence: props.fix.confidence
+        })}
+        .
       </span>{" "}
       {why.basis}
-      {why.detail === undefined || props.brief === true ? null : ` ${why.detail}`}
+      {props.brief === true ? null : O.match(why.detail, { onNone: () => null, onSome: (detail) => ` ${detail}` })}
     </span>
   )
 }
 
 /** The answer to "Why?": the reason, then what accepting applies to: this row, or every row with the same fix. */
 export function WhyBody(props: {
-  fix: Fix
-  size: "sm" | "touch"
-  onAccept?: (() => void) | undefined
+  readonly fix: Fix
+  readonly size: "sm" | "touch"
+  readonly onAccept?: (() => void) | undefined
   /** Present when other rows wait on the same fix. */
-  all?: { count: number; onAccept: () => void } | undefined
-  onPick?: ((value: string) => void) | undefined
+  readonly all?: { readonly count: number; readonly onAccept: () => void } | undefined
+  readonly onPick?: ((value: string) => void) | undefined
   /** The proposal is turned down: the file's value stands and the row waits for the person. One undo step. */
-  onReject?: (() => void) | undefined
+  readonly onReject?: (() => void) | undefined
   /** The fix is in force: this takes it out again. One undo step. */
-  onUndoFix?: (() => void) | undefined
+  readonly onUndoFix?: (() => void) | undefined
 }) {
   const { fix } = props
   const choices = choicesOf(fix)
@@ -601,8 +629,8 @@ export function WhyBody(props: {
           <Button variant="outline" size={props.size} onClick={props.onUndoFix}>
             Undo this fix
           </Button>
-        ) : choices !== undefined && props.onPick !== undefined ? (
-          choices.map((value) => (
+        ) : O.isSome(choices) && props.onPick !== undefined ? (
+          choices.value.map((value) => (
             <Button
               key={value}
               variant="secondary"
@@ -637,14 +665,37 @@ export function WhyBody(props: {
   )
 }
 
-/** What one edit form holds: the value it opened with, then what was typed. A later value from outside does not move it. */
-const EditScope = ScopedAtom.make((opened: string) => Atom.make(opened))
+const $I = $ReviewId.create("parts")
+
+/** The form's submitted text: outside spaces removed, and a blank box never submitted. */
+const SubmittedText = S.Trim.check(S.isNonEmpty()).pipe(
+  $I.annoteSchema("SubmittedText", {
+    description: "The edit form's trimmed, nonempty submitted text"
+  })
+)
+
+/** The box's raw text and the checked value it can submit, read once at each input event. */
+const EditText = S.Struct({
+  text: S.String.pipe(S.annotateKey({ description: "The person's exact text in the box" })),
+  submission: SubmittedText.pipe(
+    S.toType,
+    S.Option,
+    S.annotateKey({ description: "The trimmed, nonempty value, or none for a blank box" })
+  )
+}).pipe($I.annoteSchema("EditText", { description: "The edit form's raw input and checked submission" }))
+
+type EditText = typeof EditText.Type
+
+/** What one edit form holds; a later value from outside does not move it. */
+const EditScope = ScopedAtom.make((opened: string) =>
+  Atom.make<EditText>({ text: opened, submission: S.decodeOption(SubmittedText)(opened) })
+)
 
 type EditFormProps = {
-  label: string
-  value: string
-  size: "sm" | "touch"
-  onSave: (value: string) => void
+  readonly label: string
+  readonly value: string
+  readonly size: "sm" | "touch"
+  readonly onSave: (value: string) => void
 }
 
 /** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
@@ -664,21 +715,23 @@ function EditBody(props: EditFormProps) {
       className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault()
-        if (value.trim() !== "") props.onSave(value.trim())
+        O.match(value.submission, { onNone: () => undefined, onSome: props.onSave })
       }}
     >
       <Field>
         <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
         <Input
           id={id}
-          value={value}
+          value={value.text}
           autoFocus
           autoComplete="off"
           className="max-md:h-11"
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) =>
+            setValue({ text: event.target.value, submission: S.decodeOption(SubmittedText)(event.target.value) })
+          }
         />
       </Field>
-      <Button type="submit" variant="secondary" size={props.size} disabled={value.trim() === ""}>
+      <Button type="submit" variant="secondary" size={props.size} disabled={O.isNone(value.submission)}>
         Save
       </Button>
     </form>

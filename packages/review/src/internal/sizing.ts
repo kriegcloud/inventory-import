@@ -5,33 +5,36 @@
  * other than the first (a second description, a note); only when the columns that must stay still do not fit does the
  * table scroll sideways, with its first column pinned. `fill` columns share what is left and end in an ellipsis.
  */
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as Num from "effect/Number"
 import type { ColumnSize } from "@inventory/review/ReviewTypes"
 
 /** One column as the rule sees it, in the table's order, the record's own column first. */
 export type SizedColumn = {
-  id: string
-  size: ColumnSize
+  readonly id: string
+  readonly size: ColumnSize
   /** A `fit` column: the width its longest value and its header need. A `fill` column: the least it may take. */
-  need: number
+  readonly need: number
   /** Higher stays longer. */
-  priority: number
+  readonly priority: number
   /**
    * Never moved into the detail: the first column, a column the person turned on themselves, the column the problems
    * on screen are about.
    */
-  keep: boolean
+  readonly keep: boolean
 }
 
 export type ColumnPlan = {
   /** The columns left in the table, in order, each with its width. */
-  shown: ReadonlyArray<{ id: string; width: number }>
+  readonly shown: ReadonlyArray<{ readonly id: string; readonly width: number }>
   /** The column that takes whatever the others leave (drawn without a fixed width): the first `fill`, else the first. */
-  flex: string | undefined
+  readonly flex: O.Option<string>
   /** The columns moved into each row's detail, in the table's order. */
-  folded: ReadonlyArray<string>
+  readonly folded: ReadonlyArray<string>
   /** The table's least width: the room when it fits, more when it must scroll sideways. */
-  minWidth: number
-  scrolls: boolean
+  readonly minWidth: number
+  readonly scrolls: boolean
 }
 
 /**
@@ -49,7 +52,11 @@ export type ColumnPlan = {
  *   room: 700
  * }).folded // ["note"]: the lowest priority goes first, and the name keeps its 200
  */
-export function planColumns(input: { columns: ReadonlyArray<SizedColumn>; fixed: number; room: number }): ColumnPlan {
+export function planColumns(input: {
+  readonly columns: ReadonlyArray<SizedColumn>
+  readonly fixed: number
+  readonly room: number
+}): ColumnPlan {
   const { columns, fixed, room } = input
   const folded: Array<string> = []
   const isShown = (column: SizedColumn): boolean => !folded.includes(column.id)
@@ -57,14 +64,22 @@ export function planColumns(input: { columns: ReadonlyArray<SizedColumn>; fixed:
 
   // The lowest priority first; between equals, the one furthest right. `fit` columns go before any `fill` one.
   const next = (size: SizedColumn["size"]) =>
-    columns
-      .map((column, index) => ({ column, index }))
-      .filter(({ column, index }) => index > 0 && column.size === size && !column.keep && isShown(column))
-      .sort((a, b) => a.column.priority - b.column.priority || b.index - a.index)[0]
+    A.head(
+      A.sort(
+        A.filter(
+          A.map(columns, (column, index) => ({ column, index })),
+          ({ column, index }) => index > 0 && column.size === size && !column.keep && isShown(column)
+        ),
+        (
+          a: { readonly column: SizedColumn; readonly index: number },
+          b: { readonly column: SizedColumn; readonly index: number }
+        ) => Num.sign(a.column.priority - b.column.priority || b.index - a.index)
+      )
+    )
   while (total() > room) {
-    const candidate = next("fit") ?? next("fill")
-    if (candidate === undefined) break
-    folded.push(candidate.column.id)
+    const candidate = O.orElse(next("fit"), () => next("fill"))
+    if (O.isNone(candidate)) break
+    folded.push(candidate.value.column.id)
   }
 
   const shown = columns.filter(isShown)
@@ -74,14 +89,17 @@ export function planColumns(input: { columns: ReadonlyArray<SizedColumn>; fixed:
   // What is left over goes to the `fill` columns in equal parts; with none, the first column takes it.
   const extra = scrolls ? 0 : room - used
   const share = fills.length === 0 ? 0 : Math.floor(extra / fills.length)
-  const flex = fills[0]?.id ?? shown[0]?.id
+  const flex = O.map(
+    O.orElse(A.head(fills), () => A.head(shown)),
+    (column) => column.id
+  )
   return {
     shown: shown.map((column) => ({
       id: column.id,
       width:
         column.size === "fill"
           ? column.need + share
-          : fills.length === 0 && column.id === flex
+          : fills.length === 0 && O.contains(flex, column.id)
             ? column.need + extra
             : column.need
     })),
@@ -93,5 +111,5 @@ export function planColumns(input: { columns: ReadonlyArray<SizedColumn>; fixed:
 }
 
 /** A column's priority as the rule reads it: its own number, else 1 for a `core` column and 0 for the rest. */
-export const priorityOf = (column: { priority?: number; core?: boolean }): number =>
-  column.priority ?? (column.core === true ? 1 : 0)
+export const priorityOf = (column: { readonly priority: O.Option<number>; readonly core: boolean }): number =>
+  O.match(column.priority, { onNone: () => (column.core ? 1 : 0), onSome: (priority) => priority })

@@ -1,3 +1,5 @@
+import { Dom } from "./internal/dom.adapter.ts"
+import { parameter } from "./internal/browser.ts"
 import { useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -58,23 +60,33 @@ const nothingToFollow = Atom.readable((): void => undefined)
 export const readAgainWhenBack = perKey((id: ImportId) =>
   Atom.readable((get): void => {
     get.mount(
-      askedAgainWhenBack({ read: importViewShown(id), askAgain: (registry) => importView(id).askAgain(registry) })
+      askedAgainWhenBack({
+        mayPass: isTransient,
+        read: importViewShown(id),
+        askAgain: (registry) => importView(id).askAgain(registry, O.none())
+      })
     )
-    get.mount(askedAgainWhenBack({ read: importTable(id), askAgain: (registry) => importTable(id).askAgain(registry) }))
+    get.mount(
+      askedAgainWhenBack({
+        mayPass: isTransient,
+        read: importTable(id),
+        askAgain: (registry) => importTable(id).askAgain(registry, O.none())
+      })
+    )
   })
 )
 
 /** The person asked for an import to be read again: its view and its rows, whichever could not be. */
 const readAgain = Atom.fnSync((id: ImportId, get) => {
-  if (AsyncResult.isFailure(get.registry.get(importView(id)))) importView(id).askAgain(get.registry)
-  if (AsyncResult.isFailure(get.registry.get(importTable(id)))) importTable(id).askAgain(get.registry)
+  if (AsyncResult.isFailure(get.registry.get(importView(id)))) importView(id).askAgain(get.registry, O.none())
+  if (AsyncResult.isFailure(get.registry.get(importTable(id)))) importTable(id).askAgain(get.registry, O.none())
 })
 
 /** The server says there is no such import where the person is: removed, or another organization's. */
 const isGone = S.is(ImportNotFound)
 
 /** Above a step that stays drawn: the import could not be read again, and when it will be. */
-function NotReadAgain(props: { importId: ImportId; error: unknown }) {
+function NotReadAgain(props: { readonly importId: ImportId; readonly error: unknown }) {
   const again = useAtomSet(readAgain)
   return (
     <div className="max-h-1/3 flex-none overflow-y-auto">
@@ -83,7 +95,7 @@ function NotReadAgain(props: { importId: ImportId; error: unknown }) {
         <AlertDescription>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="min-w-0">
-              {sayError(props.error).sentence} What you see is how it was when it was last read.
+              {sayError(props.error, { fields: {} }).sentence} What you see is how it was when it was last read.
               {isTransient(props.error)
                 ? " It is read again by itself every half minute, and at once when the connection comes back."
                 : ""}
@@ -109,51 +121,54 @@ export function ImportPage() {
   const { params } = useAtomValue(location)
   const { id: importId, malformed } = importInAddress(params)
   const signedIn = useAtomValue(member)
-  const actor = O.getOrUndefined(signedIn)
+  const actor = signedIn
   // The server enforces this. The screen mirrors it so nobody is offered a button that will be refused.
-  const canImport = actor !== undefined && hasRole(actor.role, "editor")
+  const canImport = O.exists(actor, (who) => hasRole(who.role, "editor"))
   // Found removed: what the person's tabs kept for it is let go and named, above the page.
-  useAtomMount(importId === undefined ? nothingToFollow : followRemoval(importId))
+  useAtomMount(O.match(importId, { onNone: () => nothingToFollow, onSome: followRemoval }))
   // Could not be read: read again by itself once the connection is back.
-  useAtomMount(importId === undefined ? nothingToFollow : readAgainWhenBack(importId))
-  const viewRead = useAtomValue(importId === undefined ? noImport : importViewShown(importId))
-  const tableRead = useAtomValue(importId === undefined ? noImport : importTable(importId))
+  useAtomMount(O.match(importId, { onNone: () => nothingToFollow, onSome: readAgainWhenBack }))
+  const viewRead = useAtomValue(O.match(importId, { onNone: () => noImport, onSome: importViewShown }))
+  const tableRead = useAtomValue(O.match(importId, { onNone: () => noImport, onSome: importTable }))
   const view = openedOf({ read: viewRead, isGone })
   const table = openedOf({ read: tableRead, isGone })
-  const wanted = params.get("step")
+  const wanted = parameter("step")(params)
   // Confirmed, or confirmed and taken back: either way the result screen is where it stands.
-  const imported = view.data !== undefined && view.data.status !== "open"
+  const imported = O.exists(view.data, (value) => value.status !== "open")
   const step: Step =
     // An address that names something that is no import is said so on the step it asked for, not answered
     // with the upload screen as if it named none.
-    (importId === undefined && !malformed) || wanted === "upload"
+    (O.isNone(importId) && !malformed) || O.contains(wanted, "upload")
       ? "upload"
-      : view.data === undefined
+      : O.isNone(view.data)
         ? // While the import is on its way the address decides, so a link to a result shows the result's skeleton,
           // not the review's.
-          wanted === "match" || wanted === "result"
-          ? wanted
+          O.contains(wanted, "match") || O.contains(wanted, "result")
+          ? O.contains(wanted, "match")
+            ? "match"
+            : "result"
           : "review"
         : imported
           ? "result"
-          : wanted === "match"
+          : O.contains(wanted, "match")
             ? "match"
             : "review"
   const reachable = (value: Step): boolean =>
-    value === "upload" || (importId !== undefined && view.data !== undefined && (value === "result") === imported)
+    value === "upload" || (O.isSome(importId) && O.isSome(view.data) && (value === "result") === imported)
 
-  const barSlot = useAtomValue(barSlotAtom)
+  const barSlot = Dom.portalTarget(useAtomValue(barSlotAtom))
   const narrow = useAtomValue(isNarrow)
 
   const go = (value: string) => {
-    if (value === "upload") navigate(importId === undefined ? "/" : importAddress(importId, "upload"))
-    else if (importId !== undefined) navigate(importAddress(importId, value))
+    if (value === "upload")
+      navigate(O.isNone(importId) ? "/" : importAddress(importId.value, "upload"), { replace: false })
+    else if (O.isSome(importId)) navigate(importAddress(importId.value, value), { replace: false })
   }
 
-  const waiting = importId !== undefined && (view.data === undefined || table.data === undefined)
+  const waiting = O.isSome(importId) && (O.isNone(view.data) || O.isNone(table.data))
   const skeleton =
     step === "review" ? (
-      <ReviewSkeleton {...(view.data === undefined ? {} : { title: `Review ${view.data.fileName}` })} />
+      <ReviewSkeleton {...(O.isNone(view.data) ? {} : { title: `Review ${view.data.value.fileName}` })} />
     ) : step === "match" ? (
       <TablePageSkeleton title="Match columns" line action caption="Fields and columns" columns={someColumns(4)} />
     ) : (
@@ -172,9 +187,9 @@ export function ImportPage() {
               ? "Somebody removed it, or it belongs to another organization. The first screen lists the imports there are: continue one of them, or choose a file."
               : O.match(refused, {
                   onNone: () => "The address does not name an import. Check the link, or choose a file.",
-                  onSome: (error) => sayError(error).sentence
+                  onSome: (error) => sayError(error, { fields: {} }).sentence
                 })}
-            <Button variant="outline" size="sm" onClick={() => navigate("/")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/", { replace: false })}>
               {gone ? "Go to the first screen" : "Choose a file"}
             </Button>
           </AlertDescription>
@@ -186,7 +201,9 @@ export function ImportPage() {
       // The same boxes with the line above the step and without it: the step stays the one that is drawn, with whatever
       // is being typed in it, when the line comes and goes.
       <div className="flex h-full flex-col">
-        {importId !== undefined && O.isSome(behind) ? <NotReadAgain importId={importId} error={behind.value} /> : null}
+        {O.isSome(importId) && O.isSome(behind) ? (
+          <NotReadAgain importId={importId.value} error={behind.value} />
+        ) : null}
         <div className="min-h-0 flex-1">
           <Suspense fallback={skeleton}>{render()}</Suspense>
         </div>
@@ -211,7 +228,7 @@ export function ImportPage() {
         </StepperList>
       </div>
       <div className="flex items-center gap-2" />
-      {importId !== undefined && step === "review" ? <SheetButton importId={importId} /> : null}
+      {O.isSome(importId) && step === "review" ? <SheetButton importId={importId.value} /> : null}
     </>
   )
   // Keyed by which steps can be reached: the stepper renumbers a step whose `disabled` changes after mount.
@@ -219,10 +236,10 @@ export function ImportPage() {
 
   return (
     <Stepper value={step} onValueChange={go} aria-label="Import steps" className="flex h-full flex-col">
-      {barSlot !== null && !narrow ? (
+      {O.isSome(barSlot) && !narrow ? (
         // On a desk the steps sit in the shell's top bar, beside the breadcrumb: one bar, and the review table
         // gets the band's height.
-        createPortal(stepNav, barSlot, stepsKey)
+        createPortal(stepNav, barSlot.value, stepsKey)
       ) : (
         // On a phone, a band of their own. One height whatever the step puts beside it (the sheet button),
         // so the step below never moves when that button arrives.
@@ -231,26 +248,31 @@ export function ImportPage() {
         </div>
       )}
       <StepperContent value="upload" className="min-h-0 flex-1">
-        <UploadStep canImport={canImport} viewOnly={actor !== undefined && !canImport} />
+        <UploadStep canImport={canImport} viewOnly={O.isSome(actor) && !canImport} />
       </StepperContent>
       <StepperContent value="match" className="min-h-0 flex-1">
         {body(() =>
-          view.data === undefined || table.data === undefined ? null : (
-            <MatchStep view={view.data} table={table.data} canImport={canImport} />
+          O.isNone(view.data) || O.isNone(table.data) ? null : (
+            <MatchStep view={view.data.value} table={table.data.value} canImport={canImport} />
           )
         )}
       </StepperContent>
       <StepperContent value="review" className="min-h-0 flex-1">
         {body(() =>
-          view.data === undefined || table.data === undefined ? null : (
-            <ReviewStep view={view.data} table={table.data} canImport={canImport} />
+          O.isNone(view.data) || O.isNone(table.data) ? null : (
+            <ReviewStep view={view.data.value} table={table.data.value} canImport={canImport} />
           )
         )}
       </StepperContent>
       <StepperContent value="result" className="min-h-0 flex-1">
         {body(() =>
-          view.data === undefined || O.isNone(view.data.result) || table.data === undefined ? null : (
-            <ResultStep view={view.data} result={view.data.result.value} table={table.data} canImport={canImport} />
+          O.isNone(view.data) || O.isNone(view.data.value.result) || O.isNone(table.data) ? null : (
+            <ResultStep
+              view={view.data.value}
+              result={view.data.value.result.value}
+              table={table.data.value}
+              canImport={canImport}
+            />
           )
         )}
       </StepperContent>

@@ -7,10 +7,10 @@
 import * as Config from "effect/Config"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
-import * as Str from "effect/String"
+
 import * as S from "effect/Schema"
 import { PublicUrl } from "@beep/better-auth/BetterAuthConfig"
-import { signUpRuleOf } from "@inventory/access-model/SignUp"
+import { SignUpSetting, SignUpInvited, SignUpOpen } from "@inventory/access-model/SignUp"
 import { testAccountPassword } from "./internal/TestAccounts.ts"
 
 /** An address setting: unset or blank is none, anything else must be an http(s) origin (`PublicUrl`). */
@@ -36,9 +36,11 @@ export const StagePassword = S.String.check(
   })
 ).annotate({ description: "A deployed stage's own password for its test accounts" })
 
+const NonBlankSecret = S.String.check(S.isPattern(/\S/))
+
 /** A secret that is set but blank is the same as none. */
 const present = (key: O.Option<Redacted.Redacted<string>>) =>
-  O.filter(key, (value) => value.pipe(Redacted.value, Str.trim) !== "")
+  O.filter(key, (value) => value.pipe(Redacted.value, S.is(NonBlankSecret)))
 
 /**
  * The sign-in settings. The shortest secret accepted, 32 characters, is `@beep/better-auth`'s rule. `production` is
@@ -74,9 +76,8 @@ export const authSettings = (build: { readonly production: boolean }) =>
       Config.option,
       Config.map(present)
     ),
-    signUp: Config.String("SIGN_UP").pipe(
-      Config.withDefault(build.production ? "closed" : "open"),
-      Config.map(signUpRuleOf)
+    signUp: Config.schema(SignUpSetting, "SIGN_UP").pipe(
+      Config.withDefault(build.production ? SignUpInvited.make({ emails: [] }) : SignUpOpen.make({}))
     )
   })
 

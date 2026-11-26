@@ -31,7 +31,7 @@ const lockOf = Effect.gen(function* () {
   )
   const texts = yield* Effect.forEach(
     files,
-    (file) => Effect.map(repo.text(file), (text) => `${repo.relative(repo.root, file)} ${text}`),
+    (file) => Effect.map(repo.text(file), (text) => `${repo.relative(file, repo.root)} ${text}`),
     { concurrency: 1 }
   )
   yield* repo.write(repo.join(repo.root, "bun.lock"), A.join(texts, ""))

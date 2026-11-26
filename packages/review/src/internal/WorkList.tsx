@@ -1,3 +1,5 @@
+import { viewport, firstChild } from "./browser.ts"
+import * as O from "effect/Option"
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
@@ -15,11 +17,11 @@ const whole = new Intl.NumberFormat("en-US")
  * row of toggle chips above the table where there is not. The arrow keys move along it (a toggle group).
  */
 export function WorkList(props: {
-  items: ReadonlyArray<WorkItem>
+  readonly items: ReadonlyArray<WorkItem>
   /** The kind the table is showing; undefined while it shows another view (Ready, All). */
-  active: string | undefined
-  onPick: (kindId: string) => void
-  mode: "rail" | "chips"
+  readonly active: O.Option<string>
+  readonly onPick: (kindId: string) => void
+  readonly mode: "rail" | "chips"
 }) {
   const items = props.items.map((item) => (
     <ToggleGroupItem
@@ -50,7 +52,7 @@ export function WorkList(props: {
               orientation="vertical"
               size="sm"
               spacing={1}
-              value={props.active ?? ""}
+              value={O.match(props.active, { onNone: () => "", onSome: (active) => active })}
               onValueChange={onValueChange}
               className="w-full flex-col items-stretch"
             >
@@ -68,7 +70,7 @@ export function WorkList(props: {
         variant="outline"
         size="sm"
         spacing={1}
-        value={props.active ?? ""}
+        value={O.match(props.active, { onNone: () => "", onSome: (active) => active })}
         onValueChange={onValueChange}
       >
         {items}
@@ -80,10 +82,6 @@ export function WorkList(props: {
 /** Whether a strip has chips hidden past its left and right edges. */
 type More = { readonly left: boolean; readonly right: boolean }
 
-/** The strip's scrolling box, where the scroll area draws it. */
-const viewportOf = (root: HTMLElement | null): HTMLElement | null =>
-  root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null
-
 /**
  * One strip's own: whether chips are hidden past its edges, and the ref callback for its `nav`, the same for as long
  * as the strip is drawn. From the moment the strip appears until it goes it hears the strip's scroll, its size, and a
@@ -94,8 +92,9 @@ const StripScope = ScopedAtom.make(() =>
     const registry = get.registry
     const more = Atom.make<More>({ left: false, right: false })
     const follow = (root: HTMLElement | null) => {
-      const element = viewportOf(root)
-      if (element === null) return undefined
+      const found = viewport(root)
+      if (O.isNone(found)) return undefined
+      const element = found.value
       const measure = () => {
         const left = element.scrollLeft > 1
         const right = element.scrollLeft + element.clientWidth < element.scrollWidth - 1
@@ -112,7 +111,7 @@ const StripScope = ScopedAtom.make(() =>
       element.addEventListener("wheel", onWheel, { passive: false })
       const observer = new ResizeObserver(measure)
       observer.observe(element)
-      if (element.firstElementChild !== null) observer.observe(element.firstElementChild)
+      O.map(firstChild(element), (child) => observer.observe(child))
       return () => {
         element.removeEventListener("scroll", measure)
         element.removeEventListener("wheel", onWheel)
@@ -127,7 +126,7 @@ const StripScope = ScopedAtom.make(() =>
  * One line of chips that scrolls sideways with no bar drawn: by wheel, by touch, by the arrow keys (focus brings a
  * chip into view), and by a round button over a fade at each edge that has more behind it.
  */
-function Strip(props: { children: React.ReactNode }) {
+function Strip(props: { readonly children: React.ReactNode }) {
   return (
     <StripScope.Provider>
       <StripBody>{props.children}</StripBody>
@@ -135,12 +134,12 @@ function Strip(props: { children: React.ReactNode }) {
   )
 }
 
-function StripBody(props: { children: React.ReactNode }) {
+function StripBody(props: { readonly children: React.ReactNode }) {
   const strip = useAtomValue(StripScope.use())
   const more = useAtomValue(strip.more)
   const move = (target: HTMLElement, by: number) => {
-    const element = viewportOf(target.closest("nav"))
-    element?.scrollBy({ left: by * element.clientWidth * 0.8, behavior: "smooth" })
+    const element = viewport(target.closest("nav"))
+    O.map(element, (element) => element.scrollBy({ left: by * element.clientWidth * 0.8, behavior: "smooth" }))
   }
   return (
     <nav ref={strip.follow} aria-label="Problems to settle" className="relative flex-none border-b">

@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // What a re-match of a column takes back besides accepts (Benjamin, 2026-11-20: "Server refuses, says so" for a SKU
 // re-match and an undone fix, "Refuse if it changes the row" for a Replace across another re-match), and a field moved
 // off its column by another field's match; what a match by hand to the column a field already reads takes back: nothing
@@ -37,25 +38,41 @@ const headings = [
   "Pack unit"
 ] as const
 type Heading = (typeof headings)[number]
-type Line = Partial<Record<Heading, string>>
+type Line = Record<Heading, string>
 const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
-const column = (heading: Heading): number =>
-  O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
+const column = (heading: Heading): number => {
+  const valueOption = A.findFirstIndex(headings, (candidate) => candidate === heading)
+  assertTrue(O.isSome(valueOption), "expected value to be present")
+  const value = valueOption.value
+  return value
+}
 
 const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
   fileName,
   kind: "csv",
   sheet: O.none(),
   headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
+  columns: A.map(A.zip(headings, letters), ([label, letter], index) => ({ index, letter, label })),
   notes: [],
   rows: A.map(lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
+    cells: A.map(headings, (heading) => ({ text: line[heading], shown: O.none() }))
   }))
 })
 
-const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
+const item = {
+  sku: "",
+  name: "",
+  description: "",
+  unit_cost: "",
+  "Alt code": "",
+  "List cost": "",
+  "Net cost": "",
+  "Pack unit": "",
+  category: "packaging",
+  uom: "EA",
+  quantity_on_hand: "10"
+}
 /** What the organization already has: two items, confirmed from a first file. */
 const stocked = tableOf("stocked.csv", [
   { ...item, sku: "AAA-0001", name: "Oak Crate", unit_cost: "12.50" },
@@ -123,10 +140,10 @@ const scenario = Effect.fn("scenario")(function* (input: {
   readonly rematch: ReadonlyArray<{ readonly field: Field; readonly column: number }>
   readonly set: Readonly<Record<string, RowDecisionFlags.Encoded>>
   /** What else is stored for the import saved on, before anything is decided. */
-  readonly before?: (id: string) => Effect.Effect<void, never, SqlClient.SqlClient>
+  readonly before: O.Option<(id: string) => Effect.Effect<void, never, SqlClient.SqlClient>>
 }) {
   const { client, saving, matching } = yield* seeded
-  if (input.before !== undefined) yield* input.before(saving.id)
+  yield* O.match(input.before, { onNone: () => Effect.void, onSome: (before) => before(saving.id) })
   const set = flags(input.set)
   const madeOn = R.map(set, () => saving.revision)
   const rematch = (id: typeof saving.id) =>
@@ -201,6 +218,7 @@ layer(TypedApp)("a Replace or Keep-stored across a re-match of the SKU column", 
   it.effect("is named and not applied by a save, refuses a confirm, and is dropped by the match", () =>
     Effect.gen(function* () {
       const done = yield* scenario({
+        before: O.none(),
         rematch: [{ field: "sku", column: column("Alt code") }],
         set: { "row-2": { stored: "replace" }, "row-3": { stored: "keep" } }
       })
@@ -233,7 +251,7 @@ layer(TypedApp)("a stored suggestion that never reads as one", (it) => {
       const done = yield* scenario({
         rematch: [{ field: "unitCost", column: column("List cost") }],
         set: { "row-2": { stored: "replace" }, "row-3": { stored: "replace" } },
-        before: brokenSuggestion
+        before: O.some(brokenSuggestion)
       })
       const named = [{ rowId: "row-3", field: "unitCost", kind: "stored" }]
       expect([done.notApplied, done.refused, done.confirm]).toEqual([named, named, nothingWritten])
@@ -245,6 +263,7 @@ layer(TypedApp)("a keep-one-of-two across a re-match of the SKU column", (it) =>
   it.effect("the row's place is open again, a row left out stays left out, at a save, a confirm and the match", () =>
     Effect.gen(function* () {
       const done = yield* scenario({
+        before: O.none(),
         rematch: [{ field: "sku", column: column("Alt code") }],
         set: { "row-4": { kept: true }, "row-5": { out: true, kept: true } }
       })
@@ -264,6 +283,7 @@ layer(TypedApp)("a Replace or Keep-stored across a re-match of another column", 
   it.effect("is taken back only where the row's comparison with its stored item changed; the other stands", () =>
     Effect.gen(function* () {
       const done = yield* scenario({
+        before: O.none(),
         rematch: [{ field: "unitCost", column: column("List cost") }],
         set: { "row-2": { stored: "replace" }, "row-3": { stored: "replace" } }
       })
@@ -309,6 +329,7 @@ layer(TypedApp)("an undone fix across a re-match of its field's column", (it) =>
       Effect.gen(function* () {
         // The unit is matched to "Pack unit", where row 6 says "kg": a new value, with its own fix (KG).
         const done = yield* scenario({
+          before: O.none(),
           rematch: [{ field: "uom", column: column("Pack unit") }],
           set: { "row-6": { reverted: ["uom"], edits: { name: "Hemp Rope 10m" } } }
         })
@@ -331,6 +352,7 @@ layer(TypedApp)("a field moved off its column when a person gives that column to
     Effect.gen(function* () {
       // Name takes the column headed "uom": the unit moves to its next heading match, none here.
       const done = yield* scenario({
+        before: O.none(),
         rematch: [{ field: "name", column: column("uom") }],
         set: { "row-6": { reverted: ["uom"] }, "row-2": { accepted: ["uom"] } }
       })
@@ -383,7 +405,9 @@ layer(TypedApp)("what a match took back from the stored decisions", (it) => {
         const read = yield* client.imports.get({ params }).pipe(marcus)
         expect(read.takenBack).toEqual(named)
         const trail = yield* client.activity.recent().pipe(marcus)
-        const line = O.getOrThrow(A.findFirst(trail, (entry) => entry.action === "Matched a column"))
+        const lineOption = A.findFirst(trail, (entry) => entry.action === "Matched a column")
+        assertTrue(O.isSome(lineOption), "expected line to be present")
+        const line = lineOption.value
         expect(line.detail).toBe(
           `SKU reads column H "Alt code" in reviewed.csv; took back 2 Replaces or Keep-storeds, 2 keeps of one of two`
         )
@@ -563,6 +587,7 @@ layer(TypedApp)("a field matched to another column and back to the one it read",
     () =>
       Effect.gen(function* () {
         const done = yield* scenario({
+          before: O.none(),
           rematch: [
             { field: "sku", column: column("Alt code") },
             { field: "sku", column: column("sku") },
@@ -700,7 +725,9 @@ layer(TypedApp)("a Replace made after a match before moves were kept, and stored
       const confirmed = yield* client.imports
         .commit({ params, payload: { revision: other.revision, madeOn: {}, set: {}, clear: [] } })
         .pipe(marcus)
-      const result = O.getOrThrow(confirmed.result)
+      const resultOption = confirmed.result
+      assertTrue(O.isSome(resultOption), "expected result to be present")
+      const result = resultOption.value
       const items = yield* client.items.list().pipe(marcus)
       const replaced = A.findFirst(items, (one) => one.sku === "AAA-0001")
       expect([result.updated, O.map(replaced, (one) => one.revision)]).toEqual([1, O.some(2)])

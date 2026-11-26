@@ -63,8 +63,8 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     // Why, for a row that was already there or not imported; and who left it out, when someone did.
     cell: (row) =>
       row.outcome === "notImported" && row.decidedBy.kind === "person"
-        ? `${row.reason} (${row.decidedBy.name})`
-        : O.getOrElse(outcomeReasonOf(row), () => "")
+        ? `${row.reason} (${O.match(row.decidedBy.name, { onNone: () => importWords.notRecorded, onSome: (name) => name })})`
+        : O.match(outcomeReasonOf(row), { onNone: () => null, onSome: (reason) => reason })
   },
   {
     id: "sku",
@@ -85,14 +85,15 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     align: "right",
     // One of several items on its row says which ("8 · 2"); a row that is one item shows its number alone.
     cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: O.map(row.part, String) }),
-    sort: (row) => row.rowNumber * 1000 + O.getOrElse(row.part, () => 0)
+    sort: (row) =>
+      O.match(row.part, { onNone: () => row.rowNumber * 1000, onSome: (part) => row.rowNumber * 1000 + part })
   }
 ]
 
 const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`
 
 /** An item someone changed, in words: its SKU and name, who changed it and when. */
-function Changed(props: { item: ChangedItem }) {
+function Changed(props: { readonly item: ChangedItem }) {
   return (
     <>
       <Code>{props.item.sku}</Code> {props.item.name}
@@ -104,7 +105,7 @@ function Changed(props: { item: ChangedItem }) {
 }
 
 /** The items named one after another, and how many more there are than the list shows. */
-function ChangedList(props: { items: ReadonlyArray<ChangedItem>; count: number }) {
+function ChangedList(props: { readonly items: ReadonlyArray<ChangedItem>; readonly count: number }) {
   return (
     <ul className="mt-1 flex flex-col gap-0.5">
       {props.items.map((item) => (
@@ -134,11 +135,11 @@ const filterOf = (input: {
   readonly result: ImportResult
   readonly chosen: O.Option<Filter>
 }): Filter =>
-  O.getOrElse(input.chosen, () =>
-    input.view.status === "takenBack" ? "takenBack" : input.result.notImported > 0 ? "notImported" : "all"
-  )
-
-const noResultRows: ImportResult["rows"] = []
+  O.match(input.chosen, {
+    onSome: (chosen) => chosen,
+    onNone: () =>
+      input.view.status === "takenBack" ? "takenBack" : input.result.notImported > 0 ? "notImported" : "all"
+  })
 
 /**
  * One import as the server last answered it, not the read itself: the read is a new object when it starts asking
@@ -149,13 +150,18 @@ const viewAnswer = perKey((id: ImportId) => answerOf(importView(id)))
 
 /** The rows the view on screen shows: the same rows while the result and the view are the same, so the table keeps its state. */
 export const shownRows = perKey((id: ImportId) =>
-  Atom.readable((get): ImportResult["rows"] => {
-    const view = get(viewAnswer(id))
-    if (view === undefined || O.isNone(view.result)) return noResultRows
-    const result = view.result.value
-    const filter = filterOf({ view, result, chosen: get(chosenFilter(id)) })
-    return A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
-  })
+  Atom.readable((get): ImportResult["rows"] =>
+    O.match(
+      O.flatMap(get(viewAnswer(id)), (view) => O.map(view.result, (result) => ({ view, result }))),
+      {
+        onNone: A.empty,
+        onSome: ({ view, result }) => {
+          const filter = filterOf({ view, result, chosen: get(chosenFilter(id)) })
+          return A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
+        }
+      }
+    )
+  )
 )
 
 /**
@@ -164,7 +170,12 @@ export const shownRows = perKey((id: ImportId) =>
  * can be taken back: the confirm says what it will remove and keep, and once every item has changed the screen says
  * it can no longer be done. After a take-back the review comes back with every decision, so nothing is done twice.
  */
-export function ResultStep(props: { view: ImportView; result: ImportResult; table: StagedTable; canImport: boolean }) {
+export function ResultStep(props: {
+  readonly view: ImportView
+  readonly result: ImportResult
+  readonly table: StagedTable
+  readonly canImport: boolean
+}) {
   const { view, result, table } = props
   const [chosen, choose] = useAtom(chosenFilter(view.id))
   const filter = filterOf({ view, result, chosen })
@@ -173,15 +184,15 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
   const reopenNow = useAtomSet(reopenImport, { mode: "promiseExit" })
   const reopen = () =>
     void reopenNow(view.id).then((exit) => {
-      if (Exit.isSuccess(exit)) navigate(importAddress(exit.value.id, "review"))
-      else toastError(exit.cause.pipe(Cause.squash))
+      if (Exit.isSuccess(exit)) navigate(importAddress(exit.value.id, "review"), { replace: false })
+      else toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
     })
   const takingBack = useAtomValue(takeBackImport).waiting
   const takeBackNow = useAtomSet(takeBackImport, { mode: "promiseExit" })
   const takeBack = () =>
     void takeBackNow(view).then((exit) => {
       if (Exit.isFailure(exit)) {
-        toastError(exit.cause.pipe(Cause.squash))
+        toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
         invalidate(catalogKeys.import(view.id))
         return
       }
@@ -218,7 +229,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
 
   const { removable, restorable, changed, changedCount, kept, keptCount, confirms } = view.takeBack
   const takenBack = view.status === "takenBack"
-  const lastTakeBack = O.getOrUndefined(A.findLast(view.history, ImportEvent.guards.TakenBack))
+  const lastTakeBack = A.findLast(view.history, ImportEvent.guards.TakenBack)
   // A take-back is possible while a confirm is in force and one of its items is as it created or replaced it.
   const canTakeBack = props.canImport && !takenBack && confirms.length > 0 && (removable > 0 || restorable > 0)
   const noLonger = !takenBack && confirms.length > 0 && removable === 0 && restorable === 0 && changedCount > 0
@@ -229,11 +240,15 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
       ? []
       : [`puts back the ${items(restorable)} it replaced as ${restorable === 1 ? "it was" : "they were"} before`])
   ].join(" and ")
-  const replaced = result.updated
-  const putsBack =
-    takenBack || replaced === 0
-      ? null
-      : `A take-back puts back the ${items(replaced)} this import replaced as ${replaced === 1 ? "it was" : "they were"} before, unless changed since.`
+  const putsBack = O.map(
+    O.liftPredicate((replaced: number) => !takenBack && replaced > 0)(result.updated),
+    (replaced) =>
+      `A take-back puts back the ${items(replaced)} this import replaced as ${replaced === 1 ? "it was" : "they were"} before, unless changed since.`
+  )
+  const omitted = [
+    ...O.match(putsBack, { onNone: A.empty, onSome: (line) => [line] }),
+    ...A.map(view.unusedColumns, notImportedColumn)
+  ]
 
   const downloadButton =
     result.notImported === 0 ? null : (
@@ -300,16 +315,19 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
     <div className="flex h-full flex-col">
       <PageHeader
         title={takenBack ? `Took back ${view.fileName}` : `Imported ${view.fileName}`}
-        line={
-          takenBack && lastTakeBack !== undefined
-            ? `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack.removed)}${lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`
-            : // What the form-only rules changed without the person, counted from what the confirms stored.
+        line={O.match(
+          O.filter(lastTakeBack, () => takenBack),
+          {
+            onSome: (lastTakeBack) =>
+              `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack.removed)}${lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`,
+            onNone: () =>
               `${result.importedBy} · ${when(result.importedAt)}${result.fixed.cells === 0 ? "" : ` · ${result.fixed.cells} values fixed for you in ${result.fixed.rows} ${result.fixed.rows === 1 ? "row" : "rows"}`}`
-        }
+          }
+        )}
         actions={
           takenBack ? (
             <>
-              <Button variant="outline" onClick={() => navigate("/items")}>
+              <Button variant="outline" onClick={() => navigate("/items", { replace: false })}>
                 View items
               </Button>
               {props.canImport ? (
@@ -327,7 +345,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
                 </Button>
               )}
               {takeBackButton}
-              <Button onClick={() => navigate("/items")}>View items</Button>
+              <Button onClick={() => navigate("/items", { replace: false })}>View items</Button>
             </>
           )
         }
@@ -390,10 +408,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           </Alert>
         </div>
       ) : null}
-      {putsBack === null && view.unusedColumns.length === 0 ? null : (
-        <p className="px-4 pb-2 text-sm text-muted-foreground sm:px-9">
-          {[...(putsBack === null ? [] : [putsBack]), ...view.unusedColumns.map(notImportedColumn)].join(" · ")}
-        </p>
+      {omitted.length === 0 ? null : (
+        <p className="px-4 pb-2 text-sm text-muted-foreground sm:px-9">{A.join(omitted, " · ")}</p>
       )}
       {view.history.length > 1 ? (
         <ol

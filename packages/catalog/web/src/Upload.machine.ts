@@ -5,6 +5,9 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import * as Tuple from "effect/Tuple"
+import * as O from "effect/Option"
+import * as Effect from "effect/Effect"
+import type { ReaderProgress } from "./internal/protocol.ts"
 import * as S from "effect/Schema"
 
 /** What is known of how many rows a file has while it is read. */
@@ -26,24 +29,22 @@ const RowsCounted = S.Struct({
 
 /** How many rows a file has, as far as it is known: not yet, about so many, or exactly so many. */
 export const RowEstimate = RowEstimateKind.mapMembers(() => Tuple.make(RowsUnknown, RowsAbout, RowsCounted)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ description: "How many rows a file has, as far as it is known" })
+  S.annotate({ description: "How many rows a file has, as far as it is known" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `RowEstimate`. */
 export type RowEstimate = typeof RowEstimate.Type
 
 /**
- * The estimate a reader's progress says. The reader runs in a worker and reports plain fields (`rowsAbout`, null
- * while unknown, and `exact`), because nothing with a tag survives the way back.
+ * The estimate a reader's progress says. The reader reports null on the wire while the total is unknown; receipt decodes it to an Option before this fold.
  *
- * @example rowsOf({ rowsAbout: 49600, exact: false }) // { kind: "about", n: 49600 }
+ * @example rowsOf({ rowsAbout: O.some(49600), exact: false }) // { kind: "about", n: 49600 }
  */
-export const rowsOf = (progress: { readonly rowsAbout: number | null; readonly exact: boolean }): RowEstimate =>
-  progress.rowsAbout === null
-    ? { kind: "unknown" }
-    : progress.exact
-      ? { kind: "counted", n: progress.rowsAbout }
-      : { kind: "about", n: progress.rowsAbout }
+export const rowsOf = (progress: Pick<ReaderProgress, "rowsAbout" | "exact">): RowEstimate =>
+  O.match(progress.rowsAbout, {
+    onNone: () => RowEstimate.cases.unknown.make({}),
+    onSome: (n) => (progress.exact ? RowEstimate.cases.counted.make({ n }) : RowEstimate.cases.about.make({ n }))
+  })
 
 /**
  * Where one upload stands, as the screen shows it. Each state carries only what is needed to say so in words and
@@ -66,7 +67,7 @@ export const UploadState = S.TaggedUnion({
   /** Every piece arrived; the server is turning the upload into an import and preparing its review. */
   Preparing: { fileName: S.String, uploadId: ImportId, rows: S.Int },
   /** The person pressed Cancel: the reader is stopped and the server is deleting what arrived. */
-  Cancelling: { fileName: S.String, uploadId: S.NullOr(ImportId) },
+  Cancelling: { fileName: S.String, uploadId: S.OptionFromNullOr(ImportId) },
   /** The file itself cannot be staged, found by the reader or by the server: what is wrong and what to do. */
   Refused: { problem: FileProblem },
   /** Something that is not the file stopped it (the network, the server, the browser): the sentence says what to do. */
@@ -80,24 +81,37 @@ export const UploadState = S.TaggedUnion({
 export type UploadState = typeof UploadState.Type
 
 /**
- * How far an upload is, for a bar: `done` of `total`, where `total` is null while nobody can know it. `done` never
+ * How far an upload is, for a bar: `done` of `total`, where `total` is None while nobody can know it. `done` never
  * passes `total`: a CSV's estimate is raised to the rows already read, and saved rows are capped at the file's rows.
  *
- * @example progressOf({ state: { _tag: "Reading", fileName: "items.csv", rowsRead: 52000, rows: rowsOf({ rowsAbout: 50000, exact: false }) } })
- * // { done: 52000, total: 52000 }
+ * @example progressOf({ state: { _tag: "Reading", fileName: "items.csv", rowsRead: 52000, rows: rowsOf({ rowsAbout: O.some(50000), exact: false }) } })
+ * // { done: 52000, total: O.some(52000) }
  */
-export const progressOf = (input: { readonly state: UploadState }): { done: number; total: number | null } =>
+const UploadProgress = S.Struct({
+  done: S.Int.pipe(
+    S.annotateKey({ description: "Rows completed in the current step" }),
+    S.withConstructorDefault(Effect.succeed(0))
+  ),
+  total: S.Option(S.Int).pipe(
+    S.annotateKey({ description: "The total, while the reader knows it" }),
+    S.withConstructorDefault(Effect.succeedNone)
+  )
+}).annotate({ description: "Canonical progress for the upload's bar, including its indeterminate starting state" })
+
+export const progressOf = (input: { readonly state: UploadState }): typeof UploadProgress.Type =>
   UploadState.matchOrElse(
     input.state,
     {
-      Reading: (state) => ({
-        done: Math.max(0, state.rowsRead),
-        total: state.rows.kind === "unknown" ? null : Math.max(state.rows.n, state.rowsRead, 0)
-      }),
-      Saving: (state) => ({ done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: state.rows }),
-      Preparing: (state) => ({ done: state.rows, total: state.rows })
+      Reading: (state) =>
+        UploadProgress.make({
+          done: Math.max(0, state.rowsRead),
+          total: state.rows.kind === "unknown" ? O.none() : O.some(Math.max(state.rows.n, state.rowsRead, 0))
+        }),
+      Saving: (state) =>
+        UploadProgress.make({ done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: O.some(state.rows) }),
+      Preparing: (state) => UploadProgress.make({ done: state.rows, total: O.some(state.rows) })
     },
-    () => ({ done: 0, total: null })
+    () => UploadProgress.make({})
   )
 
 /**

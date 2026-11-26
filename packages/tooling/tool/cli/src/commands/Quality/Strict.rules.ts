@@ -250,7 +250,7 @@ export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Optio
           )
         )
   const inOwn = (finding: Finding): boolean => {
-    const path = repo.relative(repo.cwd, finding.file)
+    const path = repo.relative(finding.file, repo.cwd)
     return (
       A.some(ledger.own, (dir) => Str.startsWith(dir)(path)) &&
       !A.some(ledger.vendored, (dir) => Str.startsWith(dir)(path))
@@ -265,7 +265,7 @@ export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Optio
       [StrictFinding.cases.RuleCount.make({ rule, count: found.length })],
       A.map(shown, (finding) =>
         StrictFinding.cases.At.make({
-          file: repo.relative(repo.cwd, finding.file),
+          file: repo.relative(finding.file, repo.cwd),
           line: finding.line,
           column: finding.column
         })

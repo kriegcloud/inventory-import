@@ -1,3 +1,5 @@
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as O from "effect/Option"
@@ -35,8 +37,8 @@ export function ActivityPage() {
   const askPastAgain = useAtomRefresh(pastImports)
   // Each list in the same shape, for the one error and skeleton below.
   const shapeOf = <A,>(read: AsyncResult.AsyncResult<A, unknown>, refetch: () => void) => ({
-    data: read.pipe(AsyncResult.value, O.getOrUndefined),
-    error: AsyncResult.isFailure(read) && !read.waiting ? read.cause.pipe(Cause.squash) : null,
+    data: AsyncResult.value(read),
+    error: AsyncResult.isFailure(read) && !read.waiting ? read.cause.pipe(Cause.squash, O.fromNullOr) : O.none(),
     updating: read.waiting,
     refetch
   })
@@ -47,54 +49,82 @@ export function ActivityPage() {
   const past = shapeOf(pastRead, askPastAgain)
   // Until the person chooses, the page opens on the list that has something in it: an empty "Decisions" beside
   // nine events read as "nothing has happened here".
-  const view =
-    O.getOrUndefined(chosen) ?? (changes.data?.length === 0 && (events.data?.length ?? 0) > 0 ? "events" : "decisions")
+  const view = O.match(chosen, {
+    onSome: (chosen) => chosen,
+    onNone: () =>
+      O.exists(changes.data, (rows) => rows.length === 0) && O.exists(events.data, (rows) => rows.length > 0)
+        ? "events"
+        : "decisions"
+  })
   const shown = view === "decisions" ? changes : view === "events" ? events : past
-  const failed = shown.error
-  const loading = shown.data === undefined
-  const older = past.data?.older ?? 0
+  const loading =
+    view === "decisions" ? O.isNone(changes.data) : view === "events" ? O.isNone(events.data) : O.isNone(past.data)
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Activity" />
       <Views label="What to show">
         <Button variant="ghost" size="sm" aria-pressed={view === "decisions"} onClick={() => setView("decisions")}>
-          Decisions {changes.data?.length ?? ""}
+          Decisions {O.match(changes.data, { onNone: () => "", onSome: (rows) => rows.length })}
         </Button>
         <Button variant="ghost" size="sm" aria-pressed={view === "events"} onClick={() => setView("events")}>
-          Events {events.data?.length ?? ""}
+          Events {O.match(events.data, { onNone: () => "", onSome: (rows) => rows.length })}
         </Button>
         <Button variant="ghost" size="sm" aria-pressed={view === "imports"} onClick={() => setView("imports")}>
-          Imports {past.data === undefined ? "" : past.data.imports.length + past.data.older}
+          Imports {O.match(past.data, { onNone: () => "", onSome: (page) => page.imports.length + page.older })}
         </Button>
       </Views>
-      {failed !== null ? (
-        <div className="px-4 sm:px-9">
-          <Alert variant="destructive">
-            <AlertTitle>The activity could not be loaded</AlertTitle>
-            <AlertDescription>
-              {sayError(failed).sentence}
-              <Button variant="outline" size="sm" onClick={() => shown.refetch()}>
-                Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      ) : loading ? (
-        view === "imports" ? (
-          <TableSkeleton caption={pastImportsCaption} columns={pastImportColumns} />
-        ) : (
-          <TableSkeleton
-            caption={view === "decisions" ? importDecisionsCaption : auditEventsCaption}
-            columns={view === "decisions" ? importDecisionColumns : auditEventColumns}
-          />
-        )
-      ) : view === "imports" ? (
-        <PastImportsList older={older} />
-      ) : view === "decisions" ? (
-        <ImportDecisions />
-      ) : (
-        <AuditEvents updating={events.updating} />
-      )}
+      {O.match(shown.error, {
+        onSome: (failed) => (
+          <div className="px-4 sm:px-9">
+            <Alert variant="destructive">
+              <AlertTitle>The activity could not be loaded</AlertTitle>
+              <AlertDescription>
+                {sayError(failed, { fields: {} }).sentence}
+                <Button variant="outline" size="sm" onClick={() => shown.refetch()}>
+                  Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        ),
+        onNone: () =>
+          loading ? (
+            view === "imports" ? (
+              <TableSkeleton
+                caption={pastImportsCaption}
+                columns={A.map(pastImportColumns, (column) => ({
+                  label: O.some(column.label),
+                  ...R.getSomes({ width: column.width })
+                }))}
+              />
+            ) : (
+              <TableSkeleton
+                caption={view === "decisions" ? importDecisionsCaption : auditEventsCaption}
+                columns={A.map(view === "decisions" ? importDecisionColumns : auditEventColumns, (column) => ({
+                  label: O.some(column.label),
+                  ...R.getSomes({ width: column.width })
+                }))}
+              />
+            )
+          ) : view === "imports" ? (
+            O.match(past.data, {
+              onNone: () => (
+                <TableSkeleton
+                  caption={pastImportsCaption}
+                  columns={A.map(pastImportColumns, (column) => ({
+                    label: O.some(column.label),
+                    ...R.getSomes({ width: column.width })
+                  }))}
+                />
+              ),
+              onSome: (page) => <PastImportsList older={page.older} />
+            })
+          ) : view === "decisions" ? (
+            <ImportDecisions />
+          ) : (
+            <AuditEvents updating={events.updating} />
+          )
+      })}
     </div>
   )
 }

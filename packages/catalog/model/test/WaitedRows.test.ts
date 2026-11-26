@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // Rows of a save that waited (Benjamin, 2026-11-20: "Hold it, show both, ask"): such a row is written only while what is
 // stored of it is one of the decisions the sender knows the server may hold, or one of those as a match since left it.
 // Anything else is somebody's decision made since: it stays, the save names it, and the save's other rows are written.
@@ -821,10 +822,24 @@ describe("what lands between a save's comparison and its write", () => {
     const tries = MutableRef.make(0)
     const store = ImportStore.of({
       ...inner,
-      decide: Effect.fn("windowed.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
-        if (MutableRef.updateAndGet(tries, (n) => n + 1) <= times) yield* between
-        return yield* inner.decide(...args)
-      })
+      decide: dual(
+        5,
+        (
+          self: Parameters<ImportStore["Service"]["decide"]>[0],
+          actor: Parameters<ImportStore["Service"]["decide"]>[1],
+          delta: Parameters<ImportStore["Service"]["decide"]>[2],
+          read: Parameters<ImportStore["Service"]["decide"]>[3],
+          expected: Parameters<ImportStore["Service"]["decide"]>[4]
+        ) => {
+          const perform = Effect.fn("windowed.decide")(function* (
+            ...args: Parameters<ImportStore["Service"]["decide"]>
+          ) {
+            if (MutableRef.updateAndGet(tries, (n) => n + 1) <= times) yield* between
+            return yield* inner.decide(...args)
+          })
+          return perform(self, actor, delta, read, expected)
+        }
+      )
     })
     const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, store))
     return { imports, tries }
@@ -958,18 +973,18 @@ describe("what lands between a save's comparison and its write", () => {
         const { view, marcusSaves, stored } = yield* seeded
         const store = yield* ImportStore
         yield* marcusSaves({ set: { "row-5": { out: true } } })
-        const found = yield* store.find(dana.organizationId, view.id)
+        const found = yield* store.find(view.id, dana.organizationId)
         const draft = O.getOrThrow(found)
-        const held = yield* store.decisions(dana.organizationId, view.id)
+        const held = yield* store.decisions(view.id, dana.organizationId)
         const at = O.some({ revision: view.revision, saves: held.saves })
         const refused = yield* store.decide(
-          dana,
           draft,
+          dana,
           { set: flags({ "row-4": { out: true } }), clear: [] },
           noItemsRead,
           at
         )
-        const nothing = yield* store.decide(dana, draft, { set: {}, clear: [] }, noItemsRead, at)
+        const nothing = yield* store.decide(draft, dana, { set: {}, clear: [] }, noItemsRead, at)
         expect([refused, nothing]).toEqual([decisionsMoved, decisionsMoved])
         const now = yield* stored(["row-4"])
         expect(now).toEqual([O.none()])
@@ -1117,7 +1132,7 @@ describe("a row that waited, and who last saved what is stored", () => {
     // Who row 2 is credited to and the revision it was saved at, and who last saved it, as the store holds them.
     const credit = Effect.gen(function* () {
       const store = yield* ImportStore
-      const held = yield* store.decisions(dana.organizationId, view.id)
+      const held = yield* store.decisions(view.id, dana.organizationId)
       return {
         by: R.get(held.deciders, "row-2"),
         savedAt: R.get(held.savedAt, "row-2"),
@@ -1424,14 +1439,14 @@ describe("a row that waited, and who last saved what is stored", () => {
       const { view, presses, sends } = yield* sackSeen
       yield* sends(dana)({ on: view.revision, set: { "row-2": mine } })
       const store = yield* ImportStore
-      const found = yield* store.find(dana.organizationId, view.id)
+      const found = yield* store.find(view.id, dana.organizationId)
       const draft = O.getOrThrow(found)
-      const held = yield* store.decisions(dana.organizationId, view.id)
+      const held = yield* store.decisions(view.id, dana.organizationId)
       const his = yield* presses(marcus)({ set: { "row-2": mine } })
       expect([his.changed, his.revision]).toEqual([false, draft.revision])
       const refused = yield* store.decide(
-        dana,
         draft,
+        dana,
         { set: flags({ "row-2": { out: true } }), clear: [] },
         noItemsRead,
         O.some({ revision: draft.revision, saves: held.saves })

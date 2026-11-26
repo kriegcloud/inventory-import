@@ -29,7 +29,10 @@ import { catalogKeys } from "./Catalog.keys.ts"
  * again whenever the person comes back to the tab, however fresh, so decisions made on another screen show up.
  */
 export const importView = perKey((id: ImportId) =>
-  catalogApi.query((api) => api.imports.get({ params: { id } }), { reactivityKeys: catalogKeys.import(id) })
+  catalogApi.query((api) => api.imports.get({ params: { id } }), {
+    keep: "unwatched",
+    reactivityKeys: O.some(catalogKeys.import(id))
+  })
 )
 
 /** `importView`, asked again when the tab regains focus: what the import's screens read. */
@@ -59,7 +62,7 @@ export const followRemoval = perKey((id: ImportId) =>
 
 /** One staged file's rows. They never change once staged: asked for once and kept for the page. */
 export const importTable = perKey((id: ImportId) =>
-  catalogApi.query((api) => api.imports.table({ params: { id } }), { keep: "page" })
+  catalogApi.query((api) => api.imports.table({ params: { id } }), { keep: "page", reactivityKeys: O.none() })
 )
 
 /**
@@ -104,7 +107,11 @@ export const putView = (input: { readonly registry: AtomRegistry.AtomRegistry; r
 }
 
 /** A workbook chosen in this tab, kept so the person can read another of its sheets without choosing it again. */
-export type OpenWorkbook = { file: File; sheets: ReadonlyArray<SheetSummary>; chosen: SheetChoice }
+export type OpenWorkbook = {
+  readonly file: File
+  readonly sheets: ReadonlyArray<SheetSummary>
+  readonly chosen: SheetChoice
+}
 
 /**
  * The workbook behind an import, when it was chosen in this tab: kept for the page so the person can read another of
@@ -119,7 +126,7 @@ export const openWorkbook = perKey((_importId: string) =>
  * remove each. The server sends the newest few in full and counts the rest (`older`). Shown through removals.
  */
 export const openImports = shown(
-  catalogApi.query((api) => api.imports.open(), { reactivityKeys: catalogKeys.openImports })
+  catalogApi.query((api) => api.imports.open(), { keep: "unwatched", reactivityKeys: O.some(catalogKeys.openImports) })
 )
 
 /**
@@ -127,12 +134,13 @@ export const openImports = shown(
  * back to a past import's result from the first screen and from Activity. The server counts the older ones.
  */
 export const pastImports = catalogApi.query((api) => api.imports.past(), {
-  reactivityKeys: catalogKeys.pastImports
+  keep: "unwatched",
+  reactivityKeys: O.some(catalogKeys.pastImports)
 })
 
 /** Goes to the first screen when the address names this import, and stays where it is otherwise. */
 const leaveIfNamed = (id: ImportId): void => {
-  if (new URLSearchParams(window.location.search).get("import") === id) navigate("/")
+  if (new URLSearchParams(window.location.search).get("import") === id) navigate("/", { replace: false })
 }
 
 /**
@@ -171,7 +179,7 @@ export const removeImport = Atom.family((id: ImportId) =>
       registry.set(openWorkbook(id), O.none())
     },
     readAgainAfterRefusal: true,
-    settled: catalogKeys.activity
+    settled: O.some(catalogKeys.activity)
   })
 )
 

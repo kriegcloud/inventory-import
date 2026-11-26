@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // A browser that refuses its storage (a private window refuses even to hand it over; a full disk or blocked site data
 // refuses every call) costs the catalog's screens only what was to be kept, never the page. The rule that would hurt
 // if wrong: a refusal that reached the screen as a throw would break the import's review and the table assistant for
@@ -9,8 +10,8 @@ import { vi } from "vitest"
 import { askBeforeLeaving, takeUpGoneTabs } from "../src/Draft.atoms.ts"
 import { emptyConversation, readConversation, writeConversation } from "../src/Conversation.machine.ts"
 import { leaveTakenUp, notices } from "../src/Notices.atoms.ts"
-import { importId, registryFor } from "./support/catalog.ts"
-import { memberOf } from "./support/session.ts"
+import { importId, registryFor, registryStart } from "./support/catalog.ts"
+import { memberStart, memberOf } from "./support/session.ts"
 
 const refused = (): never => {
   throw new DOMException("The operation is insecure.", "SecurityError")
@@ -52,7 +53,7 @@ const inWindow = (storage: () => unknown) => {
   vi.stubGlobal("navigator", {})
 }
 
-const dana = memberOf({ id: "mem_dana" })
+const dana = memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" })
 
 describe.each(windows)("when %s", (_, { storage }) => {
   it("the table assistant's conversation starts empty, and a write is dropped", () => {
@@ -64,7 +65,11 @@ describe.each(windows)("when %s", (_, { storage }) => {
 
   it("no gone tab's rows are taken up, and the question before leaving counts none", () => {
     inWindow(storage)
-    const registry = registryFor({ endpoints: {}, signedIn: Atom.make(dana) })
+    const registry = registryFor({
+      ...registryStart,
+      endpoints: {},
+      signedIn: dana.pipe((who) => Atom.make(who), O.some)
+    })
     const taken: Array<unknown> = []
     takeUpGoneTabs({ registry, id: importId, take: (kept) => taken.push(kept) })
     expect(taken).toEqual([])
@@ -75,8 +80,14 @@ describe.each(windows)("when %s", (_, { storage }) => {
 
   it("a notice for another tab is not kept, and this tab's notices are none", () => {
     inWindow(storage)
-    const registry = registryFor({ endpoints: {}, signedIn: Atom.make(dana) })
-    const of = O.getOrThrow(dana)
+    const registry = registryFor({
+      ...registryStart,
+      endpoints: {},
+      signedIn: dana.pipe((who) => Atom.make(who), O.some)
+    })
+    const expectedSome1 = dana
+    assertTrue(O.isSome(expectedSome1), "expected dana")
+    const of = expectedSome1.value
     leaveTakenUp({
       registry,
       of,

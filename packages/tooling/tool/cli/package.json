@@ -24,7 +24,7 @@
     "@beep/schema": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:",
-    "oxc-parser": "0.148.0"
+    "oxc-parser": "0.160.0"
   },
   "devDependencies": {
     "@effect/platform-node": "catalog:",

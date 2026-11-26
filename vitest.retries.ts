@@ -19,6 +19,7 @@
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import type { Reporter, TestCase, TestModule } from "vitest/node"
@@ -58,8 +59,8 @@ const escaped = (text: string) =>
 
 /** The reporter: add it beside the default one in a package whose tests are tried again. */
 export class RetriedTests implements Reporter {
-  private readonly retried: Array<Retried> = []
-  private readonly againstTheRule: Array<string> = []
+  private readonly retried = MutableRef.make<ReadonlyArray<Retried>>([])
+  private readonly againstTheRule = MutableRef.make<ReadonlyArray<string>>([])
 
   onTestCaseResult(testCase: TestCase) {
     const attempts = testCase.attempts()
@@ -73,7 +74,7 @@ export class RetriedTests implements Reporter {
     )
     if (A.isArrayNonEmpty(hidden)) {
       const where = `${fromRoot(testCase.module.moduleId)}:${testCase.location?.line ?? 1}`
-      this.againstTheRule.push(where)
+      MutableRef.update(this.againstTheRule, A.append(where))
       process.stdout.write(
         `RETRIED AGAINST THE RULE ${where}  ${testCase.fullName}: tried again after "${hidden[0]}", which ends a test at once. A later error of the same try hid it from vitest's retry condition. The run fails.\n`
       )
@@ -91,7 +92,7 @@ export class RetriedTests implements Reporter {
       tries: attempts.length,
       first: `${Str.split("\n")(failed[0]?.errors?.[0]?.message ?? "no message")[0]}`
     }
-    this.retried.push(found)
+    MutableRef.update(this.retried, A.append(found))
     process.stdout.write(
       `RETRIED ${found.file}:${found.line}  passed on try ${found.tries} of ${found.tries}: ${found.name}  (first try: ${found.first})\n`
     )
@@ -103,15 +104,16 @@ export class RetriedTests implements Reporter {
   }
 
   onTestRunEnd(_modules: ReadonlyArray<TestModule>) {
-    const count = this.retried.length
+    const count = MutableRef.get(this.retried).length
     process.stdout.write(
       count === 0
         ? "Retried: no test needed a second try.\n"
         : `Retried: ${count} test(s) passed only on a later try (named above with RETRIED). Why is not known: each is a fault to find, and one that waits in real time belongs on TestClock.\n`
     )
-    if (A.isArrayNonEmpty(this.againstTheRule)) {
+    const againstTheRule = MutableRef.get(this.againstTheRule)
+    if (A.isReadonlyArrayNonEmpty(againstTheRule)) {
       process.stdout.write(
-        `Retried against the rule: ${this.againstTheRule.length} test(s) were tried again after a hang or a falsified property (named above). The run fails.\n`
+        `Retried against the rule: ${againstTheRule.length} test(s) were tried again after a hang or a falsified property (named above). The run fails.\n`
       )
       // Vitest reads this when it ends: a run whose every test passed on a later try still fails.
       process.exitCode = 1

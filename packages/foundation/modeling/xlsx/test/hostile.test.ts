@@ -1,6 +1,7 @@
 // Hostile files, made here and never committed. Each one stops the read with its finding and the part it happened
 // in: never a defect, a stack overflow or a hang.
 import { describe, expect, it } from "@effect/vitest"
+import { assertDefined } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
 import * as Effect from "effect/Effect"
@@ -8,17 +9,17 @@ import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { Xlsx } from "@beep/xlsx/Xlsx"
 import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
-import { archive, partsOf, sheet, workbook, type Recipe } from "./support/workbooks.ts"
+import { archive, partsOf, recipeStart, sheet, workbook, type RecipeInput } from "./support/workbooks.ts"
 
 const big = { maxInputBytes: ByteSize.mebibytes(64) }
-const findingOf = (bytes: Uint8Array, limits: Parameters<typeof XlsxLimits.make>[0] = big) =>
+const findingOf = (bytes: Uint8Array, limits: Parameters<typeof XlsxLimits.make>[0]) =>
   Xlsx.parse(bytes, XlsxReadOptions.make({ limits: XlsxLimits.make(limits) })).pipe(
     Effect.flip,
     Effect.map((error) => error.fatal.finding)
   )
-const builtFindingOf = (recipe: Recipe, limits?: Parameters<typeof XlsxLimits.make>[0]) =>
-  Effect.flatMap(workbook(recipe), (bytes) => findingOf(bytes, limits ?? big))
-const one = (xml: string): Recipe => ({ sheets: [{ name: "S", xml }] })
+const builtFindingOf = (recipe: RecipeInput, limits: Parameters<typeof XlsxLimits.make>[0]) =>
+  Effect.flatMap(workbook(recipe), (bytes) => findingOf(bytes, limits))
+const one = (xml: string): RecipeInput => ({ ...recipeStart, sheets: [{ name: "S", xml }] })
 const cell = "<c><v>1</v></c>"
 
 describe("hostile files", () => {
@@ -47,7 +48,8 @@ describe("hostile files", () => {
     Effect.gen(function* () {
       const text = Str.repeat(20 * 1024 * 1024)("x")
       const finding = yield* builtFindingOf(
-        one(sheet(`<row r="1"><c r="A1" t="inlineStr"><is><t>${text}</t></is></c></row>`))
+        one(sheet(`<row r="1"><c r="A1" t="inlineStr"><is><t>${text}</t></is></c></row>`)),
+        big
       )
       expect(finding).toMatchObject({ kind: "LimitExceeded", path: "xl/worksheets/sheet1.xml" })
       expect(["cellChars", "xml"]).toContain(finding.kind === "LimitExceeded" ? finding.limit : "")
@@ -59,14 +61,14 @@ describe("hostile files", () => {
       const rows = Str.repeat(1001)("<row/>")
       const many = yield* builtFindingOf(one(sheet(rows)), { ...big, maxRows: 1000 })
       expect(many).toMatchObject({ kind: "LimitExceeded", limit: "rows" })
-      const far = yield* builtFindingOf(one(sheet('<row r="1048577"><c><v>1</v></c></row>')))
+      const far = yield* builtFindingOf(one(sheet('<row r="1048577"><c><v>1</v></c></row>')), big)
       expect(far).toMatchObject({ kind: "LimitExceeded", limit: "rows" })
     })
   )
 
   it.effect("a row of 16,385 cells", () =>
     Effect.gen(function* () {
-      const finding = yield* builtFindingOf(one(sheet(`<row r="1">${Str.repeat(16_385)(cell)}</row>`)))
+      const finding = yield* builtFindingOf(one(sheet(`<row r="1">${Str.repeat(16_385)(cell)}</row>`)), big)
       expect(finding).toMatchObject({ kind: "LimitExceeded", limit: "columns", path: "xl/worksheets/sheet1.xml" })
     })
   )
@@ -85,7 +87,7 @@ describe("hostile files", () => {
   it.effect("XML nested deeper than any workbook is", () =>
     Effect.gen(function* () {
       const deep = `${Str.repeat(5000)("<a>")}${Str.repeat(5000)("</a>")}`
-      const finding = yield* builtFindingOf(one(`<worksheet>${deep}</worksheet>`))
+      const finding = yield* builtFindingOf(one(`<worksheet>${deep}</worksheet>`), big)
       expect(finding).toMatchObject({ kind: "LimitExceeded", limit: "xml", path: "xl/worksheets/sheet1.xml" })
     })
   )
@@ -96,26 +98,29 @@ describe("hostile files", () => {
         '<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">' +
         '<!ENTITY xxe SYSTEM "file:///etc/passwd">]>' +
         '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>&lol2;&xxe;</t></is></c></row></sheetData></worksheet>'
-      const finding = yield* builtFindingOf(one(bomb))
+      const finding = yield* builtFindingOf(one(bomb), big)
       expect(finding).toMatchObject({ kind: "DamagedXml", path: "xl/worksheets/sheet1.xml" })
     })
   )
 
   it.effect("XML that is not well-formed, with where", () =>
     Effect.gen(function* () {
-      const finding = yield* builtFindingOf(one('<worksheet><sheetData>\n<row r="1"><c></row></sheetData></worksheet>'))
+      const finding = yield* builtFindingOf(
+        one('<worksheet><sheetData>\n<row r="1"><c></row></sheetData></worksheet>'),
+        big
+      )
       expect(finding).toMatchObject({ kind: "DamagedXml", path: "xl/worksheets/sheet1.xml", line: 2 })
     })
   )
 
   it.effect("one path twice in the archive", () =>
     Effect.gen(function* () {
-      const parts = partsOf(one(sheet('<row r="1"><c r="A1"><v>1</v></c></row>')))
+      const parts = yield* partsOf(one(sheet('<row r="1"><c r="A1"><v>1</v></c></row>')))
       const bytes = yield* archive([
         ...parts,
         ["xl/worksheets/sheet1.xml", sheet('<row r="1"><c r="A1"><v>2</v></c></row>')]
       ])
-      const finding = yield* findingOf(bytes)
+      const finding = yield* findingOf(bytes, big)
       expect(finding).toMatchObject({ kind: "DuplicatePart", path: "xl/worksheets/sheet1.xml" })
     })
   )
@@ -126,13 +131,17 @@ describe("hostile files", () => {
   it.effect("a file cut short at every hundredth byte", () =>
     Effect.gen(function* () {
       const bytes = yield* workbook(one(sheet('<row r="1"><c r="A1"><v>1</v></c></row>')))
-      const whole = yield* Xlsx.parse(bytes)
+      const whole = yield* Xlsx.parse(bytes, XlsxReadOptions.default)
       const cuts = A.filter(A.range(1, Math.floor(bytes.length / 100)), (n) => n * 100 < bytes.length)
       const kinds = A.map(cuts, (n) => {
-        const found = Xlsx.parseResult(bytes.subarray(0, n * 100))
-        if (Result.isFailure(found)) return found.failure.fatal.finding.kind
-        expect(found.success.workbook).toEqual(whole.workbook)
-        return "read"
+        const found = Xlsx.parseResult(bytes.subarray(0, n * 100), XlsxReadOptions.default)
+        return Result.match(found, {
+          onFailure: (error) => error.fatal.finding.kind,
+          onSuccess: (read) => {
+            expect(read.workbook).toEqual(whole.workbook)
+            return "read"
+          }
+        })
       })
       expect(cuts.length).toBeGreaterThan(10)
       expect(A.filter(kinds, (kind) => kind !== "read").length).toBeGreaterThan(cuts.length / 2)
@@ -150,17 +159,19 @@ describe("hostile files", () => {
       const bytes = yield* workbook(one(sheet("")))
       // Bit 0 of the general purpose flags of the first local header says the entry is encrypted.
       const marked = new Uint8Array(bytes)
-      marked[6] = (marked[6] ?? 0) | 1
-      const finding = yield* findingOf(marked)
+      const flags = marked[6]
+      assertDefined(flags)
+      marked[6] = flags | 1
+      const finding = yield* findingOf(marked, big)
       expect(finding).toMatchObject({ kind: "DamagedArchive", damage: "Unsupported" })
     })
   )
 
   it.effect("bytes that are no archive at all", () =>
     Effect.gen(function* () {
-      const finding = yield* findingOf(new TextEncoder().encode("SKU,Name\nA-1,Bolt\n"))
+      const finding = yield* findingOf(new TextEncoder().encode("SKU,Name\nA-1,Bolt\n"), big)
       expect(finding).toMatchObject({ kind: "NotAWorkbook", container: "notAnArchive" })
-      const garbage = yield* findingOf(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
+      const garbage = yield* findingOf(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8, 9]), big)
       expect(garbage).toMatchObject({ kind: "NotAWorkbook", container: "otherZip" })
     })
   )

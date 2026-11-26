@@ -40,8 +40,9 @@ anything unasked. oaklib is not installed as a tool, but `uvx --from oaklib runo
 | Reuse report, ODP recommendations | One report, `explorations/erp-ontology/research/NN-title.md`, with frontmatter; then `bun run docs:check` |
 | Import term lists, extracted modules | Do not apply. A projected gist term is a proposed change to the vocabulary module, shown as a TypeScript sketch in the report |
 
-The thin thread is built (the module, the projector, the generated Turtle, CQ-P06 and CQ-P11, the reasoner step, the
-ontology-terms law). SHACL, alignments and any term beyond the thread's 22 are not built. This skill does not run
+The thin thread and the party slice are built (the module, the projector, the generated Turtle, CQ-P06 and CQ-P11 and
+the party questions, the reasoner step, the ontology-terms law). SHACL, alignments and any term beyond the module's
+are not built. This skill does not run
 those gates, and it never reports a check as run that has no code behind it. No candidate becomes a parent except through gist; an IOF, ISA-95,
 schema.org, W3C ORG, FIBO or EPCIS match is an alignment row. Never mint an IRI under a real domain (`example.org`
 until published), never propose `owl:sameAs` to merge parties or `owl:inverseOf`, and do not propose a relationship
@@ -168,7 +169,7 @@ candidate (or extracted module) to test practical fit:
 
 ### Step 4: Module Extraction
 
-> Here: does not apply. Nothing is extracted and nothing goes in `imports/`. The thread's gist projection is in `packages/kernel/src/Terms.vocab.ts`. A new gist term is a proposed change to that module.
+> Here: does not apply. Nothing is extracted and nothing goes in `imports/`. The module's gist projection is in `packages/kernel/src/Terms.vocab.ts`. A new gist term is a proposed change to that module.
 
 #### Extraction Method Trade-offs
 

@@ -4,7 +4,7 @@
 // are the catalog host's (`@inventory/catalog-host/Model`).
 // The day's allowance is not here: every feature takes a call from it (the access context's `ModelAllowanceGateway`) before it asks.
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
-import { OpenRouterSettings } from "@beep/openrouter/OpenRouterConfig"
+import { ModelPolicy, OpenRouterSettings } from "@beep/openrouter/OpenRouterConfig"
 import { ModelId, ModelStatus, OffReason } from "@beep/openrouter/OpenRouterModel"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -30,7 +30,8 @@ export const modelLayer: Layer.Layer<OpenRouter, never, HttpClient.HttpClient> =
         model,
         fallbackModels,
         apiKey: settings.openRouterKey
-      })
+      }),
+      ModelPolicy.default
     )
   })
 ).pipe(Layer.orDie)

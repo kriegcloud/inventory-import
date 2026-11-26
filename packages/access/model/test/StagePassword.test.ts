@@ -2,6 +2,8 @@
 // opens them, and the one written in the repository opens nothing there.
 import { describe, expect, it } from "@effect/vitest"
 import * as O from "effect/Option"
+import * as Arbitrary from "effect/Arbitrary"
+import * as S from "effect/Schema"
 import { passwordToVerify } from "@inventory/access-model/StagePassword"
 
 const repository = "local-test-password"
@@ -29,4 +31,25 @@ describe("the password held against a stored hash", () => {
     expect(onStage("9c41d0aa72e6b3f5d2a17c089")).toEqual(O.some("9c41d0aa72e6b3f5d2a17c089"))
     expect(onStage("")).toEqual(O.some(""))
   })
+})
+
+// The comparator's zero padding must never confuse unequal lengths or UTF-16 code units.
+it.prop(
+  "stage password selection agrees with exact text equality",
+  [Arbitrary.schema(S.String), Arbitrary.schema(S.String), Arbitrary.schema(S.String)],
+  ([stage, repository, typed]) => {
+    expect(passwordToVerify({ stage: O.some(stage), repository, typed })).toEqual(
+      typed === stage ? O.some(repository) : typed === repository ? O.none() : O.some(typed)
+    )
+  }
+)
+
+it("keeps empty, NUL, and surrogate code units distinct", () => {
+  for (const stage of ["", "\0", "a\0", "😀", "\ud800", "\udfff"]) {
+    for (const typed of ["", "\0", "a", "a\0", "😀", "\ud800", "\udfff"]) {
+      expect(passwordToVerify({ stage: O.some(stage), repository, typed })).toEqual(
+        typed === stage ? O.some(repository) : O.some(typed)
+      )
+    }
+  }
 })

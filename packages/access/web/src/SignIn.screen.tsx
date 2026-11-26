@@ -1,9 +1,11 @@
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
@@ -15,76 +17,78 @@ import { Input } from "@inventory/ui/components/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { Spinner } from "@inventory/ui/components/spinner"
 import type { SignInFeatures, TestAccount } from "@inventory/access-contract/SessionState"
-import { $AccessWebId } from "./internal/identity.ts"
-
-const $I = $AccessWebId.create("SignIn")
+import { betterAuthClient } from "@beep/better-auth/Client"
+import { type BetterAuthRefused, Credentials, NewAccount, NewOrganization } from "@beep/better-auth/ClientSchema"
+import { authSentence } from "./internal/authWords.ts"
 
 // The sign-in page, drawn with the first paint (the app's sign-in gate says why). Better Auth's client is loaded
-// only when a person reaches for the page or presses, so the first page of the app does not carry it.
+// only when a person reaches for the page or presses, so the first page of the app does not carry it
+// (`betterAuthClient`, which fetches it when first run).
 
-/** Better Auth's browser client, fetched when it is first needed. Asking again returns the same module. */
-const authClient = () => import("./internal/authClient.ts")
+/** Fetches Better Auth's client as soon as the person reaches for the page, so the press itself does not wait. */
+const preloadAuth = Atom.fn((_: void) => betterAuthClient.preload)
 
-/** A slug the organization plugin requires: the name in lowercase words, plus a short suffix so two names can match. */
+/**
+ * The words of an organization's slug, read from its name: lowercase letters and digits joined by hyphens, forty
+ * characters at most. A name with no letter or digit reads as "organization", so the plugin always gets a slug.
+ */
+const OrganizationSlugStem = S.String.pipe(
+  S.decode(SchemaTransformation.toLowerCase()),
+  S.decodeTo(
+    S.String,
+    SchemaTransformation.transform({
+      decode: (name) => {
+        const stem = name
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40)
+        return stem === "" ? "organization" : stem
+      },
+      encode: identity
+    })
+  )
+).annotate({ description: "The words of an organization's slug, read from the name the person typed." })
+
+/** A slug the organization plugin requires: the name's words, plus a short suffix so two names can match. */
 const slugFor = (name: string) =>
-  `${
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 40) || "organization"
-  }-${SecureRandom.uuidV4Unsafe().slice(0, 6)}`
+  S.decodeEffect(OrganizationSlugStem)(name).pipe(
+    Effect.orDie,
+    Effect.map((stem) => `${stem}-${SecureRandom.uuidV4Unsafe().slice(0, 6)}`)
+  )
 
 const roleWord = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
 /** Where the account belongs, and as what: one line per organization ("Admin, Example Works (test)"). */
 const membershipsOf = (account: TestAccount) =>
-  account.memberships.map((membership) => `${roleWord[membership.role]}, ${membership.organizationName}`)
+  A.map(account.memberships, (membership) => `${roleWord[membership.role]}, ${membership.organizationName}`)
 
 /** What the person asked for: to sign in to an account, or to make one and its organization. */
 type Attempt = Data.TaggedEnum<{
-  SignIn: { readonly email: string; readonly password: string }
-  SignUp: { readonly name: string; readonly email: string; readonly password: string; readonly organization: string }
+  readonly SignIn: { readonly email: string; readonly password: string }
+  readonly SignUp: {
+    readonly name: string
+    readonly email: string
+    readonly password: string
+    readonly organization: string
+  }
 }>
 const Attempt = Data.taggedEnum<Attempt>()
 
-/** Better Auth said no, in a sentence already written for the person ("Invalid email or password"). */
-class AuthRefused extends S.TaggedError<AuthRefused, { readonly brand: unique symbol }>()(
-  "AuthRefused",
-  { message: S.String },
-  $I.annote("AuthRefused", { description: "Better Auth refused a sign-in, a sign-up or a new organization." })
-) {}
-
-/** A Better Auth step as an Effect: its refusal is `AuthRefused` with Better Auth's own sentence. */
-const authStep = (step: () => Promise<unknown>): Effect.Effect<void, AuthRefused> =>
-  Effect.tryPromise({
-    try: () => step().then(() => undefined),
-    catch: (cause) =>
-      AuthRefused.make({
-        message: cause instanceof Error ? cause.message : "Something went wrong. Try again."
-      })
-  })
-
-/** Sends one attempt to Better Auth: a sign-in, or a sign-up followed by the new organization. */
-const submitAttempt = Atom.fn((attempt: Attempt) =>
-  Attempt.$match(attempt, {
-    SignIn: ({ email, password }) =>
-      authStep(() =>
-        authClient().then(({ authClient: client, orThrow }) =>
-          client.signIn.email({ email, password }).then((answer) => orThrow(answer))
-        )
-      ),
+/**
+ * Sends one attempt to Better Auth: a sign-in, or a sign-up followed by the new organization. `onSignedIn` runs when
+ * Better Auth has done it, never after a refusal.
+ */
+const submitAttempt = Atom.fn((sent: { readonly attempt: Attempt; readonly onSignedIn: () => void }) =>
+  Attempt.$match(sent.attempt, {
+    SignIn: ({ email, password }) => betterAuthClient.signIn(Credentials.make({ email, password })),
     SignUp: ({ name, email, password, organization }) =>
-      authStep(() =>
-        authClient().then(({ authClient: client, orThrow }) =>
-          client.signUp
-            .email({ name, email, password })
-            .then((answer) => orThrow(answer))
-            .then(() => client.organization.create({ name: organization, slug: slugFor(organization) }))
-            .then((answer) => orThrow(answer))
+      slugFor(organization).pipe(
+        Effect.tap(() => betterAuthClient.signUp(NewAccount.make({ name, email, password }))),
+        Effect.flatMap((slug) =>
+          betterAuthClient.createOrganization(NewOrganization.make({ name: organization, slug }))
         )
       )
-  })
+  }).pipe(Effect.tap(() => Effect.sync(sent.onSignedIn)))
 )
 
 /** The attempt last sent, so the button pressed shows that it is working. */
@@ -97,12 +101,11 @@ const passwordTyped = Atom.make("")
 const nameTyped = Atom.make("")
 const organizationTyped = Atom.make("")
 
-/** Making the first organization of an account that has none. */
-const createOrganization = Atom.fn((name: string) =>
-  authStep(() =>
-    authClient().then(({ authClient: client, orThrow }) =>
-      client.organization.create({ name, slug: slugFor(name) }).then((answer) => orThrow(answer))
-    )
+/** Making the first organization of an account that has none; `onCreated` runs when Better Auth has made it. */
+const createOrganization = Atom.fn((sent: { readonly name: string; readonly onCreated: () => void }) =>
+  slugFor(sent.name).pipe(
+    Effect.flatMap((slug) => betterAuthClient.createOrganization(NewOrganization.make({ name: sent.name, slug }))),
+    Effect.tap(() => Effect.sync(sent.onCreated))
   )
 )
 const organizationName = Atom.make("")
@@ -111,16 +114,20 @@ const organizationName = Atom.make("")
  * What to say under the form after a refusal, while nothing is on its way: Better Auth's own sentence, or a general one
  * for a failure that is not a refusal.
  */
-const refusalOf = (result: AsyncResult.AsyncResult<void, AuthRefused>): string | undefined =>
+const refusalOf = (result: AsyncResult.AsyncResult<void, BetterAuthRefused>): O.Option<string> =>
   !AsyncResult.isFailure(result) || result.waiting
-    ? undefined
-    : O.match(AsyncResult.error(result), {
-        onNone: () => "Something went wrong. Try again.",
-        onSome: (refused) => refused.message
-      })
+    ? O.none()
+    : result.pipe(
+        AsyncResult.error,
+        O.match({
+          onNone: () => "Something went wrong. Try again.",
+          onSome: authSentence
+        }),
+        O.some
+      )
 
 /** The first screen when nobody is signed in: the test accounts in one click, sign in, or create an account. */
-export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: () => void }) {
+export function SignIn(props: { readonly features: O.Option<SignInFeatures>; readonly onSignedIn: () => void }) {
   const id = useId()
   const [current, setMode] = useAtom(mode)
   const [email, setEmail] = useAtom(emailTyped)
@@ -128,8 +135,8 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
   const [name, setName] = useAtom(nameTyped)
   const [organization, setOrganization] = useAtom(organizationTyped)
   const result = useAtomValue(submitAttempt)
-  const submit = useAtomSet(submitAttempt, { mode: "promiseExit" })
-  const reset = useAtomSet(submitAttempt)
+  const submit = useAtomSet(submitAttempt)
+  const preload = useAtomSet(preloadAuth)
   const [last, setLast] = useAtom(lastAttempt)
   const testAccounts = O.flatMap(props.features, (features) => features.testAccounts)
   // Until the features are known nothing is offered that may then be refused.
@@ -137,9 +144,7 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
 
   const send = (attempt: Attempt) => {
     setLast(O.some(attempt))
-    void submit(attempt).then((exit) => {
-      if (Exit.isSuccess(exit)) props.onSignedIn()
-    })
+    submit({ attempt, onSignedIn: props.onSignedIn })
   }
   const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -151,15 +156,17 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
   }
   const signUp = current === "sign-up"
   const pending = result.waiting
-  const pendingEmail = pending ? O.getOrUndefined(O.map(last, (attempt) => attempt.email)) : undefined
+  const pendingEmail = O.map(
+    O.filter(last, () => pending),
+    (attempt) => attempt.email
+  )
   const refused = refusalOf(result)
 
   return (
     <div
       className={`mx-auto grid w-full gap-6 ${O.isNone(testAccounts) ? "max-w-sm" : "max-w-3xl md:grid-cols-2 md:items-start"}`}
-      // Fetch Better Auth's client as soon as the person reaches for the page, so the press itself does not wait.
-      onPointerEnter={() => void authClient()}
-      onFocus={() => void authClient()}
+      onPointerEnter={() => preload()}
+      onFocus={() => preload()}
     >
       <Card>
         <CardHeader>
@@ -237,10 +244,10 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
                   />
                 </Field>
               )}
-              {refused !== undefined && <FieldError>{refused}</FieldError>}
+              {O.match(refused, { onNone: () => null, onSome: (message) => <FieldError>{message}</FieldError> })}
               <Field>
                 <Button type="submit" disabled={pending}>
-                  {pending && pendingEmail === email ? <Spinner /> : null}
+                  {pending && O.contains(pendingEmail, email) ? <Spinner /> : null}
                   {signUp ? "Create account" : "Sign in"}
                 </Button>
                 {/* Offered only where an account can be made: closed, the page is sign-in alone. */}
@@ -249,7 +256,7 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
                     type="button"
                     variant="ghost"
                     onClick={() => {
-                      reset(Atom.Reset)
+                      submit(Atom.Reset)
                       setMode(signUp ? "sign-in" : "sign-up")
                     }}
                   >
@@ -283,11 +290,11 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
                 </p>
               ) : (
                 <div role="list" className="flex flex-col gap-2">
-                  {testAccounts.accounts.map((account) => (
+                  {A.map(testAccounts.accounts, (account) => (
                     <Item key={account.email} role="listitem" variant="outline" size="sm">
                       <ItemContent className="min-w-0">
                         <ItemTitle>{account.name}</ItemTitle>
-                        {membershipsOf(account).map((line) => (
+                        {A.map(membershipsOf(account), (line) => (
                           <ItemDescription key={line}>{line}</ItemDescription>
                         ))}
                       </ItemContent>
@@ -300,7 +307,7 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
                             send(Attempt.SignIn({ email: account.email, password: testAccounts.password }))
                           }
                         >
-                          {pendingEmail === account.email ? <Spinner /> : null}
+                          {O.contains(pendingEmail, account.email) ? <Spinner /> : null}
                           Sign in<span className="sr-only"> as {account.name}</span>
                         </Button>
                       </ItemActions>
@@ -317,11 +324,11 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
 }
 
 /** Signed in, but in no organization yet (an account whose organization was not created): create one. */
-export function CreateOrganization(props: { onCreated: () => void; onSignOut: () => void }) {
+export function CreateOrganization(props: { readonly onCreated: () => void; readonly onSignOut: () => void }) {
   const id = useId()
   const [name, setName] = useAtom(organizationName)
   const result = useAtomValue(createOrganization)
-  const create = useAtomSet(createOrganization, { mode: "promiseExit" })
+  const create = useAtomSet(createOrganization)
   const refused = refusalOf(result)
   return (
     <Card className="mx-auto w-full max-w-sm">
@@ -335,9 +342,7 @@ export function CreateOrganization(props: { onCreated: () => void; onSignOut: ()
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            void create(name).then((exit) => {
-              if (Exit.isSuccess(exit)) props.onCreated()
-            })
+            create({ name, onCreated: props.onCreated })
           }}
         >
           <FieldGroup>
@@ -352,7 +357,7 @@ export function CreateOrganization(props: { onCreated: () => void; onSignOut: ()
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            {refused !== undefined && <FieldError>{refused}</FieldError>}
+            {O.match(refused, { onNone: () => null, onSome: (message) => <FieldError>{message}</FieldError> })}
             <Field>
               <Button type="submit" disabled={result.waiting}>
                 {result.waiting && <Spinner />}

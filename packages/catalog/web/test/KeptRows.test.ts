@@ -1,7 +1,14 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
+import type { ConfirmRequest } from "@inventory/catalog-contract/Decision"
+import type { SaveAnswer } from "./support/catalog.ts"
+import * as MutableRef from "effect/MutableRef"
+import { RowId } from "@inventory/catalog-contract/Ids"
+import { identity } from "effect/Function"
 // The person's waiting rows as this browser keeps them, wired: kept under the member who decided them, whoever is
 // signed in when the server answers; read for nobody else; erased with a removed import; named, then dropped, when
 // the import turns out to be closed; and the question before the page is left, asked wherever the person is while
 // rows wait to be sent, never for rows that are only to be named, never once the app itself leaves.
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
@@ -19,10 +26,9 @@ import { DisplayName } from "@inventory/kernel/Text"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
 import { decisionFromFlags, type SaveRequest } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { DraftBusy, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
-import * as S from "effect/Schema"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { DraftEvent } from "../src/Draft.machine.ts"
 import { askBeforeLeaving, importView, importViewShown, removeImport } from "../src/Imports.atoms.ts"
@@ -40,8 +46,8 @@ import {
 } from "../src/ReviewDraft.atoms.ts"
 import { noticeWords } from "../src/internal/notices.ts"
 import { dismissNotice, notices } from "../src/Notices.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
-import { memberOf, sessionStandIn } from "./support/session.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its storage, which outlives a page, the tab's own storage (every page here is one tab, loaded again),
 // and the listeners a page adds to its window. It has no locks: a page loaded again is one whose old page is gone.
@@ -54,7 +60,7 @@ const browser = vi.hoisted(() => {
     window: {
       location: { pathname: "/", search: "" },
       localStorage: {
-        getItem: (key: string) => kept[key] ?? null,
+        getItem: (key: string) => StorageTwin.getItem(kept, key),
         setItem: (key: string, value: string) => {
           kept[key] = value
         },
@@ -76,22 +82,23 @@ const browser = vi.hoisted(() => {
         }
       },
       sessionStorage: {
-        getItem: (key: string) => tab[key] ?? null,
+        getItem: (key: string) => StorageTwin.getItem(tab, key),
         setItem: (key: string, value: string) => {
           tab[key] = value
         }
       },
       addEventListener: (name: string, listener: (event: unknown) => void) => {
-        listeners[name] = [...(listeners[name] ?? []), listener]
+        listeners[name] = [...O.match(R.get(listeners, name), { onNone: A.empty, onSome: identity }), listener]
       },
       removeEventListener: (name: string, listener: (event: unknown) => void) => {
         const others: Array<(event: unknown) => void> = []
-        for (const each of listeners[name] ?? []) if (each !== listener) others.push(each)
+        for (const each of O.match(R.get(listeners, name), { onNone: A.empty, onSome: identity }))
+          if (each !== listener) others.push(each)
         listeners[name] = others
       }
     }
   })
-  return { kept, tab, listeners, said: [] as Array<string> }
+  return { kept, tab, listeners, said: Array<string>() }
 })
 
 // What is said to the person, by title.
@@ -115,7 +122,7 @@ const emptyStorage = (): void => {
 /** The page is about to be left: true when something asked the person first. */
 const leaving = (): boolean => {
   let asked = false
-  for (const listener of browser.listeners["beforeunload"] ?? []) {
+  for (const listener of O.match(R.get(browser.listeners, "beforeunload"), { onNone: A.empty, onSome: identity })) {
     listener({
       preventDefault: () => {
         asked = true
@@ -141,8 +148,11 @@ const person = (id: string, organizationId: string) =>
 const dana = person("mem_dana", "org_prairie")
 
 /** Where one member's waiting rows of one import are kept, by this tab (its id is in the tab's own storage). */
-const keyOf = (id: ImportId, memberId: string, organizationId = "org_prairie") =>
-  progressKey({ organizationId, memberId, screen: `import:${id}:waiting:${browser.tab["inventory:tab"] ?? ""}` })
+const keyOf = (id: ImportId, memberId: string, organizationId: string) => {
+  const tab = browser.tab["inventory:tab"]
+  assertDefined(tab)
+  return progressKey({ organizationId, memberId, screen: `import:${id}:waiting:${tab}` })
+}
 
 /**
  * One page of the app, on the shared storage: the server answers each save only when the test says, and refuses it as
@@ -151,51 +161,54 @@ const keyOf = (id: ImportId, memberId: string, organizationId = "org_prairie") =
  * (`asking` true) until the test answers it. With `session`, who is signed in is the app's own session stand-in
  * (`support/session.ts`), asked and answered by its rules.
  */
+const serverStart = { signedOut: false, removed: false, in: "org_prairie", view: O.none<ImportView>() }
 const page = (
   id: ImportId,
-  signedIn = dana,
-  server: {
-    signedOut: boolean
-    removed: boolean
+  signedIn: typeof dana,
+  server: MutableRef.MutableRef<{
+    readonly signedOut: boolean
+    readonly removed: boolean
     /** The organization a read that answers not found looked in: the session's, which another tab may have switched. */
-    in?: string
-    view?: ImportView
-    askHangs?: boolean
-  } = {
-    signedOut: false,
-    removed: false
-  },
-  session?: ReturnType<typeof sessionStandIn>
+    readonly in: string
+    readonly view: O.Option<ImportView>
+    readonly askHangs?: boolean
+  }>,
+  session: O.Option<ReturnType<typeof sessionStandIn>>
 ) => {
-  const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
+  const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<SaveAnswer, SaveFailure> }> =
+    []
   // The confirms sent; the server never answers one.
-  const commits: Array<SaveRequest & { readonly revision: number }> = []
+  const commits: Array<ConfirmRequest> = []
   const who = Atom.make(signedIn)
   const asking = Atom.make(false).pipe(Atom.keepAlive)
   const asked = { times: 0 }
-  const held: { registry: AtomRegistry.AtomRegistry | undefined } = { registry: undefined }
+  const held: MutableRef.MutableRef<{ readonly registry: AtomRegistry.AtomRegistry | undefined }> = MutableRef.make<{
+    readonly registry: AtomRegistry.AtomRegistry | undefined
+  }>({ registry: undefined })
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         get: () =>
-          server.removed
+          server.current.removed
             ? Effect.fail(
                 ImportNotFound.make({
                   reason: "It is gone.",
-                  organizationId: OrganizationId.make(server.in ?? "org_prairie")
+                  organizationId: OrganizationId.make(server.current.in)
                 })
               )
-            : server.view === undefined
-              ? Deferred.await(Deferred.makeUnsafe<ImportView>())
-              : Effect.succeed(server.view),
+            : O.match(server.current.view, {
+                onNone: () => Deferred.await(Deferred.makeUnsafe<ImportView>()),
+                onSome: Effect.succeed
+              }),
         decide: (request: { readonly payload: SaveRequest }) =>
-          Effect.suspend((): Effect.Effect<unknown, SaveFailure | NotSignedIn> => {
-            const answer = Deferred.makeUnsafe<unknown, SaveFailure>()
+          Effect.suspend((): Effect.Effect<SaveAnswer, SaveFailure | NotSignedIn> => {
+            const answer = Deferred.makeUnsafe<SaveAnswer, SaveFailure>()
             saves.push({ payload: request.payload, answer })
-            if (server.signedOut) return Effect.fail(NotSignedIn.make({ reason: "Sign in to continue." }))
+            if (server.current.signedOut) return Effect.fail(NotSignedIn.make({ reason: "Sign in to continue." }))
             return Deferred.await(answer)
           }),
-        commit: (request: { readonly payload: SaveRequest & { readonly revision: number } }) =>
+        commit: (request: { readonly payload: ConfirmRequest }) =>
           Effect.suspend(() => {
             commits.push(request.payload)
             return Deferred.await(Deferred.makeUnsafe<ImportView>())
@@ -204,19 +217,23 @@ const page = (
         remove: () => Effect.void
       }
     },
-    signedIn:
-      session === undefined
-        ? Atom.readable(
+    ...O.match(session, {
+      onNone: () => ({
+        signedIn: O.some(
+          Atom.readable(
             (get) => get(who),
             () => {
               asked.times += 1
-              if (server.askHangs === true) held.registry?.set(asking, true)
+              if (server.current.askHangs === true) held.current.registry?.set(asking, true)
             }
           )
-        : session.signedIn,
-    asked: session === undefined ? asking : session.asked
+        ),
+        asked: O.some(asking)
+      }),
+      onSome: (session) => ({ signedIn: O.some(session.signedIn), asked: O.some(session.asked) })
+    })
   })
-  held.registry = registry
+  held.current = { ...held.current, registry: registry }
   return {
     registry,
     saves,
@@ -232,8 +249,16 @@ const page = (
       return registry.mount(followDraft(id))
     },
     decide: (rowId: string) => registry.set(draftEvents(id), DraftEvent.Decided({ changes: { [rowId]: O.some(out) } })),
-    answer: (n: number, revision: number) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed: true, notApplied: [], decidedSince: [] })
+    answer: (n: number, revision: number) => {
+      const requiredEntry1 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry1), "expected saves[n]")
+      return Deferred.succeed(requiredEntry1.value.answer, {
+        revision,
+        changed: true,
+        notApplied: [],
+        decidedSince: []
+      })
+    }
   }
 }
 
@@ -241,19 +266,19 @@ describe("the waiting rows this browser keeps", () => {
   it.live("are cleared under the member who decided them when the save answers after a switch of organization", () =>
     Effect.gen(function* () {
       const id = importNo(61)
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       t.open(viewAt({ id, revision: 12 }))
       yield* settle
       t.decide("row-31")
       yield* settle
-      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+      expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
       // Dana picks her other organization before the answer comes.
       t.registry.set(t.who, person("mem_dana", "org_northline"))
       yield* t.answer(0, 13)
       yield* settle
       // The server took the row: nothing of it is kept under her Example Works key, or under the other one.
       expect([
-        R.has(browser.kept, keyOf(id, "mem_dana")),
+        R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie")),
         R.has(browser.kept, keyOf(id, "mem_dana", "org_northline"))
       ]).toEqual([false, false])
     })
@@ -262,42 +287,47 @@ describe("the waiting rows this browser keeps", () => {
   it.live("are one member's: another member opening the same import in this browser sends none and shows none", () =>
     Effect.gen(function* () {
       const id = importNo(62)
-      const first = page(id)
+      const first = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       first.open(viewAt({ id, revision: 4 }))
       yield* settle
       first.decide("row-2")
       yield* settle
       // Dana's save never answers: the row waits, kept for her.
-      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
-      const other = page(id, person("mem_lee", "org_prairie"))
+      expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
+      const other = page(
+        id,
+        person("mem_lee", "org_prairie"),
+        MutableRef.make({ ...serverStart, signedOut: false, removed: false }),
+        O.none()
+      )
       other.open(viewAt({ id, revision: 4 }))
       yield* settle
-      expect([other.saves.length, R.has(browser.kept, keyOf(id, "mem_lee"))]).toEqual([0, false])
+      expect([other.saves.length, R.has(browser.kept, keyOf(id, "mem_lee", "org_prairie"))]).toEqual([0, false])
     })
   )
 
   it.live("are erased with the import when it is removed", () =>
     Effect.gen(function* () {
       const id = importNo(63)
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       const view = viewAt({ id, revision: 4, fileName: "a.csv" })
       const leave = t.open(view)
       yield* settle
       t.decide("row-2")
       yield* settle
       leave()
-      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+      expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
       t.registry.mount(removeImport(id))
       t.registry.set(removeImport(id), view)
       yield* settle
-      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(false)
+      expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(false)
     })
   )
 
   it.live("of an import found closed are sent nowhere, named by the result, and dropped once it has named them", () =>
     Effect.gen(function* () {
       const id = importNo(64)
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
@@ -312,13 +342,16 @@ describe("the waiting rows this browser keeps", () => {
       expect(t.registry.get(rowsLeftOver(id))).toEqual(
         O.some({ rows: { "row-3": O.some(out) }, beside: {}, theirs: {} })
       )
-      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+      expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
       // The result names them; when it is left, nothing of them is kept.
       const naming = t.registry.mount(namingLeftOver(id))
       yield* settle
       naming()
       yield* settle
-      expect([t.registry.get(rowsLeftOver(id)), R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([O.none(), false])
+      expect([t.registry.get(rowsLeftOver(id)), R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))]).toEqual([
+        O.none(),
+        false
+      ])
     })
   )
 })
@@ -328,7 +361,7 @@ describe("the question before the page is left", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(65)
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       t.registry.mount(askBeforeLeaving)
       const leave = t.open(viewAt({ id, revision: 4 }))
       yield* settle
@@ -341,7 +374,8 @@ describe("the question before the page is left", () => {
       yield* settle
       expect(leaving()).toBe(true)
       // A sign-out leaves the page on purpose: nothing asks after the session has ended.
-      for (const listener of browser.listeners[leavingApp] ?? []) listener({})
+      for (const listener of O.match(R.get(browser.listeners, leavingApp), { onNone: A.empty, onSome: identity }))
+        listener({})
       expect(leaving()).toBe(false)
     })
   )
@@ -350,7 +384,7 @@ describe("the question before the page is left", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(66)
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       t.registry.mount(askBeforeLeaving)
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
@@ -368,18 +402,18 @@ describe("the question before the page is left", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(67)
-      const first = page(id)
+      const first = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       first.open(viewAt({ id, revision: 4 }))
       yield* settle
       first.decide("row-2")
       yield* settle
-      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+      expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
       // A colleague removes the import; the page is loaded again.
       browser.listeners["beforeunload"] = []
-      const again = page(id, dana, { signedOut: false, removed: true })
+      const again = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: true }), O.none())
       again.registry.mount(askBeforeLeaving)
       yield* settle
-      expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([false, false])
+      expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))]).toEqual([false, false])
     })
   )
 })
@@ -391,12 +425,23 @@ describe("rows that wait after a save refused for nobody signed in (G3)", () => 
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(68)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: MutableRef.MutableRef<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }> = MutableRef.make<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }>({
+          ...serverStart,
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 })
-        }
-        const t = page(id, dana, server)
+          view: O.some(viewAt({ id, revision: 4 }))
+        })
+        const t = page(id, dana, server, O.none())
         const leave = t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -407,22 +452,22 @@ describe("rows that wait after a save refused for nobody signed in (G3)", () => 
           A.length(t.saves),
           t.registry.get(reviewLines(id)),
           t.registry.get(rowsNotSaved(id)),
-          R.has(browser.kept, keyOf(id, "mem_dana")),
+          R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie")),
           t.asked.times
         ]).toEqual([1, {}, 1, true, 1])
         // Signed out: the workspace goes. Marcus signs in on this page, and opens the import.
         leave()
         t.registry.set(t.who, O.none())
         yield* settle
-        server.signedOut = false
+        server.current = { ...server.current, signedOut: false }
         t.registry.set(t.who, person("mem_marcus", "org_prairie"))
         const asMarcus = t.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Nothing of Dana's is sent as Marcus, or kept under his key; hers stays kept for her.
         expect([
           A.length(t.saves),
-          R.has(browser.kept, keyOf(id, "mem_marcus")),
-          R.has(browser.kept, keyOf(id, "mem_dana"))
+          R.has(browser.kept, keyOf(id, "mem_marcus", "org_prairie")),
+          R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))
         ]).toEqual([1, false, true])
         // Dana signs in again and opens the import: the picture the step reads checks the row, and it is sent.
         asMarcus()
@@ -437,11 +482,30 @@ describe("rows that wait after a save refused for nobody signed in (G3)", () => 
 })
 
 /** Two take-backs of one match, as the view carries them, read through the contract's schema. */
-// @effect-diagnostics-next-line schemaSync:off
-const taken = S.decodeSync(S.Array(MatchTakeBack))([
-  { revision: 5, by: "Marcus", field: "sku", kind: "stored", count: 2, rows: ["row-4", "row-9"] },
-  { revision: 5, by: "Marcus", field: "sku", kind: "twin", count: 1, rows: ["row-10"] }
-])
+const taken = [
+  MatchTakeBack.make({
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none(),
+    revision: 5,
+    by: "Marcus",
+    field: "sku",
+    kind: "stored",
+    count: 2,
+    rows: [RowId.make("row-4"), RowId.make("row-9")]
+  }),
+  MatchTakeBack.make({
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none(),
+    revision: 5,
+    by: "Marcus",
+    field: "sku",
+    kind: "twin",
+    count: 1,
+    rows: [RowId.make("row-10")]
+  })
+]
 
 describe("what a match took back from saved decisions", () => {
   it.live(
@@ -451,18 +515,25 @@ describe("what a match took back from saved decisions", () => {
         emptyStorage()
         const id = importNo(70)
         const view = viewAt({ id, revision: 5, takenBack: taken })
-        const t = page(id)
+        const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
         t.open(view)
         t.registry.mount(takeBacksNamed(id))
         yield* settle
         expect(t.registry.get(takeBacksNamed(id))).toEqual(taken)
-        t.registry.set(dismissTakeBack(id), taken[0]!)
+        const requiredEntry2 = A.get(taken, 0)
+        assertTrue(O.isSome(requiredEntry2), "expected taken[0]")
+        t.registry.set(dismissTakeBack(id), requiredEntry2.value)
         expect(t.registry.get(takeBacksNamed(id))).toEqual([taken[1]])
         // The page loaded again: still dismissed for Dana; named to Lee, who has not dismissed it.
-        const again = page(id)
+        const again = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
         again.open(view)
         again.registry.mount(takeBacksNamed(id))
-        const lee = page(id, person("mem_lee", "org_prairie"))
+        const lee = page(
+          id,
+          person("mem_lee", "org_prairie"),
+          MutableRef.make({ ...serverStart, signedOut: false, removed: false }),
+          O.none()
+        )
         lee.open(view)
         lee.registry.mount(takeBacksNamed(id))
         yield* settle
@@ -481,27 +552,36 @@ describe("rows on hold and the values seen, through the browser's storage", () =
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(69)
-        const first = page(id)
+        const first = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
         first.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Row 3's save is refused; row 2's then fails on the network.
         first.decide("row-3")
         yield* settle
+        const requiredEntry3 = A.get(first.saves, 0)
+        assertTrue(O.isSome(requiredEntry3), "expected first.saves[0]")
         yield* Deferred.fail(
-          first.saves[0]!.answer,
+          requiredEntry3.value.answer,
           ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make("org_prairie") })
         )
         yield* settle
         first.decide("row-2")
         yield* settle
-        yield* Deferred.fail(first.saves[1]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry4 = A.get(first.saves, 1)
+        assertTrue(O.isSome(requiredEntry4), "expected first.saves[1]")
+        yield* Deferred.fail(requiredEntry4.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         const refused = R.get(first.registry.get(reviewLines(id)), "row-3")
         expect(O.isSome(refused)).toBe(true)
         // The page is loaded again; Lee has kept row 2 meanwhile (revision 5).
         const kept = decisionFromFlags({ kept: true })
         const later = viewAt({ id, revision: 5, decisions: { "row-2": kept } })
-        const again = page(id, dana, { signedOut: false, removed: false, view: later })
+        const again = page(
+          id,
+          dana,
+          MutableRef.make({ ...serverStart, signedOut: false, removed: false, view: O.some(later) }),
+          O.none()
+        )
         again.open(later)
         yield* settle
         const lines = again.registry.get(reviewLines(id))
@@ -524,31 +604,49 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(71)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: MutableRef.MutableRef<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }> = MutableRef.make<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }>({
+          ...serverStart,
           signedOut: false,
           removed: false,
-          view: viewAt({ id, revision: 4 })
-        }
-        const t = page(id, dana, server)
+          view: O.some(viewAt({ id, revision: 4 }))
+        })
+        const t = page(id, dana, server, O.none())
         const leave = t.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Row 2 left out; its save fails on the server: it waits, at revision 4.
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry5 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry5), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry5.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // To the Match step: the Review step leaves; the import page keeps the view of revision 4.
         leave()
         yield* settle
         // Lee keeps row 2 meanwhile (revision 5).
-        server.view = viewAt({ id, revision: 5, decisions: { "row-2": keptDecision } })
+        server.current = {
+          ...server.current,
+          view: O.some(viewAt({ id, revision: 5, decisions: { "row-2": keptDecision } }))
+        }
         // Back to Review: the step is drawn again over the view the tab held. Nothing is judged before it goes: the row
         // goes, written only over what the server may hold of it (nothing, when it was decided, or the save that failed).
         t.registry.mount(followDraft(id))
         yield* settle
         expect(A.map(t.saves, (save) => save.payload.over)).toEqual([{}, { "row-2": [O.none(), O.some(out)] }])
         // The server holds Lee's decision, which is none of those: it writes nothing, and says so.
-        yield* Deferred.succeed(t.saves[1]!.answer, {
+        const requiredEntry6 = A.get(t.saves, 1)
+        assertTrue(O.isSome(requiredEntry6), "expected t.saves[1]")
+        yield* Deferred.succeed(requiredEntry6.value.answer, {
           revision: 5,
           changed: false,
           notApplied: [],
@@ -569,12 +667,24 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         emptyStorage()
         const id = importNo(72)
         // The import, as the server answers it for whoever is signed in.
-        const t = page(id, dana, { signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) })
+        const t = page(
+          id,
+          dana,
+          MutableRef.make({
+            ...serverStart,
+            signedOut: false,
+            removed: false,
+            view: O.some(viewAt({ id, revision: 4 }))
+          }),
+          O.none()
+        )
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry7 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry7), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry7.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // Marcus signs in on this page, and presses the confirm on a screen that still shows Dana's row 2 left out.
         t.registry.set(t.who, marcus)
@@ -590,7 +700,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
           ["Nothing was imported"]
         ])
         // Dana's row stays kept for her.
-        expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+        expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
         // Marcus presses again, on what he now sees: that is confirmed.
         t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
         yield* settle
@@ -604,18 +714,32 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(73)
-        const t = page(id, dana, { signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) })
+        const t = page(
+          id,
+          dana,
+          MutableRef.make({
+            ...serverStart,
+            signedOut: false,
+            removed: false,
+            view: O.some(viewAt({ id, revision: 4 }))
+          }),
+          O.none()
+        )
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry8 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry8), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry8.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         t.registry.set(t.who, marcus)
         yield* settle
         t.decide("row-3")
         yield* settle
-        const last = t.saves[A.length(t.saves) - 1]!.payload
+        const requiredEntry9 = A.get(t.saves, A.length(t.saves) - 1)
+        assertTrue(O.isSome(requiredEntry9), "expected t.saves[A.length(t.saves) - 1]")
+        const last = requiredEntry9.value.payload
         expect([R.keys(last.set), last.madeOn]).toEqual([["row-3"], { "row-3": 4 }])
       })
   )
@@ -626,21 +750,21 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(74)
-        const server = { signedOut: false, removed: false, in: "org_northline" }
-        const t = page(id, dana, server)
+        const server = MutableRef.make({ ...serverStart, signedOut: false, removed: false, in: "org_northline" })
+        const t = page(id, dana, server, O.none())
         t.open(viewAt({ id, revision: 4 }))
         t.registry.mount(notices)
         yield* settle
         t.decide("row-2")
         yield* settle
-        expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+        expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
         // Another tab switched the session's organization: this one's read of the import answers not found there.
-        server.removed = true
-        importView(id).askAgain(t.registry)
+        server.current = { ...server.current, removed: true }
+        importView(id).askAgain(t.registry, O.none())
         yield* settle
         // Everything stays, the row and its place on the screen; only who is signed in is asked.
         expect([
-          R.has(browser.kept, keyOf(id, "mem_dana")),
+          R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie")),
           t.asked.times > 0,
           t.registry.get(shownDecisions(id)),
           t.registry.get(notices)
@@ -652,12 +776,14 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(75)
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
       yield* settle
-      yield* Deferred.fail(t.saves[0]!.answer, DraftBusy.make({ reason: "The import kept changing." }))
+      const requiredEntry10 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry10), "expected t.saves[0]")
+      yield* Deferred.fail(requiredEntry10.value.answer, DraftBusy.make({ reason: "The import kept changing." }))
       yield* settle
       expect([t.registry.get(reviewLines(id)), t.registry.get(rowsNotSaved(id))]).toEqual([{}, 1])
     })
@@ -670,16 +796,32 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         emptyStorage()
         browser.said.length = 0
         const id = importNo(76)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
-        const t = page(id, dana, server)
+        const server: MutableRef.MutableRef<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }> = MutableRef.make<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }>({
+          ...serverStart,
+          signedOut: false,
+          removed: false
+        })
+        const t = page(id, dana, server, O.none())
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry11 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry11), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry11.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // Marcus signs in on this page; the import read for him finds Dana's row waiting.
-        server.view = viewAt({ id, revision: 4 })
+        server.current = { ...server.current, view: O.some(viewAt({ id, revision: 4 })) }
         t.registry.set(t.who, marcus)
         yield* settle
         expect(A.length(t.saves)).toBe(1)
@@ -695,11 +837,13 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       emptyStorage()
       const id = importNo(77)
       const view = viewAt({ id, revision: 5, takenBack: taken })
-      const t = page(id)
+      const t = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       const leave = t.open(view)
       t.registry.mount(takeBacksNamed(id))
       yield* settle
-      t.registry.set(dismissTakeBack(id), taken[0]!)
+      const requiredEntry12 = A.get(taken, 0)
+      assertTrue(O.isSome(requiredEntry12), "expected taken[0]")
+      t.registry.set(dismissTakeBack(id), requiredEntry12.value)
       const key = progressKey({ organizationId: "org_prairie", memberId: "mem_dana", screen: `import:${id}:takenBack` })
       yield* settle
       expect(R.has(browser.kept, key)).toBe(true)
@@ -717,21 +861,34 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(78)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: MutableRef.MutableRef<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }> = MutableRef.make<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }>({
+          ...serverStart,
           signedOut: false,
           removed: false,
-          view: viewAt({ id, revision: 4 })
-        }
+          view: O.some(viewAt({ id, revision: 4 }))
+        })
         // Marcus left row 5 out on this tab earlier; its save failed, and it is kept for him.
-        const before = page(id, marcus, server)
+        const before = page(id, marcus, server, O.none())
         before.open(viewAt({ id, revision: 4 }))
         yield* settle
         before.decide("row-5")
         yield* settle
-        yield* Deferred.fail(before.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry13 = A.get(before.saves, 0)
+        assertTrue(O.isSome(requiredEntry13), "expected before.saves[0]")
+        yield* Deferred.fail(requiredEntry13.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // The page is loaded again: Dana opens the Review step, with nothing of hers pending.
-        const t = page(id, dana, server)
+        const t = page(id, dana, server, O.none())
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Marcus signs in on the page and leaves row 3 out; its save fails.
@@ -739,14 +896,16 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         t.decide("row-3")
         yield* settle
-        const rowsKept = () => Str.includes('"row-3"')(browser.kept[keyOf(id, "mem_marcus")] ?? "")
-        const fiveKept = () => Str.includes('"row-5"')(browser.kept[keyOf(id, "mem_marcus")] ?? "")
+        const rowsKept = () =>
+          O.exists(R.get(browser.kept, keyOf(id, "mem_marcus", "org_prairie")), Str.includes('"row-3"'))
+        const fiveKept = () =>
+          O.exists(R.get(browser.kept, keyOf(id, "mem_marcus", "org_prairie")), Str.includes('"row-5"'))
         expect([rowsKept(), fiveKept()]).toEqual([true, true])
         for (const save of t.saves) yield* Deferred.fail(save.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         expect([rowsKept(), fiveKept()]).toEqual([true, true])
         // A reload, as Marcus: both rows come back, and are sent once the import's picture has checked them.
-        const again = page(id, marcus, server)
+        const again = page(id, marcus, server, O.none())
         again.open(viewAt({ id, revision: 4 }))
         yield* settle
         expect(A.map(again.saves, (save) => A.sort(R.keys(save.payload.set), Str.Order))).toEqual([["row-3", "row-5"]])
@@ -760,7 +919,17 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         emptyStorage()
         browser.said.length = 0
         const id = importNo(79)
-        const t = page(id, dana, { signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) })
+        const t = page(
+          id,
+          dana,
+          MutableRef.make({
+            ...serverStart,
+            signedOut: false,
+            removed: false,
+            view: O.some(viewAt({ id, revision: 4 }))
+          }),
+          O.none()
+        )
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Dana leaves row 2 out, and presses the confirm while its save is out: the confirm waits.
@@ -783,13 +952,24 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(80)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: MutableRef.MutableRef<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }> = MutableRef.make<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }>({
+          ...serverStart,
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 })
-        }
-        const session = sessionStandIn(memberOf({ id: "mem_dana" }))
-        const t = page(id, dana, server, session)
+          view: O.some(viewAt({ id, revision: 4 }))
+        })
+        const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
+        const t = page(id, dana, server, O.some(session))
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -797,18 +977,18 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         // Refused for nobody signed in: who is signed in is asked again, and has not answered.
         expect([A.length(t.saves), session.times(), t.registry.get(session.asked)]).toEqual([1, 1, true])
         // The cookie is Marcus's now; the page still says Dana. She presses Save again: the save waits for the answer.
-        server.signedOut = false
+        server.current = { ...server.current, signedOut: false }
         t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
         yield* settle
         expect(A.length(t.saves)).toBe(1)
         // The answer: Marcus. The page is left, never his; nothing of Dana's goes as him, and her row stays kept for her.
-        yield* session.answer(memberOf({ id: "mem_marcus" }))
+        yield* session.answer(memberOf({ ...memberStart, account: "mem_marcus", id: "mem_marcus" }))
         yield* settle
-        expect([A.length(t.saves), session.left.times, R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([
-          1,
-          1,
-          true
-        ])
+        expect([
+          A.length(t.saves),
+          session.left.times,
+          R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))
+        ]).toEqual([1, 1, true])
       })
   )
 
@@ -816,23 +996,34 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(81)
-      const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+      const server: MutableRef.MutableRef<{
+        readonly signedOut: boolean
+        readonly removed: boolean
+        readonly view: O.Option<ImportView>
+        readonly in: string
+      }> = MutableRef.make<{
+        readonly signedOut: boolean
+        readonly removed: boolean
+        readonly view: O.Option<ImportView>
+        readonly in: string
+      }>({
+        ...serverStart,
         signedOut: true,
         removed: false,
-        view: viewAt({ id, revision: 4 })
-      }
-      const session = sessionStandIn(memberOf({ id: "mem_dana" }))
-      const t = page(id, dana, server, session)
+        view: O.some(viewAt({ id, revision: 4 }))
+      })
+      const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
+      const t = page(id, dana, server, O.some(session))
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
       yield* settle
-      server.signedOut = false
+      server.current = { ...server.current, signedOut: false }
       t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
       yield* settle
       expect(A.length(t.saves)).toBe(1)
       // The answer: Dana is still signed in. The held save goes.
-      yield* session.answer(memberOf({ id: "mem_dana" }))
+      yield* session.answer(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
       yield* settle
       expect(A.map(t.saves, (save) => R.keys(save.payload.set))).toEqual([["row-2"], ["row-2"]])
     })
@@ -844,24 +1035,35 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(82)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: MutableRef.MutableRef<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }> = MutableRef.make<{
+          readonly signedOut: boolean
+          readonly removed: boolean
+          readonly view: O.Option<ImportView>
+          readonly in: string
+        }>({
+          ...serverStart,
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 })
-        }
-        const session = sessionStandIn(memberOf({ id: "mem_dana" }))
-        const t = page(id, dana, server, session)
+          view: O.some(viewAt({ id, revision: 4 }))
+        })
+        const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
+        const t = page(id, dana, server, O.some(session))
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
         yield* settle
-        server.signedOut = false
+        server.current = { ...server.current, signedOut: false }
         t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
         yield* settle
         expect(t.commits).toEqual([])
-        yield* session.answer(memberOf({ id: "mem_marcus" }))
+        yield* session.answer(memberOf({ ...memberStart, account: "mem_marcus", id: "mem_marcus" }))
         yield* settle
-        expect([t.commits, R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([[], true])
+        expect([t.commits, R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))]).toEqual([[], true])
       })
   )
 })
@@ -876,7 +1078,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(83)
-        const first = page(id)
+        const first = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
         first.open(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
         yield* settle
         first.decide("row-31")
@@ -884,8 +1086,8 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         yield* settle
         // A colleague removes the import; the page is loaded again.
         browser.listeners["beforeunload"] = []
-        const gone = { signedOut: false, removed: true }
-        const again = page(id, dana, gone)
+        const gone = { ...serverStart, signedOut: false, removed: true }
+        const again = page(id, dana, MutableRef.make(gone), O.none())
         again.registry.mount(askBeforeLeaving)
         again.registry.mount(notices)
         yield* settle
@@ -895,16 +1097,22 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
             text: "Your decisions on it that were not saved went with it. Row 12: you left out; Row 31: you left out."
           }
         ]
-        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), says(again)]).toEqual([false, false, said])
+        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie")), says(again)]).toEqual([
+          false,
+          false,
+          said
+        ])
         // Not to Marcus, on the same tab; and to Dana again after a reload, until she dismisses it.
-        const other = page(id, marcus, gone)
+        const other = page(id, marcus, MutableRef.make(gone), O.none())
         other.registry.mount(notices)
-        const reloaded = page(id, dana, gone)
+        const reloaded = page(id, dana, MutableRef.make(gone), O.none())
         reloaded.registry.mount(notices)
         yield* settle
         expect([says(other), says(reloaded)]).toEqual([[], said])
-        reloaded.registry.set(dismissNotice, reloaded.registry.get(notices)[0]!)
-        const after = page(id, dana, gone)
+        const requiredEntry14 = A.get(reloaded.registry.get(notices), 0)
+        assertTrue(O.isSome(requiredEntry14), "expected reloaded.registry.get(notices)[0]")
+        reloaded.registry.set(dismissNotice, requiredEntry14.value)
+        const after = page(id, dana, MutableRef.make(gone), O.none())
         after.registry.mount(notices)
         yield* settle
         expect([says(reloaded), says(after)]).toEqual([[], []])
@@ -917,18 +1125,27 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(84)
-        const first = page(id)
+        const first = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
         first.open(viewAt({ id, revision: 4 }))
         yield* settle
         first.decide("row-2")
         yield* settle
         browser.listeners["beforeunload"] = []
         // Another tab switched the session to Northline after this page's session had answered Prairie.
-        const again = page(id, dana, { signedOut: false, removed: true, in: "org_northline" })
+        const again = page(
+          id,
+          dana,
+          MutableRef.make({ ...serverStart, signedOut: false, removed: true, in: "org_northline" }),
+          O.none()
+        )
         again.registry.mount(askBeforeLeaving)
         again.registry.mount(notices)
         yield* settle
-        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), says(again)]).toEqual([true, true, []])
+        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie")), says(again)]).toEqual([
+          true,
+          true,
+          []
+        ])
       })
   )
 
@@ -939,12 +1156,13 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         emptyStorage()
         browser.listeners["beforeunload"] = []
         const id = importNo(85)
-        const server = {
+        const server = MutableRef.make({
+          ...serverStart,
           signedOut: false,
           removed: false,
-          view: viewAt({ id, revision: 4, fileName: "items_messy.csv" })
-        }
-        const t = page(id, dana, server)
+          view: O.some(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
+        })
+        const t = page(id, dana, server, O.none())
         t.registry.mount(askBeforeLeaving)
         t.registry.mount(notices)
         t.open(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
@@ -952,21 +1170,30 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         // Row 3 is refused (on hold), row 2 waits after a failed save.
         t.decide("row-3")
         yield* settle
+        const requiredEntry15 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry15), "expected t.saves[0]")
         yield* Deferred.fail(
-          t.saves[0]!.answer,
+          requiredEntry15.value.answer,
           ImportNotFound.make({ reason: "No.", organizationId: OrganizationId.make("org_prairie") })
         )
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[1]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry16 = A.get(t.saves, 1)
+        assertTrue(O.isSome(requiredEntry16), "expected t.saves[1]")
+        yield* Deferred.fail(requiredEntry16.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         expect([leaving(), says(t)]).toEqual([true, []])
         const asked = t.asked.times
-        server.removed = true
-        importView(id).askAgain(t.registry)
+        server.current = { ...server.current, removed: true }
+        importView(id).askAgain(t.registry, O.none())
         yield* settle
-        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), t.asked.times - asked, says(t)]).toEqual([
+        expect([
+          leaving(),
+          R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie")),
+          t.asked.times - asked,
+          says(t)
+        ]).toEqual([
           false,
           false,
           0,
@@ -987,8 +1214,22 @@ describe("what the runner asks for while nobody looks", () => {
       emptyStorage()
       const id = importNo(91)
       // The import is not read yet: the step is drawn, and the person's row waits with no picture under it.
-      const server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
-      const t = page(id, dana, server)
+      const server: MutableRef.MutableRef<{
+        readonly signedOut: boolean
+        readonly removed: boolean
+        readonly view: O.Option<ImportView>
+        readonly in: string
+      }> = MutableRef.make<{
+        readonly signedOut: boolean
+        readonly removed: boolean
+        readonly view: O.Option<ImportView>
+        readonly in: string
+      }>({
+        ...serverStart,
+        signedOut: false,
+        removed: false
+      })
+      const t = page(id, dana, server, O.none())
       t.registry.mount(importViewShown(id))
       const leave = t.registry.mount(followDraft(id))
       yield* settle
@@ -998,7 +1239,7 @@ describe("what the runner asks for while nobody looks", () => {
       // She goes to another page; the server can be read now; she presses Save again on what was said.
       leave()
       yield* settle
-      server.view = viewAt({ id, revision: 4 })
+      server.current = { ...server.current, view: O.some(viewAt({ id, revision: 4 })) }
       t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
       yield* settle
       expect(A.map(t.saves, (save) => save.payload.set)).toEqual([{ "row-2": out }])
@@ -1009,12 +1250,18 @@ describe("what the runner asks for while nobody looks", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(92)
-      const server: { signedOut: boolean; removed: boolean; in?: string } = {
-        signedOut: false,
-        removed: true,
-        in: "org_switched"
-      }
-      const t = page(id, dana, server)
+      const server: MutableRef.MutableRef<{
+        readonly signedOut: boolean
+        readonly removed: boolean
+        readonly in: string
+        readonly view: O.Option<ImportView>
+      }> = MutableRef.make<{
+        readonly signedOut: boolean
+        readonly removed: boolean
+        readonly in: string
+        readonly view: O.Option<ImportView>
+      }>({ ...serverStart, signedOut: false, removed: true, in: "org_switched" })
+      const t = page(id, dana, server, O.none())
       t.registry.mount(importViewShown(id))
       t.registry.mount(followDraft(id))
       yield* settle
@@ -1024,7 +1271,7 @@ describe("what the runner asks for while nobody looks", () => {
       yield* settle
       expect(t.asked.times).toBe(1)
       // Not found where the session now looks, another organization again: asked once more.
-      server.in = "org_another"
+      server.current = { ...server.current, in: "org_another" }
       t.registry.refresh(importView(id))
       yield* settle
       expect(t.asked.times).toBe(2)
@@ -1035,14 +1282,19 @@ describe("what the runner asks for while nobody looks", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(93)
-      const first = page(id)
+      const first = page(id, dana, MutableRef.make({ ...serverStart, signedOut: false, removed: false }), O.none())
       first.open(viewAt({ id, revision: 4 }))
       yield* settle
       first.decide("row-2")
       yield* settle
       // The page is loaded again for her in her other organization: the rows kept for Example Works still wait.
       browser.listeners["beforeunload"] = []
-      const again = page(id, person("mem_dana_north", "org_northline"))
+      const again = page(
+        id,
+        person("mem_dana_north", "org_northline"),
+        MutableRef.make({ ...serverStart, signedOut: false, removed: false }),
+        O.none()
+      )
       again.registry.mount(askBeforeLeaving)
       yield* settle
       expect(leaving()).toBe(true)

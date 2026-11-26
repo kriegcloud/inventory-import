@@ -73,14 +73,14 @@ describe("the sign-in settings as read", () => {
         const password = writtenPassword(given)
         const settings = yield* read({ TEST_ACCOUNT_PASSWORD: password }, production)
         expect(Result.isFailure(settings)).toBe(password === testAccountPassword)
-        if (Result.isSuccess(settings)) {
-          const stage = O.map(settings.success.testAccountPassword, Redacted.value)
-          expect(O.isNone(stage)).toBe(S.is(Blank)(given))
-          if (O.isSome(stage)) {
-            const opened = passwordToVerify({ stage, repository: testAccountPassword, typed: testAccountPassword })
-            expect(O.isNone(opened)).toBe(true)
-          }
+        if (password === testAccountPassword) {
+          return
         }
+        const loaded = yield* Effect.fromResult(settings)
+        const stage = O.map(loaded.testAccountPassword, Redacted.value)
+        expect(O.isNone(stage)).toBe(S.is(Blank)(given))
+        const opened = passwordToVerify({ stage, repository: testAccountPassword, typed: testAccountPassword })
+        expect(opened).toEqual(S.is(Blank)(given) ? O.some(testAccountPassword) : O.none())
       }),
     runs
   )

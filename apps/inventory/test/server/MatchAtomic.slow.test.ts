@@ -1,3 +1,5 @@
+import { dual } from "effect/Function"
+import { assertTrue } from "@effect/vitest/utils"
 // A match and another person's write that fall into each other, on the real handlers and SQL, a fresh D1. Benjamin's
 // answer "Server refuses, screen says so" holds only if nothing can land between a match's read and its write, or
 // between a save's check of the choices and its write. The match reads the draft, its decisions and the stored items
@@ -19,7 +21,6 @@ import * as O from "effect/Option"
 import { noComparison, noItemsRead } from "@inventory/catalog-model/Rematch"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import { ImportId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
@@ -39,7 +40,7 @@ import { stage } from "./support/files.ts"
 import { upload } from "./support/upload.ts"
 
 /** What runs around one of the store's next batches: just before it is sent, and just after it answered. */
-type Around = { readonly before?: Effect.Effect<unknown>; readonly after?: Effect.Effect<unknown> }
+type Around = { readonly before: O.Option<Effect.Effect<unknown>>; readonly after: O.Option<Effect.Effect<unknown>> }
 
 /** One entry per coming batch of the D1 store, in order; an empty entry lets that batch go as it is. */
 const coming = MutableRef.make<ReadonlyArray<Around>>([])
@@ -54,13 +55,15 @@ const around = (entries: ReadonlyArray<Around>) =>
     MutableRef.set(sent, 0)
   })
 
-const runInside = (effect: Effect.Effect<unknown> | undefined): Effect.Effect<void> =>
-  effect === undefined
-    ? Effect.void
-    : Effect.suspend(() => {
+const runInside = (effect: O.Option<Effect.Effect<unknown>>): Effect.Effect<void> =>
+  O.match(effect, {
+    onNone: () => Effect.void,
+    onSome: (effect) =>
+      Effect.suspend(() => {
         MutableRef.set(inside, true)
         return Effect.asVoid(effect).pipe(Effect.ensuring(Effect.sync(() => MutableRef.set(inside, false))))
       })
+  })
 
 /** D1 as it is, but each of the store's next batches runs its entry's writes around it. */
 const SteppedD1 = Layer.effect(
@@ -69,14 +72,18 @@ const SteppedD1 = Layer.effect(
     const d1 = yield* D1
     const batch: D1["Service"]["batch"] = (queries) =>
       Effect.suspend(() => {
-        const [next, ...rest] = MutableRef.get(coming)
-        if (MutableRef.get(inside) || next === undefined) return d1.batch(queries)
-        MutableRef.set(coming, rest)
-        MutableRef.update(sent, (n) => n + 1)
-        return Effect.andThen(
-          runInside(next.before),
-          Effect.tap(d1.batch(queries), () => runInside(next.after))
-        )
+        if (MutableRef.get(inside)) return d1.batch(queries)
+        return A.matchLeft(MutableRef.get(coming), {
+          onEmpty: () => d1.batch(queries),
+          onNonEmpty: (next, rest) => {
+            MutableRef.set(coming, rest)
+            MutableRef.update(sent, (n) => n + 1)
+            return Effect.andThen(
+              runInside(next.before),
+              Effect.tap(d1.batch(queries), () => runInside(next.after))
+            )
+          }
+        })
       })
     return D1.of({ run: d1.run, batch })
   })
@@ -111,7 +118,7 @@ const waitingNow = () => [
 
 /** Everything waiting, as a test that failed before its batches ran would leave it. */
 const leaveEverythingWaiting = () => {
-  MutableRef.set(coming, [{ before: Effect.die("a batch of the test before") }])
+  MutableRef.set(coming, [{ after: O.none(), before: O.some(Effect.die("a batch of the test before")) }])
   MutableRef.set(sent, 3)
   MutableRef.set(inside, true)
   MutableRef.set(between, O.some({ before: "decide", run: () => Effect.die("a save of the test before") }))
@@ -138,10 +145,22 @@ const Around = Layer.effect(
       )
     return ImportStore.of({
       ...inner,
-      decide: Effect.fn("Around.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
-        yield* first("decide")
-        return yield* inner.decide(...args)
-      })
+      decide: dual(
+        5,
+        (
+          self: Parameters<ImportStore["Service"]["decide"]>[0],
+          actor: Parameters<ImportStore["Service"]["decide"]>[1],
+          delta: Parameters<ImportStore["Service"]["decide"]>[2],
+          read: Parameters<ImportStore["Service"]["decide"]>[3],
+          expected: Parameters<ImportStore["Service"]["decide"]>[4]
+        ) => {
+          const perform = Effect.fn("Around.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
+            yield* first("decide")
+            return yield* inner.decide(...args)
+          })
+          return perform(self, actor, delta, read, expected)
+        }
+      )
     })
   })
 ).pipe(Layer.provide(Layer.fresh(ImportStoreD1).pipe(Layer.provide(SteppedD1))))
@@ -168,9 +187,12 @@ const marcusSaves = (
   id: string,
   set: Readonly<Record<string, RowDecisionFlags.Encoded>>
 ) =>
-  Effect.flatMap(store.find(prairie, id), (draft) =>
-    store.decide(marcusAsMember, O.getOrThrow(draft), { set: flags(set), clear: [] }, noItemsRead, O.none())
-  )
+  Effect.flatMap(store.find(id, prairie), (draft) => {
+    const valueOption = draft
+    assertTrue(O.isSome(valueOption), "expected value to be present")
+    const value = valueOption.value
+    return store.decide(value, marcusAsMember, { set: flags(set), clear: [] }, noItemsRead, O.none())
+  })
 
 /** The messy sample staged by Marcus, and the column Dana's matches give the unit cost: the reorder point's. */
 const staged = Effect.gen(function* () {
@@ -179,9 +201,9 @@ const staged = Effect.gen(function* () {
     as("mem_marcus")
   )
   const table = yield* client.imports.table({ params: { id: view.id } }).pipe(as("mem_dana"))
-  const other = O.getOrThrow(
-    A.findFirst(table.columns, (column) => Str.includes("reorder")(Str.toLowerCase(column.label)))
-  )
+  const otherOption = A.findFirst(table.columns, (column) => column.label === "Reorder Pt")
+  assertTrue(O.isSome(otherOption), "expected other to be present")
+  const other = otherOption.value
   const store = yield* ImportStore
   return { client, view, params: { id: view.id }, other, store }
 })
@@ -197,23 +219,37 @@ const headings = [
   "List cost",
   "Net cost"
 ] as const
-type Line = Partial<Record<(typeof headings)[number], string>>
+type Line = Record<(typeof headings)[number], string>
 const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
-const column = (heading: (typeof headings)[number]): number =>
-  O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
+const column = (heading: (typeof headings)[number]): number => {
+  const valueOption = A.findFirstIndex(headings, (candidate) => candidate === heading)
+  assertTrue(O.isSome(valueOption), "expected value to be present")
+  const value = valueOption.value
+  return value
+}
 const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
   fileName,
   kind: "csv",
   sheet: O.none(),
   headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
+  columns: A.map(A.zip(headings, letters), ([label, letter], index) => ({ index, letter, label })),
   notes: [],
   rows: A.map(lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
+    cells: A.map(headings, (heading) => ({ text: line[heading], shown: O.none() }))
   }))
 })
-const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
+const item = {
+  sku: "",
+  name: "",
+  unit_cost: "",
+  "Alt code": "",
+  "List cost": "",
+  "Net cost": "",
+  category: "packaging",
+  uom: "EA",
+  quantity_on_hand: "10"
+}
 
 /** A Replace on row 2. */
 const replace = flags({ "row-2": { stored: "replace" } })
@@ -291,7 +327,13 @@ layer(App)("a match and another person's write that fall into each other", (it) 
       Effect.gen(function* () {
         const { client, view, params, other, store } = yield* staged
         // Marcus leaves row 3 out once Dana's match has read the import and is about to send its batch.
-        yield* around([{ before: Effect.orDie(marcusSaves(store, view.id, { "row-3": { out: true } })) }, {}])
+        yield* around([
+          {
+            after: O.none(),
+            before: marcusSaves(store, view.id, { "row-3": { out: true } }).pipe(Effect.orDie, O.some)
+          },
+          { before: O.none(), after: O.none() }
+        ])
         const matched = yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
           .pipe(as("mem_dana"))
@@ -333,15 +375,18 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const { client, view, params, other } = yield* staged
         // Dana's match lands once Marcus's save has been checked against the choices and is about to be written.
         yield* putBetween("decide", (inner) =>
-          Effect.flatMap(inner.find(prairie, view.id), (draft) =>
-            inner.matchColumn(
+          Effect.flatMap(inner.find(view.id, prairie), (draft) => {
+            const valueOption = draft
+            assertTrue(O.isSome(valueOption), "expected value to be present")
+            const value = valueOption.value
+            return inner.matchColumn(
+              value,
               danaAsMember,
-              O.getOrThrow(draft),
               { field: "unitCost", column: O.some(other.index) },
               "unit cost",
               noComparison
             )
-          )
+          })
         )
         const saved = yield* client.imports
           .decide({
@@ -388,10 +433,13 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         // Marcus leaves row 55 out once Dana's match has read the import (his screen still holds her accept).
         yield* around([
           {
-            before: Effect.orDie(marcusSaves(store, view.id, { "row-55": { out: true, accepted: ["unitCost"] } })),
-            after: look
+            before: marcusSaves(store, view.id, { "row-55": { out: true, accepted: ["unitCost"] } }).pipe(
+              Effect.orDie,
+              O.some
+            ),
+            after: O.some(look)
           },
-          { after: look }
+          { before: O.none(), after: O.some(look) }
         ])
         yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
@@ -431,15 +479,14 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .pipe(as("mem_dana"))
         yield* around([
           {
-            before: Effect.orDie(
-              marcusSaves(store, view.id, {
-                "row-2": { out: true, stored: "replace", accepted: ["uom"] },
-                "row-3": { out: true, kept: true },
-                "row-5": { out: true, reverted: ["uom"] }
-              })
-            )
+            after: O.none(),
+            before: marcusSaves(store, view.id, {
+              "row-2": { out: true, stored: "replace", accepted: ["uom"] },
+              "row-3": { out: true, kept: true },
+              "row-5": { out: true, reverted: ["uom"] }
+            }).pipe(Effect.orDie, O.some)
           },
-          {}
+          { before: O.none(), after: O.none() }
         ])
         const matched = yield* client.imports
           .match({ params, payload: { field: "sku", column: O.some(column("uom")) } })
@@ -499,13 +546,12 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         // is stored for row 3 any more, so the cost's column cannot change how it compares.
         yield* around([
           {
-            before: Effect.orDie(
-              client.imports
-                .takeBack({ params: { id: stocked.id }, payload: { confirms: confirmed.takeBack.confirms } })
-                .pipe(as("mem_marcus"))
-            )
+            after: O.none(),
+            before: client.imports
+              .takeBack({ params: { id: stocked.id }, payload: { confirms: confirmed.takeBack.confirms } })
+              .pipe(as("mem_marcus"), Effect.orDie, O.some)
           },
-          {}
+          { before: O.none(), after: O.none() }
         ])
         const matched = yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
@@ -548,8 +594,14 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           })
           .pipe(as("mem_marcus"))
         yield* around([
-          { before: Effect.orDie(Effect.andThen(stock, marcusSaves(store, view.id, { "row-3": { out: true } }))) },
-          {}
+          {
+            after: O.none(),
+            before: Effect.andThen(stock, marcusSaves(store, view.id, { "row-3": { out: true } })).pipe(
+              Effect.orDie,
+              O.some
+            )
+          },
+          { before: O.none(), after: O.none() }
         ])
         const matched = yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
@@ -603,11 +655,13 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .pipe(as("mem_marcus"))
         yield* around([
           {
-            before: Effect.orDie(
-              Effect.andThen(theirs, marcusSaves(store, view.id, { "row-2": { stored: "replace" } }))
+            after: O.none(),
+            before: Effect.andThen(theirs, marcusSaves(store, view.id, { "row-2": { stored: "replace" } })).pipe(
+              Effect.orDie,
+              O.some
             )
           },
-          {}
+          { before: O.none(), after: O.none() }
         ])
         const matched = yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
@@ -627,7 +681,11 @@ layer(App)("a match and another person's write that fall into each other", (it) 
       // Before each of the match's batches, Marcus changes row 3 again.
       yield* around(
         A.makeBy(draftTries, (index) => ({
-          before: Effect.orDie(marcusSaves(store, view.id, { "row-3": { edits: { name: `Copper Plate ${index}` } } }))
+          after: O.none(),
+          before: marcusSaves(store, view.id, { "row-3": { edits: { name: `Copper Plate ${index}` } } }).pipe(
+            Effect.orDie,
+            O.some
+          )
         }))
       )
       const refused = yield* Effect.flip(
@@ -651,7 +709,10 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const { client, view, params, stock } = yield* judgedAgainst("EEE-0001")
         // Once Marcus's save has been judged (nothing stored under EEE-0001: the Replace stands) and is about to be
         // written, the stocking import is confirmed.
-        yield* around([{ before: stock }, {}])
+        yield* around([
+          { after: O.none(), before: O.some(stock) },
+          { before: O.none(), after: O.none() }
+        ])
         const saved = yield* client.imports
           .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
@@ -672,7 +733,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const look = Effect.orDie(
           Effect.map(client.imports.get({ params }).pipe(as("mem_marcus")), (now) => MutableRef.set(seen, now.status))
         )
-        yield* around([{ before: stock, after: look }])
+        yield* around([{ before: O.some(stock), after: O.some(look) }])
         const confirmed = yield* client.imports
           .commit({
             params,
@@ -711,7 +772,9 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
           .pipe(as("mem_dana"))
         const listed = yield* client.items.list().pipe(as("mem_marcus"))
-        const stored = O.getOrThrow(A.findFirst(listed, (found) => found.sku === "XXX-0001"))
+        const storedOption = A.findFirst(listed, (found) => found.sku === "XXX-0001")
+        assertTrue(O.isSome(storedOption), "expected stored to be present")
+        const stored = storedOption.value
         // Once Marcus's confirm has read X (the cost reads 3 under either column: the Replace stands) and is about
         // to be written, Dana edits X on the Items page.
         const edit = Effect.orDie(
@@ -738,7 +801,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const look = Effect.orDie(
           Effect.map(client.imports.get({ params }).pipe(as("mem_marcus")), (now) => MutableRef.set(seen, now.status))
         )
-        yield* around([{ before: edit, after: look }])
+        yield* around([{ before: O.some(edit), after: O.some(look) }])
         const confirmed = yield* client.imports
           .commit({
             params,
@@ -746,13 +809,14 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           })
           .pipe(as("mem_marcus"))
         // The first batch found X edited since it read it and wrote nothing; the confirm worked out again wrote.
-        expect([MutableRef.get(seen), confirmed.status, O.getOrUndefined(confirmed.result)?.updated]).toEqual([
-          "open",
-          "imported",
-          1
-        ])
+        const confirmedResultOption = confirmed.result
+        assertTrue(O.isSome(confirmedResultOption), "expected confirmedResult to be present")
+        const confirmedResult = confirmedResultOption.value
+        expect([MutableRef.get(seen), confirmed.status, confirmedResult.updated]).toEqual(["open", "imported", 1])
         const now = yield* client.items.list().pipe(as("mem_marcus"))
-        const after = O.getOrThrow(A.findFirst(now, (found) => found.sku === "XXX-0001"))
+        const afterOption = A.findFirst(now, (found) => found.sku === "XXX-0001")
+        assertTrue(O.isSome(afterOption), "expected after to be present")
+        const after = afterOption.value
         expect(after.name).toBe("Brass Hinge XL")
       })
   )
@@ -767,7 +831,10 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           suggestion: "00000000-0000-4000-8000-000000000301",
           line: "00000000-0000-4000-8000-000000000302"
         })
-        yield* around([{ before: stored }, {}])
+        yield* around([
+          { after: O.none(), before: O.some(stored) },
+          { before: O.none(), after: O.none() }
+        ])
         const saved = yield* client.imports
           .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
@@ -789,7 +856,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           suggestion: "00000000-0000-4000-8000-000000000303",
           line: "00000000-0000-4000-8000-000000000304"
         })
-        yield* around([{ before: stored, after: look }])
+        yield* around([{ before: O.some(stored), after: O.some(look) }])
         const confirmed = yield* client.imports
           .commit({
             params,
@@ -831,13 +898,12 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         // Dana takes the import's confirm back: row 3's item goes, and no item under a key the review read changes.
         yield* around([
           {
-            before: Effect.orDie(
-              client.imports
-                .takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })
-                .pipe(as("mem_dana"))
-            )
+            after: O.none(),
+            before: client.imports
+              .takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })
+              .pipe(as("mem_dana"), Effect.orDie, O.some)
           },
-          {}
+          { before: O.none(), after: O.none() }
         ])
         yield* client.imports
           .decide({ params, payload: { over: {}, madeOn: { "row-2": reopened.revision }, set: replace, clear: [] } })
@@ -880,13 +946,15 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         yield* match("List cost")
         yield* around([
           {
-            before: suggestionStored(suggestions, view.id, {
-              suggestion: "00000000-0000-4000-8000-000000000305",
-              line: "00000000-0000-4000-8000-000000000306"
-            }),
-            after: Effect.orDie(match("Net cost"))
+            before: O.some(
+              suggestionStored(suggestions, view.id, {
+                suggestion: "00000000-0000-4000-8000-000000000305",
+                line: "00000000-0000-4000-8000-000000000306"
+              })
+            ),
+            after: match("Net cost").pipe(Effect.orDie, O.some)
           },
-          {}
+          { before: O.none(), after: O.none() }
         ])
         const saved = yield* client.imports
           .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
@@ -932,13 +1000,16 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         // Once Dana's match has asked the review, Marcus sees the item and presses row 2's Replace again, by way of Keep.
         yield* around([
           {
-            before: stock.pipe(
-              Effect.andThen(marcusSaves(store, view.id, { "row-2": { stored: "keep" } })),
-              Effect.andThen(marcusSaves(store, view.id, { "row-2": { stored: "replace" } })),
-              Effect.orDie
+            after: O.none(),
+            before: O.some(
+              stock.pipe(
+                Effect.andThen(marcusSaves(store, view.id, { "row-2": { stored: "keep" } })),
+                Effect.andThen(marcusSaves(store, view.id, { "row-2": { stored: "replace" } })),
+                Effect.orDie
+              )
             )
           },
-          {}
+          { before: O.none(), after: O.none() }
         ])
         const matched = yield* client.imports
           .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
@@ -965,7 +1036,13 @@ layer(App)("a match and another person's write that fall into each other", (it) 
     () =>
       Effect.gen(function* () {
         const { client, view, params, store } = yield* staged
-        yield* around([{ before: Effect.orDie(marcusSaves(store, view.id, { "row-3": { out: true } })) }, {}])
+        yield* around([
+          {
+            after: O.none(),
+            before: marcusSaves(store, view.id, { "row-3": { out: true } }).pipe(Effect.orDie, O.some)
+          },
+          { before: O.none(), after: O.none() }
+        ])
         const saved = yield* client.imports.decide({ params, payload: waited(view) }).pipe(as("mem_dana"))
         // Two batches: the first found the draft moved on and wrote nothing, not the other row either.
         expect([MutableRef.get(sent), saved.decidedSince, saved.revision]).toEqual([
@@ -987,7 +1064,10 @@ layer(App)("a match and another person's write that fall into each other", (it) 
       const match = client.imports
         .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
         .pipe(as("mem_marcus"))
-      yield* around([{ before: Effect.orDie(match) }, {}])
+      yield* around([
+        { after: O.none(), before: match.pipe(Effect.orDie, O.some) },
+        { before: O.none(), after: O.none() }
+      ])
       const saved = yield* client.imports.decide({ params, payload: waited(view) }).pipe(as("mem_dana"))
       expect([MutableRef.get(sent), saved.decidedSince, saved.changed]).toEqual([2, [], true])
     })
@@ -1001,7 +1081,10 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const confirm = client.imports
           .commit({ params, payload: { revision: view.revision, madeOn: {}, set: {}, clear: [] } })
           .pipe(as("mem_marcus"))
-        yield* around([{ before: Effect.orDie(confirm) }, {}])
+        yield* around([
+          { after: O.none(), before: confirm.pipe(Effect.orDie, O.some) },
+          { before: O.none(), after: O.none() }
+        ])
         const refused = yield* Effect.flip(
           client.imports.decide({ params, payload: waited(view) }).pipe(as("mem_dana"))
         )
@@ -1017,7 +1100,11 @@ layer(App)("a match and another person's write that fall into each other", (it) 
       Effect.gen(function* () {
         const { client, view, params, store } = yield* staged
         const overtaking = A.makeBy(draftTries, (index) => ({
-          before: Effect.orDie(marcusSaves(store, view.id, { "row-5": { edits: { name: `Plate ${index}` } } }))
+          after: O.none(),
+          before: marcusSaves(store, view.id, { "row-5": { edits: { name: `Plate ${index}` } } }).pipe(
+            Effect.orDie,
+            O.some
+          )
         }))
         yield* around(overtaking)
         const refused = yield* Effect.flip(
@@ -1026,7 +1113,13 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         expect([S.is(DraftBusy)(refused), MutableRef.get(sent)]).toEqual([true, draftTries])
         const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
         expect([R.get(after.decisions, "row-3"), R.get(after.decisions, "row-4")]).toEqual([O.none(), O.none()])
-        yield* around([{ before: Effect.orDie(marcusSaves(store, view.id, { "row-5": { out: true } })) }, {}])
+        yield* around([
+          {
+            after: O.none(),
+            before: marcusSaves(store, view.id, { "row-5": { out: true } }).pipe(Effect.orDie, O.some)
+          },
+          { before: O.none(), after: O.none() }
+        ])
         const saved = yield* client.imports
           .decide({ params, payload: { ...waited(view), over: {} } })
           .pipe(as("mem_dana"))
@@ -1041,7 +1134,10 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const { client, view, params, store } = yield* staged
         const first = yield* marcusSaves(store, view.id, { "row-5": { out: true } })
         const again = marcusSaves(store, view.id, { "row-5": { out: true } })
-        yield* around([{ before: Effect.orDie(again) }, {}])
+        yield* around([
+          { after: O.none(), before: again.pipe(Effect.orDie, O.some) },
+          { before: O.none(), after: O.none() }
+        ])
         const saved = yield* client.imports.decide({ params, payload: waited(view) }).pipe(as("mem_dana"))
         // Two batches: the first found another save since its comparison, though the draft's revision had not moved.
         expect([first, MutableRef.get(sent), saved.decidedSince, saved.changed]).toEqual([
@@ -1104,7 +1200,10 @@ layer(App)("a take-back of the import itself between a save's comparison of a ro
         .pipe(as("mem_marcus"))
       const confirms = match.takeBack.confirms
       const takeBack = client.imports.takeBack({ params, payload: { confirms } }).pipe(as("mem_marcus"))
-      yield* around([{ before: Effect.orDie(takeBack) }, {}])
+      yield* around([
+        { after: O.none(), before: takeBack.pipe(Effect.orDie, O.some) },
+        { before: O.none(), after: O.none() }
+      ])
       const saved = yield* client.imports
         .decide({
           params,

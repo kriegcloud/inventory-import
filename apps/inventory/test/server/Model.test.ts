@@ -56,7 +56,7 @@ const fromFallback = `{"id":"gen-1","model":"google/gemini-3.8-flash","created":
   "message":{"role":"assistant","content":"{\\"greeting\\":\\"Hello from the fallback\\"}"}}],
   "usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15,"cost":0.00002}}`
 
-const modelOn = (status: number, body: string, settings: Record<string, string> = keyed) =>
+const modelOn = (status: number, body: string, settings: Record<string, string>) =>
   modelLayer.pipe(Layer.provide(openRouterAnswering(status, body)), Layer.provide(settingsLayer(settings)))
 
 describe("the model, as the app sees it", () => {
@@ -94,7 +94,7 @@ describe("the model, as the app sees it", () => {
     )
   })
 
-  layer(modelOn(200, fromFallback))("OpenRouter with a fallback model", (it) => {
+  layer(modelOn(200, fromFallback, keyed))("OpenRouter with a fallback model", (it) => {
     it.effect("is sent the models list, and the answer names the fallback that answered", () =>
       Effect.gen(function* () {
         const status = aiStatusOf((yield* OpenRouter).status)
@@ -114,7 +114,7 @@ describe("the model, as the app sees it", () => {
     )
   })
 
-  layer(modelOn(402, '{"error":{"code":402,"message":"Insufficient credits"}}'))("an empty credit", (it) => {
+  layer(modelOn(402, '{"error":{"code":402,"message":"Insufficient credits"}}', keyed))("an empty credit", (it) => {
     it.effect("is refused, worded as the refused sentence, not retried", () =>
       Effect.gen(function* () {
         const error = yield* ask.pipe(Effect.flip)
@@ -123,7 +123,7 @@ describe("the model, as the app sees it", () => {
     )
   })
 
-  layer(modelOn(400, '{"error":{"code":400,"message":"upstream exploded"}}'))("a provider's own words", (it) => {
+  layer(modelOn(400, '{"error":{"code":400,"message":"upstream exploded"}}', keyed))("a provider's own words", (it) => {
     it.effect("never reach the error a screen shows", () =>
       Effect.gen(function* () {
         const error = yield* ask.pipe(Effect.flip)

@@ -23,7 +23,8 @@ An exploration is a question being shaped before anyone builds. Each lives in `e
 - [ideal-architecture](ideal-architecture/README.md): what inventory-import becomes as a model-first Turborepo of deep
   packages, shipped with Alchemy. Its goals are being built.
 - [erp-ontology](erp-ontology/README.md): a vocabulary for an operations ERP that this repository's records point
-  at. Graduated to the goal `erp-vocabulary`, whose thin thread is built; the slices after it are not specified.
+  at. Graduated to the goal `erp-vocabulary`, whose thin thread is built; slice 1 is built as the goal
+  `party-slice`, which is being closed, and the slices after it are not specified.
 - [alchemy-domain](alchemy-domain/README.md): everything `@alchemy.run/domain` and what plugs into it offers, concept
   by concept, with how this app would use each. Research, seven rounds of trials, and a brief whose decisions 1 to 40
   he has answered but for 21a (9 fell away, 24 stands on an earlier answer); it awaits his word that it matches.

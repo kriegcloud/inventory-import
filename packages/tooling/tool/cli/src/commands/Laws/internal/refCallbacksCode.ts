@@ -6,20 +6,13 @@
 // being read, with the verdicts it would have had left unsaid, and so is one the scan or the parser refuses.
 import * as A from "effect/Array"
 import * as MutableHashSet from "effect/MutableHashSet"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { parseSync } from "oxc-parser"
-import {
-  type Budget,
-  budgetOf,
-  parseFailure,
-  refsStepsPerCharacter,
-  type Stopped,
-  Unread,
-  unreadable
-} from "./budget.ts"
+import { budgetOf, parseFailure, refsStepsPerCharacter, type Stopped, Unread, unreadable } from "./budget.ts"
 import { linesOf } from "./lines.ts"
 
 /** A node of the syntax tree. */
@@ -37,14 +30,14 @@ const children = (node: Node): ReadonlyArray<Node> =>
   )
 
 /** The budget of the file being read: one file at a time, read from start to end without a pause. */
-const reading: { budget: Budget } = { budget: budgetOf({ length: 0, perCharacter: refsStepsPerCharacter }) }
+const reading = MutableRef.make(budgetOf({ length: 0, perCharacter: refsStepsPerCharacter }))
 /** `read()` as one read inside another of the file being read, at `node`. */
-const nestedIn = <A>(node: Node, fallback: A, read: () => A): A => reading.budget.within(node.start, fallback, read)
+const nestedIn = <A>(node: Node, fallback: A, read: () => A): A => reading.current.within(node.start, fallback, read)
 /** `judge()` as one judgement of the file being read that follows a name, at `node`. */
 const following = <A>(node: Node, fallback: A, judge: () => A): A =>
-  reading.budget.following(node.start, fallback, judge)
+  reading.current.following(node.start, fallback, judge)
 /** Counts one step of the file being read. */
-const tick = (count = 1, at?: number): boolean => reading.budget.tick(count, at)
+const tick = (count = 1, at?: number): boolean => reading.current.tick(count, at)
 
 const functions = ["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"] as const
 const isFunction = (node: Node): boolean => typeIs(node, ...functions)
@@ -709,7 +702,7 @@ const resolved = (
   depth = 0,
   followed: ReadonlyArray<string> = []
 ): ReadonlyArray<Place> =>
-  reading.budget.following(undefined, [], () =>
+  reading.current.following(undefined, [], () =>
     O.match(lookUpAt(scopes, place.root), {
       onNone: () => [place],
       onSome: ({ at, binding }): ReadonlyArray<Place> => {
@@ -807,7 +800,7 @@ const writtenInFunctions = (program: Node, top: Scope): Written => {
     samePathsOnce(
       A.flatMap(resolved({ root: name, path: [], open: false }, [top], topAssigned), (own) =>
         A.flatMap(
-          reading.budget.stopped() !== undefined
+          reading.current.stopped() !== undefined
             ? []
             : O.getOrElse(R.get(slotsUnder, own.root), (): ReadonlyArray<Place> => []),
           (slot: Place): ReadonlyArray<ReadonlyArray<string>> => {
@@ -874,7 +867,7 @@ export const readScreen = (input: {
   const program: unknown = parsed.program
   if (!isNode(program)) return unreadAt({ at: 0, unread: Unread.Unparsed({ message: "no program" }) })
   const budget = budgetOf({ length: source.length, perCharacter: refsStepsPerCharacter })
-  reading.budget = budget
+  reading.current = budget
   const top = topLevel(
     program,
     writtenInFunctions(program, topLevel(program, { reassigned: [], filledAt: () => [] }, hookModules)),

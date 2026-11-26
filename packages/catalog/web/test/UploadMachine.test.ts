@@ -6,6 +6,8 @@ import { ImportId } from "@inventory/catalog-contract/Ids"
 import { rowsAbout, savedRows } from "@inventory/catalog-model/Upload"
 import { progressOf, rowsOf, UploadState } from "@inventory/catalog-web/UploadMachine"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
+import { assertTrue } from "@effect/vitest/utils"
 import * as S from "effect/Schema"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 
@@ -13,7 +15,7 @@ const reading = (rowsRead: number, about: number | null): UploadState =>
   UploadState.cases.Reading.make({
     fileName: "items.csv",
     rowsRead,
-    rows: rowsOf({ rowsAbout: about, exact: false })
+    rows: rowsOf({ rowsAbout: O.fromNullOr(about), exact: false })
   })
 
 describe("progress", () => {
@@ -25,7 +27,10 @@ describe("progress", () => {
     ({ read, about }) => {
       const { done, total } = progressOf({ state: reading(read, about) })
       expect(done).toBe(read)
-      if (total !== null) expect(done).toBeLessThanOrEqual(total)
+      O.match(total, {
+        onNone: () => {},
+        onSome: (total) => expect(done).toBeLessThanOrEqual(total)
+      })
     }
   )
 
@@ -45,7 +50,7 @@ describe("progress", () => {
           rows
         })
       })
-      expect(total).toBe(rows)
+      expect(total).toEqual(O.some(rows))
       expect(done).toBeGreaterThanOrEqual(0)
       expect(done).toBeLessThanOrEqual(rows)
     }
@@ -59,8 +64,8 @@ describe("progress", () => {
       rows += chars <= 1_000_000 ? 6_000 : 2_500
       const about = rowsAbout({ rowsRead: rows, charsRead: chars, charsTotal: total })
       const { done, total: shown } = progressOf({ state: reading(rows, about) })
-      expect(shown).not.toBeNull()
-      expect(done).toBeLessThanOrEqual(shown ?? 0)
+      assertTrue(O.isSome(shown), "Expected the CSV row total")
+      expect(done).toBeLessThanOrEqual(shown.value)
     }
     expect(rowsAbout({ rowsRead: rows, charsRead: total, charsTotal: total })).toBe(rows)
   })
@@ -85,6 +90,6 @@ describe("progress", () => {
   )
 
   it("shows a workbook that is still opening as having no total yet", () => {
-    expect(progressOf({ state: reading(0, null) })).toEqual({ done: 0, total: null })
+    expect(progressOf({ state: reading(0, null) })).toEqual({ done: 0, total: O.none() })
   })
 })

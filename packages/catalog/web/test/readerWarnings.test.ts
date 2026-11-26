@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // Which of the reader's Notes the Review step shows above the table before the person imports: the warnings, from a
 // workbook and from a CSV alike, and never a Note that only says how the file was read.
 import { describe, expect, it } from "@effect/vitest"
@@ -5,7 +6,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { readerWarnings, stageTable } from "@inventory/catalog-model/Staging"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
-import { built } from "./xlsxCorpus.ts"
+import { built, workbookStart } from "./xlsxCorpus.ts"
 
 const text = (ref: string) => (value: string) => `<c r="${ref}" t="inlineStr"><is><t>${value}</t></is></c>`
 const row = (r: number, cells: string) =>
@@ -13,7 +14,8 @@ const row = (r: number, cells: string) =>
 const sheetOf = (rows: string) =>
   `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows}</sheetData></worksheet>`
 const heading = row(1, `${text("C1")("Quantity")}${text("D1")("Bay")}`)
-const staged = (file: File) => Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table }))
+const staged = (file: File) =>
+  Effect.map(readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file }), (table) => stageTable({ table }))
 const kinds = (notes: ReadonlyArray<{ readonly kind: string }>) => A.map(notes, (note) => note.kind)
 
 describe("the reader's warnings shown on the Review step", () => {
@@ -21,8 +23,8 @@ describe("the reader's warnings shown on the Review step", () => {
     Effect.gen(function* () {
       const rows =
         row(2, `<c r="C2" s="1"><v>4</v></c><c r="D2" t="s"><v>900</v></c>`) + row(3, `<c r="C3" s="1"><v>5</v></c>`)
-      const bytes = yield* built({ sheet: sheetOf(heading + rows), codes: ["# ?/?"] })
-      const table = yield* staged(new File([bytes as Uint8Array<ArrayBuffer>], "stock.xlsx"))
+      const bytes = yield* built({ ...workbookStart, sheet: sheetOf(heading + rows), codes: ["# ?/?"] })
+      const table = yield* staged(new File([new Uint8Array(bytes)], "stock.xlsx"))
       expect(kinds(table.notes)).toEqual(["unreadableCells", "formatNotShown"])
       const warnings = readerWarnings(table)
       expect(kinds(warnings)).toEqual(["unreadableCells"])

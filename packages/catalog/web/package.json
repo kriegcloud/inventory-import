@@ -44,6 +44,7 @@
   "dependencies": {
     "@beep/csv": "workspace:*",
     "@beep/schema": "workspace:*",
+    "@beep/unsafe-assert": "workspace:*",
     "@beep/xlsx": "workspace:*",
     "@effect/atom-react": "catalog:",
     "@inventory/catalog-contract": "workspace:*",
@@ -58,7 +59,7 @@
     "sonner": "catalog:"
   },
   "devDependencies": {
-    "@alchemy.run/domain": "2.0.0-beta.87-734c27a",
+    "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

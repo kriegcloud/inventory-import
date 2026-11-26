@@ -18,7 +18,6 @@ import * as Ref from "effect/Ref"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 import { $AccessModelId } from "../internal/identity.ts"
 import { AccessMemoryRef, type AccessMemoryState, type MemoryMembership } from "../internal/memory.ts"
 import { keepsAnAdmin } from "./LastAdmin.rules.ts"
@@ -164,7 +163,7 @@ export class PeopleStore extends Context.Service<
         accountByEmail: Effect.fn("People.accountByEmail")(function* (email: AccountEmail) {
           const state = yield* Ref.get(ref)
           return O.map(
-            A.findFirst(state.accounts, (account) => Str.toLowerCase(account.email) === email),
+            A.findFirst(state.accounts, (account) => account.emailKey === email),
             (account) => Account.make({ userId: account.userId, name: account.name })
           )
         }),

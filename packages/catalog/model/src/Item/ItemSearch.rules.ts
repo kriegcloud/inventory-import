@@ -87,9 +87,9 @@ export const closeMatches = (word: string): ReadonlyArray<string> => {
  * different.
  */
 export type WordMatch = Data.TaggedEnum<{
-  Indexed: { readonly word: string; readonly phrase: string }
-  Contains: { readonly word: string; readonly patterns: ReadonlyArray<string> }
-  Close: { readonly word: string; readonly patterns: ReadonlyArray<string> }
+  readonly Indexed: { readonly word: string; readonly phrase: string }
+  readonly Contains: { readonly word: string; readonly patterns: ReadonlyArray<string> }
+  readonly Close: { readonly word: string; readonly patterns: ReadonlyArray<string> }
 }>
 
 /** The constructors, guards and matcher of `WordMatch`. */

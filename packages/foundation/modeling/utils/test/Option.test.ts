@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/Option.test.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/Option.test.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 import { it } from "@effect/vitest";
 import { O } from "@beep/utils";
 import {
@@ -29,25 +29,34 @@ describe("@beep/utils literal fallbacks", () => {
   });
 
   it("preserves fallback literals and the original Option value type", () => {
-    expectTypeOf(O.getOrElseFalse(O.none())).toEqualTypeOf<false>();
-    expectTypeOf(O.getOrElseTrue(O.none())).toEqualTypeOf<true>();
-    expectTypeOf(O.getOrElse0(O.none())).toEqualTypeOf<0>();
-    expectTypeOf(O.getOrElseEmptyStr(O.none())).toEqualTypeOf<"">();
-
+    const none = O.none();
     const value = O.some<"present">("present");
-    expectTypeOf(O.getOrElseFalse(value)).toEqualTypeOf<"present" | false>();
-    expectTypeOf(O.getOrElseTrue(value)).toEqualTypeOf<"present" | true>();
-    expectTypeOf(O.getOrElse0(value)).toEqualTypeOf<"present" | 0>();
-    expectTypeOf(O.getOrElseEmptyStr(value)).toEqualTypeOf<"present" | "">();
+    const fallbackFalse = O.getOrElseFalse(none);
+    const fallbackTrue = O.getOrElseTrue(none);
+    const fallbackZero = O.getOrElse0(none);
+    const fallbackEmpty = O.getOrElseEmptyStr(none);
+    const valueOrFalse = O.getOrElseFalse(value);
+    const valueOrTrue = O.getOrElseTrue(value);
+    const valueOrZero = O.getOrElse0(value);
+    const valueOrEmpty = O.getOrElseEmptyStr(value);
 
-    expect(O.getOrElseFalse(O.none())).toBe(false);
-    expect(O.getOrElseTrue(O.none())).toBe(true);
-    expect(O.getOrElse0(O.none())).toBe(0);
-    expect(O.getOrElseEmptyStr(O.none())).toBe("");
-    expect(O.getOrElseFalse(value)).toBe("present");
-    expect(O.getOrElseTrue(value)).toBe("present");
-    expect(O.getOrElse0(value)).toBe("present");
-    expect(O.getOrElseEmptyStr(value)).toBe("present");
+    expectTypeOf(fallbackFalse).toEqualTypeOf<false>();
+    expectTypeOf(fallbackTrue).toEqualTypeOf<true>();
+    expectTypeOf(fallbackZero).toEqualTypeOf<0>();
+    expectTypeOf(fallbackEmpty).toEqualTypeOf<"">();
+    expectTypeOf(valueOrFalse).toEqualTypeOf<"present" | false>();
+    expectTypeOf(valueOrTrue).toEqualTypeOf<"present" | true>();
+    expectTypeOf(valueOrZero).toEqualTypeOf<"present" | 0>();
+    expectTypeOf(valueOrEmpty).toEqualTypeOf<"present" | "">();
+
+    expect(fallbackFalse).toBe(false);
+    expect(fallbackTrue).toBe(true);
+    expect(fallbackZero).toBe(0);
+    expect(fallbackEmpty).toBe("");
+    expect(valueOrFalse).toBe("present");
+    expect(valueOrTrue).toBe("present");
+    expect(valueOrZero).toBe("present");
+    expect(valueOrEmpty).toBe("present");
   });
 });
 

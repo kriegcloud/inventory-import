@@ -49,8 +49,8 @@ export type ItemFormProblems = Partial<
  * tests tell the two apart with its own `$match` and `$is`, and build either with its constructor.
  */
 export type ItemFormReading = Data.TaggedEnum<{
-  Edit: { readonly edit: ItemEdit }
-  Problems: { readonly problems: ItemFormProblems }
+  readonly Edit: { readonly edit: ItemEdit }
+  readonly Problems: { readonly problems: ItemFormProblems }
 }>
 
 /** The constructors, guards and matcher of `ItemFormReading`. */
@@ -74,7 +74,9 @@ export const readItemForm = (input: { readonly form: ItemForm; readonly revision
   // None: the box holds something that cannot be read. Some(none): the box is empty, which an optional value may be.
   const optional = <A>(text: string, read: (text: string) => O.Option<A>): O.Option<O.Option<A>> =>
     isBlank(text) ? O.some(O.none()) : O.map(read(text), O.some)
-  const quantity = isBlank(form.quantityOnHand) ? O.some(0) : readCount(form.quantityOnHand)
+  // An empty box is refused, never read as 0: a slip would otherwise store 0 for an item that holds stock
+  // (Benjamin, 2026-11-26). The import's own rule for an empty quantity cell ("Defaults to 0") is unchanged.
+  const quantity = isBlank(form.quantityOnHand) ? O.none() : readCount(form.quantityOnHand)
   const reorder = optional(form.reorderPoint, readCount)
   const received = optional(form.firstReceivedOn, readDate)
   const discontinued = optional(form.discontinuedOn, readDate)
@@ -104,9 +106,11 @@ export const readItemForm = (input: { readonly form: ItemForm; readonly revision
     ],
     [
       "quantityOnHand",
-      O.isNone(quantity)
-        ? O.some("Quantity on hand is not a whole number. Write it as digits, for example 120.")
-        : O.none()
+      O.isSome(quantity)
+        ? O.none()
+        : isBlank(form.quantityOnHand)
+          ? O.some("Quantity on hand is empty. Write it as digits, for example 120, or 0 when there is none.")
+          : O.some("Quantity on hand is not a whole number. Write it as digits, for example 120.")
     ],
     [
       "reorderPoint",

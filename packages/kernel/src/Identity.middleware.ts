@@ -17,7 +17,7 @@ const $I = $KernelId.create("Identity")
  *
  * @category middleware
  */
-export class Identity extends HttpApiMiddleware.Service<Identity, { provides: CurrentActor; requires: never }>()(
-  $I`Identity`,
-  { error: NotSignedIn }
-) {}
+export class Identity extends HttpApiMiddleware.Service<
+  Identity,
+  { readonly provides: CurrentActor; readonly requires: never }
+>()($I`Identity`, { error: NotSignedIn }) {}

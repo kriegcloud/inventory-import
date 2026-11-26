@@ -1,7 +1,9 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 // Who answered the assistant's last request decides whether the screen says what the rules read: told by the case
 // the answer carries, never by the name the line shows, so a model whose id is "Rules" is still read as a model.
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import { vi } from "vitest"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { answererName, type Entry, lastAnsweredByRules, readConversation } from "../src/Conversation.machine.ts"
@@ -10,9 +12,9 @@ const entry = (answeredBy: AnsweredBy | null): Entry => ({
   id: "ask-1",
   prompt: "only Box",
   outcome: "applied",
-  answeredBy,
-  note: null,
-  reason: null,
+  answeredBy: O.fromNullOr(answeredBy),
+  note: O.none(),
+  reason: O.none(),
   applied: [],
   undone: false
 })
@@ -44,7 +46,7 @@ describe("a conversation kept as version 1", () => {
   it("comes back with its entries, who answered as a case, and its columns", () => {
     const kept: Record<string, string> = {}
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) => kept[key] ?? null,
+      getItem: (key: string) => StorageTwin.getItem(kept, key),
       setItem: (key: string, value: string) => {
         kept[key] = value
       },
@@ -66,9 +68,9 @@ describe("a conversation kept as version 1", () => {
     expect(found.version).toBe(2)
     expect(found.visibility).toEqual({ cost: false, name: true })
     expect(A.map(found.entries, (each) => each.answeredBy)).toEqual([
-      AnsweredBy.cases.Rules.make({ reason: "No AI key is set up." }),
-      AnsweredBy.cases.Model.make({ provider: "openrouter", model: "anthropic/claude-haiku", fallback: false }),
-      null
+      O.some(AnsweredBy.cases.Rules.make({ reason: "No AI key is set up." })),
+      O.some(AnsweredBy.cases.Model.make({ provider: "openrouter", model: "anthropic/claude-haiku", fallback: false })),
+      O.none()
     ])
     expect(A.map(found.entries, (each) => each.applied.length)).toEqual([1, 1, 1])
     expect(kept["v1"]).toBeDefined()

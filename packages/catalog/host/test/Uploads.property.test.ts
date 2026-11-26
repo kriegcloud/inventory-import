@@ -2,6 +2,7 @@
 // comparing the stored text with the bound one. The property reads the text as it is bound, so it holds for what SQL
 // really sees.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import { AbandonedBefore, UploadInsert } from "@inventory/catalog-host/ImportRows"
 import * as Arbitrary from "effect/Arbitrary"
 import * as DateTime from "effect/DateTime"
@@ -25,8 +26,9 @@ describe("an upload's statements", () => {
         const { before } = yield* S.encodeEffect(AbandonedBefore)(cutOff)
         const began = momentOf(at)
         const cut = momentOf(before)
-        expect([O.isSome(began), O.isSome(cut)]).toEqual([true, true])
-        if (O.isSome(began) && O.isSome(cut)) {
+        assertTrue(O.isSome(began), "expected the tested value to be present")
+        assertTrue(O.isSome(cut), "expected the tested value to be present")
+        {
           // `importUpload.createdAt < before`, as SQLite compares two texts.
           expect(Str.Order(at, before) === -1).toBe(began.value < cut.value)
         }

@@ -206,7 +206,7 @@ layer(App)("the most rows one save may name", (it) => {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000d0")
       yield* seeded(id, 1)
       const store = yield* ImportStore
-      const found = yield* store.find(org, id)
+      const found = yield* store.find(id, org)
       const draftOption = found
       assertTrue(O.isSome(draftOption), "expected draft to be present")
       const draft = draftOption.value
@@ -214,7 +214,7 @@ layer(App)("the most rows one save may name", (it) => {
         counted(maxStagedRows, (n) => [`row-${n + 2}`, out] as const)
       )
       const clear = counted(maxStagedRows, (n) => `row-${n + 2 + maxStagedRows}`)
-      const saved = yield* store.decide(marcus, draft, { set, clear }, noItemsRead, O.none())
+      const saved = yield* store.decide(draft, marcus, { set, clear }, noItemsRead, O.none())
       const held = yield* savedFor(id)
       expect([saved, held]).toEqual([{ kind: "saved", revision: 2, changed: true }, [[maxStagedRows, 0]]])
     })
@@ -227,7 +227,7 @@ layer(App)("a save of long typed values", (it) => {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000e0")
       yield* seeded(id, 1)
       const store = yield* ImportStore
-      const found = yield* store.find(org, id)
+      const found = yield* store.find(id, org)
       const typed = decisionFromFlags({ edits: { description: Str.repeat(1500)("x") } })
       const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
         counted(2000, (n) => [`row-${n + 2}`, typed] as const)
@@ -235,7 +235,7 @@ layer(App)("a save of long typed values", (it) => {
       const foundDraftOption = found
       assertTrue(O.isSome(foundDraftOption), "expected foundDraft to be present")
       const foundDraft = foundDraftOption.value
-      const saved = yield* store.decide(marcus, foundDraft, { set, clear: [] }, noItemsRead, O.none())
+      const saved = yield* store.decide(foundDraft, marcus, { set, clear: [] }, noItemsRead, O.none())
       const held = yield* savedFor(id)
       expect([saved.kind, held]).toEqual(["saved", [[2000, 0]]])
     })
@@ -260,7 +260,7 @@ layer(App)("a save, a match and a confirm of long typed values whose bytes are m
           yield* seeded(id, index === 0 ? 1 : 0)
           const store = yield* ImportStore
           const at = yield* DateTime.now
-          const draftNow = Effect.map(store.find(org, id), (draft) => {
+          const draftNow = Effect.map(store.find(id, org), (draft) => {
             const valueOption = draft
             assertTrue(O.isSome(valueOption), "expected value to be present")
             const value = valueOption.value
@@ -272,11 +272,11 @@ layer(App)("a save, a match and a confirm of long typed values whose bytes are m
           const set = (by: string): Readonly<Record<string, RowDecision>> =>
             R.fromEntries(counted(2000, (n) => [`row-${n + 2}`, typed(by)] as const))
           const first = yield* draftNow
-          const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] }, noItemsRead, O.none())
+          const saved = yield* store.decide(first, marcus, { set: set("saved"), clear: [] }, noItemsRead, O.none())
           const second = yield* draftNow
           const matched = yield* store.matchColumn(
-            marcus,
             second,
+            marcus,
             { field: "uom", column: O.none() },
             "Unit of measure",
             noComparison
@@ -430,19 +430,19 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       yield* seeded(id, 1)
       yield* createdBefore(id)
       const store = yield* ImportStore
-      const found = yield* store.find(org, id)
+      const found = yield* store.find(id, org)
       const draftOption = found
       assertTrue(O.isSome(draftOption), "expected draft to be present")
       const draft = draftOption.value
-      yield* store.decide(marcus, draft, { set: { "row-2": replace }, clear: [] }, noItemsRead, O.none())
+      yield* store.decide(draft, marcus, { set: { "row-2": replace }, clear: [] }, noItemsRead, O.none())
       const answer = yield* store.matchColumn(
-        marcus,
         draft,
+        marcus,
         { field: "unitCost", column: O.some(unitCost) },
         "Unit cost",
         () => Effect.succeed({ changed: [], read: everything })
       )
-      const after = yield* store.find(org, id)
+      const after = yield* store.find(id, org)
       const held = yield* savedFor(id)
       const afterDraftOption = after
       assertTrue(O.isSome(afterDraftOption), "expected afterDraft to be present")
@@ -456,7 +456,7 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000b0")
       const store = yield* ImportStore
       const now = yield* DateTime.now
-      const found = yield* store.find(org, id)
+      const found = yield* store.find(id, org)
       const beforeOption = found
       assertTrue(O.isSome(beforeOption), "expected before to be present")
       const before = beforeOption.value

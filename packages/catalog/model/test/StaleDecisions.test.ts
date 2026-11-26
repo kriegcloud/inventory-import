@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // What a re-match of a column takes back besides accepts (Benjamin, 2026-11-20): a Replace or Keep-stored and a
 // keep-one-of-two across a SKU re-match, a Replace or Keep-stored across another re-match only where the row's
 // comparison changed, an undone fix across its field's re-match, and a field moved off its column by another field's
@@ -1053,11 +1054,22 @@ describe("a match worked out again because something changed between two tries",
     const asked = MutableRef.make(0)
     const stepped = SuggestionStore.of({
       ...inner,
-      list: Effect.fn("stepped.list")(function* (...args: Parameters<SuggestionStore["Service"]["list"]>) {
-        const suggestions = yield* inner.list(...args)
-        if (MutableRef.updateAndGet(asked, (n) => n + 1) === 1) yield* between
-        return suggestions
-      })
+      list: dual(
+        2,
+        (
+          self: Parameters<SuggestionStore["Service"]["list"]>[0],
+          organizationId: Parameters<SuggestionStore["Service"]["list"]>[1]
+        ) => {
+          const perform = Effect.fn("stepped.list")(function* (
+            ...args: Parameters<SuggestionStore["Service"]["list"]>
+          ) {
+            const suggestions = yield* inner.list(...args)
+            if (MutableRef.updateAndGet(asked, (n) => n + 1) === 1) yield* between
+            return suggestions
+          })
+          return perform(self, organizationId)
+        }
+      )
     })
     const imports = yield* importsEndpoints.pipe(Effect.provideService(SuggestionStore, stepped))
     return { imports, asked }
@@ -1226,11 +1238,25 @@ describe("a save worked out again because something it read changed, and a colum
         const tries = MutableRef.make(0)
         const stepped = ImportStore.of({
           ...inner,
-          decide: Effect.fn("stepped.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
-            if (MutableRef.updateAndGet(tries, (n) => n + 1) > 1) return yield* inner.decide(...args)
-            yield* Effect.orDie(match("Net cost"))
-            return decisionsItemsChanged
-          })
+          decide: dual(
+            5,
+            (
+              self: Parameters<ImportStore["Service"]["decide"]>[0],
+              actor: Parameters<ImportStore["Service"]["decide"]>[1],
+              delta: Parameters<ImportStore["Service"]["decide"]>[2],
+              read: Parameters<ImportStore["Service"]["decide"]>[3],
+              expected: Parameters<ImportStore["Service"]["decide"]>[4]
+            ) => {
+              const perform = Effect.fn("stepped.decide")(function* (
+                ...args: Parameters<ImportStore["Service"]["decide"]>
+              ) {
+                if (MutableRef.updateAndGet(tries, (n) => n + 1) > 1) return yield* inner.decide(...args)
+                yield* Effect.orDie(match("Net cost"))
+                return decisionsItemsChanged
+              })
+              return perform(self, actor, delta, read, expected)
+            }
+          )
         })
         const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, stepped))
         const saved = yield* imports

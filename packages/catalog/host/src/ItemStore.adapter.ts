@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // The Items table's questions, answered in SQL: one page of an organization's items, searched, sorted and
 // filtered, and what the table's filters can offer. The one rule not to break: nothing from the request is ever SQL
 // text. A column id becomes a column only through the fixed tables below, every value is a bound parameter, and the
@@ -550,6 +551,10 @@ export const ItemStoreD1 = Layer.effect(
         : EditOutcome.cases.Changed.make({ item: stored })
     }, Effect.orDie)
 
-    return ItemStore.of({ page, facets, edit })
+    return ItemStore.of({
+      page: dual(2, (self: ItemQuery, organizationId: OrganizationId) => page(organizationId, self)),
+      facets,
+      edit: dual(3, (self: string, actor: Member, change: ItemEdit) => edit(actor, self, change))
+    })
   })
 ).pipe(Layer.provide(SecureRandom.layerWebCrypto))

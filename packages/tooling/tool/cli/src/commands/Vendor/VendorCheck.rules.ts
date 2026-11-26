@@ -152,7 +152,7 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
     manifests,
     Effect.fnUntraced(function* (manifestPath) {
       const dir = repo.dirname(manifestPath)
-      const where = repo.relative(repo.root, dir)
+      const where = repo.relative(dir, repo.root)
       const manifest = yield* repo.json(VendorRecord)(manifestPath)
       const commit = Str.slice(0, 12)(manifest.source.commit)
       const upstreamDir = manifest.source.path
@@ -216,7 +216,7 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
           repo.files(repo.join(dir, sub)).pipe(
             Effect.map((found) =>
               A.flatMap(found, (file) => {
-                const inside = repo.relative(dir, file)
+                const inside = repo.relative(file, dir)
                 return A.contains(listed, inside)
                   ? A.empty<VendorCheckFinding>()
                   : A.of<VendorCheckFinding>(VendorCheckFinding.cases.Stray.make({ file: `${where}/${inside}` }))

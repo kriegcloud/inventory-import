@@ -7,6 +7,7 @@ import * as AiError from "effect/ai/AiError"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
+import { pipe } from "effect/Function"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
@@ -32,7 +33,7 @@ const refused = () =>
     reason: AiError.AuthenticationError.make({ kind: "InvalidKey" })
   })
 
-const greet = OpenRouter.pipe(Effect.flatMap((openRouter) => openRouter.generateObject(prompt, Greeting)))
+const greet = OpenRouter.pipe(Effect.flatMap((openRouter) => pipe(prompt, openRouter.generateObject(Greeting))))
 const failure = greet.pipe(Effect.flip)
 
 describe("a scripted model", () => {

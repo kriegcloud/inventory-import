@@ -1,3 +1,5 @@
+import { dual } from "effect/Function"
+import * as P from "effect/Predicate"
 // `infra setup` on a workstation that is not one: every tool is a stand-in that answers from a small world the test
 // writes (who is logged in, which accounts, profiles, vaults and items there are) and every thing said, asked, run
 // or handed the terminal is written down in order. No real `op-human`, `cf`, `gh` or `alchemy` is started, so what
@@ -169,201 +171,220 @@ const standIn = (w: MutableRef.MutableRef<World>): Workstation["Service"] => {
       Effect.sync(() => {
         w.current = { ...w.current, log: [...w.current.log, `say: ${Str.trim(text)}`] }
       }),
-    ask: (command, args) =>
-      Effect.sync(() => {
-        const asked = line(command, args)
-        w.current = { ...w.current, log: [...w.current.log, `ask: ${asked}`] }
-        if (command === "op-human" && O.exists(w.current.opDown, (part) => Str.includes(part)(asked))) {
-          return { stdout: "", stderr: `${opDownSaid}\n`, code: 1 }
-        }
-        if (command === "op-human" && O.exists(w.current.opRefuses, (part) => Str.includes(part)(asked))) {
-          return { stdout: "", stderr: `${opRefusedSaid}\n`, code: 1 }
-        }
-        if (command === "op-human" && O.exists(w.current.opHeld, (part) => Str.includes(part)(asked))) {
-          return { stdout: "", stderr: `${opHeldSaid}\n`, code: 1 }
-        }
-        if (Str.includes("/workers/subdomain")(asked)) {
-          return O.match(w.current.subdomainError, {
-            onNone: () => answer(json({ success: true, errors: [], result: { subdomain: "previews-owner" } })),
-            onSome: (code) =>
-              answer(
-                json({ success: false, errors: [{ code, message: `error ${code} from Cloudflare` }], result: null })
-              )
-          })
-        }
-        if (asked === "cf auth whoami") {
-          return w.current.cloudflare
-            ? answer(
-                json({
-                  authenticated: true,
-                  tokenValid: true,
-                  email: "owner@example.test",
-                  accounts: w.current.accounts
-                })
-              )
-            : answer(json({ authenticated: false, accounts: [] }))
-        }
-        if (asked === "cf zones list --name beep-effect.com --status active") {
-          if (O.isSome(w.current.zoneFails)) return { stdout: "", stderr: w.current.zoneFails.value, code: 1 }
-          const zones = A.map(A.fromOption(w.current.zone), (id) => ({
-            name: "beep-effect.com",
-            account: w.current.zoneNamed
-              ? {
-                  id,
-                  name: A.findFirst(w.current.accounts, (one) => one.id === id).pipe(
-                    O.match({ onNone: () => "Zone holder", onSome: (one) => one.name })
-                  )
-                }
-              : { id }
-          }))
-          return answer(json(zones))
-        }
-        if (Str.endsWith("cf accounts tokens verify")(asked)) {
-          if (O.isSome(w.current.verifyRaw)) return w.current.verifyRaw.value
-          return answer(
-            json({ id: "0123456789abcdef0123456789abcdef", status: w.current.token.active ? "active" : "disabled" })
-          )
-        }
-        if (Str.includes("cf accounts tokens get 0123456789abcdef0123456789abcdef")(asked)) {
-          return O.match(w.current.token.allows, {
-            onNone: () => answer("", 1),
-            onSome: (names) =>
-              answer(json({ policies: [{ effect: "allow", permission_groups: A.map(names, (name) => ({ name })) }] }))
-          })
-        }
-        const shown = Str.match(/^bunx alchemy profile show --profile (\S+)$/)(asked)
-        if (O.isSome(shown)) {
-          const name = `${shown.value[1]}`
-          const providers = R.get(w.current.profiles, name).pipe(O.getOrElse(() => ""))
-          if (!Str.includes("Cloudflare (")(providers))
-            return answer(`- ${name}`, R.has(w.current.profiles, name) ? 0 : 1)
-          const account = Str.includes("Cloudflare (stored)")(providers)
-            ? O.some(w.current.tokenAccount)
-            : R.get(w.current.connects, name)
-          // A profile the tool cannot say an account for: its Cloudflare lines carry none.
-          if (O.isNone(account)) return answer(`- ${name}\n  Cloudflare (oauth) — needs a login again`)
-          // As the tool prints it: part of a token among the lines, which must reach nothing.
-          return answer(
-            A.join(
-              [
-                `- ${name}`,
-                "  Cloudflare (oauth) — ok",
-                `    accessToken: ${secret}`,
-                `    accountId: ${account.value}`
-              ],
-              "\n"
-            )
-          )
-        }
-        if (asked === "gh variable get SIGN_UP --env production --repo kriegcloud/inventory-import") {
-          return O.match(w.current.signUpOnGitHub, {
-            onNone: () => answer("", 1),
-            onSome: (list) => answer(`${list}\n`)
-          })
-        }
-        // The comparison 1Password fills: 0 the same, 3 they differ, and whatever `opFails` says when 1Password
-        // itself does not answer.
-        const compared = Str.match(/^op-human run --env-file \S+ -- sh -c .*\|\| exit 3 sh (\S+)$/)(asked)
-        if (O.isSome(compared)) {
-          return O.match(w.current.opFails, {
-            onSome: (code) => answer("", code),
-            onNone: () => answer("", compared.value[1] === w.current.tokenAccount ? 0 : 3)
-          })
-        }
-        if (asked === "bunx alchemy profile list") {
-          w.current = { ...w.current, listFailsAfter: w.current.listFailsAfter - 1 }
-          if (w.current.listFailsAfter < 0) return answer("", 1)
-          return answer(
-            A.join(
-              [
-                `Profiles (${R.size(w.current.profiles)})`,
-                ...A.map(R.toEntries(w.current.profiles), ([name, to]) => `- ${name}${to === "" ? "" : `: ${to}`}`)
-              ],
-              "\n"
-            )
-          )
-        }
-        if (Str.startsWith("bunx alchemy profile create ")(asked)) {
-          w.current = {
-            ...w.current,
-            profiles: { ...w.current.profiles, [`${A.last(args).pipe(O.getOrElse(() => ""))}`]: "" }
+    ask: dual(
+      2,
+      (self: Parameters<Workstation["Service"]["ask"]>[0], args: Parameters<Workstation["Service"]["ask"]>[1]) =>
+        Effect.sync(() => {
+          const asked = line(self, args)
+          w.current = { ...w.current, log: [...w.current.log, `ask: ${asked}`] }
+          if (self === "op-human" && O.exists(w.current.opDown, (part) => Str.includes(part)(asked))) {
+            return { stdout: "", stderr: `${opDownSaid}\n`, code: 1 }
           }
-          return answer("")
-        }
-        if (asked === "op-human vault list --format json") {
-          if (O.isSome(w.current.vaultsFail)) return { stdout: "", stderr: w.current.vaultsFail.value, code: 1 }
-          return answer(json(w.current.vaults))
-        }
-        if (Str.startsWith("op-human item list ")(asked)) return answer(json(w.current.items))
-        if (asked === "gh api user --jq .login") {
-          return O.match(w.current.github, { onNone: () => answer("", 1), onSome: (login) => answer(`${login}\n`) })
-        }
-        return answer("", 1)
-      }),
-    quiet: (command, args) =>
-      Effect.sync(() => {
-        w.current = { ...w.current, log: [...w.current.log, `quiet: ${line(command, args)}`] }
-        if (O.isSome(w.current.createFails)) return { stderr: w.current.createFails.value, code: 1 }
-        w.current = {
-          ...w.current,
-          items: [
-            ...w.current.items,
-            {
-              id: `itemaaaaaaaaaaaaaaaaaaaaa${w.current.items.length + 1}`,
-              title: previewPasswordItem,
-              additional_information: secret
+          if (self === "op-human" && O.exists(w.current.opRefuses, (part) => Str.includes(part)(asked))) {
+            return { stdout: "", stderr: `${opRefusedSaid}\n`, code: 1 }
+          }
+          if (self === "op-human" && O.exists(w.current.opHeld, (part) => Str.includes(part)(asked))) {
+            return { stdout: "", stderr: `${opHeldSaid}\n`, code: 1 }
+          }
+          if (Str.includes("/workers/subdomain")(asked)) {
+            return O.match(w.current.subdomainError, {
+              onNone: () => answer(json({ success: true, errors: [], result: { subdomain: "previews-owner" } })),
+              onSome: (code) =>
+                answer(
+                  json({ success: false, errors: [{ code, message: `error ${code} from Cloudflare` }], result: null })
+                )
+            })
+          }
+          if (asked === "cf auth whoami") {
+            return w.current.cloudflare
+              ? answer(
+                  json({
+                    authenticated: true,
+                    tokenValid: true,
+                    email: "owner@example.test",
+                    accounts: w.current.accounts
+                  })
+                )
+              : answer(json({ authenticated: false, accounts: [] }))
+          }
+          if (asked === "cf zones list --name beep-effect.com --status active") {
+            if (O.isSome(w.current.zoneFails)) return { stdout: "", stderr: w.current.zoneFails.value, code: 1 }
+            const zones = A.map(A.fromOption(w.current.zone), (id) => ({
+              name: "beep-effect.com",
+              account: w.current.zoneNamed
+                ? {
+                    id,
+                    name: A.findFirst(w.current.accounts, (one) => one.id === id).pipe(
+                      O.match({ onNone: () => "Zone holder", onSome: (one) => one.name })
+                    )
+                  }
+                : { id }
+            }))
+            return answer(json(zones))
+          }
+          if (Str.endsWith("cf accounts tokens verify")(asked)) {
+            if (O.isSome(w.current.verifyRaw)) return w.current.verifyRaw.value
+            return answer(
+              json({ id: "0123456789abcdef0123456789abcdef", status: w.current.token.active ? "active" : "disabled" })
+            )
+          }
+          if (Str.includes("cf accounts tokens get 0123456789abcdef0123456789abcdef")(asked)) {
+            return O.match(w.current.token.allows, {
+              onNone: () => answer("", 1),
+              onSome: (names) =>
+                answer(json({ policies: [{ effect: "allow", permission_groups: A.map(names, (name) => ({ name })) }] }))
+            })
+          }
+          const shown = Str.match(/^bunx alchemy profile show --profile (\S+)$/)(asked)
+          if (O.isSome(shown)) {
+            const name = `${shown.value[1]}`
+            const providers = R.get(w.current.profiles, name).pipe(O.getOrElse(() => ""))
+            if (!Str.includes("Cloudflare (")(providers))
+              return answer(`- ${name}`, R.has(w.current.profiles, name) ? 0 : 1)
+            const account = Str.includes("Cloudflare (stored)")(providers)
+              ? O.some(w.current.tokenAccount)
+              : R.get(w.current.connects, name)
+            // A profile the tool cannot say an account for: its Cloudflare lines carry none.
+            if (O.isNone(account)) return answer(`- ${name}\n  Cloudflare (oauth) — needs a login again`)
+            // As the tool prints it: part of a token among the lines, which must reach nothing.
+            return answer(
+              A.join(
+                [
+                  `- ${name}`,
+                  "  Cloudflare (oauth) — ok",
+                  `    accessToken: ${secret}`,
+                  `    accountId: ${account.value}`
+                ],
+                "\n"
+              )
+            )
+          }
+          if (asked === "gh variable get SIGN_UP --env production --repo kriegcloud/inventory-import") {
+            return O.match(w.current.signUpOnGitHub, {
+              onNone: () => answer("", 1),
+              onSome: (list) => answer(`${list}\n`)
+            })
+          }
+          // The comparison 1Password fills: 0 the same, 3 they differ, and whatever `opFails` says when 1Password
+          // itself does not answer.
+          const compared = Str.match(/^op-human run --env-file \S+ -- sh -c .*\|\| exit 3 sh (\S+)$/)(asked)
+          if (O.isSome(compared)) {
+            return O.match(w.current.opFails, {
+              onSome: (code) => answer("", code),
+              onNone: () => answer("", compared.value[1] === w.current.tokenAccount ? 0 : 3)
+            })
+          }
+          if (asked === "bunx alchemy profile list") {
+            w.current = { ...w.current, listFailsAfter: w.current.listFailsAfter - 1 }
+            if (w.current.listFailsAfter < 0) return answer("", 1)
+            return answer(
+              A.join(
+                [
+                  `Profiles (${R.size(w.current.profiles)})`,
+                  ...A.map(R.toEntries(w.current.profiles), ([name, to]) => `- ${name}${to === "" ? "" : `: ${to}`}`)
+                ],
+                "\n"
+              )
+            )
+          }
+          if (Str.startsWith("bunx alchemy profile create ")(asked)) {
+            w.current = {
+              ...w.current,
+              profiles: { ...w.current.profiles, [`${A.last(args).pipe(O.getOrElse(() => ""))}`]: "" }
             }
-          ]
-        }
-        return { stderr: "", code: 0 }
-      }),
-    hand: (command, args, given = {}) =>
-      Effect.sync(() => {
-        const handed = line(command, args)
-        if (command === "sh") return w.current.terminal ? 0 : 1
-        const names = A.map(R.toEntries(given), ([name, value]) => `${name}=${value}`)
-        w.current = {
-          ...w.current,
-          log: [
-            ...w.current.log,
-            `hand: ${handed}${A.isReadonlyArrayNonEmpty(names) ? ` | given ${A.join(names, " ")}` : ""}`
-          ]
-        }
-        const code = w.current.exits(handed)
-        if (code !== 0) return code
-        if (handed === "cf auth login") w.current = { ...w.current, cloudflare: true }
-        if (handed === "gh auth login") w.current = { ...w.current, github: O.some("octo-owner") }
-        const edited = Str.match(/bunx alchemy profile edit --profile (\S+) (.*)$/)(handed)
-        if (O.isSome(edited)) {
-          const name = `${edited.value[1]}`
-          const added = A.map(
-            A.filter(
-              Str.split(" ")(`${edited.value[2]}`),
-              (word) => word === "Cloudflare" || word === "GitHub" || word === "1Password"
-            ),
-            (provider) =>
-              `${provider} (${provider === "GitHub" ? "gh-cli" : provider === "1Password" ? "desktop" : Str.includes("--method stored")(handed) ? "stored" : "oauth"})`
-          )
-          const before = R.get(w.current.profiles, name).pipe(O.getOrElse(() => ""))
+            return answer("")
+          }
+          if (asked === "op-human vault list --format json") {
+            if (O.isSome(w.current.vaultsFail)) return { stdout: "", stderr: w.current.vaultsFail.value, code: 1 }
+            return answer(json(w.current.vaults))
+          }
+          if (Str.startsWith("op-human item list ")(asked)) return answer(json(w.current.items))
+          if (asked === "gh api user --jq .login") {
+            return O.match(w.current.github, { onNone: () => answer("", 1), onSome: (login) => answer(`${login}\n`) })
+          }
+          return answer("", 1)
+        })
+    ),
+    quiet: dual(
+      2,
+      (self: Parameters<Workstation["Service"]["quiet"]>[0], args: Parameters<Workstation["Service"]["quiet"]>[1]) =>
+        Effect.sync(() => {
+          w.current = { ...w.current, log: [...w.current.log, `quiet: ${line(self, args)}`] }
+          if (O.isSome(w.current.createFails)) return { stderr: w.current.createFails.value, code: 1 }
           w.current = {
             ...w.current,
-            profiles: { ...w.current.profiles, [name]: A.join([...(before === "" ? [] : [before]), ...added], ", ") }
+            items: [
+              ...w.current.items,
+              {
+                id: `itemaaaaaaaaaaaaaaaaaaaaa${w.current.items.length + 1}`,
+                title: previewPasswordItem,
+                additional_information: secret
+              }
+            ]
           }
-        }
-        return 0
-      }),
+          return { stderr: "", code: 0 }
+        })
+    ),
+    hand: dual(
+      (args) => P.isString(args[0]),
+      (
+        self: Parameters<Workstation["Service"]["hand"]>[0],
+        args: Parameters<Workstation["Service"]["hand"]>[1],
+        given: Parameters<Workstation["Service"]["hand"]>[2] = {}
+      ) =>
+        Effect.sync(() => {
+          const handed = line(self, args)
+          if (self === "sh") return w.current.terminal ? 0 : 1
+          const names = A.map(R.toEntries(given), ([name, value]) => `${name}=${value}`)
+          w.current = {
+            ...w.current,
+            log: [
+              ...w.current.log,
+              `hand: ${handed}${A.isReadonlyArrayNonEmpty(names) ? ` | given ${A.join(names, " ")}` : ""}`
+            ]
+          }
+          const code = w.current.exits(handed)
+          if (code !== 0) return code
+          if (handed === "cf auth login") w.current = { ...w.current, cloudflare: true }
+          if (handed === "gh auth login") w.current = { ...w.current, github: O.some("octo-owner") }
+          const edited = Str.match(/bunx alchemy profile edit --profile (\S+) (.*)$/)(handed)
+          if (O.isSome(edited)) {
+            const name = `${edited.value[1]}`
+            const added = A.map(
+              A.filter(
+                Str.split(" ")(`${edited.value[2]}`),
+                (word) => word === "Cloudflare" || word === "GitHub" || word === "1Password"
+              ),
+              (provider) =>
+                `${provider} (${provider === "GitHub" ? "gh-cli" : provider === "1Password" ? "desktop" : Str.includes("--method stored")(handed) ? "stored" : "oauth"})`
+            )
+            const before = R.get(w.current.profiles, name).pipe(O.getOrElse(() => ""))
+            w.current = {
+              ...w.current,
+              profiles: { ...w.current.profiles, [name]: A.join([...(before === "" ? [] : [before]), ...added], ", ") }
+            }
+          }
+          return 0
+        })
+    ),
     confirm: (question) =>
       Effect.sync(() => {
         const yes = w.current.yes(question)
         w.current = { ...w.current, log: [...w.current.log, `confirm: ${question} -> ${yes ? "yes" : "no"}`] }
         return yes
       }),
-    choose: (question, choices) =>
-      Effect.sync(() => {
-        w.current = { ...w.current, log: [...w.current.log, `choose: ${question}`] }
-        // He picks the last one listed for production and the first for anything else.
-        return Str.includes("production")(question) ? A.lastNonEmpty(choices).value : choices[0].value
-      })
+    choose: dual(
+      2,
+      (
+        self: Parameters<Workstation["Service"]["choose"]>[0],
+        choices: Parameters<Workstation["Service"]["choose"]>[1]
+      ) =>
+        Effect.sync(() => {
+          w.current = { ...w.current, log: [...w.current.log, `choose: ${self}`] }
+          // He picks the last one listed for production and the first for anything else.
+          return Str.includes("production")(self) ? A.lastNonEmpty(choices).value : choices[0].value
+        })
+    )
   }
 }
 

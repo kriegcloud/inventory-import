@@ -62,18 +62,20 @@ const reactivity: Reactivity.Reactivity = Effect.runSync(Reactivity.make)
 export const invalidate = (keys: Reactivity.KeysInput): void => reactivity.invalidateUnsafe(keys)
 
 /** A read that asks again whenever one of `keys` is invalidated (Effect's `withReactivity`, on the tab's instance). */
-const followKeys =
-  (keys: Reactivity.KeysInput) =>
-  <A>(atom: Atom.Atom<A>): Atom.Atom<A> =>
-    Atom.transform(
-      atom,
-      (get) => {
-        get.addFinalizer(reactivity.registerUnsafe(keys, () => get.refresh(atom)))
-        get.subscribe(atom, (value) => get.setSelf(value))
-        return get.once(atom)
-      },
-      { initialValueTarget: atom }
-    )
+const followKeys: {
+  (keys: Reactivity.KeysInput): <A>(self: Atom.Atom<A>) => Atom.Atom<A>
+  <A>(self: Atom.Atom<A>, keys: Reactivity.KeysInput): Atom.Atom<A>
+} = dual(2, <A>(self: Atom.Atom<A>, keys: Reactivity.KeysInput): Atom.Atom<A> =>
+  Atom.transform(
+    self,
+    (get) => {
+      get.addFinalizer(reactivity.registerUnsafe(keys, () => get.refresh(self)))
+      get.subscribe(self, (value) => get.setSelf(value))
+      return get.once(self)
+    },
+    { initialValueTarget: self }
+  )
+)
 
 /** A read is asked again once for a failure that may pass (the network, a server error), never for a refusal. */
 const readRetry = { times: 1, while: isTransient } as const
@@ -243,7 +245,10 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
    * the answer wanted: nothing is asked. An earlier one, or any one when no `since` is given, is left to land, and
    * the read is asked once more when it does.
    */
-  readonly askAgain: (registry: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>) => void
+  readonly askAgain: {
+    (since: O.Option<DateTime.Utc>): (self: AtomRegistry.AtomRegistry) => void
+    (self: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>): void
+  }
 }
 
 /**
@@ -287,18 +292,23 @@ export interface ApiAtoms<Id, Client> {
    * them with `get`: when they change it asks again and keeps the previous answer, marked waiting, until the new one
    * comes (the Items table's paging).
    */
-  readonly query: <A, E>(
-    use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
-    options: QueryOptions
-  ) => Query<A, E>
+  readonly query: {
+    (options: QueryOptions): <A, E>(self: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>) => Query<A, E>
+    <A, E>(self: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>, options: QueryOptions): Query<A, E>
+  }
   /**
    * A write, made by setting the atom to its input. Every press runs on its own (a second press does not interrupt
    * the first); when it succeeds the reads under `reactivityKeys` are asked again.
    */
-  readonly write: <Input>() => <A, E>(
-    use: (client: Client, input: Input) => Effect.Effect<A, E>,
-    options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
-  ) => Atom.AtomResultFn<Input, A, E>
+  readonly write: <Input>() => {
+    (options: {
+      readonly reactivityKeys: O.Option<Reactivity.KeysInput>
+    }): <A, E>(self: (client: Client, input: Input) => Effect.Effect<A, E>) => Atom.AtomResultFn<Input, A, E>
+    <A, E>(
+      self: (client: Client, input: Input) => Effect.Effect<A, E>,
+      options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
+    ): Atom.AtomResultFn<Input, A, E>
+  }
   /**
    * One program against the API with the write retries, to run on `apiRuntime`: for a write built of several steps
    * (the optimistic write). It requires the client's tag, which the runtime provides.
@@ -317,10 +327,10 @@ export interface ApiAtoms<Id, Client> {
  */
 export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms<Id, Client> => {
   const client = Effect.service(tag)
-  function query<A, E>(
-    use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
-    options: QueryOptions
-  ): Query<A, E> {
+  const query: ApiAtoms<Id, Client>["query"] = dual(2, function <
+    A,
+    E
+  >(self: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>, options: QueryOptions): Query<A, E> {
     const keeping = options.keep
     // One read per member: when the person or the organization changes, the screen shows its skeleton, never the
     // previous organization's rows marked as waiting. Held with ordinary references, not `Atom.family`'s weak ones: a
@@ -389,7 +399,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         }
         const mine: Out = { at: DateTime.nowUnsafe() }
         return Effect.sync(() => registry.set(out, O.some(mine))).pipe(
-          Effect.andThen(Effect.flatMap(client, (c) => use(c, get)).pipe(Effect.retry(readRetry))),
+          Effect.andThen(Effect.flatMap(client, (c) => self(c, get)).pipe(Effect.retry(readRetry))),
           Effect.map((answer) => {
             // The same answer as the one on screen keeps the object on screen, whether the request or a screen gave it.
             const shown = O.orElse(
@@ -551,41 +561,54 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
             () => (nodes.has(per.held) ? AsyncResult.value(registry.get(per.held)) : O.none())
           )
         }),
-      askAgain: (registry: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>) => {
-        O.map(MutableHashMap.get(reads, registry.get(memberKey)), (per) =>
-          O.match(registry.get(per.out), {
-            onNone: () => registry.refresh(per.read),
+      askAgain: dual<
+        (since: O.Option<DateTime.Utc>) => (self: AtomRegistry.AtomRegistry) => void,
+        (self: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>) => void
+      >(2, (self: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>) => {
+        O.map(MutableHashMap.get(reads, self.get(memberKey)), (per) =>
+          O.match(self.get(per.out), {
+            onNone: () => self.refresh(per.read),
             onSome: (request) => {
               if (O.exists(since, (since) => DateTime.isGreaterThan(request.at, since))) return
-              if (registry.getNodes().has(per.beside)) {
-                registry.update(per.beside, (now) => ({ ...now, newer: now.newer + 1 }))
+              if (self.getNodes().has(per.beside)) {
+                self.update(per.beside, (now) => ({ ...now, newer: now.newer + 1 }))
               }
             }
           })
         )
-      }
+      })
     })
-  }
+  })
   function send<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {
     return Effect.flatMap(client, use).pipe(Effect.retry(writeRetry))
   }
-  const write =
-    <Input>() =>
-    <A, E>(
-      use: (client: Client, input: Input) => Effect.Effect<A, E>,
-      options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
-    ): Atom.AtomResultFn<Input, A, E> =>
-      apiRuntime.fn<Input>()(
-        (input) => {
-          const keys = options.reactivityKeys
-          const sent = send((c) => use(c, input))
-          return O.match(keys, {
-            onNone: () => sent,
-            onSome: (keys) => Effect.tap(sent, () => Effect.sync(() => invalidate(keys)))
-          })
-        },
-        { concurrent: true }
-      )
+  const write = <Input>() =>
+    dual<
+      (options: {
+        readonly reactivityKeys: O.Option<Reactivity.KeysInput>
+      }) => <A, E>(self: (client: Client, input: Input) => Effect.Effect<A, E>) => Atom.AtomResultFn<Input, A, E>,
+      <A, E>(
+        self: (client: Client, input: Input) => Effect.Effect<A, E>,
+        options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
+      ) => Atom.AtomResultFn<Input, A, E>
+    >(
+      2,
+      <A, E>(
+        self: (client: Client, input: Input) => Effect.Effect<A, E>,
+        options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
+      ): Atom.AtomResultFn<Input, A, E> =>
+        apiRuntime.fn<Input>()(
+          (input) => {
+            const keys = options.reactivityKeys
+            const sent = send((c) => self(c, input))
+            return O.match(keys, {
+              onNone: () => sent,
+              onSome: (keys) => Effect.tap(sent, () => Effect.sync(() => invalidate(keys)))
+            })
+          },
+          { concurrent: true }
+        )
+    )
   function ask<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {
     return Effect.flatMap(client, use)
   }

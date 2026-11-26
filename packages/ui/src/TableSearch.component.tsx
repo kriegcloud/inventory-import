@@ -1,4 +1,5 @@
 import * as S from "effect/Schema"
+import { dual } from "effect/Function"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Eq from "effect/Equal"
 import { closest } from "./internal/browser.ts"
@@ -74,149 +75,152 @@ interface BoxScoped {
   readonly clear: () => void
 }
 
-const makeBox = (
-  input: { readonly fieldId: string; readonly table: Searched },
-  registry: AtomRegistry.AtomRegistry
-): BoxScoped => {
-  const { fieldId, table } = input
-  const heldNow = (): string => {
-    const search: unknown = table.atoms.globalFilter.get()
-    return typeof search === "string" ? search : ""
-  }
-  // The search the table holds now (the page address, where the table keeps it there): the table's own state, which
-  // the box listens to as an atom listens to anything outside. The assistant, Reset or a link changes what it says.
-  const held = Atom.readable((get) => {
-    const subscription = table.atoms.globalFilter.subscribe(() => get.setSelf(heldNow()))
-    get.addFinalizer(() => subscription.unsubscribe())
-    return heldNow()
-  })
-  const box = Atom.make<Box>({ typed: O.none(), waiting: false, asked: O.none() })
-  // What was typed counts while the table's search is still the last one this box asked for (its own echo) or, before
-  // it asked anything, the one it was typed over. A search changed from elsewhere (the assistant, Reset, a link) shows
-  // instead, even one back to where the typing started, and a pause that was still running asks nothing.
-  const shown = Atom.readable((get): Shown => {
-    const now = get(box)
-    const value = get(held)
-    return O.match(now.typed, {
-      onNone: () => ({
-        draft: value,
-        asked: value,
-        search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-        askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-        waiting: false
-      }),
-      onSome: (typed) =>
-        O.match(now.asked, {
-          onNone: () =>
-            typed.over === value
-              ? {
-                  draft: typed.text,
-                  asked: value,
-                  search: O.some(typed.search),
-                  askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-                  waiting: now.waiting
-                }
-              : {
-                  draft: value,
-                  asked: value,
-                  search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-                  askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-                  waiting: false
-                },
-          onSome: (asked) =>
-            asked === value
-              ? {
-                  draft: typed.text,
-                  asked,
-                  search: O.some(typed.search),
-                  askedSearch: O.map(readSearchText({ text: asked, search: asked }), (text) => text.search),
-                  waiting: now.waiting
-                }
-              : {
-                  draft: value,
-                  asked: value,
-                  search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-                  askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
-                  waiting: false
-                }
-        })
+const makeBox: {
+  (registry: AtomRegistry.AtomRegistry): (input: { readonly fieldId: string; readonly table: Searched }) => BoxScoped
+  (input: { readonly fieldId: string; readonly table: Searched }, registry: AtomRegistry.AtomRegistry): BoxScoped
+} = dual(
+  2,
+  (input: { readonly fieldId: string; readonly table: Searched }, registry: AtomRegistry.AtomRegistry): BoxScoped => {
+    const { fieldId, table } = input
+    const heldNow = (): string => {
+      const search: unknown = table.atoms.globalFilter.get()
+      return typeof search === "string" ? search : ""
+    }
+    // The search the table holds now (the page address, where the table keeps it there): the table's own state, which
+    // the box listens to as an atom listens to anything outside. The assistant, Reset or a link changes what it says.
+    const held = Atom.readable((get) => {
+      const subscription = table.atoms.globalFilter.subscribe(() => get.setSelf(heldNow()))
+      get.addFinalizer(() => subscription.unsubscribe())
+      return heldNow()
     })
-  })
-  const ask = (text: string) => {
-    registry.update(box, (now) => ({ ...now, asked: O.some(text), waiting: false }))
-    table.setGlobalFilter(text)
-  }
-  // The typed text, published once the typing has stopped for the pause.
-  const typed = Atom.map(box, (now) => now.typed)
-  const paused = Atom.debounce(typed, typingPause)
-  const field = () => document.getElementById(fieldId)
-  return {
-    shown,
-    // Let go the moment nothing mounts it: a box that has gone asks nothing and hears no key.
-    asks: Atom.setIdleTTL(
-      Atom.readable((get) => {
-        get.subscribe(paused, (after) => {
-          const now = registry.get(box)
-          // Asked after the pause, unless it was asked already (Enter, the cross), the person typed on, or the search
-          // was changed from elsewhere meanwhile.
-          if (O.isNone(after) || !now.waiting || now.typed !== after || after.value.over !== heldNow()) return
-          ask(after.value.search)
-        })
-      }),
-      0
-    ),
-    keys: Atom.setIdleTTL(
-      Atom.readable((get) => {
-        const onKey = (event: KeyboardEvent) => {
-          const slash =
-            event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingIn(event.target)
-          const command =
-            Eq.equals(readCommandKey(event.key), commandK) && (event.ctrlKey || event.metaKey) && !event.altKey
-          // A dialog open over the table keeps its keys.
-          const inDialog = event.target instanceof Element && O.isSome(closest("[role=dialog]")(event.target))
-          const node = field()
-          if ((!slash && !command) || inDialog || !(node instanceof HTMLInputElement)) return
-          event.preventDefault()
-          node.focus()
-          node.select()
-        }
-        document.addEventListener("keydown", onKey)
-        get.addFinalizer(() => document.removeEventListener("keydown", onKey))
-      }),
-      0
-    ),
-    type: (text) => {
-      const read = readSearchText({ text, search: text })
-      if (O.isNone(read)) return
-      const same = O.contains(registry.get(shown).askedSearch, read.value.search)
-      // Typing starts again from the search the table holds now: the last ask is behind it.
-      registry.update(box, (now) => ({
-        ...now,
-        typed: O.some({ ...read.value, over: heldNow() }),
-        asked: O.none(),
-        waiting: !same
-      }))
-    },
-    askNow: () => {
-      const now = registry.get(shown)
-      O.map(now.search, (search) => {
-        if (search !== now.asked) ask(search)
-        else registry.update(box, (before) => ({ ...before, waiting: false }))
+    const box = Atom.make<Box>({ typed: O.none(), waiting: false, asked: O.none() })
+    // What was typed counts while the table's search is still the last one this box asked for (its own echo) or, before
+    // it asked anything, the one it was typed over. A search changed from elsewhere (the assistant, Reset, a link) shows
+    // instead, even one back to where the typing started, and a pause that was still running asks nothing.
+    const shown = Atom.readable((get): Shown => {
+      const now = get(box)
+      const value = get(held)
+      return O.match(now.typed, {
+        onNone: () => ({
+          draft: value,
+          asked: value,
+          search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+          askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+          waiting: false
+        }),
+        onSome: (typed) =>
+          O.match(now.asked, {
+            onNone: () =>
+              typed.over === value
+                ? {
+                    draft: typed.text,
+                    asked: value,
+                    search: O.some(typed.search),
+                    askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                    waiting: now.waiting
+                  }
+                : {
+                    draft: value,
+                    asked: value,
+                    search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                    askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                    waiting: false
+                  },
+            onSome: (asked) =>
+              asked === value
+                ? {
+                    draft: typed.text,
+                    asked,
+                    search: O.some(typed.search),
+                    askedSearch: O.map(readSearchText({ text: asked, search: asked }), (text) => text.search),
+                    waiting: now.waiting
+                  }
+                : {
+                    draft: value,
+                    asked: value,
+                    search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                    askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                    waiting: false
+                  }
+          })
       })
-    },
-    clear: () => {
-      const { asked } = registry.get(shown)
-      registry.update(box, (now) => ({
-        ...now,
-        typed: O.some({ text: "", search: "", over: heldNow() }),
-        asked: O.none()
-      }))
-      if (asked !== "") ask("")
-      else registry.update(box, (now) => ({ ...now, waiting: false }))
-      field()?.focus()
+    })
+    const ask = (text: string) => {
+      registry.update(box, (now) => ({ ...now, asked: O.some(text), waiting: false }))
+      table.setGlobalFilter(text)
+    }
+    // The typed text, published once the typing has stopped for the pause.
+    const typed = Atom.map(box, (now) => now.typed)
+    const paused = Atom.debounce(typed, typingPause)
+    const field = () => document.getElementById(fieldId)
+    return {
+      shown,
+      // Let go the moment nothing mounts it: a box that has gone asks nothing and hears no key.
+      asks: Atom.setIdleTTL(
+        Atom.readable((get) => {
+          get.subscribe(paused, (after) => {
+            const now = registry.get(box)
+            // Asked after the pause, unless it was asked already (Enter, the cross), the person typed on, or the search
+            // was changed from elsewhere meanwhile.
+            if (O.isNone(after) || !now.waiting || now.typed !== after || after.value.over !== heldNow()) return
+            ask(after.value.search)
+          })
+        }),
+        0
+      ),
+      keys: Atom.setIdleTTL(
+        Atom.readable((get) => {
+          const onKey = (event: KeyboardEvent) => {
+            const slash =
+              event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingIn(event.target)
+            const command =
+              Eq.equals(readCommandKey(event.key), commandK) && (event.ctrlKey || event.metaKey) && !event.altKey
+            // A dialog open over the table keeps its keys.
+            const inDialog = event.target instanceof Element && O.isSome(closest("[role=dialog]")(event.target))
+            const node = field()
+            if ((!slash && !command) || inDialog || !(node instanceof HTMLInputElement)) return
+            event.preventDefault()
+            node.focus()
+            node.select()
+          }
+          document.addEventListener("keydown", onKey)
+          get.addFinalizer(() => document.removeEventListener("keydown", onKey))
+        }),
+        0
+      ),
+      type: (text) => {
+        const read = readSearchText({ text, search: text })
+        if (O.isNone(read)) return
+        const same = O.contains(registry.get(shown).askedSearch, read.value.search)
+        // Typing starts again from the search the table holds now: the last ask is behind it.
+        registry.update(box, (now) => ({
+          ...now,
+          typed: O.some({ ...read.value, over: heldNow() }),
+          asked: O.none(),
+          waiting: !same
+        }))
+      },
+      askNow: () => {
+        const now = registry.get(shown)
+        O.map(now.search, (search) => {
+          if (search !== now.asked) ask(search)
+          else registry.update(box, (before) => ({ ...before, waiting: false }))
+        })
+      },
+      clear: () => {
+        const { asked } = registry.get(shown)
+        registry.update(box, (now) => ({
+          ...now,
+          typed: O.some({ text: "", search: "", over: heldNow() }),
+          asked: O.none()
+        }))
+        if (asked !== "") ask("")
+        else registry.update(box, (now) => ({ ...now, waiting: false }))
+        field()?.focus()
+      }
     }
   }
-}
+)
 
 /**
  * One box's own, made when the box is first drawn from the id of its field and the table it searches: what was typed,

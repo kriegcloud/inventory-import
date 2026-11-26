@@ -261,7 +261,7 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
         A.appendAll(Str.endsWith(".css")(file) ? [] : readImports({ file, source: text }), named(file, text)),
         (specifier) => intoScratchpad(file, specifier)
       ),
-      (specifier) => BoundariesFinding.cases.IntoScratchpad.make({ where: repo.relative(repo.root, file), specifier })
+      (specifier) => BoundariesFinding.cases.IntoScratchpad.make({ where: repo.relative(file, repo.root), specifier })
     )
   /** A package.json's `imports` map (`#exp/*`) whose target is in the scratchpad. */
   const mappedInto = (file: string, text: string): ReadonlyArray<BoundariesFinding> =>
@@ -272,7 +272,7 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
           A.filter(stringsIn(block)(text), (found) => intoScratchpad(file, found.value)),
           (found) =>
             BoundariesFinding.cases.IntoScratchpad.make({
-              where: repo.relative(repo.root, file),
+              where: repo.relative(file, repo.root),
               specifier: found.value
             })
         )
@@ -361,7 +361,7 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
         ({ code, file }) =>
           repo.text(file).pipe(
             Effect.map((text) => {
-              const where = repo.relative(repo.root, file)
+              const where = repo.relative(file, repo.root)
               // A third-party package this file may import: the code takes what it and the root declare to run with,
               // a test takes what either declares for the tests too.
               const thirdParty = code ? A.appendAll(rootForCode, forCode) : A.appendAll(rootForTests, forTests)

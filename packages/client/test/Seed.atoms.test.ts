@@ -268,7 +268,7 @@ describe("what a read shows besides the answer a screen gave", () => {
       t.registry.subscribe(t.rows, (now) => {
         if (asked || now.waiting) return
         asked = true
-        t.rows.askAgain(t.registry, O.none())
+        t.rows.askAgain(O.none())(t.registry)
       })
       yield* Effect.sleep("80 millis")
       // That request left after the save's answer was given: it is the once more, and nothing ends it.

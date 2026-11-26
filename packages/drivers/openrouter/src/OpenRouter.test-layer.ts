@@ -13,7 +13,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
-import { identity } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as Stream from "effect/Stream"
 import * as HttpClient from "effect/http/HttpClient"
 import type * as HttpClientRequest from "effect/http/HttpClientRequest"
@@ -49,9 +49,18 @@ export class OpenRouterTest {
       OpenRouter,
       OpenRouter.of({
         status: Status.cases.off.make({ kind: "off", why, model }),
-        generateObject: Effect.fn("OpenRouter.generateObject")(function* () {
-          return yield* ModelUnavailable.make({ trouble: "noKey", retryable: false })
-        })
+        generateObject: dual<
+          OpenRouter["Service"]["generateObject"],
+          (
+            self: Parameters<OpenRouter["Service"]["generateObject"]>[0],
+            schema: AnswerSchema
+          ) => Effect.Effect<never, ModelUnavailable>
+        >(
+          2,
+          Effect.fn("OpenRouter.generateObject")(function* () {
+            return yield* ModelUnavailable.make({ trouble: "noKey", retryable: false })
+          })
+        )
       })
     )
 
@@ -96,20 +105,23 @@ export class OpenRouterTest {
         const models = Context.make(LanguageModel.LanguageModel, languageModel)
         return OpenRouter.of({
           status,
-          generateObject: Effect.fn("OpenRouter.generateObject")(function* <Sc extends AnswerSchema>(
-            prompt: Parameters<OpenRouter["Service"]["generateObject"]>[0],
-            schema: Sc
-          ) {
-            return yield* ask({
-              models,
-              model: options.model,
-              fallbackModels,
-              policy,
-              prompt,
-              schema,
-              withConfig: (effect) => effect
+          generateObject: dual(
+            2,
+            Effect.fn("OpenRouter.generateObject")(function* <Sc extends AnswerSchema>(
+              self: Parameters<OpenRouter["Service"]["generateObject"]>[0],
+              schema: Sc
+            ) {
+              return yield* ask({
+                models,
+                model: options.model,
+                fallbackModels,
+                policy,
+                prompt: self,
+                schema,
+                withConfig: (effect) => effect
+              })
             })
-          })
+          )
         })
       })
     )

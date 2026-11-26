@@ -46,10 +46,10 @@ describe("what is built from a read's answer", () => {
           return { categories: [...categories] }
         })
       })
-      const read = makeApiAtoms(Server).query((server) => server.facets, {
+      const read = makeApiAtoms(Server).query({
         keep: "unwatched",
         reactivityKeys: O.none()
-      })
+      })((server) => server.facets)
       const answer = answerOf(read)
       let fromAnswer = 0
       let fromRead = 0

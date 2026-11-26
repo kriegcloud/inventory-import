@@ -7,6 +7,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as Ref from "effect/Ref"
 import * as S from "effect/Schema"
@@ -56,10 +57,15 @@ export class Answerer extends Context.Service<
     /** Whether a model can be asked now. */
     readonly status: ModelAvailability
     /** One structured answer, decoded through `schema`; a model that cannot answer is an `AiUnavailable`. */
-    readonly ask: <Sc extends AnswerSchema>(
-      question: ModelQuestion,
-      schema: Sc
-    ) => Effect.Effect<ModelAnswered<Sc["Type"]>, AiUnavailable>
+    readonly ask: {
+      <Sc extends AnswerSchema>(
+        schema: Sc
+      ): (self: ModelQuestion) => Effect.Effect<ModelAnswered<Sc["Type"]>, AiUnavailable>
+      <Sc extends AnswerSchema>(
+        self: ModelQuestion,
+        schema: Sc
+      ): Effect.Effect<ModelAnswered<Sc["Type"]>, AiUnavailable>
+    }
   }
 >()("@inventory/catalog-model/Answer/Answerer.external/Answerer") {
   /** A twin with no model: `status` is off, and asking it anyway is the trouble "no key". */
@@ -67,9 +73,15 @@ export class Answerer extends Context.Service<
     Answerer,
     Answerer.of({
       status: "off",
-      ask: Effect.fnUntraced(function* () {
-        return yield* aiUnavailable({ kind: "noKey", retryable: false })
-      })
+      ask: dual<
+        Answerer["Service"]["ask"],
+        (self: ModelQuestion, schema: AnswerSchema) => Effect.Effect<never, AiUnavailable>
+      >(
+        2,
+        Effect.fnUntraced(function* () {
+          return yield* aiUnavailable({ kind: "noKey", retryable: false })
+        })
+      )
     })
   )
 
@@ -86,7 +98,10 @@ export class Answerer extends Context.Service<
       Answerer,
       Effect.gen(function* () {
         const left = yield* Ref.make(input.answers)
-        const ask = Effect.fnUntraced(function* <Sc extends AnswerSchema>(_question: ModelQuestion, schema: Sc) {
+        const scriptedAnswer = Effect.fnUntraced(function* <Sc extends AnswerSchema>(
+          _question: ModelQuestion,
+          schema: Sc
+        ) {
           const script = yield* Ref.getAndUpdate(left, (answers) => answers.slice(1))
           const next = O.fromUndefinedOr(script[0])
           if (O.isNone(next)) return yield* aiUnavailable({ kind: "down", retryable: true })
@@ -102,6 +117,9 @@ export class Answerer extends Context.Service<
           }
           return answered
         })
+        const ask: Answerer["Service"]["ask"] = dual(2, (self: ModelQuestion, schema: AnswerSchema) =>
+          scriptedAnswer(self, schema)
+        )
         return Answerer.of({ status: "on", ask })
       })
     )

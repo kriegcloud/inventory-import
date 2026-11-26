@@ -11,6 +11,7 @@
  * @packageDocumentation
  */
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as ByteSize from "effect/ByteSize"
 import * as Channel from "effect/Channel"
 import * as Effect from "effect/Effect"
@@ -77,7 +78,10 @@ interface Prepared {
 }
 
 /** Strips a BOM, honours a `sep=` line when asked, and settles the delimiter. */
-const prepare = (input: string, options: ReadOptions): Prepared => {
+const prepare: {
+  (options: ReadOptions): (input: string) => Prepared
+  (input: string, options: ReadOptions): Prepared
+} = dual(2, (input: string, options: ReadOptions): Prepared => {
   const bom = Str.startsWith("﻿")(input)
   const unmarked = bom ? Str.slice(1)(input) : input
   const sep = options.excelSepHint
@@ -114,7 +118,7 @@ const prepare = (input: string, options: ReadOptions): Prepared => {
       limits: options.limits
     })
   }
-}
+})
 
 interface Ran {
   readonly records: ReadonlyArray<RawRecord>
@@ -247,8 +251,14 @@ const WHOLE = Number.MAX_SAFE_INTEGER
 
 // ── schema plumbing ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-const issue = (error: CsvParseError, input: unknown): SchemaIssue.Issue =>
-  new SchemaIssue.InvalidValue({ message: error.message }, input)
+const issue: {
+  (actual: unknown): (error: CsvParseError) => SchemaIssue.Issue
+  (error: CsvParseError, actual: unknown): SchemaIssue.Issue
+} = dual(
+  2,
+  (error: CsvParseError, actual: unknown): SchemaIssue.Issue =>
+    new SchemaIssue.InvalidValue({ message: error.message }, actual)
+)
 
 const tableFromText = (text: string, options: CodecOptions) =>
   Effect.mapBoth(Effect.fromResult(readText(text, options.read, WHOLE, noProgress)), {

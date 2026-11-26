@@ -1,24 +1,20 @@
-import * as R from "effect/Record"
-import { identity } from "effect/Function"
-// @effect-diagnostics nodeBuiltinImport:off
 // The definition of done for moving workbook reading onto @beep/xlsx: the reader gives exactly the table (cells with
 // their type, text, displayed text and formula, row numbers, Notes, the sheet list and the sheet chosen) or exactly
 // the problem the SheetJS reader gave, for every workbook fixture and every sheet of it, and for files built by
 // hand. The SheetJS reader's results were recorded in test/fixtures/xlsx-expected/ while it was still installed;
-// the comparison reads those. XLSX_RECORD=true writes them again from the reader as it is now, which is only for a
-// change of the table's shape that is meant.
-import { writeFileSync } from "node:fs"
+// the comparison reads those. `bun apps/inventory/scripts/record-xlsx-parity.mjs` writes current-reader snapshots
+// only for an intentional change of the table's wire shape.
 import { readBytes, readText } from "./support/fixture.ts"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as Config from "effect/Config"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import { readXlsx } from "../src/internal/spreadsheet/xlsx.ts"
-import { builtCases, fixtureNames, lyingExtent, type XlsxCase } from "./xlsxCorpus.ts"
+import { lyingExtent } from "./xlsxCorpus.ts"
+import { xlsxParityCases } from "./xlsxParityCases.ts"
 
 const bytesOf = (name: string): Uint8Array => readBytes(new URL(`./fixtures/spreadsheet/${name}`, import.meta.url))
 const Json = S.fromJsonString(S.Unknown)
@@ -29,31 +25,11 @@ const plain = (result: Result.Result<SpreadsheetTable, unknown>) =>
   result.pipe(
     Result.match({
       onSuccess: (table) => Effect.map(S.encodeEffect(SpreadsheetTable)(table), (table) => ({ table })),
-      onFailure: (problem) => Effect.succeed({ problem: { ...(problem as object) } })
+      onFailure: (problem) => Effect.succeed({ problem: problem })
     })
   )
 
-/** The sheets of each fixture, as the fixtures hold them: every one is a case of its own. */
-const sheetsOf: { readonly [name: string]: ReadonlyArray<string> } = {
-  "date-1904.xlsx": ["Sheet1"],
-  "empty.xlsx": ["Sheet1"],
-  "libreoffice.xlsx": ["items"],
-  "messy.xlsx": ["Stock"],
-  "no-header.xlsx": ["Sheet1"],
-  "sheets.xlsx": ["Read me", "Empty", "Items", "Lookup", "Old prices", "Bay 2"]
-}
-
-const cases: ReadonlyArray<XlsxCase> = [
-  ...A.flatMap(fixtureNames, (name) => [
-    { name, bytes: Effect.sync(() => bytesOf(name)), sheet: O.none<string>() },
-    ...A.map(O.match(R.get(sheetsOf, name), { onNone: A.empty, onSome: identity }), (sheet) => ({
-      name: `${name} sheet ${sheet}`,
-      bytes: Effect.sync(() => bytesOf(name)),
-      sheet: O.some(sheet)
-    }))
-  ]),
-  ...builtCases(bytesOf)
-]
+const cases = xlsxParityCases(bytesOf)
 
 describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
   for (const item of cases) {
@@ -61,14 +37,6 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
       Effect.gen(function* () {
         const bytes = yield* item.bytes
         const fileName = item.name
-        const record = yield* Config.Boolean("XLSX_RECORD").pipe(Config.withDefault(false))
-        if (record) {
-          const old = yield* readXlsx({ onProgress: () => {}, fileName, bytes, sheet: item.sheet, notes: [] }).pipe(
-            Effect.result
-          )
-          const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
-          writeFileSync(expectedUrl(item.name), `${text}\n`)
-        }
         const expected = yield* S.decodeEffect(Json)(readText(expectedUrl(item.name)))
         const next = yield* readXlsx({ onProgress: () => {}, fileName, bytes, sheet: item.sheet, notes: [] }).pipe(
           Effect.result

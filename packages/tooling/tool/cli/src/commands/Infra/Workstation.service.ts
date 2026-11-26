@@ -1,3 +1,5 @@
+import { dual } from "effect/Function"
+import * as P from "effect/Predicate"
 /**
  * The owner's workstation as `infra setup` uses it: what the command says to him, the tools it reads an answer from,
  * the tools it hands his terminal to, and the questions it asks him.
@@ -59,18 +61,27 @@ export class Workstation extends Context.Service<
     /** Says one line to him. */
     readonly say: (line: string) => Effect.Effect<void>
     /** Runs a tool and reads what it says. For tools whose answer holds nothing secret. */
-    readonly ask: (command: string, args: ReadonlyArray<string>) => Effect.Effect<Answer, RepoError>
+    readonly ask: {
+      (args: ReadonlyArray<string>): (self: string) => Effect.Effect<Answer, RepoError>
+      (self: string, args: ReadonlyArray<string>): Effect.Effect<Answer, RepoError>
+    }
     /** Runs a tool with its standard output thrown away unread; what it says on failure and its exit code. */
-    readonly quiet: (
-      command: string,
-      args: ReadonlyArray<string>
-    ) => Effect.Effect<Pick<Answer, "stderr" | "code">, RepoError>
+    readonly quiet: {
+      (args: ReadonlyArray<string>): (self: string) => Effect.Effect<Pick<Answer, "stderr" | "code">, RepoError>
+      (self: string, args: ReadonlyArray<string>): Effect.Effect<Pick<Answer, "stderr" | "code">, RepoError>
+    }
     /** Hands his terminal to a tool until it ends: he sees and answers it, this process reads nothing. Its exit code. */
-    readonly hand: (command: string, args: ReadonlyArray<string>, given?: Given) => Effect.Effect<number, RepoError>
+    readonly hand: {
+      (args: ReadonlyArray<string>, given?: Given): (self: string) => Effect.Effect<number, RepoError>
+      (self: string, args: ReadonlyArray<string>, given?: Given): Effect.Effect<number, RepoError>
+    }
     /** A yes or no from him. Leaving the question is a no. */
     readonly confirm: (question: string) => Effect.Effect<boolean>
     /** One of several, picked by him. Leaving the question is a `RepoError`. */
-    readonly choose: (question: string, choices: A.NonEmptyReadonlyArray<Choice>) => Effect.Effect<string, RepoError>
+    readonly choose: {
+      (choices: A.NonEmptyReadonlyArray<Choice>): (self: string) => Effect.Effect<string, RepoError>
+      (self: string, choices: A.NonEmptyReadonlyArray<Choice>): Effect.Effect<string, RepoError>
+    }
   }
 >()($I`Workstation`) {
   /** The real workstation: the process's own terminal, and tools started from the repository's root. */
@@ -125,7 +136,17 @@ export class Workstation extends Context.Service<
           Effect.mapError(() => RepoError.make({ path: "terminal", message: `Stopped: "${question}" was left.` }))
         )
 
-      return { say, ask, quiet, hand, confirm, choose }
+      return {
+        say,
+        ask: dual(2, (self: string, args: ReadonlyArray<string>) => ask(self, args)),
+        quiet: dual(2, (self: string, args: ReadonlyArray<string>) => quiet(self, args)),
+        hand: dual(
+          (args) => P.isString(args[0]),
+          (self: string, args: ReadonlyArray<string>, given?: Given) => hand(self, args, given)
+        ),
+        confirm,
+        choose: dual(2, (self: string, choices: A.NonEmptyReadonlyArray<Choice>) => choose(self, choices))
+      }
     })
   )
 }

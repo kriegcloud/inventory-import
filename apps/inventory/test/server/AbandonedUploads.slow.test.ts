@@ -60,18 +60,18 @@ layer(Store, { timeout: "60 seconds" })("abandoned uploads on D1", (it) => {
         const store = yield* ImportStore
         yield* drawn.first.pipe(DateTime.toEpochMillis, TestClock.setTime)
         const begun = yield* Effect.flatMap(
-          store.beginUpload(dana, drawn.firstKey, drawn.head, counts),
+          store.beginUpload(drawn.head, dana, drawn.firstKey, counts),
           Effect.fromResult
         )
         yield* TestClock.adjust(drawn.gap)
         const again = yield* Effect.flatMap(
-          store.beginUpload(dana, drawn.secondKey, drawn.head, counts),
+          store.beginUpload(drawn.head, dana, drawn.secondKey, counts),
           Effect.fromResult
         )
-        const kept = yield* store.findUpload(dana, begun)
+        const kept = yield* store.findUpload(begun, dana)
         // Each run leaves nothing behind, so a key a later run draws again starts a new upload.
-        yield* store.discardUpload(dana, begun)
-        yield* store.discardUpload(dana, again)
+        yield* store.discardUpload(begun, dana)
+        yield* store.discardUpload(again, dana)
         // Kept for the hour, the hour itself included; gone a millisecond after it.
         expect(O.isSome(kept)).toBe(drawn.gap <= hour)
       }),

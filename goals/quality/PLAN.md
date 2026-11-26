@@ -64,9 +64,9 @@ A test for each law feeds it a report whose file is a `file://` address.
 
 ### 2. Loose ends
 
-- **The push rule.** `.claude/settings.json` moved `Bash(git push:*)` from `deny` to `ask` on 2026-11-25, at his
-  word; the change is in a working tree and not committed. Commit it, alone. `CLAUDE.md` says "never push unless
-  Benjamin asks in that message": it stays.
+- **The push rule.** Done 2026-11-25, at his word: `.claude/settings.json` moved `Bash(git push:*)` from `deny` to
+  `ask`, in a commit of its own on this goal's first pull request. A push from an agent now asks him each time.
+  `CLAUDE.md` says "never push unless Benjamin asks in that message": it stays.
 - **`docs:check` warns** 14 times, once for every goal and exploration: "unknown status value 'done' (expected:
   draft|stable|deprecated)", and the same for `active` and `graduated`. The validator knows the format's three
   statuses; `goals/README.md` and the explorations' README give their own (`active`, `done`, `dropped`, `graduated`).

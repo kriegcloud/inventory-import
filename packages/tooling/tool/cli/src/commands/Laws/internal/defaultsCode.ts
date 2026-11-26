@@ -210,6 +210,58 @@ const testGuard = (node: Node, ancestors: ReadonlyArray<Node>): boolean => {
   return false
 }
 
+// A component's first parameter owns its props, including reads captured by callbacks. A callback
+// parameter or local declaration that binds the same name cuts off that outer prop's scope.
+const bindingHas = (node: Node, name: string): boolean => {
+  if (named(node, name)) return true
+  if (node.type === "AssignmentPattern") return O.exists(child(node, "left"), (left) => bindingHas(left, name))
+  if (node.type === "Property") return O.exists(child(node, "value"), (value) => bindingHas(value, name))
+  if (node.type === "ObjectPattern" || node.type === "ArrayPattern" || node.type === "RestElement")
+    return A.some(children(node), (child) => bindingHas(child, name))
+  return false
+}
+const drawsJsx = (node: Node): boolean =>
+  node.type === "JSXElement" || node.type === "JSXFragment" || A.some(children(node), drawsJsx)
+const ownProp = (value: Node, ancestors: ReadonlyArray<Node>): boolean => {
+  const reference =
+    value.type === "MemberExpression" && value["computed"] !== true ? child(value, "object") : O.some(value)
+  const localName = O.flatMap(reference, (node) => (node.type === "Identifier" ? text(node, "name") : O.none()))
+  if (O.isNone(localName)) return false
+  const name = localName.value
+  for (const { index, node: scope } of A.reverse(A.map(ancestors, (node, index) => ({ index, node })))) {
+    if (
+      scope.type === "BlockStatement" &&
+      A.some(
+        children(scope),
+        (statement) =>
+          statement.type === "VariableDeclaration" &&
+          A.some(children(statement), (declaration) =>
+            O.exists(child(declaration, "id"), (binding) => bindingHas(binding, name))
+          )
+      )
+    )
+      return false
+    if (!A.contains(["ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration"], scope.type)) continue
+    const params = scope["params"]
+    if (!A.isArray(params)) continue
+    const bindings = A.filter(params, isNode)
+    if (!A.some(bindings, (binding) => bindingHas(binding, name))) continue
+    const owner = ancestors[index - 1]
+    const component = O.orElse(child(scope, "id"), () =>
+      isNode(owner) && owner.type === "VariableDeclarator" ? child(owner, "id") : O.none()
+    )
+    if (!O.exists(component, (node) => O.exists(text(node, "name"), (name) => /^[A-Z]/.test(name))) || !drawsJsx(scope))
+      return false
+    return O.exists(
+      A.head(bindings),
+      (param) =>
+        bindingHas(param, name) &&
+        (param.type === "Identifier" ? value.type === "MemberExpression" : value.type === "Identifier")
+    )
+  }
+  return false
+}
+
 const kindOf = (
   node: Node,
   screen: boolean,
@@ -284,6 +336,13 @@ const kindOf = (
       O.flatMap(child(node, "right"), (right) => {
         const one = bare(left)
         const other = bare(right)
+        if (
+          screen &&
+          (is("===") || is("!==")) &&
+          ((named(one, "undefined") && ownProp(other, ancestors)) ||
+            (named(other, "undefined") && ownProp(one, ancestors)))
+        )
+          return O.none()
         return isMissing(one) || isMissing(other) || isTypeofMissing(one, other) || isTypeofMissing(other, one)
           ? O.some<DefaultsKind>("absence")
           : O.none()

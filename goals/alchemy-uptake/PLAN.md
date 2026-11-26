@@ -16,9 +16,9 @@ closes the step with what was seen; it does not get worked around.
 | # | Step | Needs first | Status |
 | --- | --- | --- | --- |
 | 1 | CLI inspection: `docs/operations.md` with plan, drift, logs and state for a stage; the plan and its guard before each deploy in `deploy.yml` | nothing | done |
-| 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | todo |
-| 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | todo |
-| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | his re-pin adding `@alchemy.run/test` | todo |
+| 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | waits for his measurement ("What Benjamin does by hand"); nothing declared |
+| 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | built; the dump and the restore seen on a local database, never on a deployed one. A real run is his |
+| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | his re-pin adding `@alchemy.run/test` | waits for his re-pin ("What Benjamin does by hand"); nothing built |
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
 | 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
 | 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
@@ -29,9 +29,8 @@ The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 
 
 ## Current blocker
 
-Step 4 waits for `bun run alchemy:repin` with `@alchemy.run/test` added to the kept packages. Step 2 waits for a
-deployed stage to measure on. The four decisions were answered on 2026-11-26 (the exploration's DECISIONS.md,
-"Alchemy uptake: the four open decisions"), so steps 3, 6, 7 and 8 can be built.
+Nothing an agent can do is left. Steps 2 and 4 wait for Benjamin, and steps 6, 7, 8 and 3 are built and unseen on
+a real account: each is under "What Benjamin does by hand" and "What waits for a real account".
 
 ## What each proof must show
 
@@ -108,8 +107,74 @@ Nothing is sent until this is done, and nothing breaks while it is not.
 4. The next deploy's plan should read `[TelemetryTraces] create`, `[TelemetryLogs] create` and `[Website] update`,
    and the collector should then show the Worker's requests.
 
+### When a stage's rows are wanted: a dump (step 3)
+
+`bunx wrangler whoami` must show the stage's account (`bunx wrangler login` if it does not), then:
+
+```bash
+bun run beep infra export --stage staging
+```
+
+The first run settles the three unknowns under "What was proved on this machine", step 3. If it stops on the
+state record or on the table list, the sentence it prints says which, and nothing was written.
+
+### To measure the Worker's limits (step 2)
+
+Nothing is declared until this is measured: a guessed CPU limit cuts a confirm off half way.
+
+1. On a deployed stage that has the model key or not (it does not matter), follow the Worker's requests:
+
+   ```bash
+   bunx alchemy logs --stage staging --profile inventory-preview --tail
+   ```
+
+   and, for the CPU time of each request, the Worker's page in the Cloudflare dashboard (Workers, the Worker,
+   Observability, the request's "CPU time"). Whether `alchemy logs` prints CPU time is not known.
+2. Sign in once; upload `items_messy.csv` (200 rows) and confirm it; then the largest file you expect anyone to
+   load, and confirm it.
+3. Write down the CPU time of the sign-in (`POST /api/auth/sign-in/email`) and of each confirm, and the wall time
+   of one read (`GET /api/v1/items`) and one write.
+4. Tell an agent the numbers. It declares `limits.cpuMs` above the largest confirm with room, and tries
+   `placement: { mode: "smart" }` only if a read that touches D1 is slow from where you are: placement can slow
+   the routes that do not touch D1, so the same four requests are measured again with it on.
+
+### To test the stack itself (step 4)
+
+`@alchemy.run/test` is not among the packages kept in `vendor/alchemy`. Ask for the re-pin in these words, or do
+it: add `"@alchemy.run/test"` to `ROOTS` in `vendor/alchemy/repin.py`, then
+
+```bash
+bun run alchemy:repin -- e1c3e6d
+```
+
+(the commit already pinned: only the package list changes). It ends with `check:full` and commits nothing. Step 4
+then starts with its proof in `scratchpad/`: whether the harness deploys this stack on the local providers with the
+state store given, and whether any file it writes holds the sign-in secret.
+
 ## What was proved on this machine
 
+- **Step 3** (2026-11-26). **The proof changed the design.** On a copy of the local development database (5 people,
+  168 items, 600 outcomes), in `.scratch/dump-trial`: `wrangler d1 export` of the whole database answered "cannot
+  export databases with Virtual Tables (fts5)", which the app has (`itemSearch`). With every other table named
+  (`--table`, `--no-schema`) it wrote 911 statements. Loaded into a second database that had only the migrations
+  (`wrangler d1 execute --file`), the file was refused whole, "statement too long: SQLITE_TOOBIG": three rows of
+  `importChunk` are 105,666 bytes each. Without those three lines it loaded, and both databases then counted the
+  same: 5 users, 6 members, 168 items, 168 rows in the search index, 23 activities, 600 outcomes, 6 sessions; a
+  search for `bolt*` found 4 in each; `PRAGMA foreign_key_check` found nothing. The refused load had written
+  nothing (the second load met no row already there).
+  `DatabaseDump.test.ts`, with stand-ins for both tools: the tables named are the app's own; a row over the limit
+  is counted by its table and one at the limit is not; a run asks first, reads the state with the stage's profile
+  (production's for `prod`), names `item` and `user` to wrangler and leaves `staging-<time>.sql` at mode 600 in a
+  folder at mode 700, then says where it is, what a restore leaves out and how to delete it; a no starts no tool
+  and makes no folder; a bad stage name, a state record or a table list it cannot read, and a table name that is no
+  plain name each stop with nothing written; an export that fails, or that is still running after 15 minutes, leaves
+  no file. Typed at a terminal: `bun run beep infra export --stage staging --dry-run` printed the six steps and
+  ended with 0; `--stage "Bad Stage"` ended with 1. Run once without `--dry-run` and with no terminal (my mistake:
+  the rule is `--dry-run` only): it asked its question, got no answer, said "No dump was taken" and started no tool.
+  **Not seen:** anything against an account. Unknown until his first run: whether the state record reads
+  `attr.databaseName` and `attr.accountId` (read from `D1/Database.ts`, not from a record), whether wrangler prints
+  only JSON for the table list on a remote database, and whether Cloudflare's own export takes named tables on a
+  database with a full-text index as the local one does (its documents say only that such a database is refused).
 - **Step 8** (2026-11-26). `StagePlan.test.ts`: of `prod`, `pr-42`, `staging`, `test_ben` and `dev_ben` only
   staging's and production's plans name a collector (`TELEMETRY_COLLECTOR_URL`, `TELEMETRY_COLLECTOR_AUTHORIZATION`);
   " https://otel.example.test/otlp/ " with a header becomes `…/otlp/v1/traces` and `…/otlp/v1/logs` with that
@@ -241,6 +306,9 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
   `alchemy destroy` in "Remove the preview" runs without `PREVIEW_ACCESS` as it is believed to without the
   preview's password (`goals/infra/PLAN.md`, unknown 14); if it stops, the cleanup job needs both secrets.
 
+- **Step 3.** A dump of a deployed stage, and a load into a new one: the three unknowns of the command, the
+  100,000-byte limit on a deployed database, and whether a stage that already made its test accounts refuses the
+  load.
 - **Step 8.** Everything past the type-check: the two destinations made, Cloudflare's test request answered, and
   the Worker's requests at the collector. Unknown until then: the token's permission group, and whether a
   destination's name (Alchemy's physical name for it) is accepted as the Worker's `destinations` entry on the
@@ -248,6 +316,15 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
 
 ## Choices made
 
+- **wrangler takes the dump, not Alchemy's `D1/ExportDatabase.ts`** (step 3; the proof first said the command would
+  wrap that function). The function needs Alchemy's credentials built outside a stack, which nothing here could
+  run, and it has no bound; wrangler is installed, its export and its load were both tried locally, he watches it
+  and the command stops it after 15 minutes. The cost: wrangler's own login beside the Alchemy profile.
+- **Rows only, tables named** (step 3): forced by the full-text index. A whole-database export is refused.
+- **The dump keeps the rows that cannot be loaded back** (step 3) and says which tables have them: it is the record
+  of what was there. Leaving them out is a line he runs before a restore.
+- **The command reads no token and starts no login** (step 3): the account's id from the state record is all it
+  gives wrangler.
 - **The address is a variable and the header a secret** (step 8): his answer. The address shows in the workflow's
   log as any variable does; an address with a query is refused, since a key in the address would be printed there.
 - **Traces and logs both, to one collector** (step 8), at `/v1/traces` and `/v1/logs` under the address given.

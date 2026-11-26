@@ -79,9 +79,10 @@ proving the capability here before anything depends on it.
 - [x] The stack declares where Cloudflare's telemetry is sent for a stage that names a collector, and none
       otherwise; `planFor`'s test holds it. Built only after "where telemetry goes" is answered (2026-11-26:
       staging and production, from their environment; neither names one yet, so nothing is sent or seen).
-- [ ] `bun run beep infra export --stage <name> --dry-run` prints the steps of a dump; `docs/operations.md` says
-      how to take one and how to restore it into a new stage. The command itself is his to run.
-- [ ] PLAN lists what was proved on this machine, what waits for a real account, and what Benjamin does by hand.
+- [x] `bun run beep infra export --stage <name> --dry-run` prints the steps of a dump; `docs/operations.md` says
+      how to take one and how to restore it into a new stage. The command itself is his to run. (2026-11-26: the
+      dry run typed and read; the dump and the restore seen on a local database only.)
+- [x] PLAN lists what was proved on this machine, what waits for a real account, and what Benjamin does by hand.
 
 ## Decisions
 

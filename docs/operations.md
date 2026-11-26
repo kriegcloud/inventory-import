@@ -177,6 +177,58 @@ changing the account, or the reverse. They are recovery tools, not ways of looki
 
 ## A dump of a stage's database
 
-Not built yet: step 3 of [the Alchemy uptake goal](../goals/alchemy-uptake/PLAN.md), which waits for Benjamin's
-answer on where a dump is kept, for how long, and who may take one. Until then a plan that would lose the database
-is deployed by nobody.
+A dump is the rows of a stage's tables as they were at one moment, in a file on Benjamin's workstation. It is not
+a backup: nothing takes one on a schedule, and nothing keeps one. It is taken before a deploy whose plan would
+lose the database, or to move a stage's rows into a new one. Only he takes one (decision of 2026-11-26): the file
+holds every person's email and password hash.
+
+```bash
+bun run beep infra export --stage staging
+```
+
+It asks first, reads the database's name and account from the state store, lists the tables, and hands the
+terminal to `wrangler d1 export` for at most 15 minutes. `wrangler` uses its own login, so `bunx wrangler whoami`
+must show the stage's account first. The file is `~/inventory-dumps/<stage>-<time>.sql`, readable by him alone in
+a folder readable by him alone; an export that fails or is stopped leaves no file. Nothing is uploaded anywhere.
+The command ends by naming the file and how to delete it: delete it when it has served.
+`--dry-run` prints the steps and starts nothing, and is the only way an agent runs it.
+
+**What is in it.** One `INSERT` for each row of every table that holds the app's rows, and no schema. Left out are
+the search index (`itemSearch` and the tables SQLite keeps for it), SQLite's own tables and the migrations'
+ledger: D1 refuses to export a database that has a full-text index unless the tables are named, and a new
+database has all three from its own migrations.
+
+### Loading a dump into a new stage
+
+1. Deploy the new stage. Its database then has every table, the search index, the triggers that fill it and the
+   ledger, and no rows of the app's. Load before anyone signs in to it.
+2. Read the new database's name and account (`attr.databaseName`, `attr.accountId`):
+
+   ```bash
+   bunx alchemy state read inventory/<new stage>/Database --profile <profile>
+   ```
+
+3. Load the file:
+
+   ```bash
+   CLOUDFLARE_ACCOUNT_ID=<account> bunx wrangler d1 execute <database> --remote --file ~/inventory-dumps/<file>.sql
+   ```
+
+4. Open the new stage, sign in, and compare the Items page's count and one search with the old stage's.
+
+Three things to know, each seen on a local database (PLAN, step 3) and none on a deployed one:
+
+- **A row longer than 100,000 bytes is not loaded, and it stops the whole file** ("statement too long"), with
+  nothing written. The dump command names the tables that have such rows; in the app's data they are the pieces of
+  an uploaded file (`importChunk`), which only an import still open needs. Take those lines out and load again:
+
+  ```bash
+  grep -v '^INSERT INTO "importChunk"' ~/inventory-dumps/<file>.sql > ~/inventory-dumps/<file>-without-chunks.sql
+  ```
+
+- **The search index fills itself**: each item's `INSERT` runs the trigger that indexes it.
+- **A row that is already there stops the load** with nothing written. A stage that made its test accounts before
+  the load may hold rows with the same ids: not tried.
+
+People's sessions are in the dump and are of no use in a new stage, whose sign-in secret is its own: everyone
+signs in again.

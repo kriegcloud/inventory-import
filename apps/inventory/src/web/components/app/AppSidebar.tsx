@@ -7,6 +7,7 @@ import { pipe } from "effect/Function"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import * as S from "effect/Schema"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as Str from "effect/String"
 import {
   CheckIcon,
@@ -65,15 +66,23 @@ export const appPages: ReadonlyArray<AppPage> = [
   { path: "/people", label: "People", icon: UsersIcon }
 ]
 
-const initials = (name: string): string =>
-  pipe(
-    Str.split(name, /\s+/),
-    A.map((word) => Str.at(word, 0)),
-    A.getSomes,
-    A.join(""),
-    Str.takeLeft(2),
-    Str.toUpperCase
-  )
+/** The initials displayed for a name: the original first-letter, two-character and uppercase rules. */
+const Initials = S.String.pipe(
+  S.decodeTo(S.String, {
+    decode: SchemaGetter.transform((name: string) =>
+      pipe(
+        Str.split(name, /\s+/),
+        A.map((word) => Str.at(word, 0)),
+        A.getSomes,
+        A.join(""),
+        Str.takeLeft(2)
+      )
+    ),
+    encode: SchemaGetter.passthrough()
+  }),
+  S.decodeTo(S.String, { decode: SchemaGetter.toUpperCase(), encode: SchemaGetter.passthrough() }),
+  S.annotate({ description: "The two initials shown in the signed-in person's avatar" })
+)
 
 const roleWords = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
@@ -230,7 +239,9 @@ function UserMenu() {
   const who = (
     <>
       <Avatar>
-        <AvatarFallback>{initials(actor.name)}</AvatarFallback>
+        <AvatarFallback>
+          {O.match(S.decodeOption(Initials)(actor.name), { onNone: () => null, onSome: (initials) => initials })}
+        </AvatarFallback>
       </Avatar>
       <span className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{actor.name}</span>

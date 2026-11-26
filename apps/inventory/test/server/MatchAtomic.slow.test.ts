@@ -20,7 +20,6 @@ import * as O from "effect/Option"
 import { noComparison, noItemsRead } from "@inventory/catalog-model/Rematch"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import { ImportId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
@@ -189,7 +188,7 @@ const staged = Effect.gen(function* () {
     as("mem_marcus")
   )
   const table = yield* client.imports.table({ params: { id: view.id } }).pipe(as("mem_dana"))
-  const otherOption = A.findFirst(table.columns, (column) => Str.includes("reorder")(Str.toLowerCase(column.label)))
+  const otherOption = A.findFirst(table.columns, (column) => column.label === "Reorder Pt")
   assertTrue(O.isSome(otherOption), "expected other to be present")
   const other = otherOption.value
   const store = yield* ImportStore

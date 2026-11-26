@@ -8,7 +8,6 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
@@ -30,9 +29,7 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
         const params = { id: staged.id }
         // Dana matches the unit cost to another column (the reorder point's): the draft moves on.
         const table = yield* client.imports.table({ params }).pipe(dana)
-        const otherOption = A.findFirst(table.columns, (column) =>
-          Str.includes("reorder")(Str.toLowerCase(column.label))
-        )
+        const otherOption = A.findFirst(table.columns, (column) => column.label === "Reorder Pt")
         assertTrue(O.isSome(otherOption), "expected other to be present")
         const other = otherOption.value
         const matched = yield* client.imports

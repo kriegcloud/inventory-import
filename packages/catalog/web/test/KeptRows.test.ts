@@ -1,9 +1,10 @@
+import { RowId } from "@inventory/catalog-contract/Ids"
 import { identity } from "effect/Function"
 // The person's waiting rows as this browser keeps them, wired: kept under the member who decided them, whoever is
 // signed in when the server answers; read for nobody else; erased with a removed import; named, then dropped, when
 // the import turns out to be closed; and the question before the page is left, asked wherever the person is while
 // rows wait to be sent, never for rows that are only to be named, never once the app itself leaves.
-import { assertDefined } from "@effect/vitest/utils"
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
@@ -24,7 +25,6 @@ import { decisionFromFlags, type SaveRequest } from "@inventory/catalog-contract
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { DraftBusy, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
-import * as S from "effect/Schema"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { DraftEvent } from "../src/Draft.machine.ts"
 import { askBeforeLeaving, importView, importViewShown, removeImport } from "../src/Imports.atoms.ts"
@@ -242,8 +242,16 @@ const page = (
       return registry.mount(followDraft(id))
     },
     decide: (rowId: string) => registry.set(draftEvents(id), DraftEvent.Decided({ changes: { [rowId]: O.some(out) } })),
-    answer: (n: number, revision: number) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed: true, notApplied: [], decidedSince: [] })
+    answer: (n: number, revision: number) => {
+      const requiredEntry1 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry1), "expected saves[n]")
+      return Deferred.succeed(requiredEntry1.value.answer, {
+        revision,
+        changed: true,
+        notApplied: [],
+        decidedSince: []
+      })
+    }
   }
 }
 
@@ -457,11 +465,30 @@ describe("rows that wait after a save refused for nobody signed in (G3)", () => 
 })
 
 /** Two take-backs of one match, as the view carries them, read through the contract's schema. */
-// @effect-diagnostics-next-line schemaSync:off
-const taken = S.decodeSync(S.Array(MatchTakeBack))([
-  { revision: 5, by: "Marcus", field: "sku", kind: "stored", count: 2, rows: ["row-4", "row-9"] },
-  { revision: 5, by: "Marcus", field: "sku", kind: "twin", count: 1, rows: ["row-10"] }
-])
+const taken = [
+  MatchTakeBack.make({
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none(),
+    revision: 5,
+    by: "Marcus",
+    field: "sku",
+    kind: "stored",
+    count: 2,
+    rows: [RowId.make("row-4"), RowId.make("row-9")]
+  }),
+  MatchTakeBack.make({
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none(),
+    revision: 5,
+    by: "Marcus",
+    field: "sku",
+    kind: "twin",
+    count: 1,
+    rows: [RowId.make("row-10")]
+  })
+]
 
 describe("what a match took back from saved decisions", () => {
   it.live(
@@ -476,7 +503,9 @@ describe("what a match took back from saved decisions", () => {
         t.registry.mount(takeBacksNamed(id))
         yield* settle
         expect(t.registry.get(takeBacksNamed(id))).toEqual(taken)
-        t.registry.set(dismissTakeBack(id), taken[0]!)
+        const requiredEntry2 = A.get(taken, 0)
+        assertTrue(O.isSome(requiredEntry2), "expected taken[0]")
+        t.registry.set(dismissTakeBack(id), requiredEntry2.value)
         expect(t.registry.get(takeBacksNamed(id))).toEqual([taken[1]])
         // The page loaded again: still dismissed for Dana; named to Lee, who has not dismissed it.
         const again = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
@@ -512,14 +541,18 @@ describe("rows on hold and the values seen, through the browser's storage", () =
         // Row 3's save is refused; row 2's then fails on the network.
         first.decide("row-3")
         yield* settle
+        const requiredEntry3 = A.get(first.saves, 0)
+        assertTrue(O.isSome(requiredEntry3), "expected first.saves[0]")
         yield* Deferred.fail(
-          first.saves[0]!.answer,
+          requiredEntry3.value.answer,
           ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make("org_prairie") })
         )
         yield* settle
         first.decide("row-2")
         yield* settle
-        yield* Deferred.fail(first.saves[1]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry4 = A.get(first.saves, 1)
+        assertTrue(O.isSome(requiredEntry4), "expected first.saves[1]")
+        yield* Deferred.fail(requiredEntry4.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         const refused = R.get(first.registry.get(reviewLines(id)), "row-3")
         expect(O.isSome(refused)).toBe(true)
@@ -566,7 +599,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         // Row 2 left out; its save fails on the server: it waits, at revision 4.
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry5 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry5), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry5.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // To the Match step: the Review step leaves; the import page keeps the view of revision 4.
         leave()
@@ -579,7 +614,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         expect(A.map(t.saves, (save) => save.payload.over)).toEqual([{}, { "row-2": [O.none(), O.some(out)] }])
         // The server holds Lee's decision, which is none of those: it writes nothing, and says so.
-        yield* Deferred.succeed(t.saves[1]!.answer, {
+        const requiredEntry6 = A.get(t.saves, 1)
+        assertTrue(O.isSome(requiredEntry6), "expected t.saves[1]")
+        yield* Deferred.succeed(requiredEntry6.value.answer, {
           revision: 5,
           changed: false,
           notApplied: [],
@@ -610,7 +647,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry7 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry7), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry7.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // Marcus signs in on this page, and presses the confirm on a screen that still shows Dana's row 2 left out.
         t.registry.set(t.who, marcus)
@@ -650,13 +689,17 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry8 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry8), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry8.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         t.registry.set(t.who, marcus)
         yield* settle
         t.decide("row-3")
         yield* settle
-        const last = t.saves[A.length(t.saves) - 1]!.payload
+        const requiredEntry9 = A.get(t.saves, A.length(t.saves) - 1)
+        assertTrue(O.isSome(requiredEntry9), "expected t.saves[A.length(t.saves) - 1]")
+        const last = requiredEntry9.value.payload
         expect([R.keys(last.set), last.madeOn]).toEqual([["row-3"], { "row-3": 4 }])
       })
   )
@@ -698,7 +741,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       yield* settle
       t.decide("row-2")
       yield* settle
-      yield* Deferred.fail(t.saves[0]!.answer, DraftBusy.make({ reason: "The import kept changing." }))
+      const requiredEntry10 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry10), "expected t.saves[0]")
+      yield* Deferred.fail(requiredEntry10.value.answer, DraftBusy.make({ reason: "The import kept changing." }))
       yield* settle
       expect([t.registry.get(reviewLines(id)), t.registry.get(rowsNotSaved(id))]).toEqual([{}, 1])
     })
@@ -721,7 +766,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry11 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry11), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry11.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // Marcus signs in on this page; the import read for him finds Dana's row waiting.
         server.view = O.some(viewAt({ id, revision: 4 }))
@@ -744,7 +791,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       const leave = t.open(view)
       t.registry.mount(takeBacksNamed(id))
       yield* settle
-      t.registry.set(dismissTakeBack(id), taken[0]!)
+      const requiredEntry12 = A.get(taken, 0)
+      assertTrue(O.isSome(requiredEntry12), "expected taken[0]")
+      t.registry.set(dismissTakeBack(id), requiredEntry12.value)
       const key = progressKey({ organizationId: "org_prairie", memberId: "mem_dana", screen: `import:${id}:takenBack` })
       yield* settle
       expect(R.has(browser.kept, key)).toBe(true)
@@ -774,7 +823,9 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         before.decide("row-5")
         yield* settle
-        yield* Deferred.fail(before.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry13 = A.get(before.saves, 0)
+        assertTrue(O.isSome(requiredEntry13), "expected before.saves[0]")
+        yield* Deferred.fail(requiredEntry13.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // The page is loaded again: Dana opens the Review step, with nothing of hers pending.
         const t = page(id, dana, server, O.none())
@@ -963,7 +1014,9 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         reloaded.registry.mount(notices)
         yield* settle
         expect([says(other), says(reloaded)]).toEqual([[], said])
-        reloaded.registry.set(dismissNotice, reloaded.registry.get(notices)[0]!)
+        const requiredEntry14 = A.get(reloaded.registry.get(notices), 0)
+        assertTrue(O.isSome(requiredEntry14), "expected reloaded.registry.get(notices)[0]")
+        reloaded.registry.set(dismissNotice, requiredEntry14.value)
         const after = page(id, dana, gone, O.none())
         after.registry.mount(notices)
         yield* settle
@@ -1017,14 +1070,18 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         // Row 3 is refused (on hold), row 2 waits after a failed save.
         t.decide("row-3")
         yield* settle
+        const requiredEntry15 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry15), "expected t.saves[0]")
         yield* Deferred.fail(
-          t.saves[0]!.answer,
+          requiredEntry15.value.answer,
           ImportNotFound.make({ reason: "No.", organizationId: OrganizationId.make("org_prairie") })
         )
         yield* settle
         t.decide("row-2")
         yield* settle
-        yield* Deferred.fail(t.saves[1]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry16 = A.get(t.saves, 1)
+        assertTrue(O.isSome(requiredEntry16), "expected t.saves[1]")
+        yield* Deferred.fail(requiredEntry16.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         expect([leaving(), says(t)]).toEqual([true, []])
         const asked = t.asked.times

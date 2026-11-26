@@ -103,7 +103,7 @@ describe("items_messy.csv", () => {
         assertTrue(O.isSome(expectedSome4), "expected O.flatMap(A.head(rowOf(result, n).problems), (p) => p.proposal)")
         return expectedSome4.value
       }
-      expect(head(49)).toMatchObject({ kind: "missing", field: "sku", tone: "blocker", proposal: O.none() })
+      expect(head(49)).toMatchObject({ kind: "missing", field: O.some("sku"), tone: "blocker", proposal: O.none() })
       expect(head(25)?.message).toBe('Unit cost "-2.44" is below zero. A cost is 0 or more.')
       expect(head(91)?.message).toContain("Dimensions has no height")
       // A decimal comma and a thousands comma are proposals with their evidence, never applied.
@@ -295,7 +295,7 @@ describe("a second import", () => {
         const waits = reviewOf(table, { "row-2": decision }, other)
         expect([rowOf(waits, 2).status, rowOf(waits, 2).problems[0]?.field, waits.counts.already]).toEqual([
           "needs",
-          "quantityOnHand",
+          O.some("quantityOnHand"),
           24
         ])
       }
@@ -320,7 +320,7 @@ describe("a second import", () => {
         expect([rowOf(result, 2).values.sku, rowOf(result, 2).status, rowOf(result, 2).problems[0]?.field]).toEqual([
           "SHH-9574",
           "needs",
-          "unitCost"
+          O.some("unitCost")
         ])
       }
       expect(acceptedSku.counts).toEqual(typedSku.counts)

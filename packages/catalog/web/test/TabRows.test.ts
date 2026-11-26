@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 import { identity } from "effect/Function"
 // Two tabs of one person on one import (Benjamin, 2026-11-20, "Each tab keeps its own"): each keeps and sends only
 // its own waiting rows, a tab opened later takes up rows only from a tab that is gone (closed or crashed), never from
@@ -34,7 +35,8 @@ const browser = vi.hoisted(() => {
   // The requests that wait for a lock, oldest first: each is tried again whenever one is let go.
   const queued: Array<{ readonly name: string; readonly tryNow: () => boolean }> = []
   // Set by a test: the next answer of what is held is worked out when it is asked and given when the test says.
-  const gate: { answer: Promise<unknown> | undefined } = { answer: undefined }
+  const queryNow = (locks: ReadonlyArray<{ readonly name: string }>) => Promise.resolve({ held: locks })
+  const gate = { answer: queryNow }
   const listeners: Record<string, Array<(event: unknown) => void>> = {}
   const server: { revision: number; decisions: Record<string, unknown>; removed: boolean } = {
     revision: 4,
@@ -130,13 +132,12 @@ const browser = vi.hoisted(() => {
         query: () => {
           const locks: Array<{ readonly name: string }> = []
           for (const lock of held) locks.push({ name: lock.name })
-          const wait = gate.answer
-          return wait === undefined ? Promise.resolve({ held: locks }) : wait.then(() => ({ held: locks }))
+          return gate.answer(locks)
         }
       }
     }
   })
-  return { kept, session, held, listeners, server, closed, gate }
+  return { kept, session, held, listeners, server, closed, gate, queryNow }
 })
 
 const settle = Effect.sleep("20 millis")
@@ -240,7 +241,11 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
           })),
         /** What this tab says of unsaved decisions, as the person reads it; and the first of it dismissed. */
         says: () => A.map(registry.get(noticed.notices), (one) => noticeWords(one).text),
-        dismiss: () => registry.set(noticed.dismissNotice, registry.get(noticed.notices)[0]!),
+        dismiss: () => {
+          const requiredEntry1 = A.get(registry.get(noticed.notices), 0)
+          assertTrue(O.isSome(requiredEntry1), "expected registry.get(noticed.notices)[0]")
+          return registry.set(noticed.dismissNotice, requiredEntry1.value)
+        },
         /** The import is read again. */
         /** The import page is open on this import's address, with no step drawn yet. */
         openAddress: (id: ImportId) => {
@@ -654,14 +659,15 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
         yield* settle
         // The taker has asked the browser which locks are held (the discarded tab's is not), and has not read yet.
         const answer = Deferred.makeUnsafe<void>()
-        browser.gate.answer = held(answer)
+        const wait = held(answer)
+        browser.gate.answer = (locks) => wait.then(() => ({ held: locks }))
         taker.open(id)
         yield* settle
         // The discarded tab loads at that moment, and its step is drawn.
         const back = yield* tab(session, dana)
         back.open(id)
         yield* settle
-        browser.gate.answer = undefined
+        browser.gate.answer = browser.queryNow
         yield* Deferred.succeed(answer, undefined)
         yield* Effect.sleep("700 millis")
         const all = [...taker.saves, ...back.saves]

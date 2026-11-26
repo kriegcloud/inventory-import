@@ -1,3 +1,4 @@
+import { ItemId } from "@inventory/catalog-contract/Ids"
 // One item's save, after the row that pressed it has left the screen. A save runs to its end whatever happens to its
 // row, so two things must outlive the row: that a save of the item is out (or the row that comes back offers Edit on
 // the revision the first save is about to move, and the second save is refused as "changed by someone else": their
@@ -11,14 +12,15 @@ import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as S from "effect/Schema"
+import * as BigDecimal from "effect/BigDecimal"
+import * as DateTime from "effect/DateTime"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
-import { type ItemEdit, StoredItem } from "@inventory/catalog-contract/Item"
+import { type ItemEdit, StoredItem, active } from "@inventory/catalog-contract/Item"
 import { ItemChanged } from "@inventory/catalog-contract/Catalog"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import type { ItemForm } from "@inventory/catalog-model/ItemEdit"
@@ -67,24 +69,23 @@ vi.mock("sonner", () => ({
 
 // Hex bolt M6 as the API sends it, read through its own schema: a refusal that carries the item (`ItemChanged`) is
 // built with its constructor, which checks the item it is given.
-// @effect-diagnostics-next-line schemaSync:off
-const item = S.decodeSync(StoredItem)({
-  id: "5b0f8a3e-2c41-4c7e-9a55-0f3c1d2e4b6a",
+const item = StoredItem.make({
+  id: ItemId.make("5b0f8a3e-2c41-4c7e-9a55-0f3c1d2e4b6a"),
   sku: "HXB-0616",
   name: "Hex bolt M6",
-  description: null,
+  description: O.none(),
   category: "components",
   uom: "BX",
-  unitCost: "0.19",
+  unitCost: BigDecimal.make(19n, 2),
   quantityOnHand: 500,
-  reorderPoint: null,
-  stocking: { kind: "active" },
+  reorderPoint: O.none(),
+  stocking: active,
   lotTracked: false,
   tags: [],
-  firstReceivedOn: null,
-  dimensions: null,
+  firstReceivedOn: O.none(),
+  dimensions: O.none(),
   vendors: [],
-  createdAt: "2026-11-19T05:06:15.445Z",
+  createdAt: DateTime.makeUnsafe("2026-11-19T05:06:15.445Z"),
   createdBy: "Dana Whitfield",
   revision: 3
 })

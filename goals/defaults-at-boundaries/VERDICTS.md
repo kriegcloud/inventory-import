@@ -2996,3 +2996,202 @@ condition and the reproduced unchanged-model test failure.
 
 Needs the person: nothing. The remaining work is implementation and measurement follow-up; no new product default
 or exemption is requested.
+
+## Catalog web final boundary pass: field verdicts before implementation (2026-11-26)
+
+This pass owns catalog web and the forced owned-contract/model/host callers, the named app test helper and
+non-null assertions in the named app/foundation files. PLAN, baselines, ledgers, locks, exemptions and vendored
+files are unchanged. Existing product behavior, screen words and encoded/stored bytes are the acceptance boundary.
+
+| Field / owner | Verdict | Intended representation |
+| --- | --- | --- |
+| Review problems' field, ask and note; matching selection and owned snapshots | Missing is meaningful | Decode owned nullable/optional entry fields to Option once, then carry that Option to callers. Preserve the original encoded form. |
+| Independent fold rows, actors, touches, answer counters and undo history | Construction owns starts; absence remains a real state | State named zero/empty starts at construction; carry historical absence through whole cases without fabricated provenance. Preserve every oracle assertion. |
+| Generated draft-world commands | Generated absence is valid | Fold whole command/state cases; do not narrow a valid generated missing state as though required. Preserve generation and failure-reporting logic. |
+| Required test rows, indices and fixture schema values | Required evidence | Narrow with @effect/vitest/utils assertions; align fixture construction with its schema rather than suppress synchronous-codec diagnostics. |
+| Storage/lock stand-ins | Browser contract | Keep null-on-missing storage and exclusive lock semantics; remove sites only through complete modeled state, never a renamed fallback. |
+| Own optional React props and third-party/browser fields | Existing optional edge | Keep props optional and enumerate every retained occurrence. DOM absence belongs in the existing internal/browser entry. |
+| Page count and optional import bar | Owned derived presentation state | Express complete render/table states where possible without changing words or behavior. |
+
+No new product fallback or exemption is authorized. Any site whose clearing cannot be justified within these
+constraints stays visible in the final exhaustive remaining-site table. Timing and verification receipts follow.
+
+### Final catalog boundary pass: implementation and remaining places
+
+The source producer now owns Problem.field/ask/note and Wrong.ask as Options, with no nullable wrapper at their
+consumers. These are internally constructed review rule values, not stored/HTTP payloads: no wire codec or encoded
+byte changes. Matching carries its selected column Option. The upstream UI shell slot remains nullable: changing its owner is outside this lane. ImportPage therefore retains
+its original nullable check, individually enumerated below. ItemsPage carries its
+optional header line through drawing and reads URL search through the existing browser entry. Its page count
+fallback remains explicit after rejecting a candidate which only grouped zero inside a larger onNone object.
+
+All 36 test non-null assertions and both draft-world history assertions were replaced by required-value narrowing.
+The app bootstrap root now narrows the actual DOM result and throws a missing-root invariant error when absent;
+normal mounting is unchanged. An OXC AST scan finds zero non-null assertions across catalog web, the named app
+bootstrap/helper and owned foundation CSV/XLSX/vocabulary files. No cast or unsafe unwrap was added.
+
+Four synchronous fixture decodes and all four schemaSync:off comments were removed: ItemEditor makes the canonical
+StoredItem with ItemId, BigDecimal, DateTime and Options; DraftPicks, KeptRows and TakenBackWords make MatchTakeBack
+with branded RowId and explicit absent fields. TabRows constructs ready query behavior and substitutes its existing
+delayed Promise behavior without changing the lock snapshot timing. The parity loop matches empty/nonempty groups
+and retains its 60-round bound, press order and every agreement assertion. Three ItemImport expected Problem.field
+values now assert the same sku/quantityOnHand/unitCost inside O.some.
+
+The independent fold initializes all eleven refusal-category counts at zero, both actors with empty histories,
+every staged row's top/undo comparison at zero, and every review row's touch at zero. Required historical levels
+and answered-redo touches narrow before reading. The first focused run exposed a missing eleventh counter category
+(UndoGroup ReviewMovedOn); that implementation omission was corrected. The generated fold picks now run their whole
+None/Some cases with identical seed/domain. Draft-world held/pending/answered workflows likewise use whole cases;
+no enabled-command generation, shortest-failure logic or existing expectation changed.
+
+The following table is exhaustive for the **22 non-exempt counted places** in catalog web and the named app helper:
+18 fallbacks and four absences. Counts are current scanner occurrences; none is waived or newly exempt. This pass
+therefore remains incomplete for the requested zero-test condition.
+
+| File | Kind | Count and every line | Example | Why retained |
+| --- | --- | --- | --- | --- |
+| `apps/inventory/test/web/support/page.ts` | fallback | 1: 22 | `of[key] ?? null` | The browser Storage stand-in returns null for an arbitrary absent key. |
+| `packages/catalog/web/src/ImportPage.screen.tsx` | absence | 1: 238 | `barSlot !== null` | Upstream UI owns this nullable DOM slot. Scope excludes reshaping UI ownership; the original check remains. |
+| `packages/catalog/web/src/ItemsPage.screen.tsx` | fallback | 1: 715 | `O.getOrElse` | The vendored table hook still receives zero pages before its first data read; grouping zero inside an onNone object was rejected as hiding the same fallback. |
+| `packages/catalog/web/test/Conversation.test.ts` | fallback | 1: 48 | `kept[key] ?? null` | Storage.getItem returns null for an arbitrary absent key. Replacing this with literal onNone:null would rename the question. |
+| `packages/catalog/web/test/KeptRows.test.ts` | fallback | 2: 59, 81 | `kept[key] ?? null` | Shared/session Storage must answer null for an arbitrary absent key; no finite owned key domain exists. |
+| `packages/catalog/web/test/ReviewHistory.test.ts` | fallback | 2: 44, 53 | `kept[key] ?? null` | Shared/session Storage must answer null for an arbitrary absent key; no finite owned key domain exists. |
+| `packages/catalog/web/test/ReviewModelFold.fold.test.ts` | fallback | 5: 122, 371, 621, 798, 1388 | `O.getOrElse` | An absent decision before a patch; missing decision text as NO_DECISION; two absent undo histories fabricate change zero/empty writer; redo with no returned step retains its mirror. A complete explicit independent-oracle state contract remains unbuilt. |
+| `packages/catalog/web/test/SessionAsked.test.ts` | fallback | 1: 36 | `of[key] ?? null` | Storage.getItem returns null for an arbitrary absent key. |
+| `packages/catalog/web/test/TabRows.test.ts` | fallback | 3: 49, 98, 220 | `of()[key] ?? null` | Storage null-on-missing; the third-party lock default exclusive; pending tab identity is still observed as an empty string by an unchanged assertion. |
+| `packages/catalog/web/test/TableAssistant.test.ts` | fallback | 1: 23 | `kept[key] ?? null` | Storage.getItem returns null for an arbitrary absent key. |
+| `packages/catalog/web/test/support/draftWorld.ts` | absence | 3: 1136, 1672, 1675 | `O.isSome(world.draft.landed)` | Match retains an absent writer as somebody else. The answer bookkeeping still branches on a landed draft. The two generation exits stop on absent enabled command or thrown command so broken can preserve the minimized failure; their generation and assertion logic is unchanged. |
+| `packages/catalog/web/test/support/draftWorld.ts` | fallback | 1: 1062 | `O.getOrElse` | Match retains an absent writer as somebody else. The answer bookkeeping still branches on a landed draft. The two generation exits stop on absent enabled command or thrown command so broken can preserve the minimized failure; their generation and assertion logic is unchanged. |
+
+The five reviewed-cell display files retain their 15 cleanup occurrences under existing exemptions: CellForms 5,
+WhyFlagged 2, cellDrafts 1, format 1 and itemText 6. No new exemption was requested or written. The six existing
+binary-read nodeBuiltinImport:off comments remain: csvDifferential:1, readSpreadsheet:2, xlsxParity:3,
+support/files:5, reviewHonesty:6 and reviewParity:9, all relative to packages/catalog/web/test.
+
+Every remaining nullable wrapper in source is an actual foreign/browser read: Draft.atoms LockManagerSnapshot.held;
+ItemsPage TanStack column.id and getColumn; cellDrafts RegExp match/capture; itemText RegExp capture;
+spreadsheet/read RegExp match/capture; and internal/browser querySelector, DOM ref read, dataset, URL parameter,
+drop transfer/files and nullable React ref entry. Own optional React SheetChooser.disabled remains optional; TableAssistant globalFilter and ItemsPage min/max are
+third-party table interface fields. No own optional React prop was made required.
+
+### Final catalog boundary pass: verification receipts
+
+Before: the complete web fast suite passed 401 tests in 38 files, no retry; Vitest 153.33 seconds, elapsed 153.67
+seconds (`/tmp/catalog-last-before.log`). Full catalog/model tests passed 274 tests in 21 files; Vitest 57.23 seconds,
+elapsed 57.53 seconds (`/tmp/catalog-last-model.log`). Source focused parity/rules passed 13/2 and Review/Suggest
+passed 66/3. Final suite/check/fold results follow below after completion.
+
+Effect APIs were inspected in the installed 4.1.5 source: Option.match/map/exists/contains/fromNullOr/fromUndefinedOr,
+Record.get/fromEntries/set, Array.get/match/headNonEmpty and the assertion signature. A mistaken Option.forall call
+was caught by type checking and replaced before final validation. No synchronous codec, unsafe unwrap, fallback-only
+decode, function schema, new diagnostics suppression or conversion to undefined was introduced.
+
+PLAN, every baseline/ledger/lock, exemptions, vendor files and stored data are unchanged. No .dev.vars was read,
+UPDATE_VERIFY_LOCK was not set, and no commit or push was made. No browser workflow was run; not seen on screen.
+The 155-item real Confirm/storage acceptance and a real browser worker crossing were not re-established here.
+
+Needs the person: nothing. The remaining counted places need implementation follow-up, not a new product decision.
+
+### Final catalog boundary pass: completed validation and limits
+
+| Final command | Result | Receipt |
+| --- | --- | --- |
+| Complete catalog web fast suite | 401 tests / 38 files; no retry; Vitest 173.72 s, elapsed 174.23 s | `/tmp/catalog-last-after.log` |
+| Independent ReviewModelFold project | 17 tests / 1 file; no retry; Vitest 178.04 s, elapsed 178.33 s | `/tmp/catalog-last-fold-final.log` |
+| Complete catalog/model tests | 274 tests / 21 files; Vitest 57.23 s, elapsed 57.53 s | `/tmp/catalog-last-model.log` |
+| Explicit changed-file defaults law | 22 TS/TSX files; 13 fallback, 3 absence, zero unwrap/normalise; four files decrease | `/tmp/catalog-last-law-final.log` |
+| Complete catalog web plus named app helper law | 91 files; 18 fallback, 4 absence; four files decrease | `/tmp/catalog-last-all-law.log` |
+| Full check on final code | 102 successful / 105 tasks, 80 cached, 11.732 s; three failures are required ledger decreases below | `/tmp/catalog-last-check-final.log` |
+
+The full check is **not green**. diagnostics:check requires removal of the four now-unused schemaSync entries
+(DraftPicks, ItemEditor, KeptRows, TakenBackWords). promises:check requires TabRows 16 to 15; readonly:check requires
+TabRows 5 to 4. The instruction forbids editing ledgers, so these decreases are reported and left unchanged. No
+new-rule failure remains. The first full check also failed D1 at a read-only home Wrangler registry; setting
+XDG_CONFIG_HOME under the permitted temporary runtime fixed it, and the final run passed D1 12 tests / 3 files.
+The final app check includes the bootstrap root change. Full check's catalog web task also passed 401/38 with no
+retry, its model task 274/21 and five proof tasks pass. No generated Draft.machine failure occurred on either full
+fast run, so the permitted rare-failure retry was not used.
+
+Before/after fast suite elapsed time is 153.67 to 174.23 seconds (+13.38%). The after suite ran concurrently with
+full check, full model tests and the fold project; these are recorded wall times, not a controlled hot-path
+benchmark or evidence of no regression. No assertion, expected outcome, generated domain or existing story was
+weakened to obtain the green test suites.
+
+Formatting, docs validation and git diff whitespace validation pass. The independent non-null gate was:
+`bunx --no-install oxlint --disable-nested-config --allow all --deny typescript/no-non-null-assertion
+packages/catalog/web apps/inventory packages/foundation/modeling/csv packages/foundation/modeling/xlsx
+packages/foundation/modeling/vocabulary`; it reports zero. These paths contain our owned modeling packages, not
+vendor.json kit packages. The supplementary OXC AST inventory likewise reports zero. The raw inventory retains the
+15 existing exempt cell-display cleanups as well as the 22 non-exempt places listed above.
+
+Catalog.lock SHA-256 remains `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`;
+PLAN remains `eb608e3827dd73c4ce38e5e41976c122f142f8e34b4c1ffd3be06d9c4630ae27`. Git comparisons confirm that
+SPEC, baseline/ledgers, lock/Verify rules, exemptions and vendor files have no diff. No storage/HTTP contract codec
+was changed. The model Options are internal review data; a browser structured-clone crossing was not changed.
+
+The 23 changed files are:
+
+- `apps/inventory/src/web/main.tsx`
+- `goals/defaults-at-boundaries/VERDICTS.md`
+- `packages/catalog/model/src/Review/Review.rules.ts`
+- `packages/catalog/model/src/Suggestion/Suggest.rules.ts`
+- `packages/catalog/web/src/ImportReview.controller.ts`
+- `packages/catalog/web/src/ItemsPage.screen.tsx`
+- `packages/catalog/web/src/MatchStep.screen.tsx`
+- `packages/catalog/web/src/internal/WhyFlagged.tsx`
+- `packages/catalog/web/src/internal/view.ts`
+- `packages/catalog/web/test/ConfirmDraft.test.ts`
+- `packages/catalog/web/test/DraftPicks.test.ts`
+- `packages/catalog/web/test/ImportViewAnswers.test.ts`
+- `packages/catalog/web/test/ItemEditor.test.ts`
+- `packages/catalog/web/test/ItemImport.test.ts`
+- `packages/catalog/web/test/KeptRows.test.ts`
+- `packages/catalog/web/test/ReviewDraft.test.ts`
+- `packages/catalog/web/test/ReviewModelFold.fold.test.ts`
+- `packages/catalog/web/test/SessionAsked.test.ts`
+- `packages/catalog/web/test/TabRows.test.ts`
+- `packages/catalog/web/test/TakenBackWords.test.ts`
+- `packages/catalog/web/test/UploadOwner.test.ts`
+- `packages/catalog/web/test/reviewParity.test.ts`
+- `packages/catalog/web/test/support/draftWorld.ts`
+
+This is an implementation hand-back with 22 counted places still open and three ledger-decrease gates intentionally
+unmodified. It does not claim the requested zero-test condition, final goal acceptance, a green full check,
+check:full, on-screen verification or the 155-item end-to-end gate. No commit or push was made.
+
+Needs the person: nothing. The remaining work is explicit implementation follow-up; ledger edits remain outside
+this lane's authorization.
+
+Scope correction before hand-back: the initial UI/ShellSlots migration and ImportPage consumer change were restored
+byte-for-byte to HEAD after the parent clarified that upstream UI ownership is outside this lane. The surviving
+Problem Options are internal catalog/model rule data, not a contract migration. The timed suite and full-check
+results above precede this scope correction; final-tree results follow below. No model/fold import changed in the
+scope correction. Focused catalog/app typechecks were rerun.
+
+Uncounted test-builder debt is also retained explicitly: ReviewModelFold's unitFix at line 1525 still accepts
+`group?: string` and wraps it at line 1526; its four callers comprise three supplied groups and one omitted group.
+This pass does not claim all helper arguments are required. Draft-world has six sparse line-side wrappers at
+521/995/1299/1319/1344/1357, an optional-list predicate at 116, two required history-index conversions at 948/1228,
+and its real array shift at 1209. These are test lookups rather than source producer fields; they remain visible
+here rather than being described as cleared. Two additional unmodified Draft.machine assertion lookups retain
+line-side wrappers at 1417/1583. Third-party toast/request/Fiber observations retain their actual optional reads.
+
+After restoring upstream UI and ImportPage, the final scoped full check completed 102/105 tasks, 71 cached,
+2m33.837s (153.88s elapsed), with only the same diagnostics/promises/readonly ledger-decrease failures. Catalog web
+again passed 401/38 without retry, and the final app and catalog typechecks pass. Receipt:
+`/tmp/catalog-last-check-scoped.log`. The sole remaining source absence is ImportPage's upstream slot check.
+The final standalone timed web suite is recorded next; no further code changes follow the scope correction.
+
+Final-tree standalone timing, after the scoped check finished: **401 tests in 38 files pass, no retry**, Vitest
+**145.44 s**, elapsed **145.73 s** (`/tmp/catalog-last-after-solo.log`). The before suite was 153.33 s / 153.67 s;
+standalone elapsed time is 5.17% lower. These suite timings include cache/startup effects and do not establish a
+controlled hot-path performance claim. The earlier concurrent 174.23 s result remains above as an honest receipt,
+but is not the final standalone timing. No code changed during or after this final run.
+
+An independent read of HEAD and the final test files with the same scanner confirms **46 to 19 counted test
+places**, 27 removed: ReviewModelFold 17 to 5, TabRows 4 to 3, reviewParity 1 to 0, draftWorld 17 to 4. Adding the
+unchanged app helper fallback and the two remaining source sites gives the complete 22-place table above. No
+baseline was lowered. The final typecheck/lint/test tasks pass apart from the three explicitly reported
+ledger-decrease gates; full check is not green.
+
+Needs the person: nothing.

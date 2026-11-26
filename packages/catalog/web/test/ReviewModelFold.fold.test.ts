@@ -12,7 +12,7 @@ import { fixableBy } from "@inventory/review/ReviewDraft"
 // instances are read back and folded.
 import { Story } from "@alchemy.run/domain/Story"
 import { expect, it } from "@effect/vitest"
-import { assertSome } from "@effect/vitest/utils"
+import { assertSome, assertTrue } from "@effect/vitest/utils"
 import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId, RowId } from "@inventory/catalog-contract/Ids"
 import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -456,7 +456,7 @@ const sealed = (levels: ReadonlyArray<Level>): string => A.reduce(levels, "", (b
  * out from what the screen received (a story fails on any other event and on a rejection), and after each press the
  * instances it touched are read back from the model itself: the fold reads those, never this bookkeeping.
  */
-const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
+const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArray<string>; readonly first: Actor }) => {
   const steps: Array<Step> = [
     Story.given(
       life,
@@ -473,7 +473,9 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
   let changes = 0
   let lastGroup = 0
   let topGroup = 0
-  let own: Readonly<Record<string, ReadonlyArray<Held>>> = {}
+  let own: Readonly<Record<string, ReadonlyArray<Held>>> = R.fromEntries(
+    A.map(input.rowIds, (row) => [row, A.empty<Held>()])
+  )
   let groups: ReadonlyArray<KnownGroup> = []
   let touchedRows: ReadonlyArray<string> = []
   let touchedGroups: ReadonlyArray<string> = []
@@ -489,7 +491,20 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
   let noChange = 0
   let noChangeCovered = 0
   // Presses from a screen that is behind, by the command and what the model answered; group undos sent from one.
-  let behindAnswers: Readonly<Record<string, number>> = {}
+  // Every observed refusal category starts at zero before the first press.
+  let behindAnswers: Readonly<Record<string, number>> = {
+    "DecideRow GroupedSince": 0,
+    "DecideRow DecidedSince": 0,
+    "DecideRow PutBackSince": 0,
+    "DecideRow NoLongerThere": 0,
+    "DecideRow NoChange": 0,
+    "DecideRow UndoneSince": 0,
+    "UndoRowStep GroupedSince": 0,
+    "UndoRowStep NotYourStep": 0,
+    "UndoRowStep UndoneSince": 0,
+    "DecideGroup ReviewMovedOn": 0,
+    "UndoGroup ReviewMovedOn": 0
+  }
   // Row acts from a screen behind whose word on the row being covered differs from what a live screen would say.
   let behindCoveredOtherwise = 0
   let behindGroupUndos = 0
@@ -513,7 +528,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
         lastGroup,
         changes,
         tops: R.map(own, topOf),
-        undone: R.map(undoneOf, (undone) => undone.change),
+        undone: R.fromEntries(A.map(input.rowIds, (row) => [row, undoneChange(row)])),
         own,
         groups
       }
@@ -531,7 +546,9 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
   }
   const heldBack = (command: string, answer: BehindAnswer): void => {
     const key = `${command} ${answer}`
-    behindAnswers = R.set(behindAnswers, key, O.getOrElse(R.get(behindAnswers, key), () => 0) + 1)
+    const count = R.get(behindAnswers, key)
+    assertTrue(O.isSome(count), `the observed answer category is initialized: ${key}`)
+    behindAnswers = R.set(behindAnswers, key, count.value + 1)
   }
   const as = (actor: Actor): void => {
     if (actor.memberId === acting.memberId) return
@@ -656,10 +673,14 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     O.map(staleFor(actor, screen), (stale) => {
       const held = instancesOf(stale)
       const coveredThen = coveredIn(held, row)
+      const staleTop = R.get(stale.tops, row)
+      const staleUndo = R.get(stale.undone, row)
+      assertTrue(O.isSome(staleTop), "every staged row starts with a top change of zero")
+      assertTrue(O.isSome(staleUndo), "every staged row starts with an undo change of zero")
       const seen = {
         sawGroup: stale.lastGroup,
-        saw: O.getOrElse(R.get(stale.tops, row), () => 0),
-        sawUndone: O.getOrElse(R.get(stale.undone, row), () => 0),
+        saw: staleTop.value,
+        sawUndone: staleUndo.value,
         covered: coveredThen,
         asItReads: coveredThen && holdsAlready(foldRow(held, row), decision)
       }
@@ -730,7 +751,13 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     const under = A.last(rest)
     // The model takes the level brought to go under the decision put back only when it seals to what the row holds.
     const kept = stack.length >= 3
-    const next = kept ? O.getOrElse(A.get(stack, stack.length - 3), () => ({ level: noLevel })).level : noLevel
+    const thirdLast = A.get(stack, stack.length - 3)
+    const next = kept
+      ? (() => {
+          assertTrue(O.isSome(thirdLast), "the kept history has its third-last level")
+          return thirdLast.value.level
+        })()
+      : noLevel
     const below = kept ? sealed(A.map(A.take(stack, stack.length - 3), (held) => held.level)) : ""
     // A group in force decided after the row's decision covers it: the screen says so, as it does for a row's act.
     const covered = coveredIn(known(), row)
@@ -763,12 +790,21 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
       const then = O.match(R.get(stale.own, row), { onNone: A.empty, onSome: identity })
       const mineThen = O.exists(A.last(then), (top) => top.level.change === undo && top.level.by === actor.memberId)
       if (!mineThen) return
-      const sawUndone = O.getOrElse(R.get(stale.undone, row), () => 0)
+      const staleUndo = R.get(stale.undone, row)
+      assertTrue(O.isSome(staleUndo), "every staged row has an undo comparison in the stale screen")
+      const sawUndone = staleUndo.value
       // The row holds the sender's decision now as that screen shows it, with an undo on the row between that the
       // screen has not received (another person decided over it and took that back): held, with whose undo it was.
       const undone = O.getOrElse(R.get(undoneOf, row), () => ({ change: 0, by: "" }))
       if (mine && sawUndone === undone.change) return
       const keptThen = then.length >= 3
+      const thirdLastThen = A.get(then, then.length - 3)
+      const nextThen = keptThen
+        ? (() => {
+            assertTrue(O.isSome(thirdLastThen), "the stale kept history has its third-last level")
+            return thirdLastThen.value.level
+          })()
+        : noLevel
       steps.push(
         Story.when(
           UndoRowStep.make({
@@ -781,7 +817,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
             madeOn: 0,
             sawUndone,
             opening: 0,
-            next: keptThen ? O.getOrElse(A.get(then, then.length - 3), () => ({ level: noLevel })).level : noLevel,
+            next: nextThen,
             below: keptThen ? sealed(A.map(A.take(then, then.length - 3), (held) => held.level)) : ""
           })
         ),
@@ -1019,7 +1055,11 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
      * undos refused under a later group, the no-change row acts, and what each press from a screen behind came to.
      */
     reached: () => {
-      const answered = (key: string): number => O.getOrElse(R.get(behindAnswers, key), () => 0)
+      const answered = (key: string): number => {
+        const count = R.get(behindAnswers, key)
+        assertTrue(O.isSome(count), `the reported answer category is initialized: ${key}`)
+        return count.value
+      }
       return {
         behindRowActs,
         sealedUndos,
@@ -1161,16 +1201,24 @@ const liveReview = (input: {
   readonly touching: "named" | "changed"
 }) => {
   let decisions = HashMap.empty<string, ReviewDecision>()
-  let people: Readonly<Record<string, Person>> = {}
-  let touch: Touches = {}
+  let people: Readonly<Record<string, Person>> = { [dana.memberId]: nobody, [ana.memberId]: nobody }
+  let touch: Touches = R.fromEntries(A.map(input.rows({}), (row) => [row.id, 0]))
   let tick = 0
   let presses = 0
   const expected: Array<O.Option<Readonly<Record<string, string>>>> = []
   const apart: Array<string> = []
   const checking = { recheck: input.recheck }
   const stateOf = (steps: Person["steps"]): ReviewState => ({ decisions, undo: steps.undo, redo: steps.redo })
-  const personOf = (actor: Actor): Person => O.getOrElse(R.get(people, actor.memberId), () => nobody)
-  const touchOf = (row: string): number => O.getOrElse(R.get(touch, row), () => 0)
+  const personOf = (actor: Actor): Person => {
+    const person = R.get(people, actor.memberId)
+    assertTrue(O.isSome(person), "both actors begin with their own empty history")
+    return person.value
+  }
+  const touchOf = (row: string): number => {
+    const touched = R.get(touch, row)
+    assertTrue(O.isSome(touched), "every review row starts with touch zero")
+    return touched.value
+  }
   const rowsOf = (step: UndoStep): ReadonlyArray<string> => step.before.pipe(HashMap.keys, A.fromIterable)
   const look = () => {
     const rows = input.rows(saved(stateOf(nobody.steps)))
@@ -1194,8 +1242,11 @@ const liveReview = (input: {
     const rows = rowsOf(step)
     const prior: Touches = R.fromEntries(A.map(rows, (row) => [row, touchOf(row)] as const))
     for (const row of rows) {
-      const now = O.getOrElse(HashMap.get(decisions, row), () => undecided)
-      if (input.touching === "changed" && holdsAlready(HashMap.get(before, row), now)) continue
+      const unchanged = O.match(HashMap.get(decisions, row), {
+        onNone: () => !O.exists(HashMap.get(before, row), (decision) => !ReviewDecision.isEmpty(decision)),
+        onSome: (now) => holdsAlready(HashMap.get(before, row), now)
+      })
+      if (input.touching === "changed" && unchanged) continue
       tick += 1
       touch = R.set(touch, row, tick)
     }
@@ -1330,6 +1381,8 @@ const liveReview = (input: {
           let done: Done
           let taken: UndoStep
           if (answer) {
+            const expectedTouches = back.expect
+            assertTrue(O.isSome(expectedTouches), "a redo with an answer has expected touches")
             decisions = out.state.decisions
             touch = { ...touch, ...back.after }
             taken = O.getOrElse(A.head(out.state.undo), () => mirror)
@@ -1337,7 +1390,7 @@ const liveReview = (input: {
               action: back.action,
               unit,
               sent,
-              prior: O.getOrElse(back.expect, () => ({})),
+              prior: expectedTouches.value,
               after: back.after
             }
           } else {
@@ -1741,7 +1794,7 @@ const walk = Effect.fnUntraced(function* (
   const screen = messy(table)
   // With rule fixes in force a review starts with no decision, as every row of the model does.
   expect(screen.first).toEqual({})
-  const side = modelSide({ rows: table.rows.length, first: dana })
+  const side = modelSide({ rows: table.rows.length, rowIds: A.map(screen.rows({}), (row) => row.id), first: dana })
   const live = liveReview({ side, rows: screen.rows, recheck: screen.recheck, touching })
   let groupActs = 0
   let groupUndos = 0
@@ -1766,40 +1819,44 @@ const walk = Effect.fnUntraced(function* (
     const actor = people === "two" && pick >= 500_000 ? ana : dana
     const following = people === "two" && last.by !== actor.memberId && Math.floor(pick / 100_000) % 5 < 2
     const press = pressFor(pick, live.history(actor), live.look().views, following ? last.rows : [])
-    if (O.isNone(press)) continue
-    const { kind, sent, answer, undid, rows } = yield* live.press(actor, press.value, howFor(pick, people))
-    if (A.isReadonlyArrayNonEmpty(rows)) last = { by: actor.memberId, rows }
-    // One person's history is walked back in order: every undo and redo has an answer, and none is refused.
-    if (people === "one" && (!answer || undid !== "taken")) refused.push(`${kind}: answer ${answer}, ${undid}`)
-    if (!answer && undid === "taken") noAnswer += 1
-    if (undid === "GroupedAfter") groupedAfter += 1
-    if (undid === "NotYourStep") notYourStep += 1
-    if (undid !== "taken") continue
-    if (kind === "redo") redos += 1
-    Sent.$match(sent, {
-      Nothing: () => undefined,
-      RowAct: () => {
-        if (kind === "undo") {
-          rowUndos += 1
-          return
-        }
-        rowActs += 1
-        if (kind === "redo") rowRedos += 1
-      },
-      GroupAct: ({ step }) => {
-        if (kind === "undo") {
-          groupUndos += 1
-          return
-        }
-        groupActs += 1
-        if (kind === "redo") groupRedos += 1
-        if (side.partsIn(step) > 1) splitGroups += 1
-      }
+    yield* O.match(press, {
+      onNone: () => Effect.void,
+      onSome: Effect.fnUntraced(function* (selected) {
+        const { kind, sent, answer, undid, rows } = yield* live.press(actor, selected, howFor(pick, people))
+        if (A.isReadonlyArrayNonEmpty(rows)) last = { by: actor.memberId, rows }
+        // One person's history is walked back in order: every undo and redo has an answer, and none is refused.
+        if (people === "one" && (!answer || undid !== "taken")) refused.push(`${kind}: answer ${answer}, ${undid}`)
+        if (!answer && undid === "taken") noAnswer += 1
+        if (undid === "GroupedAfter") groupedAfter += 1
+        if (undid === "NotYourStep") notYourStep += 1
+        if (undid !== "taken") return
+        if (kind === "redo") redos += 1
+        Sent.$match(sent, {
+          Nothing: () => undefined,
+          RowAct: () => {
+            if (kind === "undo") {
+              rowUndos += 1
+              return
+            }
+            rowActs += 1
+            if (kind === "redo") rowRedos += 1
+          },
+          GroupAct: ({ step }) => {
+            if (kind === "undo") {
+              groupUndos += 1
+              return
+            }
+            groupActs += 1
+            if (kind === "redo") groupRedos += 1
+            if (side.partsIn(step) > 1) splitGroups += 1
+          }
+        })
+        const now = side.depth()
+        mostInForce = Math.max(mostInForce, now.inForce)
+        deepest = Math.max(deepest, now.deepest)
+        stackedRows = A.union(stackedRows, now.stacked)
+      })
     })
-    const now = side.depth()
-    mostInForce = Math.max(mostInForce, now.inForce)
-    deepest = Math.max(deepest, now.deepest)
-    stackedRows = A.union(stackedRows, now.stacked)
   }
   const folded = yield* verdict(side, live.expected)
   const apart = [...live.apart, ...side.odd, ...refused, ...folded]
@@ -2071,7 +2128,7 @@ const twoOn = Effect.fnUntraced(function* (
   how: How,
   touching: "named" | "changed"
 ) {
-  const side = modelSide({ rows: rows.length, first: dana })
+  const side = modelSide({ rows: rows.length, rowIds: A.map(rows, (row) => row.id), first: dana })
   const live = liveReview({ side, rows: () => rows, recheck: O.none(), touching })
   for (const [actor, action] of presses) yield* live.press(actor, action, how)
   const apart = yield* verdict(side, live.expected)
@@ -2157,7 +2214,7 @@ it.effect(
 it.effect("a row's undo from a screen that has not received an undo on the row is held, and taken once it has", () =>
   Effect.gen(function* () {
     const rows = [groupedRow("row-1", 1, "EA")]
-    const side = modelSide({ rows: rows.length, first: dana })
+    const side = modelSide({ rows: rows.length, rowIds: A.map(rows, (row) => row.id), first: dana })
     const live = liveReview({ side, rows: () => rows, recheck: O.none(), touching: walkStart.touching })
     yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" }, right)
     yield* live.press(ana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "LB" }, right)
@@ -2183,7 +2240,7 @@ it.effect("a row's undo from a screen that has not received an undo on the row i
 it.effect("a row's undo under a later group is refused naming the group, and taken once the group is taken back", () =>
   Effect.gen(function* () {
     const rows = [groupedRow("row-1", 1, "EA"), groupedRow("row-2", 2, "EA")]
-    const side = modelSide({ rows: rows.length, first: dana })
+    const side = modelSide({ rows: rows.length, rowIds: A.map(rows, (row) => row.id), first: dana })
     const live = liveReview({ side, rows: () => rows, recheck: O.none(), touching: walkStart.touching })
     const changeOf = (sent: Sent): number =>
       Sent.$match(sent, { Nothing: () => 0, RowAct: ({ change }) => change, GroupAct: ({ change }) => change })

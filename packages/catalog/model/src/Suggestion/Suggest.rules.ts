@@ -70,7 +70,10 @@ const has = (source: SuggestSource, row: ReviewedRow, field: Field): boolean =>
   )
 
 const open = (row: ReviewedRow, kind: "missing" | "category", field: Field): boolean =>
-  A.some(row.problems, (problem) => problem.kind === kind && problem.field === field && O.isNone(problem.proposal))
+  A.some(
+    row.problems,
+    (problem) => problem.kind === kind && O.contains(problem.field, field) && O.isNone(problem.proposal)
+  )
 
 /**
  * What a model is sent instead of the file: the few rows it must answer for, each with only the cells that bear on

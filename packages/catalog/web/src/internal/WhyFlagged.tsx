@@ -41,8 +41,7 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
               !O.exists(
                 problem.proposal,
                 (proposal) =>
-                  proposal.lossless &&
-                  O.exists(O.fromNullOr(problem.field), (field) => reviewed.values[field] === proposal.to)
+                  proposal.lossless && O.exists(problem.field, (field) => reviewed.values[field] === proposal.to)
               )
           )
           return open.length === 0 ? O.none() : O.some({ ...reviewed, problems: open })
@@ -84,7 +83,7 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
             <ul className="flex flex-col gap-1.5 pl-4">
               {row.problems.map((problem, at) => (
                 <li
-                  key={O.match(O.fromNullOr(problem.field), {
+                  key={O.match(problem.field, {
                     onNone: () => `${problem.kind}::${at}`,
                     onSome: (field) => `${problem.kind}:${field}:${at}`
                   })}

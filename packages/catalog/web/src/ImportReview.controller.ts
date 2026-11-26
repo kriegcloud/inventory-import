@@ -101,11 +101,11 @@ const storedWords: Readonly<Record<string, string>> = {
  */
 const choicesFor = (problem: Problem): O.Option<{ readonly ask: string; readonly choices: ReadonlyArray<Choice> }> => {
   if (O.isSome(problem.proposal) || problem.choices.length === 0) return O.none()
-  return O.map(O.fromNullOr(problem.field), (field) => ({
+  return O.map(problem.field, (field) => ({
     ask:
       problem.kind === "changed"
         ? "Keep or replace"
-        : O.match(O.fromNullOr(problem.ask), {
+        : O.match(problem.ask, {
             onNone: () => `Choose ${field === "sku" ? "sku" : fieldWords[field]}`,
             onSome: (ask) => ask
           }),
@@ -128,13 +128,13 @@ export const toRegionProblem = (problem: Problem, options: { readonly withoutRiv
     kind: problem.kind,
     tone: O.some(problem.tone),
     reason: O.some(problem.message),
-    column: problem.kind === "changed" ? O.some(storedChoice) : O.fromNullOr(problem.field),
+    column: problem.kind === "changed" ? O.some(storedChoice) : problem.field,
     ask: O.orElse(
       O.map(pick, (pick) => pick.ask),
-      () => O.fromNullOr(problem.ask)
+      () => problem.ask
     ),
     choices: O.map(pick, (pick) => pick.choices),
-    note: O.fromNullOr(problem.note),
+    note: problem.note,
     fix: O.map(problem.proposal, (proposal) => toFix(proposal, O.none())),
     rivals: problem.rivals.length === 0 || options.withoutRivals ? O.none() : O.some(problem.rivals)
   })
@@ -166,7 +166,7 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
   const applied = A.map(
     A.filter(row.proposals, (proposal) => proposal.lossless || A.contains(accepted, proposal.field)),
     (proposal) => {
-      const message = A.findFirst(row.problems, (problem) => problem.field === proposal.field)
+      const message = A.findFirst(row.problems, (problem) => O.contains(problem.field, proposal.field))
       return toFix(
         proposal,
         O.map(message, (problem) => reasonShown(problem.message, row.reasons.length))

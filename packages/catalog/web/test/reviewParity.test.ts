@@ -127,15 +127,23 @@ describe("the screen and the server apply decisions the same way", () => {
 
         // Take every group that is not a question, as the person would with "Use BX for the 2 ticked", until
         // none is left. Each accept can uncover the next problem of the same rows.
-        for (let round = 0; round < 60; round += 1) {
-          const group = A.findFirst(
+        const acceptGroups = (rounds: number): void => {
+          if (rounds === 0) return
+          const groups = A.filter(
             waitingGroups({ kind: O.none(), views: s.derive().views }),
             (candidate) => !O.contains(candidate.confidence, "low")
           )
-          if (O.isNone(group)) break
-          s.press({ type: "acceptGroup" as const, groupId: group.value.id, except: [] })
-          s.agree()
+          A.match(groups, {
+            onEmpty: () => {},
+            onNonEmpty: (groups) => {
+              const group = A.headNonEmpty(groups)
+              s.press({ type: "acceptGroup" as const, groupId: group.id, except: [] })
+              s.agree()
+              acceptGroups(rounds - 1)
+            }
+          })
         }
+        acceptGroups(60)
         // What is left are the rows only a person can settle. One of each answer the screen offers, on real rows.
         const left = A.filter(s.derive().views, (view) => view.status === "needs")
         expect(left.length).toBeGreaterThan(0)

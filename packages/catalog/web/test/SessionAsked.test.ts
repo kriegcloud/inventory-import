@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The review while who is signed in is asked again, on the page the app has: one session everything derives from. The
 // step stays drawn and goes on being decided; its saves and its confirm wait for the answer, and go as the member who
 // pressed them or not at all. Anybody else: the page is left, their rows stay kept in this browser for them alone, and
@@ -317,7 +318,9 @@ describe("the review while who is signed in is asked again", () => {
         yield* until("the review drawn", t.onScreen, 1_000)
         t.decide("row-2")
         yield* until("row 2 sent", () => A.length(t.saves) > 0, 1_000)
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry1 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry1), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry1.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         // The failure lands, and the row waits to be sent again.
         yield* passes(100)
         t.session.choose("org_northline")

@@ -18,7 +18,7 @@ closes the step with what was seen; it does not get worked around.
 | 1 | CLI inspection: `docs/operations.md` with plan, drift, logs and state for a stage; the plan and its guard before each deploy in `deploy.yml` | nothing | done |
 | 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | waits for his measurement ("What Benjamin does by hand"); nothing declared |
 | 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | built; the dump and the restore seen on a local database, never on a deployed one. A real run is his |
-| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | npm's `@alchemy.run/test` 2.0.0-beta.87 in `scratchpad/` (the registry never builds it) | in progress: the trial in `scratchpad/` |
+| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | npm's `@alchemy.run/test` 2.0.0-beta.87 in `scratchpad/` (the registry never builds it) | trial passed in `scratchpad/` ("What was proved"); how the harness is kept for `check:full` is Benjamin's |
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
 | 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
 | 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
@@ -29,7 +29,8 @@ The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 
 
 ## Current blocker
 
-Step 4 is in progress: the trial of npm's harness in `scratchpad/`. Step 2 waits for Benjamin, and steps 6, 7, 8
+Step 4's trial passed in `scratchpad/`; the test in `check:full` waits on how the harness is kept, which is
+Benjamin's. Step 2 waits for Benjamin, and steps 6, 7, 8
 and 3 are built and unseen on a real account: each is under "What Benjamin does by hand" and "What waits for a real
 account".
 
@@ -151,6 +152,21 @@ is back to the five packages, so a re-pin runs again.
 
 ## What was proved on this machine
 
+- **Step 4, the trial** (2026-11-26, `scratchpad/experiments/stack-harness`; its `NOTE.md` has the detail).
+  npm's `@alchemy.run/test@2.0.0-beta.87`, installed into the scratchpad only (`--omit=peer`, so `alchemy`,
+  `effect` and vitest are the root's: the vendored build of e1c3e6d). Its source imports 26 `alchemy/...` modules
+  and every one is in the vendored build; it passes the scratchpad's type-checker with the Effect diagnostics. On
+  the scratchpad's vitest, on Node: `Test.make` from `@alchemy.run/test/Vitest` with `Cloudflare.providers()`,
+  `Alchemy.inMemoryState()`, `dev: true` and the stage `dev_trial`, `beforeAll(deploy(InventoryDev))`, then
+  `afterAll(destroy(InventoryDev))`. Six runs passed, 6.0 to 12.5 seconds each with the deploy: the signed-out
+  session offered the test accounts, the first one signed in at `/api/auth/sign-in/email`, the session read
+  `ready` with the cookie, and `/api/v1/system/status` answered 200 (401 before the sign-in, as under
+  `bun run dev`). **The sign-in secret was in no file**: every file the runs wrote was searched for 64 hexadecimal
+  characters, and the only ones are the migrations' hashes and the five test accounts' password hashes, inside the
+  local D1 database. **Two things a test in `check:full` must deal with**: the local runtime writes its data to
+  `.alchemy/local` under the folder vitest runs in (git-ignored), whatever `dotAlchemy` says; and every run leaves
+  its D1 database there, `destroy` included, holding the test accounts' password hashes and the run's sessions.
+  **Not tried:** the acceptance's import of `items_clean.csv`, and the harness at the pinned commit.
 - **Step 3** (2026-11-26). **The proof changed the design.** On a copy of the local development database (5 people,
   168 items, 600 outcomes), in `.scratch/dump-trial`: `wrangler d1 export` of the whole database answered "cannot
   export databases with Virtual Tables (fts5)", which the app has (`itemSearch`). With every other table named

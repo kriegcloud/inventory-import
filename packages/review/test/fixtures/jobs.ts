@@ -18,19 +18,22 @@ export const lineKinds: ReadonlyArray<ProblemKind> = [
     id: "unit",
     label: "Unit to pick",
     tone: "decision",
-    help: O.some("The file says “length”. Pick the unit the job counts it in.")
+    help: O.some("The file says “length”. Pick the unit the job counts it in."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "comma",
     label: "Decimal comma",
     tone: "decision",
-    help: O.some("The quantity is written with a comma.")
+    help: O.some("The quantity is written with a comma."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "stock",
     label: "Not in stock",
     tone: "blocker",
-    help: O.some("The SKU is not on your item list. Type one, or leave it out.")
+    help: O.some("The SKU is not on your item list. Type one, or leave it out."),
+    fixable: true
   })
 ]
 

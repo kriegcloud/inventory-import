@@ -93,6 +93,11 @@ the value moves.
 | `model/src/Review/Review.rules.ts` `recheckRow` | a field the screen's row sends no value for, as the person types | `""`, an empty cell (`emptyText`) | not an import path: the screen sends every field of a row | none in the sample |
 | `model/src/Review/CellReading.rules.ts` `readDimensions` | the unit of a dimensions cell that names none | `cm` | 0: every dimensions cell of the sample names its unit (108 cm, 19 in) | `{"length":31.2,"width":41.4,"height":2}` reads as cm |
 
+| `drivers/openrouter/src/internal/plan.ts` | provider input/output token totals missing, undefined or NULL | `0` each, on the provider response schema | 0 (model calls are optional assistance, not stored import rows) | a scripted reply with no usage reports 0 tokens |
+| `drivers/openrouter/src/internal/plan.ts` | provider response with no valid model name | the requested model, on the response schema | 0 (no stored import row changes) | scripted reply without response metadata attributes the answer to `scripted/primary` |
+| `drivers/better-auth/src/BetterAuth.schema.ts` | library options with absent, undefined or NULL `basePath` | `/api/auth` | 0 (sign-in routing, not an import row) | the default sign-in endpoint `/api/auth/sign-in/email` |
+| `drivers/openrouter/src/OpenRouter.test-layer.ts` | script options without fallbacks or policy; text reply without model id | `[]`, `ModelPolicy.default`, the requested model | none (test twin) | `scripted([hello], { model })` uses the ordinary retry policy and requested model |
+
 ## What the law should count, beyond today
 
 Read from beep-effect's lints (below) and from the pilot. Each is a change to `internal/defaultsCode.ts` and

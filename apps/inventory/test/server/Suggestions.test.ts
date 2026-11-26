@@ -16,6 +16,7 @@ import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-con
 import { storedSuggestion, suggestedByModel, type Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { digest, guard, type SuggestSource } from "@inventory/catalog-model/Suggest"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { ModelPolicy } from "@beep/openrouter/OpenRouterConfig"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { propose } from "@inventory/catalog-model/SuggestionsHandler"
 import { taken as callTaken, usedUp as callsUsedUp } from "@inventory/catalog-model/ModelAllowance"
@@ -160,7 +161,11 @@ layer(AnswererOpenRouter.pipe(Layer.provide(OpenRouterTest.off("noKey", ModelId.
 
 const answer =
   '{"names":[{"rowNumber":7,"name":"Nylon Coil"}],"categories":[{"rowNumber":40,"category":"finished-goods"},{"rowNumber":116,"category":"Misc"}],"columns":[]}'
-const scripted = OpenRouterTest.scripted([{ text: answer }], { model: ModelId.make("scripted/model") })
+const scripted = OpenRouterTest.scripted([{ text: answer, modelId: O.none() }], {
+  model: ModelId.make("scripted/model"),
+  fallbackModels: [],
+  policy: ModelPolicy.default
+})
 
 layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (it) => {
   it.effect("one call is taken, the answer goes through the guard, and with the allowance used the rules answer", () =>

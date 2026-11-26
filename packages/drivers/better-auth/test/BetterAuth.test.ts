@@ -1,13 +1,15 @@
 // The secret policy (a guessable key never signs sessions in production), the session answer as Better Auth gives it,
 // and what a span may carry.
+import { assertSome, assertFailure } from "@effect/vitest/utils"
 import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as Result from "effect/Result"
 import * as S from "effect/Schema"
+import { BetterAuthConfigError } from "@beep/better-auth/BetterAuthError"
 import { BetterAuthSettings, PublicUrl } from "@beep/better-auth/BetterAuthConfig"
 import {
+  AuthDriverOptions,
   AuthEmail,
   AuthEndpoint,
   authEndpointOf,
@@ -22,10 +24,26 @@ import {
 describe("resolveAuthSecret", () => {
   it("says how to set a missing secret in production", () => {
     const missing = resolveAuthSecret({ secret: O.none(), production: true })
-    expect(Result.isFailure(missing) && missing.failure.message).toContain(
+    assertFailure(missing, BetterAuthConfigError.make({ problem: "missingSecret" }))
+    expect(missing.failure.message).toContain(
       "BETTER_AUTH_SECRET is not set. Set it with `wrangler secret put BETTER_AUTH_SECRET`"
     )
   })
+})
+
+describe("driver options", () => {
+  it.effect("reads the usual base path only when absent, and preserves a custom path", () =>
+    Effect.gen(function* () {
+      const usual = yield* S.decodeEffect(AuthDriverOptions)({})
+      const custom = yield* S.decodeEffect(AuthDriverOptions)({ basePath: "/accounts" })
+      const nullPath = yield* S.decodeEffect(AuthDriverOptions)({ basePath: null })
+      const emptyPath = yield* S.decodeEffect(AuthDriverOptions)({ basePath: "" })
+      expect(usual).toEqual({ basePath: "/api/auth" })
+      expect(custom).toEqual({ basePath: "/accounts" })
+      expect(nullPath).toEqual(usual)
+      expect(emptyPath).toEqual({ basePath: "" })
+    })
+  )
 })
 
 describe("the session answer", () => {
@@ -33,19 +51,34 @@ describe("the session answer", () => {
   it.effect("reads nobody, an account in no organization, and one with an organization", () =>
     Effect.gen(function* () {
       const nobody = yield* decode(null)
-      expect(nobody).toBeNull()
+      expect(nobody).toEqual(O.none())
       const none = yield* decode({ session: { userId: "u1" }, user: { email: "dana@example-works.test" } })
-      expect(none !== null && O.isNone(none.session.activeOrganizationId)).toBe(true)
+      assertSome(none, {
+        session: { userId: AuthUserId.make("u1"), activeOrganizationId: O.none() },
+        user: { email: "dana@example-works.test" }
+      })
+      expect(none.value.session.activeOrganizationId).toEqual(O.none())
       const cleared = yield* decode({
         session: { userId: "u1", activeOrganizationId: null },
         user: { email: "dana@example-works.test" }
       })
-      expect(cleared !== null && O.isNone(cleared.session.activeOrganizationId)).toBe(true)
+      assertSome(cleared, {
+        session: { userId: AuthUserId.make("u1"), activeOrganizationId: O.none() },
+        user: { email: "dana@example-works.test" }
+      })
+      expect(cleared.value.session.activeOrganizationId).toEqual(O.none())
       const chosen = yield* decode({
         session: { userId: "u1", activeOrganizationId: "org_prairie" },
         user: { email: "dana@example-works.test" }
       })
-      expect(chosen?.session.activeOrganizationId).toEqual(O.some("org_prairie"))
+      assertSome(chosen, {
+        session: {
+          userId: AuthUserId.make("u1"),
+          activeOrganizationId: O.some(AuthOrganizationId.make("org_prairie"))
+        },
+        user: { email: "dana@example-works.test" }
+      })
+      expect(chosen.value.session.activeOrganizationId).toEqual(O.some("org_prairie"))
     })
   )
 })
@@ -72,6 +105,7 @@ const generatesOnlyValid = <Schema extends S.Top>(name: string, schema: Schema) 
   )
 
 describe("every schema generates only valid values", () => {
+  generatesOnlyValid("AuthDriverOptions", AuthDriverOptions)
   generatesOnlyValid("AuthUserId", AuthUserId)
   generatesOnlyValid("AuthOrganizationId", AuthOrganizationId)
   generatesOnlyValid("AuthEmail", AuthEmail)

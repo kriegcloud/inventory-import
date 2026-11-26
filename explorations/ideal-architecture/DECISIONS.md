@@ -2030,3 +2030,15 @@ which is the same unwrap under another name; the agent added it under "the law c
 the lane was redone.
 
 Reverse: taking a file off `exemptions` counts its places again, and they are cleared in the same commit.
+
+### 2026-11-26 — the review region's sparse cells: made total where rows enter
+
+Question: about 100 places in the review region read a row's cell that may be missing, or start a counter
+(`view.cells[column.id] ?? ""` in `review/src/internal/ReviewGrid.tsx`). A lane rewrote them with an Option a lookup
+and measured it: drawing the grid for the 200-row sample went from 32.1 ms to 34.1 ms, the queue's context from
+0.035 ms to 0.060 ms; told to revert anything measurably slower, it did.
+Answer: I chose; the agent recommended the same. A row's cells are made a complete record for the region's columns
+once, where rows enter the region, so a lookup cannot miss and no Option is made a cell. The lane shows the grid no
+slower than today, or the places stay. Rejected: accepting the 6%; leaving the places counted.
+
+Reverse: a row's cells go back to a sparse record and each lookup says its missing case.

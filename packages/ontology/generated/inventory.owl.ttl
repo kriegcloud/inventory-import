@@ -47,6 +47,11 @@ gist:PhysicalIdentifiableItem a owl:Class .
 
 gist:TemporalRelation a owl:Class .
 
+inv:AgentRun a owl:Class ;
+    rdfs:subClassOf gist:Event ;
+    skos:prefLabel "Agent run"@en ;
+    skos:definition "An event in which a software agent acts for one signed-in member, never above that member's role nor above its own role cap."@en .
+
 inv:AuditEntry a owl:Class ;
     rdfs:subClassOf gist:Content ;
     skos:prefLabel "Audit entry"@en ;
@@ -71,7 +76,12 @@ inv:IdentityEvidence a owl:Class ;
 inv:Member a owl:Class ;
     rdfs:subClassOf gist:TemporalRelation ;
     skos:prefLabel "Member"@en ;
-    skos:definition "A relationship between one person and one tenant that lets the person act in the tenant's workspace from the day it is made until it is removed."@en .
+    skos:definition "A relationship between one person and one tenant, made when the person is invited or added and kept after it is removed or revoked, that lets the person act in the tenant's workspace or, where it names one, in that source's workspace, until it is removed and, where it states a stage, while that stage is active."@en .
+
+inv:ModelCall a owl:Class ;
+    rdfs:subClassOf gist:Event ;
+    skos:prefLabel "Model call"@en ;
+    skos:definition "An event in which the app asks a language model one question for a tenant, taken from that tenant's daily allowance before it is asked."@en .
 
 inv:Organization a owl:Class ;
     rdfs:subClassOf inv:Party ,
@@ -93,6 +103,11 @@ inv:Role a owl:Class ;
     skos:prefLabel "Role"@en ;
     skos:definition "A named level of access a grant gives a member, such as viewer, editor or admin."@en .
 
+inv:SignInAccount a owl:Class ;
+    rdfs:subClassOf gist:Content ;
+    skos:prefLabel "Sign-in account"@en ;
+    skos:definition "A credential record that lets one person sign in to an application, this one or a source such as Sutton, before any organization is chosen."@en .
+
 inv:SourceRecord a owl:Class ;
     rdfs:subClassOf gist:Content ;
     skos:prefLabel "Source record"@en ;
@@ -102,6 +117,18 @@ inv:Tenant a owl:Class ;
     rdfs:subClassOf inv:Organization ;
     skos:prefLabel "Tenant"@en ;
     skos:definition "An organization for which this application keeps a workspace, whose records are scoped to it and hidden from every other organization."@en .
+
+inv:callPurpose a owl:ObjectProperty ;
+    rdfs:subPropertyOf gist:isCategorizedBy ;
+    rdfs:domain inv:ModelCall ;
+    skos:prefLabel "call purpose"@en ;
+    skos:definition "Links a model call to what it is for: reading a table request, checking the key, or suggesting fixes for an import."@en .
+
+inv:calledFor a owl:ObjectProperty ;
+    rdfs:domain inv:ModelCall ;
+    rdfs:range inv:Member ;
+    skos:prefLabel "called for"@en ;
+    skos:definition "Links a model call to the member whose action asked for it."@en .
 
 inv:citesEvidence a owl:ObjectProperty ;
     rdfs:range inv:IdentityEvidence ;
@@ -149,6 +176,18 @@ inv:inTenant a owl:ObjectProperty ;
     skos:prefLabel "in tenant"@en ;
     skos:definition "The tenant whose workspace holds this record, not the owner of the body it describes."@en .
 
+inv:maxRole a owl:ObjectProperty ;
+    rdfs:domain inv:AgentRun ;
+    rdfs:range inv:Role ;
+    skos:prefLabel "max role"@en ;
+    skos:definition "Links an agent run to the highest role it may act with, whatever the role of the member it acts for."@en .
+
+inv:memberAccount a owl:ObjectProperty ;
+    rdfs:domain inv:Member ;
+    rdfs:range inv:SignInAccount ;
+    skos:prefLabel "member account"@en ;
+    skos:definition "Links a membership to the sign-in account its person signs in with to act under that membership."@en .
+
 inv:membershipIn a owl:ObjectProperty ;
     rdfs:domain inv:Member ;
     rdfs:range inv:Tenant ;
@@ -160,6 +199,12 @@ inv:membershipOf a owl:ObjectProperty ;
     rdfs:range inv:Person ;
     skos:prefLabel "membership of"@en ;
     skos:definition "Links a membership to the human who holds it, independently of any account."@en .
+
+inv:membershipStatus a owl:ObjectProperty ;
+    rdfs:subPropertyOf gist:isCategorizedBy ;
+    rdfs:domain inv:Member ;
+    skos:prefLabel "membership status"@en ;
+    skos:definition "Links a membership to the stage it stands at: pending, active, suspended or revoked."@en .
 
 inv:recordOf a owl:ObjectProperty ;
     rdfs:subPropertyOf gist:isAbout ;
@@ -174,15 +219,39 @@ inv:recordedActor a owl:ObjectProperty ;
     skos:prefLabel "recorded actor"@en ;
     skos:definition "Links an audit entry to the member it names as having made the change."@en .
 
+inv:recordedAgentRun a owl:ObjectProperty ;
+    rdfs:domain inv:AuditEntry ;
+    rdfs:range inv:AgentRun ;
+    skos:prefLabel "recorded agent run"@en ;
+    skos:definition "Links an audit entry to the agent run that made the change for the member it names, when an agent did."@en .
+
 gist:isAbout a owl:ObjectProperty .
 
 gist:isCategorizedBy a owl:ObjectProperty .
+
+inv:accountEmail a owl:DatatypeProperty ;
+    rdfs:domain inv:SignInAccount ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "account email"@en ;
+    skos:definition "The email a sign-in account signs in with, compared whatever its case."@en .
 
 inv:action a owl:DatatypeProperty ;
     rdfs:domain inv:AuditEntry ;
     rdfs:range xsd:string ;
     skos:prefLabel "action"@en ;
     skos:definition "What was done in the change an audit entry records, in a few words a person reads."@en .
+
+inv:agentName a owl:DatatypeProperty ;
+    rdfs:domain inv:AgentRun ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "agent name"@en ;
+    skos:definition "The agent's name as people read it in the activity list, such as \"Assistant\"."@en .
+
+inv:calledAt a owl:DatatypeProperty ;
+    rdfs:domain inv:ModelCall ;
+    rdfs:range xsd:dateTime ;
+    skos:prefLabel "called at"@en ;
+    skos:definition "When a model call was taken from the tenant's daily allowance."@en .
 
 inv:capturedAt a owl:DatatypeProperty ;
     rdfs:domain inv:SourceRecord ;
@@ -219,6 +288,18 @@ inv:isVendor a owl:DatatypeProperty ;
         "Vendor"@en ;
     skos:definition "Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party sells to the tenant: true or false on every such stored record, and stated on no other record."@en .
 
+inv:joinedAt a owl:DatatypeProperty ;
+    rdfs:domain inv:Member ;
+    rdfs:range xsd:dateTime ;
+    skos:prefLabel "joined at"@en ;
+    skos:definition "When the person could first act in the membership, as its record states it: for this app's members the moment an admin added them, for an invitee the moment the invitation was accepted."@en .
+
+inv:name a owl:DatatypeProperty ;
+    rdfs:subPropertyOf gist:name ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "name"@en ;
+    skos:definition "The name people read for a party, a membership, a record or a place, which is never unique and never decides identity or permission."@en .
+
 inv:recordedAt a owl:DatatypeProperty ;
     rdfs:domain inv:AuditEntry ;
     rdfs:range xsd:dateTime ;
@@ -245,6 +326,8 @@ inv:sourceType a owl:DatatypeProperty ;
 
 gist:atDateTime a owl:DatatypeProperty .
 
+gist:name a owl:DatatypeProperty .
+
 inv:GrantScopeKindScheme-organization a owl:NamedIndividual .
 
 inv:IdentityOutcomeScheme-differentParties a owl:NamedIndividual .
@@ -259,3 +342,17 @@ inv:MemberRoleScheme-editor a owl:NamedIndividual ,
 
 inv:MemberRoleScheme-viewer a owl:NamedIndividual ,
         inv:Role .
+
+inv:MembershipStatusScheme-active a owl:NamedIndividual .
+
+inv:MembershipStatusScheme-pending a owl:NamedIndividual .
+
+inv:MembershipStatusScheme-revoked a owl:NamedIndividual .
+
+inv:MembershipStatusScheme-suspended a owl:NamedIndividual .
+
+inv:ModelCallPurposeScheme-check a owl:NamedIndividual .
+
+inv:ModelCallPurposeScheme-suggest a owl:NamedIndividual .
+
+inv:ModelCallPurposeScheme-view a owl:NamedIndividual .

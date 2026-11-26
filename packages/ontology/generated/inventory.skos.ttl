@@ -21,6 +21,14 @@ inv:MemberRoleScheme a skos:ConceptScheme ;
     skos:prefLabel "Member role"@en ;
     skos:definition "A controlled vocabulary of the access levels a member holds in an organization, ranked by what each may do."@en .
 
+inv:MembershipStatusScheme a skos:ConceptScheme ;
+    skos:prefLabel "Membership status"@en ;
+    skos:definition "A controlled vocabulary of the stages a person's membership of a tenant passes through, from invited to revoked."@en .
+
+inv:ModelCallPurposeScheme a skos:ConceptScheme ;
+    skos:prefLabel "Model call purpose"@en ;
+    skos:definition "A controlled vocabulary of what a call to a language model is made for, each call drawn from the day's allowance."@en .
+
 inv:GrantScopeKindScheme-organization a skos:Concept ;
     skos:prefLabel "Whole organization"@en ;
     skos:altLabel "Tenant"@en ;
@@ -67,3 +75,53 @@ inv:MemberRoleScheme-viewer a skos:Concept ;
     skos:notation "viewer" ;
     skos:inScheme inv:MemberRoleScheme ;
     skos:topConceptOf inv:MemberRoleScheme .
+
+inv:MembershipStatusScheme-active a skos:Concept ;
+    skos:prefLabel "Active"@en ;
+    skos:definition "A membership status in which the person may act in the workspace the membership lets them act in."@en ;
+    skos:notation "active" ;
+    skos:inScheme inv:MembershipStatusScheme ;
+    skos:topConceptOf inv:MembershipStatusScheme .
+
+inv:MembershipStatusScheme-pending a skos:Concept ;
+    skos:prefLabel "Pending"@en ;
+    skos:altLabel "Invited"@en ;
+    skos:definition "A membership status in which the person was invited and has not yet accepted, and cannot yet act under the membership."@en ;
+    skos:notation "pending" ;
+    skos:inScheme inv:MembershipStatusScheme ;
+    skos:topConceptOf inv:MembershipStatusScheme .
+
+inv:MembershipStatusScheme-revoked a skos:Concept ;
+    skos:prefLabel "Revoked"@en ;
+    skos:definition "A membership status in which the membership no longer lets, or will never let, the person act and is not made active again, its row kept so the audit trail still names it."@en ;
+    skos:notation "revoked" ;
+    skos:inScheme inv:MembershipStatusScheme ;
+    skos:topConceptOf inv:MembershipStatusScheme .
+
+inv:MembershipStatusScheme-suspended a skos:Concept ;
+    skos:prefLabel "Suspended"@en ;
+    skos:definition "A membership status in which the person may not act in the workspace the membership lets them act in, the history kept, and from which the membership can be made active again."@en ;
+    skos:notation "suspended" ;
+    skos:inScheme inv:MembershipStatusScheme ;
+    skos:topConceptOf inv:MembershipStatusScheme .
+
+inv:ModelCallPurposeScheme-check a skos:Concept ;
+    skos:prefLabel "Key check"@en ;
+    skos:definition "A model call purpose in which the app checks that the model key works."@en ;
+    skos:notation "check" ;
+    skos:inScheme inv:ModelCallPurposeScheme ;
+    skos:topConceptOf inv:ModelCallPurposeScheme .
+
+inv:ModelCallPurposeScheme-suggest a skos:Concept ;
+    skos:prefLabel "Import suggestions"@en ;
+    skos:definition "A model call purpose in which the app asks for proposals for the rows of an import."@en ;
+    skos:notation "suggest" ;
+    skos:inScheme inv:ModelCallPurposeScheme ;
+    skos:topConceptOf inv:ModelCallPurposeScheme .
+
+inv:ModelCallPurposeScheme-view a skos:Concept ;
+    skos:prefLabel "Table request"@en ;
+    skos:definition "A model call purpose in which the table assistant reads a request in words."@en ;
+    skos:notation "view" ;
+    skos:inScheme inv:ModelCallPurposeScheme ;
+    skos:topConceptOf inv:ModelCallPurposeScheme .

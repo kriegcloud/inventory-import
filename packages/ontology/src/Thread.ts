@@ -1,7 +1,7 @@
 /**
  * The thread's graph (report 14 section 4.4): `graphOf` puts the lifted triples of a record's rows beside a
  * hand-written text, and `threadGraph` is `graphOf` given the kernel's `Member`, the two committed member rows and the
- * committed hand-written fixture, seventeen triples.
+ * committed hand-written fixture, twenty-four triples.
  *
  * Do not break: nothing is added to a graph between the lift and the question. Every triple `graphOf` returns is one
  * `lift` returned for a decoded row or one the hand-written text states; a guard of gate 8 holds it to that, so a
@@ -67,7 +67,7 @@ export const threadRows: ReadonlyArray<unknown> = members
 /**
  * The graph the thread's questions are asked of: the two committed member rows lifted, with the hand-written fixture.
  *
- * @example threadGraph() // seventeen triples: twelve lifted, five hand-written
+ * @example threadGraph() // twenty-four triples: fourteen lifted, ten hand-written
  */
 export const threadGraph = Effect.fnUntraced(function* () {
   const context = yield* threadContext

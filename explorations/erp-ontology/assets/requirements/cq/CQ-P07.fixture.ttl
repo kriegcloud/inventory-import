@@ -1,0 +1,40 @@
+# The fixture of CQ-P07 (report 04 section 3.1, report 18 section 10). test_ExampleWorks keeps an active admin, beside
+# an admin whose invitation is pending. test_SecondOrg's only admin is revoked, beside an active editor. test_EmptyOrg
+# is a tenant with no members, and test_FlourMill an organization that is no tenant, with no members either. Every
+# member states its stage, which no record of this app stores (decision 136). Nothing here is a record of this app,
+# and every name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+<data/test_EmptyOrg/Tenant/test_EmptyOrg> a inv:Tenant .
+<fixture/Organization/test_FlourMill> a inv:Organization .
+
+<fixture/Member/test_WorksAdmin> a inv:Member ;
+  inv:membershipIn <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:membershipStatus inv:MembershipStatusScheme-active .
+<fixture/Grant/test_WorksAdminGrant> a inv:Grant ;
+  inv:grantedTo <fixture/Member/test_WorksAdmin> ;
+  inv:grantsRole inv:MemberRoleScheme-admin .
+
+<fixture/Member/test_WorksInvitee> a inv:Member ;
+  inv:membershipIn <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:membershipStatus inv:MembershipStatusScheme-pending .
+<fixture/Grant/test_WorksInviteeGrant> a inv:Grant ;
+  inv:grantedTo <fixture/Member/test_WorksInvitee> ;
+  inv:grantsRole inv:MemberRoleScheme-admin .
+
+<fixture/Member/test_SecondFormerAdmin> a inv:Member ;
+  inv:membershipIn <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:membershipStatus inv:MembershipStatusScheme-revoked .
+<fixture/Grant/test_SecondFormerAdminGrant> a inv:Grant ;
+  inv:grantedTo <fixture/Member/test_SecondFormerAdmin> ;
+  inv:grantsRole inv:MemberRoleScheme-admin .
+
+<fixture/Member/test_SecondEditor> a inv:Member ;
+  inv:membershipIn <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:membershipStatus inv:MembershipStatusScheme-active .
+<fixture/Grant/test_SecondEditorGrant> a inv:Grant ;
+  inv:grantedTo <fixture/Member/test_SecondEditor> ;
+  inv:grantsRole inv:MemberRoleScheme-editor .

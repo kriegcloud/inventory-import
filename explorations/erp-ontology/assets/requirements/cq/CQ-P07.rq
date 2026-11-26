@@ -1,0 +1,23 @@
+# CQ-P07: Does every tenant keep at least one admin who is not removed?
+# A constraint: each row is a tenant that keeps none, so the answer is yes when no row comes back, read beside the
+# companion that finds the tenants that do keep one. It starts from each tenant, never from the memberships, so a
+# tenant with no members is a row (report 04 section 3.1). An admin who is not removed is a member whose stage is
+# active, holding a grant of the admin role (decision 136); the grant's scope is not read (report 18 section 10).
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?tenant
+WHERE {
+  ?tenant rdf:type/rdfs:subClassOf* inv:Tenant .
+  FILTER NOT EXISTS {
+    ?member rdf:type/rdfs:subClassOf* inv:Member ;
+            inv:membershipIn ?tenant ;
+            inv:membershipStatus inv:MembershipStatusScheme-active .
+    ?grant rdf:type/rdfs:subClassOf* inv:Grant ;
+           inv:grantedTo ?member ;
+           inv:grantsRole inv:MemberRoleScheme-admin .
+  }
+}
+ORDER BY ?tenant

@@ -2,8 +2,9 @@
 // schemas `src/Enrolled.ts` maps it to and the kernel's vocabulary give no finding of P1 to P15. The gate reads the
 // real records, never copies: the marks are read from their ASTs through `@beep/vocabulary/Pointer`'s reader.
 //
-// P13's table states section 3's placements (3.3, 3.5, 3.6), eighteen rows, each mark built with the kernel's helper
-// that writes it and turned into a reading by the same reader, so no annotation key is written here by hand.
+// P13's table states section 3's placements (3.3, 3.5, 3.6) as report 18 section 7 changes and adds to them, twenty-two
+// rows over five records, each mark built with the kernel's helper that writes it and turned into a reading by the
+// same reader, so no annotation key is written here by hand.
 //
 // Each negative hands the gate one planted input in place of a real one, and the table's rows for a planted field are
 // the plant's own marks, so the negative names its rule alone. The two the report specifies (the unmarked `name`,
@@ -17,8 +18,9 @@
 // Step 7 adds, on copies too: P4 for a class that stores no id (decision 135), `Run`, a class of this test's own; and
 // the enrolment kind `noTerm` (decision 21), on planted exports beside the real ones, with P2, P8, P9 and P15 on them. A
 // malformed mark is written by a helper given what its checker would refuse with the real vocabulary's names (a slice
-// with no name, a property with no prefix), since gate 7's rule 6 refuses a mark written by hand here. The real
-// `Membership` is enrolled by step 11, not here.
+// with no name, a property with no prefix), since gate 7's rule 6 refuses a mark written by hand here. Step 11 enrols the
+// real `Membership` as `noTerm`, `AgentRun` and `OrganizationChoice` as records and `ModelCallPurpose` as a scheme, and
+// no mark is deferred to the party slice any more.
 import { describe, expect, it } from "@effect/vitest"
 import type { Curie } from "@beep/identity/Vocab"
 import { Vocabulary } from "@beep/vocabulary/Model"
@@ -27,6 +29,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Model from "effect/schema/Model"
 import { Activity } from "@inventory/kernel/Activity"
@@ -50,6 +53,10 @@ const role = "packages/kernel/src/Role.schema.ts#Role"
 const activity = "packages/kernel/src/Activity.schema.ts#Activity"
 const person = "packages/access/contract/src/People/Person.read.ts#Person"
 const auditTrail = "packages/access/contract/src/Activity/AuditTrail.read.ts#AuditTrail"
+const agentRun = "packages/kernel/src/AgentRun.schema.ts#AgentRun"
+const organizationChoice = "packages/access/contract/src/Session/SessionState.read.ts#OrganizationChoice"
+const modelCallPurpose = "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts#ModelCallPurpose"
+const membership = "packages/access/contract/src/Session/SessionState.read.ts#Membership"
 
 /** A mark as the reader reads it in a field's key annotations: the helper's object, put on a throwaway schema. */
 const reading = (mark: S.Annotations.Key<string>) => readKeyMark(S.String.annotateKey(mark).ast)
@@ -64,26 +71,45 @@ const roleGrant = aboutPath([
   { property: "inv:grantsRole" }
 ])
 
-/** Report 14 sections 3.3, 3.5 and 3.6: record, field, mark. Eighteen rows. */
+/** The person's name, reached through the membership's person (report 18 section 7). */
+const personName = aboutPath([{ property: "inv:membershipOf", node: "inv:Person" }, { property: "inv:name" }])
+
+/** Report 14 sections 3.3, 3.5 and 3.6, with report 18 section 7: record, field, mark. Twenty-two rows. */
 const table: ReadonlyArray<readonly [string, string, S.Annotations.Key<string>]> = [
   [member, "id", aboutClass("inv:Member")],
-  [member, "name", noTerm("screen")],
+  [member, "name", personName],
   [member, "role", roleGrant],
   [member, "organizationId", aboutProperty("inv:membershipIn")],
-  [member, "organizationName", noTerm("screen")],
+  [
+    member,
+    "organizationName",
+    aboutPath([{ property: "inv:membershipIn", node: "inv:Tenant" }, { property: "inv:name" }])
+  ],
   [activity, "id", aboutClass("inv:AuditEntry")],
   [activity, "organizationId", aboutProperty("inv:inTenant")],
   [activity, "actorId", aboutProperty("inv:recordedActor")],
   [activity, "actorName", noTerm("screen")],
   [activity, "action", aboutProperty("inv:action")],
   [activity, "detail", noTerm("screen")],
-  [activity, "agent", noTerm("deferred", "party")],
+  [
+    activity,
+    "agent",
+    aboutPath([{ property: "inv:recordedAgentRun", node: "inv:AgentRun" }, { property: "inv:agentName" }])
+  ],
   [activity, "createdAt", aboutProperty("inv:recordedAt")],
   [person, "memberId", aboutClass("inv:Member")],
-  [person, "name", noTerm("screen")],
+  [person, "name", personName],
   [person, "role", roleGrant],
-  [person, "email", noTerm("deferred", "party")],
-  [person, "joinedAt", noTerm("deferred", "party")]
+  [
+    person,
+    "email",
+    aboutPath([{ property: "inv:memberAccount", node: "inv:SignInAccount" }, { property: "inv:accountEmail" }])
+  ],
+  [person, "joinedAt", aboutProperty("inv:joinedAt")],
+  [agentRun, "agent", aboutProperty("inv:agentName")],
+  [agentRun, "maxRole", aboutProperty("inv:maxRole")],
+  [organizationChoice, "id", aboutClass("inv:Tenant")],
+  [organizationChoice, "name", aboutProperty("inv:name")]
 ]
 
 const placements = A.map(table, ([entry, field, mark]) => Placement.make({ entry, field, mark: reading(mark) }))
@@ -155,34 +181,59 @@ class Uneven extends Model.Class<Uneven>("Uneven")(
 ) {}
 
 describe("gate 5, record pointers", () => {
-  it.effect("finds nothing in the five enrolled exports, the committed enrolment list and the vocabulary", () =>
+  it.effect("finds nothing in the nine enrolled exports, the committed enrolment list and the vocabulary", () =>
     Effect.gen(function* () {
       const found = yield* gate({})
       expect(found).toEqual([])
     })
   )
 
-  it.effect("reads enrolment.json as the five entries of section 3.7, and Enrolled.ts maps the same five", () =>
-    Effect.gen(function* () {
-      const enrolment = yield* decodeEnrolment(enrolmentFile)
-      const keys = A.map(enrolment, (entry) => `${entry.file}#${entry.export}`)
-      expect(keys).toEqual([member, role, activity, person, auditTrail])
-      expect(A.map(enrolment, (entry) => entry.as)).toEqual(["record", "scheme", "record", "record", "collection"])
-    })
+  it.effect(
+    "reads enrolment.json as section 3.7's five entries and report 18's four, and Enrolled.ts maps the nine",
+    () =>
+      Effect.gen(function* () {
+        const enrolment = yield* decodeEnrolment(enrolmentFile)
+        const keys = A.map(enrolment, (entry) => `${entry.file}#${entry.export}`)
+        expect(keys).toEqual([
+          member,
+          role,
+          activity,
+          person,
+          auditTrail,
+          agentRun,
+          organizationChoice,
+          modelCallPurpose,
+          membership
+        ])
+        expect(A.map(enrolment, (entry) => entry.as)).toEqual([
+          "record",
+          "scheme",
+          "record",
+          "record",
+          "collection",
+          "record",
+          "record",
+          "scheme",
+          "noTerm"
+        ])
+        expect(R.keys(enrolled)).toEqual(keys)
+      })
   )
 
-  it("states eighteen placements, every field of the three records once", () => {
-    expect(placements).toHaveLength(18)
-    expect(A.dedupe(A.map(placements, (row) => `${row.entry}#${row.field}`))).toHaveLength(18)
+  it("states twenty-two placements, every field of the five records once", () => {
+    expect(placements).toHaveLength(22)
+    expect(A.dedupe(A.map(placements, (row) => `${row.entry}#${row.field}`))).toHaveLength(22)
   })
 })
 
 describe("gate 5's negatives, one rule each", () => {
   it.effect("P1: Enrolled.ts leaves out an export enrolment.json lists", () =>
     Effect.gen(function* () {
-      const { [person]: _left, ...rest } = enrolled
+      // OrganizationChoice, whose terms other records name too: left out, it is missed by P1 alone. Person is the only
+      // record that names memberAccount, accountEmail and joinedAt, so leaving it out would draw P11 as well.
+      const { [organizationChoice]: _left, ...rest } = enrolled
       const found = yield* gate({ enrolled: rest })
-      expect(found).toEqual([["P1", person, ""]])
+      expect(found).toEqual([["P1", organizationChoice, ""]])
     })
   )
 
@@ -365,15 +416,17 @@ describe("gate 5's negatives, one rule each", () => {
     })
   )
 
-  it.effect("P11: membershipOf, named by no record, without its fixture evidence", () =>
+  // From step 11 Member's and Person's name paths take a node step along membershipOf, so a record names it, and the
+  // plant moves to membershipStatus, which only CQ-P07's fixture states.
+  it.effect("P11: membershipStatus, named by no record, without its fixture evidence", () =>
     Effect.gen(function* () {
-      const { evidence: _evidence, ...unevidenced } = vocabulary.objectProperties.membershipOf
+      const { evidence: _evidence, ...unevidenced } = vocabulary.objectProperties.membershipStatus
       const decoded = yield* decodeVocabulary({
         ...vocabulary,
-        objectProperties: { ...vocabulary.objectProperties, membershipOf: unevidenced }
+        objectProperties: { ...vocabulary.objectProperties, membershipStatus: unevidenced }
       })
       const found = yield* gate({ vocabulary: decoded })
-      expect(found).toEqual([["P11", "vocabulary", "membershipOf"]])
+      expect(found).toEqual([["P11", "vocabulary", "membershipStatus"]])
     })
   )
 

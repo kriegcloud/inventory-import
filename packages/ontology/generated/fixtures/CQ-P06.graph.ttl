@@ -4,6 +4,7 @@
 @prefix inv: <https://example.org/inventory-import/ontology/> .
 
 <https://example.org/inventory-import/data/test_ExampleWorks/Member/test_RaviWorks> a inv:Member ;
+    inv:memberAccount <https://example.org/inventory-import/fixture/SignInAccount/test_RaviAccount> ;
     inv:membershipIn <https://example.org/inventory-import/data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
     inv:membershipOf <https://example.org/inventory-import/fixture/Person/test_Ravi> .
 
@@ -12,9 +13,11 @@
     inv:grantedTo <https://example.org/inventory-import/data/test_ExampleWorks/Member/test_RaviWorks> ;
     inv:grantsRole inv:MemberRoleScheme-admin .
 
-<https://example.org/inventory-import/data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<https://example.org/inventory-import/data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant ;
+    inv:name "Example Works (test)" .
 
 <https://example.org/inventory-import/data/test_SecondOrg/Member/test_RaviSecond> a inv:Member ;
+    inv:memberAccount <https://example.org/inventory-import/fixture/SignInAccount/test_RaviAccount> ;
     inv:membershipIn <https://example.org/inventory-import/data/test_SecondOrg/Tenant/test_SecondOrg> ;
     inv:membershipOf <https://example.org/inventory-import/fixture/Person/test_Ravi> .
 
@@ -23,6 +26,11 @@
     inv:grantedTo <https://example.org/inventory-import/data/test_SecondOrg/Member/test_RaviSecond> ;
     inv:grantsRole inv:MemberRoleScheme-viewer .
 
-<https://example.org/inventory-import/data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+<https://example.org/inventory-import/data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant ;
+    inv:name "Second Org (test)" .
 
-<https://example.org/inventory-import/fixture/Person/test_Ravi> a inv:Person .
+<https://example.org/inventory-import/fixture/Person/test_Ravi> a inv:Person ;
+    inv:name "Ravi Example" .
+
+<https://example.org/inventory-import/fixture/SignInAccount/test_RaviAccount> a inv:SignInAccount ;
+    inv:accountEmail "test_ravi@example.org" .

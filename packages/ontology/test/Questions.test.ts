@@ -38,6 +38,7 @@ import {
   ontology,
   roleless,
   sameness,
+  stewardship,
   tenancy,
   trading
 } from "./support/fixtures.ts"
@@ -45,7 +46,7 @@ import {
 const type = `${RdfVocab.rdf.iri}type`
 const subClassOf = `${RdfVocab.rdfs.iri}subClassOf`
 
-const membersVariables = ["tenant", "person", "member", "role"]
+const membersVariables = ["tenant", "person", "name", "member", "email", "role"]
 const scopeVariables = ["member", "role", "scope"]
 
 /** The names of the fixture, built from the vocabulary. */
@@ -54,6 +55,7 @@ const names = Effect.map(threadContext, ({ vocabulary }) => {
   const data = (organization: string, key: string, id: string) => `${vocabulary.base}/data/${organization}/${key}/${id}`
   return {
     inv,
+    data,
     person: `${vocabulary.base}/fixture/Person/test_Ravi`,
     works: data("test_ExampleWorks", "Tenant", "test_ExampleWorks"),
     second: data("test_SecondOrg", "Tenant", "test_SecondOrg"),
@@ -62,14 +64,27 @@ const names = Effect.map(threadContext, ({ vocabulary }) => {
     admin: inv("MemberRoleScheme-admin"),
     editor: inv("MemberRoleScheme-editor"),
     viewer: inv("MemberRoleScheme-viewer"),
-    organizationScope: inv("GrantScopeKindScheme-organization")
+    organizationScope: inv("GrantScopeKindScheme-organization"),
+    account: `${vocabulary.base}/fixture/SignInAccount/test_RaviAccount`
   }
 })
 
+const raviEmail = "test_ravi@example.org"
+
+/** One row of CQ-P06 for Ravi: the person's name and the sign-in email the fixture writes by hand (decisions 133, 134). */
+const raviRow = (person: string, tenant: string, member: string, role: string, email: string) => [
+  tenant,
+  person,
+  "Ravi Example",
+  member,
+  email,
+  role
+]
+
 /** Section 5.3: exactly these two rows, in this order. One person, twice, with two roles. */
 const expectedMembers = Effect.map(names, (n) => [
-  [n.works, n.person, n.raviWorks, n.admin],
-  [n.second, n.person, n.raviSecond, n.viewer]
+  raviRow(n.person, n.works, n.raviWorks, n.admin, raviEmail),
+  raviRow(n.person, n.second, n.raviSecond, n.viewer, raviEmail)
 ])
 
 /** Decision 120: both of the person's grants, each at the organization's scope. */
@@ -110,6 +125,7 @@ const memberWithRole = (mark: S.Annotations.Key<Role>) =>
 const tradingVariables = ["tenant", "organization"]
 const tenancyVariables = ["record", "tenants"]
 const identityVariables = ["tenant", "a", "b", "decider", "at", "evidence"]
+const stewardshipVariables = ["tenant"]
 
 /** A party question's hand-written fixture as a graph: no record holds what it states, so nothing is lifted. */
 const fixtureGraph = (text: string) =>
@@ -152,8 +168,38 @@ describe("gate 8, the questions", () => {
       const n = yield* names
       const rows = yield* asked(graph, membersAndRoles, membersVariables)
       expect(A.filter(rows, ([tenant]) => tenant === n.second)).toStrictEqual([
-        [n.second, n.person, n.raviSecond, n.viewer]
+        raviRow(n.person, n.second, n.raviSecond, n.viewer, raviEmail)
       ])
+    })
+  )
+
+  // Decisions 133 and 134: the name is read on the person, required; the email on the member's sign-in account,
+  // optional, since the People page lists a member with no account.
+  it.effect("CQ-P06 lists a member with no account with no email, and no member whose person has no name", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const n = yield* names
+      const noAccount = dropped(graph, n.raviSecond, n.inv("memberAccount"))
+      expect(noAccount).toHaveLength(graph.length - 1)
+      const unaccounted = yield* asked(noAccount, membersAndRoles, membersVariables)
+      expect(unaccounted).toStrictEqual([
+        raviRow(n.person, n.works, n.raviWorks, n.admin, raviEmail),
+        raviRow(n.person, n.second, n.raviSecond, n.viewer, "")
+      ])
+      // Planted: the account untyped, so the email is read from nothing the vocabulary calls an account.
+      const untypedAccount = A.filter(graph, (triple) => !(triple.subject === n.account && triple.predicate === type))
+      expect(untypedAccount).toHaveLength(graph.length - 1)
+      const unsigned = yield* asked(untypedAccount, membersAndRoles, membersVariables)
+      expect(unsigned).toStrictEqual([
+        raviRow(n.person, n.works, n.raviWorks, n.admin, ""),
+        raviRow(n.person, n.second, n.raviSecond, n.viewer, "")
+      ])
+      // Planted: the person's name left out. The tenants' lifted names do not stand in for it.
+      const nameless = dropped(graph, n.person, n.inv("name"))
+      expect(nameless).toHaveLength(graph.length - 1)
+      expect(A.some(nameless, withPredicate(n.inv("name")))).toBe(true)
+      const unnamed = yield* asked(nameless, membersAndRoles, membersVariables)
+      expect(unnamed).toStrictEqual([])
     })
   )
 
@@ -177,7 +223,8 @@ describe("gate 8, the questions", () => {
         trading.query,
         roleless.query,
         tenancy.query,
-        identity.query
+        identity.query,
+        stewardship.query
       ]) {
         expect(query).toContain(`PREFIX inv: <${vocabulary.namespace}>`)
         expect(query).toContain(`PREFIX rdf: <${RdfVocab.rdf.iri}>`)
@@ -244,15 +291,17 @@ ASK { ?organization ${walk} inv:Organization }`
   it.effect("each question gives the same rows with every typed node one subclass down, its bare twin none", () =>
     Effect.gen(function* () {
       const graph = yield* threadGraph()
-      expect(movedDown(graph)).toHaveLength(graph.length + 4)
+      expect(movedDown(graph)).toHaveLength(graph.length + 5)
       const tradingGraph = yield* fixtureGraph(trading.fixture)
       const rolelessGraph = yield* fixtureGraph(roleless.fixture)
       const tenancyGraph = yield* fixtureGraph(tenancy.fixture)
       const identityGraph = yield* fixtureGraph(identity.fixture)
+      const stewardshipGraph = yield* fixtureGraph(stewardship.fixture)
       const questions: ReadonlyArray<readonly [ReadonlyArray<Triple>, string, ReadonlyArray<string>]> = [
         [graph, membersAndRoles, membersVariables],
         [graph, mutantThroughPerson, membersVariables],
         [graph, rolesAtScope, scopeVariables],
+        [stewardshipGraph, stewardship.query, stewardshipVariables],
         [tradingGraph, trading.query, tradingVariables],
         [rolelessGraph, roleless.query, tradingVariables],
         [tenancyGraph, tenancy.query, tenancyVariables],
@@ -281,7 +330,7 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
   it.effect("M1: the hand-written fixture cannot answer alone", () =>
     Effect.gen(function* () {
       const { written } = yield* parts
-      expect(written).toHaveLength(5)
+      expect(written).toHaveLength(10)
       const rows = yield* asked(written, membersAndRoles, membersVariables)
       expect(rows).toStrictEqual([])
     })
@@ -337,8 +386,8 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       const graph = yield* graphOf(context, Member, changed, threadHandWritten)
       const answer = yield* asked(graph, membersAndRoles, membersVariables)
       expect(answer).toStrictEqual([
-        [n.works, n.person, n.raviWorks, n.editor],
-        [n.second, n.person, n.raviSecond, n.viewer]
+        raviRow(n.person, n.works, n.raviWorks, n.editor, raviEmail),
+        raviRow(n.person, n.second, n.raviSecond, n.viewer, raviEmail)
       ])
     })
   )
@@ -349,17 +398,17 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       const n = yield* names
       const rows = yield* asked(graph, mutantThroughPerson, membersVariables)
       const asWritten = yield* asked(graph, membersAndRoles, membersVariables)
-      const wrong = [n.second, n.person, n.raviSecond, n.admin]
+      const wrong = raviRow(n.person, n.second, n.raviSecond, n.admin, raviEmail)
       // The mutant differs from the question by its join alone, so its four rows are compared whatever their order.
       const sorted = A.sort(A.map(rows, A.join(" ")), byCodePoint)
       expect(sorted).toStrictEqual(
         A.sort(
           A.map(
             [
-              [n.works, n.person, n.raviWorks, n.admin],
-              [n.works, n.person, n.raviWorks, n.viewer],
+              raviRow(n.person, n.works, n.raviWorks, n.admin, raviEmail),
+              raviRow(n.person, n.works, n.raviWorks, n.viewer, raviEmail),
               wrong,
-              [n.second, n.person, n.raviSecond, n.viewer]
+              raviRow(n.person, n.second, n.raviSecond, n.viewer, raviEmail)
             ],
             A.join(" ")
           ),
@@ -383,8 +432,10 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       const membersOnly = [
         link(n.raviWorks, type, n.inv("Member")),
         link(n.raviWorks, n.inv("membershipIn"), n.works),
+        literal(n.works, n.inv("name"), "Example Works (test)", `${RdfVocab.xsd.iri}string`),
         link(n.raviSecond, type, n.inv("Member")),
-        link(n.raviSecond, n.inv("membershipIn"), n.second)
+        link(n.raviSecond, n.inv("membershipIn"), n.second),
+        literal(n.second, n.inv("name"), "Second Org (test)", `${RdfVocab.xsd.iri}string`)
       ]
       expect(linesOf(without(graph, written))).toStrictEqual(linesOf(membersOnly))
       const decoded = yield* Effect.forEach(threadRows, (row) => S.decodeUnknownEffect(copy)(row), { concurrency: 1 })
@@ -451,6 +502,108 @@ describe("gate 8, the must-fail case of CQ-P11", () => {
       const less = A.filter(graph, (triple) => !withPredicate(n.inv("grantScope"))(triple))
       expect(less).toHaveLength(graph.length - 2)
       const rows = yield* asked(less, rolesAtScope, scopeVariables)
+      expect(rows).toStrictEqual([])
+    })
+  )
+})
+
+/** CQ-P07 as committed with one clause changed: each plant below is checked to change the text. */
+const plantedStewardship = (from: string, to: string) => {
+  const planted = Str.replace(from, to)(stewardship.query)
+  expect(planted).not.toBe(stewardship.query)
+  return planted
+}
+
+describe("gate 8, CQ-P07 and its must-fail cases", () => {
+  // Report 04 section 3.1 with decision 136: a tenant whose only admin is not active and a tenant with no members are
+  // the rows; test_FlourMill, an organization that is no tenant, is none; test_ExampleWorks keeps an active admin.
+  it.effect("CQ-P07: the tenant whose only admin is revoked and the tenant with no members keep no admin", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const rows = yield* asked(graph, stewardship.query, stewardshipVariables)
+      const empty = n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")
+      expect(rows).toStrictEqual([[empty], [n.second]])
+      // The companion: the tenants that keep one, which shows the fixture holds the rule's other side.
+      const keeping = plantedStewardship("FILTER NOT EXISTS {", "FILTER EXISTS {")
+      const kept = yield* asked(graph, keeping, stewardshipVariables)
+      expect(kept).toStrictEqual([[n.works]])
+    })
+  )
+
+  it.effect("the answer comes from the stage: the revoked admin made active keeps test_SecondOrg out of the rows", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const former = n.member("test_SecondFormerAdmin")
+      const status = n.inv("membershipStatus")
+      const restored = [...dropped(graph, former, status), link(former, status, n.inv("MembershipStatusScheme-active"))]
+      expect(restored).toHaveLength(graph.length)
+      const rows = yield* asked(restored, stewardship.query, stewardshipVariables)
+      expect(rows).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")]])
+    })
+  )
+
+  it.effect("planted: without the stage, the revoked admin still counts, and test_SecondOrg is no row", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const stageless = plantedStewardship(
+        `inv:membershipIn ?tenant ;
+            inv:membershipStatus inv:MembershipStatusScheme-active .`,
+        "inv:membershipIn ?tenant ."
+      )
+      const rows = yield* asked(graph, stageless, stewardshipVariables)
+      expect(rows).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")]])
+    })
+  )
+
+  it.effect("planted: started from the memberships, the tenant with no members is missed", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const fromMemberships = plantedStewardship(
+        "?tenant rdf:type/rdfs:subClassOf* inv:Tenant .",
+        "?anyone inv:membershipIn ?tenant ."
+      )
+      const rows = yield* asked(graph, fromMemberships, stewardshipVariables)
+      expect(A.dedupe(A.map(rows, A.join(" ")))).toStrictEqual([n.second])
+    })
+  )
+
+  it.effect("planted: started from the organizations, test_FlourMill, which is no tenant, is a row", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const fromOrganizations = plantedStewardship(
+        "?tenant rdf:type/rdfs:subClassOf* inv:Tenant .",
+        "?tenant rdf:type/rdfs:subClassOf* inv:Organization ."
+      )
+      const rows = yield* asked(graph, fromOrganizations, stewardshipVariables)
+      expect(rows).toContainEqual([n.organization("test_FlourMill")])
+      expect(rows).toHaveLength(3)
+    })
+  )
+
+  it.effect("planted: any role counts, so test_SecondOrg's active editor stands in for an admin", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const anyRole = plantedStewardship("inv:grantsRole inv:MemberRoleScheme-admin .", "inv:grantsRole ?role .")
+      const rows = yield* asked(graph, anyRole, stewardshipVariables)
+      expect(rows).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")]])
+    })
+  )
+
+  it.effect("planted: an admin of any tenant counts for every tenant once the membership's tenant is not read", () =>
+    Effect.gen(function* () {
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const anyTenant = plantedStewardship(
+        `inv:membershipIn ?tenant ;
+            inv:membershipStatus`,
+        "inv:membershipStatus"
+      )
+      const rows = yield* asked(graph, anyTenant, stewardshipVariables)
       expect(rows).toStrictEqual([])
     })
   )
@@ -1315,17 +1468,23 @@ describe("gate 8, the guards on the fixture's two parts", () => {
   it.effect("guard 1: the hand-written text states nothing the lift states", () =>
     Effect.gen(function* () {
       const { written, lifted } = yield* parts
-      expect(lifted).toHaveLength(12)
+      expect(lifted).toHaveLength(14)
       expect(linesOf(overreach(written, lifted))).toStrictEqual([])
-      // And it states what section 5.2 says no record holds: the person, the two tenants, the two links to the person.
+      // And it states what section 5.2 says no record holds: the person and their name, the two tenants, the two links
+      // to the person, and the sign-in account with its email and the two links to it (report 18 section 10).
       const n = yield* names
       expect(linesOf(written)).toStrictEqual(
         linesOf([
           link(n.person, type, n.inv("Person")),
+          literal(n.person, n.inv("name"), "Ravi Example", `${RdfVocab.xsd.iri}string`),
           link(n.works, type, n.inv("Tenant")),
           link(n.second, type, n.inv("Tenant")),
           link(n.raviWorks, n.inv("membershipOf"), n.person),
-          link(n.raviSecond, n.inv("membershipOf"), n.person)
+          link(n.raviSecond, n.inv("membershipOf"), n.person),
+          link(n.account, type, n.inv("SignInAccount")),
+          literal(n.account, n.inv("accountEmail"), "test_ravi@example.org", `${RdfVocab.xsd.iri}string`),
+          link(n.raviWorks, n.inv("memberAccount"), n.account),
+          link(n.raviSecond, n.inv("memberAccount"), n.account)
         ])
       )
     })
@@ -1346,6 +1505,28 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
+  // Decision 171: the lift writes each tenant's name, so a predicate alone would take the person's hand-written name
+  // for one the lift states. Subject and predicate together tell them apart.
+  it.effect(
+    "guard 1 reports a hand-written tenant name and passes the person's, whose predicate the lift uses too",
+    () =>
+      Effect.gen(function* () {
+        const { written, lifted } = yield* parts
+        const n = yield* names
+        const name = n.inv("name")
+        const personName = A.filter(written, (triple) => triple.subject === n.person && triple.predicate === name)
+        expect(personName).toHaveLength(1)
+        expect(A.filter(lifted, withPredicate(name))).toHaveLength(2)
+        expect(linesOf(overreach(personName, lifted))).toStrictEqual([])
+        const tenantName = literal(n.works, name, "Example Works (test)", `${RdfVocab.xsd.iri}string`)
+        // Planted with another value: the guard reads what a triple is about and by which property, not its value.
+        const renamed = literal(n.second, name, "Another name", `${RdfVocab.xsd.iri}string`)
+        expect(linesOf(overreach([...written, tenantName, renamed], lifted))).toStrictEqual(
+          linesOf([tenantName, renamed])
+        )
+      })
+  )
+
   it.effect("guard 2: the graph less the hand-written triples is the lift of the two rows, triple for triple", () =>
     Effect.gen(function* () {
       const { context, graph, written, lifted } = yield* parts
@@ -1358,9 +1539,9 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
-  // The forward plant of step 5 (PLAN, Steps 9 and 10): the party fixtures state thirteen properties no other text
-  // states, so guard 3 fed CQ-P06's text alone, as before step 5, reports them; and CQ-P04's fixture alone states the
-  // six of step 10, so with it left out guard 3 reports those six.
+  // The forward plant of step 5 (PLAN, Steps 9 to 11): the party fixtures state seventeen properties no other text
+  // states, so guard 3 fed CQ-P06's text alone, as before step 5, reports them; CQ-P04's fixture alone states the six
+  // of step 10, and CQ-P07's and model-call.ttl the four of step 11, so with one left out guard 3 reports its own.
   it.effect(
     "guard 3 reads every hand-written fixture text: with CQ-P06's alone or left out, a property is unshown",
     () =>
@@ -1373,7 +1554,9 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "CQ-P02.fixture.ttl",
           "CQ-P09.fixture.ttl",
           "CQ-P04.fixture.ttl",
-          "CQ-P05.fixture.ttl"
+          "CQ-P05.fixture.ttl",
+          "model-call.ttl",
+          "CQ-P07.fixture.ttl"
         ])
         const texts = yield* Effect.forEach(
           handWrittenFixtures,
@@ -1399,6 +1582,9 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "identityOutcome",
           "decidedBy",
           "citesEvidence",
+          "membershipStatus",
+          "callPurpose",
+          "calledFor",
           "sourceSystem",
           "sourceType",
           "sourceId",
@@ -1406,7 +1592,8 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "isCustomer",
           "isVendor",
           "eventTime",
-          "evidenceText"
+          "evidenceText",
+          "calledAt"
         ])
         const notIdentity = A.filter(texts, ({ name }) => name !== "CQ-P04.fixture.ttl")
         const withoutIdentity = A.flatMap(notIdentity, ({ graph }) => graph)
@@ -1419,6 +1606,15 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "eventTime",
           "evidenceText"
         ])
+        // Step 11's two fixtures: CQ-P07's alone states the stage, and model-call.ttl alone the model call's three.
+        const notStewardship = A.filter(texts, ({ name }) => name !== "CQ-P07.fixture.ttl")
+        const withoutStewardship = A.flatMap(notStewardship, ({ graph }) => graph)
+        expect(withoutStewardship).not.toStrictEqual([])
+        expect(unshown(context.vocabulary, withoutStewardship)).toStrictEqual(["membershipStatus"])
+        const notCalls = A.filter(texts, ({ name }) => name !== "model-call.ttl")
+        const withoutCalls = A.flatMap(notCalls, ({ graph }) => graph)
+        expect(withoutCalls).not.toStrictEqual([])
+        expect(unshown(context.vocabulary, withoutCalls)).toStrictEqual(["callPurpose", "calledFor", "calledAt"])
       })
   )
 

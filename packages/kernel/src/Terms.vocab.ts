@@ -8,8 +8,9 @@
  * is the text Benjamin accepted, word for word; change one only with a decision. The thread's terms are report 14
  * section 2's text as decision 111 accepted it, and they name 111: `Person` and `Organization` keep it with their
  * category parent `Party` (decision 12), `Person` with `storesId: false` (decision 161), and `grantScope` with its link
- * to `gist:isCategorizedBy` (decision 17), each listed by decision 176 without changing the term's text. The party
- * slice's terms are report 18's text as decision 176 accepted it, and they name 176. It is never built with
+ * to `gist:isCategorizedBy` (decision 17), each listed by decision 176 without changing the term's text. `Member`,
+ * whose definition, criterion and basis report 18 changed (decisions P2, 137, 154 and 158), names 176 instead. The
+ * party slice's terms are report 18's text as decision 176 accepted it, and they name 176. It is never built with
  * `Vocabulary.make`, whose record keys widen to `string` and would let any text pass as a term's name. `base` is the
  * one IRI literal; every other IRI of the vocabulary is derived from it.
  *
@@ -60,11 +61,12 @@ export const vocabulary = {
       ["PhysicalIdentifiableItem", "Content"]
     ],
     // Report 18 section 8, read from the pinned file: `isCategorizedBy` declares no domain and no range, `isAbout` the
-    // domain `gist:Content` and no range, and `atDateTime` no domain and the range `xsd:dateTime`.
+    // domain `gist:Content` and no range, `atDateTime` no domain and the range `xsd:dateTime`, and `name` neither.
     properties: {
       isCategorizedBy: { kind: "object" },
       isAbout: { kind: "object", domain: "Content" },
-      atDateTime: { kind: "datatype", range: "xsd:dateTime" }
+      atDateTime: { kind: "datatype", range: "xsd:dateTime" },
+      name: { kind: "datatype" }
     }
   },
   classes: {
@@ -109,15 +111,16 @@ export const vocabulary = {
     Member: {
       prefLabel: "Member",
       definition:
-        "A relationship between one person and one tenant that lets the person act in the tenant's workspace from the day it is made until it is removed.",
+        "A relationship between one person and one tenant, made when the person is invited or added and kept after it is removed or revoked, that lets the person act in the tenant's workspace or, where it names one, in that source's workspace, until it is removed and, where it states a stage, while that stage is active.",
       tag: "relator",
       parent: { kind: "gist", name: "TemporalRelation" },
       identity: {
         kind: "stated",
         criterion:
-          "the MemberId within its tenant, kept after removal. It rests on Member.id and Member.organizationId."
+          "the MemberId within its tenant, kept at every stage and after removal, revoked included; a membership that names a source's workspace is told apart by that link, and its own id in that source waits until the source's records are lifted (decision 158).",
+        restsOn: ["membershipIn"]
       },
-      ratification
+      ratification: partySlice
     },
     Role: {
       prefLabel: "Role",
@@ -213,6 +216,45 @@ export const vocabulary = {
         restsOn: ["inTenant"]
       },
       ratification: partySlice
+    },
+    AgentRun: {
+      prefLabel: "Agent run",
+      definition:
+        "An event in which a software agent acts for one signed-in member, never above that member's role nor above its own role cap.",
+      tag: "event",
+      storesId: false,
+      parent: { kind: "gist", name: "Event" },
+      identity: {
+        kind: "stated",
+        criterion: "the request it runs in; never the agent's name, which many runs share (decision 160)."
+      },
+      ratification: partySlice
+    },
+    ModelCall: {
+      prefLabel: "Model call",
+      definition:
+        "An event in which the app asks a language model one question for a tenant, taken from that tenant's daily allowance before it is asked.",
+      tag: "event",
+      parent: { kind: "gist", name: "Event" },
+      identity: {
+        kind: "stated",
+        criterion: "the tenant and the call's id, the modelCall table's key.",
+        restsOn: ["inTenant"]
+      },
+      ratification: partySlice
+    },
+    SignInAccount: {
+      prefLabel: "Sign-in account",
+      definition:
+        "A credential record that lets one person sign in to an application, this one or a source such as Sutton, before any organization is chosen.",
+      tag: "information",
+      parent: { kind: "gist", name: "Content" },
+      identity: {
+        kind: "stated",
+        criterion:
+          "the UserId this application gives the account, never its email, which can change (decision 104); an account another system issued, such as a Sutton User, waits until that system's records are lifted (decision 158)."
+      },
+      ratification: partySlice
     }
   },
   objectProperties: {
@@ -306,6 +348,56 @@ export const vocabulary = {
       range: { kind: "class", key: "IdentityEvidence" },
       evidence: "fixture",
       ratification: partySlice
+    },
+    membershipStatus: {
+      prefLabel: "membership status",
+      definition: "Links a membership to the stage it stands at: pending, active, suspended or revoked.",
+      domain: "Member",
+      range: { kind: "scheme", key: "MembershipStatusScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    memberAccount: {
+      prefLabel: "member account",
+      definition: "Links a membership to the sign-in account its person signs in with to act under that membership.",
+      domain: "Member",
+      range: { kind: "class", key: "SignInAccount" },
+      ratification: partySlice
+    },
+    recordedAgentRun: {
+      prefLabel: "recorded agent run",
+      definition:
+        "Links an audit entry to the agent run that made the change for the member it names, when an agent did.",
+      domain: "AuditEntry",
+      range: { kind: "class", key: "AgentRun" },
+      ratification: partySlice
+    },
+    maxRole: {
+      prefLabel: "max role",
+      definition:
+        "Links an agent run to the highest role it may act with, whatever the role of the member it acts for.",
+      domain: "AgentRun",
+      range: { kind: "class", key: "Role" },
+      ratification: partySlice
+    },
+    callPurpose: {
+      prefLabel: "call purpose",
+      definition:
+        "Links a model call to what it is for: reading a table request, checking the key, or suggesting fixes for an import.",
+      domain: "ModelCall",
+      range: { kind: "scheme", key: "ModelCallPurposeScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    calledFor: {
+      prefLabel: "called for",
+      definition: "Links a model call to the member whose action asked for it.",
+      domain: "ModelCall",
+      range: { kind: "class", key: "Member" },
+      evidence: "fixture",
+      ratification: partySlice
     }
   },
   datatypeProperties: {
@@ -391,6 +483,47 @@ export const vocabulary = {
       datatype: "xsd:string",
       evidence: "fixture",
       ratification: partySlice
+    },
+    joinedAt: {
+      prefLabel: "joined at",
+      definition:
+        "When the person could first act in the membership, as its record states it: for this app's members the moment an admin added them, for an invitee the moment the invitation was accepted.",
+      domain: "Member",
+      datatype: "xsd:dateTime",
+      ratification: partySlice
+    },
+    accountEmail: {
+      prefLabel: "account email",
+      definition: "The email a sign-in account signs in with, compared whatever its case.",
+      domain: "SignInAccount",
+      datatype: "xsd:string",
+      designation: "email",
+      ratification: partySlice
+    },
+    name: {
+      prefLabel: "name",
+      definition:
+        "The name people read for a party, a membership, a record or a place, which is never unique and never decides identity or permission.",
+      datatype: "xsd:string",
+      subPropertyOf: { kind: "gist", name: "name" },
+      designation: "name",
+      ratification: partySlice
+    },
+    agentName: {
+      prefLabel: "agent name",
+      definition: 'The agent\'s name as people read it in the activity list, such as "Assistant".',
+      domain: "AgentRun",
+      datatype: "xsd:string",
+      designation: "name",
+      ratification: partySlice
+    },
+    calledAt: {
+      prefLabel: "called at",
+      definition: "When a model call was taken from the tenant's daily allowance.",
+      domain: "ModelCall",
+      datatype: "xsd:dateTime",
+      evidence: "fixture",
+      ratification: partySlice
     }
   },
   schemes: {
@@ -458,6 +591,64 @@ export const vocabulary = {
           altLabels: ["Not a duplicate"],
           definition:
             "An identity outcome in which two source records a tenant holds are found to be records of two parties.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
+    },
+    MembershipStatusScheme: {
+      prefLabel: "Membership status",
+      definition:
+        "A controlled vocabulary of the stages a person's membership of a tenant passes through, from invited to revoked.",
+      closed: true,
+      concepts: {
+        pending: {
+          prefLabel: "Pending",
+          altLabels: ["Invited"],
+          definition:
+            "A membership status in which the person was invited and has not yet accepted, and cannot yet act under the membership.",
+          ratification: partySlice
+        },
+        active: {
+          prefLabel: "Active",
+          definition:
+            "A membership status in which the person may act in the workspace the membership lets them act in.",
+          ratification: partySlice
+        },
+        suspended: {
+          prefLabel: "Suspended",
+          definition:
+            "A membership status in which the person may not act in the workspace the membership lets them act in, the history kept, and from which the membership can be made active again.",
+          ratification: partySlice
+        },
+        revoked: {
+          prefLabel: "Revoked",
+          definition:
+            "A membership status in which the membership no longer lets, or will never let, the person act and is not made active again, its row kept so the audit trail still names it.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
+    },
+    ModelCallPurposeScheme: {
+      prefLabel: "Model call purpose",
+      definition:
+        "A controlled vocabulary of what a call to a language model is made for, each call drawn from the day's allowance.",
+      closed: true,
+      concepts: {
+        view: {
+          prefLabel: "Table request",
+          definition: "A model call purpose in which the table assistant reads a request in words.",
+          ratification: partySlice
+        },
+        check: {
+          prefLabel: "Key check",
+          definition: "A model call purpose in which the app checks that the model key works.",
+          ratification: partySlice
+        },
+        suggest: {
+          prefLabel: "Import suggestions",
+          definition: "A model call purpose in which the app asks for proposals for the rows of an import.",
           ratification: partySlice
         }
       },

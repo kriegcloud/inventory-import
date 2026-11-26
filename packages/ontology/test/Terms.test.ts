@@ -1,7 +1,7 @@
 // The vocabulary literal decodes strictly through `Vocabulary`, and gate 4's rules find nothing in it when the
 // exception list holds `Role` (decision 97) and `Party` (decision 176) and the decision log answers 97, 111 and 176.
 // Gate 4's own test reads the real log and the committed list; this test holds the literal itself: the thread's terms
-// with the party slice's steps 9 and 10 (goals/party-slice PLAN), at version 0.2.0 (decision 144).
+// with the party slice's steps 9, 10 and 11 (goals/party-slice PLAN), at version 0.2.0 (decision 144).
 import { describe, expect, it } from "@effect/vitest"
 import { Vocabulary } from "@beep/vocabulary/Model"
 import { coherenceFindings, ExceptionList } from "@beep/vocabulary/Rules"
@@ -33,10 +33,10 @@ describe("the vocabulary", () => {
       const decoded = yield* S.decodeEffect(Vocabulary, strict)(vocabulary)
       const list = yield* S.decodeEffect(ExceptionList, strict)(exceptions)
       expect(vocabulary.version).toBe("0.2.0")
-      expect(R.size(decoded.classes)).toBe(11)
-      expect([R.size(decoded.objectProperties), R.size(decoded.datatypeProperties)]).toStrictEqual([12, 10])
-      expect(R.size(decoded.schemes)).toBe(3)
-      expect(R.keys(decoded.gist.properties)).toStrictEqual(["isCategorizedBy", "isAbout", "atDateTime"])
+      expect(R.size(decoded.classes)).toBe(14)
+      expect([R.size(decoded.objectProperties), R.size(decoded.datatypeProperties)]).toStrictEqual([18, 15])
+      expect(R.size(decoded.schemes)).toBe(5)
+      expect(R.keys(decoded.gist.properties)).toStrictEqual(["isCategorizedBy", "isAbout", "atDateTime", "name"])
       expect(
         coherenceFindings({ vocabulary: decoded, exceptions: list, decisions: HashSet.make(97, 111, 176) })
       ).toEqual([])

@@ -59,10 +59,11 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
-  // Decision 129 with 176: each new term and Party's exception entry name the accepting decision, and the thread's 22
-  // terms keep 111, Person, Organization and grantScope among them, whose new links change no text of theirs.
+  // Decision 129 with 176: each new term and Party's exception entry name the accepting decision, and the thread's 21
+  // other terms keep 111, Person, Organization and grantScope among them, whose new links change no text of theirs.
+  // Member's text changed in step 11 (report 18 section 7), so it names 176 now.
   it.effect(
-    "the thread's 22 terms name decision 111, steps 9 and 10's twenty name 176, and so does Party's exception entry",
+    "the thread's 21 other terms name decision 111, the slice's forty-four name 176, and so does Party's exception entry",
     () =>
       Effect.gen(function* () {
         const decoded = yield* decodeVocabulary(vocabulary)
@@ -70,15 +71,25 @@ describe("gate 4, vocabulary coherence", () => {
         const named176 = A.filter(termRatifications(decoded), ([, decision]) => decision === 176)
         const named111 = A.filter(termRatifications(decoded), ([, decision]) => decision === 111)
         expect(A.map(named176, ([key]) => key)).toStrictEqual([
+          "Member",
           "Party",
           "SourceRecord",
           "IdentityDecision",
           "IdentityEvidence",
+          "AgentRun",
+          "ModelCall",
+          "SignInAccount",
           "recordOf",
           "decidesOn",
           "identityOutcome",
           "decidedBy",
           "citesEvidence",
+          "membershipStatus",
+          "memberAccount",
+          "recordedAgentRun",
+          "maxRole",
+          "callPurpose",
+          "calledFor",
           "sourceSystem",
           "sourceType",
           "sourceId",
@@ -87,15 +98,29 @@ describe("gate 4, vocabulary coherence", () => {
           "isVendor",
           "eventTime",
           "evidenceText",
+          "joinedAt",
+          "accountEmail",
+          "name",
+          "agentName",
+          "calledAt",
           "IdentityOutcomeScheme",
           "sameParty",
-          "differentParties"
+          "differentParties",
+          "MembershipStatusScheme",
+          "pending",
+          "active",
+          "suspended",
+          "revoked",
+          "ModelCallPurposeScheme",
+          "view",
+          "check",
+          "suggest"
         ])
-        expect(named111).toHaveLength(22)
+        expect(named111).toHaveLength(21)
         expect(A.map(named111, ([key]) => key)).toEqual(
           expect.arrayContaining(["Person", "Organization", "grantScope"])
         )
-        expect(termRatifications(decoded)).toHaveLength(42)
+        expect(termRatifications(decoded)).toHaveLength(65)
         expect(A.map(exceptions, (entry) => [entry.class, entry.ratification.decision])).toEqual([
           ["Role", 97],
           ["Party", 176]
@@ -175,7 +200,7 @@ describe("gate 4, vocabulary coherence", () => {
         expect(coherenceFindings({ vocabulary: decoded, exceptions, decisions })).toEqual([])
         // The copy's own terms name decisions 12, 33 and 35, each a heading of the real log (rule C12), beside the
         // kernel's 111 and 176.
-        expect(A.dedupe(termDecisions(decoded))).toEqual([111, 12, 176, 33, 35])
+        expect(A.dedupe(termDecisions(decoded))).toEqual([111, 176, 12, 33, 35])
       })
   )
 
@@ -239,7 +264,7 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
-  it.effect("reports exactly C9 on the three relations under a gist property that leaves the gist list", () =>
+  it.effect("reports exactly C9 on every relation and attribute under a gist property that leaves the gist list", () =>
     Effect.gen(function* () {
       const planted = {
         ...constructsVocabulary,
@@ -254,11 +279,15 @@ describe("gate 4, vocabulary coherence", () => {
       }
       const found = yield* findingsOfCopy(planted)
       // The retired relation is held to its gist parent too: C9 reads every property, live or retired. The kernel's
-      // identityOutcome sits under isCategorizedBy too (decision 176), and eventTime keeps atDateTime on the list.
+      // identityOutcome, membershipStatus and callPurpose sit under isCategorizedBy too, and name under gist's name
+      // (decision 176); eventTime keeps atDateTime on the list.
       expect(found).toEqual([
         ["C9", "objectProperty", "grantScope"],
         ["C9", "objectProperty", "identityOutcome"],
-        ["C9", "objectProperty", "workspaceMembership"]
+        ["C9", "objectProperty", "membershipStatus"],
+        ["C9", "objectProperty", "callPurpose"],
+        ["C9", "objectProperty", "workspaceMembership"],
+        ["C9", "datatypeProperty", "name"]
       ])
     })
   )
@@ -266,28 +295,13 @@ describe("gate 4, vocabulary coherence", () => {
 
 // V18 (decision 146) on the kernel's terms: CQ-I08 asks what tells two records of a class apart, and C16 holds that
 // the properties a criterion rests on are the vocabulary's and that none of them is a name or an email. The kernel
-// states no `restsOn` yet, so these copies add them, with a `name` attribute planted beside the terms (decision 132
-// links a name to gist's `name`; report 18 enters the real one).
-const named132 = {
-  ...constructsVocabulary,
-  datatypeProperties: {
-    ...constructsVocabulary.datatypeProperties,
-    name: {
-      prefLabel: "name",
-      definition: "What an organization is called, a planted attribute of this test's own.",
-      domain: "Organization",
-      datatype: "xsd:string",
-      designation: "name",
-      evidence: "fixture",
-      ratification: { decision: 132 }
-    }
-  }
-} as const
+// states `restsOn` for Member and ModelCall (report 18), so these copies add it for AuditEntry and Grant, and plant the
+// kernel's own `name` (report 18 section 5, under gist's `name`, a designation) under Organization's criterion.
+const { classes } = constructsVocabulary
 
 /** The copy with Member, AuditEntry and Grant each resting on the relation that holds it to the others. */
-const { classes } = named132
 const restingOn = {
-  ...named132,
+  ...constructsVocabulary,
   classes: {
     ...classes,
     Member: { ...classes.Member, identity: { ...classes.Member.identity, restsOn: ["membershipIn"] } },

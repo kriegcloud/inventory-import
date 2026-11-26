@@ -2,7 +2,12 @@
 @prefix inv: <https://example.org/inventory-import/ontology/> .
 
 <fixture/Person/test_Ravi> a inv:Person .
+<fixture/Person/test_Ravi> inv:name "Ravi Example" .
 <data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
 <data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
 <data/test_ExampleWorks/Member/test_RaviWorks> inv:membershipOf <fixture/Person/test_Ravi> .
 <data/test_SecondOrg/Member/test_RaviSecond> inv:membershipOf <fixture/Person/test_Ravi> .
+<fixture/SignInAccount/test_RaviAccount> a inv:SignInAccount .
+<fixture/SignInAccount/test_RaviAccount> inv:accountEmail "test_ravi@example.org" .
+<data/test_ExampleWorks/Member/test_RaviWorks> inv:memberAccount <fixture/SignInAccount/test_RaviAccount> .
+<data/test_SecondOrg/Member/test_RaviSecond> inv:memberAccount <fixture/SignInAccount/test_RaviAccount> .

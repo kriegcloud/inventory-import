@@ -11,6 +11,11 @@
  * writes no node of a class that stores no id (decision 135), as a record, a path's node or a link's object: an IRI
  * made from another record's id would say each such record is its own instance, which nobody decided.
  *
+ * A path that ends in an attribute states nothing, an absent value included, and the record still lifts (decision
+ * 155): no record identifies the person, the account or the run such a path passes through. The one exception is a
+ * path whose node step is a relation another field of the same record fills (decision 161): its node is that field's
+ * object, untyped here, and the literal is written on it, so `Member.organizationName` names the tenant.
+ *
  * @packageDocumentation
  */
 import { RangeTarget, type Vocabulary, type XsdDatatype } from "@beep/vocabulary/Model"
@@ -84,7 +89,7 @@ const objectOf = Effect.fnUntraced(function* (
   const { vocabulary } = context
   const at = O.some(field.name)
   if (property.kind === "datatype") {
-    // A path's last step: no mark ends a path at an attribute, so the node it would make is not built for one.
+    // A path that ends in an attribute is read by `attributePath`; reaching here, the attribute is a node step's.
     return yield* refused(at, `${property.key} takes a literal, which the lift writes for a field's own property only`)
   }
   const pointed = O.flatMap(O.flatMap(schemaTermOf(field.ast), localOf(context.prefix)), (local) =>
@@ -212,6 +217,63 @@ const propertyNamed = Effect.fnUntraced(function* (context: LiftContext, field: 
   return property.value
 })
 
+/** What a path reads of the record beyond its own field: the fields that name a property, and their values. */
+type Siblings = {
+  readonly fields: ReadonlyArray<Field>
+  readonly termOf: (field: Field) => O.Option<string>
+  readonly valueOf: (field: Field) => unknown
+}
+
+/**
+ * What a path that ends in an attribute states (decisions 155 and 161): the literal on the node another field's
+ * relation names, when the path's one node step is that relation, forward; nothing otherwise, whatever the node's class
+ * stores. A reused step that fixes a concept is refused, since it would state on another record's node what no field
+ * states, and so is a relation two fields name, whose node is then undecided.
+ */
+const attributePath = Effect.fnUntraced(function* (
+  context: LiftContext,
+  organization: string,
+  field: Field,
+  path: LiftPathRead,
+  property: Attribute,
+  value: unknown,
+  encoded: O.Option<unknown>,
+  siblings: Siblings
+) {
+  const at = O.some(field.name)
+  const step = A.head(A.dropRight(path, 1))
+  const last = A.last(path)
+  if (O.isNone(step) || O.isNone(last) || !("node" in step.value)) {
+    return yield* refused(at, `${property.key} takes a literal, which the lift writes for a field's own property only`)
+  }
+  if (O.isSome(step.value.reverse)) {
+    return []
+  }
+  const linking = step.value.property
+  const key = localOf(context.prefix)(linking)
+  const filling = A.filter(
+    siblings.fields,
+    (other) => other.name !== field.name && O.exists(key, (local) => O.contains(siblings.termOf(other), local))
+  )
+  const filler = A.head(filling)
+  if (O.isNone(filler)) {
+    return []
+  }
+  if (filling.length > 1) {
+    return yield* refused(at, `${filling.length} fields fill ${linking}, so the path's node is undecided`)
+  }
+  if (step.value.fixed.length > 0) {
+    return yield* refused(
+      at,
+      `the node ${linking} names is another field's, and a fixed concept on it is stated by no field`
+    )
+  }
+  const relation = yield* propertyNamed(context, O.some(filler.value.name), linking)
+  const node = yield* objectOf(context, organization, relation, filler.value, siblings.valueOf(filler.value))
+  const predicate = yield* iriOf(context, at, last.value.property)
+  return yield* literalsOf(property, field, node, predicate, value, encoded)
+})
+
 /** The triples of one path: at most one node step, then the value step (section 4.3). */
 const pathTriples = Effect.fnUntraced(function* (
   context: LiftContext,
@@ -219,13 +281,19 @@ const pathTriples = Effect.fnUntraced(function* (
   subject: Iri,
   field: Field,
   path: LiftPathRead,
-  value: unknown
+  value: unknown,
+  encoded: O.Option<unknown>,
+  siblings: Siblings
 ) {
   const at = O.some(field.name)
   const nodeSteps = A.dropRight(path, 1)
   const last = A.last(path)
   if (nodeSteps.length > 1 || O.isNone(last)) {
     return yield* refused(at, "a path is at most one node step and then one value step")
+  }
+  const ending = yield* propertyNamed(context, at, last.value.property)
+  if (ending.kind === "datatype") {
+    return yield* attributePath(context, organization, field, path, ending, value, encoded, siblings)
   }
   const triples: Array<Triple> = []
   let from = subject
@@ -248,9 +316,8 @@ const pathTriples = Effect.fnUntraced(function* (
     triples.push(O.isSome(step.reverse) ? link(node, linking, subject) : link(subject, linking, node))
     from = node
   }
-  const property = yield* propertyNamed(context, at, last.value.property)
   const predicate = yield* iriOf(context, at, last.value.property)
-  const object = yield* objectOf(context, organization, property, field, value)
+  const object = yield* objectOf(context, organization, ending, field, value)
   return [...triples, link(from, predicate, object)]
 })
 
@@ -261,10 +328,11 @@ const pathTriples = Effect.fnUntraced(function* (
  *
  * It fails with `LiftRefused` when the record names no class or one that stores no id, when not exactly one field is
  * its id, when its tenant is not named by exactly one field or given beside it (and not both), when a field is
- * unmarked, when a mark cannot be followed, when a path's node or a link's object is of a class that stores no id, or
- * when a literal's value is not one its datatype writes.
+ * unmarked, when a mark cannot be followed, when a path's node or a link's object is of a class that stores no id, when
+ * a path ending in an attribute reuses a node two fields fill or fixes a concept on it, or when a literal's value is not
+ * one its datatype writes.
  *
- * @example lift(context, Member, member) // six triples: the member, its tenant, and the grant its role is
+ * @example lift(context, Member, member) // seven triples: the member, its tenant, the grant its role is, the tenant's name
  */
 export const lift = Effect.fnUntraced(function* <Record extends S.Top & { readonly EncodingServices: never }>(
   context: LiftContext,
@@ -333,7 +401,20 @@ export const lift = Effect.fnUntraced(function* <Record extends S.Top & { readon
       continue
     }
     if (MarkReading.guards.path(field.mark)) {
-      const made = yield* pathTriples(context, organization, subject, field, field.mark.path, valueOf(field))
+      const made = yield* pathTriples(
+        context,
+        organization,
+        subject,
+        field,
+        field.mark.path,
+        valueOf(field),
+        encodedOf(field),
+        {
+          fields,
+          termOf,
+          valueOf
+        }
+      )
       triples.push(...made)
       continue
     }

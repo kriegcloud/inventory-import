@@ -90,7 +90,8 @@ Properties gist offers for these classes (all exist in 14.1.0 as named): `gist:h
 `gist:isAbout`, `gist:hasBroader`, `gist:isIdentifiedBy`, `gist:idText`, `gist:uniqueText`, `gist:isAllocatedBy`,
 `gist:name`, `gist:atDateTime`, `gist:plannedStartDateTime`, `gist:actualStartDateTime`. Use one direction of each;
 gist itself defines no `gist:hasPart`, and none is added here. The thin thread takes no gist property; the party slice
-takes `gist:isCategorizedBy` and `gist:isAbout` first, then `gist:atDateTime` (report 18 section 8, decision 176). When
+takes `gist:isCategorizedBy` and `gist:isAbout` first, then `gist:atDateTime`, then `gist:name` (report 18 section 8,
+decision 176). When
 a slice takes one, copy its named `rdfs:subPropertyOf` links, never its domain or range. Put an `inv:` property under it
 only if the local property's domain and range fall under the gist property's (decision 16).
 

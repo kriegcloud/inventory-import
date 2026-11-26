@@ -1,0 +1,30 @@
+# The fixture model-call.ttl (report 18 sections 4 and 10, decision 130): three calls test_ExampleWorks took from its
+# daily allowance on 2026-11-01, one of each purpose, each for test_Dana and each stating its tenant, on which
+# ModelCall's criterion rests. No question reads it: guard 3 reads it for callPurpose, calledFor and calledAt, and gate
+# 9 runs on it from step 13. Nothing here is a record of this app, and every name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+
+<fixture/Member/test_Dana> a inv:Member ;
+  inv:membershipIn <data/test_ExampleWorks/Tenant/test_ExampleWorks> .
+
+<fixture/ModelCall/test_ViewCall> a inv:ModelCall ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:callPurpose inv:ModelCallPurposeScheme-view ;
+  inv:calledFor <fixture/Member/test_Dana> ;
+  inv:calledAt "2026-11-01T09:00:00Z"^^xsd:dateTime .
+
+<fixture/ModelCall/test_CheckCall> a inv:ModelCall ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:callPurpose inv:ModelCallPurposeScheme-check ;
+  inv:calledFor <fixture/Member/test_Dana> ;
+  inv:calledAt "2026-11-01T10:00:00Z"^^xsd:dateTime .
+
+<fixture/ModelCall/test_SuggestCall> a inv:ModelCall ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:callPurpose inv:ModelCallPurposeScheme-suggest ;
+  inv:calledFor <fixture/Member/test_Dana> ;
+  inv:calledAt "2026-11-01T11:00:00Z"^^xsd:dateTime .

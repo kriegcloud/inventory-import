@@ -1,5 +1,5 @@
-// The lift, `graphOf` and `threadGraph` (report 14 section 4), in memory. The seventeen triples of section 4.4 are
-// asserted on the value `threadGraph()` returns, and every expected IRI is built from the vocabulary's `base` and
+// The lift, `graphOf` and `threadGraph` (report 14 section 4), in memory. The thread's twenty-four triples (section 4.4,
+// with step 11's tenant names and hand-written person's name and account) are asserted on the value `threadGraph()` returns, and every expected IRI is built from the vocabulary's `base` and
 // namespace, never written out.
 //
 // The planted cases hold the lift to its marks: a copy of `Member` whose `role` mark is changed gives other triples,
@@ -10,6 +10,11 @@
 // has a boolean field; each value its datatype does not write is planted and refused. The People page's `Person`
 // names no tenant, so its caller gives one beside the rows, and a tenant given to a record that names its own is
 // refused (PLAN, "Choices made").
+//
+// A path that ends in an attribute (party slice, step 11; decisions 155 and 161): it states nothing, and the record still
+// lifts, unless its node step is a relation another field fills, whose object then carries the literal, untyped. Each
+// branch is planted on a struct beside the kernel's records: the reuse with a fixed concept, two fields filling the
+// relation, a reverse step, and a node step no field fills, each with the near miss that differs from it by one step.
 //
 // A class that stores no id (party slice, step 7; decision 135): on copies of the kernel's terms with one class's
 // records storing no id, the lift makes no node of it as a record, as a path's node or as a link's object, and the
@@ -26,7 +31,7 @@ import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
 import { vocabulary as kernelTerms } from "@inventory/kernel/Terms"
 import { aboutClass, aboutPath, aboutProperty, noTerm } from "@inventory/kernel/TermsPointer"
-import { Instant } from "@inventory/kernel/Text"
+import { DisplayName, Instant } from "@inventory/kernel/Text"
 import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
 import * as A from "effect/Array"
 import * as Duration from "effect/Duration"
@@ -47,12 +52,21 @@ const xsd = (local: string) => `${RdfVocab.xsd.iri}${local}`
 const memberWith = (fields: Partial<typeof Member.fields>) =>
   S.Struct({ ...Member.fields, ...fields }).pipe(S.annotate(aboutClass("inv:Member")))
 
-/** The six triples section 4.2 gives one member, and the names its fixture triples use. */
+/** The thread's tenants by organization id, with the name each member row gives its organization. */
+const tenantNames = { test_ExampleWorks: "Example Works (test)", test_SecondOrg: "Second Org (test)" } as const
+
+/**
+ * The seven triples one member lifts to: section 4.2's six, then its tenant's name on the tenant (decision 161), and
+ * the names its fixture triples use.
+ */
 const names = Effect.map(threadContext, ({ vocabulary }) => {
   const inv = (local: string) => `${vocabulary.namespace}${local}`
   const data = (organization: string, key: string, id: string) => `${vocabulary.base}/data/${organization}/${key}/${id}`
   const person = `${vocabulary.base}/fixture/Person/test_Ravi`
-  const lifted = (organization: string, id: string, role: string) => {
+  const account = `${vocabulary.base}/fixture/SignInAccount/test_RaviAccount`
+  const tenantName = (organization: keyof typeof tenantNames) =>
+    literal(data(organization, "Tenant", organization), inv("name"), tenantNames[organization], xsd("string"))
+  const lifted = (organization: keyof typeof tenantNames, id: string, role: string) => {
     const member = data(organization, "Member", id)
     const grant = `${member}/role`
     return [
@@ -61,17 +75,25 @@ const names = Effect.map(threadContext, ({ vocabulary }) => {
       link(grant, type, inv("Grant")),
       link(grant, inv("grantScope"), inv("GrantScopeKindScheme-organization")),
       link(grant, inv("grantedTo"), member),
-      link(grant, inv("grantsRole"), inv(`MemberRoleScheme-${role}`))
+      link(grant, inv("grantsRole"), inv(`MemberRoleScheme-${role}`)),
+      tenantName(organization)
     ]
   }
+  const works = data("test_ExampleWorks", "Member", "test_RaviWorks")
+  const second = data("test_SecondOrg", "Member", "test_RaviSecond")
   const written = [
     link(person, type, inv("Person")),
+    literal(person, inv("name"), "Ravi Example", xsd("string")),
     link(data("test_ExampleWorks", "Tenant", "test_ExampleWorks"), type, inv("Tenant")),
     link(data("test_SecondOrg", "Tenant", "test_SecondOrg"), type, inv("Tenant")),
-    link(data("test_ExampleWorks", "Member", "test_RaviWorks"), inv("membershipOf"), person),
-    link(data("test_SecondOrg", "Member", "test_RaviSecond"), inv("membershipOf"), person)
+    link(works, inv("membershipOf"), person),
+    link(second, inv("membershipOf"), person),
+    link(account, type, inv("SignInAccount")),
+    literal(account, inv("accountEmail"), "test_ravi@example.org", xsd("string")),
+    link(works, inv("memberAccount"), account),
+    link(second, inv("memberAccount"), account)
   ]
-  return { inv, data, lifted, written }
+  return { inv, data, lifted, tenantName, written }
 })
 
 /** An audit entry of the thread's tenant with the fields given beside its id and tenant: a struct planted in `Activity`'s place. */
@@ -144,13 +166,13 @@ const ravi = S.decodeEffect(Member)({
 })
 
 describe("the lift", () => {
-  it.effect("gives one Member the six triples of section 4.2", () =>
+  it.effect("gives one Member section 4.2's six triples and its tenant's name, and nothing for its person's name", () =>
     Effect.gen(function* () {
       const context = yield* threadContext
       const member = yield* ravi
       const { lifted } = yield* names
       const triples = yield* lift(context, Member, member)
-      expect(triples).toHaveLength(6)
+      expect(triples).toHaveLength(7)
       expect(linesOf(triples)).toStrictEqual(linesOf(lifted("test_ExampleWorks", "test_RaviWorks", "admin")))
     })
   )
@@ -162,7 +184,8 @@ describe("the lift", () => {
       const { lifted } = yield* names
       const unmarked = memberWith({ role: Role.pipe(S.annotateKey(noTerm("screen"))) })
       const triples = yield* lift(context, unmarked, member)
-      expect(linesOf(triples)).toStrictEqual(linesOf(A.take(lifted("test_ExampleWorks", "test_RaviWorks", "admin"), 2)))
+      const all = lifted("test_ExampleWorks", "test_RaviWorks", "admin")
+      expect(linesOf(triples)).toStrictEqual(linesOf([...A.take(all, 2), ...A.takeRight(all, 1)]))
     })
   )
 
@@ -170,7 +193,7 @@ describe("the lift", () => {
     Effect.gen(function* () {
       const context = yield* threadContext
       const person = yield* ravi
-      const { inv, data } = yield* names
+      const { inv, data, tenantName } = yield* names
       const other = memberWith({
         role: Role.pipe(
           S.annotateKey(
@@ -186,7 +209,8 @@ describe("the lift", () => {
           link(member, inv("membershipIn"), data("test_ExampleWorks", "Tenant", "test_ExampleWorks")),
           link(`${member}/role`, type, inv("Grant")),
           link(member, inv("grantedTo"), `${member}/role`),
-          link(`${member}/role`, inv("grantsRole"), inv("MemberRoleScheme-admin"))
+          link(`${member}/role`, inv("grantsRole"), inv("MemberRoleScheme-admin")),
+          tenantName("test_ExampleWorks")
         ])
       )
     })
@@ -309,16 +333,16 @@ describe("the lift's literals", () => {
       const context = yield* copyContext
       const { inv, lifted } = yield* names
       const member = `${context.vocabulary.base}/data/test_ExampleWorks/Member/test_RaviWorks`
-      const six = lifted("test_ExampleWorks", "test_RaviWorks", "admin")
+      const seven = lifted("test_ExampleWorks", "test_RaviWorks", "admin")
       const held = yield* S.decodeUnknownEffect(heldMember)({ ...raviRow, onHold: true })
       const free = yield* S.decodeUnknownEffect(heldMember)({ ...raviRow, onHold: false })
       const heldTriples = yield* lift(context, heldMember, held)
       const freeTriples = yield* lift(context, heldMember, free)
       expect(linesOf(heldTriples)).toStrictEqual(
-        linesOf([...six, literal(member, inv("onHold"), "true", xsd("boolean"))])
+        linesOf([...seven, literal(member, inv("onHold"), "true", xsd("boolean"))])
       )
       expect(linesOf(freeTriples)).toStrictEqual(
-        linesOf([...six, literal(member, inv("onHold"), "false", xsd("boolean"))])
+        linesOf([...seven, literal(member, inv("onHold"), "false", xsd("boolean"))])
       )
       const worded = yield* S.decodeUnknownEffect(wordedMember)({ ...raviRow, onHold: "true" })
       const refusal = yield* Effect.flip(lift(context, wordedMember, worded))
@@ -369,17 +393,43 @@ describe("the tenant given beside the rows", () => {
     () =>
       Effect.gen(function* () {
         const context = yield* threadContext
-        const { inv, data, lifted } = yield* names
+        const { inv, data, lifted, tenantName } = yield* names
         const row = yield* person
         const triples = yield* lift({ ...context, organization: O.some("test_ExampleWorks") }, Person, row)
         const member = data("test_ExampleWorks", "Member", "test_RaviWorks")
         const tenant = link(member, inv("membershipIn"), data("test_ExampleWorks", "Tenant", "test_ExampleWorks"))
-        // Member's six triples less the one its organizationId states: Person names no tenant, so it states none.
+        // Member's seven triples less the two its organization's fields state: Person names no tenant, so it states
+        // neither the link nor the tenant's name, and its name's path, whose person no field fills, states nothing.
         expect(triples).toHaveLength(5)
         expect(linesOf(triples)).toStrictEqual(
-          linesOf(without(lifted("test_ExampleWorks", "test_RaviWorks", "admin"), [tenant]))
+          linesOf(
+            without(lifted("test_ExampleWorks", "test_RaviWorks", "admin"), [tenant, tenantName("test_ExampleWorks")])
+          )
         )
       })
+  )
+
+  it.effect("writes Person's joinedAt on the member, and nothing for its email, whose account no field fills", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const { inv, data, lifted, tenantName } = yield* names
+      const row = yield* S.decodeEffect(Person)({
+        memberId: "test_RaviWorks",
+        name: "Ravi Example",
+        email: "test_ravi@example.org",
+        role: "admin",
+        joinedAt: "2026-11-01T09:00:00.000Z"
+      })
+      const triples = yield* lift({ ...context, organization: O.some("test_ExampleWorks") }, Person, row)
+      const member = data("test_ExampleWorks", "Member", "test_RaviWorks")
+      const tenant = link(member, inv("membershipIn"), data("test_ExampleWorks", "Tenant", "test_ExampleWorks"))
+      expect(linesOf(triples)).toStrictEqual(
+        linesOf([
+          ...without(lifted("test_ExampleWorks", "test_RaviWorks", "admin"), [tenant, tenantName("test_ExampleWorks")]),
+          literal(member, inv("joinedAt"), "2026-11-01T09:00:00.000Z", xsd("dateTime"))
+        ])
+      )
+    })
   )
 
   it.effect("refuses Person with no tenant given, and a given tenant that is no id", () =>
@@ -414,12 +464,12 @@ describe("the tenant given beside the rows", () => {
 })
 
 describe("the thread's graph", () => {
-  it.effect("is the seventeen triples of section 4.4: twelve lifted, five hand-written", () =>
+  it.effect("is twenty-four triples: fourteen lifted, ten hand-written", () =>
     Effect.gen(function* () {
       const { lifted, written } = yield* names
       const graph = yield* threadGraph()
-      expect(graph).toHaveLength(17)
-      expect(linesOf(graph)).toHaveLength(17)
+      expect(graph).toHaveLength(24)
+      expect(linesOf(graph)).toHaveLength(24)
       expect(linesOf(graph)).toStrictEqual(
         linesOf([
           ...lifted("test_ExampleWorks", "test_RaviWorks", "admin"),
@@ -430,7 +480,7 @@ describe("the thread's graph", () => {
     })
   )
 
-  it.effect("reads the hand-written fixture as its five triples", () =>
+  it.effect("reads the hand-written fixture as its ten triples", () =>
     Effect.gen(function* () {
       const context = yield* threadContext
       const { written } = yield* names
@@ -461,6 +511,138 @@ describe("the thread's graph", () => {
       expect(blank).toHaveProperty("_tag", "TurtleRefused")
       const broken = yield* Effect.flip(graphOf(context, Member, threadRows, "<a> <b"))
       expect(broken).toHaveProperty("_tag", "TurtleRefused")
+    })
+  )
+})
+
+/** The actor's name reached by the path given: a field whose path the reuse may read. */
+const actorNamed = (mark: S.Annotations.Key<string>) => DisplayName.pipe(S.annotateKey(mark))
+
+const actorLink = MemberId.pipe(S.annotateKey(aboutProperty("inv:recordedActor")))
+
+describe("a path that ends in an attribute (decisions 155 and 161)", () => {
+  it.effect("states nothing for Activity's agent, a run no record identifies, and the entry still lifts", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const row = {
+        id: entryId,
+        organizationId: "test_ExampleWorks",
+        actorId: "test_RaviWorks",
+        actorName: "Ravi Example",
+        action: "Imported items",
+        detail: "Created 11 items from items.csv",
+        createdAt: "2026-11-01T09:00:00Z"
+      }
+      const byPerson = yield* S.decodeEffect(Activity)({ ...row, agent: null })
+      const byAgent = yield* S.decodeEffect(Activity)({ ...row, agent: "Table assistant" })
+      const alone = yield* lift(context, Activity, byPerson)
+      const helped = yield* lift(context, Activity, byAgent)
+      expect(alone).toHaveLength(5)
+      expect(linesOf(helped)).toStrictEqual(linesOf(alone))
+    })
+  )
+
+  it.effect("near miss: a field filling the node step's relation takes the literal on its object, untyped", () =>
+    Effect.gen(function* () {
+      const { inv, data } = yield* names
+      const { entry, head } = yield* entryNames
+      const actor = data("test_ExampleWorks", "Member", "test_RaviWorks")
+      const triples = yield* liftEntry(
+        {
+          actorId: actorLink,
+          actorName: actorNamed(
+            aboutPath([{ property: "inv:recordedActor", node: "inv:Member" }, { property: "inv:name" }])
+          )
+        },
+        { actorId: "test_RaviWorks", actorName: "Ravi Example" }
+      )
+      expect(linesOf(triples)).toStrictEqual(
+        linesOf([
+          ...head,
+          link(entry, inv("recordedActor"), actor),
+          literal(actor, inv("name"), "Ravi Example", xsd("string"))
+        ])
+      )
+    })
+  )
+
+  it.effect("planted: with no field filling the relation the same path states nothing", () =>
+    Effect.gen(function* () {
+      const { head } = yield* entryNames
+      const triples = yield* liftEntry(
+        {
+          actorName: actorNamed(
+            aboutPath([{ property: "inv:recordedActor", node: "inv:Member" }, { property: "inv:name" }])
+          )
+        },
+        { actorName: "Ravi Example" }
+      )
+      expect(linesOf(triples)).toStrictEqual(linesOf(head))
+    })
+  )
+
+  it.effect("planted: a reverse step is not the other field's link, so the path states nothing", () =>
+    Effect.gen(function* () {
+      const { inv, data } = yield* names
+      const { entry, head } = yield* entryNames
+      const triples = yield* liftEntry(
+        {
+          actorId: actorLink,
+          actorName: actorNamed(
+            aboutPath([{ property: "inv:recordedActor", reverse: true, node: "inv:Member" }, { property: "inv:name" }])
+          )
+        },
+        { actorId: "test_RaviWorks", actorName: "Ravi Example" }
+      )
+      expect(linesOf(triples)).toStrictEqual(
+        linesOf([...head, link(entry, inv("recordedActor"), data("test_ExampleWorks", "Member", "test_RaviWorks"))])
+      )
+    })
+  )
+
+  it.effect("refuses the path when two fields fill its relation, naming the path's field", () =>
+    Effect.gen(function* () {
+      const refusal = yield* Effect.flip(
+        liftEntry(
+          {
+            actorId: actorLink,
+            reviewerId: actorLink,
+            actorName: actorNamed(
+              aboutPath([{ property: "inv:recordedActor", node: "inv:Member" }, { property: "inv:name" }])
+            )
+          },
+          { actorId: "test_RaviWorks", reviewerId: "test_RaviSecond", actorName: "Ravi Example" }
+        )
+      )
+      expect(refusal.field).toStrictEqual(O.some("actorName"))
+      expect(refusal.reason).toBe("2 fields fill inv:recordedActor, so the path's node is undecided")
+    })
+  )
+
+  it.effect("refuses a reused node step that fixes a concept, which no field states on the other record", () =>
+    Effect.gen(function* () {
+      const refusal = yield* Effect.flip(
+        liftEntry(
+          {
+            actorId: actorLink,
+            actorName: actorNamed(
+              aboutPath([
+                {
+                  property: "inv:recordedActor",
+                  node: "inv:Member",
+                  fixed: [{ property: "inv:membershipStatus", concept: "inv:MembershipStatusScheme-active" }]
+                },
+                { property: "inv:name" }
+              ])
+            )
+          },
+          { actorId: "test_RaviWorks", actorName: "Ravi Example" }
+        )
+      )
+      expect(refusal.field).toStrictEqual(O.some("actorName"))
+      expect(refusal.reason).toBe(
+        "the node inv:recordedActor names is another field's, and a fixed concept on it is stated by no field"
+      )
     })
   )
 })
@@ -499,7 +681,8 @@ describe("a class that stores no id (decision 135)", () => {
     })
   )
 
-  it.effect("near miss: the same Member lifts its six triples where Person stores no id", () =>
+  // Decision 155: Member's name passes through a Person, and the record lifts whatever Person stores.
+  it.effect("near miss: the same Member lifts its seven triples where Person stores no id", () =>
     Effect.gen(function* () {
       const context = yield* storingNoId("Person")
       const member = yield* ravi

@@ -12,7 +12,7 @@ export type { ProposalSource } from "@inventory/ui/ProposalSource"
  * sparkle for a model, a question mark for a suggestion whose source the caller did not name, and nothing to see for a
  * fixed rule (its words are still read out). The words come from the source the caller passes, never assumed.
  */
-export function SourceMark(props: { source: ProposalSource | undefined }) {
+export function SourceMark(props: { readonly source: ProposalSource | undefined }) {
   const words = sourceWordsFor(O.fromUndefinedOr(props.source))
   if (props.source === "rule" || props.source === "person") return <span className="sr-only"> ({words.hidden})</span>
   return (
@@ -37,7 +37,7 @@ export function SourceMark(props: { source: ProposalSource | undefined }) {
  * `accepted` is what the person took: green with a tick. Never colour alone: the outline, the tick and the hidden
  * word differ too.
  */
-export function ProposedChip(props: { children: ReactNode; state?: "proposed" | "accepted" }) {
+export function ProposedChip(props: { readonly children: ReactNode; readonly state?: "proposed" | "accepted" }) {
   return props.state === "accepted" ? (
     <span className="inline-flex h-5 max-w-full min-w-0 items-center gap-1 rounded-chip bg-success px-1.5 font-medium text-success-foreground">
       <span className="truncate">{props.children}</span>
@@ -61,16 +61,16 @@ export function ProposedChip(props: { children: ReactNode; state?: "proposed" | 
  * sparkle only when the caller says a model made it.
  */
 export function ProposedValue(props: {
-  from: ReactNode
-  to: ReactNode
+  readonly from: ReactNode
+  readonly to: ReactNode
   /**
    * Who prepared the change, as the caller knows it. Without `state`: a small label after the new value. With it: the
    * source's mark. Left out, nothing is said about who made it.
    */
-  source?: ProposalSource
+  readonly source?: ProposalSource
   /** `proposed` waits for the person, `accepted` is what they took, `applied` is what a rule did by itself. */
-  state?: "proposed" | "applied" | "accepted"
-  className?: string
+  readonly state?: "proposed" | "applied" | "accepted"
+  readonly className?: string
 }) {
   const mark = props.source === undefined ? null : <SourceMark source={props.source} />
   return (

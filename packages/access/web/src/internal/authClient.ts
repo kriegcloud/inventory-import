@@ -12,14 +12,16 @@ import { organizationClient } from "better-auth/client/plugins"
 export const authClient = createAuthClient({ plugins: [organizationClient()] })
 
 /** A sentence for the person from a Better Auth error. Its messages are already written for people. */
-export const authErrorMessage = (error: { message?: string | undefined; status: number }): string => {
+export const authErrorMessage = (error: { readonly message?: string | undefined; readonly status: number }): string => {
   if (error.status === 429) return "Too many attempts. Wait a minute, then try again."
   return error.message ?? "Something went wrong. Try again."
 }
 
 /** Better Auth's answer as a value, or its error as a thrown `Error` with that sentence, for an atom's promise. */
 export const orThrow = <A>(
-  result: { data: A; error: null } | { data: null; error: { message?: string | undefined; status: number } }
+  result:
+    | { readonly data: A; readonly error: null }
+    | { readonly data: null; readonly error: { readonly message?: string | undefined; readonly status: number } }
 ): A => {
   if (result.error !== null) throw new Error(authErrorMessage(result.error))
   return result.data

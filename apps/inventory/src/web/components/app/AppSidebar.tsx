@@ -56,7 +56,7 @@ import { type Theme, theme as themeChoice } from "@inventory/ui/Theme"
 import { BrandMark } from "./BrandMark.tsx"
 
 /** A page the sidebar links to. `path` is its address; `icon` is all that shows when the sidebar is collapsed. */
-export type AppPage = { path: string; label: string; icon: LucideIcon }
+export type AppPage = { readonly path: string; readonly label: string; readonly icon: LucideIcon }
 
 /** The app's pages, in the order the sidebar lists them. */
 export const appPages: ReadonlyArray<AppPage> = [
@@ -86,7 +86,7 @@ const Initials = S.String.pipe(
 
 const roleWords = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
-const themes: ReadonlyArray<{ value: Theme; label: string; icon: LucideIcon }> = [
+const themes: ReadonlyArray<{ readonly value: Theme; readonly label: string; readonly icon: LucideIcon }> = [
   { value: "light", label: "Light", icon: SunIcon },
   { value: "dark", label: "Dark", icon: MoonIcon },
   { value: "system", label: "System", icon: MonitorIcon }
@@ -347,7 +347,7 @@ function UserMenu() {
  * The app's sidebar: the organization at the top, the pages, and the signed-in person at the foot. It folds to a
  * strip of icons (the rail, the header's button or Ctrl+B) and is a drawer on a phone.
  */
-export function AppSidebar(props: { current: string | undefined }) {
+export function AppSidebar(props: { readonly current: string | undefined }) {
   const { isMobile, setOpenMobile } = useSidebar()
   return (
     <Sidebar collapsible="icon">

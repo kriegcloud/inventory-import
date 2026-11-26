@@ -73,12 +73,16 @@ const themeOnPage: Atom.Atom<void> = Atom.readable((get) => {
  * Light by default, dark or system by choice: keeps the page in the theme while it is drawn. The class is set before
  * first paint by index.html. It reads the atom registry, so it sits inside `RegistryProvider`.
  */
-export function ThemeProvider(props: { children: ReactNode }) {
+export function ThemeProvider(props: { readonly children: ReactNode }) {
   useAtomMount(themeOnPage)
   return props.children
 }
 
 /** The theme as the vendored toaster and the menus read it: the choice, the theme shown, and how to choose. */
-export function useTheme(): { theme: Theme; resolvedTheme: Resolved; setTheme: (theme: Theme) => void } {
+export function useTheme(): {
+  readonly theme: Theme
+  readonly resolvedTheme: Resolved
+  readonly setTheme: (theme: Theme) => void
+} {
   return { theme: useAtomValue(theme), resolvedTheme: useAtomValue(resolvedTheme), setTheme: useAtomSet(theme) }
 }

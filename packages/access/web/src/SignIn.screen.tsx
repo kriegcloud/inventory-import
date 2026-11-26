@@ -64,8 +64,13 @@ const membershipsOf = (account: TestAccount) =>
 
 /** What the person asked for: to sign in to an account, or to make one and its organization. */
 type Attempt = Data.TaggedEnum<{
-  SignIn: { readonly email: string; readonly password: string }
-  SignUp: { readonly name: string; readonly email: string; readonly password: string; readonly organization: string }
+  readonly SignIn: { readonly email: string; readonly password: string }
+  readonly SignUp: {
+    readonly name: string
+    readonly email: string
+    readonly password: string
+    readonly organization: string
+  }
 }>
 const Attempt = Data.taggedEnum<Attempt>()
 
@@ -149,7 +154,7 @@ const refusalOf = (result: AsyncResult.AsyncResult<void, AuthRefused>): O.Option
       )
 
 /** The first screen when nobody is signed in: the test accounts in one click, sign in, or create an account. */
-export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: () => void }) {
+export function SignIn(props: { readonly features: O.Option<SignInFeatures>; readonly onSignedIn: () => void }) {
   const id = useId()
   const [current, setMode] = useAtom(mode)
   const [email, setEmail] = useAtom(emailTyped)
@@ -349,7 +354,7 @@ export function SignIn(props: { features: O.Option<SignInFeatures>; onSignedIn: 
 }
 
 /** Signed in, but in no organization yet (an account whose organization was not created): create one. */
-export function CreateOrganization(props: { onCreated: () => void; onSignOut: () => void }) {
+export function CreateOrganization(props: { readonly onCreated: () => void; readonly onSignOut: () => void }) {
   const id = useId()
   const [name, setName] = useAtom(organizationName)
   const result = useAtomValue(createOrganization)

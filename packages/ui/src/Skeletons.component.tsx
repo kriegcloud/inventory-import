@@ -22,7 +22,7 @@ import { isNarrow } from "@inventory/ui/ContentWidth"
 // Kept free of the table and review code, so a page whose code is still loading can show one.
 
 /** One grey bar of a cell, in one of three widths so the rows do not look stamped; at the right in a number column. */
-function Bar(props: { seed: number; right?: boolean | undefined }) {
+function Bar(props: { readonly seed: number; readonly right?: boolean | undefined }) {
   const n = props.seed % 3
   if (props.right === true) {
     return (
@@ -39,7 +39,11 @@ export type SkeletonColumn = { readonly label: O.Option<string>; readonly width?
  * A page's top while the page's code is on its way: its title (a bar when even that depends on data), the grey line
  * and an action, in PageHeader's box.
  */
-export function PageHeaderSkeleton(props: { title?: string; line?: boolean; action?: boolean }) {
+export function PageHeaderSkeleton(props: {
+  readonly title?: string
+  readonly line?: boolean
+  readonly action?: boolean
+}) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 px-4 pt-5 pb-3 sm:px-9">
       <div className="min-w-0 flex-1">
@@ -58,7 +62,7 @@ export function PageHeaderSkeleton(props: { title?: string; line?: boolean; acti
 }
 
 /** Phone cards while their rows are on their way, the shape a data table's cards (`DataTableCards`) draw on a phone. */
-function CardsSkeleton(props: { lines: number }) {
+function CardsSkeleton(props: { readonly lines: number }) {
   return (
     <div aria-hidden className="relative min-h-0 flex-1 overflow-hidden border-y">
       {Array.from({ length: 6 }, (_, card) => (
@@ -88,7 +92,11 @@ function CardsSkeleton(props: { lines: number }) {
  * A data table while its rows are on their way: the data table's own frame and header row (with the column names when
  * the page knows them), then rows of grey bars, enough to fill the screen. On a phone, the cards it draws there.
  */
-export function TableSkeleton(props: { caption: string; columns: ReadonlyArray<SkeletonColumn>; rows?: number }) {
+export function TableSkeleton(props: {
+  readonly caption: string
+  readonly columns: ReadonlyArray<SkeletonColumn>
+  readonly rows?: number
+}) {
   const narrow = useAtomValue(isNarrow)
   if (narrow) return <CardsSkeleton lines={Math.min(4, Math.max(1, props.columns.length - 1))} />
   return (
@@ -109,9 +117,9 @@ function GridSkeleton({
   columns,
   rows = 24
 }: {
-  caption: string
-  columns: ReadonlyArray<SkeletonColumn>
-  rows?: number
+  readonly caption: string
+  readonly columns: ReadonlyArray<SkeletonColumn>
+  readonly rows?: number
 }) {
   const minWidth = A.reduce(columns, 0, (total, column) => total + (column.width ?? 240))
   return (
@@ -158,12 +166,12 @@ function GridSkeleton({
 
 /** A page that is a header and a table, while its code or its rows are on their way. */
 export function TablePageSkeleton(props: {
-  title?: string
-  caption: string
-  columns: ReadonlyArray<SkeletonColumn>
-  line?: boolean
-  action?: boolean
-  views?: number
+  readonly title?: string
+  readonly caption: string
+  readonly columns: ReadonlyArray<SkeletonColumn>
+  readonly line?: boolean
+  readonly action?: boolean
+  readonly views?: number
 }) {
   return (
     <div className="flex h-full flex-col" aria-busy="true">
@@ -179,7 +187,7 @@ export function TablePageSkeleton(props: {
 }
 
 /** The row of saved views ("Decisions 12", "Events 30") while their counts are on their way, in `Views`' box. */
-export function ViewsSkeleton(props: { count: number }) {
+export function ViewsSkeleton(props: { readonly count: number }) {
   return (
     <div className="flex flex-wrap gap-1 px-4 pb-2 sm:px-8">
       {Array.from({ length: props.count }, (_, index) => (
@@ -200,7 +208,7 @@ export const someColumns = (count: number): ReadonlyArray<SkeletonColumn> =>
  * The review while its code or its rows are on their way, in the review's own bands: the title row, the filter row,
  * the grid with its header and 36px rows, and the bar with the import button. On a phone, the one-decision queue.
  */
-export function ReviewSkeleton(props: { title?: string }) {
+export function ReviewSkeleton(props: { readonly title?: string }) {
   const narrow = useAtomValue(isNarrow)
   const gutter = "px-4 sm:px-9"
   const title =

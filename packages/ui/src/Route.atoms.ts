@@ -40,7 +40,7 @@ export const location: Atom.Atom<{ readonly path: string; readonly params: URLSe
 )
 
 /** Goes to an address inside the app without a page load. `replace` keeps the back button on the previous screen. */
-export const navigate = (to: string, options: { replace: boolean }) => {
+export const navigate = (to: string, options: { readonly replace: boolean }) => {
   if (to === snapshot()) return
   if (options.replace) window.history.replaceState(null, "", to)
   else window.history.pushState(null, "", to)
@@ -68,7 +68,12 @@ export const useLocation = (): { readonly path: string; readonly params: URLSear
  */
 export const linkTo = (to: string, after: O.Option<() => void>) => ({
   href: to,
-  onClick: (event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; preventDefault: () => void }) => {
+  onClick: (event: {
+    readonly metaKey: boolean
+    readonly ctrlKey: boolean
+    readonly shiftKey: boolean
+    readonly preventDefault: () => void
+  }) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey) return
     event.preventDefault()
     navigate(to, { replace: false })

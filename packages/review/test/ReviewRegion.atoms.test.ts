@@ -14,6 +14,7 @@ import { batch, createAtom, shallow } from "@tanstack/store"
 import { createRenderPhaseSource, renderPhaseReactivity } from "@tanstack/table-core/reactivity"
 import { table_publishExternalState, table_setOptions } from "@tanstack/table-core/static-functions"
 import * as A from "effect/Array"
+import * as MutableRef from "effect/MutableRef"
 import * as HashMap from "effect/HashMap"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
@@ -29,14 +30,14 @@ import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication
 
 /** A key as the page hears it. */
 type Key = {
-  key: string
-  ctrlKey: boolean
-  metaKey: boolean
-  altKey: boolean
-  shiftKey: boolean
-  defaultPrevented: boolean
-  target: null
-  preventDefault: () => void
+  readonly key: string
+  readonly ctrlKey: boolean
+  readonly metaKey: boolean
+  readonly altKey: boolean
+  readonly shiftKey: boolean
+  readonly defaultPrevented: boolean
+  readonly target: null
+  readonly preventDefault: () => void
 }
 
 // A desk-wide page with no sidebar cookie (the region asks the page how much room it has when it is first read), the
@@ -66,13 +67,13 @@ const page = vi.hoisted(() => {
   return {
     keys,
     frames,
-    toasts: [] as Array<{ id: number; label: string; undo: () => void }>,
+    toasts: [] as Array<{ readonly id: number; readonly label: string; readonly undo: () => void }>,
     dismissed: [] as Array<unknown>
   }
 })
 vi.mock("sonner", () => ({
   toast: Object.assign(
-    (label: string, options?: { action?: { onClick: () => void } }) => {
+    (label: string, options?: { readonly action?: { readonly onClick: () => void } }) => {
       const id = page.toasts.length + 1
       page.toasts.push({ id, label, undo: () => options?.action?.onClick() })
       return id
@@ -90,17 +91,20 @@ const passFrames = () => {
 
 /** Raises a key on the page; says whether somebody took it. */
 const noModifiers = { ctrl: false, shift: false }
-const press = (key: string, held: { ctrl: boolean; shift: boolean }): boolean => {
+const press = (key: string, held: { readonly ctrl: boolean; readonly shift: boolean }): boolean => {
+  const defaultPrevented = MutableRef.make(false)
   const event: Key = {
     key,
     ctrlKey: held.ctrl === true,
     metaKey: false,
     altKey: false,
     shiftKey: held.shift === true,
-    defaultPrevented: false,
+    get defaultPrevented() {
+      return MutableRef.get(defaultPrevented)
+    },
     target: null,
     preventDefault: () => {
-      event.defaultPrevented = true
+      MutableRef.set(defaultPrevented, true)
     }
   }
   for (const heard of [...page.keys]) heard(event)

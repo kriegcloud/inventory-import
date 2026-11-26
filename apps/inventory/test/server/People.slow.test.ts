@@ -104,7 +104,7 @@ layer(TypedApp)("people", (it) => {
       const left = yield* client.people.list().pipe(samIs)
       expect(A.map(left, (person) => person.name)).toEqual(["Priya Raman", "Sam Okafor"])
       const sql = yield* SqlClient.SqlClient
-      const gone = yield* sql<{ userId: string | null; removedAt: string | null }>`
+      const gone = yield* sql<{ readonly userId: string | null; readonly removedAt: string | null }>`
         SELECT userId, removedAt FROM member WHERE id = 'mem_dana'`.pipe(Effect.orDie)
       expect(gone[0]?.userId).toBeNull()
       expect(gone[0]?.removedAt).not.toBeNull()

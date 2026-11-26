@@ -65,7 +65,7 @@ export const authOptions = (input: AuthOptionsInput) => {
   const addressOptions: Pick<BetterAuthOptions, "baseURL"> = R.getSomes({ baseURL: address })
   const passwordOptions: Pick<NonNullable<BetterAuthOptions["emailAndPassword"]>, "password"> = R.getSomes({
     password: O.map(settings.passwordToVerify, (select) => ({
-      verify: ({ hash, password }: { hash: string; password: string }) =>
+      verify: ({ hash, password }: { readonly hash: string; readonly password: string }) =>
         O.match(select(password), {
           onNone: () => Promise.resolve(false),
           onSome: (held) => verifyPassword({ hash, password: held })
@@ -163,7 +163,7 @@ export const authOptions = (input: AuthOptionsInput) => {
             context === null
               ? Promise.resolve()
               : context.context.adapter
-                  .findMany<{ organizationId: string }>({
+                  .findMany<{ readonly organizationId: string }>({
                     model: "member",
                     where: [{ field: "userId", value: session.userId }],
                     sortBy: { field: "createdAt", direction: "asc" },

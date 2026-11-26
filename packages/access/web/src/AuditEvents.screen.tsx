@@ -73,7 +73,7 @@ const auditEventRows = Atom.map(auditEventAnswer, (answer) =>
 const auditEventColumnsAtom = Atom.make(auditEventColumns)
 
 /** The audit trail as a list a person searches and filters: every upload, import, take-back and change of role. */
-export function AuditEvents({ updating = false }: { updating?: boolean }) {
+export function AuditEvents({ updating = false }: { readonly updating?: boolean }) {
   return (
     <ListTable
       key="events"

@@ -29,7 +29,11 @@ const statusWords = { running: "Running", done: "Done", failed: "Failed" } as co
  * The visible record of a run: who ran it, then one line per step, each opening to show its input and output.
  * It is a log the person can audit, not a chat. `producer` says which path made the result ("AI" or "Rules").
  */
-export function AgentRun(props: { title: string; producer: string; steps: ReadonlyArray<RunStep> }) {
+export function AgentRun(props: {
+  readonly title: string
+  readonly producer: string
+  readonly steps: ReadonlyArray<RunStep>
+}) {
   const running = props.steps.some((step) => step.status === "running")
   return (
     <section aria-label={props.title} className="flex flex-col gap-2">

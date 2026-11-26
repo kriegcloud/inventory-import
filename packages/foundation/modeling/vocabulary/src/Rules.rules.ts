@@ -449,17 +449,34 @@ const domainCheck = (
     : [finding("C9", kind, key, "Its domain does not fall under the domain of the gist property it sits under.")]
 
 /**
- * C9 (decision 16): a property's gist parent is a gist property of its own kind on the gist list, and the property's
- * domain and range fall under that gist property's. A domain falls under a gist class its class reaches through its
- * parents, category parents included; a scheme range falls under no gist class, since concepts are typed by SKOS only
- * (decision 17); a datatype falls under the same datatype only. A gist property that declares no domain or range
- * accepts any.
+ * C9 (decision 16): a gist property's declared domain and class range are gist classes on the gist list, reported at
+ * the gist property, as C6 reports a disjoint pair's name; a property's gist parent is a gist property of its own kind
+ * on the gist list, and the property's domain and range fall under that gist property's. A domain falls under a gist
+ * class its class reaches through its parents, category parents included; a scheme range falls under no gist class,
+ * since concepts are typed by SKOS only (decision 17); a datatype falls under the same datatype only. A gist property
+ * that declares no domain or range accepts any. A gist property no property sits under is not refused, as C5 refuses
+ * no gist class that no class reaches.
  */
 const c9 = (vocabulary: Vocabulary): ReadonlyArray<Finding> => {
   const parentOf = (name: string): O.Option<GistProperty> => R.get(vocabulary.gist.properties, name)
   const missing = (kind: TermKind, key: string, name: string): Finding =>
     finding("C9", kind, key, `Its gist parent ${name} is not on the gist list.`)
+  const onList = (name: string, part: string, declared: O.Option<string>): ReadonlyArray<Finding> =>
+    O.match(declared, {
+      onNone: () => [],
+      onSome: (cls) =>
+        R.has(vocabulary.gist.classes, cls)
+          ? []
+          : [finding("C9", "gist", name, `Its ${part} ${cls} is not on the gist list.`)]
+    })
   return [
+    ...A.flatMap(R.toEntries(vocabulary.gist.properties), ([name, gist]) => [
+      ...onList(name, "domain", gist.domain),
+      ...GistProperty.match(gist, {
+        object: (relation) => onList(name, "range", relation.range),
+        datatype: () => []
+      })
+    ]),
     ...A.flatMap(R.toEntries(vocabulary.objectProperties), ([key, term]) =>
       O.match(term.subPropertyOf, {
         onNone: () => [],

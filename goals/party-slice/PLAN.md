@@ -60,7 +60,7 @@ Step 13 is the first that needs Java.
 O1 to O19 are unanswered, and no term can enter the module before O1. Steps 1 to 5 wait on none of them and come
 first; step 6 enters the rows in the exploration's Open table and puts them to Benjamin. The commit that added this
 goal's two files also set the exploration README's `goals:` and `next:`, with a paragraph and a log line, and the
-exploration's line in `explorations/README.md`. Nothing is started.
+exploration's line in `explorations/README.md`. Step 1 is done; steps 2 to 5 come next.
 
 ## Choices made
 
@@ -134,6 +134,10 @@ Choices the SPEC left open, each the agent's:
   category and gist parents; an undeclared domain falls under no declared one; a scheme range falls under no gist
   class (decision 17), so it passes only a gist property that declares no range; a datatype falls under the same
   datatype only.
+- **What C9 holds of the gist list itself**: a gist property's declared domain and class range are gist classes on
+  the list, found at the gist property's name, as C6 finds a disjoint pair's. A gist property no property sits under
+  is not refused, as C5 refuses no gist class that no class reaches; the list's own description ("none unless a
+  property sits under one") is kept by hand, unchecked.
 
 ## Closing note
 

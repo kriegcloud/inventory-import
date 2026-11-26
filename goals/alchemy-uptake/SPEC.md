@@ -62,9 +62,9 @@ proving the capability here before anything depends on it.
 - [ ] `bun run check:full` runs a stack test that deploys the stack locally, signs in as a test account over HTTP
       with its cookie, imports `items_clean.csv` and reads 25 items back; the run leaves no secret in a file
       (a test reads the state folder).
-- [ ] `deploy.yml` shows `alchemy plan` for the stage before each `alchemy deploy --yes`, and a plan that destroys
+- [x] `deploy.yml` shows `alchemy plan` for the stage before each `alchemy deploy --yes`, and a plan that destroys
       the database stops the job; a workflow test or a dry run shows both.
-- [ ] `docs/operations.md` exists and says, for a stage: how to read its plan, its drift, its logs and its state,
+- [x] `docs/operations.md` exists and says, for a stage: how to read its plan, its drift, its logs and its state,
       each with the exact command; listed in `docs/index.md`; `bun run docs:check` passes.
 - [ ] The `alchemy dev` trial is written up in PLAN: what started, whether it opened signed in as Dana Whitfield
       with no key, where its secrets were kept, what of `scripts/` it would delete, and what it could not do.

@@ -62,6 +62,18 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # What the deploy below will do, shown before it does it: the tool's `plan` and `deploy --dry-run` are one code
+      # path, and `--yes` lets this step bring the state store up to date as the deploy itself would, where `plan`
+      # would stop the job. One line for each resource and what happens to it, never `--detailed`: this log is public.
+      # The guard after it reads that text and refuses a plan that deletes or replaces the database, and one it
+      # cannot read (docs/operations.md).
+      - name: Show the plan
+        run: |
+          bunx alchemy deploy --stage "$STAGE" --dry-run --yes > "$RUNNER_TEMP/plan.txt" 2>&1 && said=0 || said=$?
+          cat "$RUNNER_TEMP/plan.txt"
+          exit "$said"
+      - name: Stop a plan that loses the database
+        run: bun run beep infra plan-check "$RUNNER_TEMP/plan.txt"
       - name: Deploy the preview
         run: bunx alchemy deploy --stage "$STAGE" --yes
 
@@ -165,6 +177,16 @@ jobs:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
         if: steps.head.outputs.deploy == 'true'
+      # The plan, then the guard on it, as in the preview's job.
+      - name: Show the plan
+        if: steps.head.outputs.deploy == 'true'
+        run: |
+          bunx alchemy deploy --stage staging --dry-run --yes > "$RUNNER_TEMP/plan.txt" 2>&1 && said=0 || said=$?
+          cat "$RUNNER_TEMP/plan.txt"
+          exit "$said"
+      - name: Stop a plan that loses the database
+        if: steps.head.outputs.deploy == 'true'
+        run: bun run beep infra plan-check "$RUNNER_TEMP/plan.txt"
       - name: Deploy staging
         if: steps.head.outputs.deploy == 'true'
         run: bunx alchemy deploy --stage staging --yes
@@ -265,5 +287,13 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # The plan, then the guard on it, as in the preview's job.
+      - name: Show the plan
+        run: |
+          bunx alchemy deploy --stage prod --dry-run --yes > "$RUNNER_TEMP/plan.txt" 2>&1 && said=0 || said=$?
+          cat "$RUNNER_TEMP/plan.txt"
+          exit "$said"
+      - name: Stop a plan that loses the database
+        run: bun run beep infra plan-check "$RUNNER_TEMP/plan.txt"
       - name: Deploy production
         run: bunx alchemy deploy --stage prod --yes

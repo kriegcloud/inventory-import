@@ -216,7 +216,7 @@ export interface QueryOptions {
    * "page": the answer never changes once given (a staged file's rows), so it is kept for the page's life and not
    * asked again on a return. Otherwise kept for `keepUnwatched` and asked again behind it on every return.
    */
-  readonly keep?: Keeping
+  readonly keep: Keeping
 }
 
 /**
@@ -266,10 +266,13 @@ export const answerOf = <A, E>(read: Atom.Atom<AsyncResult.AsyncResult<A, E>>): 
 export const perKey = <K, A>(make: (key: K) => A): ((key: K) => A) => {
   const made = MutableHashMap.empty<K, A>()
   return (key) =>
-    O.getOrElse(MutableHashMap.get(made, key), () => {
-      const atom = make(key)
-      MutableHashMap.set(made, key, atom)
-      return atom
+    O.match(MutableHashMap.get(made, key), {
+      onSome: (made) => made,
+      onNone: () => {
+        const atom = make(key)
+        MutableHashMap.set(made, key, atom)
+        return atom
+      }
     })
 }
 
@@ -283,7 +286,7 @@ export interface ApiAtoms<Id, Client> {
    */
   readonly query: <A, E>(
     use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
-    options?: QueryOptions
+    options: QueryOptions
   ) => Query<A, E>
   /**
    * A write, made by setting the atom to its input. Every press runs on its own (a second press does not interrupt
@@ -291,7 +294,7 @@ export interface ApiAtoms<Id, Client> {
    */
   readonly write: <Input>() => <A, E>(
     use: (client: Client, input: Input) => Effect.Effect<A, E>,
-    options?: { readonly reactivityKeys?: Reactivity.KeysInput }
+    options: { readonly reactivityKeys?: Reactivity.KeysInput }
   ) => Atom.AtomResultFn<Input, A, E>
   /**
    * One program against the API with the write retries, to run on `apiRuntime`: for a write built of several steps
@@ -313,9 +316,9 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
   const client = Effect.service(tag)
   function query<A, E>(
     use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
-    options?: QueryOptions
+    options: QueryOptions
   ): Query<A, E> {
-    const keeping = options?.keep ?? "unwatched"
+    const keeping = options.keep
     // One read per member: when the person or the organization changes, the screen shows its skeleton, never the
     // previous organization's rows marked as waiting. Held with ordinary references, not `Atom.family`'s weak ones: a
     // collected one would be made anew on a return, empty (measured: after 35 s away).
@@ -336,11 +339,11 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       },
       (ctx, held: HashMap.HashMap<string, GivenHold>) => ctx.setSelf(held)
     ).pipe(Atom.keepAlive)
-    const letGiven = (registry: AtomRegistry.AtomRegistry, member: string, of?: Atom.Atom<unknown>): void =>
+    const letGiven = (registry: AtomRegistry.AtomRegistry, member: string, of: O.Option<Atom.Atom<unknown>>): void =>
       O.match(HashMap.get(registry.get(givenHeld), member), {
         onNone: () => {},
         onSome: (hold) => {
-          if (of !== undefined && hold.beside !== of) return
+          if (O.exists(of, (of) => hold.beside !== of)) return
           registry.update(givenHeld, HashMap.remove(member))
           hold.release()
         }
@@ -355,7 +358,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const now = registry.get(beside)
         if (O.exists(now.given, (given) => given === taken)) {
           registry.set(beside, { ...now, given: O.none() })
-          letGiven(registry, member, beside)
+          letGiven(registry, member, O.some(beside))
         }
       }
       /** Asks once more, unless a request already left since: one that left after what was learned includes it. */
@@ -444,14 +447,17 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         beside,
         out,
         held,
-        read: options?.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
+        read: options.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
       }
     }
     const forMember = (member: string): PerMember<A, E> =>
-      O.getOrElse(MutableHashMap.get(reads, member), () => {
-        const made = make(member)
-        MutableHashMap.set(reads, member, made)
-        return made
+      O.match(MutableHashMap.get(reads, member), {
+        onSome: (read) => read,
+        onNone: () => {
+          const made = make(member)
+          MutableHashMap.set(reads, member, made)
+          return made
+        }
       })
     // The reads nobody looks at, each kept by a hold this module has on it for `keepUnwatched`.
     const kept = MutableHashMap.empty<string, Keep>()
@@ -474,7 +480,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
           if (registry.getNodes().has(entry.beside)) {
             registry.update(entry.beside, (now) => ({ ...now, given: O.none() }))
           }
-          letGiven(registry, member, entry.beside)
+          letGiven(registry, member, O.some(entry.beside))
         })
       )
     }
@@ -515,7 +521,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const { beside } = forMember(member)
         const registry = ctx.get(registryOf)
         if (!O.exists(HashMap.get(registry.get(givenHeld), member), (hold) => hold.beside === beside)) {
-          letGiven(registry, member)
+          letGiven(registry, member, O.none())
           const release = registry.mount(beside)
           const hold: GivenHold = { beside, release }
           registry.update(givenHeld, HashMap.set(member, hold))
@@ -528,7 +534,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       letGo: (registry: AtomRegistry.AtomRegistry) => {
         const member = registry.get(memberKey)
         stopKeeping(member)
-        letGiven(registry, member)
+        letGiven(registry, member, O.none())
         MutableHashMap.remove(reads, member)
         // A screen that still shows it is not left on an answer nothing refreshes: it asks the server now.
         registry.update(letGoes, (count) => count + 1)
@@ -564,11 +570,11 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     <Input>() =>
     <A, E>(
       use: (client: Client, input: Input) => Effect.Effect<A, E>,
-      options?: { readonly reactivityKeys?: Reactivity.KeysInput }
+      options: { readonly reactivityKeys?: Reactivity.KeysInput }
     ): Atom.AtomResultFn<Input, A, E> =>
       apiRuntime.fn<Input>()(
         (input) => {
-          const keys = options?.reactivityKeys
+          const keys = options.reactivityKeys
           const sent = send((c) => use(c, input))
           return keys === undefined ? sent : Effect.tap(sent, () => Effect.sync(() => invalidate(keys)))
         },

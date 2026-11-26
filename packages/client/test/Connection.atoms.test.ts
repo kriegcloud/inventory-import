@@ -1,3 +1,6 @@
+import { assertedValue } from "./support"
+import { assertDefined } from "@effect/vitest/utils"
+import { isTransient } from "@inventory/client/SayError"
 // A read that could not be made is made again by itself once the connection is back: when the browser says it is online,
 // when the server has answered anything else, and every half minute while nothing does. Never a read the server refused, which would be refused again, and
 // never in a loop on a server that keeps failing.
@@ -34,7 +37,7 @@ class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/te
  * A read whose server answers as the test says, followed by what asks it again; `times` counts the requests. With a
  * `clock` (the test's own), the API's runtime runs on it and the server answers at once.
  */
-const world = (clock?: Clock.Clock) => {
+const world = (clock: O.Option<Clock.Clock>) => {
   const server: { answer: Effect.Effect<string, Refusal>; times: number } = {
     answer: Effect.succeed("rows"),
     times: 0
@@ -42,12 +45,19 @@ const world = (clock?: Clock.Clock) => {
   const layer = Layer.succeed(RowServer, {
     rows: Effect.suspend(() => {
       server.times += 1
-      return clock === undefined ? Effect.sleep("1 millis").pipe(Effect.andThen(server.answer)) : server.answer
+      return O.match(clock, {
+        onNone: () => Effect.sleep("1 millis").pipe(Effect.andThen(server.answer)),
+        onSome: () => server.answer
+      })
     })
-  }).pipe(Layer.merge(clock === undefined ? Layer.empty : Layer.succeed(Clock.Clock, clock)))
-  const rows = makeApiAtoms(RowServer).query((api) => api.rows)
+  }).pipe(
+    Layer.merge(O.match(clock, { onNone: () => Layer.empty, onSome: (clock) => Layer.succeed(Clock.Clock, clock) }))
+  )
+  const rows = makeApiAtoms(RowServer).query((api) => api.rows, { keep: "unwatched" })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
-  const stop = registry.mount(askedAgainWhenBack({ read: rows, askAgain: (at) => rows.askAgain(at) }))
+  const stop = registry.mount(
+    askedAgainWhenBack({ mayPass: isTransient, read: rows, askAgain: (at) => rows.askAgain(at) })
+  )
   const read = () => registry.get(rows)
   const down = Effect.fail(HttpApiError.InternalServerErrorProblem.make({}))
   return { registry, rows, read, server, stop, down }
@@ -56,7 +66,7 @@ const world = (clock?: Clock.Clock) => {
 describe("a read that could not be made", () => {
   it.live("is made again when the browser is online, and when the server has answered something else", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(O.none())
       yield* settle
       t.server.answer = t.down
       t.rows.askAgain(t.registry)
@@ -81,17 +91,47 @@ describe("a read that could not be made", () => {
 
   it.live("is made again when a request made outside the atoms has been answered (the session's, a sign-in's)", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(O.none())
       yield* settle
       t.server.answer = t.down
       t.rows.askAgain(t.registry)
       yield* settle
       t.server.answer = Effect.succeed("fresh rows")
+      const context = yield* Effect.context<never>()
+      const signal = yield* Effect.abortSignal
+      let observed: RequestInit | undefined
+      const native = new Response("native response", { status: 201 })
       Object.assign(globalThis, {
         location: { href: "http://localhost/" },
-        fetch: () => Promise.resolve(new Response(null, { status: 204 }))
+        fetch: (_input: unknown, init: RequestInit) => {
+          observed = init
+          return Effect.runPromiseWith(context)(Effect.succeed(native))
+        }
       })
-      yield* Effect.promise(() => request("/api/v1/identity/session"))
+      const response = yield* Effect.promise(() =>
+        request("/api/v1/items", {
+          method: "POST",
+          body: "request body",
+          credentials: "include",
+          cache: "no-store",
+          redirect: "manual",
+          integrity: "sha256-example",
+          signal
+        })
+      )
+      assertDefined(observed)
+      expect([observed.credentials, observed.cache, observed.redirect, observed.integrity]).toEqual([
+        "include",
+        "no-store",
+        "manual",
+        "sha256-example"
+      ])
+      const observedSignal = O.fromNullishOr(observed.signal)
+      const forwarded = assertedValue(observedSignal)
+      expect(forwarded.aborted).toBe(false)
+      expect(response).toBe(native)
+      const text = yield* Effect.promise(() => response.text())
+      expect(text).toBe("native response")
       yield* settle
       expect(AsyncResult.value(t.read())).toEqual(O.some("fresh rows"))
     })
@@ -99,7 +139,7 @@ describe("a read that could not be made", () => {
 
   it.live("is not made again for a refusal, for the server failing elsewhere, or once nothing follows it", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(O.none())
       yield* settle
       t.server.answer = Effect.fail(Forbidden.make({ reason: "Your role is viewer.", required: "editor" }))
       t.rows.askAgain(t.registry)
@@ -131,7 +171,7 @@ describe("a read that could not be made, on a quiet page", () => {
   it.effect("is made again every half minute while it stays failed, and no more once it is answered", () =>
     Effect.gen(function* () {
       const clock = yield* Clock.clockWith(Effect.succeed)
-      const t = world(clock)
+      const t = world(O.some(clock))
       const tick = (by: Duration.Input) => TestClock.adjust(by)
       yield* tick("1 second")
       t.server.answer = t.down

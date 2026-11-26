@@ -225,7 +225,7 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
           variant={props.lead && props.canImport ? "default" : "outline"}
           onClick={() => {
             giveNext(view)
-            navigate(importAddress(view.id, "review"))
+            navigate(importAddress(view.id, "review"), { replace: false })
           }}
         >
           {props.canImport ? "Continue" : "Open"}
@@ -250,7 +250,7 @@ function PastImports() {
         <Alert>
           <AlertTitle>Past imports could not be listed</AlertTitle>
           <AlertDescription>
-            <p>They are safe. {sayError(past.error).sentence}</p>
+            <p>They are safe. {sayError(past.error, { fields: {} }).sentence}</p>
             <Button variant="outline" size="sm" onClick={askPastAgain}>
               Try again
             </Button>
@@ -396,7 +396,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
             <Alert>
               <AlertTitle>Files loaded earlier could not be listed</AlertTitle>
               <AlertDescription>
-                <p>They are safe. {sayError(openImports.error).sentence}</p>
+                <p>They are safe. {sayError(openImports.error, { fields: {} }).sentence}</p>
                 <Button variant="outline" size="sm" onClick={askOpenAgain}>
                   Try again
                 </Button>

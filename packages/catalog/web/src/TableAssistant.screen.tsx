@@ -322,7 +322,7 @@ export function TableAssistant(props: {
               outcome: "failed",
               answeredBy: null,
               note: null,
-              reason: sayError(error).sentence,
+              reason: sayError(error, { fields: {} }).sentence,
               applied: [],
               undone: false
             },

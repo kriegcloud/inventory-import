@@ -96,7 +96,7 @@ export function SignedIn(props: { title: string; children: ReactNode }) {
         <Alert variant="destructive" className="mx-auto max-w-sm">
           <AlertTitle>Could not open the app</AlertTitle>
           <AlertDescription>
-            <p>{sayError(error).sentence}</p>
+            <p>{sayError(error, { fields: {} }).sentence}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={retry}>
                 Try again

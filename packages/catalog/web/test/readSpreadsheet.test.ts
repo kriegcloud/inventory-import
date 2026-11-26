@@ -369,7 +369,7 @@ describe("Failures a person can act on", () => {
         todo: "Choose a .csv or .xlsx file."
       })
       // The screen says it as the problem, then what to do, with nothing technical.
-      expect(sayError(error)).toEqual({
+      expect(sayError(error, { fields: {} })).toEqual({
         title: "The file was not read",
         sentence: '"stock.csv" is not a spreadsheet: it is a PDF. Choose a .csv or .xlsx file.',
         problems: []

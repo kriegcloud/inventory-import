@@ -141,6 +141,7 @@ export const importDecisionsCaption = "Values that imports changed, and who deci
 
 /** Every changed value the organization's imports wrote, newest first: a confirm or a take-back changes it. */
 export const importDecisions = catalogApi.query((api) => api.imports.changes(), {
+  keep: "unwatched",
   reactivityKeys: catalogKeys.changes
 })
 

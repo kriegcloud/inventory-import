@@ -227,9 +227,10 @@ const statusFit = (input: {
   words: ReviewWords
 }): number => {
   // 12 px medium text in a pill: its padding and icon; "Auto-fixed" and the person's tags carry an icon too.
-  const pill = (words: string, icon: boolean) => (textWidth(words, { medium: true }) * 12) / 13 + 12 + (icon ? 16 : 0)
+  const pill = (words: string, icon: boolean) =>
+    (textWidth(words, { medium: true, mono: false }) * 12) / 13 + 12 + (icon ? 16 : 0)
   const { words } = input
-  let widest = textWidth(words.ready)
+  let widest = textWidth(words.ready, { medium: false, mono: false })
   for (const view of input.views) {
     if (view.status === "needs" || view.status === "cannot") {
       const kind = O.getOrUndefined(HashMap.get(input.kinds, view.problem?.kind ?? ""))
@@ -244,7 +245,7 @@ const statusFit = (input: {
 }
 
 /** A hint button's width (`xs`, quiet): its words at 12 px and its padding. */
-const xsHint = (words: string): number => (textWidth(words) * 12) / 13 + 16
+const xsHint = (words: string): number => (textWidth(words, { medium: false, mono: false }) * 12) / 13 + 16
 
 /** The longest values of a column by characters, to measure only those: 50,000 rows are not drawn on a canvas. */
 const longest = (values: ReadonlyArray<string>, n: number): ReadonlyArray<string> => {
@@ -279,8 +280,8 @@ const measureNeeds = (input: {
     const mono = column.code === true
     const header =
       Math.max(
-        textWidth(column.label, { medium: true }),
-        column.unit === undefined ? 0 : textWidth(column.unit) * (12 / 13)
+        textWidth(column.label, { medium: true, mono: false }),
+        column.unit === undefined ? 0 : textWidth(column.unit, { medium: false, mono: false }) * (12 / 13)
       ) +
       headerChrome +
       (index === 0 ? 30 : 0)
@@ -295,18 +296,18 @@ const measureNeeds = (input: {
       ),
       40
     ))
-      widest = Math.max(widest, textWidth(value, { mono }))
+      widest = Math.max(widest, textWidth(value, { mono, medium: false }))
     for (const view of views) {
       const mark = view.marks[column.id]
       if (mark === undefined || mark.from === mark.to || view.status === "out") continue
-      const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono })
+      const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono, medium: false })
       const guess = isCellMarkProposed(mark) && choicesOf(mark.fix) !== undefined
       // A mark that draws an icon: a model's sparkle, or the question mark of a suggestion nobody was named for.
       const icon = mark.by === "model" || mark.by === "unknown" ? sparkle : 0
       const to = shownWith(column, mark.to, view.cells)
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
-        ? from + 6 + icon + textWidth(`${to}?`, { mono })
+        ? from + 6 + icon + textWidth(`${to}?`, { mono, medium: false })
         : isCellMarkProposed(mark) && mark.from.trim() === mark.to && to.length > longValue
           ? chip
           : from + arrowGap + chip
@@ -325,7 +326,7 @@ const measureNeeds = (input: {
 
 /** An `xs` button's width for its words: 12 px text in the medium weight, its padding, and an outline's border. */
 const xsButton = (words: string, outline: boolean): number =>
-  Math.ceil((textWidth(words, { medium: true }) * 12) / 13) + 16 + (outline ? 2 : 0)
+  Math.ceil((textWidth(words, { medium: true, mono: false }) * 12) / 13) + 16 + (outline ? 2 : 0)
 // The actions cell's own padding (6 px before, 32 after), its rule, and a few pixels for a face not yet loaded.
 const actionsChrome = 6 + 32 + 1 + 6
 

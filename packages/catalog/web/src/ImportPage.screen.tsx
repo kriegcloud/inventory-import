@@ -58,9 +58,19 @@ const nothingToFollow = Atom.readable((): void => undefined)
 export const readAgainWhenBack = perKey((id: ImportId) =>
   Atom.readable((get): void => {
     get.mount(
-      askedAgainWhenBack({ read: importViewShown(id), askAgain: (registry) => importView(id).askAgain(registry) })
+      askedAgainWhenBack({
+        mayPass: isTransient,
+        read: importViewShown(id),
+        askAgain: (registry) => importView(id).askAgain(registry)
+      })
     )
-    get.mount(askedAgainWhenBack({ read: importTable(id), askAgain: (registry) => importTable(id).askAgain(registry) }))
+    get.mount(
+      askedAgainWhenBack({
+        mayPass: isTransient,
+        read: importTable(id),
+        askAgain: (registry) => importTable(id).askAgain(registry)
+      })
+    )
   })
 )
 
@@ -83,7 +93,7 @@ function NotReadAgain(props: { importId: ImportId; error: unknown }) {
         <AlertDescription>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="min-w-0">
-              {sayError(props.error).sentence} What you see is how it was when it was last read.
+              {sayError(props.error, { fields: {} }).sentence} What you see is how it was when it was last read.
               {isTransient(props.error)
                 ? " It is read again by itself every half minute, and at once when the connection comes back."
                 : ""}
@@ -146,8 +156,9 @@ export function ImportPage() {
   const narrow = useAtomValue(isNarrow)
 
   const go = (value: string) => {
-    if (value === "upload") navigate(importId === undefined ? "/" : importAddress(importId, "upload"))
-    else if (importId !== undefined) navigate(importAddress(importId, value))
+    if (value === "upload")
+      navigate(importId === undefined ? "/" : importAddress(importId, "upload"), { replace: false })
+    else if (importId !== undefined) navigate(importAddress(importId, value), { replace: false })
   }
 
   const waiting = importId !== undefined && (view.data === undefined || table.data === undefined)
@@ -172,9 +183,9 @@ export function ImportPage() {
               ? "Somebody removed it, or it belongs to another organization. The first screen lists the imports there are: continue one of them, or choose a file."
               : O.match(refused, {
                   onNone: () => "The address does not name an import. Check the link, or choose a file.",
-                  onSome: (error) => sayError(error).sentence
+                  onSome: (error) => sayError(error, { fields: {} }).sentence
                 })}
-            <Button variant="outline" size="sm" onClick={() => navigate("/")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/", { replace: false })}>
               {gone ? "Go to the first screen" : "Choose a file"}
             </Button>
           </AlertDescription>

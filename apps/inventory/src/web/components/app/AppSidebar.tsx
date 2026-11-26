@@ -181,7 +181,7 @@ function OrganizationPicker() {
                   key={organization.id}
                   onSelect={() => {
                     if (organization.id !== actor.organizationId) {
-                      navigate(addressInAnother(window.location))
+                      navigate(addressInAnother(window.location), { replace: false })
                       // The server checks the membership, so the switch is not shown before it answers: it says
                       // what it is doing, and the pages show their skeletons once it has.
                       switchTo({ id: organization.id, name: organization.name, from: actor.organizationName })
@@ -353,7 +353,10 @@ export function AppSidebar(props: { current: string | undefined }) {
                     <a
                       aria-current={page.path === props.current ? "page" : undefined}
                       // On a phone the sidebar is a drawer over the page: going somewhere closes it.
-                      {...linkTo(page.path, () => setOpenMobile(false))}
+                      {...linkTo(
+                        page.path,
+                        O.some(() => setOpenMobile(false))
+                      )}
                     >
                       <page.icon />
                       <span>{page.label}</span>

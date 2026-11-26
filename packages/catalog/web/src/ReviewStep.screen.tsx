@@ -172,7 +172,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     void matchOne({ id: view.id, field: pick.field, column: O.some(pick.column) }).then((exit) => {
       happened(DraftEvent.MatchEnded())
       done?.()
-      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash))
+      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), {})
     })
   }
   // Asks for suggestions where the rules have none. Nothing it returns changes a row: each waits for the person.
@@ -338,9 +338,13 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
           const working = toast.loading(`Matching ${column.label}`)
           match({ field, column: column.index }, () => toast.dismiss(working))
         }}
-        onShowMatching={() => navigate(importAddress(view.id, "match"))}
+        onShowMatching={() => navigate(importAddress(view.id, "match"), { replace: false })}
         emptyAction={
-          <Button variant="outline" size="sm" onClick={() => navigate(importAddress(view.id, "upload"))}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(importAddress(view.id, "upload"), { replace: false })}
+          >
             Choose another file
           </Button>
         }

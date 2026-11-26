@@ -52,7 +52,7 @@ export const browserLocks = (): LockManager | undefined =>
  * kept id (or a new one) at once.
  */
 export const thisTab: Atom.Atom<O.Option<string>> = Atom.readable((get): O.Option<string> => {
-  const first = O.getOrElse(keptId(), newId)
+  const first = O.match(keptId(), { onSome: (id) => id, onNone: newId })
   const locks = browserLocks()
   if (locks === undefined) return O.some(first)
   const hold = (tab: string): void =>

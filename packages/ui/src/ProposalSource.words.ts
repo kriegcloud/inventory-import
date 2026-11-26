@@ -41,6 +41,8 @@ export const unknownSource: SourceWords = {
 export const sourceWordsFor = (source: ProposalSource | undefined): SourceWords =>
   source === undefined ? unknownSource : known[source]
 
+const confidenceWords = { high: "High", medium: "Medium", low: "Low" } as const
+
 /**
  * The lead of a "Why?" answer: who is behind the change and, for anything but a fixed rule's sure reading, how sure.
  * Never a percentage.
@@ -64,7 +66,7 @@ export const sourceAndConfidence = (fix: {
 }): string => {
   const who = sourceWordsFor(fix.by).tag
   if (fix.confidence === undefined) return who
-  return `${who} · ${fix.confidence.charAt(0).toUpperCase()}${fix.confidence.slice(1)}`
+  return `${who} · ${confidenceWords[fix.confidence]}`
 }
 
 export const sourceLead = (fix: {

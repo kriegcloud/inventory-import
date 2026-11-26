@@ -29,7 +29,10 @@ import { catalogKeys } from "./Catalog.keys.ts"
  * again whenever the person comes back to the tab, however fresh, so decisions made on another screen show up.
  */
 export const importView = perKey((id: ImportId) =>
-  catalogApi.query((api) => api.imports.get({ params: { id } }), { reactivityKeys: catalogKeys.import(id) })
+  catalogApi.query((api) => api.imports.get({ params: { id } }), {
+    keep: "unwatched",
+    reactivityKeys: catalogKeys.import(id)
+  })
 )
 
 /** `importView`, asked again when the tab regains focus: what the import's screens read. */
@@ -119,7 +122,7 @@ export const openWorkbook = perKey((_importId: string) =>
  * remove each. The server sends the newest few in full and counts the rest (`older`). Shown through removals.
  */
 export const openImports = shown(
-  catalogApi.query((api) => api.imports.open(), { reactivityKeys: catalogKeys.openImports })
+  catalogApi.query((api) => api.imports.open(), { keep: "unwatched", reactivityKeys: catalogKeys.openImports })
 )
 
 /**
@@ -127,12 +130,13 @@ export const openImports = shown(
  * back to a past import's result from the first screen and from Activity. The server counts the older ones.
  */
 export const pastImports = catalogApi.query((api) => api.imports.past(), {
+  keep: "unwatched",
   reactivityKeys: catalogKeys.pastImports
 })
 
 /** Goes to the first screen when the address names this import, and stays where it is otherwise. */
 const leaveIfNamed = (id: ImportId): void => {
-  if (new URLSearchParams(window.location.search).get("import") === id) navigate("/")
+  if (new URLSearchParams(window.location.search).get("import") === id) navigate("/", { replace: false })
 }
 
 /**

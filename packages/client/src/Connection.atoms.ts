@@ -9,7 +9,6 @@ import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { apiRuntime } from "@inventory/client/Api"
-import { isTransient } from "@inventory/client/SayError"
 
 /** The event the page sends itself when the server has answered a request. */
 const answered = "inventory:server-answered"
@@ -38,9 +37,9 @@ export const askAgainEvery = Duration.seconds(30)
 export const askedAgainWhenBack = <A, E>(input: {
   readonly read: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   readonly askAgain: (registry: AtomRegistry.AtomRegistry) => void
-  readonly mayPass?: (error: unknown) => boolean
+  readonly mayPass: (error: unknown) => boolean
 }): Atom.Atom<void> => {
-  const mayPass = input.mayPass ?? isTransient
+  const mayPass = input.mayPass
   /** Whether the read stands failed, with a failure that may pass, and nothing is asking it now. */
   const standsFailed = (now: AsyncResult.AsyncResult<A, E>): boolean =>
     AsyncResult.isFailure(now) && !now.waiting && mayPass(now.cause.pipe(Cause.squash))

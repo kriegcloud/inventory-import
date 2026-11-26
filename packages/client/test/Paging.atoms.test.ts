@@ -1,3 +1,5 @@
+import { assertDefined } from "@effect/vitest/utils"
+import { assertedValue } from "./support"
 // The Items table keeps its rows while the next page loads: one read whose page comes from another atom answers the
 // previous page, marked waiting, until the next one arrives (BRIEF-atoms.md, "keep-previous-data paging").
 import { describe, expect, it } from "@effect/vitest"
@@ -5,7 +7,6 @@ import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
@@ -33,25 +34,29 @@ describe("paging", () => {
       })
       const api = makeApiAtoms(PageServer)
       const page = Atom.make(0)
-      const rows = api.query((server, get) => server.page(get(page)))
+      const rows = api.query((server, get) => server.page(get(page)), { keep: "unwatched" })
       const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
       registry.mount(rows)
       yield* settle
-      yield* Deferred.succeed(answers[0]!, undefined)
+      const first = answers[0]
+      assertDefined(first)
+      yield* Deferred.succeed(first, undefined)
       yield* settle
-      expect(registry.get(rows).pipe(AsyncResult.value, O.getOrUndefined)).toEqual(["row 1", "row 2"])
+      expect(registry.get(rows).pipe(AsyncResult.value, assertedValue)).toEqual(["row 1", "row 2"])
 
       registry.set(page, 1)
       yield* settle
       const loading = registry.get(rows)
       expect(loading.waiting).toBe(true)
-      expect(loading.pipe(AsyncResult.value, O.getOrUndefined)).toEqual(["row 1", "row 2"])
+      expect(loading.pipe(AsyncResult.value, assertedValue)).toEqual(["row 1", "row 2"])
 
-      yield* Deferred.succeed(answers[1]!, undefined)
+      const second = answers[1]
+      assertDefined(second)
+      yield* Deferred.succeed(second, undefined)
       yield* settle
       const next = registry.get(rows)
       expect(next.waiting).toBe(false)
-      expect(next.pipe(AsyncResult.value, O.getOrUndefined)).toEqual(["row 3", "row 4"])
+      expect(next.pipe(AsyncResult.value, assertedValue)).toEqual(["row 3", "row 4"])
     })
   )
 })

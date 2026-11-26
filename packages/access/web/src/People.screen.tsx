@@ -68,7 +68,9 @@ const roles: ReadonlyArray<{ value: Role; label: string }> = [
 ]
 
 /** The people of the organization, as the server has them, with each optimistic change on top while it is saved. */
-const people = shown(accessApi.query((api) => api.people.list(), { reactivityKeys: accessKeys.people }))
+const people = shown(
+  accessApi.query((api) => api.people.list(), { keep: "unwatched", reactivityKeys: accessKeys.people })
+)
 
 /** The people whose role is on its way to the server: their row shows the new role, and waits for it. */
 const savingRoles = Atom.make(HashSet.empty<MemberId>())
@@ -208,7 +210,7 @@ function AddPerson() {
             {failed === null ? null : (
               <Alert variant="destructive">
                 <AlertTitle>Not added</AlertTitle>
-                <AlertDescription>{sayError(failed).sentence}</AlertDescription>
+                <AlertDescription>{sayError(failed, { fields: {} }).sentence}</AlertDescription>
               </Alert>
             )}
           </FieldGroup>
@@ -376,7 +378,7 @@ export function PeoplePage() {
           <Alert variant="destructive">
             <AlertTitle>The people could not be loaded</AlertTitle>
             <AlertDescription>
-              {sayError(error).sentence}
+              {sayError(error, { fields: {} }).sentence}
               <Button variant="outline" size="sm" onClick={askAgain}>
                 Try again
               </Button>

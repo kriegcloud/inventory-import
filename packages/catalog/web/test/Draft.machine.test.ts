@@ -110,7 +110,7 @@ describe("the orderings that lost or hid a decision", () => {
     for (const command of [
       Command.cases.SomeoneElse.make({ row: "b", to: "out" }),
       Command.cases.Decide.make({ row: "b", to: "kept" }),
-      Command.cases.SaveFails.make({}),
+      Command.cases.SaveFails.make({ which: "last" }),
       Command.cases.Decide.make({ row: "a", to: "out" }),
       Command.cases.OtherAnswerSent.make({}),
       Command.cases.Decide.make({ row: "b", to: "nothing" }),
@@ -133,7 +133,7 @@ describe("the orderings that lost or hid a decision", () => {
   it("back on Review with a decision unsaved, another person's rows are still followed and never sent over", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.Leave.make({}))
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.ComeBack.make({}))
@@ -158,8 +158,8 @@ describe("the orderings that lost or hid a decision", () => {
     run(world, Command.cases.ReadArrives.make({}))
     expect(world.restarts).toBe(1)
     run(world, Command.cases.Decide.make({ row: "c", to: "out" }))
-    run(world, Command.cases.ServerTakesSave.make({}))
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     run(world, Command.cases.Leave.make({}))
     run(world, Command.cases.ComeBackQuickly.make({}))
     // Back within the idle time: the region is not the one it was, it is what the draft shows.
@@ -179,9 +179,9 @@ describe("the orderings that lost or hid a decision", () => {
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.OtherAnswerSent.make({}))
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
     // The save's answer is two revisions on: the import is asked again.
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     expect(O.isSome(world.read)).toBe(true)
     // The match's answer lands now, without the person's row in it.
     run(world, Command.cases.OtherAnswerArrives.make({}))
@@ -195,7 +195,7 @@ describe("the orderings that lost or hid a decision", () => {
   it("a decision the server refused is held with the reason on the next visit, not shown as standing, and not sent with the next one", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveRefused.make({}))
+    run(world, Command.cases.SaveRefused.make({ which: "last" }))
     run(world, Command.cases.Leave.make({}))
     run(world, Command.cases.ComeBack.make({}))
     expect(shown(world.draft)).toEqual({})
@@ -210,7 +210,7 @@ describe("the orderings that lost or hid a decision", () => {
   it("a save waiting for Save again does not stop a newer draft from being followed", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.ReturnToTab.make({}))
     run(world, Command.cases.ServerTakesRead.make({}))
@@ -223,8 +223,8 @@ describe("the orderings that lost or hid a decision", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Leave.make({}))
-    run(world, Command.cases.ServerTakesSave.make({}))
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     expect(O.map(world.view, (view) => view.revision)).toEqual(O.some(2))
     run(world, Command.cases.ComeBack.make({}))
     expect(shown(world.draft)).toEqual({ a: out })
@@ -236,7 +236,7 @@ describe("the orderings that lost or hid a decision", () => {
     // The person leaves a row out and takes that back while the save is out; the save fails and waits.
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     // "Save again" sends the clear at once, written only where the server holds what may be hers: what it held when
     // she began (nothing), and the leave-out that failed.
     run(world, Command.cases.SaveAgain.make({}))
@@ -246,11 +246,11 @@ describe("the orderings that lost or hid a decision", () => {
     // Somebody else decides another row before the server takes it. It holds nothing of row a, which is what the clear
     // asks for: nothing changes, at the other person's revision.
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
-    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
     expect(O.flatMap(A.last(world.saves), (save) => save.answer)).toEqual(
       O.some({ revision: 2, changed: false, notApplied: [], decidedSince: [] })
     )
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     // The screen does not claim revision 2 for a picture without the other person's row: it holds what it read,
     // and has asked for the import again, at once.
     holds(world)
@@ -301,8 +301,8 @@ describe("a confirm", () => {
     run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
     run(world, Command.cases.PressConfirm.make({}))
     expect([world.draft.confirm, O.isNone(world.confirm)]).toEqual(["waiting", true])
-    run(world, Command.cases.ServerTakesSave.make({}))
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     // Row a is saved at revision 2; the confirm names that revision and carries row b alone.
     expect([sent(world), O.isNone(A.last(world.saves))]).toEqual([O.some([2, { set: { b: kept }, clear: [] }]), true])
     run(world, Command.cases.ServerTakesConfirm.make({}))
@@ -325,8 +325,8 @@ describe("a confirm", () => {
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.PressConfirm.make({}))
-    run(world, Command.cases.ServerTakesSave.make({}))
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     // Two revisions on from the picture held: no confirm goes, the newer picture is asked for.
     expect([world.draft.confirm, world.draft.heldBack, O.isNone(world.confirm), O.isSome(world.read)]).toEqual([
       "idle",
@@ -351,15 +351,15 @@ describe("a confirm", () => {
     run(world, Command.cases.PressConfirm.make({}))
     run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.confirm, world.draft.heldBack]).toEqual(["idle", O.some({ read: true, apart: 1, accepts: [] })])
-    run(world, Command.cases.ServerTakesSave.make({}))
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     expect(O.isNone(world.confirm)).toBe(true)
   })
 
   it("carries the clear of a decision the person took back and the server never heard of", () => {
     const world = opened({ a: out })
     run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.PressConfirm.make({}))
     expect(sent(world)).toEqual(O.some([1, { set: {}, clear: ["a"] }]))
     run(world, Command.cases.ServerTakesConfirm.make({}))
@@ -370,7 +370,7 @@ describe("a confirm", () => {
   it("that did not get through sends nothing and offers no Save again before the import is read; a read that says it is open sends the rows", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.PressConfirm.make({}))
     run(world, Command.cases.ConfirmFails.make({}))
     // Nothing is sent and nothing offered as a save: the import may be closed. The import is asked for.
@@ -395,7 +395,7 @@ describe("a confirm", () => {
   it("that did not get through, then the step drawn again: the view given again is not the answer, and the next read is", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.PressConfirm.make({}))
     run(world, Command.cases.ConfirmFails.make({}))
     run(world, Command.cases.Leave.make({}))
@@ -446,7 +446,7 @@ describe("rows that wait, kept in the browser", () => {
   it("are sent again when a picture arrives after a save that failed, and the failure is said once", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     expect([world.said, notSaved(world.draft) > 0, O.isNone(A.last(world.saves))]).toEqual([1, true, true])
     // An answer of a save nobody waits for (another id) says nothing and changes nothing.
     const stray = step(world.draft, DraftEvent.SaveFailed({ id: 7 }))
@@ -464,7 +464,7 @@ describe("rows that wait, kept in the browser", () => {
   it("are named and never sent when somebody else confirms the import, and kept until the result has named them", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.SomeoneConfirms.make({}))
     run(world, Command.cases.ReturnToTab.make({}))
     run(world, Command.cases.ServerTakesRead.make({}))
@@ -484,9 +484,9 @@ describe("rows that wait, kept in the browser", () => {
   it("that the confirm already wrote are not named: only what the confirmed import does not say", () => {
     const world = opened({ a: out })
     run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
-    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
     // The server took row b; its answer is lost on the way, and somebody else confirms.
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.SomeoneConfirms.make({}))
     run(world, Command.cases.ReturnToTab.make({}))
     run(world, Command.cases.ServerTakesRead.make({}))
@@ -605,7 +605,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
   it("refused because somebody else confirmed it sends nothing: the import is read, and its rows are named", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.SomeoneConfirms.make({}))
     run(world, Command.cases.PressConfirm.make({}))
     // The server answers AlreadyImported.
@@ -623,7 +623,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
   it("made, with its answer lost on the way back: nothing is sent, and the closed picture names nothing it wrote", () => {
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
-    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SaveFails.make({ which: "last" }))
     run(world, Command.cases.PressConfirm.make({}))
     run(world, Command.cases.ServerTakesConfirm.make({}))
     expect(closedAs(world)).toEqual(O.some({ a: out }))
@@ -712,8 +712,8 @@ describe("what a save and a confirm name", () => {
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
     expect(world.draft.unsent).toEqual({})
-    run(world, Command.cases.ServerTakesSave.make({}))
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     expect(O.isNone(A.last(world.saves))).toBe(true)
   })
 
@@ -761,13 +761,13 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
     const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.PressConfirm.make({}))
-    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.ServerTakesSave.make({ which: "last" }))
     // The read taken after the save brings the person's own row back before the save's answer does.
     run(world, Command.cases.ReturnToTab.make({}))
     run(world, Command.cases.ServerTakesRead.make({}))
     run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.confirm, world.draft.heldBack]).toEqual(["waiting", O.none()])
-    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.SaveAnswers.make({ which: "last" }))
     expect(O.map(world.confirm, (confirm) => confirm.revision)).toEqual(O.some(2))
   })
 
@@ -858,10 +858,10 @@ describe("orderings the properties met, pinned", () => {
     const orderings: ReadonlyArray<ReadonlyArray<Command>> = [
       [
         C.Decide.make({ row: "b", to: "out" }),
-        C.SaveFails.make({}),
+        C.SaveFails.make({ which: "last" }),
         C.Decide.make({ row: "b", to: "kept" }),
-        C.ServerTakesSave.make({}),
-        C.SaveAnswers.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.SaveAnswers.make({ which: "last" }),
         C.SomeoneElse.make({ row: "b", to: "accepted" }),
         refusedOut
       ],
@@ -870,11 +870,11 @@ describe("orderings the properties met, pinned", () => {
         C.Reload.make({}),
         C.ServerTakesRead.make({}),
         C.ReadArrives.make({}),
-        C.ServerTakesSave.make({}),
-        C.SaveAnswers.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.SaveAnswers.make({ which: "last" }),
         C.Decide.make({ row: "b", to: "kept" }),
-        C.ServerTakesSave.make({}),
-        C.SaveAnswers.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.SaveAnswers.make({ which: "last" }),
         C.SomeoneElse.make({ row: "b", to: "accepted" }),
         refusedOut
       ],
@@ -904,15 +904,15 @@ describe("orderings the properties met, pinned", () => {
     // What the newer picture holds of the row is what the match left of her own decision: nobody decided it since.
     const ordering = [
       Command.cases.Decide.make({ row: "a", to: "acceptedOut" }),
-      Command.cases.ServerTakesSave.make({}),
+      Command.cases.ServerTakesSave.make({ which: "last" }),
       Command.cases.Match.make({}),
       Command.cases.ReturnToTab.make({}),
       Command.cases.ServerTakesRead.make({}),
       Command.cases.ReadArrives.make({}),
       Command.cases.Decide.make({ row: "a", to: "kept" }),
-      Command.cases.SaveAnswers.make({}),
-      Command.cases.ServerTakesSave.make({}),
-      Command.cases.SaveAnswers.make({})
+      Command.cases.SaveAnswers.make({ which: "last" }),
+      Command.cases.ServerTakesSave.make({ which: "last" }),
+      Command.cases.SaveAnswers.make({ which: "last" })
     ]
     const world = opened({})
     for (const command of ordering) run(world, command)
@@ -942,15 +942,15 @@ describe("orderings the properties met, pinned", () => {
     // Her screen showed her own decision on its way, never the other one: a live press would write over it unasked.
     const ordering = [
       Command.cases.Decide.make({ row: "a", to: "out" }),
-      Command.cases.ServerTakesSave.make({}),
+      Command.cases.ServerTakesSave.make({ which: "last" }),
       Command.cases.SomeoneElse.make({ row: "a", to: "kept" }),
       Command.cases.ReturnToTab.make({}),
       Command.cases.ServerTakesRead.make({}),
       Command.cases.ReadArrives.make({}),
       Command.cases.Decide.make({ row: "a", to: "accepted" }),
-      Command.cases.SaveAnswers.make({}),
-      Command.cases.ServerTakesSave.make({}),
-      Command.cases.SaveAnswers.make({})
+      Command.cases.SaveAnswers.make({ which: "last" }),
+      Command.cases.ServerTakesSave.make({ which: "last" }),
+      Command.cases.SaveAnswers.make({ which: "last" })
     ]
     const world = opened({})
     for (const command of ordering) run(world, command)
@@ -964,7 +964,7 @@ describe("orderings the properties met, pinned", () => {
     const orderings: ReadonlyArray<ReadonlyArray<Command>> = [
       [
         C.Decide.make({ row: "a", to: "acceptedOut" }),
-        C.ServerTakesSave.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
         C.Match.make({}),
         C.SomeoneElse.make({ row: "a", to: "kept" }),
         C.SomeoneElse.make({ row: "a", to: "out" }),
@@ -972,9 +972,9 @@ describe("orderings the properties met, pinned", () => {
         C.ServerTakesRead.make({}),
         C.ReadArrives.make({}),
         C.Decide.make({ row: "a", to: "kept" }),
-        C.SaveAnswers.make({}),
-        C.ServerTakesSave.make({}),
-        C.SaveAnswers.make({})
+        C.SaveAnswers.make({ which: "last" }),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.SaveAnswers.make({ which: "last" })
       ],
       [
         C.SomeoneElse.make({ row: "a", to: "acceptedOut" }),
@@ -982,7 +982,7 @@ describe("orderings the properties met, pinned", () => {
         C.ServerTakesRead.make({}),
         C.ReadArrives.make({}),
         C.Decide.make({ row: "a", to: "kept" }),
-        C.ServerTakesSave.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
         C.SomeoneElse.make({ row: "a", to: "accepted" }),
         C.Match.make({}),
         C.SomeoneElse.make({ row: "a", to: "out" }),
@@ -990,8 +990,8 @@ describe("orderings the properties met, pinned", () => {
         C.ServerTakesRead.make({}),
         C.ReadArrives.make({}),
         C.Decide.make({ row: "a", to: "accepted" }),
-        C.SaveAnswers.make({}),
-        C.ServerTakesSave.make({})
+        C.SaveAnswers.make({ which: "last" }),
+        C.ServerTakesSave.make({ which: "last" })
       ]
     ]
     const ends = A.map(orderings, (ordering) => {
@@ -1015,15 +1015,15 @@ describe("orderings the properties met, pinned", () => {
       C.ServerTakesRead.make({}),
       C.ReadArrives.make({}),
       C.Decide.make({ row: "a", to: "out" }),
-      C.ServerTakesSave.make({}),
+      C.ServerTakesSave.make({ which: "last" }),
       C.SomeoneElse.make({ row: "a", to: "kept" }),
       C.ReturnToTab.make({}),
       C.ServerTakesRead.make({}),
       C.ReadArrives.make({}),
       C.Decide.make({ row: "a", to: "accepted" }),
-      C.SaveAnswers.make({}),
-      C.ServerTakesSave.make({}),
-      C.SaveAnswers.make({})
+      C.SaveAnswers.make({ which: "last" }),
+      C.ServerTakesSave.make({ which: "last" }),
+      C.SaveAnswers.make({ which: "last" })
     ]
     const world = opened({})
     for (const command of ordering) run(world, command)
@@ -1035,15 +1035,15 @@ describe("orderings the properties met, pinned", () => {
     const C = Command.cases
     const ordering = [
       C.Decide.make({ row: "a", to: "out" }),
-      C.ServerTakesSave.make({}),
+      C.ServerTakesSave.make({ which: "last" }),
       C.SomeoneElse.make({ row: "b", to: "kept" }),
       C.ReturnToTab.make({}),
       C.ServerTakesRead.make({}),
       C.ReadArrives.make({}),
       C.Decide.make({ row: "a", to: "accepted" }),
-      C.SaveAnswers.make({}),
-      C.ServerTakesSave.make({}),
-      C.SaveAnswers.make({})
+      C.SaveAnswers.make({ which: "last" }),
+      C.ServerTakesSave.make({ which: "last" }),
+      C.SaveAnswers.make({ which: "last" })
     ]
     const world = opened({})
     for (const command of ordering) run(world, command)
@@ -1058,15 +1058,15 @@ describe("orderings the properties met, pinned", () => {
     const ordering = [
       C.Decide.make({ row: "a", to: "acceptedOut" }),
       C.SomeoneElse.make({ row: "a", to: "acceptedOut" }),
-      C.ServerTakesSave.make({}),
+      C.ServerTakesSave.make({ which: "last" }),
       C.Match.make({}),
       C.ReturnToTab.make({}),
       C.ServerTakesRead.make({}),
       C.ReadArrives.make({}),
       C.Decide.make({ row: "a", to: "kept" }),
-      C.SaveAnswers.make({}),
-      C.ServerTakesSave.make({}),
-      C.SaveAnswers.make({})
+      C.SaveAnswers.make({ which: "last" }),
+      C.ServerTakesSave.make({ which: "last" }),
+      C.SaveAnswers.make({ which: "last" })
     ]
     const world = opened({})
     for (const command of ordering) run(world, command)
@@ -1095,7 +1095,7 @@ describe("orderings the properties met, pinned", () => {
       Command.cases.ServerTakesRead.make({}),
       Command.cases.ReadArrives.make({}),
       Command.cases.Decide.make({ row: "a", to: "kept" }),
-      Command.cases.SaveAnswers.make({})
+      Command.cases.SaveAnswers.make({ which: "last" })
     ]
     const world = opened({})
     for (const command of ordering) run(world, command)
@@ -1116,10 +1116,10 @@ describe("orderings the properties met, pinned", () => {
         Command.cases.OtherAnswerSent.make({}),
         Command.cases.OtherAnswerArrives.make({}),
         Command.cases.Decide.make({ row: "a", to: "kept" }),
-        Command.cases.ServerTakesSave.make({}),
-        Command.cases.SaveAnswers.make({}),
+        Command.cases.ServerTakesSave.make({ which: "last" }),
+        Command.cases.SaveAnswers.make({ which: "last" }),
         Command.cases.SomeoneElse.make({ row: "a", to: "accepted" }),
-        Command.cases.ServerTakesSave.make({})
+        Command.cases.ServerTakesSave.make({ which: "last" })
       ])
     ).toEqual(O.none())
   })
@@ -1152,11 +1152,11 @@ describe("orderings the properties met, pinned", () => {
     expect(
       broken([
         Command.cases.Decide.make({ row: "a", to: "out" }),
-        Command.cases.ServerTakesSave.make({}),
+        Command.cases.ServerTakesSave.make({ which: "last" }),
         Command.cases.SomeoneElse.make({ row: "c", to: "out" }),
         Command.cases.Decide.make({ row: "c", to: "kept" }),
         Command.cases.OtherAnswerSent.make({}),
-        Command.cases.SaveFails.make({}),
+        Command.cases.SaveFails.make({ which: "last" }),
         Command.cases.OtherAnswerArrives.make({}),
         Command.cases.Decide.make({ row: "a", to: "nothing" }),
         Command.cases.PressConfirm.make({})
@@ -1262,8 +1262,8 @@ describe("orderings the properties met, pinned", () => {
     for (const command of [
       Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
       Command.cases.Decide.make({ row: "c", to: "acceptedOut" }),
-      Command.cases.ServerTakesSave.make({}),
-      Command.cases.SaveAnswers.make({}),
+      Command.cases.ServerTakesSave.make({ which: "last" }),
+      Command.cases.SaveAnswers.make({ which: "last" }),
       Command.cases.Match.make({}),
       Command.cases.Match.make({}),
       Command.cases.TakeUp.make({ row: "a", to: "acceptedOut", beside: "another", as: "waiting" }),
@@ -1271,8 +1271,8 @@ describe("orderings the properties met, pinned", () => {
       Command.cases.TakeUp.make({ row: "c", to: "nothing", beside: "another", as: "refused" }),
       // She picks the other tab's leave-out of row c; the save of row a out before it is answered.
       Command.cases.SettleAll.make({ which: "first" }),
-      Command.cases.ServerTakesSave.make({}),
-      Command.cases.SaveAnswers.make({})
+      Command.cases.ServerTakesSave.make({ which: "last" }),
+      Command.cases.SaveAnswers.make({ which: "last" })
     ])
       run(world, command)
     expect([R.keys(world.draft.lines), O.map(world.draft.flight, (flight) => R.keys(flight.rows))]).toEqual([
@@ -1637,7 +1637,7 @@ describe("what this tab sent whose answer never came back, as the properties' wo
     for (const command of ordering) run(world, command)
     return R.keys(world.unanswered)
   }
-  const lostOnItsWay = [D.Decide.make({ row: "a", to: "out" }), D.SaveSignedOut.make({})]
+  const lostOnItsWay = [D.Decide.make({ row: "a", to: "out" }), D.SaveSignedOut.make({ which: "last" })]
 
   it("a save lost with a reload, or signed out, is kept", () => {
     expect([after([D.Decide.make({ row: "a", to: "out" }), D.Reload.make({})]), after(lostOnItsWay)]).toEqual([
@@ -1664,8 +1664,8 @@ describe("what this tab sent whose answer never came back, as the properties' wo
   it("is forgotten when a save carrying the row is answered, or refused", () => {
     const again = [...lostOnItsWay, D.SaveAgain.make({})]
     expect([
-      after([...again, D.ServerTakesSave.make({}), D.SaveAnswers.make({})]),
-      after([...again, D.SaveRefused.make({})])
+      after([...again, D.ServerTakesSave.make({ which: "last" }), D.SaveAnswers.make({ which: "last" })]),
+      after([...again, D.SaveRefused.make({ which: "last" })])
     ]).toEqual([[], []])
   })
 

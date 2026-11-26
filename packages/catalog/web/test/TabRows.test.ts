@@ -176,6 +176,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
     Effect.map(([drafts, review, imports, machine, tabs, support, noticed]) => {
       const saves: Array<SaveRequest> = []
       const registry = support.registryFor({
+        ...support.registryStart,
         endpoints: {
           imports: {
             // The server answers a read with what it holds.
@@ -200,7 +201,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
             remove: () => Effect.void
           }
         },
-        signedIn: Atom.make(signedIn)
+        signedIn: signedIn.pipe((who) => Atom.make(who), O.some)
       })
       registry.mount(tabs.thisTab)
       const view = (id: ImportId) =>
@@ -270,11 +271,13 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
         },
         /** The tab is closed: its lock goes with it. */
         close: () => {
-          const own = `inventory-tab:${O.getOrElse(registry.get(tabs.thisTab), () => "")}`
-          O.map(
-            A.findFirstIndex(browser.held, (lock) => lock.name === own),
-            (index) => browser.held.splice(index, 1)
-          )
+          O.map(registry.get(tabs.thisTab), (tab) => {
+            const own = `inventory-tab:${tab}`
+            O.map(
+              A.findFirstIndex(browser.held, (lock) => lock.name === own),
+              (index) => browser.held.splice(index, 1)
+            )
+          })
         }
       }
     })

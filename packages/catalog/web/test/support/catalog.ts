@@ -2,6 +2,8 @@
 // as the server would send it with only the fields the rule under test reads.
 import * as Layer from "effect/Layer"
 import * as Str from "effect/String"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { provideApi } from "@inventory/client/Api"
 import { makeApi } from "@inventory/client/ApiRuntime"
@@ -22,14 +24,21 @@ import {
  * the same stand-in. With `idleTTL`, it keeps an atom nobody reads for that long, as the app's does for 400 ms; with
  * `signedIn`, the member is read from that atom, as the app reads it from the session.
  */
+export const registryStart = {
+  idleTTL: O.none<number>(),
+  signedIn: O.none<Parameters<typeof provideMember>[0]>(),
+  asked: O.none<Parameters<typeof provideWhoIsSignedInAsked>[0]>(),
+  writesRetried: false
+}
+
 export const registryFor = (input: {
   readonly endpoints: object
-  readonly idleTTL?: number
-  readonly signedIn?: Parameters<typeof provideMember>[0]
+  readonly idleTTL: O.Option<number>
+  readonly signedIn: O.Option<Parameters<typeof provideMember>[0]>
   /** True while who is signed in is being asked again, as the app reads it from its session. */
-  readonly asked?: Parameters<typeof provideWhoIsSignedInAsked>[0]
+  readonly asked: O.Option<Parameters<typeof provideWhoIsSignedInAsked>[0]>
   /** Writes go through the app's own `callWrite`: a failure that may pass is sent again, as it is in the app. */
-  readonly writesRetried?: boolean
+  readonly writesRetried: boolean
 }): AtomRegistry.AtomRegistry => {
   // The stand-in holds only the endpoints the test calls: the rest of the client is never reached.
   const client = input.endpoints as CatalogApiClient
@@ -42,15 +51,16 @@ export const registryFor = (input: {
   return AtomRegistry.make({
     initialValues: [
       provideApi(Layer.succeed(CatalogClient, client)),
-      ...(input.signedIn === undefined ? [] : [provideMember(input.signedIn)]),
-      ...(input.asked === undefined ? [] : [provideWhoIsSignedInAsked(input.asked)])
+      ...O.toArray(O.map(input.signedIn, provideMember)),
+      ...O.toArray(O.map(input.asked, provideWhoIsSignedInAsked))
     ],
-    ...(input.idleTTL === undefined ? {} : { defaultIdleTTL: input.idleTTL })
+    ...R.getSomes({ defaultIdleTTL: input.idleTTL })
   })
 }
 
 /** A registry whose catalog client answers with `endpoints`, which lets an atom go the moment nobody reads it. */
-export const registryWith = (endpoints: object): AtomRegistry.AtomRegistry => registryFor({ endpoints })
+export const registryWith = (endpoints: object): AtomRegistry.AtomRegistry =>
+  registryFor({ ...registryStart, endpoints })
 
 /** The id an import has when a test needs only one. */
 export const importId = "00000000-0000-4000-8000-000000000001" as ImportId

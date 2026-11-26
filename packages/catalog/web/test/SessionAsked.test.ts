@@ -24,7 +24,7 @@ import { DraftEvent } from "../src/Draft.machine.ts"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import { draftEvents, draftOf, followDraft, reviewLocal, shownDecisions } from "../src/ReviewDraft.atoms.ts"
 import { openedOf } from "../src/internal/result.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its storage, which outlives a page, and the tab's own.
@@ -125,15 +125,16 @@ const keptOf = (id: ImportId, member: string) =>
 /** A page of the app on one import's review: the server answers a save as the test says. */
 const page = (id: ImportId, who: typeof dana) => {
   const session = sessionStandIn(who)
-  const server: { signedOut: boolean; view: ImportView; notFoundIn: string | undefined; reads: number } = {
+  const server: { signedOut: boolean; view: ImportView; notFoundIn: O.Option<string>; reads: number } = {
     signedOut: false,
     view: viewAt({ id, revision: 4 }),
-    notFoundIn: undefined,
+    notFoundIn: O.none(),
     reads: 0
   }
   const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
   const commits: Array<unknown> = []
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         get: () =>
@@ -142,11 +143,13 @@ const page = (id: ImportId, who: typeof dana) => {
             const { notFoundIn, view } = server
             return Effect.sleep("5 millis").pipe(
               Effect.andThen((): Effect.Effect<ImportView, ImportNotFound> =>
-                notFoundIn === undefined
-                  ? Effect.succeed(view)
-                  : Effect.fail(
-                      ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make(notFoundIn) })
+                O.match(notFoundIn, {
+                  onNone: () => Effect.succeed(view),
+                  onSome: (organization) =>
+                    Effect.fail(
+                      ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make(organization) })
                     )
+                })
               )
             )
           }),
@@ -164,29 +167,29 @@ const page = (id: ImportId, who: typeof dana) => {
           })
       }
     },
-    idleTTL: 20,
-    signedIn: session.signedIn,
-    asked: session.asked
+    idleTTL: O.some(20),
+    signedIn: O.some(session.signedIn),
+    asked: O.some(session.asked)
   })
   // The page as it draws: while there is a member it reads the import, and while there is a view to draw the review
   // follows the draft. What was drawn is told in order, each once in a row.
   const drew: Array<string> = []
   session.drawn(registry, () => {
-    const step: { leave: (() => void) | undefined } = { leave: undefined }
+    const step: { leave: O.Option<() => void> } = { leave: O.none() }
     const draw = () => {
       const view = openedOf({ read: registry.get(importViewShown(id)), isGone: S.is(ImportNotFound) })
-      const now = view.gone ? "gone" : O.isNone(view.data) ? "skeleton" : "review"
+      const now = view.gone ? "gone" : O.match(view.data, { onNone: () => "skeleton", onSome: () => "review" })
       if (drew[drew.length - 1] !== now) drew.push(now)
-      if (now === "review") step.leave ??= registry.mount(followDraft(id))
+      if (now === "review") step.leave = O.orElse(step.leave, () => O.some(registry.mount(followDraft(id))))
       else {
-        step.leave?.()
-        step.leave = undefined
+        O.map(step.leave, (leave) => leave())
+        step.leave = O.none()
       }
     }
     const stops = [
       registry.mount(reviewLocal(id)),
       registry.subscribe(importViewShown(id), () => draw()),
-      () => step.leave?.()
+      () => O.map(step.leave, (leave) => leave())
     ]
     draw()
     return () => A.forEach(stops, (stop) => stop())
@@ -320,7 +323,7 @@ describe("the review while who is signed in is asked again", () => {
         t.session.choose("org_northline")
         t.registry.refresh(t.session.signedIn)
         yield* until("who is signed in asked again", () => t.session.times() > 0, 1_000)
-        t.server.notFoundIn = "org_northline"
+        t.server.notFoundIn = O.some("org_northline")
         yield* t.session.answer(
           memberOf({ ...memberStart, id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
         )
@@ -349,7 +352,7 @@ describe("an import not found while it is open", () => {
       const t = page(id, dana)
       yield* until("the review drawn", t.onScreen, 1_000)
       const { reads } = t.server
-      t.server.notFoundIn = "org_prairie"
+      t.server.notFoundIn = O.some("org_prairie")
       importView(id).askAgain(t.registry, O.none())
       yield* answering(t, 5)
       expect([t.drew, t.session.times(), t.server.reads - reads]).toEqual([["skeleton", "review", "gone"], 0, 1])
@@ -363,7 +366,7 @@ describe("an import not found while it is open", () => {
       // Read more than a second ago: shown again, it would be asked again behind it.
       yield* passes(1_100)
       const { reads } = t.server
-      t.server.notFoundIn = "org_northline"
+      t.server.notFoundIn = O.some("org_northline")
       importView(id).askAgain(t.registry, O.none())
       yield* answering(t, 6)
       expect([t.drew, t.session.times(), t.server.reads - reads]).toEqual([["skeleton", "review", "gone"], 1, 1])

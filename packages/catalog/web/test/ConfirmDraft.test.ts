@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // A confirm, wired to the import's read and to the server, without the screen. The machine (`Draft.machine.ts`) says
 // when a confirm goes and what it carries; what is held here is that the request is that and nothing more (the
 // revision the screen holds, the person's rows not saved yet), that a refusal because the draft moved on writes
@@ -122,8 +123,16 @@ const world = (id: ImportId) => {
     press: () => happened(DraftEvent.ConfirmPressed()),
     confirming: () => registry.get(confirmingImport(id)),
     heldBack: () => registry.get(confirmHeldBack(id)),
-    shown: () => O.getOrThrow(registry.get(shownDecisions(id))),
-    held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
+    shown: () => {
+      const expectedSome1 = registry.get(shownDecisions(id))
+      assertTrue(O.isSome(expectedSome1), "expected registry.get(shownDecisions(id))")
+      return expectedSome1.value
+    },
+    held: () => {
+      const expectedSome2 = registry.get(importView(id)).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome2), "expected registry.get(importView(id)).pipe(AsyncResult.value)")
+      return expectedSome2.value
+    },
     draft: () => registry.get(draftOf(id))
   }
 }
@@ -175,10 +184,9 @@ describe("a confirm", () => {
         ])
         expect([t.gets.length, t.confirms.length]).toEqual([asked + 1, 1])
         // The newer picture: somebody else left row 5 out.
-        yield* Deferred.succeed(
-          O.getOrThrow(A.last(t.gets)),
-          t.at({ revision: 11, decisions: { "row-7": kept, "row-5": out } })
-        )
+        const expectedSome3 = A.last(t.gets)
+        assertTrue(O.isSome(expectedSome3), "expected A.last(t.gets)")
+        yield* Deferred.succeed(expectedSome3.value, t.at({ revision: 11, decisions: { "row-7": kept, "row-5": out } }))
         yield* settle
         expect([t.shown(), t.heldBack(), t.confirming()]).toEqual([
           { "row-7": kept, "row-5": out },
@@ -286,7 +294,9 @@ describe("a confirm", () => {
           asked + 1
         ])
         expect(page.said).toEqual(["Not saved yet", "An accept was taken back"])
-        yield* Deferred.succeed(O.getOrThrow(A.last(t.gets)), t.at({ revision: 11, decisions: { "row-7": kept } }))
+        const expectedSome4 = A.last(t.gets)
+        assertTrue(O.isSome(expectedSome4), "expected A.last(t.gets)")
+        yield* Deferred.succeed(expectedSome4.value, t.at({ revision: 11, decisions: { "row-7": kept } }))
         yield* settle
         expect([t.heldBack(), t.confirming()]).toEqual([
           O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),

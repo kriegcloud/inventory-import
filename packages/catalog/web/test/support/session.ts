@@ -1,8 +1,10 @@
+import { assertTrue } from "@effect/vitest/utils"
 // Who is signed in, as a test's page has it: one session atom that everything derives from, by the app's own rules
 // (`@inventory/client/MemberAtoms`), so a test is never on a page the app cannot be on. Asked again, the member stays
 // and nobody is certain until the test answers; the same member goes on; anybody else, another organization or nobody
 // leaves the page, which never becomes theirs (`left`); another organization the person chose (`choose`), answered for
 // the same account, is the one change a page lives through, and the choice is over with the next answer, as in the app. And what is drawn while there is a member, as the app's sign-in gate draws it.
+import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
@@ -89,7 +91,11 @@ export const sessionStandIn = (first: Who) => {
     })
   }).pipe(Atom.keepAlive)
   /** The question that is out: the last one asked. */
-  const question = () => O.getOrThrow(O.fromUndefinedOr(out[out.length - 1]))
+  const question = () => {
+    const expectedSome1 = A.last(out)
+    assertTrue(O.isSome(expectedSome1), "expected A.last(out)")
+    return expectedSome1.value
+  }
   return {
     signedIn: Atom.readable(
       (get) => memberOfAnswer({ session: get(session), memberOf: identity<Who> }),

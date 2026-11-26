@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The review's draft against the server's own handler, over the in-memory twins: a save of hers partly written (a part
 // not applied, or one a match took back since) whose answer was lost goes again over what this tab sent, and the server
 // finds it as hers, in either order and after a reload. Where the server still cannot tell (a decision sent before a
@@ -100,7 +101,9 @@ const opened = Effect.gen(function* () {
   }
   /** The last save the draft asked for reaches the server; its answer reaches the draft when `arrives` is run. */
   const taken = Effect.fnUntraced(function* () {
-    const send = O.getOrThrow(A.last(sends))
+    const expectedSome1 = A.last(sends)
+    assertTrue(O.isSome(expectedSome1), "expected A.last(sends)")
+    const send = expectedSome1.value
     sends.length = 0
     const payload = {
       madeOn: send.madeOn,

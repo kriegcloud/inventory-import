@@ -178,10 +178,14 @@ describe("every row says why", () => {
       const noFix = A.filter(open, (view) => O.isNone(O.flatMap(view.problem, (problem) => problem.fix)))
       expect(noFix.length).toBeGreaterThan(0)
       for (const view of open) {
-        const domain = O.getOrThrow(A.findFirst(current.rows, (row) => row.id === view.row.id))
+        const expectedSome1 = A.findFirst(current.rows, (row) => row.id === view.row.id)
+        assertTrue(O.isSome(expectedSome1), "expected A.findFirst(current.rows, (row) => row.id === view.row.id)")
+        const domain = expectedSome1.value
         // The first problem's sentence, and how many more the row has behind it.
+        const expectedSome2 = domain.reason
+        assertTrue(O.isSome(expectedSome2), "expected domain.reason")
         expect(reasonOf({ words: defaultReviewWords, view, kinds })).toBe(
-          reasonShown(O.getOrThrow(domain.reason), domain.reasons.length)
+          reasonShown(expectedSome2.value, domain.reasons.length)
         )
       }
     })

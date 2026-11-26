@@ -24,14 +24,14 @@ import { type CatalogApiClient, CatalogClient, configureCatalog } from "../src/C
 import { ReadMessage, type PlainHead } from "../src/internal/protocol.ts"
 import { UploadState } from "../src/Upload.machine.ts"
 import { startUpload, UploadEnd, uploadState } from "../src/Upload.controller.ts"
-import { importId, registryFor, viewAt } from "./support/catalog.ts"
+import { importId, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its window, the reader's worker (the test says what it has read), and what is asked of the server as the
 // page goes.
 const browser = vi.hoisted(() => {
   const readers: Array<{ onmessage: ((event: { data: unknown }) => void) | null; ended: boolean }> = []
-  const asked: Array<string> = []
+  const asked: Array<O.Option<string>> = []
   class Reader {
     onmessage: ((event: { data: unknown }) => void) | null = null
     onerror: unknown = null
@@ -51,17 +51,17 @@ const browser = vi.hoisted(() => {
       history: { pushState: () => undefined, replaceState: () => undefined }
     }),
     fetch: (_address: unknown, init: RequestInit) => {
-      asked.push(init.method ?? "")
+      asked.push(O.fromUndefinedOr(init.method))
       return Promise.resolve(new Response(null, { status: 204 }))
     }
   })
-  return { readers, asked, said: [] as Array<string>, described: [] as Array<string> }
+  return { readers, asked, said: [] as Array<string>, described: [] as Array<O.Option<string>> }
 })
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => browser.said.push(title), {
     error: (title: string, options?: { readonly description?: string }) => {
       browser.said.push(title)
-      browser.described.push(options?.description ?? "")
+      browser.described.push(O.fromUndefinedOr(options?.description))
     },
     dismiss: () => undefined
   })
@@ -102,7 +102,12 @@ const world = () => {
       discardUpload: () => Effect.sync(() => sent.push("discard"))
     }
   } as unknown as CatalogApiClient
-  const registry = registryFor({ endpoints: client, signedIn: session.signedIn, asked: session.asked })
+  const registry = registryFor({
+    ...registryStart,
+    endpoints: client,
+    signedIn: O.some(session.signedIn),
+    asked: O.some(session.asked)
+  })
   configureCatalog({
     ...makeApi(ManagedRuntime.make(Layer.succeed(CatalogClient, client)), CatalogClient),
     runtime: ManagedRuntime.make(Layer.empty),
@@ -178,7 +183,7 @@ describe("an upload", () => {
       yield* settle
       window.dispatchEvent(new Event("pagehide"))
       yield* settle
-      expect(browser.asked).toEqual(["DELETE"])
+      expect(browser.asked).toEqual([O.some("DELETE")])
       t.says(ReadMessage.Crashed({ message: "Enough." }))
       yield* settle
     })
@@ -242,7 +247,7 @@ describe("an upload", () => {
 })
 
 /** Whether the switch has stopped waiting. */
-const ended = (fiber: Fiber.Fiber<unknown, unknown>): boolean => fiber.pollUnsafe() !== undefined
+const ended = (fiber: Fiber.Fiber<unknown, unknown>): boolean => O.isSome(O.fromUndefinedOr(fiber.pollUnsafe()))
 
 describe("an upload, when the person presses another organization", () => {
   it.live("still sending: is stopped and what reached the server deleted, as her, before the switch is sent", () =>
@@ -289,7 +294,7 @@ describe("an upload, when the person presses another organization", () => {
       expect([ended(switching), A.last(t.sent)]).toEqual([true, A.last(["discard"])])
       expect([browser.said, browser.described]).toEqual([
         ["items.csv was not uploaded"],
-        ["items.csv has more rows than one import takes. Split it into files of 5,000 rows or fewer."]
+        [O.some("items.csv has more rows than one import takes. Split it into files of 5,000 rows or fewer.")]
       ])
     })
   )

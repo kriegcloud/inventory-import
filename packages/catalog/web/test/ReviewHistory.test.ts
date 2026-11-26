@@ -27,7 +27,7 @@ import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import { followDraft, reviewLocal, reviewState } from "../src/ReviewDraft.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 
 // The browser's storage, which outlives a refresh: looked up once when the saved progress is first read. And the tab's
 // own storage, which a refresh of the tab keeps: every visit here is a refresh of one tab.
@@ -89,6 +89,7 @@ const visit = (id: ImportId, options: typeof visitStart) => {
   const server: { revision: number; decisions: SavedDecisions } = { revision: 0, decisions: {} }
   const sent: Array<SaveRequest> = []
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         // A read of the import never answers, unless the test says the server answers it with what it holds.
@@ -105,7 +106,7 @@ const visit = (id: ImportId, options: typeof visitStart) => {
         }
       }
     },
-    signedIn: Atom.make(memberOf(options.member))
+    signedIn: memberOf(options.member).pipe((who) => Atom.make(who), O.some)
   })
   return {
     registry,

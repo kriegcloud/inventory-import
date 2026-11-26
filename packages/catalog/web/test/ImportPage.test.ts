@@ -21,7 +21,7 @@ import type { ImportView } from "@inventory/catalog-contract/Import"
 import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { ImportPage, readAgainWhenBack } from "../src/ImportPage.screen.tsx"
 import { followRemoval, importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 const id = importNo(98)
@@ -69,6 +69,7 @@ const world = (first: Effect.Effect<ImportView, Refusal>) => {
     reads: 0
   }
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         get: () =>
@@ -79,8 +80,8 @@ const world = (first: Effect.Effect<ImportView, Refusal>) => {
         table: () => Effect.succeed({ rows: [] })
       }
     },
-    signedIn: session.signedIn,
-    asked: session.asked
+    signedIn: O.some(session.signedIn),
+    asked: O.some(session.asked)
   })
   // The page is drawn: it reads the import and its rows, and follows what it mounts.
   registry.mount(importViewShown(id))

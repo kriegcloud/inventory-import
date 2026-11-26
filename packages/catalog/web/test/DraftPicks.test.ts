@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // What a line offers and what a pick does: nothing a pick could be undone by this tab's own save on its way, and the
 // line then follows what the server holds; a closed tab's refused decision lets the confirm go once the row is decided
 // again and saved; a member who can only view is offered nothing that sends; the confirm sends a waiting row before it
@@ -283,8 +284,12 @@ describe("the lines of one kind", () => {
   it("are drawn ten at first, the rest behind a press that says how many are left", () => {
     const lines = A.makeBy(23, (n) => `row-${n}`)
     const first = linesDrawn({ lines, drawn: 10 })
-    const next = linesDrawn({ lines, drawn: O.getOrThrow(first.more).drawn })
-    const last = linesDrawn({ lines, drawn: O.getOrThrow(next.more).drawn })
+    const expectedSome1 = first.more
+    assertTrue(O.isSome(expectedSome1), "expected first.more")
+    const next = linesDrawn({ lines, drawn: expectedSome1.value.drawn })
+    const expectedSome2 = next.more
+    assertTrue(O.isSome(expectedSome2), "expected next.more")
+    const last = linesDrawn({ lines, drawn: expectedSome2.value.drawn })
     expect([
       first.shown.length,
       O.map(first.more, (more) => more.label),

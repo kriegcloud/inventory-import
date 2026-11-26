@@ -5,6 +5,8 @@
 // the view changed meanwhile, does not find the region as it was.
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as A from "effect/Array"
+import { assertTrue } from "@effect/vitest/utils"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as HttpApiError from "effect/http-api/HttpApiError"
@@ -31,12 +33,12 @@ import {
   reviewStateAt,
   rowsNotSaved
 } from "../src/ReviewDraft.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 
 // What is said to the person.
 const page = vi.hoisted(() => ({
   said: [] as Array<string>,
-  descriptions: [] as Array<string>,
+  descriptions: [] as Array<O.Option<string>>,
   actions: [] as Array<() => void>
 }))
 vi.mock("sonner", () => ({
@@ -46,8 +48,8 @@ vi.mock("sonner", () => ({
     loading: () => 0,
     error: (title: string, options?: { description?: string; action?: { onClick: () => void } }) => {
       page.said.push(title)
-      page.descriptions.push(options?.description ?? "")
-      if (options?.action !== undefined) page.actions.push(options.action.onClick)
+      page.descriptions.push(O.fromUndefinedOr(options?.description))
+      O.map(O.fromUndefinedOr(options?.action), (action) => page.actions.push(action.onClick))
       return 0
     }
   })
@@ -68,6 +70,7 @@ const world = (id: ImportId, network: { down: boolean }, reads: boolean) => {
   const stored: Record<string, SavedDecisions[string]> = {}
   const at = (parts: Partial<ImportView> & { readonly revision: number }) => viewAt({ id, ...parts })
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         get: () => (reads ? Effect.sync(() => at({ revision: revision.now, decisions: { ...stored } })) : Effect.never),
@@ -84,7 +87,7 @@ const world = (id: ImportId, network: { down: boolean }, reads: boolean) => {
           })
       }
     },
-    idleTTL: 120
+    idleTTL: O.some(120)
   })
   registry.set(importView(id), at({ revision: 10 }))
   return {
@@ -202,7 +205,10 @@ describe("the region beside the draft", () => {
         ])
         expect(t.registry.get(rowsNotSaved(id))).toBe(1)
         // The button says what it does: it sends the row now, wherever the person is.
-        expect(page.descriptions.at(-1)).toContain("Save again sends it now")
+        const description = A.last(page.descriptions)
+        assertTrue(O.isSome(description), "the refusal toast was recorded")
+        assertTrue(O.isSome(description.value), "the refusal toast has its description")
+        expect(description.value.value).toContain("Save again sends it now")
         // The network is back, the person has gone to another page, and presses Save again on what was said: the row
         // goes, as one that waited, over what the server may hold of it (nothing, when it was decided, or itself).
         leave()

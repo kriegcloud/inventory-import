@@ -78,6 +78,5 @@
   "packages/ui/src/components/switch.tsx": 1,
   "packages/ui/src/components/toggle-group.tsx": 2,
   "packages/ui/src/components/tour.tsx": 110,
-  "packages/ui/src/hooks/use-data-table.ts": 9,
-  "vitest.retries.ts": 2
+  "packages/ui/src/hooks/use-data-table.ts": 9
 }

@@ -8,7 +8,7 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 167 answer the questions report 18 and step 7 raised. They are under Answered. They are what is left
+Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 175 answer the questions report 18 and step 7 raised. They are under Answered. They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
@@ -1275,3 +1275,67 @@ I confirmed all three as built; the agent recommended the same.
 - Rationale: none is spelled out by decisions 135 or 146, and each is the stricter reading.
 - What changes: nothing. A record of a class that stores no id must name the class on the record alone, so an id field naming it is a P4 finding. Rule C16 also refuses a basis key that is no property of the vocabulary. The metamodel's three new fields are `restsOn`, `designation` and `storesId`.
 - Reverse: let such a record carry an id field and have the lift refuse it.
+
+### 168. Which source records state the customer and vendor flags (2026-11-26)
+
+I chose only a record of a trading account; the agent recommended the same (report 18, question 6 of its second list).
+
+- Rationale: a Sutton `Contact` and a Sutton `Organization` are source records too, and their source never states a trading role; under decision 35's closure each would wait as Needs a decision for good, the harm decision 89 refused.
+- What changes: `isCustomer` and `isVendor` are stated, true or false, on a record whose source has a trading-role field (a Sutton `Company`), and their definitions say so. A contact's or a workspace's record carries neither. Decision 35 stands for the records it covers.
+- Reverse: state both on every source record, false by a rule for contacts and workspaces.
+
+### 169. membershipIn's text beside decision 154 (2026-11-26)
+
+I chose to reword it; the agent recommended the same (report 18, question 2 of its second list).
+
+- Rationale: decision 111's text, "the tenant it lets its person act in", is wrong for a Sutton membership, which lets its person act in the source's workspace.
+- What changes: `membershipIn` reads "Links a membership to the tenant it belongs to, in whose workspace, or in a source's workspace it names, it lets its person act." Its text changed, so it names the accepting decision, as `Member` does, and the release line marks it breaking.
+- Reverse: restore decision 111's text.
+
+### 170. Party stores no id (2026-11-26)
+
+I chose `storesId: false` for `Party`; the agent recommended the same (report 18, question 10 of its second list).
+
+- Rationale: a category has no id of its own, and the lift reads only the range class itself, so a link to `Party` would mint a node typed only `Party`.
+- What changes: the lift refuses to write a `Party` node; a record's party is stated on fixtures as a `Person` or an `Organization`.
+- Reverse: keep the default and have the lift refuse a link whose range is a category.
+
+### 171. Guard 1 compares subject and property (2026-11-26)
+
+I chose that guard 1 compares the subject and the property, not the property alone; the agent recommended the same (report 18, question 9 of its second list).
+
+- Rationale: once the lift writes a tenant's name (decision 161), guard 1 as built would refuse a person's name written by hand on CQ-P06's fixture (decision 133), both being `name`.
+- What changes: one guard and its test, in step 11. A fixture may state by hand a property the lift writes on other subjects.
+- Reverse: keep guard 1 and put the person's name in a fixture of its own.
+
+### 172. Where a Sutton UserProfile's names and job title sit (2026-11-26)
+
+I chose on the `Member`; the agent recommended the same (report 18, question 3 of its second list).
+
+- Rationale: a Sutton member has no source record, and decision 163 already places its image and text on the membership; through the person, two workspaces' spellings would sit on one node.
+- What changes: `UserProfile.fullName`, `firstName`, `middleName`, `lastName` and `jobTitle` are stated on the `Member`, per tenant. This app's own member names stay through the person (decision 133).
+- Reverse: state them on the person by hand.
+
+### 173. PostalAddress's criterion beside decision 158 (2026-11-26)
+
+I chose that decision 158's rule applies to it; the agent recommended the same (report 18, question 4 of its second list).
+
+- Rationale: its only source is Sutton's `Address.id`, and a source's id beside another system's of the same text in one tenant would read as one address.
+- What changes: the criterion is decision 138's with "an id a source issued waits until that source's records are lifted". Fixtures state `test_` addresses by name.
+- Reverse: keep decision 138's words unqualified.
+
+### 174. Gist links of memberContactPoint and defaultFor (2026-11-26)
+
+I chose `memberContactPoint` under `gist:hasAddress` and no gist parent for `defaultFor`; the agent recommended the same (report 18, questions 5 and 8 of its second list).
+
+- Rationale: a member's contact point is an address like any other, and rule C9 passes it; `defaultFor` ranges over a scheme but says which purpose an address is the default for, not what kind of thing it is, so decision 17 does not cover it.
+- What changes: decision 17 is read as covering the properties that classify a thing. One more link under `gist:hasAddress`.
+- Reverse: put `defaultFor` under `gist:isCategorizedBy`.
+
+### 175. How a lift would write a contact point (2026-11-26)
+
+I chose that contact points are written by hand in this slice and the rule is asked later; the agent recommended the same (report 18, question 7 of its second list).
+
+- Rationale: decision 159 gives a contact point an id from its record and field while decision 155 has the lift state nothing for a path that ends in an attribute; no step of this goal lifts one.
+- What changes: nothing is built. The question is put when Sutton records are first lifted, on a real record.
+- Reverse: a second exception to decision 155 that mints the node from record and field.

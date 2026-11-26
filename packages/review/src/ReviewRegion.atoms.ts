@@ -17,6 +17,7 @@ import { createColumnHelper, type Table } from "@tanstack/react-table"
 import { table_setOptions } from "@tanstack/react-table/static-functions"
 import * as A from "effect/Array"
 import * as Data from "effect/Data"
+import { identity } from "effect/Function"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as MutableHashMap from "effect/MutableHashMap"
@@ -272,7 +273,8 @@ const facetsOf = (
         spellings: {} as Record<string, number>
       }))
       MutableHashSet.add(entry.values, value)
-      entry.spellings[value.trim()] = (entry.spellings[value.trim()] ?? 0) + 1
+      const spelling = value.trim()
+      entry.spellings[spelling] = (entry.spellings[spelling] ?? 0) + 1
       MutableHashMap.set(found, key, entry)
     }
     for (const view of list) {
@@ -289,7 +291,9 @@ const facetsOf = (
       }))
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
     // A choice whose value is no longer in the file (the person fixed the last row that had it) is dropped.
-    const picked = (facetPicked[column.id] ?? []).filter((key) => MutableHashMap.has(found, key))
+    const picked = O.match(R.get(facetPicked, column.id), { onNone: A.empty<string>, onSome: identity }).filter((key) =>
+      MutableHashMap.has(found, key)
+    )
     return { column, options, picked }
   })
 
@@ -670,9 +674,8 @@ const makeRegionTable = (
           if (view.status === "needs") found.push(Stop.Row({ rowId: view.row.id }))
         },
         kind: ({ collapsed, kind, rowIds }) => {
-          const first = rowIds[0]
-          if (collapsed && first !== undefined)
-            found.push(Stop.Folded({ rowId: first, kindId: kind.id, among: rowIds }))
+          if (collapsed)
+            O.map(A.head(rowIds), (rowId) => found.push(Stop.Folded({ rowId, kindId: kind.id, among: rowIds })))
         },
         group: () => undefined,
         rest: () => undefined

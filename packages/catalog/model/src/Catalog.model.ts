@@ -8,12 +8,66 @@
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import { Group, GroupState, GroupEvent } from "./Group/Group.aggregate.ts"
+import type { DecidedGroup } from "./Group/Group.aggregate.ts"
 import { Import, ImportState, ImportEvent } from "./Import/Import.aggregate.ts"
 import { Deciding } from "./Review/Deciding.decision.ts"
 import { DecidingGroup } from "./Review/DecidingGroup.decision.ts"
 import { Undoing } from "./Review/Undoing.decision.ts"
 import { UndoingGroup } from "./Review/UndoingGroup.decision.ts"
 import { RowState, Row, RowEvent } from "./Row/Row.aggregate.ts"
+
+// What the invariants below are said in. An invariant of the model is searched, never proved: Verify runs it as it is
+// written and does not read its code, so it may call these. A relation is proved, so the two relations call nothing.
+
+/** One instance as an invariant sees it: its name and what it holds. */
+type Held<State> = { readonly id: string; readonly state: State }
+
+/** An import that was staged and not removed: the cases that number changes. */
+type StagedImport = Exclude<ImportState, typeof ImportState.cases.Unstaged.Type | typeof ImportState.cases.Removed.Type>
+
+/**
+ * Whether an act on a group still gives its rows what it decided. `undoneAt` is the change that took the act back, and
+ * 0 says none did: a change is numbered from 1. Every invariant asks it here, so the 0 is read in one place.
+ */
+const inForce = (group: DecidedGroup): boolean => group.undoneAt === 0
+
+/** Two decisions recorded by the same change of the same import. */
+const sameChangeOfOneImport = (
+  a: { readonly importId: string; readonly change: number },
+  b: { readonly importId: string; readonly change: number }
+): boolean => a.importId === b.importId && a.change === b.change
+
+/** No two instances that hold a decision are `alike`. An instance is never compared with itself. */
+const noTwoHold = <State, Decided extends State>(
+  held: ReadonlyArray<Held<State>>,
+  decided: (state: State) => state is Decided,
+  alike: (a: Decided, b: Decided) => boolean
+): boolean =>
+  A.every(held, (a) =>
+    A.every(held, (b) => a.id === b.id || !decided(a.state) || !decided(b.state) || !alike(a.state, b.state))
+  )
+
+/** `holds` of every act on a group that was decided, in force or taken back. */
+const everyDecidedGroup = (groups: ReadonlyArray<Held<GroupState>>, holds: (group: DecidedGroup) => boolean): boolean =>
+  A.every(groups, (group) => !GroupState.guards.Decided(group.state) || holds(group.state))
+
+/**
+ * `holds` of every decided act on a group, beside the import it was recorded on. A removed import is asked nothing:
+ * what it numbered is gone. An import not yet staged has no act on a group, so one found there breaks the rule.
+ */
+const everyGroupOfItsImport = (
+  all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+  holds: (group: DecidedGroup, life: StagedImport) => boolean
+): boolean =>
+  everyDecidedGroup(all.Group, (group) =>
+    A.every(
+      all.Import,
+      (life) =>
+        group.importId !== life.id ||
+        ImportState.guards.Removed(life.state) ||
+        (!ImportState.guards.Unstaged(life.state) && holds(group, life.state))
+    )
+  )
 
 /** The catalog's model: today, the review of an import. */
 export class Catalog extends Domain.Model(
@@ -41,106 +95,38 @@ export class Catalog extends Domain.Model(
     },
     invariants: {
       // No two rows of one import ever hold a decision of the same change.
-      NoTwoRowsHoldTheSameChange: (all) =>
-        A.every(all.Row, (a) =>
-          A.every(
-            all.Row,
-            (b) =>
-              a.id === b.id ||
-              !RowState.guards.Decided(a.state) ||
-              !RowState.guards.Decided(b.state) ||
-              a.state.importId !== b.state.importId ||
-              a.state.change !== b.state.change
-          )
-        ),
+      NoTwoRowsHoldTheSameChange: (all) => noTwoHold(all.Row, RowState.guards.Decided, sameChangeOfOneImport),
       // Nor a row and an act on a group, by the change that decided the group or the one that took it back.
       NoRowAndGroupHoldTheSameChange: (all) =>
         A.every(all.Row, (row) =>
-          A.every(
+          everyDecidedGroup(
             all.Group,
             (group) =>
               !RowState.guards.Decided(row.state) ||
-              !GroupState.guards.Decided(group.state) ||
-              row.state.importId !== group.state.importId ||
-              (row.state.change !== group.state.change && row.state.change !== group.state.undoneAt)
+              row.state.importId !== group.importId ||
+              (row.state.change !== group.change && row.state.change !== group.undoneAt)
           )
         ),
-      NoTwoGroupsHoldTheSameChange: (all) =>
-        A.every(all.Group, (a) =>
-          A.every(
-            all.Group,
-            (b) =>
-              a.id === b.id ||
-              !GroupState.guards.Decided(a.state) ||
-              !GroupState.guards.Decided(b.state) ||
-              a.state.importId !== b.state.importId ||
-              a.state.change !== b.state.change
-          )
-        ),
+      // Nor two acts on a group.
+      NoTwoGroupsHoldTheSameChange: (all) => noTwoHold(all.Group, GroupState.guards.Decided, sameChangeOfOneImport),
       // An act on a group was recorded, and taken back, by changes its import gave.
       AGroupsChangeIsOneItsImportGave: (all) =>
-        A.every(all.Group, (group) =>
-          A.every(
-            all.Import,
-            (life) =>
-              !GroupState.guards.Decided(group.state) ||
-              group.state.importId !== life.id ||
-              ImportState.guards.Removed(life.state) ||
-              (!ImportState.guards.Unstaged(life.state) &&
-                group.state.change >= 1 &&
-                group.state.change <= life.state.changes &&
-                group.state.undoneAt <= life.state.changes)
-          )
+        everyGroupOfItsImport(
+          all,
+          (group, life) => group.change >= 1 && group.change <= life.changes && group.undoneAt <= life.changes
         ),
+      // A group is taken back by a later change than the one that decided it.
       AGroupsUndoComesAfterIt: (all) =>
-        A.every(
-          all.Group,
-          (group) =>
-            !GroupState.guards.Decided(group.state) ||
-            group.state.undoneAt === 0 ||
-            group.state.undoneAt > group.state.change
-        ),
+        everyDecidedGroup(all.Group, (group) => inForce(group) || group.undoneAt > group.change),
       // The group an import holds as its last in force is in force.
       TheLastGroupInForceIsInForce: (all) =>
-        A.every(all.Group, (group) =>
-          A.every(
-            all.Import,
-            (life) =>
-              !GroupState.guards.Decided(group.state) ||
-              group.state.importId !== life.id ||
-              ImportState.guards.Removed(life.state) ||
-              ImportState.guards.Unstaged(life.state) ||
-              group.state.change !== life.state.topGroup ||
-              group.state.undoneAt === 0
-          )
-        ),
+        everyGroupOfItsImport(all, (group, life) => group.change !== life.topGroup || inForce(group)),
       // And no group in force is later than it: the one an import holds as its last in force is the last.
       NoGroupInForceIsLaterThanTheLastInForce: (all) =>
-        A.every(all.Group, (group) =>
-          A.every(
-            all.Import,
-            (life) =>
-              !GroupState.guards.Decided(group.state) ||
-              group.state.importId !== life.id ||
-              ImportState.guards.Removed(life.state) ||
-              ImportState.guards.Unstaged(life.state) ||
-              group.state.undoneAt !== 0 ||
-              group.state.change <= life.state.topGroup
-          )
-        ),
+        everyGroupOfItsImport(all, (group, life) => !inForce(group) || group.change <= life.topGroup),
       // No act on a group of an import is later than the one the import holds as its last.
       NoGroupActIsLaterThanTheImportsLast: (all) =>
-        A.every(all.Group, (group) =>
-          A.every(
-            all.Import,
-            (life) =>
-              !GroupState.guards.Decided(group.state) ||
-              group.state.importId !== life.id ||
-              ImportState.guards.Removed(life.state) ||
-              ImportState.guards.Unstaged(life.state) ||
-              (group.state.change <= life.state.lastGroup && group.state.undoneAt <= life.state.lastGroup)
-          )
-        )
+        everyGroupOfItsImport(all, (group, life) => group.change <= life.lastGroup && group.undoneAt <= life.lastGroup)
     },
     // Each command can be taken: some sequence of commands, from a model with nothing in it, records its event. A
     // change that made the model refuse a command shows here as "never reached". It is a search, and it says nothing

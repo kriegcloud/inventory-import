@@ -47,7 +47,10 @@ left open: the one question in section 13 is the accepting decision's number.
 Notation as in report 14 section 2: `inv:` is `https://example.org/inventory-import/ontology/`, `gist:` is
 `https://w3id.org/semanticarts/ns/ontology/gist/`, a key is the local name, labels and definitions are English. The
 kind tag, the identity criterion and its basis, `storesId`, `designation` and `evidence` live in the module only and
-reach no Turtle (decision 19).
+reach no Turtle (decision 19). A Definition cell is the definition exactly as the module writes it and the generated
+Turtle states it as `skos:definition`, so no Definition cell cites a decision, as none of the thread's definitions
+does; the decisions the new definitions follow are listed in section 11. An identity criterion, which reaches no
+Turtle, keeps its citations, as the thread's criteria do.
 
 ## 2. The accepted set in one view
 
@@ -144,9 +147,10 @@ membership when an admin adds a person by the email they signed up with, and inv
 access code's one `invited` is a value of `SignUpOffer`, who may make an account); Sutton makes one at the invitation
 (P2). "Where it names one": a Sutton membership names its workspace by `membershipWorkspace` (section 4.1), and none
 of this app's does (decision 154); CQ-P06 and CQ-P07 leave out a membership that names one. Decision 169 rewords the
-thread's `membershipIn` to agree with this definition (section 4.4). The new terms this report writes about acting
-under a membership, `memberAccount` and the concepts `pending`, `active` and `suspended`, already say the workspace
-the membership lets its person act in, not the tenant's, so decision 169 changes none of them.
+thread's `membershipIn` to agree with this definition (section 4.4). Of the new terms this report writes about acting
+under a membership, the concepts `pending`, `active` and `suspended` already say the workspace the membership lets its
+person act in, not the tenant's, and `memberAccount` ("to act under that membership") names neither the tenant nor a
+workspace, so decision 169 changes none of them.
 
 ### 3.3 `Person`, `Organization` and `grantScope`: new links, decision 111 kept
 
@@ -192,33 +196,33 @@ that test at `handWrittenFixtures` and keeps its plant (without CQ-P06's text, `
 
 | Key | Label | Definition | Domain | Range | Super | Evidence | Step |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `recordOf` | record of | Links a source record to the party it was captured about: a person, or an organization (decision 125). | `SourceRecord` | `Party` (decision 145) | `gist:isAbout` (decision 166) | fixture: CQ-P01, CQ-P02, CQ-P09 | 9 |
+| `recordOf` | record of | Links a source record to the party it was captured about: a person, or an organization. | `SourceRecord` | `Party` (decision 145) | `gist:isAbout` (decision 166) | fixture: CQ-P01, CQ-P02, CQ-P09 | 9 |
 | `decidesOn` | decides on | Links an identity decision to one of the two source records it compares. | `IdentityDecision` | `SourceRecord` (decision 145) | none | fixture: CQ-P04 | 10 |
 | `identityOutcome` | identity outcome | Links an identity decision to what it found: the two records denote one party, or two. | `IdentityDecision` | `IdentityOutcomeScheme` | `gist:isCategorizedBy` | fixture: CQ-P04 | 10 |
 | `decidedBy` | decided by | Links an identity decision to the member who made it. | `IdentityDecision` | `Member` | none | fixture: CQ-P04 | 10 |
 | `citesEvidence` | cites evidence | Links a decision to a piece of evidence it rests on. | none declared (kept broad, report 06) | `IdentityEvidence` | none | fixture: CQ-P04 | 10 |
-| `membershipStatus` | membership status | Links a membership to the stage it stands at: pending, active, suspended or revoked (decisions P2 and 137). | `Member` | `MembershipStatusScheme` | `gist:isCategorizedBy` | fixture: CQ-P07 (decision 136); `sutton-party.ttl` (`UserProfile.status`) | 11 |
-| `memberAccount` | member account | Links a membership to the sign-in account its person signs in with to act under that membership (decision 134). | `Member` | `SignInAccount` | none | mark: `Person.email`'s path, its node step | 11 |
-| `recordedAgentRun` | recorded agent run | Links an audit entry to the agent run that made the change for the member it names, when an agent did (decision 135). | `AuditEntry` | `AgentRun` | none | mark: `Activity.agent`'s path, its node step | 11 |
+| `membershipStatus` | membership status | Links a membership to the stage it stands at: pending, active, suspended or revoked. | `Member` | `MembershipStatusScheme` | `gist:isCategorizedBy` | fixture: CQ-P07 (decision 136); `sutton-party.ttl` (`UserProfile.status`) | 11 |
+| `memberAccount` | member account | Links a membership to the sign-in account its person signs in with to act under that membership. | `Member` | `SignInAccount` | none | mark: `Person.email`'s path, its node step | 11 |
+| `recordedAgentRun` | recorded agent run | Links an audit entry to the agent run that made the change for the member it names, when an agent did. | `AuditEntry` | `AgentRun` | none | mark: `Activity.agent`'s path, its node step | 11 |
 | `maxRole` | max role | Links an agent run to the highest role it may act with, whatever the role of the member it acts for. | `AgentRun` | `Role` | none | mark: `AgentRun.maxRole` | 11 |
 | `callPurpose` | call purpose | Links a model call to what it is for: reading a table request, checking the key, or suggesting fixes for an import. | `ModelCall` | `ModelCallPurposeScheme` | `gist:isCategorizedBy` | fixture: `model-call.ttl` | 11 |
 | `calledFor` | called for | Links a model call to the member whose action asked for it. | `ModelCall` | `Member` | none | fixture: `model-call.ttl` | 11 |
-| `hasPostalAddress` | has postal address | Links the tenant's record of a party to a postal address that record gives (decision 138). | `SourceRecord` | `PostalAddress` | `gist:hasAddress` (decision 166) | fixture: `sutton-party.ttl` | 12 |
-| `addressPurpose` | address purpose | Links a postal address to a purpose its record types it for, such as billing, shipping or ship from; one address may have several (decision 126). | `PostalAddress` | `ContactPurposeScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
+| `hasPostalAddress` | has postal address | Links the tenant's record of a party to a postal address that record gives. | `SourceRecord` | `PostalAddress` | `gist:hasAddress` (decision 166) | fixture: `sutton-party.ttl` | 12 |
+| `addressPurpose` | address purpose | Links a postal address to a purpose its record types it for, such as billing, shipping or ship from; one address may have several. | `PostalAddress` | `ContactPurposeScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
 | `defaultFor` | default for | Links a postal address to a purpose for which it is the one used when an order names no other. | `PostalAddress` | `ContactPurposeScheme` | none (decision 174) | fixture: `sutton-party.ttl` | 12 |
-| `hasContactPoint` | has contact point | Links the tenant's record of a party to an email address or telephone number that record gives (decision 138). | `SourceRecord` | `ContactPoint` | `gist:hasAddress` (decision 166) | fixture: CQ-P03 (the person's record gives the point); `sutton-party.ttl` | 12 |
+| `hasContactPoint` | has contact point | Links the tenant's record of a party to an email address or telephone number that record gives. | `SourceRecord` | `ContactPoint` | `gist:hasAddress` (decision 166) | fixture: CQ-P03 (the person's record gives the point); `sutton-party.ttl` | 12 |
 | `contactPointKind` | contact point kind | Links a contact point to what kind of electronic address it is: an email address or a telephone number. | `ContactPoint` | `ContactPointKindScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
 | `contactPerson` | contact person | Links a contact assignment to the person to reach on it. | `ContactAssignment` | `Person` | none | fixture: CQ-P03 | 12 |
-| `contactAccount` | contact account | Links a contact assignment to the account at which its person serves its purpose, an organization or a person (decision 125). | `ContactAssignment` | `Party` | none | fixture: CQ-P03 | 12 |
+| `contactAccount` | contact account | Links a contact assignment to the account at which its person serves its purpose, an organization or a person. | `ContactAssignment` | `Party` | none | fixture: CQ-P03 | 12 |
 | `assignmentPoint` | assignment point | Links a contact assignment to the contact point to use for it. | `ContactAssignment` | `ContactPoint` | none | fixture: CQ-P03 | 12 |
 | `servesPurpose` | serves purpose | Links a contact assignment to the business exchange for which to reach its person at its account using its point. | `ContactAssignment` | `ContactPurposeScheme` | `gist:isCategorizedBy` | fixture: CQ-P03 | 12 |
-| `contactAt` | contact at | Links the tenant's record of a contact to the tenant's record of the company the contact belongs to, stating no purpose (decision 139). | `SourceRecord` | `SourceRecord` | none | fixture: `sutton-party.ttl` | 12 |
-| `contactType` | contact type | Links the tenant's record of a contact to the kind the tenant files the contact under (decision 139). | `SourceRecord` | `ContactTypeScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
-| `contactOwner` | contact owner | Links the tenant's record of a contact to a member of the tenant who owns the contact (decision 139). | `SourceRecord` | `Member` | none | fixture: `sutton-party.ttl` | 12 |
-| `primaryContact` | primary contact | Links the tenant's record of a company to the tenant's record of the contact it names first (decision 139). | `SourceRecord` | `SourceRecord` | none | fixture: `sutton-party.ttl` | 12 |
-| `accountStatus` | account status | Links the tenant's record of a party to whether the tenant still trades with the party or has archived the record (decision 130). | `SourceRecord` | `AccountStatusScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
-| `membershipWorkspace` | membership workspace | Links a membership to the source's record of the workspace it lets its person act in, stated only where that workspace is another system's, such as a Sutton organization's (decision 154). | `Member` | `SourceRecord` | none | fixture: `sutton-party.ttl`; CQ-P06's and CQ-P07's must-fail memberships (section 10) | 12 |
-| `memberContactPoint` | member contact point | Links a membership to an email address or telephone number that its profile in the tenant gives for its person, such as a personal email or phone (decision 162). | `Member` | `ContactPoint` | `gist:hasAddress` (decision 174) | fixture: `sutton-party.ttl` | 12 |
+| `contactAt` | contact at | Links the tenant's record of a contact to the tenant's record of the company the contact belongs to, stating no purpose. | `SourceRecord` | `SourceRecord` | none | fixture: `sutton-party.ttl` | 12 |
+| `contactType` | contact type | Links the tenant's record of a contact to the kind the tenant files the contact under. | `SourceRecord` | `ContactTypeScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
+| `contactOwner` | contact owner | Links the tenant's record of a contact to a member of the tenant who owns the contact. | `SourceRecord` | `Member` | none | fixture: `sutton-party.ttl` | 12 |
+| `primaryContact` | primary contact | Links the tenant's record of a company to the tenant's record of the contact it names first. | `SourceRecord` | `SourceRecord` | none | fixture: `sutton-party.ttl` | 12 |
+| `accountStatus` | account status | Links the tenant's record of a party to whether the tenant still trades with the party or has archived the record. | `SourceRecord` | `AccountStatusScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
+| `membershipWorkspace` | membership workspace | Links a membership to the source's record of the workspace it lets its person act in, stated only where that workspace is another system's, such as a Sutton organization's. | `Member` | `SourceRecord` | none | fixture: `sutton-party.ttl`; CQ-P06's and CQ-P07's must-fail memberships (section 10) | 12 |
+| `memberContactPoint` | member contact point | Links a membership to an email address or telephone number that its profile in the tenant gives for its person, such as a personal email or phone. | `Member` | `ContactPoint` | `gist:hasAddress` (decision 174) | fixture: `sutton-party.ttl` | 12 |
 
 Every property whose range is a scheme but `defaultFor` sits under `gist:isCategorizedBy` (decision 17). Decision 174
 reads decision 17 as covering the properties that classify a thing: `defaultFor` says which purpose an address is the
@@ -237,9 +241,9 @@ thread, the OWL file writes no `rdfs:range` for a scheme range.
 | `sourceSystem` | source system | The external system a source record was read from, as written. | `SourceRecord` | `xsd:string` | none | none | fixture: CQ-P01 | 9 |
 | `sourceType` | source type | The record type the external system gives a source record, as written. | `SourceRecord` | `xsd:string` | none | none | fixture: CQ-P01 | 9 |
 | `sourceId` | source id | The opaque id the external system gives a source record, kept exactly as written. | `SourceRecord` | `xsd:string` | none | none | fixture: CQ-P01 | 9 |
-| `capturedAt` | captured at | The instant a source record was last read from its system: one value, which each later read of the same record replaces (decision 156). | `SourceRecord` | `xsd:dateTime` | none | none | fixture: CQ-P01 | 9 |
-| `isCustomer` | is customer (altLabels Customer, Client, Buyer) | Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party buys from the tenant: true or false on every such stored record, and stated on no other record (decisions 34, 35 and 168). | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
-| `isVendor` | is vendor (altLabels Vendor, Supplier) | Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party sells to the tenant: true or false on every such stored record, and stated on no other record (decisions 34, 35 and 168). | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
+| `capturedAt` | captured at | The instant a source record was last read from its system: one value, which each later read of the same record replaces. | `SourceRecord` | `xsd:dateTime` | none | none | fixture: CQ-P01 | 9 |
+| `isCustomer` | is customer (altLabels Customer, Client, Buyer) | Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party buys from the tenant: true or false on every such stored record, and stated on no other record. | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
+| `isVendor` | is vendor (altLabels Vendor, Supplier) | Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party sells to the tenant: true or false on every such stored record, and stated on no other record. | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
 | `eventTime` | event time | The instant at which an event occurred, as its record states it. | none declared | `xsd:dateTime` | `gist:atDateTime` (decision 166) | none | fixture: CQ-P04 | 10 |
 | `evidenceText` | evidence text | The evidence in a sentence a person reads, naming the two values compared. | `IdentityEvidence` | `xsd:string` | none | none | fixture: CQ-P04 | 10 |
 | `joinedAt` | joined at | When the person could first act in the membership, as its record states it: for this app's members the moment an admin added them, for an invitee the moment the invitation was accepted. | `Member` | `xsd:dateTime` | none | none | mark: `Person.joinedAt` | 11 |
@@ -251,15 +255,15 @@ thread, the OWL file writes no `rdfs:range` for a scheme range.
 | `locality` | locality | The town or city of a postal address, as written. | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `region` | region | The state, province or other region of a postal address, as written. | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `postalCode` | postal code | The postal code of a postal address, kept as text so leading zeros survive. | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
-| `countryCode` | country code | The country of a postal address as a two-letter ISO 3166 code, stated only once a person accepts the code read from the source's own text (decision 138). | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
+| `countryCode` | country code | The country of a postal address as a two-letter ISO 3166 code, stated only once a person accepts the code read from the source's own text. | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `contactValue` | contact value | The text of an email address or telephone number, as written in the source. | `ContactPoint` | `xsd:string` | none | email | fixture: CQ-P03; `sutton-party.ttl` | 12 |
 | `extension` | extension | The extension to dial after a telephone number, as written in the source. | `ContactPoint` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `givenName` | given name | A person's given name as a record or a membership's profile writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
 | `middleName` | middle name | A person's middle name as a record or a membership's profile writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
 | `familyName` | family name | A person's family name as a record or a membership's profile writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
 | `jobTitle` | job title | The title of a person's job at the organization a record or a membership names, as written. | none declared | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
-| `profileImage` | profile image | The picture the profile of a membership shows for its person, as the source gives it, such as a link to an image file (decision 163). | `Member` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
-| `profileText` | profile text (altLabel About) | The text a person writes about themselves on the profile of one membership, as written in the source (decision 163). | `Member` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
+| `profileImage` | profile image | The picture the profile of a membership shows for its person, as the source gives it, such as a link to an image file. | `Member` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
+| `profileText` | profile text (altLabel About) | The text a person writes about themselves on the profile of one membership, as written in the source. | `Member` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 
 Two datatype properties sit under a gist property. `name` passes C9, since `gist:name` declares no domain and no
 range (decision 153); `eventTime` passes it, since `gist:atDateTime` declares no domain and the range `xsd:dateTime`,
@@ -303,10 +307,10 @@ decision.
 
 | Scheme | Label | Definition | Closed | Pointed at by | Step |
 | --- | --- | --- | --- | --- | --- |
-| `IdentityOutcomeScheme` | Identity outcome | A controlled vocabulary of what an identity decision finds about two source records a tenant holds that may be one party (decision 34). | yes | `identityOutcome` | 10 |
+| `IdentityOutcomeScheme` | Identity outcome | A controlled vocabulary of what an identity decision finds about two source records a tenant holds that may be one party. | yes | `identityOutcome` | 10 |
 | `MembershipStatusScheme` | Membership status | A controlled vocabulary of the stages a person's membership of a tenant passes through, from invited to revoked. | yes | `membershipStatus` | 11 |
 | `ModelCallPurposeScheme` | Model call purpose | A controlled vocabulary of what a call to a language model is made for, each call drawn from the day's allowance. | yes | `callPurpose`; the `ModelCallPurpose` literal (`aboutScheme`) | 11 |
-| `ContactPurposeScheme` | Contact purpose | A controlled vocabulary of the purposes for which a party is reached or served: on a contact assignment, the purpose of one person at one account (decisions 39 and 43); on a postal address, a use its record types it for (decision 126). | no | `servesPurpose`, `addressPurpose`, `defaultFor` | 12 |
+| `ContactPurposeScheme` | Contact purpose | A controlled vocabulary of the purposes for which a party is reached or served: on a contact assignment, the purpose of one person at one account; on a postal address, a use its record types it for. | no | `servesPurpose`, `addressPurpose`, `defaultFor` | 12 |
 | `ContactPointKindScheme` | Contact point kind | A controlled vocabulary of the kinds of electronic address at which a party is reached. | no | `contactPointKind` | 12 |
 | `ContactTypeScheme` | Contact type | A controlled vocabulary of the kinds a tenant files its contacts under, one per contact, apart from any purpose a contact is reached for. | no | `contactType` | 12 |
 | `AccountStatusScheme` | Account status | A controlled vocabulary of whether the tenant still trades with a party it holds a record of or has set that record aside. | no | `accountStatus` | 12 |
@@ -429,10 +433,11 @@ link is not read by C9. `name`, `givenName`, `middleName`, `familyName` and `job
 undeclared domains and designations. Decisions 171 and 175 change no term.
 
 Label and definition lengths were measured by a script over this report's tables (2026-11-26, again after decisions
-168 to 175, `membershipIn`'s new text and the exception entry's reason included): every label is 1 to 80 characters
-and every definition, criterion and reason 12 to 400 (`Label` and `Definition` in `Model.schema.ts`); the longest is
-`Member`'s new definition, 312 characters. The same script counted the terms, gist links and designations of section
-2 from the tables of sections 3 to 5. Every class key fits
+168 to 175, `membershipIn`'s new text and the exception entry's reason included, and again once the 23 Definition
+cells that cited a decision were cut to the text the module writes, section 1): every label is 1 to 80 characters
+and every definition, criterion and reason 12 to 400 (`Label` and `Definition` in `Model.schema.ts`), each criterion
+measured with the citations it keeps; the longest is `Member`'s new definition, 312 characters. The same script
+counted the terms, gist links and designations of section 2 from the tables of sections 3 to 5. Every class key fits
 `ClassKey`, every property key `PropertyKey`, every scheme key `SchemeKey` and every notation `Notation` (`ship_from`
 included: the pattern admits an underscore).
 
@@ -706,13 +711,22 @@ The accepting decision covers each. Each is reversible by changing the entry bef
   and 168); `IdentityEvidence` and `citesEvidence` drop the suspicion, which is not a term
   of this slice; `SignInAccount` and `PostalAddress` are widened to Sutton's records; `SourceRecord`'s definition adds
   where the tenant's assertions sit (decision 34); `AccountStatusScheme` says "party" (decision 125); `agentName`'s
-  example is the kernel schema's, "Assistant"; `memberAccount` and the stages `pending`, `active` and `suspended` say
-  the membership's workspace, not the tenant's (decision 154's reason, section 5). The flags' prefLabels are report 06's
+  example is the kernel schema's, "Assistant"; the stages `pending`, `active` and `suspended` say the membership's
+  workspace, not the tenant's (decision 154's reason, section 5), while `memberAccount` ("to act under that
+  membership") names neither. The flags' prefLabels are report 06's
   ("is customer", "is vendor"), with report 10 section 4.8's words as altLabels. `Member`'s definition joins P2's
   widening to decision 154's quoted clause, and `capturedAt`'s states decision 156; `AgentRun`'s criterion is decision
   160's words; `membershipIn`'s definition is decision 169's words. `name`, `givenName`, `middleName`, `familyName` and
   `jobTitle` add "a membership" or "a membership's profile" to the record that writes them, since decision 172 states
   a Sutton `UserProfile`'s names and job title on the `Member`.
+- **Where the definitions come from**, since no Definition cell cites a decision (section 1): `recordOf` and
+  `contactAccount` follow decision 125; `membershipStatus` P2 and 137; `memberAccount` 134; `recordedAgentRun` 135;
+  `hasPostalAddress`, `hasContactPoint` and `countryCode` 138; `addressPurpose` 126; `contactAt`, `contactType`,
+  `contactOwner` and `primaryContact` 139; `accountStatus` 130; `membershipWorkspace` 154; `memberContactPoint` 162;
+  `capturedAt` 156; `isCustomer` and `isVendor` 34, 35 and 168; `profileImage` and `profileText` 163;
+  `IdentityOutcomeScheme` 34; `ContactPurposeScheme` 39 and 43 for a contact assignment and 126 for an address. The
+  module writes no citation into a definition: these numbers are the accepting decision's record, not text it
+  accepts.
 - **`hasPostalAddress` and `hasContactPoint` keep report 06's keys** with the domain decision 138 gives,
   `SourceRecord`, not `Party`.
 - **`contactAccount` ranges over `Party`**, not report 06's `Organization`, since an account of kind `individual` is a
@@ -874,7 +888,8 @@ report recommended.
 - No term here was decoded with `Vocabulary`, run through gate 4 or gate 5 or projected: the rule tables of section 6
   and the key patterns were checked by reading, and the counts of section 2 (with the thread's, read from
   `Terms.vocab.ts`), the lengths of labels and definitions and the distinctness of keys by a script over this report's
-  tables (2026-11-26, after decisions 168 to 175). Steps 9 to 12 decode each.
+  tables (2026-11-26, after decisions 168 to 175, and again once the Definition cells cited no decision). Steps 9 to
+  12 decode each.
 - Sutton's schema was not re-read; its field and enum names are the SPEC's, report 16's, report 17's and
   `readings.json`'s, and the definitions of `marketing`, `sales`, `manufacturing` and `other` are readings. So is
   `revoked`'s: whether Sutton's `revoked` is a removed member or a withdrawn invitation was not checked, and the

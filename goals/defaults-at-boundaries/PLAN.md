@@ -28,9 +28,9 @@ Places by package on 2026-11-23, from the baseline:
 | 2 | `packages/catalog/model` (src and tests) | 347 | this session, by hand | done: no line of the baseline names it. The text a file cell gives the review is read in `Review/CellRules.rules.ts`; it and five files that compare words are exempt for clean-ups only (SPEC, questions 1, 2 and 4) |
 | 3 | `packages/catalog/host` | 20 | this session, by hand | done: the number filters' trim is `TypedNumberText`'s, a contract schema |
 | 4 | Agent files, `CLAUDE.md`, the skills README, `docs/patterns.md` and `docs/kit.md` examples | — | this session | done: `backend.md` has the boundary shape from `ImportStore.adapter.ts`; the README has the paths that stand in |
-| 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | todo |
-| 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | todo |
-| 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | todo |
+| 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | done: items 1 to 3 counted (a test's branch on an Option, Result or Exit; a literal `onNone`; an unwrapped `optionalKey`). The 74 places they named in the pilot packages and the ontology's tests are cleared but for `Cell.shown` and `Cell.formula`. Decided 2026-11-25 and in a second lane: `onNone` narrowed to data stand-ins, `getOrThrow` and `runSync` counted, `Spreadsheet.rules.ts` exempt for absence |
+| 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | done in two rounds: the first cleared the law with `Result.getOrThrow` decodes and was refused. Left as on main: the session hook's null context and `undefined` result in `internal/authOptions.ts` (2 places, Better Auth's own API; an exemption candidate for row 15) |
+| 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | done in two rounds: a model policy and a script's options are stated by every caller; no line of the baseline names them |
 | 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | todo |
 | 9 | `packages/review` | 586 | Codex lane | todo |
 | 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | todo |
@@ -112,6 +112,23 @@ change to a schema that the browser sends.
 - **What crosses `postMessage` is in the wire's form.** An Option, a class or a Data value loses its prototype in a
   structured clone. The head's sheet crossed as a name or null; a chunk of rows now crosses encoded by `StagedRow`'s
   schema and is decoded in `Upload.controller.ts`.
+
+## Where the lanes stand
+
+2026-11-26, on `feat/defaults-sweep` (worktree `.claude/worktrees/defaults-sweep`, from `main` at `8d5accaa`): rows 5,
+6 and 7 merged. `bun run check:full` passes on the merged tree (112 tasks) and the Verify lock equals `main`'s. Not
+seen on screen: no lane so far changed a schema the browser sends or receives.
+
+What the lanes taught, beyond the pilot's list:
+
+- **A lane clears the law by renaming the question unless it is told not to.** `Result.getOrThrow(S.decodeResult(…))`
+  for a fallback, a schema built inside a function to hold a default, an encode to get `undefined` back, a double
+  negation for an `O.match`. Every brief now carries the forms refused and the forms wanted, and each diff is read
+  for them before it is merged.
+- **Codex cannot commit from its sandbox** (git's metadata is read-only even with the common dir added): a lane
+  leaves its tree dirty and the orchestrator commits after reading the diff.
+- **A third-party API's optional properties are spread with `R.getSomes`** (`...R.getSomes({ baseURL })`), and an
+  Option sorts with `O.makeOrder`: no fallback is written for either.
 
 ## Evidence
 

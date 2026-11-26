@@ -1,5 +1,5 @@
 // Gate 5, record pointers on the AST (report 14 section 6.5): the committed `enrolment.json`, decoded strictly, the
-// schemas `src/Enrolled.ts` maps it to and the kernel's vocabulary give no finding of P1 to P14. The gate reads the
+// schemas `src/Enrolled.ts` maps it to and the kernel's vocabulary give no finding of P1 to P15. The gate reads the
 // real records, never copies: the marks are read from their ASTs through `@beep/vocabulary/Pointer`'s reader.
 //
 // P13's table states section 3's placements (3.3, 3.5, 3.6), eighteen rows, each mark built with the kernel's helper
@@ -15,9 +15,10 @@
 // through helpers bound to the copy's own keys, so a misspelt name is a type error here too.
 //
 // Step 7 adds, on copies too: P4 for a class that stores no id (decision 135), `Run`, a class of this test's own; and
-// the enrolment kind `noTerm` (decision 21), on planted exports beside the real ones, with P2, P8 and P15 on them. A
-// malformed `noTerm` (P9's) is not planted: gate 7's rule 6 refuses a mark written by hand here, and the reading of one
-// is `Pointer.test.ts`'s. The real `Membership` is enrolled by step 11, not here.
+// the enrolment kind `noTerm` (decision 21), on planted exports beside the real ones, with P2, P8, P9 and P15 on them. A
+// malformed mark is written by a helper given what its checker would refuse with the real vocabulary's names (a slice
+// with no name, a property with no prefix), since gate 7's rule 6 refuses a mark written by hand here. The real
+// `Membership` is enrolled by step 11, not here.
 import { describe, expect, it } from "@effect/vitest"
 import type { Curie } from "@beep/identity/Vocab"
 import { Vocabulary } from "@beep/vocabulary/Model"
@@ -977,6 +978,35 @@ describe("gate 5, an export enrolled as standing for no term", () => {
       const planted = yield* withNoTerm("Words", schema)
       const found = yield* gate(planted)
       expect(found).toEqual([["P2", words, ""]])
+    })
+  )
+
+  it.effect("P2: the struct's annotations carry a path, which only a field may", () =>
+    Effect.gen(function* () {
+      const path = plantedPath([{ property: "inv:actedThrough", node: "inv:Run" }, { property: "inv:runAgent" }])
+      const planted = yield* withNoTerm("Words", S.Struct(wordsFields).pipe(S.annotate(path)))
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P2", words, ""]])
+    })
+  )
+
+  it.effect(
+    "P2: the struct's annotations carry a path whose property has no prefix, a malformed mark of no noTerm",
+    () =>
+      Effect.gen(function* () {
+        const path = pathFor<string, string, string>()([{ property: "runAgent" }])
+        const planted = yield* withNoTerm("Words", S.Struct(wordsFields).pipe(S.annotate(path)))
+        const found = yield* gate(planted)
+        expect(found).toEqual([["P2", words, ""]])
+      })
+  )
+
+  it.effect("P9: the struct deferred to a slice with no name, a malformed noTerm the helper still writes", () =>
+    Effect.gen(function* () {
+      const mark = noTermFor<"">()("deferred", "")
+      const planted = yield* withNoTerm("Words", S.Struct(wordsFields).pipe(S.annotate(mark)))
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P9", words, ""]])
     })
   )
 

@@ -349,7 +349,7 @@ Choices the SPEC left open, each the agent's:
   (decision 145 keeps ranges required); a gist property's own gist parent (decision 150).
 - Checked by: `Rules.test.ts` and `Vocabulary.test.ts` (C16's plants and near misses, decision 153's C9 reading, the
   name's gist link, a range still required), `Coherence.test.ts` (report 04's CQ-I08 variant: `Organization`'s
-  criterion written on a name), `Pointers.test.ts` (P4, and P2, P15 and P8 on `noTerm` entries; a malformed `noTerm`, P9's, is not planted, since gate 7's rule 6 refuses a mark written by hand there), `Lift.test.ts` (the
+  criterion written on a name), `Pointers.test.ts` (P4, and P2, P9, P15 and P8 on `noTerm` entries: a path on the schema, and two malformed marks a helper writes when given what the real vocabulary's checker refuses, a slice with no name and a property with no prefix, since gate 7's rule 6 refuses a mark written by hand there), `Lift.test.ts` (the
   three refusals), `Generated.test.ts` (the three new fields reach no byte), gate 7's `OntologyTerms.test.ts` (a
   `noTerm` entry with and without its helper); each new refusal seen to fail with its rule taken out; `bun run
   ontology:write` then `git diff --exit-code packages/ontology/generated`; `bun run check`.
@@ -394,6 +394,26 @@ Needs Benjamin:
 - **An absent agent**: once step 11 marks `Activity.agent` with its path, the lift refuses every `Activity` with an
   agent (decision 135) and, as it stands, one without, since the lift writes no literal at a path's end (step 4).
   Step 11 needs an absent `Option` at a path's end to state nothing, or `Activity` is no longer lifted.
+- **Whether a path through a class that stores no id refuses the record or states nothing for that field.** The lift
+  fails the whole record (`LiftRefused`, naming the field); decision 135 says only "a lift that refuses to write a
+  run's node", and SPEC O7 "the lift refuses it". Read as built, every `Activity` with an agent fails to lift once step
+  11 marks `Activity.agent`, not only the run's node. Step 11's `Activity` enrolment is built on the answer.
+- **Whether a basis is required.** `restsOn` defaults to empty on decode and on construction, so a stated criterion
+  that leaves it out passes C16: the refusal decision 146 asks for is opt-in, and a criterion written on a name
+  (CQ-I08's case) passes when its term states no basis. Report 05 sketches `stated { criterion, restsOn }` with no
+  default. The default stays while the kernel's accepted terms are unchanged; before report 18's terms enter (step 9),
+  either `restsOn` becomes required (every criterion states its basis, or an empty basis with a reason), or the
+  opt-in reading is accepted in writing. The plant of a term whose sentence rests on a name and omits `restsOn` is
+  written on the answer.
+- **How a basis names the class's own stored id.** `restsOn` holds property keys, and C16 refuses a key that is no
+  property of the vocabulary, yet the kernel's criteria rest on the record's own id and its tenant (`AuditEntry`'s
+  sentence: "It rests on Activity.organizationId and Activity.id"). The CQ-I08 near miss writes `Member` on
+  `membershipIn` and `AuditEntry` on `inTenant` alone, an incomplete basis; writing `"id"` is C16's "not a property"
+  finding. One reading: an explicit self-id entry, valid only where `storesId` is true. The answer goes in report 18
+  or the exploration's `DECISIONS.md`, with a valid and an invalid plant.
+- **Readings to confirm with step 11's `AgentRun` enrolment**: P4 requires, not only lets, a record whose class stores
+  no id name it on its own annotations alone, so an id field naming such a class is a P4 finding (decision 135 says
+  "lets"); and C16 refuses a basis key that is no property of the vocabulary, beyond decision 146's name and email.
 
 ## Closing note
 

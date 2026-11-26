@@ -10,6 +10,8 @@ import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
+import * as MutableList from "effect/MutableList"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
@@ -19,7 +21,6 @@ import * as SchemaIssue from "effect/SchemaIssue"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Stream from "effect/Stream"
 import * as Str from "effect/String"
-import { setOwnProperty } from "@beep/utils/Record"
 import { XlsxBlank, XlsxCell, XlsxNumberFormat, XlsxText, XlsxValue } from "./XlsxCell.schema.ts"
 import { MissingPart, type XlsxContainer, type XlsxFatal, type XlsxWarning } from "./XlsxDiagnostic.schema.ts"
 import { XlsxParseError, XlsxStringifyError } from "./XlsxError.errors.ts"
@@ -67,7 +68,7 @@ export interface XlsxBoundCodec<T> {
 const byNumber = Order.mapInput(Order.Number, (row: ReadRow) => row.number)
 
 /** The rows of a sheet in rising order with no number twice, whatever order the file wrote them in. */
-const settled = (rows: Array<ReadRow>, unordered: boolean): ReadonlyArray<ReadRow> =>
+const settled = (rows: ReadonlyArray<ReadRow>, unordered: boolean): ReadonlyArray<ReadRow> =>
   unordered ? A.dedupeAdjacentWith(A.sort(rows, byNumber), (a, b) => a.number === b.number) : rows
 
 const readerOf = (opened: Opened, entry: SheetEntry): SheetReader =>
@@ -82,8 +83,8 @@ const readerOf = (opened: Opened, entry: SheetEntry): SheetReader =>
 
 interface SheetRead {
   readonly reader: SheetReader
-  readonly rows: Array<ReadRow>
-  layout: O.Option<SheetLayout>
+  readonly rows: MutableList.MutableList<ReadRow>
+  readonly layout: MutableRef.MutableRef<O.Option<SheetLayout>>
 }
 
 /** Reads the XML of the wanted sheets in one pass over the archive, keeping their rows when asked to. */
@@ -96,7 +97,11 @@ const readSheets = Effect.fnUntraced(function* (input: {
   const reads = MutableHashMap.empty<string, SheetRead>()
   for (const entry of input.wanted) {
     if (!MutableHashMap.has(reads, entry.path)) {
-      MutableHashMap.set(reads, entry.path, { reader: readerOf(opened, entry), rows: [], layout: O.none() })
+      MutableHashMap.set(reads, entry.path, {
+        reader: readerOf(opened, entry),
+        rows: MutableList.make<ReadRow>(),
+        layout: MutableRef.make(O.none())
+      })
     }
   }
   yield* bodiesOf({ bytes: opened.bytes, wanted: (path) => MutableHashMap.has(reads, path) }).pipe(
@@ -109,13 +114,13 @@ const readSheets = Effect.fnUntraced(function* (input: {
           Effect.suspend(() => {
             for (const event of events) {
               const rows = read.reader.push(event)
-              if (keep) for (const row of rows) read.rows.push(row)
+              if (keep) for (const row of rows) MutableList.append(read.rows, row)
             }
             return O.isSome(read.reader.failed) ? Effect.fail(read.reader.failed.value) : Effect.void
           })
         ),
         Effect.map(() => {
-          read.layout = O.some(read.reader.finish())
+          read.layout.current = O.some(read.reader.finish())
         })
       )
     }),
@@ -147,7 +152,7 @@ const readWorkbook = Effect.fnUntraced(function* (bytes: Uint8Array, options: Re
   const warnings: Array<XlsxWarning> = []
   const sheets = A.map(opened.sheets, (entry) => {
     const read = MutableHashMap.get(reads, entry.path)
-    const layout = O.flatMap(read, (found) => found.layout)
+    const layout = O.flatMap(read, (found) => found.layout.current)
     if (O.isSome(read)) for (const warning of read.value.reader.warnings) warnings.push(warning)
     return trusted<XlsxWorksheet>({
       info: infoOf(entry, layout),
@@ -156,8 +161,8 @@ const readWorkbook = Effect.fnUntraced(function* (bytes: Uint8Array, options: Re
         onSome: (found) =>
           A.map(
             settled(
-              found.rows,
-              O.exists(found.layout, (l) => l.unordered)
+              MutableList.toArray(found.rows),
+              O.exists(found.layout.current, (l) => l.unordered)
             ),
             toRow
           )
@@ -227,13 +232,13 @@ const toRecords = (sheet: Pick<XlsxWorksheet, "rows" | "info">): Result.Result<R
       const blank = XlsxBlank.make({})
       return Result.succeed(
         A.map(A.drop(sheet.rows, 1), (row) => {
-          const record: { [heading: string]: XlsxValue } = {}
-          for (const [, heading] of headings) setOwnProperty(record, heading, blank)
+          const entries: Array<readonly [string, XlsxValue]> = []
+          for (const [, heading] of headings) entries.push([heading, blank])
           for (const cell of row.cells) {
             const heading = MutableHashMap.get(headings, cell.column)
-            if (O.isSome(heading)) setOwnProperty(record, heading.value, cell.value)
+            if (O.isSome(heading)) entries.push([heading.value, cell.value])
           }
-          return record
+          return R.fromEntries(entries)
         })
       )
     }
@@ -333,7 +338,7 @@ export class Xlsx {
     return XlsxOutline.make({
       dateSystem: opened.dateSystem,
       sheets: A.map(opened.sheets, (entry) => {
-        const layout = O.flatMap(MutableHashMap.get(reads, entry.path), (found) => found.layout)
+        const layout = O.flatMap(MutableHashMap.get(reads, entry.path), (found) => found.layout.current)
         return XlsxSheetOutline.make({
           count: XlsxSheetCount.make({
             info: infoOf(entry, layout),
@@ -403,7 +408,7 @@ export class Xlsx {
       return yield* Effect.fail(stop(MissingPart.make({ path: Str.slice(0, 1024)(`the sheet ${sheet}`) })))
     }
     const reads = yield* readSheets({ opened, wanted: [entry.value], keep: false })
-    const layout = O.flatMap(MutableHashMap.get(reads, entry.value.path), (found) => found.layout)
+    const layout = O.flatMap(MutableHashMap.get(reads, entry.value.path), (found) => found.layout.current)
     return XlsxWorksheet.make({
       info: infoOf(entry.value, layout),
       merges: O.match(layout, { onNone: A.empty, onSome: (found) => found.merges }),

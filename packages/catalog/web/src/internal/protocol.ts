@@ -43,8 +43,8 @@ export type PlainHead = typeof StagedHead.Encoded
  * cannot be staged), `Crashed` (the reader itself failed), or `Head`, every `Chunk` in order, and `Done`.
  */
 export type ReadMessage = Data.TaggedEnum<{
-  Progress: typeof ReaderProgress.Encoded
-  Head: {
+  readonly Progress: typeof ReaderProgress.Encoded
+  readonly Head: {
     /** The head as plain fields: an `Option` does not survive the copy between threads, so the sheet is its name or null. */
     readonly head: PlainHead
     /** Rows in each chunk that follows, in order: what the server is told to expect. */
@@ -53,11 +53,11 @@ export type ReadMessage = Data.TaggedEnum<{
     readonly workbook: typeof ReaderWorkbook.Encoded
   }
   /** The rows in the form the wire carries them: a cell's `shown` is an `Option`, which does not survive the copy. */
-  Chunk: { readonly seq: number; readonly rows: ReadonlyArray<typeof StagedRow.Encoded> }
-  Done: {}
+  readonly Chunk: { readonly seq: number; readonly rows: ReadonlyArray<typeof StagedRow.Encoded> }
+  readonly Done: {}
   /** The file's problem as its plain fields: a class does not survive the copy between threads. */
-  Refused: { readonly problem: Pick<FileProblem, "kind" | "fileName" | "problem" | "todo"> }
-  Crashed: { readonly message: string }
+  readonly Refused: { readonly problem: Pick<FileProblem, "kind" | "fileName" | "problem" | "todo"> }
+  readonly Crashed: { readonly message: string }
 }>
 
 /**

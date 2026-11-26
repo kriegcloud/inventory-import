@@ -32,10 +32,10 @@ export interface ReadSpreadsheetInput {
  * or a file refused with the sentence that says what it is instead.
  */
 type Sniffed = Data.TaggedEnum<{
-  Csv: {}
-  Xlsx: {}
-  Archive: {}
-  Refuse: { readonly error: FileProblem }
+  readonly Csv: {}
+  readonly Xlsx: {}
+  readonly Archive: {}
+  readonly Refuse: { readonly error: FileProblem }
 }>
 const Sniffed = Data.taggedEnum<Sniffed>()
 

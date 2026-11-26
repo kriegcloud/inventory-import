@@ -279,7 +279,7 @@ const wordsBeforeRegex = [
  * the `catch` and `finally` that follow it, before the next `try`. Each turn moves forward by a character at least.
  */
 const scanned = (code: string): ReadonlyArray<Statement> => {
-  const found: Array<{ at: number; caught: boolean; final: boolean }> = []
+  const found: Array<{ readonly at: number; readonly caught: boolean; readonly final: boolean }> = []
   const length = code.length
   const charAt = (offset: number): string => code[offset] ?? ""
   let at = 0

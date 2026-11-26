@@ -137,7 +137,7 @@ const pastImportColumnsAtom = Atom.make(pastImportColumns)
 export const pastImportColumnsShortAtom = Atom.make(pastImportColumnsShort)
 
 /** The Activity page's "Imports" list: every confirmed import, each a link back to its result. */
-export function PastImportsList(props: { older: number }) {
+export function PastImportsList(props: { readonly older: number }) {
   const { older } = props
   return (
     <>

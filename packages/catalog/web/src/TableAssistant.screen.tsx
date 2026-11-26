@@ -66,8 +66,8 @@ export type AssistedTable = {
     readonly columnVisibility: { get(): Readonly<Record<string, boolean>> }
     readonly globalFilter?: { get(): unknown }
   }
-  setSorting(next: Array<{ id: string; desc: boolean }>): void
-  setColumnFilters(next: Array<never>): void
+  setSorting(next: ReadonlyArray<{ readonly id: string; readonly desc: boolean }>): void
+  setColumnFilters(next: ReadonlyArray<never>): void
   setColumnVisibility(next: Record<string, boolean>): void
   setGlobalFilter(next: string): void
 }
@@ -403,7 +403,10 @@ export function TableAssistant(props: {
       )
     })
 
-  const update = (id: string, change: (entry: Entry, now: ViewState) => { entry: Entry; next: ViewState }) => {
+  const update = (
+    id: string,
+    change: (entry: Entry, now: ViewState) => { readonly entry: Entry; readonly next: ViewState }
+  ) => {
     const now = view.read()
     let next = now
     const entries = conversation.entries.map((entry) => {

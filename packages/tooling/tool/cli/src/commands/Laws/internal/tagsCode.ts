@@ -12,6 +12,7 @@
 // at the place being read.
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
@@ -44,11 +45,11 @@ const children = (node: Node): ReadonlyArray<Node> =>
   )
 
 /** The budget of the file being read: one file at a time, read from start to end without a pause. */
-const reading: { budget: Budget } = { budget: budgetOf({ length: 0, perCharacter: tagsStepsPerCharacter }) }
+const reading = MutableRef.make(budgetOf({ length: 0, perCharacter: tagsStepsPerCharacter }))
 /** `read()` as one read inside another of the file being read, at `node`. */
-const counted = <A>(node: Node, fallback: A, read: () => A): A => reading.budget.within(node.start, fallback, read)
+const counted = <A>(node: Node, fallback: A, read: () => A): A => reading.current.within(node.start, fallback, read)
 /** Counts `count` steps of the file being read. */
-const tick = (count = 1, at?: number): boolean => reading.budget.tick(count, at)
+const tick = (count = 1, at?: number): boolean => reading.current.tick(count, at)
 
 const functions = ["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"] as const
 const isFunction = (node: Node): boolean => typeIs(node, ...functions)
@@ -159,9 +160,9 @@ interface Pass {
   /** The declared functions taken for not handing a tag back before they were read: one that calls itself. */
   readonly assumed: WeakSet<Node>
   /** Those set aside because judgements were too deep inside one another, read when the file has been. */
-  readonly aside: Array<{ readonly declaration: Node; readonly env: Env }>
+  readonly aside: MutableRef.MutableRef<ReadonlyArray<{ readonly declaration: Node; readonly env: Env }>>
   /** True when one taken for not handing a tag back does: what was judged on it is judged again, in another pass. */
-  again: boolean
+  readonly again: MutableRef.MutableRef<boolean>
 }
 
 /** What a name is bound to from one point of its function on: what it holds, or the function declared under it. */
@@ -170,7 +171,7 @@ type Bound = { readonly from: number; readonly held: Held } | { readonly from: n
 /** The names one function (or the file) binds, read in one place: each with what it holds, in the order written. */
 interface Names {
   readonly outer: Env | undefined
-  readonly bound: MutableHashMap.MutableHashMap<string, Array<Bound>>
+  readonly bound: MutableHashMap.MutableHashMap<string, ReadonlyArray<Bound>>
 }
 
 /** What the names of one function hold at one point of it, over the ones it is written in; and what was judged there. */
@@ -188,9 +189,9 @@ interface Env {
 
 /** What one expression is, in one place: each answer kept once it has been asked for. */
 interface Judged {
-  carries?: boolean
-  names?: boolean
-  held?: Held
+  readonly carries?: boolean
+  readonly names?: boolean
+  readonly held?: Held
 }
 
 const envOf = (pass: Pass, names: Names, at: number, start: Env | undefined): Env => ({
@@ -339,7 +340,9 @@ const carriesTag = (value: Node, env: Env): boolean =>
     const judged = judgedOf(node, env)
     if (judged.carries === undefined) {
       for (const link of linksUnder(node, env, "carries")) carriesTag(link, env)
-      judged.carries = carriesNow(node, env)
+      const carries = carriesNow(node, env)
+      env.judged.set(node, { ...judgedOf(node, env), carries })
+      return carries
     }
     return judged.carries
   })
@@ -419,7 +422,9 @@ const namesTag = (value: Node, env: Env): boolean =>
     const judged = judgedOf(node, env)
     if (judged.names === undefined) {
       for (const link of linksUnder(node, env, "names")) namesTag(link, env)
-      judged.names = namesNow(node, env)
+      const names = namesNow(node, env)
+      env.judged.set(node, { ...judgedOf(node, env), names })
+      return names
     }
     return judged.names
   })
@@ -454,7 +459,11 @@ const heldOf = (value: Node, env: Env): Held =>
   counted(value, "neither", () => {
     const node = unwrapped(value)
     const judged = judgedOf(node, env)
-    if (judged.held === undefined) judged.held = heldNow(node, env)
+    if (judged.held === undefined) {
+      const held = heldNow(node, env)
+      env.judged.set(node, { ...judgedOf(node, env), held })
+      return held
+    }
     return judged.held
   })
 
@@ -544,18 +553,18 @@ const declaredReads = (declaration: Node, start: Env): boolean => {
   const known = start.declared.get(declaration)
   if (known === "being read") pass.assumed.add(declaration)
   if (known !== undefined) return known === true
-  if (reading.budget.depth() >= asideDepth || reading.budget.nesting() >= asideNesting) {
+  if (reading.current.depth() >= asideDepth || reading.current.nesting() >= asideNesting) {
     pass.assumed.add(declaration)
-    pass.aside.push({ declaration, env: start })
+    pass.aside.current = [...pass.aside.current, { declaration, env: start }]
     return false
   }
   if (!tick()) return false
   start.declared.set(declaration, "being read")
-  const reads = reading.budget.following(declaration.start, false, () => returnsTag(declaration, start))
+  const reads = reading.current.following(declaration.start, false, () => returnsTag(declaration, start))
   start.declared.set(declaration, reads)
   if (reads && pass.assumed.has(declaration)) {
     pass.readers.add(declaration)
-    pass.again = true
+    pass.again.current = true
   }
   return reads
 }
@@ -627,7 +636,7 @@ const namesOf = (holder: Node, pass: Pass, outer: Env | undefined): Env => {
     tick()
     const all = O.getOrUndefined(MutableHashMap.get(names.bound, name))
     if (all === undefined) MutableHashMap.set(names.bound, name, [bound])
-    else all.push(bound)
+    else MutableHashMap.set(names.bound, name, [...all, bound])
   }
   for (const param of nodes(holder["params"])) {
     for (const [name, held] of namesIn(param, "neither")) bind(name, { from: 0, held })
@@ -745,15 +754,18 @@ export const readTags = (input: { readonly file: string; readonly source: string
   const program: unknown = parsed.program
   if (!isNode(program)) return unreadAt({ at: 0, unread: Unread.Unparsed({ message: "no program" }) })
   const budget = budgetOf({ length: input.source.length, perCharacter: tagsStepsPerCharacter })
-  reading.budget = budget
+  reading.current = budget
   const readers = new WeakSet<Node>()
   for (;;) {
-    const pass: Pass = { readers, assumed: new WeakSet(), aside: [], again: false }
+    const pass: Pass = { readers, assumed: new WeakSet(), aside: MutableRef.make([]), again: MutableRef.make(false) }
     const found = placesIn(program, pass, lineAt)
-    for (const { declaration, env } of pass.aside) declaredReads(declaration, env)
+    for (let index = 0; index < pass.aside.current.length; index += 1) {
+      const next = pass.aside.current[index]
+      if (next !== undefined) declaredReads(next.declaration, next.env)
+    }
     const stopped = budget.stopped()
     if (stopped !== undefined) return unreadAt(stopped, budget)
-    if (!pass.again) {
+    if (!pass.again.current) {
       return {
         found,
         unread: O.none(),

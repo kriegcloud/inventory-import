@@ -93,7 +93,7 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
 const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`
 
 /** An item someone changed, in words: its SKU and name, who changed it and when. */
-function Changed(props: { item: ChangedItem }) {
+function Changed(props: { readonly item: ChangedItem }) {
   return (
     <>
       <Code>{props.item.sku}</Code> {props.item.name}
@@ -105,7 +105,7 @@ function Changed(props: { item: ChangedItem }) {
 }
 
 /** The items named one after another, and how many more there are than the list shows. */
-function ChangedList(props: { items: ReadonlyArray<ChangedItem>; count: number }) {
+function ChangedList(props: { readonly items: ReadonlyArray<ChangedItem>; readonly count: number }) {
   return (
     <ul className="mt-1 flex flex-col gap-0.5">
       {props.items.map((item) => (
@@ -170,7 +170,12 @@ export const shownRows = perKey((id: ImportId) =>
  * can be taken back: the confirm says what it will remove and keep, and once every item has changed the screen says
  * it can no longer be done. After a take-back the review comes back with every decision, so nothing is done twice.
  */
-export function ResultStep(props: { view: ImportView; result: ImportResult; table: StagedTable; canImport: boolean }) {
+export function ResultStep(props: {
+  readonly view: ImportView
+  readonly result: ImportResult
+  readonly table: StagedTable
+  readonly canImport: boolean
+}) {
   const { view, result, table } = props
   const [chosen, choose] = useAtom(chosenFilter(view.id))
   const filter = filterOf({ view, result, chosen })

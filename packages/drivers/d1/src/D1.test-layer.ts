@@ -86,7 +86,8 @@ export class D1Test {
       Effect.gen(function* () {
         const proxy = yield* Effect.acquireRelease(
           Effect.tryPromise({
-            try: () => getPlatformProxy<{ DB: D1Database }>({ configPath: wranglerConfig.pathname, persist: false }),
+            try: () =>
+              getPlatformProxy<{ readonly DB: D1Database }>({ configPath: wranglerConfig.pathname, persist: false }),
             catch: (cause) => D1Error.make({ stage: "execute", statement: 0, cause })
           }),
           (open) => Effect.promise(() => open.dispose())

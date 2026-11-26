@@ -60,7 +60,7 @@ const stage = (file: File): Effect.Effect<StagedTable> =>
 const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: ReadonlyArray<ItemFields>) => {
   const input = { ...noHistory, table, choices: [], storedItems }
   const check = recheckRow(input)
-  const recheck = (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => {
+  const recheck = (asked: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => {
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
     if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
@@ -225,7 +225,14 @@ describe("the screen and the server apply decisions the same way", () => {
         const ready = A.filter(current.rows, (row) => row.status === "ready")
         expect(A.map(handed.ready, (row) => row.line)).toEqual(A.map(ready, (row) => row.rowNumber))
         expect(A.map(handed.ready, (row) => row.cells)).toEqual(A.map(ready, (row) => row.values))
-        type Line = { column: string; from: string; to: string; source: string; decidedBy: string; how: string }
+        type Line = {
+          readonly column: string
+          readonly from: string
+          readonly to: string
+          readonly source: string
+          readonly decidedBy: string
+          readonly how: string
+        }
         const byColumn = (list: ReadonlyArray<Line>) =>
           A.sort(
             list,

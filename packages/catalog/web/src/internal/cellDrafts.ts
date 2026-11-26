@@ -60,16 +60,16 @@ export const dimensionsDraft = (text: string): DimensionsDraft =>
         unit: value["unit"] === "in" ? "in" : "cm"
       }),
     onNone: () => {
-      const draft: { -readonly [K in keyof DimensionsDraft]: DimensionsDraft[K] } = DimensionsDraft.make({})
+      let draft: DimensionsDraft = DimensionsDraft.make({})
       for (const key of Tuple.make("length", "width", "height")) {
         O.map(capture(new RegExp(`"${key}"\\s*:\\s*"?([^",}\\s]+)`), text), (value) => {
-          draft[key] = value
+          draft = { ...draft, [key]: value }
         })
       }
       O.map(
         O.filter(capture(/"unit"\s*:\s*"?([^",}\s]+)/, text), (unit) => unit === "in"),
         (unit) => {
-          draft.unit = unit
+          draft = { ...draft, unit }
         }
       )
       return draft
@@ -112,20 +112,20 @@ const vendorDraft = (value: Readonly<Record<string, unknown>>): VendorDraft =>
 
 /** Fields of one vendor recovered from a cell cut short; missing pieces keep their form's starting values. */
 const vendorFound = (piece: string): VendorDraft => {
-  const draft: { -readonly [K in keyof VendorDraft]: VendorDraft[K] } = VendorDraft.make({
+  let draft: VendorDraft = VendorDraft.make({
     preferred: /"is_preferred"\s*:\s*true/.test(piece)
   })
   O.map(capture(/"vendor_name"\s*:\s*"([^"]*)/, piece), (name) => {
-    draft.name = name
+    draft = { ...draft, name }
   })
   O.map(capture(/"vendor_sku"\s*:\s*"([^"]*)/, piece), (sku) => {
-    draft.sku = sku
+    draft = { ...draft, sku }
   })
   O.map(capture(/"unit_cost"\s*:\s*(-?\d+(?:\.\d+)?)/, piece), (cost) => {
-    draft.cost = `${Number(cost)}`
+    draft = { ...draft, cost: `${Number(cost)}` }
   })
   O.map(capture(/"lead_time_days"\s*:\s*(-?\d+(?:\.\d+)?)/, piece), (lead) => {
-    draft.lead = `${Number(lead)}`
+    draft = { ...draft, lead: `${Number(lead)}` }
   })
   return draft
 }

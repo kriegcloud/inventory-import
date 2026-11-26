@@ -140,12 +140,12 @@ const set = (registry: AtomRegistry.AtomRegistry, next: UploadState) => {
 
 /** How an upload ended, for a caller that keeps something until it does (the chosen file, for Continue). */
 export type UploadEnd = Data.TaggedEnum<{
-  Arrived: {}
-  Cancelled: {}
+  readonly Arrived: {}
+  readonly Cancelled: {}
   /** The file itself cannot be staged: reading it again would find the same. */
-  Refused: {}
+  readonly Refused: {}
   /** Reading the file or saving its rows failed; a save may work when tried again. */
-  Failed: { readonly step: "read" | "save" }
+  readonly Failed: { readonly step: "read" | "save" }
 }>
 /** Builds and tells apart how an upload ended. */
 export const UploadEnd = Data.taggedEnum<UploadEnd>()

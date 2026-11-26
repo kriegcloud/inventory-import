@@ -374,9 +374,9 @@ const regionTexts = (decisions: Readonly<Record<string, ReviewDecision>>) => tex
 
 /** What a press sent: nothing, one row's act, or one group act. */
 type Sent = Data.TaggedEnum<{
-  Nothing: {}
-  RowAct: { readonly row: string; readonly change: number }
-  GroupAct: { readonly step: string; readonly change: number }
+  readonly Nothing: {}
+  readonly RowAct: { readonly row: string; readonly change: number }
+  readonly GroupAct: { readonly step: string; readonly change: number }
 }>
 const Sent = Data.taggedEnum<Sent>()
 
@@ -1578,7 +1578,7 @@ it.effect("the fold equals `act` on a group only when the group's rows are split
 const messy = (table: StagedTable) => {
   const input = { ...noHistory, table, choices: [], storedItems: [] }
   const check = recheckRow(input)
-  const recheck = (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => {
+  const recheck = (asked: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => {
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
     if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem

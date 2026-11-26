@@ -778,7 +778,13 @@ export function ItemsPage() {
       <QuickFilters table={table} />
       <TableMenus table={table} />
       <TableAssistant
-        table={table}
+        table={{
+          atoms: table.atoms,
+          setSorting: (next) => table.setSorting([...next]),
+          setColumnFilters: (next) => table.setColumnFilters([...next]),
+          setColumnVisibility: (next) => table.setColumnVisibility(next),
+          setGlobalFilter: (next) => table.setGlobalFilter(next)
+        }}
         name="Items"
         columns={catalog}
         searchable

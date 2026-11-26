@@ -522,7 +522,8 @@ const entriesOfThisTab = (input: {
   const escaped = (screen: string) => Str.slice(bare)(progressKey({ organizationId: "", memberId: "", screen }))
   const start = escaped("import:")
   const end = escaped(`:waiting:${tab}`)
-  const found: Array<{ key: string; id: ImportId; sends: boolean; own: boolean }> = []
+  const found: Array<{ readonly key: string; readonly id: ImportId; readonly sends: boolean; readonly own: boolean }> =
+    []
   for (const key of keys.value) {
     if (!Str.endsWith(end)(key)) continue
     const screen = A.lastNonEmpty(Str.split(":")(key))

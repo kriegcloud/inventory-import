@@ -1,3 +1,4 @@
+import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
 import { identity } from "effect/Function"
 // Two tabs of one person on one import (Benjamin, 2026-11-20, "Each tab keeps its own"): each keeps and sends only
@@ -28,9 +29,26 @@ import { noticeWords } from "../src/internal/notices.ts"
 // The browser: storage every tab shares, the storage of the tab being loaded, the locks, the leave question, and the
 // server every tab reads the import from. A lock is held until its callback's promise settles, and a callback runs
 // after the request returns, as a browser's does.
+const session: MutableRef.MutableRef<{ readonly now: Record<string, string> }> = MutableRef.make<{
+  readonly now: Record<string, string>
+}>({ now: {} })
+const server: MutableRef.MutableRef<{
+  readonly revision: number
+  readonly decisions: Record<string, unknown>
+  readonly removed: boolean
+}> = MutableRef.make<{
+  readonly revision: number
+  readonly decisions: Record<string, unknown>
+  readonly removed: boolean
+}>({
+  revision: 4,
+  decisions: {},
+  removed: false
+})
+
 const browser = vi.hoisted(() => {
   const kept: Record<string, string> = {}
-  const session: { now: Record<string, string> } = { now: {} }
+
   const held: Array<{ readonly name: string; readonly mode: "exclusive" | "shared" }> = []
   // The requests that wait for a lock, oldest first: each is tried again whenever one is let go.
   const queued: Array<{ readonly name: string; readonly tryNow: () => boolean }> = []
@@ -38,11 +56,7 @@ const browser = vi.hoisted(() => {
   const queryNow = (locks: ReadonlyArray<{ readonly name: string }>) => Promise.resolve({ held: locks })
   const gate = { answer: queryNow }
   const listeners: Record<string, Array<(event: unknown) => void>> = {}
-  const server: { revision: number; decisions: Record<string, unknown>; removed: boolean } = {
-    revision: 4,
-    decisions: {},
-    removed: false
-  }
+
   const closed = false
   // An erase reaches the storage every tab reads a moment later, as another tab's copy lags behind it in a browser.
   const storage = (of: () => Record<string, string>) => ({
@@ -78,7 +92,7 @@ const browser = vi.hoisted(() => {
     window: {
       location: { pathname: "/", search: "" },
       localStorage: storage(() => kept),
-      sessionStorage: storage(() => session.now),
+      sessionStorage: storage(() => session.current.now),
       addEventListener: (name: string, listener: (event: unknown) => void) => {
         listeners[name] = [...O.match(R.get(listeners, name), { onNone: A.empty, onSome: identity }), listener]
       },
@@ -137,7 +151,20 @@ const browser = vi.hoisted(() => {
       }
     }
   })
-  return { kept, session, held, listeners, server, closed, gate, queryNow }
+  return {
+    kept,
+    get session() {
+      return session
+    },
+    held,
+    listeners,
+    get server() {
+      return server
+    },
+    closed,
+    gate,
+    queryNow
+  }
 })
 
 const settle = Effect.sleep("20 millis")
@@ -163,7 +190,7 @@ const entriesOf = (id: ImportId) => R.filter(browser.kept, (_value, key) => Str.
 const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
   Effect.promise(() => {
     vi.resetModules()
-    browser.session.now = own
+    browser.session.current = { ...browser.session.current, now: own }
     return Promise.all([
       import("../src/Draft.atoms.ts"),
       import("../src/ReviewDraft.atoms.ts"),
@@ -183,7 +210,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
             // The server answers a read with what it holds.
             get: (request: { readonly params: { readonly id: ImportId } }) =>
               Effect.suspend((): Effect.Effect<ImportView, ImportNotFound> =>
-                browser.server.removed
+                browser.server.current.removed
                   ? Effect.fail(
                       ImportNotFound.make({
                         reason: "It is gone.",
@@ -208,8 +235,8 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
       const view = (id: ImportId) =>
         support.viewAt({
           id,
-          revision: browser.server.revision,
-          decisions: browser.server.decisions as SavedDecisions,
+          revision: browser.server.current.revision,
+          decisions: browser.server.current.decisions as SavedDecisions,
           status: browser.closed ? "imported" : "open",
           fileName: "items_messy.csv"
         })
@@ -219,7 +246,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
         get id() {
           return O.getOrElse(registry.get(tabs.thisTab), () => "")
         },
-        session: browser.session.now,
+        session: browser.session.current.now,
         saves,
         registry,
         review,
@@ -290,9 +317,9 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
 
 /** A new import's server: nothing decided, open, at revision 4. */
 const freshServer = (): void => {
-  browser.server.revision = 4
-  browser.server.decisions = {}
-  browser.server.removed = false
+  browser.server.current = { ...browser.server.current, revision: 4 }
+  browser.server.current = { ...browser.server.current, decisions: {} }
+  browser.server.current = { ...browser.server.current, removed: false }
   browser.closed = false
 }
 
@@ -374,8 +401,8 @@ describe("two tabs of one person", () => {
         yield* settle
         gone.close()
         // Marcus keeps row 5: the server is at revision 5.
-        browser.server.revision = 5
-        browser.server.decisions = { "row-5": kept }
+        browser.server.current = { ...browser.server.current, revision: 5 }
+        browser.server.current = { ...browser.server.current, decisions: { "row-5": kept } }
         const later = yield* tab({}, dana)
         yield* settle
         later.open(id)
@@ -457,7 +484,7 @@ describe("two tabs of one person", () => {
       yield* settle
       gone.close()
       // Somebody confirmed the import without row 7.
-      browser.server.revision = 5
+      browser.server.current = { ...browser.server.current, revision: 5 }
       browser.closed = true
       const result = yield* tab({}, dana)
       yield* settle
@@ -855,7 +882,7 @@ describe("an import removed", () => {
       yield* settle
       closed.close()
       // A colleague removes the import.
-      browser.server.removed = true
+      browser.server.current = { ...browser.server.current, removed: true }
       open.readsAgain(id)
       yield* settle
       expect([open.says(), R.keys(entriesOf(id))]).toEqual([
@@ -880,7 +907,7 @@ describe("an import opened by its address and found removed", () => {
       closed.decide(id, "row-12", out)
       yield* settle
       closed.close()
-      browser.server.removed = true
+      browser.server.current = { ...browser.server.current, removed: true }
       const later = yield* tab({}, dana)
       yield* settle
       later.openAddress(id)

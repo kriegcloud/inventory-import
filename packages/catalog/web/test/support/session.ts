@@ -1,3 +1,4 @@
+import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
 // Who is signed in, as a test's page has it: one session atom that everything derives from, by the app's own rules
 // (`@inventory/client/MemberAtoms`), so a test is never on a page the app cannot be on. Asked again, the member stays
@@ -57,7 +58,9 @@ export const memberOf = (who: {
 export const sessionStandIn = (first: Who) => {
   const out: Array<Deferred.Deferred<Who, Unread>> = []
   const left = { times: 0 }
-  const chosen: { organization: string | undefined } = { organization: undefined }
+  const chosen: MutableRef.MutableRef<{ readonly organization: string | undefined }> = MutableRef.make<{
+    readonly organization: string | undefined
+  }>({ organization: undefined })
   const session: Atom.Atom<AsyncResult.AsyncResult<Who, Unread>> = Atom.make((get): Effect.Effect<Who, Unread> => {
     const before = get.self<AsyncResult.AsyncResult<Who, Unread>>()
     return O.match(before, {
@@ -70,9 +73,9 @@ export const sessionStandIn = (first: Who) => {
         }).pipe(
           Effect.flatMap((answer) => {
             const had = O.flatten(O.flatMap(before, AsyncResult.value))
-            const to = chosen.organization
+            const to = chosen.current.organization
             // Over with this answer, whatever it is: as the app's own switch is.
-            chosen.organization = undefined
+            chosen.current = { ...chosen.current, organization: undefined }
             return answeredFor({
               answer,
               before: had,
@@ -114,21 +117,25 @@ export const sessionStandIn = (first: Who) => {
      * their own switch. Any answer ends the choice.
      */
     choose: (organization: string) => {
-      chosen.organization = organization
+      chosen.current = { ...chosen.current, organization: organization }
     },
     /**
      * Draws `what` while the page has a member, as the sign-in gate does: let go with nobody, and drawn anew for
      * another organization.
      */
     drawn: (registry: AtomRegistry.AtomRegistry, what: (registry: AtomRegistry.AtomRegistry) => () => void) => {
-      const on: { for: string; stop: (() => void) | undefined } = { for: keyOfMember(O.none()), stop: undefined }
+      const on: MutableRef.MutableRef<{ readonly for: string; readonly stop: (() => void) | undefined }> =
+        MutableRef.make<{ readonly for: string; readonly stop: (() => void) | undefined }>({
+          for: keyOfMember(O.none()),
+          stop: undefined
+        })
       return registry.subscribe(
         memberKey,
         (now) => {
-          if (now === on.for) return
-          on.stop?.()
-          on.for = now
-          on.stop = now === "" ? undefined : what(registry)
+          if (now === on.current.for) return
+          on.current.stop?.()
+          on.current = { ...on.current, for: now }
+          on.current = { ...on.current, stop: now === "" ? undefined : what(registry) }
         },
         { immediate: true }
       )

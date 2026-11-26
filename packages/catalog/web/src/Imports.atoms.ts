@@ -107,7 +107,11 @@ export const putView = (input: { readonly registry: AtomRegistry.AtomRegistry; r
 }
 
 /** A workbook chosen in this tab, kept so the person can read another of its sheets without choosing it again. */
-export type OpenWorkbook = { file: File; sheets: ReadonlyArray<SheetSummary>; chosen: SheetChoice }
+export type OpenWorkbook = {
+  readonly file: File
+  readonly sheets: ReadonlyArray<SheetSummary>
+  readonly chosen: SheetChoice
+}
 
 /**
  * The workbook behind an import, when it was chosen in this tab: kept for the page so the person can read another of

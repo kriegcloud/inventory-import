@@ -78,7 +78,7 @@ const line = (state: UploadState): string => {
 }
 
 /** The file on its way in: its name, how far it is, and Cancel while cancelling still stops something. */
-function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
+function UploadProgress(props: { readonly state: UploadState; readonly onCancel: () => void }) {
   const { state } = props
   const { done, total } = progressOf({ state })
   const fileName = fileNameOf(state)
@@ -178,7 +178,7 @@ const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
  * the decisions made on it go with it. One that has already created items (confirmed once, then opened again) has
  * no Remove: the server keeps it with what it wrote.
  */
-function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean }) {
+function OpenImport(props: { readonly view: ImportView; readonly lead: boolean; readonly canImport: boolean }) {
   const { view } = props
   const giveNext = useAtomSet(giveView)
   const removing = useAtomValue(removeImport(view.id)).waiting
@@ -314,7 +314,7 @@ export const uploadProblem = ofMember(() => O.none<string>())
  * file is kept in this browser until the server has it all (`useSavedProgress`): a reload or a closed tab in the
  * middle of an upload offers Continue, which reads the same file again, instead of asking for it again.
  */
-export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
+export function UploadStep(props: { readonly canImport: boolean; readonly viewOnly: boolean }) {
   const state = useAtomValue(uploadState)
   const startOne = useAtomSet(startUpload)
   const cancel = useAtomSet(cancelUpload)

@@ -102,11 +102,11 @@ const listed = (items: ReadonlyArray<string>, limit: number): string =>
 
 /** Reads a workbook the person chose into a table from one sheet (`sheet`, or the one with the most data). */
 export const readXlsx = Effect.fn("readXlsx")(function* (input: {
-  fileName: string
-  bytes: Uint8Array
-  sheet: O.Option<string>
-  notes: ReadonlyArray<Note>
-  onProgress: (progress: ReadProgress) => void
+  readonly fileName: string
+  readonly bytes: Uint8Array
+  readonly sheet: O.Option<string>
+  readonly notes: ReadonlyArray<Note>
+  readonly onProgress: (progress: ReadProgress) => void
 }) {
   const { fileName, bytes } = input
   const failed = (error: XlsxParseError): FileProblem => problemOf(fileName, bytes.length, error)

@@ -89,7 +89,7 @@ const bounding = (storage: Storage, of: Member): void => {
   }
   const newestFirst = A.sort(
     records,
-    Order.mapInput(Order.flip(Order.Number), (record: { at: number }) => record.at)
+    Order.mapInput(Order.flip(Order.Number), (record: { readonly at: number }) => record.at)
   )
   const oldest = DateTime.toEpochMillis(DateTime.subtract(DateTime.nowUnsafe(), { days: keptFor.days }))
   A.forEach(newestFirst, (record, n) => {

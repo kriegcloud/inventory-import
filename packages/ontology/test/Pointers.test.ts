@@ -1,5 +1,5 @@
 // Gate 5, record pointers on the AST (report 14 section 6.5): the committed `enrolment.json`, decoded strictly, the
-// schemas `src/Enrolled.ts` maps it to and the kernel's vocabulary give no finding of P1 to P13. The gate reads the
+// schemas `src/Enrolled.ts` maps it to and the kernel's vocabulary give no finding of P1 to P14. The gate reads the
 // real records, never copies: the marks are read from their ASTs through `@beep/vocabulary/Pointer`'s reader.
 //
 // P13's table states section 3's placements (3.3, 3.5, 3.6), eighteen rows, each mark built with the kernel's helper

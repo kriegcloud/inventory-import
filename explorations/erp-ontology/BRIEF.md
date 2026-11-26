@@ -33,8 +33,8 @@ him, and until then its recommendation is the agent's and nothing is built on it
 second review six more (24 and five new ones, 97 to 101). [Report 14](research/14-thin-thread.md) is the one
 specification of the thin thread, written against the repository's code: where this brief and report 14 differ about
 the thread, report 14 holds. Decisions 112 to 118 update the thread where this brief and report 14 still differ. This brief says what is built
-first, what follows, and what is never built. Sixty-three decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37,
-42, 44, 45, 47 to 92 and 116). The first deliverable, the thin
+first, what follows, and what is never built. Sixty-six decisions are open (12, 17 to 19, 27 to 31, 33, 35 to 37,
+42, 44, 45, 47 to 92, 116 and 125 to 127). The first deliverable, the thin
 thread of decision 8, waits on none of them.
 
 ## Problem
@@ -50,7 +50,7 @@ thread of decision 8, waits on none of them.
 - **The Alchemy domain layer needs terms to point at.** Report 01 section 6: every aggregate, event and view carries
   the IRI of its term, and a check fails when one has none ([alchemy-domain BRIEF](../alchemy-domain/BRIEF.md),
   "Every single thing"). Nothing exists for them to point at.
-- **The design is large and unbuilt.** Eleven reports (04 to 14), 63 open decisions; nothing can be checked until
+- **The design is large and unbuilt.** Eleven reports (04 to 14), 66 open decisions; nothing can be checked until
   something runs, and nothing in the design has yet been made to fail.
 
 ## Appetite
@@ -319,6 +319,8 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
 - **Modelling Sutton whole.** Sutton's schema is behind a token. A Sutton-only term enters when a competency question
   of rank must or should needs it, never to complete a picture. That exclusion is this brief's rule. Decision 87 only
   ranks the questions and does not state it.
+  Taken back on 2026-11-26 (decision 124): Benjamin has the schema through a demo key and chose to model it all.
+  [Report 16](research/16-sutton-schema-check.md) is the first reading; no slice for the rest is planned yet.
 - **Turtle formatting.** Write one small writer; do not tune a library serializer to be stable.
 
 ## No-gos
@@ -379,17 +381,17 @@ their records' pointers and the access lifts, and the thread's gates on the larg
 questions on their fixtures. Slice 2 adds the first SHACL over real stored rows; slice 3 points the import at its
 terms. Law rule 2 stays on its own later row.
 
-What each part waits on, of the 63 open decisions. Each is put to Benjamin when its part is specified, with a concrete
+What each part waits on, of the 66 open decisions. Each is put to Benjamin when its part is specified, with a concrete
 record in front of him:
 
 | Part | Open decisions it waits on | Count |
 | --- | --- | --- |
 | The thin thread | none | 0 |
-| Slice 1, the party slice | 12, 17 to 19, 27, 33, 35 to 37, 44, 45, 47, 87, 89 | 14 |
+| Slice 1, the party slice | 12, 17 to 19, 27, 33, 35 to 37, 44, 45, 47, 87, 89, 125, 126 | 16 |
 | Slice 2, the catalog terms and SHACL | 48 to 51, 54, 55, 59 to 66, 74, 76, 88, 90, 92 | 19 |
 | Slice 3, the import's terms | 52, 53, 56 to 58, 91 | 6 |
 | The alignment file | 28 to 31 | 4 |
-| The warehouse and stock terms | 42, 67 to 73, 75, 77 to 79, 116 | 13 |
+| The warehouse and stock terms | 42, 67 to 73, 75, 77 to 79, 116, 127 | 14 |
 | The commitment, execution and accounting terms | 80 to 86 | 7 |
 
 Decisions 74 and 76 are counted once, with slice 2, which meets them first. Decision 37 is counted with slice 1 and
@@ -400,7 +402,7 @@ Gate 10 (the reasoned CQ suite) is built only if decision 27 is answered (b).
 ## What would make this brief graduate
 
 The packet scheme's four conditions ([explorations/README.md](../README.md)): the appetite answered (decision 8, on
-2026-11-22); no open question blocking the first deliverable (the thin thread waits on none of the 63, by the ruling
+2026-11-22); no open question blocking the first deliverable (the thin thread waits on none of the 66, by the ruling
 of the same day); the Map as above; and Benjamin saying the brief matches, logged as a decision. Then
 `goals/erp-vocabulary/SPEC.md` and `PLAN.md` are written from this brief, report 14 and decisions 112 to 118, with
 the thread as the first deliverable. The SPEC includes decision 117's list for Benjamin to rule on and decision

@@ -8,12 +8,12 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Sixty-three questions are open: 12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92 and 116 (the audit added 116 on 2026-11-23; it is the last row). They are what is left
+Sixty-six questions are open: 12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92, 116 and 125 to 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
 the catalog questions. Twenty-three were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 26, 32,
-34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 121. No `rat-` record is written, and the thin thread
+34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 124. No `rat-` record is written, and the thin thread
 uses none: its terms name the decision that accepted them (decisions 107 and 111). The gaps
 in the numbers below are theirs.
 
@@ -96,6 +96,9 @@ none of these rows; slice 1, the party slice, follows it.
 | 90 | Does the SKU match key drop punctuation? | (a) No: the key is the SKU without spaces, in upper case, as `skuKey` computes it, and `CLAUDE.md`'s "case, spaces, punctuation" is corrected to "case and spaces"; (b) yes: `skuKey` also drops punctuation, so "SHH-9574" and "SHH9574" are one key (a product rule, written in the product `DECISIONS.md`) | (a) | The code and the stored unique index compare `skuKey`, which keeps the hyphen (`Item.read.ts`); 07's `identifierKey` and CQ-I03 follow the code; (b) changes which rows count as "Already there" | 07's `identifierKey` definition; CQ-I03's fixture; one `CLAUDE.md` sentence, or `skuKey` | NEW, sceptic review 2026-11-22 (04 CQ-I03) |
 | 91 | What does `performedBy` point at? | (a) No range declared: a member for an act in the app (CQ-I01, I04, P10), an organization or a person for an act outside it (a vendor's shipment), each record's SHACL saying which; (b) `Member` only, with a separate `Party`-ranged property for outside actors; (c) `Party`, as 09 first wrote | (a) | Under (c) a reasoner types every member a party and "who confirmed" loses the membership the audit trail keeps; 06's `decidedBy`, `calledFor` and `actsFor` point at `Member`, and `recordedActor` does in the index, pending decision 44, which does not change this row while `PortalAccess` is not proposed; (a) keeps one key, as anti-pattern 10 advises, and (b) is its narrower form | 09's `performedBy` row; CQ-I01, I04, P10 | NEW, sceptic review 2026-11-22 (09) |
 | 116 | When a grant covers one location or one field, how does it say which? | (a) A property from the grant to the thing it covers, beside `grantScope`, which keeps the kind; (b) one concept per location or field in `GrantScopeKindScheme`; (c) the kind only, the thing covered read from another record | (a) | With the kind alone two grants at two sites look the same (the blinded seat, report 15); a concept per site turns data into vocabulary | One property; CQ-P11's answer once a second kind exists; no change while organization is the only kind (decision 115) | NEW, audit 2026-11-23 (15 section 5) |
+| 125 | What is a Sutton `Company` whose `kind` is `individual`? | (a) A `Person` with the tenant's `SourceRecord`: `recordOf` points at a person or an organization by `kind`; (b) an `Organization` all the same, as decision 3 wrote; (c) left out of the party slice | (a) | Sutton says it is "a person modelled as a company — a sole trader or a retail customer"; decision 34 already names `Person` for the human; (b) types a retail customer an organization | The `inv:Organization` row for Sutton "Account" is split by `kind`; decision 3's "a person cannot be an Account" is struck, and decision 34's "the Sutton Account is the organization" is narrowed to `kind: company` | NEW, Sutton schema 2026-11-26 (16 finding A) |
+| 126 | Where does billing or shipping purpose sit for a record imported from Sutton? | (a) On the address, as Sutton has it (`Address.type` and its default flags); no `ContactAssignment` is made up; (b) an assignment is derived for each contact of the company at each address | (a) | Sutton's contact has one company and a type of customer, marketing, sales or vendor, never a purpose at a point; (b) states pairs nobody recorded | One alignment row, purpose to `AddressType`; a property for an address's purpose is added; the contact's purpose stays on `ContactAssignment` for sources that record one, so decisions 39 and 43 stand and are not used for Sutton records | NEW, Sutton schema 2026-11-26 (16 finding C) |
+| 127 | What is a lot when the source is Sutton? | (a) The lot number is a property of the label record and no lot is minted; (b) `MaterialLot` individuals are minted from tenant, item and lot number | (a) | Sutton keeps the lot as text on `Inventory` and finds labels by that text; two receipts with one lot number from two vendors would become one lot under (b), which nobody decided | `inv:MaterialLot` keeps no Sutton alignment row; CQs on lots read the label's lot number for Sutton data | NEW, Sutton schema 2026-11-26 (16 finding E) |
 
 ## Answered
 
@@ -749,3 +752,32 @@ vocabulary's `gist` part as `versionIri`.
 - Not verified from a file: the agent read only the tagged source, which holds the placeholder. The value follows
   gist's naming. The first step that opens a released gist file checks it.
 - Reverse: change the one field; the OWL file's one triple changes and gate 1 shows it.
+
+### 123. Whether Sutton's API names may be written here (2026-11-26)
+
+Sutton's GraphQL schema is behind a token, and this repository is public. Decision 29 (a) cites a Sutton term by "a
+public document", which the API is not.
+
+I chose names only; the agent asked and recommended nothing. Sutton's type, field and enum names, and a short quote
+of a description, may be written in the packet. The schema file stays outside the repository, and no record of the
+demo organization is written here.
+
+- Rationale: an alignment row is worth nothing without the name it aligns to.
+- Reverse: take the names out of report 16 and cite the public help pages only, as report 11 did.
+
+### 124. Whether Sutton is modelled whole (2026-11-26)
+
+The brief's Non-goals ruled out modelling Sutton whole: a Sutton-only term entered only when a competency question of
+rank must or should needed it.
+
+I chose to model it all; the agent had not recommended either way. I have the schema through a demo key and API
+access.
+
+- What it changes: the brief's rule is taken back, and with it the brief's limit of slice 1 to the Sutton-only party
+  terms a must or should question needs. Decision 1 stands: the model of record is this repository's, and Sutton is
+  still a mapping onto it. Decision 87's ranking of the questions stands. The records report 16 section 3 lists are
+  in scope.
+- Not decided, and put to me when the first slice beyond the party terms is planned (no open row yet, because no
+  work waits on it): which slice takes which records, and whether "all" means every one of the 199 record types or the
+  business records without the document layouts, settings and integrations.
+- Reverse: restore the brief's rule; terms already added for Sutton alone stay or go one by one.

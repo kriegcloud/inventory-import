@@ -29,7 +29,7 @@ passed a small test ontology, HermiT found it consistent with exit 0, and an inc
 is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job (written, not yet run on GitHub), with
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
-Slice 1, the party slice, follows the thread. Benjamin will take each of the 63 open decisions with a concrete record
+Slice 1, the party slice, follows the thread. Benjamin will take each of the 66 open decisions with a concrete record
 when the slice that needs it is specified. Decision 116 asks how a grant names the location or field it covers;
 organization scope remains enough for the thread (115). Gate 10 remains open (pending Q27).
 
@@ -50,6 +50,7 @@ organization scope remains enough for the thread (115). Gate 10 remains open (pe
 | [13 Term index](research/13-term-index.md) | Terms and properties across the nine designs, with counts, the collisions resolved and the Sutton-only or later terms not proposed. Which properties get a local name remains open (pending Q19). |
 | [14 The thin thread](research/14-thin-thread.md) | The terms and records (sections 2 and 3), how the member's role answers the question (4 and 5), and how to check and package the result (6 to 8). |
 | [15 What the foundational audit of the thread found](research/15-audit-findings.md) | The auditor's two runs, what its adversary landed, why the audit is advisory (decision 107) and five design points still to rule on. |
+| [16 Sutton's API schema against the packet's Sutton rows](research/16-sutton-schema-check.md) | What the schema confirms and overturns in report 11's 28 Sutton rows, the records Sutton has that the packet lacks, and three questions (decisions 125 to 127). |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).
@@ -88,4 +89,7 @@ first class list, a decision log and a product model read from public sources).
   added CQ-P11 to the thread and five signed forbidden conclusions; Benjamin said the brief matches (119) and the
   packet graduated to [goals/erp-vocabulary](../../goals/erp-vocabulary/SPEC.md).
 - 2026-11-23: the thin thread built in thirteen steps and closed by review: the vocabulary module, the helpers'
-  package, the projector, nine gates and the CI job for gate 9, on branch `docs/erp-ontology-packet`, its commits not pushed.
+  package, the projector, nine gates and the CI job for gate 9, on branch `docs/erp-ontology-packet`, merged to `main` as pull request 8.
+- 2026-11-26: Sutton's API schema read with Benjamin's demo key ([report 16](research/16-sutton-schema-check.md));
+  decision 123 allows its names here, decision 124 takes back the rule against modelling Sutton whole, and 125 to
+  127 are open.

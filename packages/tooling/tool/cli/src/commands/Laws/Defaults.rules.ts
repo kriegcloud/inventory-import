@@ -189,6 +189,26 @@ export const exemptions: ReadonlyArray<DefaultsExemption> = [
     why: "a reviewed cell's whitespace made visible: the trim tells a value with spaces from one without (Benjamin, 2026-11-26)"
   },
   {
+    file: "packages/client/src/Storage.browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for client: Storage, the window and Web Locks hand back null or undefined, read here once and passed on as Options (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for catalog/web: DOM queries, a ref's current, a dataset, URL parameters and dropped files, read here once and passed on as Options (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/review/src/internal/browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for the review region, which may not import client: Storage, IndexedDB and DOM queries, read here once and passed on as Options (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/ui/src/internal/browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for ui: whether a dialog owns a keyboard event, read from the DOM here once (Benjamin, 2026-11-26)"
+  },
+  {
     file: "packages/catalog/contract/src/Item/SkuKey.rules.ts",
     kinds: ["normalise"],
     why: "the key two rows are compared by, never shown as a fix; pure callers need it at once, and a schema decode would need S.decodeSync (Benjamin, 2026-11-23)"

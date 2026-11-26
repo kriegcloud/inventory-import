@@ -125,16 +125,16 @@ describe("the import page", () => {
       const before = yield* drawn(t.registry)
       expect([says(before), inStepBox(before)]).toEqual([["THE REVIEW"], true])
       t.server.answer = down
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* settle
       const after = yield* drawn(t.registry)
       expect([says(after), inStepBox(after)]).toEqual([[line, "THE REVIEW"], true])
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       const asking = yield* drawn(t.registry)
       expect(says(asking)).toEqual([line, "THE REVIEW"])
       yield* settle
       t.server.answer = Effect.succeed(viewAt({ id, revision: 5, result: O.none() }))
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* settle
       const back = yield* drawn(t.registry)
       expect(says(back)).toEqual(["THE REVIEW"])
@@ -146,11 +146,11 @@ describe("the import page", () => {
       const t = world(pageStart)
       yield* settle
       t.server.answer = notFound
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* settle
       const found = yield* drawn(t.registry)
       expect(says(found)).toEqual([gone])
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       expect(t.registry.get(importView(id)).waiting).toBe(true)
       const asking = yield* drawn(t.registry)
       expect(says(asking)).toEqual([gone])
@@ -175,7 +175,7 @@ describe("the import page", () => {
       expect([follows(followRemoval(id)), follows(readAgainWhenBack(id))]).toEqual([true, true])
       // Found gone too: there is no step then, and the page still follows it.
       t.server.answer = notFound
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* settle
       yield* drawn(t.registry)
       expect(follows(followRemoval(id))).toBe(true)
@@ -189,7 +189,7 @@ describe("the import page", () => {
       yield* settle
       for (const back of [() => window.dispatchEvent(new Event("online")), () => serverAnswered(200)]) {
         t.server.answer = down
-        importView(id).askAgain(t.registry)
+        importView(id).askAgain(t.registry, O.none())
         yield* settle
         expect(AsyncResult.isFailure(t.registry.get(importView(id)))).toBe(true)
         t.server.answer = Effect.succeed(viewAt({ id, revision: 5, result: O.none() }))

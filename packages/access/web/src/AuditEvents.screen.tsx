@@ -37,7 +37,7 @@ export const auditEventsCaption = "Uploads and imports"
  */
 export const auditEvents = accessApi.query((api) => api.activity.recent(), {
   keep: "unwatched",
-  reactivityKeys: accessKeys.activity
+  reactivityKeys: O.some(accessKeys.activity)
 })
 
 const auditEventAnswer = answerOf(auditEvents)

@@ -174,14 +174,14 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
   const reopen = () =>
     void reopenNow(view.id).then((exit) => {
       if (Exit.isSuccess(exit)) navigate(importAddress(exit.value.id, "review"), { replace: false })
-      else toastError(exit.cause.pipe(Cause.squash), {})
+      else toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
     })
   const takingBack = useAtomValue(takeBackImport).waiting
   const takeBackNow = useAtomSet(takeBackImport, { mode: "promiseExit" })
   const takeBack = () =>
     void takeBackNow(view).then((exit) => {
       if (Exit.isFailure(exit)) {
-        toastError(exit.cause.pipe(Cause.squash), {})
+        toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
         invalidate(catalogKeys.import(view.id))
         return
       }

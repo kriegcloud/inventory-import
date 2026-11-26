@@ -511,14 +511,14 @@ export const itemsPage = shown(
         Effect.tap((answer) => Effect.sync(() => correctAddress(asked, answer.pageCount)))
       )
     },
-    { keep: "unwatched", reactivityKeys: catalogKeys.items }
+    { keep: "unwatched", reactivityKeys: O.some(catalogKeys.items) }
   )
 )
 
 /** What the filters offer (each column's values, the range of numbers) and how many items there are in all. */
 export const itemFacets = catalogApi.query((api) => api.items.facets(), {
   keep: "unwatched",
-  reactivityKeys: catalogKeys.itemFacets
+  reactivityKeys: O.some(catalogKeys.itemFacets)
 })
 
 type Found = Atom.Success<typeof itemFacets> | undefined

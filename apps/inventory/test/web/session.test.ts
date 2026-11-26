@@ -325,7 +325,7 @@ describe("a write pressed on the page", () => {
           .execute(HttpClientRequest.post("http://localhost/api/v1/items"))
           .pipe(Effect.as("saved"), Effect.orDie)
       })
-      const save = api.makeApiAtoms(SaveServer).write<void>()((one) => one.save, {})
+      const save = api.makeApiAtoms(SaveServer).write<void>()((one) => one.save, { reactivityKeys: O.none() })
       const registry = root.rootRegistry({ api: layer })
       yield* settle
       page.asked[0]?.answer(signedInAs({ who: "dana", organization: "prairie" }), 200)
@@ -506,8 +506,8 @@ const browserWithServer = Effect.fnUntraced(function* () {
     save: client.execute(HttpClientRequest.post("http://localhost/api/v1/items")).pipe(Effect.as("saved"), Effect.orDie)
   })
   const atoms = api.makeApiAtoms(RowServer)
-  const rows = atoms.query((one) => one.rows, { keep: "unwatched" })
-  const save = atoms.write<void>()((one) => one.save, {})
+  const rows = atoms.query((one) => one.rows, { keep: "unwatched", reactivityKeys: O.none() })
+  const save = atoms.write<void>()((one) => one.save, { reactivityKeys: O.none() })
   const registry = root.rootRegistry({ api: layer })
   yield* settle
   page.asked[0]?.answer(signedInAs({ who: "dana", organization: "prairie" }), 200)

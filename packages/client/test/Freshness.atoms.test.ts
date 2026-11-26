@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { assertedValue } from "./support"
 // Coming back to a screen shows what was there at once, marked waiting, and swaps in the fresh answer: no skeleton on
 // a return (Benjamin: "Old rows at once, refreshed behind").
@@ -22,7 +23,10 @@ describe("a return to a screen", () => {
         // Answers after a moment, as a server does.
         rows: Effect.sleep("20 millis").pipe(Effect.andThen(Effect.sync(() => `rows of read ${++reads}`)))
       })
-      const rows = makeApiAtoms(RowServer).query((server) => server.rows, { keep: "unwatched" })
+      const rows = makeApiAtoms(RowServer).query((server) => server.rows, {
+        keep: "unwatched",
+        reactivityKeys: O.none()
+      })
       // The app's registry lets an unread screen's atoms go 400 ms later; shorter here.
       const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: 50 })
       const seen = () => {

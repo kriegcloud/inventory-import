@@ -274,7 +274,7 @@ export const editItem = Atom.family((id: StoredItem["id"]) =>
       label: "Edit again",
       onClick: editAgain({ registry, save, base: save.base, notice: null })
     }),
-    settled: [...catalogKeys.imports, ...catalogKeys.itemFacets, ...catalogKeys.activity],
+    settled: O.some([...catalogKeys.imports, ...catalogKeys.itemFacets, ...catalogKeys.activity]),
     onAnswer: (saved, _save, registry) => {
       // An editor open on this item now, or opened before the row is read again, is on the saved revision.
       registry.update(savedItems, (held) => HashMap.set(held, id, saved))

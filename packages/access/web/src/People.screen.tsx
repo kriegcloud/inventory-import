@@ -72,7 +72,7 @@ const roles: ReadonlyArray<{ value: Role; label: string }> = [
 
 /** The people of the organization, as the server has them, with each optimistic change on top while it is saved. */
 const people = shown(
-  accessApi.query((api) => api.people.list(), { keep: "unwatched", reactivityKeys: accessKeys.people })
+  accessApi.query((api) => api.people.list(), { keep: "unwatched", reactivityKeys: O.some(accessKeys.people) })
 )
 
 /** The people whose role is on its way to the server: their row shows the new role, and waits for it. */
@@ -104,7 +104,7 @@ const setRole = optimisticWrite({
     )
   ],
   failed: (input) => `${input.person.name}'s role was not changed.`,
-  settled: accessKeys.activity
+  settled: O.some(accessKeys.activity)
 })
 
 /** A removal, shown at once and put back, with the reason, if the server refuses (an organization keeps an admin). */
@@ -116,7 +116,7 @@ const remove = optimisticWrite({
     )
   ],
   failed: (person) => `${person.name} was not removed.`,
-  settled: accessKeys.activity
+  settled: O.some(accessKeys.activity)
 })
 
 /** The add form: whether it is open, and what the person signed in has typed in it. */
@@ -131,7 +131,7 @@ export const addRole = ofMember((): Role => "editor")
 const addPerson = accessApi.write<{ readonly email: string; readonly role: Role }>()(
   (api, input) =>
     S.decodeEffect(AddPersonCommand)(input).pipe(Effect.flatMap((payload) => api.people.add({ payload }))),
-  { reactivityKeys: [...accessKeys.people, ...accessKeys.activity] }
+  { reactivityKeys: O.some([...accessKeys.people, ...accessKeys.activity]) }
 )
 
 /**

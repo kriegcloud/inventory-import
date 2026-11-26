@@ -6,8 +6,35 @@
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 
-let context: CanvasRenderingContext2D | null | undefined
-let families: { sans: string; mono: string } | undefined
+type FontFamilies = { sans: string; mono: string }
+
+// The outer Option distinguishes not initialized from a browser that has no 2D context.
+let context: O.Option<O.Option<CanvasRenderingContext2D>> = O.none()
+let families: O.Option<FontFamilies> = O.none()
+
+const canvasContext = (): O.Option<CanvasRenderingContext2D> =>
+  O.match(context, {
+    onSome: (held) => held,
+    onNone: () => {
+      const read = O.fromNullishOr(document.createElement("canvas").getContext("2d"))
+      context = O.some(read)
+      return read
+    }
+  })
+
+const fontFamilies = (): FontFamilies =>
+  O.match(families, {
+    onSome: (held) => held,
+    onNone: () => {
+      const style = getComputedStyle(document.documentElement)
+      const read = {
+        sans: style.getPropertyValue("--font-sans") || "sans-serif",
+        mono: style.getPropertyValue("--font-mono") || "monospace"
+      }
+      families = O.some(read)
+      return read
+    }
+  })
 const cache = MutableHashMap.empty<string, number>()
 
 /** The table's text size (`--text-table` in `index.css`), in pixels. */
@@ -23,20 +50,16 @@ export const textWidth = (text: string, options: { medium: boolean; mono: boolea
   const key = `${medium ? "m" : "r"}${mono ? "c" : "t"}${text}`
   return O.match(MutableHashMap.get(cache, key), {
     onSome: (known) => known,
-    onNone: () => {
-      if (context === undefined) context = document.createElement("canvas").getContext("2d")
-      if (context === null) return text.length * 7.5
-      if (families === undefined) {
-        const style = getComputedStyle(document.documentElement)
-        families = {
-          sans: style.getPropertyValue("--font-sans") || "sans-serif",
-          mono: style.getPropertyValue("--font-mono") || "monospace"
+    onNone: () =>
+      O.match(canvasContext(), {
+        onNone: () => text.length * 7.5,
+        onSome: (context) => {
+          const families = fontFamilies()
+          context.font = `${medium ? 500 : 400} ${tableTextSize}px ${mono ? families.mono : families.sans}`
+          const width = context.measureText(text).width
+          MutableHashMap.set(cache, key, width)
+          return width
         }
-      }
-      context.font = `${medium ? 500 : 400} ${tableTextSize}px ${mono ? families.mono : families.sans}`
-      const width = context.measureText(text).width
-      MutableHashMap.set(cache, key, width)
-      return width
-    }
+      })
   })
 }

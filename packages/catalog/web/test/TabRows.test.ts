@@ -246,7 +246,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
           registry.mount(imports.importViewShown(id))
           registry.mount(imports.followRemoval(id))
         },
-        readsAgain: (id: ImportId) => imports.importView(id).askAgain(registry),
+        readsAgain: (id: ImportId) => imports.importView(id).askAgain(registry, O.none()),
         asks: () => {
           registry.mount(drafts.askBeforeLeaving)
           let asked = false

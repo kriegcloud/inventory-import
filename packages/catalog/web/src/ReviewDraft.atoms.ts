@@ -333,7 +333,7 @@ const perform = (input: {
     // Off the review with no picture held (Save again pressed on another page, before the step had read the import),
     // nothing hands a view to the draft: it is read here, and handed over, so what waits is judged and sent on it.
     Ask: () => {
-      importView(id).askAgain(registry, O.getOrUndefined(registry.get(lastAnswered(id))))
+      importView(id).askAgain(registry, registry.get(lastAnswered(id)))
       const now = registry.get(draftOf(id))
       if (now.onScreen || O.isSome(now.held)) return
       void call((api) => api.imports.get({ params: { id } })).then(
@@ -391,7 +391,7 @@ const perform = (input: {
             }
             // Closed already, or the answer was lost: the machine sends nothing and asks for the import, whose picture
             // says what was written.
-            toastError(error, {})
+            toastError(error, { lead: O.none() })
             happened(DraftEvent.ConfirmFailed({ id: sent }))
           }
         )

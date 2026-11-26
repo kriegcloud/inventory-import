@@ -1,5 +1,6 @@
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as Str from "effect/String"
 // The address is the only place the app keeps where the person is: the page in the path, the import and its step
 // in the query. A hard refresh therefore lands on the same screen. The rule this file protects (decision "atoms A5"):
 // the address is one atom over the app's own `navigate`, so a link, the back button and a refresh behave alike.
@@ -27,8 +28,14 @@ export const address: Atom.Atom<string> = Atom.readable((get) => {
 export const location: Atom.Atom<{ readonly path: string; readonly params: URLSearchParams }> = Atom.map(
   address,
   (at) => {
-    const [path = "/", query = ""] = at.split("?")
-    return { path, params: new URLSearchParams(query) }
+    const parts = Str.split(at, "?")
+    return {
+      path: A.headNonEmpty(parts),
+      params: O.match(A.get(parts, 1), {
+        onNone: () => new URLSearchParams(),
+        onSome: (query) => new URLSearchParams(query)
+      })
+    }
   }
 )
 

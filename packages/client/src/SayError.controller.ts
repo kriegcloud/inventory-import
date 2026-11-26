@@ -195,11 +195,14 @@ export const sayError = (error: unknown, options: { readonly fields: Readonly<Re
  */
 export const toastError = (
   error: unknown,
-  options: { readonly lead?: string; readonly action?: { readonly label: string; readonly onClick: () => void } }
+  options: {
+    readonly lead: O.Option<string>
+    readonly action?: { readonly label: string; readonly onClick: () => void }
+  }
 ): void => {
   const said = sayError(error, { fields: {} })
   toast.error(said.title, {
-    description: options.lead === undefined ? said.sentence : `${options.lead} ${said.sentence}`,
+    description: O.match(options.lead, { onNone: () => said.sentence, onSome: (lead) => `${lead} ${said.sentence}` }),
     ...R.getSomes({ action: O.fromUndefinedOr(options.action) })
   })
 }

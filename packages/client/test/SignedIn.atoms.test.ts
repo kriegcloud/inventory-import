@@ -68,7 +68,9 @@ const world = () => {
       (send) => asPressed(send)
     )
   })
-  const save = makeApiAtoms(SaveServer).write<string>()((server, what) => server.save(what), {})
+  const save = makeApiAtoms(SaveServer).write<string>()((server, what) => server.save(what), {
+    reactivityKeys: O.none()
+  })
   const registry = AtomRegistry.make({
     initialValues: [provideApi(layer), provideMember(who), provideWhoIsSignedInAsked(asked)]
   })

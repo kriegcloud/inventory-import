@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { assertDefined } from "@effect/vitest/utils"
 import { assertedValue } from "./support"
 // The Items table keeps its rows while the next page loads: one read whose page comes from another atom answers the
@@ -34,7 +35,7 @@ describe("paging", () => {
       })
       const api = makeApiAtoms(PageServer)
       const page = Atom.make(0)
-      const rows = api.query((server, get) => server.page(get(page)), { keep: "unwatched" })
+      const rows = api.query((server, get) => server.page(get(page)), { keep: "unwatched", reactivityKeys: O.none() })
       const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
       registry.mount(rows)
       yield* settle

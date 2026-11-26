@@ -164,6 +164,31 @@ export const exemptions: ReadonlyArray<DefaultsExemption> = [
     why: "the text a file cell gives the review: its trim is a proposal the person sees as before and after (Benjamin, 2026-11-23)"
   },
   {
+    file: "packages/catalog/web/src/internal/CellForms.tsx",
+    kinds: ["normalise"],
+    why: "the repair box of a reviewed cell: the trim reads what the person typed over the file's value, shown as before and after (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/itemText.ts",
+    kinds: ["normalise"],
+    why: "how a reviewed cell's number, vendors and tags are shown: the trim is for display of the file's own text (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/WhyFlagged.tsx",
+    kinds: ["normalise"],
+    why: "the file's own name and SKU shown beside why a row was flagged: the trim is for display of a reviewed cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/cellDrafts.ts",
+    kinds: ["normalise"],
+    why: "the reader of what the person typed into a reviewed cell's repair box (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/format.tsx",
+    kinds: ["normalise"],
+    why: "a reviewed cell's whitespace made visible: the trim tells a value with spaces from one without (Benjamin, 2026-11-26)"
+  },
+  {
     file: "packages/catalog/contract/src/Item/SkuKey.rules.ts",
     kinds: ["normalise"],
     why: "the key two rows are compared by, never shown as a fix; pure callers need it at once, and a schema decode would need S.decodeSync (Benjamin, 2026-11-23)"

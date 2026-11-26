@@ -2003,3 +2003,30 @@ Answer: I chose each; the agent recommended the same each time.
   lanes merge; the messy sample is imported on it after each one.
 
 Reverse: taking a file off `exemptions` counts its places again, and they are cleared in the same commit.
+
+### 2026-11-26 — the defaults sweep's last edges: the browser's nulls, the reviewed cell's trims, a component's own props
+
+Question: after the lanes for review, catalog/web, client and ui, three kinds of place are left that no schema can
+take. About 50 read a null the browser hands back (Storage, `URLSearchParams`, Web Locks, DOM queries) in some 20
+files (`text === null` after `localStorage.getItem` in `catalog/web/src/internal/storedWaiting.ts`). 15 trims in five
+catalog/web files clean a cell of the file under review for display or a repair box (`row.file.name.trim()` in
+`internal/WhyFlagged.tsx`). About 49 compare a component's own optional prop with `undefined` to choose markup
+(`props.line === undefined` in `ui/src/PageHeader.component.tsx`).
+Answer: I chose each; the agent recommended the same each time.
+
+- The browser's nulls move into one small edge module a package, which reads the browser and returns Options; only
+  those modules go on `exemptions`, for absence. A screen then holds none. Rejected: exempting each file as it is;
+  leaving them in the baseline.
+- `catalog/web/src/internal/CellForms.tsx` (5), `itemText.ts` (6), `WhyFlagged.tsx` (2), `cellDrafts.ts` (1) and
+  `format.tsx` (1) go on `exemptions` for clean-ups only: each reads a reviewed cell, the case the rule of 2026-11-23
+  keeps a reader for. Rejected: leaving them in the baseline.
+- A component's check of its own optional prop stays counted in the baseline: the law cannot tell a prop from data
+  without reading types, a counted place costs nothing, and a new one is still refused. Rejected: exempting the
+  component files (their data checks would go uncounted too); teaching the law props.
+
+Also, without a question: the law counts `.valueOrUndefined` as an unwrap, beside `O.getOrUndefined` and
+`O.getOrNull`. A lane had cleared 69 test places by reading an Option's `valueOrUndefined` and asserting it defined,
+which is the same unwrap under another name; the agent added it under "the law counts getOrThrow" (2026-11-25) and
+the lane was redone.
+
+Reverse: taking a file off `exemptions` counts its places again, and they are cleared in the same commit.

@@ -10,8 +10,9 @@
  * Rules the decoded value already holds are not repeated: a scheme key ends in `Scheme`, a notation is unique in its
  * scheme, a label and a definition are not empty (C2), a datatype is in the registry, a tag is one of decision 18's
  * nine, a version is a semantic version, a retirement with no successor states its reason, and a retired term keeps
- * its label and definition. C14 (a category's place) and C15 (a retirement, report 05's V14) are named after report 14
- * section 6.4's thirteen.
+ * its label and definition. C14 (a category's place), C15 (a retirement, report 05's V14) and C16 (what an identity
+ * criterion rests on, report 05's V18) are named after report 14 section 6.4's thirteen. C16 reads what a criterion
+ * states it rests on and never its sentence: a word match cannot tell "the named level" from a name.
  *
  * @packageDocumentation
  */
@@ -29,6 +30,7 @@ import {
   ClassKey,
   Definition,
   Deprecation,
+  Designation,
   GistProperty,
   IdentityCriterion,
   ParentLink,
@@ -67,7 +69,7 @@ export const ExceptionList = S.Array(
 export type ExceptionList = typeof ExceptionList.Type
 
 /**
- * The rules gate 4 runs, by their names in report 14 section 6.4, and C14 and C15 after them. C2 is not here (the
+ * The rules gate 4 runs, by their names in report 14 section 6.4, and C14 to C16 after them. C2 is not here (the
  * file's header says why).
  */
 export const RuleId = LiteralKit([
@@ -84,7 +86,8 @@ export const RuleId = LiteralKit([
   "C12",
   "C13",
   "C14",
-  "C15"
+  "C15",
+  "C16"
 ]).pipe($I.annoteSchema("RuleId", { description: "A coherence rule of gate 4" }))
 /** Runtime type of {@link RuleId}. */
 export type RuleId = typeof RuleId.Type
@@ -746,6 +749,61 @@ const c15 = (vocabulary: Vocabulary): ReadonlyArray<Finding> => {
   ]
 }
 
+/** The properties a class's stated criterion rests on; none for an inherited criterion or a class with none. */
+const basisOf = (term: ClassTerm): ReadonlyArray<string> =>
+  O.match(term.identity, {
+    onNone: () => [],
+    onSome: (identity) =>
+      IdentityCriterion.match(identity, {
+        stated: (stated) => stated.restsOn,
+        inherited: () => []
+      })
+  })
+
+/** A property's designation, a relation's or an attribute's: none when the vocabulary has no property of that key. */
+const designationOf = (vocabulary: Vocabulary, key: string): O.Option<O.Option<Designation>> =>
+  O.orElse(
+    O.map(R.get(vocabulary.objectProperties, key), (term) => term.designation),
+    () => O.map(R.get(vocabulary.datatypeProperties, key), (term) => term.designation)
+  )
+
+/**
+ * C16 (decision 146, report 05's V18): a stated identity criterion rests only on properties of the vocabulary, and on
+ * none whose values are a name or an email, since two parties may share a name and one may change its address (report
+ * 04's CQ-I08). Only the basis the criterion states is read, never its sentence, so a criterion whose basis is left
+ * empty passes; report 05's review list of sentences is not kept here.
+ */
+const c16 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
+  A.flatMap(R.toEntries(vocabulary.classes), ([key, term]) =>
+    A.flatMap(basisOf(term), (property) =>
+      O.match(designationOf(vocabulary, property), {
+        onNone: () => [
+          finding(
+            "C16",
+            "class",
+            key,
+            `Its identity criterion rests on ${property}, which is not a property of the vocabulary.`
+          )
+        ],
+        onSome: (designation) =>
+          O.match(designation, {
+            onNone: () => [],
+            onSome: (label) => [
+              finding(
+                "C16",
+                "class",
+                key,
+                `Its identity criterion rests on ${property}, whose values are ${Designation.match(label, {
+                  name: () => "a name",
+                  email: () => "an email address"
+                })}, which tells nothing apart.`
+              )
+            ]
+          })
+      })
+    )
+  )
+
 /**
  * Gate 4: every broken coherence rule of a decoded vocabulary, in rule order, then in the order the terms are written.
  * An empty result means the vocabulary is coherent. The caller decodes the vocabulary and the exception list first,
@@ -769,6 +827,7 @@ export const coherenceFindings = (input: CoherenceInput): ReadonlyArray<Finding>
     ...c12(vocabulary, exceptions, decisions),
     ...c13(vocabulary),
     ...c14(vocabulary),
-    ...c15(vocabulary)
+    ...c15(vocabulary),
+    ...c16(vocabulary)
   ]
 }

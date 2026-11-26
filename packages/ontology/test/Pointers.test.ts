@@ -13,6 +13,11 @@
 // a category walk through `Party` (decision 12), and P14, a pointer at a retired term (report 05's V14, decision 33),
 // with a retired notation of a live scheme still passing P8 (V12). Its planted records point at the copy's terms
 // through helpers bound to the copy's own keys, so a misspelt name is a type error here too.
+//
+// Step 7 adds, on copies too: P4 for a class that stores no id (decision 135), `Run`, a class of this test's own; and
+// the enrolment kind `noTerm` (decision 21), on planted exports beside the real ones, with P2, P8 and P15 on them. A
+// malformed `noTerm` (P9's) is not planted: gate 7's rule 6 refuses a mark written by hand here, and the reading of one
+// is `Pointer.test.ts`'s. The real `Membership` is enrolled by step 11, not here.
 import { describe, expect, it } from "@effect/vitest"
 import type { Curie } from "@beep/identity/Vocab"
 import { Vocabulary } from "@beep/vocabulary/Model"
@@ -498,7 +503,55 @@ const lapsedScheme = {
   }
 } as const satisfies typeof Vocabulary.Encoded
 
-type Planted = typeof lapsedScheme
+/**
+ * The copy with `partied`'s terms and `Run`, a class of this test's own whose records store no id (decision 135), with
+ * an attribute of a run and a relation from an audit entry to its run, each shown on a fixture.
+ */
+const unkeyed = {
+  ...partied,
+  classes: {
+    ...partied.classes,
+    Run: {
+      prefLabel: "Run",
+      definition: "A stretch of work an agent does for one person, a class of this test's own.",
+      tag: "event",
+      parent: { kind: "gist", name: "TemporalRelation" },
+      identity: { kind: "stated", criterion: "the work itself, which no record of this test keys." },
+      storesId: false,
+      ratification: { decision: 135 }
+    }
+  },
+  objectProperties: {
+    ...partied.objectProperties,
+    actedThrough: {
+      prefLabel: "acted through",
+      definition: "Links an audit entry to the run that made its change, a relation of this test's own.",
+      domain: "AuditEntry",
+      range: { kind: "class", key: "Run" },
+      evidence: "fixture",
+      ratification: { decision: 135 }
+    }
+  },
+  datatypeProperties: {
+    ...partied.datatypeProperties,
+    runAgent: {
+      prefLabel: "run agent",
+      definition: "The name of the agent that does a run, an attribute of this test's own.",
+      domain: "Run",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: { decision: 135 }
+    }
+  }
+} as const satisfies typeof Vocabulary.Encoded
+
+/** The same copy with `Run` storing an id, so P4 asks one field to name it again. */
+const keyedRun = {
+  ...unkeyed,
+  classes: { ...unkeyed.classes, Run: { ...unkeyed.classes.Run, storesId: true } }
+} as const satisfies typeof Vocabulary.Encoded
+
+type Planted = typeof lapsedScheme & typeof unkeyed
 type PlantedRegistry<K extends string> = {
   readonly inv: { readonly iri: Planted["namespace"]; readonly terms: ReadonlyArray<K> }
 }
@@ -811,6 +864,170 @@ describe("gate 5 on the party slice's constructs", () => {
       ])
       const found = yield* gate({ vocabulary: decoded, ...memberRoleAs(mark) })
       expect(found).toEqual([])
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// Step 7: P4 for a class that stores no id (decision 135), and the enrolment kind `noTerm` (decision 21)
+// ---------------------------------------------------------------------------------------------------------------
+
+const runFile = `${plantedFile}#Run`
+
+/** A record of `Run` whose `agent` fills `runAgent`, with an `id` field marked as given when one is. */
+const runRecord = (id: O.Option<S.Annotations.Key<string>>) => {
+  const agentMark = plantedProperty("inv:runAgent")
+  const idMarks = O.match(id, { onNone: () => [], onSome: (mark) => [["id", mark] as const] })
+  const idFields = O.match(id, { onNone: () => ({}), onSome: (mark) => ({ id: S.String.pipe(S.annotateKey(mark)) }) })
+  const schema = S.Struct({ ...idFields, agent: S.String.pipe(S.annotateKey(agentMark)) }).pipe(
+    S.annotate(plantedClass("inv:Run"))
+  )
+  return withRecord("Run", schema, [...idMarks, ["agent", agentMark]])
+}
+
+/** An export enrolled as standing for no term beside the real ones, P13's table untouched. */
+const withNoTerm = Effect.fn("withNoTerm")(function* (name: string, schema: S.Top) {
+  const key = `${plantedFile}#${name}`
+  const enrolment = yield* decodeEnrolment([...enrolmentFile, { file: plantedFile, export: name, as: "noTerm" }])
+  return { enrolment, enrolled: { ...enrolled, [key]: schema } }
+})
+
+/** The sign-in page's words for one membership, as `Membership` holds them: a name and a role, and no member id. */
+const wordsFields = { organizationName: DisplayName, role: Role }
+
+const words = `${plantedFile}#Words`
+
+describe("gate 5, a class that stores no id (decision 135)", () => {
+  it.effect("near miss: a Run record names its class on its own annotations alone, and no field names it", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(unkeyed)
+      const planted = yield* runRecord(O.none())
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P4: a Run record whose id field names Run, a class that stores no id", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(unkeyed)
+      const planted = yield* runRecord(O.some(plantedClass("inv:Run")))
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P4", runFile, ""]])
+    })
+  )
+
+  it.effect("P4 as before: the same record with no id field, once Run stores an id", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(keyedRun)
+      const planted = yield* runRecord(O.none())
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P4", runFile, ""]])
+    })
+  )
+
+  it.effect("an audit entry's agent reached through a run's node passes: the lift, not gate 5, refuses the node", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(unkeyed)
+      const path = plantedPath([{ property: "inv:actedThrough", node: "inv:Run" }, { property: "inv:runAgent" }])
+      const marks = [
+        ["id", plantedClass("inv:AuditEntry")],
+        ["agent", path]
+      ] as const
+      const schema = S.Struct({
+        id: S.String.pipe(S.annotateKey(marks[0][1])),
+        agent: S.String.pipe(S.annotateKey(path))
+      }).pipe(S.annotate(plantedClass("inv:AuditEntry")))
+      const planted = yield* withRecord("Agent", schema, marks)
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+})
+
+describe("gate 5, an export enrolled as standing for no term", () => {
+  it.effect("near miss: a struct of screen words marked noTerm screen, its role field pointed at the role scheme", () =>
+    Effect.gen(function* () {
+      const schema = S.Struct(wordsFields).pipe(S.annotate({ description: "Words", ...noTerm("screen") }))
+      const planted = yield* withNoTerm("Words", schema)
+      const found = yield* gate(planted)
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P2: the same struct with no mark of its own", () =>
+    Effect.gen(function* () {
+      const planted = yield* withNoTerm("Words", S.Struct(wordsFields))
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P2", words, ""]])
+    })
+  )
+
+  it.effect("P2: the struct pointed at Member, which a record entry would be, enrolled as standing for no term", () =>
+    Effect.gen(function* () {
+      const schema = S.Struct(wordsFields).pipe(S.annotate(aboutClass("inv:Member")))
+      const planted = yield* withNoTerm("Words", schema)
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P2", words, ""]])
+    })
+  )
+
+  it.effect("P2: the struct deferred to the party slice, whose slice enrols it when it places it (decision 99)", () =>
+    Effect.gen(function* () {
+      const schema = S.Struct(wordsFields).pipe(S.annotate(noTerm("deferred", "party")))
+      const planted = yield* withNoTerm("Words", schema)
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P2", words, ""]])
+    })
+  )
+
+  it.effect("P2: the struct's annotations carry a noTerm mark and a class's both", () =>
+    Effect.gen(function* () {
+      const schema = S.Struct(wordsFields).pipe(S.annotate({ ...noTerm("screen"), ...aboutClass("inv:Member") }))
+      const planted = yield* withNoTerm("Words", schema)
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P2", words, ""]])
+    })
+  )
+
+  it.effect("P15: a field of the struct carries a mark, of a term and of no term alike", () =>
+    Effect.gen(function* () {
+      const schema = S.Struct({
+        organizationName: DisplayName.pipe(S.annotateKey(noTerm("screen"))),
+        role: Role.pipe(S.annotateKey(aboutProperty("inv:grantsRole")))
+      }).pipe(S.annotate(noTerm("screen")))
+      const planted = yield* withNoTerm("Words", schema)
+      const found = yield* gate(planted)
+      expect(found).toEqual([
+        ["P15", words, "organizationName"],
+        ["P15", words, "role"]
+      ])
+    })
+  )
+
+  it.effect("P8: the struct's role field allows a literal the role scheme has no notation for", () =>
+    Effect.gen(function* () {
+      const widened = S.Literals(["viewer", "owner"]).pipe(S.annotate(aboutScheme("inv:MemberRoleScheme")))
+      const schema = S.Struct({ ...wordsFields, role: widened }).pipe(S.annotate(noTerm("screen")))
+      const planted = yield* withNoTerm("Words", schema)
+      const found = yield* gate(planted)
+      expect(found).toEqual([["P8", words, "role"]])
+    })
+  )
+
+  it.effect("P13 and P10: a placement row and a variants table for it, which a record alone has", () =>
+    Effect.gen(function* () {
+      const schema = S.Struct(wordsFields).pipe(S.annotate(noTerm("screen")))
+      const planted = yield* withNoTerm("Words", schema)
+      const stray = Placement.make({ entry: words, field: "role", mark: reading(noTerm("screen")) })
+      const found = yield* gate({
+        ...planted,
+        placements: [...placements, stray],
+        variants: { ...variants, [words]: sixOf(Activity) }
+      })
+      expect(found).toEqual([
+        ["P13", words, "role"],
+        ["P10", words, ""]
+      ])
     })
   )
 })

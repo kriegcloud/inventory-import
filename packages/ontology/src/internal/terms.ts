@@ -41,6 +41,17 @@ export const classOf: {
   R.has(vocabulary.classes, local) ? O.some(local) : O.none()
 )
 
+/**
+ * Whether the class of that local name stores no id (decision 135): a record of it names it on its own annotations
+ * alone, and the lift mints no node of it. False for a class that stores one, and for a name that is no class.
+ */
+export const storesNoId: {
+  (local: string): (vocabulary: Vocabulary) => boolean
+  (vocabulary: Vocabulary, local: string): boolean
+} = dual(2, (vocabulary: Vocabulary, local: string): boolean =>
+  O.exists(R.get(vocabulary.classes, local), (term) => !term.storesId)
+)
+
 /** A local name when the vocabulary has a scheme of that name. */
 export const schemeOf: {
   (local: string): (vocabulary: Vocabulary) => O.Option<string>

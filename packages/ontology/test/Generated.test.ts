@@ -110,6 +110,29 @@ describe("gate 1, byte-compare", () => {
     })
   )
 
+  it.effect("a class that stores no id, a criterion's basis and a designation change no byte (decision 19)", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const { classes, datatypeProperties } = kernelVocabulary
+      const variant = yield* S.decodeEffect(Vocabulary, { onExcessProperty: "error", errors: "all" })({
+        ...kernelVocabulary,
+        classes: {
+          ...classes,
+          Grant: { ...classes.Grant, storesId: false },
+          Member: { ...classes.Member, identity: { ...classes.Member.identity, restsOn: ["membershipIn"] } }
+        },
+        datatypeProperties: { ...datatypeProperties, action: { ...datatypeProperties.action, designation: "name" } }
+      })
+      const varied = { ...context, vocabulary: variant }
+      const owl = yield* writeTurtle(owlProjection(context, source))
+      const skos = yield* writeTurtle(skosProjection(context, source))
+      const variedOwl = yield* writeTurtle(owlProjection(varied, source))
+      const variedSkos = yield* writeTurtle(skosProjection(varied, source))
+      expect([variedOwl, variedSkos]).toStrictEqual([owl, skos])
+      expect(variant.classes).not.toStrictEqual(context.vocabulary.classes)
+    })
+  )
+
   it("a text with a line more, or without its final newline, differs at that line", () => {
     expect(O.map(firstDifference("a\nb\n", "a\nb\nc\n"), (found) => found.line)).toStrictEqual(O.some(3))
     expect(O.map(firstDifference("a\nb\n", "a\nb"), (found) => found.line)).toStrictEqual(O.some(3))

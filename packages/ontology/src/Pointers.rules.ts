@@ -1,14 +1,17 @@
 /**
  * Gate 5, record pointers on the AST (report 14 section 6.5): rules P1 to P13 over the enrolled schemas, read through
- * `@beep/vocabulary/Pointer`'s reader and compared with the decoded vocabulary, and P14, report 05's V14: no pointer
- * names a retired term (decision 33). Each broken rule is one `PointerFinding`, data that names the rule, the enrolment
- * entry and the field; nothing here fails or throws.
+ * `@beep/vocabulary/Pointer`'s reader and compared with the decoded vocabulary, P14, report 05's V14: no pointer
+ * names a retired term (decision 33), and P15: no field of an export enrolled as standing for no term carries a mark.
+ * Each broken rule is one `PointerFinding`, data that names the rule, the enrolment entry and the field; nothing here
+ * fails or throws.
  *
  * Do not break: the rules read only their arguments. The marks are read from the schemas' ASTs, never from source
  * text, and a field's mark only from its key annotations (section 3.1), so a field whose schema is itself an enrolled
  * record is not taken for pointed. P13 is the one rule that says a mark is the right one; P1 to P12 say it is well
  * formed. A class falls under its local parent and its category parents alike (decision 12), and a retired notation of a
- * live scheme is no pointer: a stored code still reads (V12), so P8 passes it and P14 does not look at literals.
+ * live scheme is no pointer: a stored code still reads (V12), so P8 passes it and P14 does not look at literals. A
+ * record of a class that stores no id names its class on its own annotations alone (decision 135), so P4 asks no
+ * field to name it.
  *
  * @packageDocumentation
  */
@@ -18,6 +21,7 @@ import {
   MarkReading,
   readKeyMark,
   readMarks,
+  readSchemaMark,
   type FieldMark,
   type LiftPathRead,
   NoTermRead
@@ -33,7 +37,7 @@ import * as SchemaAST from "effect/SchemaAST"
 import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import { $OntologyId } from "./internal/identity.ts"
-import { classOf, localOf, propertyOf, schemaTermOf, schemeOf } from "./internal/terms.ts"
+import { classOf, localOf, propertyOf, schemaTermOf, schemeOf, storesNoId } from "./internal/terms.ts"
 
 const $I = $OntologyId.create("Pointers")
 
@@ -41,7 +45,7 @@ const $I = $OntologyId.create("Pointers")
 // The enrolment list
 // ---------------------------------------------------------------------------------------------------------------
 
-const EntryKind = LiteralKit(["record", "scheme", "collection"])
+const EntryKind = LiteralKit(["record", "scheme", "collection", "noTerm"])
 
 const entryFields = {
   file: S.String.check(S.isMinLength(1), S.isMaxLength(200)).pipe(
@@ -77,8 +81,21 @@ export class CollectionEntry extends S.Opaque<CollectionEntry, { readonly brand:
   }).pipe($I.annoteSchema("CollectionEntry", { description: "An enrolled array of one record's variant" }))
 ) {}
 
+/**
+ * An enrolled export that stands for no term (decision 21): its own annotations carry `noTerm` with a closed reason,
+ * such as the sign-in page's `Membership`, which holds no member id and so names no membership. Enrolled, a mark on
+ * it is read by a gate; none of its fields carries one (P15).
+ */
+export class NoTermEntry extends S.Opaque<NoTermEntry, { readonly brand: unique symbol }>()(
+  S.Struct({ ...entryFields, as: S.tag("noTerm") }).pipe(
+    $I.annoteSchema("NoTermEntry", { description: "An enrolled export that stands for no term, and says why" })
+  )
+) {}
+
 /** One entry of `enrolment.json`. */
-export const EnrolmentEntry = EntryKind.mapMembers(() => Tuple.make(RecordEntry, SchemeEntry, CollectionEntry)).pipe(
+export const EnrolmentEntry = EntryKind.mapMembers(() =>
+  Tuple.make(RecordEntry, SchemeEntry, CollectionEntry, NoTermEntry)
+).pipe(
   S.toTaggedUnion("as"),
   $I.annoteSchema("EnrolmentEntry", { description: "One enrolled export and what it is enrolled as" })
 )
@@ -103,7 +120,10 @@ export const entryKey = (entry: EnrolmentEntry): string => `${entry.file}#${entr
 // The finding
 // ---------------------------------------------------------------------------------------------------------------
 
-/** The rules gate 5 runs, by their names in report 14 section 6.5, and P14 for report 05's V14 (party slice, step 3). */
+/**
+ * The rules gate 5 runs, by their names in report 14 section 6.5, P14 for report 05's V14 (party slice, step 3) and P15
+ * for an export enrolled as standing for no term (step 7).
+ */
 export const PointerRule = LiteralKit([
   "P1",
   "P2",
@@ -118,7 +138,8 @@ export const PointerRule = LiteralKit([
   "P11",
   "P12",
   "P13",
-  "P14"
+  "P14",
+  "P15"
 ]).pipe($I.annoteSchema("PointerRule", { description: "A rule of gate 5" }))
 /** Runtime type of {@link PointerRule}. */
 export type PointerRule = typeof PointerRule.Type
@@ -504,13 +525,17 @@ const recordFindings = (context: Context, entry: string, schema: S.Top): Readonl
       }
     })
   }
-  if (subjects.length !== 1) {
+  // Decision 135: a class that stores no id is named by the record's own annotations alone, and by no field.
+  const unkeyed = storesNoId(vocabulary, record)
+  if (subjects.length !== (unkeyed ? 0 : 1)) {
     found.push(
       finding(
         "P4",
         entry,
         none,
-        `${subjects.length} fields name the record's class; exactly one must: ${A.join(subjects, ", ")}`
+        unkeyed
+          ? `${record} stores no id, so no field may name it: ${A.join(subjects, ", ")}`
+          : `${subjects.length} fields name the record's class; exactly one must: ${A.join(subjects, ", ")}`
       )
     )
   }
@@ -520,6 +545,40 @@ const recordFindings = (context: Context, entry: string, schema: S.Top): Readonl
     )
   }
   return found
+}
+
+/**
+ * P2, P9 and P15 on one `noTerm` entry, with P8 and P14 on its fields' schemas: its own annotations hold a `noTerm` mark
+ * with a closed reason, and none of its fields carries a mark. A deferred schema is refused, since decision 99 enrols a
+ * record when the slice that places it does; a malformed `noTerm` is P9's, as on a field.
+ */
+const noTermFindings = (context: Context, entry: string, schema: S.Top): ReadonlyArray<PointerFinding> => {
+  const none = O.none<string>()
+  const refused = (detail: string) => [finding("P2", entry, none, detail)]
+  const own = MarkReading.match(readSchemaMark(schema.ast), {
+    none: () => refused("the schema's annotations carry no noTerm mark"),
+    several: (several) => refused(`the schema's annotations carry ${several.keys.length} marks`),
+    term: (term) => refused(`the schema points at ${term.term}: enrol it as a record or a scheme`),
+    path: () => refused("the schema's annotations carry a path, which only a field may"),
+    malformed: (malformed) =>
+      malformed.key === "noTerm"
+        ? [finding("P9", entry, none, "the noTerm mark is not well formed")]
+        : refused(`the schema's ${malformed.key} mark is not well formed`),
+    noTerm: (noTerm) =>
+      NoTermRead.guards.deferred(noTerm.noTerm)
+        ? refused(`deferred to ${noTerm.noTerm.slice}: the slice that places a schema enrols it (decision 99)`)
+        : []
+  })
+  const fields = A.flatMap(fieldNodes(schema.ast), (field) => {
+    const at = O.some(field.name)
+    return [
+      ...notationFindings(context, entry, at, field.ast),
+      ...(MarkReading.guards.none(readKeyMark(field.ast))
+        ? []
+        : [finding("P15", entry, at, "a field of a schema that stands for no term carries a mark")])
+    ]
+  })
+  return [...own, ...fields]
 }
 
 /** The six variants of a `Model.Class`, by the names `Model` gives them. */
@@ -675,7 +734,7 @@ const collectionFindings = (context: Context, entry: CollectionEntry, schema: S.
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
- * Runs P1 to P14 and returns every finding: none when every enrolled schema is marked as section 3 says.
+ * Runs P1 to P15 and returns every finding: none when every enrolled schema is marked as section 3 says.
  *
  * @example pointerFindings({ vocabulary, prefix: "inv", tenant: "Tenant", slices: ["party"], ... }) // []
  */
@@ -715,7 +774,8 @@ export const pointerFindings = (input: PointerInput): ReadonlyArray<PointerFindi
             }
             return notationFindings(context, key, O.none(), schema.ast)
           },
-          collection: (collection) => collectionFindings(context, collection, schema)
+          collection: (collection) => collectionFindings(context, collection, schema),
+          noTerm: () => noTermFindings(context, key, schema)
         })
     })
   })

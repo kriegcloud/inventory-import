@@ -1,15 +1,18 @@
 // Gate 4's rules on a small vocabulary of an example library, not this repository's: the valid one gives no finding,
 // and each copy changed to break one rule gives that rule's findings and no other. The decision log is text handed
 // in, so C12's planted number 999 changes no committed file. The party slice's constructs (a category, a retirement,
-// a gist property) are planted on copies too, each beside a near miss that passes; the gist properties C9 compares
-// with are written on planted gist lists only, never read from gist's file.
+// a gist property, an identity criterion's basis) are planted on copies too, each beside a near miss that passes; the
+// gist properties C9 compares with are written on planted gist lists only, never read from gist's file, one of them as
+// decision 153 read gist 14.1.0: no domain and no range.
 import { describe, expect, it } from "@effect/vitest"
-import { Vocabulary } from "@beep/vocabulary/Model"
+import { IdentityCriterion, Vocabulary } from "@beep/vocabulary/Model"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as HashSet from "effect/HashSet"
 import * as Num from "effect/Number"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { coherenceFindings, decisionHeadings, ExceptionList } from "../src/Rules.rules.ts"
 
@@ -973,6 +976,165 @@ describe("what the decode holds for the party slice's constructs", () => {
       const noReason = { kind: "withdrawn", since: withdrawn.since }
       const refusal = yield* Effect.flip(decodeVocabulary(withClasses({ Genre: { ...genre, deprecation: noReason } })))
       expect(refusal.message).toContain("reason")
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// What an identity criterion rests on (decision 146, report 05's V18): C16
+// ---------------------------------------------------------------------------------------------------------------
+
+/** The name a library is known by: a label, not what tells one library from another. */
+const libraryName = {
+  prefLabel: "library name",
+  definition: "The name a library is known by on its signs and its cards.",
+  domain: "Library",
+  datatype: "xsd:string",
+  designation: "name",
+  ratification: accepted
+} as const
+
+/** The address a library answers mail at, which it may change. */
+const libraryEmail = {
+  prefLabel: "library email",
+  definition: "The email address at which a library answers its members.",
+  domain: "Library",
+  datatype: "xsd:string",
+  designation: "email",
+  ratification: accepted
+} as const
+
+/** The number a library is registered under, which tells one library from another. */
+const registrationNumber = {
+  prefLabel: "registration number",
+  definition: "The number under which a library is registered with its authority.",
+  domain: "Library",
+  datatype: "xsd:string",
+  ratification: accepted
+} as const
+
+const withBases = {
+  ...valid,
+  datatypeProperties: { ...valid.datatypeProperties, libraryName, libraryEmail, registrationNumber }
+} as const satisfies typeof Vocabulary.Encoded
+
+/** A stated criterion with the sentence of `term`'s and the basis given. */
+const restingOn = (term: typeof library | typeof book | typeof loan, restsOn: ReadonlyArray<string>) => ({
+  ...term,
+  identity: { ...term.identity, restsOn }
+})
+
+const findingsWithBases = (classes: object) =>
+  findingsOf({ ...withBases, classes: { ...withBases.classes, ...classes } })
+
+describe("what an identity criterion rests on", () => {
+  it.effect("near miss: a criterion on a registration number, one on a relation, and a name nothing rests on", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithBases({
+        Library: restingOn(library, ["registrationNumber"]),
+        Loan: restingOn(loan, ["loanOf"])
+      })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("C16: a library told apart by its name, as report 04's CQ-I08 plants it", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithBases({ Library: restingOn(library, ["registrationNumber", "libraryName"]) })
+      expect(found).toEqual([["C16", "class", "Library"]])
+    })
+  )
+
+  it.effect("C16: a library told apart by its email address", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithBases({ Library: restingOn(library, ["libraryEmail"]) })
+      expect(found).toEqual([["C16", "class", "Library"]])
+    })
+  )
+
+  it.effect("C16: a book told apart by a key that is no property of the vocabulary", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithBases({ Book: restingOn(book, ["isbn"]) })
+      expect(found).toEqual([["C16", "class", "Book"]])
+    })
+  )
+
+  it.effect("the decode: a criterion states no basis unless it says one, and an inherited one cannot say one", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(valid)
+      const basis = O.flatMap(
+        O.flatMap(R.get(decoded.classes, "Library"), (term) => term.identity),
+        (identity) => (IdentityCriterion.guards.stated(identity) ? O.some(identity.restsOn) : O.none())
+      )
+      expect(basis).toEqual(O.some([]))
+      const inherited = { ...branch, identity: { kind: "inherited", restsOn: ["registrationNumber"] } }
+      const refusal = yield* Effect.flip(
+        decodeVocabulary({ ...withBases, classes: { ...withBases.classes, Branch: inherited } })
+      )
+      expect(refusal.message).toContain("restsOn")
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// The gist properties as gist 14.1.0 declares them (decisions 132 and 153): no domain and no range, so no limit
+// ---------------------------------------------------------------------------------------------------------------
+
+/** A planted list with the two gist properties decision 153 read: neither declares a domain or a range. */
+const gistAsPinned = {
+  ...gist,
+  properties: { isCategorizedBy: { kind: "object" }, name: { kind: "datatype" } }
+} as const
+
+/** A name with no domain of its own, which a gist property with no domain must also take. */
+const knownAs = {
+  prefLabel: "known as",
+  definition: "The name anything a library keeps is known by, whatever it is.",
+  datatype: "xsd:string",
+  designation: "name",
+  ratification: accepted
+} as const
+
+describe("a property under a gist property that declares no domain and no range", () => {
+  it.effect(
+    "near miss: names under gist's name, and a scheme range and a class range under isCategorizedBy, pass C9",
+    () =>
+      Effect.gen(function* () {
+        const found = yield* findingsOf({
+          ...withBases,
+          gist: gistAsPinned,
+          objectProperties: {
+            ...valid.objectProperties,
+            loanStatus: { ...loanStatus, ...gistParent("isCategorizedBy") },
+            heldAt: { ...heldAt, ...gistParent("isCategorizedBy") }
+          },
+          datatypeProperties: {
+            ...withBases.datatypeProperties,
+            libraryName: { ...libraryName, ...gistParent("name") },
+            knownAs: { ...knownAs, ...gistParent("name") }
+          }
+        })
+        expect(found).toEqual([])
+      })
+  )
+
+  it.effect("C9: the same names under a gist name that declares a domain and a datatype they miss", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf({
+        ...withBases,
+        gist: { ...gistAsPinned, properties: { name: { kind: "datatype", domain: "Content", range: "xsd:dateTime" } } },
+        datatypeProperties: {
+          ...withBases.datatypeProperties,
+          libraryName: { ...libraryName, ...gistParent("name") },
+          knownAs: { ...knownAs, ...gistParent("name") }
+        }
+      })
+      expect(found).toEqual([
+        ["C9", "datatypeProperty", "libraryName"],
+        ["C9", "datatypeProperty", "libraryName"],
+        ["C9", "datatypeProperty", "knownAs"],
+        ["C9", "datatypeProperty", "knownAs"]
+      ])
     })
   )
 })

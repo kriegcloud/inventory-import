@@ -177,6 +177,35 @@ export const AuditTrail = S.Array(Activity)
     })
   )
 
+  it.effect("takes a schema enrolled as standing for no term with noTerm in its annotations, and refuses it bare", () =>
+    Effect.gen(function* () {
+      const words = (annotations: string) => `${helpers}import * as S from "effect/Schema"
+export const Words = S.Struct({ organizationName: S.String, role: S.String })${annotations}
+`
+      const entries = enrolment([
+        { file: "packages/kernel/src/Member.schema.ts", export: "Member", as: "record" },
+        { file: "packages/kernel/src/Words.schema.ts", export: "Words", as: "noTerm" }
+      ])
+      const marked = yield* inTree(
+        {
+          ...thread,
+          "packages/kernel/src/Words.schema.ts": words(
+            '.pipe(S.annotate({ description: "Words", ...noTerm("screen") }))'
+          ),
+          "packages/ontology/enrolment.json": entries
+        },
+        inRepository
+      )
+      const bare = yield* refusals({
+        ...thread,
+        "packages/kernel/src/Words.schema.ts": words(""),
+        "packages/ontology/enrolment.json": entries
+      })
+      expect(marked).toStrictEqual([clean])
+      expect(bare).toStrictEqual(["packages/kernel/src/Words.schema.ts:3 rule 1"])
+    })
+  )
+
   it.effect("takes no function of a helper's name from another module for the helper", () =>
     Effect.gen(function* () {
       const found = yield* refusals({

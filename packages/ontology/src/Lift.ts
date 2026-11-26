@@ -7,7 +7,9 @@
  * a grant for every member whatever the mark said would pass a test on the real `Member` and be wrong, which is why
  * the questions' must-fail cases M6 and M7 call it with a changed mark. It types the subject and each node a path
  * creates, and nothing else: the tenant's type is the fixture's to state. A literal's text is the field's value as its
- * own schema encodes it, so an instant is written as the ISO text the wire carries, never as code formats it.
+ * own schema encodes it, so an instant is written as the ISO text the wire carries, never as code formats it. It
+ * writes no node of a class that stores no id (decision 135), as a record, a path's node or a link's object: an IRI
+ * made from another record's id would say each such record is its own instance, which nobody decided.
  *
  * @packageDocumentation
  */
@@ -24,7 +26,7 @@ import type * as SchemaAST from "effect/SchemaAST"
 import * as Str from "effect/String"
 import { link, literal, type Iri, type Triple } from "./Graph.schema.ts"
 import { $OntologyId } from "./internal/identity.ts"
-import { classOf, localOf, propertyOf, schemaTermOf, schemeOf, type Property } from "./internal/terms.ts"
+import { classOf, localOf, propertyOf, schemaTermOf, schemeOf, storesNoId, type Property } from "./internal/terms.ts"
 import { misread } from "./Write.ts"
 
 const $I = $OntologyId.create("Lift")
@@ -92,6 +94,9 @@ const objectOf = Effect.fnUntraced(function* (
     // A link to another record: the property's range names its class, the field's value is its id.
     if (!RangeTarget.guards.class(property.range)) {
       return yield* refused(at, `${property.key} ranges over a scheme the field's schema does not point at`)
+    }
+    if (storesNoId(vocabulary, property.range.key)) {
+      return yield* refused(at, `${property.key} ranges over ${property.range.key}, which stores no id to link to`)
     }
     if (!isSegment(value)) {
       return yield* refused(at, "the field's value is no id")
@@ -228,6 +233,9 @@ const pathTriples = Effect.fnUntraced(function* (
     if (!("node" in step)) {
       return yield* refused(at, "a step before the last creates no node")
     }
+    if (O.exists(localOf(context.prefix)(step.node), (local) => storesNoId(context.vocabulary, local))) {
+      return yield* refused(at, `${step.node} stores no id, so the lift makes no node of it from this record`)
+    }
     const node = `${subject}/${field.name}`
     const nodeClass = yield* iriOf(context, at, step.node)
     const linking = yield* iriOf(context, at, step.property)
@@ -251,9 +259,10 @@ const pathTriples = Effect.fnUntraced(function* (
  * what each path creates. A field that names the record's own class is its id and is in the IRI; a field that stands
  * for no term states nothing.
  *
- * It fails with `LiftRefused` when the record names no class, when not exactly one field is its id, when its tenant is
- * not named by exactly one field or given beside it (and not both), when a field is unmarked, when a mark cannot be
- * followed, or when a literal's value is not one its datatype writes.
+ * It fails with `LiftRefused` when the record names no class or one that stores no id, when not exactly one field is
+ * its id, when its tenant is not named by exactly one field or given beside it (and not both), when a field is
+ * unmarked, when a mark cannot be followed, when a path's node or a link's object is of a class that stores no id, or
+ * when a literal's value is not one its datatype writes.
  *
  * @example lift(context, Member, member) // six triples: the member, its tenant, and the grant its role is
  */
@@ -269,6 +278,9 @@ export const lift = Effect.fnUntraced(function* <Record extends S.Top & { readon
   const signatures = fieldsOf(record.ast)
   if (O.isNone(own) || O.isNone(signatures)) {
     return yield* refused(none, "the record is no struct pointing at a class of the vocabulary")
+  }
+  if (storesNoId(vocabulary, own.value)) {
+    return yield* refused(none, `${own.value} stores no id, so the lift makes no node of it (decision 135)`)
   }
   const fields = A.map(signatures.value, (signature): Field => ({
     name: String(signature.name),

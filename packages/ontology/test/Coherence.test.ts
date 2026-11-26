@@ -199,3 +199,58 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 })
+
+// V18 (decision 146) on the kernel's terms: CQ-I08 asks what tells two records of a class apart, and C16 holds that
+// the properties a criterion rests on are the vocabulary's and that none of them is a name or an email. The kernel
+// states no `restsOn` yet, so these copies add them, with a `name` attribute planted beside the terms (decision 132
+// links a name to gist's `name`; report 18 enters the real one).
+const named132 = {
+  ...constructsVocabulary,
+  datatypeProperties: {
+    ...constructsVocabulary.datatypeProperties,
+    name: {
+      prefLabel: "name",
+      definition: "What an organization is called, a planted attribute of this test's own.",
+      domain: "Organization",
+      datatype: "xsd:string",
+      designation: "name",
+      evidence: "fixture",
+      ratification: { decision: 132 }
+    }
+  }
+} as const
+
+/** The copy with Member, AuditEntry and Grant each resting on the relation that holds it to the others. */
+const { classes } = named132
+const restingOn = {
+  ...named132,
+  classes: {
+    ...classes,
+    Member: { ...classes.Member, identity: { ...classes.Member.identity, restsOn: ["membershipIn"] } },
+    AuditEntry: { ...classes.AuditEntry, identity: { ...classes.AuditEntry.identity, restsOn: ["inTenant"] } },
+    Grant: { ...classes.Grant, identity: { ...classes.Grant.identity, restsOn: ["grantedTo"] } }
+  }
+}
+
+describe("gate 4, what a criterion rests on (CQ-I08, V18)", () => {
+  it.effect("near miss: Member on membershipIn, AuditEntry on inTenant and Grant on grantedTo give no finding", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOfCopy(restingOn)
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("reports exactly C16 on Organization when its criterion rests on its name", () =>
+    Effect.gen(function* () {
+      const planted = {
+        ...restingOn,
+        classes: {
+          ...restingOn.classes,
+          Organization: { ...classes.Organization, identity: { ...classes.Organization.identity, restsOn: ["name"] } }
+        }
+      }
+      const found = yield* findingsOfCopy(planted)
+      expect(found).toEqual([["C16", "class", "Organization"]])
+    })
+  )
+})

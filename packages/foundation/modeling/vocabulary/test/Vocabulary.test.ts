@@ -110,6 +110,24 @@ describe("Vocabulary", () => {
     })
   )
 
+  it.effect("refuses a relation with no range: decision 145 keeps an object property's range required", () =>
+    Effect.gen(function* () {
+      const unranged: unknown = {
+        ...twoTerms,
+        objectProperties: {
+          lentTo: {
+            prefLabel: "lent to",
+            definition: "Links a book to whoever it is lent to, with no range written.",
+            domain: "Book",
+            ratification: { decision: 3 }
+          }
+        }
+      }
+      const refusal = yield* Effect.flip(decodeStrict(unranged))
+      expect(refusal.message).toContain("range")
+    })
+  )
+
   it.effect("refuses a ratification that is not a whole number", () =>
     Effect.gen(function* () {
       const fraction: unknown = { ...twoTerms, classes: { Book: { ...book, ratification: { decision: 3.5 } } } }

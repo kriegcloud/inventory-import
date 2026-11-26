@@ -257,12 +257,24 @@ export type ParentLink = typeof ParentLink.Type
 
 const IdentityKind = LiteralKit(["stated", "inherited"])
 
-/** What makes two instances of the class the same one, written out. */
+/**
+ * What makes two instances of the class the same one, written out, and the properties of the vocabulary it rests on.
+ * The sentence is for people; `restsOn` is what rule C16 reads (report 05's V18, decision 146), so a criterion on a name
+ * or an email is refused by what it states, not by a word match on its sentence. An empty `restsOn` states no basis the
+ * vocabulary has, as a criterion on a body no record holds does.
+ */
 export class StatedIdentity extends S.Opaque<StatedIdentity, { readonly brand: unique symbol }>()(
   S.Struct({
     kind: S.tag("stated"),
-    criterion: Definition.pipe(S.annotateKey({ description: "What makes two instances the same one" }))
-  }).pipe($I.annoteSchema("StatedIdentity", { description: "An identity criterion written out" }))
+    criterion: Definition.pipe(S.annotateKey({ description: "What makes two instances the same one" })),
+    restsOn: S.Array(PropertyKey.annotateKey({ description: "A property of the vocabulary the criterion reads" })).pipe(
+      S.annotateKey({
+        description: "The properties of the vocabulary the criterion reads (rule C16); empty, it reads none of them"
+      }),
+      S.withConstructorDefault(Effect.succeed([])),
+      S.withDecodingDefaultTypeKey(Effect.succeed([]))
+    )
+  }).pipe($I.annoteSchema("StatedIdentity", { description: "An identity criterion written out, with its basis" }))
 ) {}
 
 /** The class takes its identity criterion from its parent, which must then be a class of the same vocabulary. */
@@ -331,6 +343,18 @@ export const Evidence = LiteralKit(["fixture"]).pipe(
 /** Runtime type of {@link Evidence}. */
 export type Evidence = typeof Evidence.Type
 
+/**
+ * What kind of label a property's values are, when they are one that is given to a thing rather than one that tells
+ * it apart: a `name` people call it by, or an `email` address it is reached at. Two parties may share a name and one
+ * party may change its address, so no identity criterion may rest on such a property (rule C16, report 05's V18,
+ * decision 146). The property carries the fact, so the rule names no term of any vocabulary.
+ */
+export const Designation = LiteralKit(["name", "email"]).pipe(
+  $I.annoteSchema("Designation", { description: "A label no identity criterion may rest on: a name or an email" })
+)
+/** Runtime type of {@link Designation}. */
+export type Designation = typeof Designation.Type
+
 // ---------------------------------------------------------------------------------------------------------------
 // The terms
 // ---------------------------------------------------------------------------------------------------------------
@@ -369,18 +393,35 @@ const propertyFields = {
     S.annotateKey({ description: "Where it is shown in use when no record fills it" }),
     S.OptionFromOptionalKey,
     S.withConstructorDefault(Effect.succeedNone)
+  ),
+  designation: Designation.pipe(
+    S.annotateKey({
+      description:
+        "What kind of label its values are, a name or an email, which no criterion may rest on; absent, neither"
+    }),
+    S.OptionFromOptionalKey,
+    S.withConstructorDefault(Effect.succeedNone)
   )
 } as const
 
 /**
  * One OWL class: its one identity-bearing parent, the local categories it also falls under (decision 12), its kind
  * tag and its identity criterion. A category supplies no criterion, so a class tagged `category` states none and every
- * other class states or inherits one (rule C7).
+ * other class states or inherits one (rule C7). A class whose records store no id (decision 135) says so with
+ * `storesId`: a record of it names it on its own annotations alone, and the lift mints no node of it, since an IRI made
+ * from another record's id would say something nobody decided.
  */
 export class ClassTerm extends S.Opaque<ClassTerm, { readonly brand: unique symbol }>()(
   S.Struct({
     ...termFields,
     tag: KindTag.pipe(S.annotateKey({ description: "The category its instances fall under" })),
+    storesId: S.Boolean.pipe(
+      S.annotateKey({
+        description: "Whether its records store an id its IRIs are made from; absent, they do (decision 135)"
+      }),
+      S.withConstructorDefault(Effect.succeed(true)),
+      S.withDecodingDefaultTypeKey(Effect.succeed(true))
+    ),
     parent: ParentLink.pipe(S.annotateKey({ description: "Its one identity-bearing parent, or why it has none" })),
     categoryParents: S.Array(ClassKey.annotateKey({ description: "A local class tagged category" })).pipe(
       S.annotateKey({ description: "The local categories it also falls under, beside its one parent (decision 12)" }),

@@ -10,6 +10,10 @@
 // has a boolean field; each value its datatype does not write is planted and refused. The People page's `Person`
 // names no tenant, so its caller gives one beside the rows, and a tenant given to a record that names its own is
 // refused (PLAN, "Choices made").
+//
+// A class that stores no id (party slice, step 7; decision 135): on copies of the kernel's terms with one class's
+// records storing no id, the lift makes no node of it as a record, as a path's node or as a link's object, and the
+// same record lifts on a copy where another class stores none.
 import { describe, expect, it } from "@effect/vitest"
 import { assertSome } from "@effect/vitest/utils"
 import { Vocabulary } from "@beep/vocabulary/Model"
@@ -17,9 +21,10 @@ import { pointerFor } from "@beep/vocabulary/Pointer"
 import { RdfVocab } from "@beep/vocabulary/Rdf"
 import { Person } from "@inventory/access-contract/Person"
 import { Activity } from "@inventory/kernel/Activity"
-import { ActivityId, OrganizationId } from "@inventory/kernel/Ids"
+import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
+import { vocabulary as kernelTerms } from "@inventory/kernel/Terms"
 import { aboutClass, aboutPath, aboutProperty, noTerm } from "@inventory/kernel/TermsPointer"
 import { Instant } from "@inventory/kernel/Text"
 import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
@@ -456,6 +461,84 @@ describe("the thread's graph", () => {
       expect(blank).toHaveProperty("_tag", "TurtleRefused")
       const broken = yield* Effect.flip(graphOf(context, Member, threadRows, "<a> <b"))
       expect(broken).toHaveProperty("_tag", "TurtleRefused")
+    })
+  )
+})
+
+/** The thread's context on a copy of the kernel's terms where `local`'s records store no id (decision 135). */
+const storingNoId = Effect.fn("storingNoId")(function* (local: keyof typeof kernelTerms.classes) {
+  const context = yield* threadContext
+  const copy = yield* S.decodeEffect(Vocabulary, { onExcessProperty: "error", errors: "all" })({
+    ...kernelTerms,
+    classes: { ...kernelTerms.classes, [local]: { ...kernelTerms.classes[local], storesId: false } }
+  })
+  return { ...context, vocabulary: copy } satisfies LiftContext
+})
+
+/** An audit entry whose `actorId` links it to the member who acted, as `Activity`'s does. */
+const actedEntry = S.Struct({
+  id: ActivityId.pipe(S.annotateKey(aboutClass("inv:AuditEntry"))),
+  organizationId: OrganizationId.pipe(S.annotateKey(aboutProperty("inv:inTenant"))),
+  actorId: MemberId.pipe(S.annotateKey(aboutProperty("inv:recordedActor")))
+}).pipe(S.annotate(aboutClass("inv:AuditEntry")))
+
+const actedValue = S.decodeEffect(actedEntry)({
+  id: entryId,
+  organizationId: "test_ExampleWorks",
+  actorId: "test_RaviWorks"
+})
+
+describe("a class that stores no id (decision 135)", () => {
+  it.effect("refuses a Member once Member stores no id, naming no field", () =>
+    Effect.gen(function* () {
+      const context = yield* storingNoId("Member")
+      const member = yield* ravi
+      const refusal = yield* Effect.flip(lift(context, Member, member))
+      expect(refusal.field).toStrictEqual(O.none())
+      expect(refusal.reason).toContain("Member stores no id")
+    })
+  )
+
+  it.effect("near miss: the same Member lifts its six triples where Person stores no id", () =>
+    Effect.gen(function* () {
+      const context = yield* storingNoId("Person")
+      const member = yield* ravi
+      const { lifted } = yield* names
+      const triples = yield* lift(context, Member, member)
+      expect(linesOf(triples)).toStrictEqual(linesOf(lifted("test_ExampleWorks", "test_RaviWorks", "admin")))
+    })
+  )
+
+  it.effect("refuses the Member's role once Grant, its path's node, stores no id", () =>
+    Effect.gen(function* () {
+      const context = yield* storingNoId("Grant")
+      const member = yield* ravi
+      const refusal = yield* Effect.flip(lift(context, Member, member))
+      expect(refusal.field).toStrictEqual(O.some("role"))
+      expect(refusal.reason).toContain("inv:Grant stores no id")
+    })
+  )
+
+  it.effect("refuses an audit entry's actor once Member, the link's object, stores no id", () =>
+    Effect.gen(function* () {
+      const context = yield* storingNoId("Member")
+      const value = yield* actedValue
+      const refusal = yield* Effect.flip(lift(context, actedEntry, value))
+      expect(refusal.field).toStrictEqual(O.some("actorId"))
+      expect(refusal.reason).toContain("ranges over Member, which stores no id")
+    })
+  )
+
+  it.effect("near miss: the same entry links its actor where Grant stores no id", () =>
+    Effect.gen(function* () {
+      const context = yield* storingNoId("Grant")
+      const value = yield* actedValue
+      const { inv, data } = yield* names
+      const { entry, head } = yield* entryNames
+      const triples = yield* lift(context, actedEntry, value)
+      expect(linesOf(triples)).toStrictEqual(
+        linesOf([...head, link(entry, inv("recordedActor"), data("test_ExampleWorks", "Member", "test_RaviWorks"))])
+      )
     })
   )
 })

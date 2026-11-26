@@ -20,7 +20,7 @@ const effectRead = (text: string) =>
   Stream.make(text).pipe(
     Stream.pipeThroughChannel(EffectCsv.decodeString()),
     Stream.runCollect,
-    Effect.map((rows) => A.map(rows, (row) => [...(row as ReadonlyArray<string>)])),
+    Effect.map((rows) => A.map(rows, (row) => [...row])),
     Effect.result
   )
 

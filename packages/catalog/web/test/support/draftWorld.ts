@@ -1713,9 +1713,10 @@ const enabledIn = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command
     when(world.current.late.length > 0, C.OtherAnswerArrives.make({})),
     when(draft.onScreen, C.Leave.make({})),
     when(!draft.onScreen, C.ComeBack.make({}), C.ComeBackQuickly.make({})),
-    A.flatMap(R.keys(draft.lines), (row) =>
-      A.map(["theirs", "first", "second"] as const, (which): Command => C.Settle.make({ row: row as "a", which }))
-    ),
+    A.flatMap(R.keys(draft.lines), (row) => {
+      if (!S.is(Row)(row)) return []
+      return A.map(["theirs", "first", "second"] as const, (which): Command => C.Settle.make({ row, which }))
+    }),
     when(R.keys(draft.lines).length > 1, C.SettleAll.make({ which: "theirs" }), C.SettleAll.make({ which: "first" })),
     when(may.tabs, C.Reload.make({})),
     may.tabs ? each(unanswered, (which) => C.SaveSignedOut.make({ which })) : [],

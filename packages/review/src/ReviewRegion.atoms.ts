@@ -275,11 +275,18 @@ const facetsOf = (
       const value = TotalCells.text(view.cells, column.id)
       const key = keyOf(value)
       if (key === "") continue
-      const entry = O.getOrElse(MutableHashMap.get(found, key), () => ({
-        values: MutableHashSet.empty<string>(),
-        n: 0,
-        spellings: {} as Record<string, number>
-      }))
+      const entry = O.getOrElse(
+        MutableHashMap.get(found, key),
+        (): {
+          readonly values: MutableHashSet.MutableHashSet<string>
+          readonly n: number
+          readonly spellings: Record<string, number>
+        } => ({
+          values: MutableHashSet.empty<string>(),
+          n: 0,
+          spellings: {}
+        })
+      )
       MutableHashSet.add(entry.values, value)
       const spelling = value.trim()
       entry.spellings[spelling] = (entry.spellings[spelling] ?? 0) + 1

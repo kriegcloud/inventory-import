@@ -24,7 +24,7 @@ describe("the reader's warnings shown on the Review step", () => {
       const rows =
         row(2, `<c r="C2" s="1"><v>4</v></c><c r="D2" t="s"><v>900</v></c>`) + row(3, `<c r="C3" s="1"><v>5</v></c>`)
       const bytes = yield* built({ ...workbookStart, sheet: sheetOf(heading + rows), codes: ["# ?/?"] })
-      const table = yield* staged(new File([bytes as Uint8Array<ArrayBuffer>], "stock.xlsx"))
+      const table = yield* staged(new File([new Uint8Array(bytes)], "stock.xlsx"))
       expect(kinds(table.notes)).toEqual(["unreadableCells", "formatNotShown"])
       const warnings = readerWarnings(table)
       expect(kinds(warnings)).toEqual(["unreadableCells"])

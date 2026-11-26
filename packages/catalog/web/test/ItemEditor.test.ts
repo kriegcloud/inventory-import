@@ -1,3 +1,4 @@
+import { emptyFacets } from "./support/catalog.ts"
 import { ItemId } from "@inventory/catalog-contract/Ids"
 // One item's save, after the row that pressed it has left the screen. A save runs to its end whatever happens to its
 // row, so two things must outlive the row: that a save of the item is out (or the row that comes back offers Edit on
@@ -20,7 +21,7 @@ import { vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
-import { type ItemEdit, StoredItem, active } from "@inventory/catalog-contract/Item"
+import { ItemEdit, StoredItem, active } from "@inventory/catalog-contract/Item"
 import { ItemChanged } from "@inventory/catalog-contract/Catalog"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import type { ItemForm } from "@inventory/catalog-model/ItemEdit"
@@ -33,12 +34,12 @@ import { registryFor, registryStart } from "./support/catalog.ts"
 const page = vi.hoisted(() => {
   const state = {
     drawn: false,
-    went: [] as Array<string>,
-    toasts: [] as Array<{
+    went: Array<string>(),
+    toasts: Array<{
       readonly title: string
       readonly description: O.Option<string>
       readonly again: O.Option<() => void>
-    }>
+    }>()
   }
   Object.assign(globalThis, {
     document: { cookie: "", querySelector: () => (state.drawn ? {} : null) },
@@ -110,7 +111,7 @@ const typed: ItemForm = {
   firstReceivedOn: "",
   discontinuedOn: ""
 }
-const edit = { name: "Hex bolt M6 × 16", revision: 3 } as unknown as ItemEdit
+const edit = ItemEdit.make({ ...item, name: "Hex bolt M6 × 16", revision: 3 })
 const save = { base: item, edit, form: typed }
 
 /** What the server refuses a save with: a role taken away, or someone else's save in between. */
@@ -129,7 +130,7 @@ const world = () => {
           return Deferred.await(answer)
         },
         page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
-        facets: () => Effect.succeed({})
+        facets: () => Effect.succeed(emptyFacets)
       }
     },
     idleTTL: O.some(20)
@@ -271,7 +272,7 @@ describe("an item edited again after its save has answered, before the table is 
                 ? Effect.succeed(pageOf(server.stored))
                 : Deferred.await(late).pipe(Effect.map(() => pageOf(server.stored)))
             },
-            facets: () => Effect.succeed({})
+            facets: () => Effect.succeed(emptyFacets)
           }
         }
       })
@@ -312,7 +313,7 @@ describe("an item edited again after its save has answered, before the table is 
         Closed: () => Effect.die("the test opened the editor"),
         Open: (editor) => Effect.succeed(editor.base)
       })
-      const again = { name: "Hex bolt M6 × 20", revision: base.revision } as unknown as ItemEdit
+      const again = ItemEdit.make({ ...base, name: "Hex bolt M6 × 20", revision: base.revision })
       registry.set(editItem(itemId), { base, edit: again, form: typed })
       yield* Effect.sleep("20 millis")
 
@@ -350,7 +351,7 @@ describe("an open editor and the server's answers to the item saves", () => {
             items: {
               edit: () => Effect.succeed({ ...item, revision: 4 }),
               page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
-              facets: () => Effect.succeed({})
+              facets: () => Effect.succeed(emptyFacets)
             }
           },
           signedIn: O.some(who)
@@ -409,7 +410,7 @@ describe("an open editor and the server's answers to the item saves", () => {
                 Forbidden.make({ reason: "Your role is viewer, and saving an item needs editor.", required: "editor" })
               ),
             page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
-            facets: () => Effect.succeed({})
+            facets: () => Effect.succeed(emptyFacets)
           }
         },
         signedIn: O.some(who)
@@ -453,7 +454,7 @@ describe("the answer of an item's last save", () => {
           items: {
             edit: () => Effect.succeed({ ...item, revision: 4 }),
             page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
-            facets: () => Effect.succeed({})
+            facets: () => Effect.succeed(emptyFacets)
           }
         },
         signedIn: O.some(who),

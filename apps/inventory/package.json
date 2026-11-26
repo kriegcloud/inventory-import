@@ -38,6 +38,7 @@
     "@beep/d1": "workspace:*",
     "@beep/openrouter": "workspace:*",
     "@beep/schema": "workspace:*",
+    "@beep/unsafe-assert": "workspace:*",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/modifiers": "catalog:",
     "@dnd-kit/sortable": "catalog:",

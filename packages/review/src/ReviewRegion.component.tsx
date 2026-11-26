@@ -1,6 +1,6 @@
+import * as S from "effect/Schema"
 import { platform, byId } from "./internal/browser.ts"
 import { ColumnMatch } from "@inventory/review/ReviewTypes"
-import type { Column } from "@tanstack/react-table"
 import {
   CheckIcon,
   CircleHelpIcon,
@@ -33,7 +33,6 @@ import {
 } from "@inventory/ui/components/alert-dialog"
 import { Button } from "@inventory/ui/components/button"
 import { DataTableFacetedFilter } from "@inventory/ui/components/data-table/data-table-faceted-filter"
-import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { DataTableViewOptions } from "@inventory/ui/components/data-table/data-table-view-options"
 import {
   DropdownMenu,
@@ -58,7 +57,7 @@ import { GridScope, ReviewGrid } from "./internal/ReviewGrid.tsx"
 import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
 import {
-  type Density,
+  Density,
   density as keptDensity,
   type Region,
   type RegionInput,
@@ -67,7 +66,7 @@ import {
   type RegionUi,
   TableScope
 } from "./ReviewRegion.atoms.ts"
-import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
+import { FilterId, type Activity, type ReviewRegionProps, type RowView } from "@inventory/review/ReviewTypes"
 
 // Each union's own guard, made once: these run for every row and every cell.
 const isColumnMatchUnmatched = ColumnMatch.guards.unmatched
@@ -495,7 +494,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
       aria-label="Show"
       value={filter === "auto" ? "" : filter}
       onValueChange={(next) => {
-        if (next !== "") chooseFilter(next as FilterId)
+        if (S.is(FilterId)(next)) chooseFilter(next)
       }}
       // On a phone the tabs stand apart and wrap onto a second line: every one is on screen, none past its edge.
       {...(narrow ? { spacing: 1, className: "w-full flex-wrap" } : {})}
@@ -552,27 +551,30 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
   const filterMenu =
     facets.length === 0 ? null : (
       <>
-        {facets.map((facet) => (
-          <DataTableFacetedFilter
-            key={facet.column.id}
-            column={
-              {
-                id: facet.column.id,
-                table,
-                columnDef: { meta: { label: facet.column.label } },
-                getFilterValue: () => facet.picked,
-                setFilterValue: (next: unknown) =>
-                  setFacetPicked((before) => ({
-                    ...before,
-                    [facet.column.id]: Array.isArray(next) ? (next as ReadonlyArray<string>) : []
-                  }))
-              } as unknown as Column<DataTableFeatures, RowView, string>
-            }
-            title={facet.column.label}
-            options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
-            multiple
-          />
-        ))}
+        {facets.map((facet) =>
+          O.match(O.fromUndefinedOr(table.getColumn(facet.column.id)), {
+            onNone: () => null,
+            onSome: (column) => (
+              <DataTableFacetedFilter
+                key={facet.column.id}
+                column={{
+                  ...column,
+                  getFilterValue: () => facet.picked,
+                  setFilterValue: (next: unknown) =>
+                    setFacetPicked((before) => ({
+                      ...before,
+                      [facet.column.id]: Array.isArray(next)
+                        ? A.filter(next, (value): value is string => typeof value === "string")
+                        : []
+                    }))
+                }}
+                title={facet.column.label}
+                options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
+                multiple
+              />
+            )
+          })
+        )}
       </>
     )
 
@@ -589,7 +591,12 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
         <TooltipContent>Row height</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={density} onValueChange={(next) => chooseDensity(next as Density)}>
+        <DropdownMenuRadioGroup
+          value={density}
+          onValueChange={(next) => {
+            if (S.is(Density)(next)) chooseDensity(next)
+          }}
+        >
           <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>

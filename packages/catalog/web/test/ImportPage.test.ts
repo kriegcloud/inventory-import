@@ -1,3 +1,4 @@
+import { emptyTable } from "./support/catalog.ts"
 // What the import page draws of an import its address names, and what it follows while it is drawn. A read that failed
 // with an answer from before keeps the step drawn (the same one, with whatever is typed in it) under a line that says
 // so; only a first read that failed, or an import found gone, takes its place. What could not be read is read again by
@@ -79,7 +80,7 @@ const world = (first: Effect.Effect<ImportView, Refusal>) => {
             server.current = { ...server.current, reads: server.current.reads + 1 }
             return Effect.sleep("2 millis").pipe(Effect.andThen(server.current.answer))
           }),
-        table: () => Effect.succeed({ rows: [] })
+        table: () => Effect.succeed(emptyTable)
       }
     },
     signedIn: O.some(session.signedIn),

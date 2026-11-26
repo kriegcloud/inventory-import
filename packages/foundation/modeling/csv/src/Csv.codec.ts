@@ -361,8 +361,8 @@ const decodeStringChannel = <IE, Done>(
   Channel.identity<A.NonEmptyReadonlyArray<string>, IE, Done>().pipe(
     Channel.mapAccum(
       (): Pending => ({ phase: "buffering", buffer: "", first: true }),
-      (pending, chunks: A.NonEmptyReadonlyArray<string>) =>
-        stepText(pending, A.join(chunks, ""), options) as readonly [Pending, ReadonlyArray<Emitted>],
+      (pending, chunks: A.NonEmptyReadonlyArray<string>): readonly [Pending, ReadonlyArray<Emitted>] =>
+        stepText(pending, A.join(chunks, ""), options),
       { onHalt: (pending) => [...haltText(pending, options)] }
     ),
     Channel.mapEffect(failOnError)
@@ -505,8 +505,8 @@ const bytesToText = <IE, Done>(
       (pending, chunks: A.NonEmptyReadonlyArray<Uint8Array>) =>
         A.reduce(
           chunks,
-          [pending, [] as ReadonlyArray<Text>] as readonly [BytesPending, ReadonlyArray<Text>],
-          (acc, chunk) => {
+          [pending, A.empty<Text>()],
+          (acc: readonly [BytesPending, ReadonlyArray<Text>], chunk): readonly [BytesPending, ReadonlyArray<Text>] => {
             const [next, texts] = stepBytes(acc[0], chunk, options)
             return [next, [...acc[1], ...texts]] as const
           }
@@ -534,7 +534,7 @@ const encodeStringChannel = <IE, Done>(
         onHalt: (first) => (!first && options.finalTerminator ? [options.terminator === "CRLF" ? "\r\n" : "\n"] : [])
       }
     ),
-    Channel.map((text) => A.of(text) as A.NonEmptyReadonlyArray<string>)
+    Channel.map((text) => A.of(text))
   )
 
 // ── the facade ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -666,10 +666,7 @@ export class Csv {
           decode: (text: string) =>
             Effect.flatMap(tableFromText(text, options), (table) =>
               Effect.mapError(Effect.fromResult(toHeaderRows(table)), (fatals) =>
-                issue(
-                  CsvParseError.make({ diagnostics: A.isReadonlyArrayNonEmpty(fatals) ? fatals : ([] as never) }),
-                  text
-                )
+                issue(CsvParseError.make({ diagnostics: fatals }), text)
               )
             ),
           encode: (rows: ReadonlyArray<HeaderRow>) => {
@@ -750,7 +747,7 @@ export class Csv {
       Done,
       Row["DecodingServices"]
     > => {
-      const decodeRows = S.decodeUnknownEffect(S.Array(row))
+      const decodeRows = S.decodeUnknownEffect(S.NonEmptyArray(row))
       return Csv.decode<IE, Done>(options).pipe(
         Channel.mapAccum(
           (): O.Option<CsvRecord> => O.none(),
@@ -766,11 +763,11 @@ export class Csv {
           Effect.flatMap(
             Effect.fromResult(
               Result.mapError(toHeaderRows({ records: [header, ...A.map(body, (s) => s.cells)] }), (fatals) =>
-                CsvParseError.make({ diagnostics: fatals as A.NonEmptyReadonlyArray<CsvFatal> })
+                CsvParseError.make({ diagnostics: fatals })
               )
             ),
             (rows) => decodeRows(rows)
-          ).pipe(Effect.map((rows) => rows as A.NonEmptyReadonlyArray<Row["Type"]>))
+          )
         )
       )
     }
@@ -787,9 +784,7 @@ export class Csv {
   static encode<IE = never, Done = unknown>(
     options: CsvWriteOptions
   ): Channel.Channel<A.NonEmptyReadonlyArray<Uint8Array>, IE, Done, A.NonEmptyReadonlyArray<CsvRecord>, IE, Done> {
-    return encodeStringChannel<IE, Done>(options).pipe(
-      Channel.map((texts) => A.map(texts, encodeUtf8) as A.NonEmptyReadonlyArray<Uint8Array>)
-    )
+    return encodeStringChannel<IE, Done>(options).pipe(Channel.map((texts) => A.map(texts, encodeUtf8)))
   }
 
   /** The delimiter detected from a sample, or none. */

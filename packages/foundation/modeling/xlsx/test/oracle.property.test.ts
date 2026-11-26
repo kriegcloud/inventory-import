@@ -29,7 +29,7 @@ import { XlsxRow, XlsxSheetInfo, XlsxSheetState, XlsxWorkbook, XlsxWorksheet } f
 const runs = { arbitrary: { runs: 100 } }
 // What SheetJS shows for a value under a format: nothing where SheetJS refuses the format.
 const formatted = (code: string, value: number, date1904: boolean): O.Option<string> =>
-  O.liftThrowable(() => SSF.format(code, value, { date1904 }) as string)()
+  O.flatMap(O.liftThrowable((): unknown => SSF.format(code, value, { date1904 }))(), S.decodeUnknownOption(S.String))
 
 // Text a spreadsheet would hold: printable, since SheetJS does not keep every control character.
 const Words = S.String.check(S.isPattern(/^[ -~]{0,40}$/))
@@ -150,7 +150,7 @@ const gridOf = (sheet: WorkSheet | undefined) =>
     {
       onNone: A.empty,
       onSome: (data) =>
-        A.map([...(data as ReadonlyArray<ReadonlyArray<CellObject | undefined> | null | undefined>)], (row) =>
+        A.map([...data], (row) =>
           O.match(O.fromNullishOr(row), {
             onNone: A.empty,
             onSome: (cells) => A.getSomes(A.map([...cells], fromSheetJs))
@@ -224,9 +224,10 @@ describe("the package reads what SheetJS writes", () => {
             Hidden: index === 0 || book.state === "visible" ? 0 : book.state === "hidden" ? 1 : 2
           }))
         }
-        const bytes = new Uint8Array(
-          write(theirs, { type: "array", bookType: "xlsx", compression: true }) as ArrayBuffer
+        const buffer = yield* S.decodeUnknownEffect(S.instanceOf(ArrayBuffer))(
+          write(theirs, { type: "array", bookType: "xlsx", compression: true })
         )
+        const bytes = new Uint8Array(buffer)
         const found = yield* Xlsx.parse(bytes, large)
         expect(S.is(XlsxWorkbook)(found.workbook)).toBe(true)
         expect(found.workbook.dateSystem).toBe(book.dateSystem)

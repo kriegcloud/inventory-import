@@ -48,8 +48,8 @@ import {
   weakGuess,
   whyWords
 } from "@inventory/review/ReviewDraft"
-import { Choice } from "@inventory/review/ReviewTypes"
-import type { ReviewRow, ReviewState, SavedDecisions } from "@inventory/review/ReviewTypes"
+import { Choice, SavedDecisions } from "@inventory/review/ReviewTypes"
+import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
 import { columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
 import { lineColumns, lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./fixtures/jobs.ts"
 
@@ -566,10 +566,11 @@ describe("the approved standards", () => {
             recheck: O.some(recheck)
           }).state
       )
-      const Json = S.fromJsonString(S.Unknown)
+      const Json = S.fromJsonString(SavedDecisions)
       const text = yield* S.encodeEffect(Json)(saved(state))
       expect(typeof text).toBe("string")
-      const back = restored((yield* S.decodeEffect(Json)(text)) as SavedDecisions)
+      const decoded = yield* S.decodeEffect(Json)(text)
+      const back = restored(decoded)
       const shape = (given: ReviewState) =>
         A.map(views(given), (view) => [
           view.row.id,

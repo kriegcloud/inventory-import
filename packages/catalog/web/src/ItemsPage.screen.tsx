@@ -7,7 +7,7 @@ import * as Num from "effect/Number"
 import * as Order from "effect/Order"
 import { type Column, createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
-import { type ComponentType, lazy, Suspense } from "react"
+import { lazy, Suspense } from "react"
 import { Code } from "@inventory/ui/Code"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
@@ -49,15 +49,14 @@ import { wordsLeftOut } from "@inventory/catalog-model/ItemSearch"
 // The sort and filter menus carry a calendar, a date library and drag-and-drop for reordering: more code than the
 // rest of the page. They are fetched after the table is drawn; until then each is its own button, the same size and
 // words, switched off, so nothing moves when it arrives.
-type MenuProps = { readonly table: ReactTable<DataTableFeatures, StoredItem, unknown>; readonly align: "end" }
 const DataTableSortMenu = lazy(() =>
   import("@inventory/ui/components/data-table/data-table-sort-menu").then((module) => ({
-    default: module.DataTableSortMenu as ComponentType<MenuProps>
+    default: module.DataTableSortMenu<StoredItem>
   }))
 )
 const DataTableFilterMenu = lazy(() =>
   import("@inventory/ui/components/data-table/data-table-filter-menu").then((module) => ({
-    default: module.DataTableFilterMenu as ComponentType<MenuProps>
+    default: module.DataTableFilterMenu<StoredItem>
   }))
 )
 
@@ -110,7 +109,7 @@ const widths = {
   createdAt: [180, O.some(1)]
 } as const satisfies Record<string, readonly [number, O.Option<number>]>
 type ColumnId = keyof typeof widths
-const columnIds = Object.keys(widths) as ReadonlyArray<ColumnId>
+const columnIds = R.keys(widths)
 const editWidth = 48
 /** The page's two gutters and the table's frame, beside the columns. */
 const aroundTable = 74
@@ -604,7 +603,10 @@ const flagOptions = (listed: Counted) =>
  * from the column it is given; the two toolbar filters read theirs from `quickFilterOptions` instead. Each column here
  * is the column made once with another meta: its cell, its heading and its pencil are the same components.
  */
-const withFilterValues = (columns: typeof editorColumns, found: Found): typeof editorColumns => {
+const withFilterValues = (
+  columns: ReadonlyArray<(typeof editorColumns)[number]>,
+  found: Found
+): ReadonlyArray<(typeof editorColumns)[number]> => {
   const values: Readonly<Record<string, object>> = {
     category: { options: options(O.map(found, (facets) => facets.category)) },
     uom: { options: options(O.map(found, (facets) => facets.uom)) },
@@ -614,13 +616,14 @@ const withFilterValues = (columns: typeof editorColumns, found: Found): typeof e
     unitCost: range(O.map(found, (facets) => facets.unitCost)),
     quantityOnHand: range(O.map(found, (facets) => facets.quantityOnHand))
   }
-  return A.map(columns, (column) => {
+  const withValues = <C extends (typeof editorColumns)[number]>(column: C): C => {
     const extra = O.flatMap(O.fromUndefinedOr(column.id), (id) => R.get<string, object>(values, id))
     return O.match(extra, {
       onNone: () => column,
       onSome: (extra) => ({ ...column, meta: { ...column.meta, ...extra } })
     })
-  }) as typeof editorColumns
+  }
+  return A.map(columns, withValues)
 }
 
 /**
@@ -709,7 +712,7 @@ export function ItemsPage() {
   const kept = useAtomValue(keptColumns)
   const catalog = useAtomValue(itemsCatalogAtom)
   const { table } = useDataTable({
-    data: rows as Array<StoredItem>,
+    data: A.fromIterable(rows),
     columns,
     config,
     pageCount: O.getOrElse(

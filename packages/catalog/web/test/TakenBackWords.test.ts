@@ -17,7 +17,7 @@ import {
   type SaveRequest,
   type DecidedSince
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -44,7 +44,7 @@ const page = vi.hoisted(() => {
       location: { pathname: "/", search: "" }
     }
   })
-  return { said: [] as Array<string> }
+  return { said: Array<string>() }
 })
 vi.mock("sonner", () => {
   const say = (title: string, more?: { readonly description?: string }) =>

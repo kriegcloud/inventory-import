@@ -9,22 +9,32 @@ import * as S from "effect/Schema"
 import { ViewChange } from "@inventory/catalog-contract/TableView"
 import type { CatalogColumn, ColumnCatalog, ViewOperator } from "@inventory/catalog-contract/TableView"
 const Sort = S.Struct({ id: S.String, desc: S.Boolean })
-const FilterItem = S.Struct({
+export const ViewFilter = S.Struct({
   id: S.String,
   value: S.Union([S.String, S.Array(S.String)]).pipe(S.withConstructorDefault(Effect.succeed(""))),
-  variant: S.String.pipe(S.withConstructorDefault(Effect.succeed("text"))),
-  operator: S.String,
+  variant: S.Literals(["boolean", "date", "number", "select", "text"]).pipe(
+    S.withConstructorDefault(Effect.succeed("text" as const))
+  ),
+  operator: S.Literals([
+    "eq",
+    "gt",
+    "gte",
+    "iLike",
+    "inArray",
+    "isBetween",
+    "isEmpty",
+    "isNotEmpty",
+    "lt",
+    "lte",
+    "ne",
+    "notILike",
+    "notInArray"
+  ]),
   filterId: S.String
 })
 
 /** A filter as the data table holds it. */
-export type ViewFilter = {
-  readonly id: string
-  readonly value: string | ReadonlyArray<string>
-  readonly variant: string
-  readonly operator: string
-  readonly filterId: string
-}
+export type ViewFilter = typeof ViewFilter.Type
 
 /** The parts of a table's state the assistant may change. A column missing from `visibility` is shown. */
 export type ViewState = {
@@ -38,8 +48,8 @@ export type ViewState = {
 export const Patch = S.Struct({
   sorting: Sort.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
   column: S.String.pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
-  columnFilters: FilterItem.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
-  filters: FilterItem.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  columnFilters: ViewFilter.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  filters: ViewFilter.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
   visibility: S.Record(S.String, S.Boolean).pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
   search: S.String.pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone))
 })
@@ -138,16 +148,16 @@ export const applyChange = (input: {
     }),
     filter: (change) => {
       const column = A.findFirst(columns, (c) => c.id === change.column)
-      const initial = FilterItem.make({ id: change.column, operator: change.operator, filterId: `${change.column}-0` })
+      const initial = ViewFilter.make({ id: change.column, operator: change.operator, filterId: `${change.column}-0` })
       const typed = O.match(column, {
         onNone: () => initial,
-        onSome: (column) => FilterItem.make({ ...initial, variant: column.type })
+        onSome: (column) => ViewFilter.make({ ...initial, variant: column.type })
       })
       const filter = O.exists(column, (column) => column.type === "select")
-        ? FilterItem.make({ ...typed, value: change.values })
+        ? ViewFilter.make({ ...typed, value: change.values })
         : O.match(A.head(change.values), {
             onNone: () => typed,
-            onSome: (value) => FilterItem.make({ ...typed, value })
+            onSome: (value) => ViewFilter.make({ ...typed, value })
           })
       const others = A.filter(state.filters, (f) => f.id !== change.column)
       return {

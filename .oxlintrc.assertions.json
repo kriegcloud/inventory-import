@@ -102,48 +102,8 @@
       "rules": { "typescript/consistent-type-assertions": "off" }
     },
     {
-      // Files that hold an assertion today. This list may only shrink: each owner takes a file off when its last
-      // assertion is gone.
-      "files": [
-        "apps/inventory/vite.config.ts",
-        "packages/access/web/src/People.screen.tsx",
-        "packages/catalog/web/src/internal/CellForms.tsx",
-        "packages/catalog/web/src/ItemsPage.screen.tsx",
-        "packages/catalog/web/src/TableAssistant.screen.tsx",
-        "packages/catalog/web/test/ConfirmDraft.test.ts",
-        "packages/catalog/web/test/DraftLines.test.ts",
-        "packages/catalog/web/test/DraftPicks.test.ts",
-        "packages/catalog/web/test/DraftRegion.test.ts",
-        "packages/catalog/web/test/DraftServer.test.ts",
-        "packages/catalog/web/test/ItemEditor.test.ts",
-        "packages/catalog/web/test/KeptRows.test.ts",
-        "packages/catalog/web/test/readerWarnings.test.ts",
-        "packages/catalog/web/test/RemoveImport.test.ts",
-        "packages/catalog/web/test/ResultRows.test.ts",
-        "packages/catalog/web/test/ReviewDraft.test.ts",
-        "packages/catalog/web/test/support/catalog.ts",
-        "packages/catalog/web/test/support/draftWorld.ts",
-        "packages/catalog/web/test/TabRows.test.ts",
-        "packages/catalog/web/test/TakenBackWords.test.ts",
-        "packages/catalog/web/test/UploadOwner.test.ts",
-        "packages/client/src/Api.atoms.ts",
-        "packages/client/src/ApiRuntime.runtime.ts",
-        "packages/foundation/modeling/csv/src/Csv.codec.ts",
-        "packages/foundation/modeling/csv/test/CsvSchemas.property.test.ts",
-        "packages/foundation/modeling/csv/test/oracle.property.test.ts",
-        "packages/foundation/modeling/xlsx/src/internal/trusted.ts",
-        "packages/foundation/modeling/xlsx/test/oracle.property.test.ts",
-        "packages/foundation/modeling/xlsx/test/XlsxSchemas.property.test.ts",
-        "packages/review/src/ReviewRegion.atoms.ts",
-        "packages/review/src/ReviewRegion.component.tsx",
-        "packages/review/test/fixtures/fabrication.ts",
-        "packages/review/test/ReviewDecision.property.test.ts",
-        "packages/review/test/ReviewRegion.atoms.test.ts",
-        "packages/review/test/Review.test.ts",
-        "packages/review/test/SavedProgress.test.ts",
-        "packages/ui/src/ListTable.component.tsx",
-        "packages/ui/src/TableSearch.component.tsx"
-      ],
+      // The sole assertion written here: a documented compiler claim for library typing gaps.
+      "files": ["packages/foundation/typing/unsafe-assert/src/unsafeAssert.ts"],
       "rules": { "typescript/consistent-type-assertions": "off" }
     }
   ]

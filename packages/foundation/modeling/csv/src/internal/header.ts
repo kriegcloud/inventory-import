@@ -14,7 +14,7 @@ export type HeaderRow = { readonly [name: string]: string }
 /** The table as objects keyed by its first record, or the fatal findings about the header. */
 export const toHeaderRows = (table: {
   readonly records: ReadonlyArray<CsvRecord>
-}): Result.Result<ReadonlyArray<HeaderRow>, ReadonlyArray<CsvFatal>> =>
+}): Result.Result<ReadonlyArray<HeaderRow>, A.NonEmptyReadonlyArray<CsvFatal>> =>
   O.match(A.head(table.records), {
     onNone: () => Result.succeed([]),
     onSome: (header) => {
@@ -29,7 +29,7 @@ export const toHeaderRows = (table: {
           problems.push(CsvFatal.make({ finding: DuplicateHeader.make({ field, firstField, name }) }))
         }
       })
-      if (problems.length > 0) return Result.fail(problems)
+      if (A.isReadonlyArrayNonEmpty(problems)) return Result.fail(problems)
       return Result.succeed(
         A.map(A.drop(table.records, 1), (record) =>
           R.fromEntries(A.map(header, (name, index): readonly [string, string] => [name, record[index] ?? ""]))

@@ -1,3 +1,5 @@
+import * as DateTime from "effect/DateTime"
+import { ImportResult, RowOutcome } from "@inventory/catalog-contract/Import"
 import { assertTrue } from "@effect/vitest/utils"
 // A confirm, wired to the import's read and to the server, without the screen. The machine (`Draft.machine.ts`) says
 // when a confirm goes and what it carries; what is held here is that the request is that and nothing more (the
@@ -19,7 +21,7 @@ import {
   type SaveRequest,
   type DecidedSince
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack, AlreadyImported, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -37,7 +39,7 @@ import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
 // The page: where the person is taken, and what is said to them.
 const page = vi.hoisted(() => {
-  const state = { went: [] as Array<string>, said: [] as Array<string> }
+  const state = { went: Array<string>(), said: Array<string>() }
   Object.assign(globalThis, {
     window: {
       addEventListener: () => undefined,
@@ -207,7 +209,21 @@ describe("a confirm", () => {
         t.press()
         yield* settle
         expect([O.map(A.last(t.sent()), (sent) => sent.revision), t.heldBack()]).toEqual([O.some(11), O.none()])
-        const result = { created: 3 } as unknown as ImportView["result"]
+        const result = O.some(
+          ImportResult.make({
+            importedBy: "Dana Whitfield",
+            importedAt: DateTime.makeUnsafe("2026-11-19T05:06:15.445Z"),
+            created: 3,
+            updated: 0,
+            already: 0,
+            notImported: 0,
+            takenBack: 0,
+            fixed: { rows: 0, cells: 0 },
+            rows: A.map([1, 2, 3], (rowNumber) =>
+              RowOutcome.cases.created.make({ rowNumber, part: O.none(), sku: `SKU-${rowNumber}`, name: "Bolt" })
+            )
+          })
+        )
         const requiredEntry3 = A.get(t.confirms, 1)
         assertTrue(O.isSome(requiredEntry3), "expected t.confirms[1]")
         yield* Deferred.succeed(requiredEntry3.value.answer, t.at({ revision: 12, status: "imported", result }))

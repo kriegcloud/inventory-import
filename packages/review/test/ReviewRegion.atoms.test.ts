@@ -1,3 +1,4 @@
+import { unsafeAssert } from "@beep/unsafe-assert"
 import * as S from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { assertDefined, assertTrue } from "@effect/vitest/utils"
@@ -64,11 +65,13 @@ const page = vi.hoisted(() => {
     HTMLElement: class {},
     requestAnimationFrame: (next: () => void) => frames.push(next)
   })
+  const toasts: Array<{ readonly id: number; readonly label: string; readonly undo: () => void }> = []
+  const dismissed: Array<unknown> = []
   return {
     keys,
     frames,
-    toasts: [] as Array<{ readonly id: number; readonly label: string; readonly undo: () => void }>,
-    dismissed: [] as Array<unknown>
+    toasts,
+    dismissed
   }
 })
 vi.mock("sonner", () => ({
@@ -112,7 +115,7 @@ const press = (key: string, held: { readonly ctrl: boolean; readonly shift: bool
 }
 
 /** A node to hand the region's section callback: the region only asks whether it was given one. */
-const node = {} as HTMLElement
+const node = new HTMLElement()
 
 /** One region in a registry of its own, with the caller's decisions atom counting every write it is sent. */
 const SearchName = S.String.pipe(S.decodeTo(S.String, SchemaTransformation.toLowerCase()))
@@ -166,8 +169,9 @@ const world = (given: { readonly kinds: ReadonlyArray<ProblemKind>; readonly row
   const features = {
     coreReactivityFeature: renderPhaseReactivity({ createAtom, batch }),
     ...dataTableFeatures
-  } as typeof dataTableFeatures
-  const state = { sorting: [] as SortingState, globalFilter: "" }
+  }
+  const sorting: SortingState = []
+  const state = { sorting, globalFilter: "" }
   const options = () => ({
     features,
     data: registry.get(region.tableData),
@@ -274,7 +278,9 @@ describe("the review region's atoms", () => {
     at.regionTable.run({ type: "undo" as const }, O.none())
     expect(at.needs()).toBe(before)
     expect(at.told).toHaveLength(2)
-    expect(saved(at.told[1] as ReviewState)).toEqual(start)
+    const told = at.told[1]
+    assertDefined(told)
+    expect(saved(told)).toEqual(start)
 
     at.regionTable.run({ type: "redo" as const }, O.none())
     expect(at.needs()).toBe(before - group.rowIds.length)
@@ -562,11 +568,17 @@ describe("the review grid's atoms", () => {
   /** The grid's own virtual list, given its frame as the grid's draw gives it one, and never drawn again. */
   const listed = (at: ReturnType<typeof world>) => {
     const { frame, scrollTo } = framed()
-    at.grid.frame(frame as unknown as HTMLDivElement)
+    at.grid.frame(
+      unsafeAssert<HTMLDivElement>(
+        frame,
+        "This fixture implements the scroll, size and event operations used by the virtualizer; TypeScript requires unrelated HTMLDivElement members."
+      )
+    )
     return { virtual: at.grid.list, scrollTo }
   }
 
-  const leadable = (line: Entry) => Entry.guards.group(line) && !line.applied && O.isNone(choicesOf(line.group))
+  const leadable = (line: Atom.Type<ReturnType<typeof world>["grid"]["entries"]>[number]) =>
+    Entry.guards.group(line) && !line.applied && O.isNone(choicesOf(line.group))
 
   it("keeps the columns' parts while a decision changes no width, so the rows drawn are not drawn again", () => {
     const at = onPage(startWorld)
@@ -593,7 +605,7 @@ describe("the review grid's atoms", () => {
     expect(at.registry.get(at.grid.lead)).toEqual(O.none())
 
     const { scrollTo, virtual } = listed(at)
-    const lines = () => at.registry.get(at.grid.entries) as ReadonlyArray<Entry>
+    const lines = () => at.registry.get(at.grid.entries)
     const groupsAt = () => A.filter(lines(), leadable)
     const first = groupsAt()[0]
     assertDefined(first)
@@ -643,7 +655,7 @@ describe("the review grid's atoms", () => {
     const at = onPage(startWorld)
     const { virtual } = listed(at)
     // Nothing mounts the lead or the lines drawn: the reads below are the first to ask since the decision.
-    const lines = () => at.registry.get(at.grid.entries) as ReadonlyArray<Entry>
+    const lines = () => at.registry.get(at.grid.entries)
     const found = A.findFirst(lines(), leadable)
     assertTrue(O.isSome(found), "expected a present test value")
     const first = found.value

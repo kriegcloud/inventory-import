@@ -29,7 +29,7 @@ const proposalWords = (proposal: Proposal): string => {
 }
 
 /** Every reason of each flagged row on screen, the rows named, counted by kind first. */
-export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Review }) {
+export function WhyFlagged(props: { readonly rows: ReadonlyArray<ReviewRow>; readonly current: Review }) {
   const found = A.getSomes(
     A.map(props.rows, (row) =>
       O.flatMap(

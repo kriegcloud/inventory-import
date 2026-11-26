@@ -50,7 +50,10 @@ vi.mock("sonner", () => ({
     dismiss: () => undefined,
     success: () => 0,
     loading: () => 0,
-    error: (title: string, options?: { description?: string; action?: { onClick: () => void } }) => {
+    error: (
+      title: string,
+      options?: { readonly description?: string; readonly action?: { readonly onClick: () => void } }
+    ) => {
       page.said.push(title)
       page.descriptions.push(O.fromUndefinedOr(options?.description))
       O.map(O.fromUndefinedOr(options?.action), (action) => page.actions.push(action.onClick))
@@ -68,7 +71,7 @@ const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} }), ReviewRow.mak
  * With `reads`, the server answers a read of the import with what it holds; otherwise a read never answers.
  */
 const networkStart = { down: false }
-const world = (id: ImportId, network: { down: boolean }, reads: boolean) => {
+const world = (id: ImportId, network: { readonly down: boolean }, reads: boolean) => {
   const saves: Array<DecisionDelta> = []
   const revision = { now: 10 }
   const stored: Record<string, SavedDecisions[string]> = {}

@@ -4,7 +4,7 @@ import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ReviewWords } from "@inventory/review/ReviewTypes"
 
 /** A cell's text, or "Not set" in grey when the file left it empty. */
-export function Text(props: { value: string }) {
+export function Text(props: { readonly value: string }) {
   return props.value.trim() === "" ? <NotSet /> : <>{props.value}</>
 }
 
@@ -96,7 +96,7 @@ const outcomeTone = {
 } as const satisfies Record<string, Tone>
 
 /** Where a row stands, in words and colour. */
-export function OutcomePill(props: { outcome: keyof typeof outcomeTone }) {
+export function OutcomePill(props: { readonly outcome: keyof typeof outcomeTone }) {
   return <StatusPill tone={outcomeTone[props.outcome]}>{importWords[props.outcome]}</StatusPill>
 }
 

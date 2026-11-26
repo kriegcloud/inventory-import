@@ -2,6 +2,7 @@
 // with an answer from before keeps the step drawn (the same one, with whatever is typed in it) under a line that says
 // so; only a first read that failed, or an import found gone, takes its place. What could not be read is read again by
 // itself when the connection is back. And an import found removed is followed, whatever step the page draws.
+import * as MutableRef from "effect/MutableRef"
 import { describe, expect, it } from "@effect/vitest"
 import { RegistryContext } from "@effect/atom-react"
 import * as A from "effect/Array"
@@ -64,18 +65,19 @@ type Refusal = ImportNotFound | HttpApiError.InternalServerErrorProblem
 const pageStart = Effect.succeed(viewAt({ id, revision: 4, fileName: "items.csv", result: O.none() }))
 const world = (first: Effect.Effect<ImportView, Refusal>) => {
   const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
-  const server: { answer: Effect.Effect<ImportView, Refusal>; reads: number } = {
-    answer: first,
-    reads: 0
-  }
+  const server: MutableRef.MutableRef<{ readonly answer: Effect.Effect<ImportView, Refusal>; readonly reads: number }> =
+    MutableRef.make<{ readonly answer: Effect.Effect<ImportView, Refusal>; readonly reads: number }>({
+      answer: first,
+      reads: 0
+    })
   const registry = registryFor({
     ...registryStart,
     endpoints: {
       imports: {
         get: () =>
           Effect.suspend(() => {
-            server.reads += 1
-            return Effect.sleep("2 millis").pipe(Effect.andThen(server.answer))
+            server.current = { ...server.current, reads: server.current.reads + 1 }
+            return Effect.sleep("2 millis").pipe(Effect.andThen(server.current.answer))
           }),
         table: () => Effect.succeed({ rows: [] })
       }
@@ -125,7 +127,7 @@ describe("the import page", () => {
       yield* settle
       const before = yield* drawn(t.registry)
       expect([says(before), inStepBox(before)]).toEqual([["THE REVIEW"], true])
-      t.server.answer = down
+      t.server.current = { ...t.server.current, answer: down }
       importView(id).askAgain(t.registry, O.none())
       yield* settle
       const after = yield* drawn(t.registry)
@@ -134,7 +136,7 @@ describe("the import page", () => {
       const asking = yield* drawn(t.registry)
       expect(says(asking)).toEqual([line, "THE REVIEW"])
       yield* settle
-      t.server.answer = Effect.succeed(viewAt({ id, revision: 5, result: O.none() }))
+      t.server.current = { ...t.server.current, answer: Effect.succeed(viewAt({ id, revision: 5, result: O.none() })) }
       importView(id).askAgain(t.registry, O.none())
       yield* settle
       const back = yield* drawn(t.registry)
@@ -146,7 +148,7 @@ describe("the import page", () => {
     Effect.gen(function* () {
       const t = world(pageStart)
       yield* settle
-      t.server.answer = notFound
+      t.server.current = { ...t.server.current, answer: notFound }
       importView(id).askAgain(t.registry, O.none())
       yield* settle
       const found = yield* drawn(t.registry)
@@ -175,7 +177,7 @@ describe("the import page", () => {
       const follows = (atom: Atom.Atom<unknown>) => A.some(browser.mounted, (one) => one === atom)
       expect([follows(followRemoval(id)), follows(readAgainWhenBack(id))]).toEqual([true, true])
       // Found gone too: there is no step then, and the page still follows it.
-      t.server.answer = notFound
+      t.server.current = { ...t.server.current, answer: notFound }
       importView(id).askAgain(t.registry, O.none())
       yield* settle
       yield* drawn(t.registry)
@@ -189,11 +191,14 @@ describe("the import page", () => {
       t.registry.mount(readAgainWhenBack(id))
       yield* settle
       for (const back of [() => window.dispatchEvent(new Event("online")), () => serverAnswered(200)]) {
-        t.server.answer = down
+        t.server.current = { ...t.server.current, answer: down }
         importView(id).askAgain(t.registry, O.none())
         yield* settle
         expect(AsyncResult.isFailure(t.registry.get(importView(id)))).toBe(true)
-        t.server.answer = Effect.succeed(viewAt({ id, revision: 5, result: O.none() }))
+        t.server.current = {
+          ...t.server.current,
+          answer: Effect.succeed(viewAt({ id, revision: 5, result: O.none() }))
+        }
         back()
         yield* settle
         expect(AsyncResult.isSuccess(t.registry.get(importView(id)))).toBe(true)

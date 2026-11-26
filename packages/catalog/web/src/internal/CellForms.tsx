@@ -45,7 +45,7 @@ const FormScope = ScopedAtom.make(() =>
   })
 )
 
-type CellFormProps = { value: string; onSave: (cell: string) => void }
+type CellFormProps = { readonly value: string; readonly onSave: (cell: string) => void }
 
 /** Length, width, height and their unit, saved as the cell's JSON once the three read; or no dimensions at all. */
 export function DimensionsForm(props: CellFormProps) {

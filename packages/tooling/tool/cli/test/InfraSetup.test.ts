@@ -8,6 +8,7 @@ import { beforeEach, vi } from "vitest"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
@@ -70,18 +71,21 @@ const opHeldSaid = "[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, 
 /** A value no line of output and no argument may ever hold. */
 const secret = "sk-live-do-not-print"
 
-// The stand-in's world: what its tools read and change. Four fields are written again by a tool that changes
-// them (a login, a profile, a variable, a list that fails after a while), so they stay writable, and this file is on
-// the readonly law's list until the stand-in keeps them in a reference of its own.
+// The stand-in's world: what its tools read and change. Each tool replaces the reference's snapshot when a login,
+// profile, variable or failing listing changes it; records and logs are rebuilt with the next value.
 interface World {
   readonly terminal: boolean
-  cloudflare: boolean
+  readonly cloudflare: boolean
   readonly accounts: ReadonlyArray<{ readonly id: string; readonly name: string }>
   /** Each Alchemy profile with what it is connected to, as `profile list` prints it. */
-  profiles: Record<string, string>
+  readonly profiles: Readonly<Record<string, string>>
   readonly vaults: ReadonlyArray<{ readonly id: string; readonly name: string }>
-  readonly items: Array<{ id: string; title: string; additional_information: string }>
-  github: O.Option<string>
+  readonly items: ReadonlyArray<{
+    readonly id: string
+    readonly title: string
+    readonly additional_information: string
+  }>
+  readonly github: O.Option<string>
   /** The id of the account that holds production's zone, when cf can tell. */
   readonly zone: O.Option<string>
   /** Whether cf's answer gives the zone's account a name: Cloudflare's published schema makes it optional. */
@@ -91,15 +95,15 @@ interface World {
   /** What a failing `op-human vault list` writes, when it fails with no op line of its own. */
   readonly vaultsFail: O.Option<string>
   /** How many `alchemy profile list` calls answer before the listing fails; each call counts. */
-  listFailsAfter: number
+  readonly listFailsAfter: number
   /** The account each profile ends up connected to when Alchemy's own login is used. */
-  readonly connects: Record<string, string>
+  readonly connects: Readonly<Record<string, string>>
   /** The account the owner's own token belongs to. */
   readonly tokenAccount: string
   /** Production's sign-up list as GitHub's production environment holds it, when it holds one. */
   readonly signUpOnGitHub: O.Option<string>
   /** The second account's token: whether it verifies, and what it allows (none when it may not say). */
-  readonly token: { active: boolean; allows: O.Option<ReadonlyArray<string>> }
+  readonly token: { readonly active: boolean; readonly allows: O.Option<ReadonlyArray<string>> }
   /** What `op-human run` exits with when 1Password itself does not answer (locked, declined). */
   readonly opFails: O.Option<number>
   /** Part of the `op-human` calls 1Password's app does not answer: each fails with op's own error line. */
@@ -118,64 +122,68 @@ interface World {
   readonly yes: (question: string) => boolean
   /** What a tool handed the terminal exits with. */
   readonly exits: (line: string) => number
-  readonly log: Array<string>
+  readonly log: ReadonlyArray<string>
 }
 
-const world = (over: Partial<World> = {}): World => ({
-  terminal: true,
-  cloudflare: true,
-  accounts: [{ id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1", name: "Previews" }],
-  profiles: {},
-  vaults: [{ id: "vaultaaaaaaaaaaaaaaaaaaaa1", name: "Deploys" }],
-  items: [],
-  github: O.some("octo-owner"),
-  zone: O.some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2"),
-  zoneNamed: true,
-  zoneFails: O.none(),
-  vaultsFail: O.none(),
-  listFailsAfter: Number.POSITIVE_INFINITY,
-  connects: {
-    "inventory-preview": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
-    "inventory-production": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2"
-  },
-  tokenAccount: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
-  signUpOnGitHub: O.some("closed"),
-  token: { active: true, allows: O.some(previewTokenNeeds) },
-  opFails: O.none(),
-  opDown: O.none(),
-  opRefuses: O.none(),
-  opHeld: O.none(),
-  createFails: O.none(),
-  verifyRaw: O.none(),
-  subdomainError: O.none(),
-  yes: () => true,
-  exits: () => 0,
-  log: [],
-  ...over
-})
+const world = (over: Partial<World> = {}): MutableRef.MutableRef<World> =>
+  MutableRef.make({
+    terminal: true,
+    cloudflare: true,
+    accounts: [{ id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1", name: "Previews" }],
+    profiles: {},
+    vaults: [{ id: "vaultaaaaaaaaaaaaaaaaaaaa1", name: "Deploys" }],
+    items: [],
+    github: O.some("octo-owner"),
+    zone: O.some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2"),
+    zoneNamed: true,
+    zoneFails: O.none(),
+    vaultsFail: O.none(),
+    listFailsAfter: Number.POSITIVE_INFINITY,
+    connects: {
+      "inventory-preview": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+      "inventory-production": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2"
+    },
+    tokenAccount: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+    signUpOnGitHub: O.some("closed"),
+    token: { active: true, allows: O.some(previewTokenNeeds) },
+    opFails: O.none(),
+    opDown: O.none(),
+    opRefuses: O.none(),
+    opHeld: O.none(),
+    createFails: O.none(),
+    verifyRaw: O.none(),
+    subdomainError: O.none(),
+    yes: () => true,
+    exits: () => 0,
+    log: [],
+    ...over
+  })
 
 const answer = (stdout: string, code = 0): Answer => ({ stdout, stderr: code === 0 ? "" : "refused", code })
 
 /** The stand-in workstation: tools that read and change `w`, and a log of everything in order. */
-const standIn = (w: World): Workstation["Service"] => {
+const standIn = (w: MutableRef.MutableRef<World>): Workstation["Service"] => {
   const line = (command: string, args: ReadonlyArray<string>) => A.join([command, ...args], " ")
   return {
-    say: (text) => Effect.sync(() => void w.log.push(`say: ${Str.trim(text)}`)),
+    say: (text) =>
+      Effect.sync(() => {
+        w.current = { ...w.current, log: [...w.current.log, `say: ${Str.trim(text)}`] }
+      }),
     ask: (command, args) =>
       Effect.sync(() => {
         const asked = line(command, args)
-        w.log.push(`ask: ${asked}`)
-        if (command === "op-human" && O.exists(w.opDown, (part) => Str.includes(part)(asked))) {
+        w.current = { ...w.current, log: [...w.current.log, `ask: ${asked}`] }
+        if (command === "op-human" && O.exists(w.current.opDown, (part) => Str.includes(part)(asked))) {
           return { stdout: "", stderr: `${opDownSaid}\n`, code: 1 }
         }
-        if (command === "op-human" && O.exists(w.opRefuses, (part) => Str.includes(part)(asked))) {
+        if (command === "op-human" && O.exists(w.current.opRefuses, (part) => Str.includes(part)(asked))) {
           return { stdout: "", stderr: `${opRefusedSaid}\n`, code: 1 }
         }
-        if (command === "op-human" && O.exists(w.opHeld, (part) => Str.includes(part)(asked))) {
+        if (command === "op-human" && O.exists(w.current.opHeld, (part) => Str.includes(part)(asked))) {
           return { stdout: "", stderr: `${opHeldSaid}\n`, code: 1 }
         }
         if (Str.includes("/workers/subdomain")(asked)) {
-          return O.match(w.subdomainError, {
+          return O.match(w.current.subdomainError, {
             onNone: () => answer(json({ success: true, errors: [], result: { subdomain: "previews-owner" } })),
             onSome: (code) =>
               answer(
@@ -184,18 +192,25 @@ const standIn = (w: World): Workstation["Service"] => {
           })
         }
         if (asked === "cf auth whoami") {
-          return w.cloudflare
-            ? answer(json({ authenticated: true, tokenValid: true, email: "owner@example.test", accounts: w.accounts }))
+          return w.current.cloudflare
+            ? answer(
+                json({
+                  authenticated: true,
+                  tokenValid: true,
+                  email: "owner@example.test",
+                  accounts: w.current.accounts
+                })
+              )
             : answer(json({ authenticated: false, accounts: [] }))
         }
         if (asked === "cf zones list --name beep-effect.com --status active") {
-          if (O.isSome(w.zoneFails)) return { stdout: "", stderr: w.zoneFails.value, code: 1 }
-          const zones = A.map(A.fromOption(w.zone), (id) => ({
+          if (O.isSome(w.current.zoneFails)) return { stdout: "", stderr: w.current.zoneFails.value, code: 1 }
+          const zones = A.map(A.fromOption(w.current.zone), (id) => ({
             name: "beep-effect.com",
-            account: w.zoneNamed
+            account: w.current.zoneNamed
               ? {
                   id,
-                  name: A.findFirst(w.accounts, (one) => one.id === id).pipe(
+                  name: A.findFirst(w.current.accounts, (one) => one.id === id).pipe(
                     O.match({ onNone: () => "Zone holder", onSome: (one) => one.name })
                   )
                 }
@@ -204,13 +219,13 @@ const standIn = (w: World): Workstation["Service"] => {
           return answer(json(zones))
         }
         if (Str.endsWith("cf accounts tokens verify")(asked)) {
-          if (O.isSome(w.verifyRaw)) return w.verifyRaw.value
+          if (O.isSome(w.current.verifyRaw)) return w.current.verifyRaw.value
           return answer(
-            json({ id: "0123456789abcdef0123456789abcdef", status: w.token.active ? "active" : "disabled" })
+            json({ id: "0123456789abcdef0123456789abcdef", status: w.current.token.active ? "active" : "disabled" })
           )
         }
         if (Str.includes("cf accounts tokens get 0123456789abcdef0123456789abcdef")(asked)) {
-          return O.match(w.token.allows, {
+          return O.match(w.current.token.allows, {
             onNone: () => answer("", 1),
             onSome: (names) =>
               answer(json({ policies: [{ effect: "allow", permission_groups: A.map(names, (name) => ({ name })) }] }))
@@ -219,11 +234,12 @@ const standIn = (w: World): Workstation["Service"] => {
         const shown = Str.match(/^bunx alchemy profile show --profile (\S+)$/)(asked)
         if (O.isSome(shown)) {
           const name = `${shown.value[1]}`
-          const providers = R.get(w.profiles, name).pipe(O.getOrElse(() => ""))
-          if (!Str.includes("Cloudflare (")(providers)) return answer(`- ${name}`, R.has(w.profiles, name) ? 0 : 1)
+          const providers = R.get(w.current.profiles, name).pipe(O.getOrElse(() => ""))
+          if (!Str.includes("Cloudflare (")(providers))
+            return answer(`- ${name}`, R.has(w.current.profiles, name) ? 0 : 1)
           const account = Str.includes("Cloudflare (stored)")(providers)
-            ? O.some(w.tokenAccount)
-            : R.get(w.connects, name)
+            ? O.some(w.current.tokenAccount)
+            : R.get(w.current.connects, name)
           // A profile the tool cannot say an account for: its Cloudflare lines carry none.
           if (O.isNone(account)) return answer(`- ${name}\n  Cloudflare (oauth) — needs a login again`)
           // As the tool prints it: part of a token among the lines, which must reach nothing.
@@ -240,65 +256,83 @@ const standIn = (w: World): Workstation["Service"] => {
           )
         }
         if (asked === "gh variable get SIGN_UP --env production --repo kriegcloud/inventory-import") {
-          return O.match(w.signUpOnGitHub, { onNone: () => answer("", 1), onSome: (list) => answer(`${list}\n`) })
+          return O.match(w.current.signUpOnGitHub, {
+            onNone: () => answer("", 1),
+            onSome: (list) => answer(`${list}\n`)
+          })
         }
         // The comparison 1Password fills: 0 the same, 3 they differ, and whatever `opFails` says when 1Password
         // itself does not answer.
         const compared = Str.match(/^op-human run --env-file \S+ -- sh -c .*\|\| exit 3 sh (\S+)$/)(asked)
         if (O.isSome(compared)) {
-          return O.match(w.opFails, {
+          return O.match(w.current.opFails, {
             onSome: (code) => answer("", code),
-            onNone: () => answer("", compared.value[1] === w.tokenAccount ? 0 : 3)
+            onNone: () => answer("", compared.value[1] === w.current.tokenAccount ? 0 : 3)
           })
         }
         if (asked === "bunx alchemy profile list") {
-          w.listFailsAfter -= 1
-          if (w.listFailsAfter < 0) return answer("", 1)
+          w.current = { ...w.current, listFailsAfter: w.current.listFailsAfter - 1 }
+          if (w.current.listFailsAfter < 0) return answer("", 1)
           return answer(
             A.join(
               [
-                `Profiles (${R.size(w.profiles)})`,
-                ...A.map(R.toEntries(w.profiles), ([name, to]) => `- ${name}${to === "" ? "" : `: ${to}`}`)
+                `Profiles (${R.size(w.current.profiles)})`,
+                ...A.map(R.toEntries(w.current.profiles), ([name, to]) => `- ${name}${to === "" ? "" : `: ${to}`}`)
               ],
               "\n"
             )
           )
         }
         if (Str.startsWith("bunx alchemy profile create ")(asked)) {
-          w.profiles = { ...w.profiles, [`${A.last(args).pipe(O.getOrElse(() => ""))}`]: "" }
+          w.current = {
+            ...w.current,
+            profiles: { ...w.current.profiles, [`${A.last(args).pipe(O.getOrElse(() => ""))}`]: "" }
+          }
           return answer("")
         }
         if (asked === "op-human vault list --format json") {
-          if (O.isSome(w.vaultsFail)) return { stdout: "", stderr: w.vaultsFail.value, code: 1 }
-          return answer(json(w.vaults))
+          if (O.isSome(w.current.vaultsFail)) return { stdout: "", stderr: w.current.vaultsFail.value, code: 1 }
+          return answer(json(w.current.vaults))
         }
-        if (Str.startsWith("op-human item list ")(asked)) return answer(json(w.items))
+        if (Str.startsWith("op-human item list ")(asked)) return answer(json(w.current.items))
         if (asked === "gh api user --jq .login") {
-          return O.match(w.github, { onNone: () => answer("", 1), onSome: (login) => answer(`${login}\n`) })
+          return O.match(w.current.github, { onNone: () => answer("", 1), onSome: (login) => answer(`${login}\n`) })
         }
         return answer("", 1)
       }),
     quiet: (command, args) =>
       Effect.sync(() => {
-        w.log.push(`quiet: ${line(command, args)}`)
-        if (O.isSome(w.createFails)) return { stderr: w.createFails.value, code: 1 }
-        w.items.push({
-          id: `itemaaaaaaaaaaaaaaaaaaaaa${w.items.length + 1}`,
-          title: previewPasswordItem,
-          additional_information: secret
-        })
+        w.current = { ...w.current, log: [...w.current.log, `quiet: ${line(command, args)}`] }
+        if (O.isSome(w.current.createFails)) return { stderr: w.current.createFails.value, code: 1 }
+        w.current = {
+          ...w.current,
+          items: [
+            ...w.current.items,
+            {
+              id: `itemaaaaaaaaaaaaaaaaaaaaa${w.current.items.length + 1}`,
+              title: previewPasswordItem,
+              additional_information: secret
+            }
+          ]
+        }
         return { stderr: "", code: 0 }
       }),
     hand: (command, args, given = {}) =>
       Effect.sync(() => {
         const handed = line(command, args)
-        if (command === "sh") return w.terminal ? 0 : 1
+        if (command === "sh") return w.current.terminal ? 0 : 1
         const names = A.map(R.toEntries(given), ([name, value]) => `${name}=${value}`)
-        w.log.push(`hand: ${handed}${A.isReadonlyArrayNonEmpty(names) ? ` | given ${A.join(names, " ")}` : ""}`)
-        const code = w.exits(handed)
+        w.current = {
+          ...w.current,
+          log: [
+            ...w.current.log,
+            `hand: ${handed}${A.isReadonlyArrayNonEmpty(names) ? ` | given ${A.join(names, " ")}` : ""}`
+          ]
+        }
+        const code = w.current.exits(handed)
         if (code !== 0) return code
-        if (handed === "cf auth login") w.cloudflare = true
-        if (handed === "gh auth login") w.github = O.some("octo-owner")
+        if (handed === "cf auth login") w.current = { ...w.current, cloudflare: true }
+        if (handed === "gh auth login") w.current = { ...w.current, github: O.some("octo-owner") }
         const edited = Str.match(/bunx alchemy profile edit --profile (\S+) (.*)$/)(handed)
         if (O.isSome(edited)) {
           const name = `${edited.value[1]}`
@@ -310,20 +344,23 @@ const standIn = (w: World): Workstation["Service"] => {
             (provider) =>
               `${provider} (${provider === "GitHub" ? "gh-cli" : provider === "1Password" ? "desktop" : Str.includes("--method stored")(handed) ? "stored" : "oauth"})`
           )
-          const before = R.get(w.profiles, name).pipe(O.getOrElse(() => ""))
-          w.profiles = { ...w.profiles, [name]: A.join([...(before === "" ? [] : [before]), ...added], ", ") }
+          const before = R.get(w.current.profiles, name).pipe(O.getOrElse(() => ""))
+          w.current = {
+            ...w.current,
+            profiles: { ...w.current.profiles, [name]: A.join([...(before === "" ? [] : [before]), ...added], ", ") }
+          }
         }
         return 0
       }),
     confirm: (question) =>
       Effect.sync(() => {
-        const yes = w.yes(question)
-        w.log.push(`confirm: ${question} -> ${yes ? "yes" : "no"}`)
+        const yes = w.current.yes(question)
+        w.current = { ...w.current, log: [...w.current.log, `confirm: ${question} -> ${yes ? "yes" : "no"}`] }
         return yes
       }),
     choose: (question, choices) =>
       Effect.sync(() => {
-        w.log.push(`choose: ${question}`)
+        w.current = { ...w.current, log: [...w.current.log, `choose: ${question}`] }
         // He picks the last one listed for production and the first for anything else.
         return Str.includes("production")(question) ? A.lastNonEmpty(choices).value : choices[0].value
       })
@@ -359,7 +396,7 @@ const own = O.some(
 /** One run in a repository holding this `op.env`: why it stopped (if it did), and the file afterwards. */
 // A run that sets up the repository's stack has his own file unless the test says otherwise: the stack needs it.
 const run = (
-  w: World,
+  w: MutableRef.MutableRef<World>,
   given: SetupOptions,
   env = untouched,
   mine: O.Option<string> = A.contains(given.sizes, "staging") ? own : O.none(),
@@ -387,9 +424,11 @@ const isCheck = (entry: string) =>
   /^ask: (bunx alchemy profile show |gh variable get |op-human run .* sh -c v=)/.test(entry)
 
 /** The tools a run started, without what was said or asked of him and without those looks (`checks`). */
-const started = (w: World) => A.filter(w.log, (entry) => /^(ask|quiet|hand): /.test(entry) && !isCheck(entry))
-const checks = (w: World) => A.filter(w.log, isCheck)
-const at = (w: World, part: string) => A.findFirstIndex(w.log, Str.includes(part)).pipe(O.getOrElse(() => -1))
+const started = (w: MutableRef.MutableRef<World>) =>
+  A.filter(w.current.log, (entry) => /^(ask|quiet|hand): /.test(entry) && !isCheck(entry))
+const checks = (w: MutableRef.MutableRef<World>) => A.filter(w.current.log, isCheck)
+const at = (w: MutableRef.MutableRef<World>, part: string) =>
+  A.findFirstIndex(w.current.log, Str.includes(part)).pipe(O.getOrElse(() => -1))
 
 const twoAccounts = [
   { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1", name: "Previews" },
@@ -450,7 +489,7 @@ describe("infra setup: the steps", () => {
       expect(result.stopped).toEqual(O.none())
       expect(started(w)).toEqual([])
       expect(result.env).toBe(untouched)
-      const said = A.join(w.log, "\n")
+      const said = A.join(w.current.log, "\n")
       expect(said).toContain("bunx alchemy plan --stage test_ben --profile inventory-preview")
       expect(said).toContain(
         "bunx alchemy deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes"
@@ -507,8 +546,8 @@ describe("infra setup: a test stage", () => {
       expect(at(w, "hand: bunx alchemy plan")).toBeLessThan(at(w, "confirm: Deploy your test stage test_ben"))
       expect(at(w, "confirm: Deploy your test stage test_ben")).toBeLessThan(at(w, "hand: bunx alchemy deploy"))
       // A test stage asks nothing of 1Password or GitHub and leaves the references alone.
-      expect(A.some(w.log, Str.includes("op-human"))).toBe(false)
-      expect(A.some(w.log, Str.includes("gh "))).toBe(false)
+      expect(A.some(w.current.log, Str.includes("op-human"))).toBe(false)
+      expect(A.some(w.current.log, Str.includes("gh "))).toBe(false)
       expect(result.env).toBe(untouched)
     })
   )
@@ -537,7 +576,7 @@ describe("infra setup: a test stage", () => {
       const w = world({ exits: (handed) => (Str.includes("alchemy plan")(handed) ? 1 : 0) })
       const result = yield* run(w, options())
       expect(O.getOrElse(result.stopped, () => "")).toContain("Nothing was deployed")
-      expect(A.some(w.log, Str.startsWith("confirm: Deploy "))).toBe(false)
+      expect(A.some(w.current.log, Str.startsWith("confirm: Deploy "))).toBe(false)
       expect(A.some(started(w), Str.includes("alchemy deploy"))).toBe(false)
     })
   )
@@ -576,7 +615,7 @@ describe("infra setup: the previews' password", () => {
       const w = world({ accounts: twoAccounts, profiles: connected })
       const result = yield* run(w, options({ sizes: ["staging"] }))
       expect(result.stopped).toEqual(O.none())
-      expect(A.filter(w.log, Str.startsWith("quiet: "))).toEqual([
+      expect(A.filter(w.current.log, Str.startsWith("quiet: "))).toEqual([
         `quiet: op-human item create --category password --title ${previewPasswordItem} --vault vaultaaaaaaaaaaaaaaaaaaaa1 --generate-password`
       ])
       expect(result.env).toBe(
@@ -586,7 +625,7 @@ describe("infra setup: the previews' password", () => {
         )(untouched)
       )
       // What the item list said beside ids and titles is dropped: it reaches no line and no argument.
-      expect(A.some(w.log, Str.includes(secret))).toBe(false)
+      expect(A.some(w.current.log, Str.includes(secret))).toBe(false)
       expect(result.env).not.toContain(secret)
     })
   )
@@ -599,7 +638,7 @@ describe("infra setup: the previews' password", () => {
         items: [{ id: "itemaaaaaaaaaaaaaaaaaaaaa7", title: previewPasswordItem, additional_information: secret }]
       })
       const first = yield* run(there, options({ sizes: ["staging"] }))
-      expect(A.some(there.log, Str.startsWith("quiet: "))).toBe(false)
+      expect(A.some(there.current.log, Str.startsWith("quiet: "))).toBe(false)
       expect(first.env).toContain(
         "PREVIEW_TEST_ACCOUNT_PASSWORD=op://vaultaaaaaaaaaaaaaaaaaaaa1/itemaaaaaaaaaaaaaaaaaaaaa7/password"
       )
@@ -621,7 +660,7 @@ describe("infra setup: the previews' password", () => {
       const result = yield* run(w, options({ sizes: ["staging"] }))
       expect(O.getOrElse(result.stopped, () => "")).toContain("2 items titled")
       expect(result.env).toBe(untouched)
-      expect(A.some(w.log, Str.startsWith("quiet: "))).toBe(false)
+      expect(A.some(w.current.log, Str.startsWith("quiet: "))).toBe(false)
     })
   )
 
@@ -651,13 +690,13 @@ describe("infra setup: the previews' password", () => {
         expect(said).toContain("Line 3 is neither")
         expect(said).not.toContain(secret)
         // Before the first tool, and so before the reference is written and "commit that file" is said.
-        expect(w.log).toEqual([])
+        expect(w.current.log).toEqual([])
       })
       // A test stage reads nothing from that file, and is still stopped: the file is the same tracked file.
       const test = world()
       const stopped = yield* run(test, options(), `export A=${secret}\n`)
       expect(O.getOrElse(stopped.stopped, () => "")).toContain("Line 1 is neither")
-      expect(test.log).toEqual([])
+      expect(test.current.log).toEqual([])
     })
   )
 })
@@ -672,7 +711,7 @@ describe("infra setup: the repository's stack and production", () => {
       expect(O.getOrElse(result.stopped, () => "")).toContain("Name the second account's token and id in")
       expect(A.some(started(one), Str.includes("alchemy"))).toBe(false)
       // It stops on what cf said, before asking him which account is which.
-      expect(A.some(one.log, Str.startsWith("confirm: Use the Cloudflare account"))).toBe(false)
+      expect(A.some(one.current.log, Str.startsWith("confirm: Use the Cloudflare account"))).toBe(false)
       const same = world({ accounts: twoAccounts, profiles: connected })
       const named = yield* run(
         same,
@@ -702,7 +741,7 @@ describe("infra setup: the repository's stack and production", () => {
         'confirm: Use "Production" for production and "Previews" for previews, test stages and staging? -> yes'
       expect(at(w, asked)).toBeGreaterThan(-1)
       expect(at(w, asked)).toBeLessThan(at(w, "ask: bunx alchemy profile list"))
-      expect(A.some(w.log, Str.startsWith("choose: Which Cloudflare account"))).toBe(false)
+      expect(A.some(w.current.log, Str.startsWith("choose: Which Cloudflare account"))).toBe(false)
       expect(
         at(w, 'say: Cloudflare: production is "Production"; previews, test stages and staging are "Previews".')
       ).toBeLessThan(at(w, asked))
@@ -724,7 +763,7 @@ describe("infra setup: the repository's stack and production", () => {
       const w = world({ accounts: twoAccounts, profiles: connected, zone: O.none() })
       const result = yield* run(w, options({ sizes: ["test-stage", "production"], signUp: O.some("closed") }))
       expect(O.getOrElse(result.stopped, () => "")).toContain(said)
-      expect(A.some(w.log, Str.startsWith("choose: "))).toBe(false)
+      expect(A.some(w.current.log, Str.startsWith("choose: "))).toBe(false)
       expect(A.some(started(w), Str.includes("alchemy"))).toBe(false)
       // The review's case: his file names the zone's account for previews by mistake, and cf is logged in to the
       // other one only. Production would be the account cf sees, and every pull request would deploy into the zone's.
@@ -735,13 +774,13 @@ describe("infra setup: the repository's stack and production", () => {
       })
       const stack = yield* run(wrong, options({ sizes: ["staging"], signUp: O.some("me@example.test") }))
       expect(O.getOrElse(stack.stopped, () => "")).toContain(said)
-      expect(A.some(wrong.log, Str.startsWith("confirm: Use the Cloudflare account"))).toBe(false)
+      expect(A.some(wrong.current.log, Str.startsWith("confirm: Use the Cloudflare account"))).toBe(false)
       expect(A.some(started(wrong), Str.includes("alchemy"))).toBe(false)
       // A test stage alone needs no production account: with nothing to tell them apart, he is asked.
       const stage = world({ accounts: twoAccounts, zone: O.none() })
       const went = yield* run(stage, options())
       expect(went.stopped).toEqual(O.none())
-      expect(A.filter(stage.log, Str.startsWith("choose: Which Cloudflare account"))).toEqual([
+      expect(A.filter(stage.current.log, Str.startsWith("choose: Which Cloudflare account"))).toEqual([
         "choose: Which Cloudflare account is for preview?"
       ])
     })
@@ -821,7 +860,11 @@ describe("infra setup: the repository's stack and production", () => {
         env
       )
       expect(result.stopped).toEqual(O.none())
-      const deploy = A.last(started(w)).pipe(O.getOrElse(() => ""))
+      const deploy = w.pipe(
+        started,
+        A.last,
+        O.getOrElse(() => "")
+      )
       expect(deploy).not.toContain("DEPLOY_WITHOUT_MODEL_KEY")
       expect(deploy).toContain("PRODUCTION_APPROVER=someone-else SIGN_UP=owner@example.test")
       expect(A.some(started(w), (entry) => /op-human (read|item get|inject)/.test(entry))).toBe(false)
@@ -858,7 +901,7 @@ describe("infra setup: the repository's stack and production", () => {
       expect(
         at(w, "say: Model key: packages/infra/env/op.env.local names a reference for OPENROUTER_API_KEY")
       ).toBeGreaterThan(-1)
-      expect(A.some(w.log, Str.includes("DEPLOY_WITHOUT_MODEL_KEY"))).toBe(false)
+      expect(A.some(w.current.log, Str.includes("DEPLOY_WITHOUT_MODEL_KEY"))).toBe(false)
       // His own line wins over op.env's: one that is no reference there leaves the stacks none, and the command says so.
       const shadowed = world({ accounts: productionOnly, profiles: connected })
       const env =
@@ -881,7 +924,7 @@ describe("infra setup: the repository's stack and production", () => {
         O.some('OPENROUTER_API_KEY=op://<vault>/<item>/<field>\nOPENROUTER_API_KEY="op://Vault/Model Key/credential"\n')
       )
       expect(at(below, "say: Model key: packages/infra/env/op.env.local names a reference")).toBeGreaterThan(-1)
-      expect(A.some(below.log, Str.includes("DEPLOY_WITHOUT_MODEL_KEY"))).toBe(false)
+      expect(A.some(below.current.log, Str.includes("DEPLOY_WITHOUT_MODEL_KEY"))).toBe(false)
     })
   )
 
@@ -910,7 +953,13 @@ describe("infra setup: the repository's stack and production", () => {
       const w = world({ accounts: productionOnly, profiles: connected, signUpOnGitHub: O.some("me@example.test") })
       const result = yield* run(w, options({ sizes: ["staging"] }))
       expect(result.stopped).toEqual(O.none())
-      expect(A.last(started(w)).pipe(O.getOrElse(() => ""))).toContain("SIGN_UP=me@example.test")
+      expect(
+        w.pipe(
+          started,
+          A.last,
+          O.getOrElse(() => "")
+        )
+      ).toContain("SIGN_UP=me@example.test")
       expect(
         at(w, "say: Sign-up in production: me@example.test, as GitHub's production environment already holds it")
       ).toBeLessThan(at(w, "ask: op-human run"))
@@ -961,9 +1010,9 @@ describe("infra setup: the repository's stack and production", () => {
         )
         A.forEach([earlier, picked, byToken, unread], (w) => {
           expect(A.some(started(w), (entry) => /state bootstrap|alchemy plan|alchemy deploy/.test(entry))).toBe(false)
-          expect(A.some(w.log, Str.startsWith("confirm: Make sure the state store"))).toBe(false)
+          expect(A.some(w.current.log, Str.startsWith("confirm: Make sure the state store"))).toBe(false)
           // What the tool prints beside the account's line reaches no line and no argument.
-          expect(A.some(w.log, Str.includes(secret))).toBe(false)
+          expect(A.some(w.current.log, Str.includes(secret))).toBe(false)
         })
         expect(checks(picked)).toContain("ask: bunx alchemy profile show --profile inventory-preview")
       })
@@ -1127,7 +1176,8 @@ describe("infra setup: the repository's stack and production", () => {
 })
 
 describe("infra setup: what is set outside it", () => {
-  const tools = (w: World) => A.filter(w.log, (entry) => /^(ask|quiet|hand): /.test(entry))
+  const tools = (w: MutableRef.MutableRef<World>) =>
+    A.filter(w.current.log, (entry) => /^(ask|quiet|hand): /.test(entry))
 
   it.effect("a Cloudflare variable in his shell stops it before any tool, named and never shown", () =>
     Effect.gen(function* () {
@@ -1141,7 +1191,7 @@ describe("infra setup: what is set outside it", () => {
       )
       expect(said).toContain("Nothing was started")
       expect(tools(w)).toEqual([])
-      expect(A.some([said, ...w.log], Str.includes(secret))).toBe(false)
+      expect(A.some([said, ...w.current.log], Str.includes(secret))).toBe(false)
     })
   )
 
@@ -1157,7 +1207,7 @@ describe("infra setup: what is set outside it", () => {
       )
       expect(said).not.toContain("OTHER")
       expect(tools(w)).toEqual([])
-      expect(A.some([said, ...w.log], Str.includes(secret))).toBe(false)
+      expect(A.some([said, ...w.current.log], Str.includes(secret))).toBe(false)
     })
   )
 
@@ -1173,7 +1223,7 @@ describe("infra setup: what is set outside it", () => {
       const stage = world()
       const second = yield* run(stage, options())
       expect(second.stopped).toEqual(O.none())
-      expect(A.some(stage.log, Str.includes(secret))).toBe(false)
+      expect(A.some(stage.current.log, Str.includes(secret))).toBe(false)
       vi.stubEnv("OPENROUTER_API_KEY", undefined)
       A.forEach(
         ["PREVIEW_TEST_ACCOUNT_PASSWORD", "PREVIEW_CLOUDFLARE_API_TOKEN", "PREVIEW_CLOUDFLARE_ACCOUNT_ID"],
@@ -1212,7 +1262,7 @@ describe("infra setup: what is set outside it", () => {
       expect(said).not.toContain("your shell)")
       expect(said).toContain("`env -u` cannot")
       expect(tools(w)).toEqual([])
-      expect(A.some([said, ...w.log], Str.includes(secret))).toBe(false)
+      expect(A.some([said, ...w.current.log], Str.includes(secret))).toBe(false)
     })
   )
 
@@ -1226,10 +1276,10 @@ describe("infra setup: what is set outside it", () => {
     Effect.gen(function* () {
       const w = world({ terminal: false })
       yield* run(w, options({ sizes: ["production"], dryRun: true }))
-      expect(A.join(w.log, "\n")).toContain(
+      expect(A.join(w.current.log, "\n")).toContain(
         "A run stops before its first tool when one of these is set in your shell or named in the root .env"
       )
-      expect(A.join(w.log, "\n")).toContain("CLOUDFLARE_API_TOKEN, CLOUDFLARE_API_KEY")
+      expect(A.join(w.current.log, "\n")).toContain("CLOUDFLARE_API_TOKEN, CLOUDFLARE_API_KEY")
     })
   )
 })
@@ -1262,7 +1312,7 @@ describe("infra setup: the two accounts told apart", () => {
     Effect.gen(function* () {
       const healthy = world({ accounts: productionOnly, profiles: connected })
       yield* run(healthy, options({ sizes: ["production"], signUp: O.some("closed") }))
-      const listings = A.filter(healthy.log, (entry) => entry === "ask: bunx alchemy profile list").length
+      const listings = A.filter(healthy.current.log, (entry) => entry === "ask: bunx alchemy profile list").length
       // The last listing is the one that tells the two profiles apart.
       const w = world({ accounts: productionOnly, profiles: connected, listFailsAfter: listings - 1 })
       const result = yield* run(w, options({ sizes: ["production"], signUp: O.some("closed") }))
@@ -1334,7 +1384,7 @@ describe("infra setup: the second account by its token", () => {
           "hand: bunx alchemy deploy --stage test_ben --profile inventory-preview --yes | given HIDE_TEST_ACCOUNT_PASSWORD=true"
         ])
         // Neither a reference nor the names in it reach a line or an argument: only the file's path does.
-        expect(A.some(w.log, (entry) => /op:\/\/|Second Account/.test(entry))).toBe(false)
+        expect(A.some(w.current.log, (entry) => /op:\/\/|Second Account/.test(entry))).toBe(false)
         expect(at(w, "say: Cloudflare: the previews' token is active and allows what a deploy needs")).toBeGreaterThan(
           -1
         )
@@ -1348,7 +1398,7 @@ describe("infra setup: the second account by its token", () => {
       const byLogin = world()
       yield* run(byLogin, options())
       A.forEach([byToken, byLogin], (w) => {
-        const making = A.filter(w.log, (entry) => /^confirm: (Make sure the state store|Deploy )/.test(entry))
+        const making = A.filter(w.current.log, (entry) => /^confirm: (Make sure the state store|Deploy )/.test(entry))
         expect(making.length).toBe(2)
         expect(A.every(making, Str.includes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"))).toBe(true)
         // The id asked about is the one read from the profile the tool is then started with.
@@ -1359,7 +1409,7 @@ describe("infra setup: the second account by its token", () => {
       // All three sizes: production's questions name production's account, the previews' theirs.
       const all = world({ accounts: productionOnly })
       yield* run(all, options({ sizes: ["test-stage", "staging", "production"], signUp: O.some("closed") }))
-      const asked = A.filter(all.log, (entry) => /^confirm: (Make sure the state store|Deploy )/.test(entry))
+      const asked = A.filter(all.current.log, (entry) => /^confirm: (Make sure the state store|Deploy )/.test(entry))
       expect(asked.length).toBe(5)
       // The repository's question names both: it makes a token in production's account, and gives previews and
       // staging the previews' account to deploy into.
@@ -1431,7 +1481,7 @@ describe("infra setup: the second account by its token", () => {
         connects: { "inventory-preview": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1" }
       })
       // A profile connected by a login, to another account than the id his file names.
-      other.profiles = { "inventory-preview": "Cloudflare (oauth)" }
+      other.current = { ...other.current, profiles: { "inventory-preview": "Cloudflare (oauth)" } }
       const second = yield* run(other, options(), untouched, own)
       expect(O.getOrElse(second.stopped, () => "")).toContain(
         "deploys into the account aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1, which is not the one packages/infra/env/op.env.local names"
@@ -1486,7 +1536,7 @@ describe("infra setup: the second account by its token", () => {
         )
         expect(O.getOrElse(third.stopped, () => "")).toContain("must name both")
         expect([...started(half), ...started(value)]).toEqual([])
-        expect(A.some([...value.log, ...A.getSomes([third.stopped])], Str.includes(secret))).toBe(false)
+        expect(A.some([...value.current.log, ...A.getSomes([third.stopped])], Str.includes(secret))).toBe(false)
       })
   )
 
@@ -1552,14 +1602,14 @@ describe("infra setup: the dry run", () => {
     Effect.gen(function* () {
       const withFile = world({ terminal: false })
       yield* run(withFile, options({ sizes: ["staging"], dryRun: true }))
-      const said = A.join(withFile.log, "\n")
+      const said = A.join(withFile.current.log, "\n")
       expect(said).toContain("cf accounts tokens verify'")
       expect(said).toContain("--method stored --set apiToken=env:PREVIEW_CLOUDFLARE_API_TOKEN")
       expect(said).toContain("gh variable get SIGN_UP --env production")
       expect(said).toContain("bunx alchemy profile show --profile inventory-production")
       const without = world({ terminal: false })
       yield* run(without, options({ sizes: ["staging"], dryRun: true }), untouched, O.none())
-      expect(A.join(without.log, "\n")).toContain("As things are, a run stops before step 1")
+      expect(A.join(without.current.log, "\n")).toContain("As things are, a run stops before step 1")
       expect([...started(withFile), ...checks(withFile), ...started(without)]).toEqual([])
     })
   )
@@ -1569,7 +1619,7 @@ describe("infra setup: the dry run", () => {
       const w = world({ terminal: false })
       const result = yield* run(w, options({ sizes: [], dryRun: true }))
       expect(result.stopped).toEqual(O.none())
-      const said = A.join(w.log, "\n")
+      const said = A.join(w.current.log, "\n")
       expect(said).toContain("No size was given, so these are the steps of all three sizes at once.")
       expect(said).toContain("bunx alchemy plan --stage test_ben --profile inventory-preview")
       expect(said).toContain(
@@ -1749,7 +1799,7 @@ describe("infra setup: the previews' workers.dev subdomain", () => {
       expect(asked).toContain(
         "printf 'Authorization: Bearer %s\\n' \"$PREVIEW_CLOUDFLARE_API_TOKEN\" | curl -sS -H @- "
       )
-      expect(A.some(w.log, (entry) => /op:\/\/|Second Account/.test(entry))).toBe(false)
+      expect(A.some(w.current.log, (entry) => /op:\/\/|Second Account/.test(entry))).toBe(false)
     })
   )
 
@@ -1788,8 +1838,8 @@ describe("infra setup: the previews' workers.dev subdomain", () => {
     Effect.gen(function* () {
       const w = world({ terminal: false })
       yield* run(w, options({ dryRun: true }), untouched, own)
-      expect(A.join(w.log, "\n")).toContain("/workers/subdomain")
-      expect(A.join(w.log, "\n")).toContain("workers.dev subdomain")
+      expect(A.join(w.current.log, "\n")).toContain("/workers/subdomain")
+      expect(A.join(w.current.log, "\n")).toContain("workers.dev subdomain")
       expect([...started(w), ...checks(w)]).toEqual([])
     })
   )
@@ -1994,14 +2044,16 @@ describe("infra setup: the dry run says what a run would", () => {
         const w = world({ terminal: false })
         const result = yield* run(w, options({ sizes: [], dryRun: true, user }))
         expect(result.stopped).toEqual(O.none())
-        expect(A.join(w.log, "\n")).toContain("bunx alchemy plan --stage test_<user> --profile inventory-preview")
+        expect(A.join(w.current.log, "\n")).toContain(
+          "bunx alchemy plan --stage test_<user> --profile inventory-preview"
+        )
       }
       // Asked for a test stage, a name that is none still stops, dry run or not.
       const sized = yield* run(world(), options({ dryRun: true, user: "Benjamin" }))
       expect(O.getOrElse(sized.stopped, () => "")).toContain('"test_Benjamin" is not a stage name')
       const fine = world({ terminal: false })
       yield* run(fine, options({ sizes: [], dryRun: true }))
-      expect(A.join(fine.log, "\n")).toContain("--stage test_ben ")
+      expect(A.join(fine.current.log, "\n")).toContain("--stage test_ben ")
     })
   )
 
@@ -2009,7 +2061,7 @@ describe("infra setup: the dry run says what a run would", () => {
     Effect.gen(function* () {
       const w = world({ terminal: false })
       yield* run(w, options({ dryRun: true }), `${untouched}${O.getOrElse(own, () => "")}`, O.none())
-      expect(A.join(w.log, "\n")).toContain(
+      expect(A.join(w.current.log, "\n")).toContain(
         "As things are, a run stops before step 1: packages/infra/env/op.env names PREVIEW_CLOUDFLARE_API_TOKEN and PREVIEW_CLOUDFLARE_ACCOUNT_ID"
       )
       const one = world({ terminal: false })
@@ -2019,10 +2071,12 @@ describe("infra setup: the dry run says what a run would", () => {
         `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
         O.some("PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/g\n")
       )
-      expect(A.join(one.log, "\n")).toContain("op.env names PREVIEW_CLOUDFLARE_ACCOUNT_ID, and the repository's stack")
+      expect(A.join(one.current.log, "\n")).toContain(
+        "op.env names PREVIEW_CLOUDFLARE_ACCOUNT_ID, and the repository's stack"
+      )
       const placed = world({ terminal: false })
       yield* run(placed, options({ dryRun: true }), untouched, own)
-      expect(A.join(placed.log, "\n")).not.toContain("op.env names")
+      expect(A.join(placed.current.log, "\n")).not.toContain("op.env names")
     })
   )
 
@@ -2054,7 +2108,7 @@ describe("infra setup: the dry run says what a run would", () => {
         expect(real).toContain(words)
         const dry = world({ terminal: false })
         yield* run(dry, { ...given, dryRun: true }, env, file)
-        expect(A.filter(dry.log, Str.includes("As things are"))).toEqual([
+        expect(A.filter(dry.current.log, Str.includes("As things are"))).toEqual([
           `say: As things are, a run stops before step 1: ${real}`
         ])
         expect(started(dry)).toEqual([])
@@ -2067,11 +2121,11 @@ describe("infra setup: the dry run says what a run would", () => {
         `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
         O.some(tokenLine)
       )
-      expect(A.join(A.filter(one.log, Str.includes("As things are")), "\n")).not.toContain("Write PREVIEW")
+      expect(A.join(A.filter(one.current.log, Str.includes("As things are")), "\n")).not.toContain("Write PREVIEW")
       // Files that are fine: no stop is said, by the function or the dry run.
       const fine = world({ terminal: false })
       yield* run(fine, options({ sizes: ["staging"], dryRun: true }), untouched, own)
-      expect(A.join(fine.log, "\n")).not.toContain("As things are")
+      expect(A.join(fine.current.log, "\n")).not.toContain("As things are")
       const given = { committed: untouched, own: mine }
       expect(
         filesStop({
@@ -2090,7 +2144,7 @@ describe("infra setup: the dry run says what a run would", () => {
       const w = world({ terminal: false })
       yield* run(w, options({ dryRun: true }), untouched, own)
       const script = A.last(subdomainCall.args).pipe(O.getOrElse(() => ""))
-      expect(A.join(w.log, "\n")).toContain(`sh -c ${shellQuoted(script)}`)
+      expect(A.join(w.current.log, "\n")).toContain(`sh -c ${shellQuoted(script)}`)
       expect(shellQuoted("printf 'a' x")).toBe("'printf '\\''a'\\'' x'")
       expect(shellQuoted("plain")).toBe("'plain'")
       expect(stateStoreFailed("p")).toContain("--profile p` failed")

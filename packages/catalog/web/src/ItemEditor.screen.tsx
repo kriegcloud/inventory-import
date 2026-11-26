@@ -66,7 +66,7 @@ const changedMeanwhile = (error: unknown): O.Option<StoredItem> =>
   O.map(O.liftPredicate(isItemChanged)(error), (changed) => changed.item)
 
 /** What only an import writes, shown and not changed here: the tags, the dimensions and every vendor. */
-function FromTheFile(props: { item: StoredItem }) {
+function FromTheFile(props: { readonly item: StoredItem }) {
   const { item } = props
   return (
     <dl className="flex flex-col gap-2 text-sm">
@@ -291,9 +291,9 @@ export const editItem = Atom.family((id: StoredItem["id"]) =>
  * than overwritten. An item that has been changed is kept if the import that created it is taken back.
  */
 export function ItemEditor(props: {
-  item: StoredItem
+  readonly item: StoredItem
   /** What opens it: a small pencil in a table's row, or a full-size "Edit" button on a phone's card. */
-  trigger: "icon" | "button"
+  readonly trigger: "icon" | "button"
 }) {
   const ids = {
     name: useId(),

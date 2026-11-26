@@ -34,7 +34,11 @@ const page = vi.hoisted(() => {
   const state = {
     drawn: false,
     went: [] as Array<string>,
-    toasts: [] as Array<{ title: string; description: O.Option<string>; again: O.Option<() => void> }>
+    toasts: [] as Array<{
+      readonly title: string
+      readonly description: O.Option<string>
+      readonly again: O.Option<() => void>
+    }>
   }
   Object.assign(globalThis, {
     document: { cookie: "", querySelector: () => (state.drawn ? {} : null) },
@@ -56,7 +60,10 @@ vi.mock("sonner", () => ({
   toast: Object.assign(() => 0, {
     dismiss: () => undefined,
     success: () => 0,
-    error: (title: string, options?: { description?: string; action?: { onClick: () => void } }) => {
+    error: (
+      title: string,
+      options?: { readonly description?: string; readonly action?: { readonly onClick: () => void } }
+    ) => {
       page.toasts.push({
         title,
         description: O.fromUndefinedOr(options?.description),

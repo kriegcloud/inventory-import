@@ -1,3 +1,4 @@
+import * as MutableRef from "effect/MutableRef"
 import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 // The undo history behind a review's decisions, kept in this browser per person and import. The rule: it is written
 // with every decision, and used when the review is opened again only while it ends at the decisions the server
@@ -90,7 +91,8 @@ const memberOf = (member: string) =>
 const visitStart: { readonly member: string; readonly saves: "taken" | "lost"; readonly reads: "answered" | "silent" } =
   { member: "mem_dana", saves: "taken", reads: "silent" }
 const visit = (id: ImportId, options: typeof visitStart) => {
-  const server: { revision: number; decisions: SavedDecisions } = { revision: 0, decisions: {} }
+  const server: MutableRef.MutableRef<{ readonly revision: number; readonly decisions: SavedDecisions }> =
+    MutableRef.make<{ readonly revision: number; readonly decisions: SavedDecisions }>({ revision: 0, decisions: {} })
   const sent: Array<SaveRequest> = []
   const registry = registryFor({
     ...registryStart,
@@ -99,14 +101,14 @@ const visit = (id: ImportId, options: typeof visitStart) => {
         // A read of the import never answers, unless the test says the server answers it with what it holds.
         get: () =>
           options.reads === "answered"
-            ? Effect.sync(() => viewAt({ id, revision: server.revision, decisions: server.decisions }))
+            ? Effect.sync(() => viewAt({ id, revision: server.current.revision, decisions: server.current.decisions }))
             : Deferred.await(Deferred.makeUnsafe<ImportView>()),
         // The server takes every save, unless the test says the network loses them: those never answer.
         decide: (request: { readonly payload: SaveRequest }) => {
           sent.push(request.payload)
           if (options.saves === "lost") return Deferred.await(Deferred.makeUnsafe<Saved>())
-          server.revision += 1
-          return Effect.succeed({ revision: server.revision, changed: true, notApplied: [], decidedSince: [] })
+          server.current = { ...server.current, revision: server.current.revision + 1 }
+          return Effect.succeed({ revision: server.current.revision, changed: true, notApplied: [], decidedSince: [] })
         }
       }
     },
@@ -117,8 +119,8 @@ const visit = (id: ImportId, options: typeof visitStart) => {
     sent,
     /** The server's view is in the tab and the step is drawn. */
     open: (revision: number, decisions: SavedDecisions) => {
-      server.revision = revision
-      server.decisions = decisions
+      server.current = { ...server.current, revision: revision }
+      server.current = { ...server.current, decisions: decisions }
       registry.set(importView(id), viewAt({ id, revision, decisions }))
       registry.mount(importViewShown(id))
       registry.mount(reviewLocal(id))

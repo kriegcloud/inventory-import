@@ -115,8 +115,8 @@ export type Lines = Readonly<Record<string, Line>>
 
 /** Which answer of a row's line the person picked: what the server holds, or one of the sides, named by its decision. */
 export type Keep = Data.TaggedEnum<{
-  Theirs: {}
-  Side: { readonly decision: O.Option<RowDecision> }
+  readonly Theirs: {}
+  readonly Side: { readonly decision: O.Option<RowDecision> }
 }>
 export const Keep = Data.taggedEnum<Keep>()
 
@@ -344,22 +344,22 @@ export type DraftEvent = Data.TaggedEnum<{
    * A step of the import that follows its draft is drawn, the first time or again. `kept`: what this browser kept from
    * before a reload, read when the step is drawn.
    */
-  Opened: { readonly kept: O.Option<Waiting> }
+  readonly Opened: { readonly kept: O.Option<Waiting> }
   /** The Review step left the screen. */
-  Left: {}
+  readonly Left: {}
   /**
    * What a tab of the person's that is gone (closed or crashed) kept for this import, taken up by this tab; or, with
    * `here`, what this tab itself kept, read after its step had opened.
    */
-  TakenUp: { readonly kept: Waiting; readonly here: boolean }
+  readonly TakenUp: { readonly kept: Waiting; readonly here: boolean }
   /** The person changed these rows. */
-  Decided: { readonly changes: RowChanges }
+  readonly Decided: { readonly changes: RowChanges }
   /**
    * The server answered the save of this id: the draft is at `revision`, and `changed` says whether this save is
    * what moved it there. When it changed nothing (the server already held every row as sent), `revision` is not the
    * person's own next one: it is wherever the draft had got to, with whatever others decided on the way.
    */
-  SaveAnswered: {
+  readonly SaveAnswered: {
     readonly id: number
     readonly revision: number
     readonly changed: boolean
@@ -369,26 +369,26 @@ export type DraftEvent = Data.TaggedEnum<{
     readonly decidedSince: ReadonlyArray<DecidedSince>
   }
   /** The save did not get through (the network, a server error): the rows are not lost, and wait. */
-  SaveFailed: { readonly id: number }
+  readonly SaveFailed: { readonly id: number }
   /**
    * The save was not taken because nobody is signed in: not a refusal. The rows wait, kept in this browser, and are
    * sent after the person signs in again.
    */
-  SaveSignedOut: { readonly id: number }
+  readonly SaveSignedOut: { readonly id: number }
   /** The person pressed "Save again". */
-  SaveAgain: {}
+  readonly SaveAgain: {}
   /**
    * The server refused the rows (the import was confirmed or removed meanwhile, the role was taken away), with its
    * sentence for the person.
    */
-  SaveRefused: { readonly id: number; readonly reason: string }
+  readonly SaveRefused: { readonly id: number; readonly reason: string }
   /** The person settled lines: which answer of each row stands. A refused decision is never sent by it. */
-  Settled: { readonly picks: ReadonlyArray<LinePick> }
+  readonly Settled: { readonly picks: ReadonlyArray<LinePick> }
   /**
    * A picture of the import arrived: a read, a match's answer, a card's Continue. `open`: whether the import can
    * still be decided; a picture of one that cannot ends the draft.
    */
-  ViewArrived: Picture & {
+  readonly ViewArrived: Picture & {
     readonly open: boolean
     /** How many times the import has been confirmed, taken back ones included: the view's history counts them. */
     readonly confirms: number
@@ -403,26 +403,26 @@ export type DraftEvent = Data.TaggedEnum<{
      */
     readonly takenBack: ReadonlyArray<TakenBackAt>
   }
-  MatchStarted: {}
-  MatchEnded: {}
+  readonly MatchStarted: {}
+  readonly MatchEnded: {}
   /** The person pressed the confirm button. */
-  ConfirmPressed: {}
+  readonly ConfirmPressed: {}
   /**
    * The server made the confirm, and answered with the import as it now is: closed, with these decisions. Rows the
    * person decided while it was out were not part of it.
    */
-  ConfirmDone: Picture & { readonly id: number }
+  readonly ConfirmDone: Picture & { readonly id: number }
   /** The server refused the confirm and wrote nothing: the draft is at another revision than the one it named. */
-  ConfirmMoved: { readonly id: number }
+  readonly ConfirmMoved: { readonly id: number }
   /**
    * The confirm did not get through, or was refused for another reason (the import is closed): what was written is
    * not known until the import is read again.
    */
-  ConfirmFailed: { readonly id: number }
+  readonly ConfirmFailed: { readonly id: number }
   /** The server refused the confirm and wrote nothing: it carried accepts made before their column was matched again. */
-  ConfirmStale: { readonly id: number; readonly accepts: ReadonlyArray<StaleAccept> }
+  readonly ConfirmStale: { readonly id: number; readonly accepts: ReadonlyArray<StaleAccept> }
   /** The result screen has shown the rows that were left over. */
-  LeftOverNamed: {}
+  readonly LeftOverNamed: {}
 }>
 export const DraftEvent = Data.taggedEnum<DraftEvent>()
 
@@ -435,26 +435,26 @@ export interface TakenBackAt {
 /** What the person is told, in the machine's own terms: said only when the thing it is about was really out. */
 export type Said = Data.TaggedEnum<{
   /** A save did not get through: the rows are on the screen, not saved yet, and wait to be sent again. */
-  NotSaved: {}
+  readonly NotSaved: {}
   /** A save was not taken because nobody is signed in: the rows wait, and are sent after sign-in. */
-  SignedOut: {}
+  readonly SignedOut: {}
   /** The server refused a save: the rows it carried are on lines above the review, with `reason`. */
-  Refused: { readonly reason: string }
+  readonly Refused: { readonly reason: string }
   /** Decisions were not applied (a column they rest on was matched again): each row shows what it now reads. */
-  AcceptsTakenBack: { readonly accepts: ReadonlyArray<StaleAccept> }
+  readonly AcceptsTakenBack: { readonly accepts: ReadonlyArray<StaleAccept> }
   /** Rows sent while the review is not on screen were decided otherwise since: they are on lines there. */
-  DecidedSince: { readonly rows: ReadonlyArray<string> }
+  readonly DecidedSince: { readonly rows: ReadonlyArray<string> }
   /**
    * Rows sent while the review is not on screen were not written, and what the server holds of each is, as far as this
    * tab can tell, an earlier decision of the person's or what a match left of one: they are on lines there, which say
    * what is saved and not who saved it.
    */
-  SavedOtherwise: { readonly rows: ReadonlyArray<string> }
+  readonly SavedOtherwise: { readonly rows: ReadonlyArray<string> }
   /**
    * The person's decisions outlived a confirm of the import (it was confirmed, and opened again, before they were
    * sent): they were not part of it and are not sent into it.
    */
-  Outlived: Named
+  readonly Outlived: Named
 }>
 export const Said = Data.taggedEnum<Said>()
 
@@ -465,21 +465,21 @@ export type DraftEffect = Data.TaggedEnum<{
    * what `over` names only; say how it went with `SaveAnswered`, `SaveFailed`, `SaveSignedOut` or `SaveRefused`, and
    * this id.
    */
-  Send: { readonly id: number; readonly delta: DecisionDelta; readonly madeOn: MadeOn; readonly over: Several }
+  readonly Send: { readonly id: number; readonly delta: DecisionDelta; readonly madeOn: MadeOn; readonly over: Several }
   /** Tell the person. */
-  Say: { readonly what: Said }
+  readonly Say: { readonly what: Said }
   /** Ask the server for the import again. */
-  Ask: {}
+  readonly Ask: {}
   /** The person's own save moved the draft on by one: put that into the view held, with no request. */
-  Put: Picture
+  readonly Put: Picture
   /** The decisions under the region changed: draw it again from what is shown now. `announce`: say it was elsewhere. */
-  Restart: { readonly announce: boolean }
+  readonly Restart: { readonly announce: boolean }
   /**
    * Confirm the import as the screen shows it: the picture of `revision`, with the person's rows the server has not
    * been sent. Sent once; say how it went with `ConfirmDone`, `ConfirmMoved`, `ConfirmStale` or `ConfirmFailed`, and
    * this id.
    */
-  Confirm: {
+  readonly Confirm: {
     readonly id: number
     readonly revision: number
     readonly madeOn: MadeOn

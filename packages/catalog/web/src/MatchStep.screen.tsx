@@ -24,18 +24,22 @@ const howWords = {
   none: "Not matched"
 }
 
-type Row = { match: ColumnMatch }
+type Row = { readonly match: ColumnMatch }
 
 /**
  * Which file column fills which field, with three examples of each. The person changes a match with the select. The
  * review waits until every required field has a column: the button is off and the line under the title names the
  * fields left. A file none of whose columns matches a field is said to be likely the wrong file, with the way back.
  */
-export function MatchStep(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
+export function MatchStep(props: {
+  readonly view: ImportView
+  readonly table: StagedTable
+  readonly canImport: boolean
+}) {
   const { view, table } = props
   const matching = useAtomValue(matchColumn).waiting
   const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
-  const match = (input: { field: Field; column: O.Option<number> }) =>
+  const match = (input: { readonly field: Field; readonly column: O.Option<number> }) =>
     void matchOne({ id: view.id, field: input.field, column: input.column }).then((exit) => {
       if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
     })

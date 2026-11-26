@@ -85,7 +85,7 @@ const readAgain = Atom.fnSync((id: ImportId, get) => {
 const isGone = S.is(ImportNotFound)
 
 /** Above a step that stays drawn: the import could not be read again, and when it will be. */
-function NotReadAgain(props: { importId: ImportId; error: unknown }) {
+function NotReadAgain(props: { readonly importId: ImportId; readonly error: unknown }) {
   const again = useAtomSet(readAgain)
   return (
     <div className="max-h-1/3 flex-none overflow-y-auto">

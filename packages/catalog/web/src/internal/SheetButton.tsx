@@ -17,7 +17,7 @@ import { startUpload } from "../Upload.controller.ts"
  * file, and the sheet's name is in the review's activity instead. Another sheet is a new upload, so the person goes
  * to the upload screen and watches it there.
  */
-export function SheetButton(props: { importId: ImportId }) {
+export function SheetButton(props: { readonly importId: ImportId }) {
   const start = useAtomSet(startUpload)
   const opened = useAtomValue(openWorkbook(props.importId))
   return O.match(

@@ -15,10 +15,10 @@ export function SheetChooser({
   onChoose,
   disabled = false
 }: {
-  sheets: ReadonlyArray<SheetSummary>
-  chosen: SheetChoice
-  onChoose: (sheetName: string) => void
-  disabled?: boolean
+  readonly sheets: ReadonlyArray<SheetSummary>
+  readonly chosen: SheetChoice
+  readonly onChoose: (sheetName: string) => void
+  readonly disabled?: boolean
 }) {
   const id = useId()
   const readable = A.filter(sheets, (sheet) => sheet.rowCount > 0)

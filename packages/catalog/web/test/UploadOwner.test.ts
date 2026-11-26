@@ -1,3 +1,4 @@
+import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
 import * as O from "effect/Option"
 // An upload is one member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody
@@ -31,17 +32,20 @@ import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 // The browser: its window, the reader's worker (the test says what it has read), and what is asked of the server as the
 // page goes.
 const browser = vi.hoisted(() => {
-  const readers: Array<{ onmessage: ((event: { data: unknown }) => void) | null; ended: boolean }> = []
+  const readers: Array<{
+    readonly onmessage: ((event: { readonly data: unknown }) => void) | null
+    readonly ended: MutableRef.MutableRef<boolean>
+  }> = []
   const asked: Array<O.Option<string>> = []
   class Reader {
-    onmessage: ((event: { data: unknown }) => void) | null = null
-    onerror: unknown = null
-    ended = false
+    readonly onmessage: ((event: { readonly data: unknown }) => void) | null = null
+    readonly onerror: unknown = null
+    readonly ended = MutableRef.make(false)
     postMessage() {
       readers.push(this)
     }
     terminate() {
-      this.ended = true
+      this.ended.current = true
     }
   }
   Object.assign(globalThis, {
@@ -201,7 +205,7 @@ describe("an upload", () => {
       yield* settle
       yield* t.switched
       // At once, whatever the reader reads next.
-      expect([t.reader.ended, t.state(), browser.said]).toEqual([
+      expect([t.reader.ended.current, t.state(), browser.said]).toEqual([
         true,
         UploadState.cases.Idle.make({}),
         ["items.csv was not uploaded"]
@@ -263,7 +267,7 @@ describe("an upload, when the person presses another organization", () => {
       const switching = yield* Effect.forkChild(settledBeforeOwnSwitch(t.registry))
       yield* settle
       // Done before the switch: nothing more is read or sent, and what was staged is deleted.
-      expect([ended(switching), t.reader.ended, t.sent]).toEqual([true, true, ["begin", "chunk", "discard"]])
+      expect([ended(switching), t.reader.ended.current, t.sent]).toEqual([true, true, ["begin", "chunk", "discard"]])
       expect([t.state(), browser.said, A.map(t.ended, UploadEnd.$is("Failed"))]).toEqual([
         UploadState.cases.Idle.make({}),
         ["items.csv was not uploaded"],

@@ -49,8 +49,8 @@ export type ItemFormProblems = Partial<
  * tests tell the two apart with its own `$match` and `$is`, and build either with its constructor.
  */
 export type ItemFormReading = Data.TaggedEnum<{
-  Edit: { readonly edit: ItemEdit }
-  Problems: { readonly problems: ItemFormProblems }
+  readonly Edit: { readonly edit: ItemEdit }
+  readonly Problems: { readonly problems: ItemFormProblems }
 }>
 
 /** The constructors, guards and matcher of `ItemFormReading`. */

@@ -10,6 +10,7 @@ import * as Context from "effect/Context"
 import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
@@ -38,16 +39,16 @@ class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/te
  * `clock` (the test's own), the API's runtime runs on it and the server answers at once.
  */
 const world = (clock: O.Option<Clock.Clock>) => {
-  const server: { answer: Effect.Effect<string, Refusal>; times: number } = {
+  const server = MutableRef.make<{ readonly answer: Effect.Effect<string, Refusal>; readonly times: number }>({
     answer: Effect.succeed("rows"),
     times: 0
-  }
+  })
   const layer = Layer.succeed(RowServer, {
     rows: Effect.suspend(() => {
-      server.times += 1
+      server.current = { ...server.current, times: server.current.times + 1 }
       return O.match(clock, {
-        onNone: () => Effect.sleep("1 millis").pipe(Effect.andThen(server.answer)),
-        onSome: () => server.answer
+        onNone: () => Effect.sleep("1 millis").pipe(Effect.andThen(server.current.answer)),
+        onSome: () => server.current.answer
       })
     })
   }).pipe(
@@ -68,24 +69,24 @@ describe("a read that could not be made", () => {
     Effect.gen(function* () {
       const t = world(O.none())
       yield* settle
-      t.server.answer = t.down
+      t.server.current = { ...t.server.current, answer: t.down }
       t.rows.askAgain(t.registry, O.none())
       yield* settle
       expect(AsyncResult.isFailure(t.read())).toBe(true)
-      const before = t.server.times
+      const before = t.server.current.times
       window.dispatchEvent(new Event("online"))
       yield* settle
       // Still down: tried (and once more, as every read is), and left until the next sign.
-      expect([t.server.times - before, AsyncResult.isFailure(t.read())]).toEqual([2, true])
-      t.server.answer = Effect.succeed("fresh rows")
+      expect([t.server.current.times - before, AsyncResult.isFailure(t.read())]).toEqual([2, true])
+      t.server.current = { ...t.server.current, answer: Effect.succeed("fresh rows") }
       serverAnswered(200)
       yield* settle
       expect(AsyncResult.value(t.read())).toEqual(O.some("fresh rows"))
-      const after = t.server.times
+      const after = t.server.current.times
       serverAnswered(200)
       window.dispatchEvent(new Event("online"))
       yield* settle
-      expect(t.server.times).toBe(after)
+      expect(t.server.current.times).toBe(after)
     })
   )
 
@@ -93,10 +94,10 @@ describe("a read that could not be made", () => {
     Effect.gen(function* () {
       const t = world(O.none())
       yield* settle
-      t.server.answer = t.down
+      t.server.current = { ...t.server.current, answer: t.down }
       t.rows.askAgain(t.registry, O.none())
       yield* settle
-      t.server.answer = Effect.succeed("fresh rows")
+      t.server.current = { ...t.server.current, answer: Effect.succeed("fresh rows") }
       const context = yield* Effect.context<never>()
       const signal = yield* Effect.abortSignal
       let observed: RequestInit | undefined
@@ -141,28 +142,31 @@ describe("a read that could not be made", () => {
     Effect.gen(function* () {
       const t = world(O.none())
       yield* settle
-      t.server.answer = Effect.fail(Forbidden.make({ reason: "Your role is viewer.", required: "editor" }))
+      t.server.current = {
+        ...t.server.current,
+        answer: Effect.fail(Forbidden.make({ reason: "Your role is viewer.", required: "editor" }))
+      }
       t.rows.askAgain(t.registry, O.none())
       yield* settle
-      const refused = t.server.times
+      const refused = t.server.current.times
       serverAnswered(200)
       window.dispatchEvent(new Event("online"))
       yield* settle
-      expect(t.server.times).toBe(refused)
-      t.server.answer = t.down
+      expect(t.server.current.times).toBe(refused)
+      t.server.current = { ...t.server.current, answer: t.down }
       t.rows.askAgain(t.registry, O.none())
       yield* settle
-      const failed = t.server.times
+      const failed = t.server.current.times
       serverAnswered(503)
       serverAnswered(429)
       yield* settle
-      expect(t.server.times).toBe(failed)
+      expect(t.server.current.times).toBe(failed)
       t.registry.mount(t.rows)
       t.stop()
       yield* settle
       serverAnswered(200)
       yield* settle
-      expect(t.server.times).toBe(failed)
+      expect(t.server.current.times).toBe(failed)
     })
   )
 })
@@ -174,25 +178,25 @@ describe("a read that could not be made, on a quiet page", () => {
       const t = world(O.some(clock))
       const tick = (by: Duration.Input) => TestClock.adjust(by)
       yield* tick("1 second")
-      t.server.answer = t.down
+      t.server.current = { ...t.server.current, answer: t.down }
       t.rows.askAgain(t.registry, O.none())
       yield* tick("1 second")
       expect(AsyncResult.isFailure(t.read())).toBe(true)
-      const failed = t.server.times
+      const failed = t.server.current.times
       // Half a minute after it failed, and not before.
       yield* tick("28 seconds")
-      expect(t.server.times).toBe(failed)
+      expect(t.server.current.times).toBe(failed)
       yield* tick("1 second")
       // Asked again (and once more, as every read is), still down: and again half a minute later.
-      expect(t.server.times - failed).toBe(2)
+      expect(t.server.current.times - failed).toBe(2)
       yield* tick("30 seconds")
-      expect(t.server.times - failed).toBe(4)
-      t.server.answer = Effect.succeed("fresh rows")
+      expect(t.server.current.times - failed).toBe(4)
+      t.server.current = { ...t.server.current, answer: Effect.succeed("fresh rows") }
       yield* tick("30 seconds")
       expect(AsyncResult.value(t.read())).toEqual(O.some("fresh rows"))
-      const answered = t.server.times
+      const answered = t.server.current.times
       yield* tick("2 minutes")
-      expect(t.server.times).toBe(answered)
+      expect(t.server.current.times).toBe(answered)
     })
   )
 })

@@ -165,8 +165,8 @@ const encodeVendors = S.encodeOption(VendorsCell)
 
 /** A value of a cell that holds JSON: read (`ok`), or the sentence that says what is wrong with it (`bad`). */
 export type Read<A> = Data.TaggedEnum<{
-  ok: { readonly value: A }
-  bad: { readonly message: string }
+  readonly ok: { readonly value: A }
+  readonly bad: { readonly message: string }
 }>
 
 /** A value of a cell that holds JSON, read. */

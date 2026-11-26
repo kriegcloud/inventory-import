@@ -190,63 +190,64 @@ export function makeJobs(): ReadonlyArray<Job> {
   let comma = 0
   let stranger = 0
   for (const [jobAt, lineAt, kind] of questions) {
-    const job = jobs[jobAt]
-    const target = job?.lines[lineAt]
-    if (job === undefined || target === undefined) continue
-    const lines = [...job.lines]
-    if (kind === "unit") {
-      const bar = materials[(jobAt + lineAt) % 4] ?? A.headNonEmpty(materials)
-      lines[lineAt] = {
-        ...target,
-        material: bar.name,
-        sku: bar.sku,
-        unit: "length",
-        problem: Problem.makeOption({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
+    const foundJob = A.get(jobs, jobAt)
+    const foundTarget = O.flatMap(foundJob, (job) => A.get(job.lines, lineAt))
+    O.map(O.all({ job: foundJob, target: foundTarget }), ({ job, target }) => {
+      const lines = [...job.lines]
+      if (kind === "unit") {
+        const bar = materials[(jobAt + lineAt) % 4] ?? A.headNonEmpty(materials)
+        lines[lineAt] = {
+          ...target,
+          material: bar.name,
+          sku: bar.sku,
+          unit: "length",
+          problem: Problem.makeOption({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
+        }
       }
-    }
-    if (kind === "comma") {
-      const [qty, material] = commas[comma % commas.length] ?? ["1,5", A.headNonEmpty(materials)]
-      comma += 1
-      const to = qty.replace(",", ".")
-      lines[lineAt] = {
-        ...target,
-        material: material.name,
-        sku: material.sku,
-        unit: material.unit,
-        qty,
-        problem: Problem.makeOption({
-          kind: "comma",
-          column: O.some("qty"),
-          fix: O.some(
-            Fix.make({
-              column: "qty",
-              to,
-              label: O.some("a decimal point"),
-              by: O.some("rule"),
-              confidence: O.some("high"),
-              kind: "comma",
-              group: O.some("qty:comma"),
-              why: {
-                basis: `"${qty}" is ${to} written with a decimal comma.`,
-                detail: O.some("Every other quantity in the file uses a point.")
-              }
-            })
-          )
-        })
+      if (kind === "comma") {
+        const [qty, material] = commas[comma % commas.length] ?? ["1,5", A.headNonEmpty(materials)]
+        comma += 1
+        const to = qty.replace(",", ".")
+        lines[lineAt] = {
+          ...target,
+          material: material.name,
+          sku: material.sku,
+          unit: material.unit,
+          qty,
+          problem: Problem.makeOption({
+            kind: "comma",
+            column: O.some("qty"),
+            fix: O.some(
+              Fix.make({
+                column: "qty",
+                to,
+                label: O.some("a decimal point"),
+                by: O.some("rule"),
+                confidence: O.some("high"),
+                kind: "comma",
+                group: O.some("qty:comma"),
+                why: {
+                  basis: `"${qty}" is ${to} written with a decimal comma.`,
+                  detail: O.some("Every other quantity in the file uses a point.")
+                }
+              })
+            )
+          })
+        }
       }
-    }
-    if (kind === "stock") {
-      const material = strangers[stranger % strangers.length] ?? A.headNonEmpty(strangers)
-      stranger += 1
-      lines[lineAt] = {
-        ...target,
-        material: material.name,
-        sku: material.sku,
-        unit: material.unit,
-        problem: Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
+      if (kind === "stock") {
+        const material = strangers[stranger % strangers.length] ?? A.headNonEmpty(strangers)
+        stranger += 1
+        lines[lineAt] = {
+          ...target,
+          material: material.name,
+          sku: material.sku,
+          unit: material.unit,
+          problem: Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
+        }
       }
-    }
-    job.lines = lines
+      job.lines = lines
+    })
   }
   const all = jobs.flatMap((job) => job.lines)
   for (const job of jobs) {

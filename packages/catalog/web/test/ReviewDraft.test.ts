@@ -1,3 +1,8 @@
+import type { SaveAnswer } from "./support/catalog.ts"
+import { Suggestion, suggestedByRule } from "@inventory/catalog-contract/Suggestion"
+import { RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
+import { ItemFields, active } from "@inventory/catalog-contract/Item"
+import * as BigDecimal from "effect/BigDecimal"
 import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { assertTrue } from "@effect/vitest/utils"
 // The review's draft while its screen is open, without the screen: the machine (`Draft.machine.ts`, tested on its own
@@ -20,13 +25,12 @@ import {
   type DecisionDelta,
   type SaveRequest,
   decisionFromFlags,
-  type SavedDecisions,
-  type DecidedSince
+  type SavedDecisions
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { AlreadyImported } from "@inventory/catalog-contract/ImportRejection"
-import type { StagedTable } from "@inventory/catalog-contract/Staged"
+import { StagedTable } from "@inventory/catalog-contract/Staged"
 import { DraftEvent, type RowChanges, settled } from "../src/Draft.machine.ts"
 import { giveView, importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
@@ -47,7 +51,7 @@ import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.
 const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // What is said to the person.
-const page = vi.hoisted(() => ({ said: [] as Array<string> }))
+const page = vi.hoisted(() => ({ said: Array<string>() }))
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => page.said.push(title), {
     dismiss: () => undefined,
@@ -58,12 +62,7 @@ vi.mock("sonner", () => ({
 }))
 
 /** What the server answers a save with. */
-type Saved = {
-  readonly revision: number
-  readonly changed: boolean
-  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
-  readonly decidedSince: ReadonlyArray<DecidedSince>
-}
+type Saved = SaveAnswer
 
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
@@ -182,7 +181,18 @@ describe("a saved decision", () => {
         yield* settle
         expect(t.deltas()).toEqual([{ set: { "row-1": out }, clear: [] }])
         // Suggestions arrive while the save is out.
-        const suggestions = [{ rowId: "row-3" }] as unknown as ImportView["suggestions"]
+        const suggestions = [
+          Suggestion.cases.name.make({
+            id: SuggestionId.make("00000000-0000-4000-8000-000000000003"),
+            rowId: RowId.make("row-3"),
+            rowNumber: 3,
+            from: "",
+            to: "Bolt",
+            by: suggestedByRule,
+            confidence: "low",
+            basis: "Description names a bolt"
+          })
+        ]
         t.give(t.at({ revision: 10, decisions: { "row-7": kept }, suggestions }))
         yield* t.answerSave(0, 11, true)
         yield* settle
@@ -245,7 +255,24 @@ describe("a saved decision", () => {
       yield* settle
       // The second save's answer is put into the view while the ask is out, and does not end it: one ask, still out.
       expect([t.gets(), t.held().revision]).toEqual([1, 12])
-      const stored = [{ sku: "AB-1" }] as unknown as ImportView["storedItems"]
+      const stored = [
+        ItemFields.make({
+          sku: "ABC-1001",
+          name: "Bolt",
+          description: O.none(),
+          category: "components",
+          uom: "EA",
+          unitCost: BigDecimal.make(1n, 0),
+          quantityOnHand: 1,
+          reorderPoint: O.none(),
+          stocking: active,
+          lotTracked: false,
+          tags: [],
+          firstReceivedOn: O.none(),
+          dimensions: O.none(),
+          vendors: []
+        })
+      ]
       // The ask lands with what the server held when it left. The view keeps the later picture the save put in place,
       // and the server is asked once more, for what that save changed.
       yield* t.answerGet(0, t.at({ revision: 11, decisions: { "row-1": typed }, storedItems: stored }))
@@ -465,7 +492,15 @@ describe("the review's input", () => {
     Effect.gen(function* () {
       const id = importNo(9)
       const t = world(id)
-      const table = { rows: [] } as unknown as StagedTable
+      const table = StagedTable.make({
+        fileName: "items.csv",
+        kind: "csv",
+        sheet: O.none(),
+        headerRowNumber: 1,
+        columns: [{ index: 0, letter: "A", label: "SKU" }],
+        rows: [],
+        notes: []
+      })
       t.registry.set(importTable(id), table)
       t.registry.mount(importTable(id))
       t.give(t.at({ revision: 10 }))

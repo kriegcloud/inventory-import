@@ -1,3 +1,7 @@
+import type { SuggestAnswer } from "./support/catalog.ts"
+import { Suggestion, suggestedByRule } from "@inventory/catalog-contract/Suggestion"
+import { SuggestionId, RowId } from "@inventory/catalog-contract/Ids"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import * as A from "effect/Array"
 import { assertTrue } from "@effect/vitest/utils"
 // An answer put into the import's view (suggestions, a match) must change only its own part of what the view holds
@@ -14,12 +18,21 @@ import { importView, matchColumn, suggestFixes } from "../src/Imports.atoms.ts"
 import { importId, registryWith, viewAt } from "./support/catalog.ts"
 
 const settle = Effect.sleep("10 millis")
-const suggestion = { rowId: "row-3" }
+const suggestion = Suggestion.cases.name.make({
+  id: SuggestionId.make("00000000-0000-4000-8000-000000000003"),
+  rowId: RowId.make("row-3"),
+  rowNumber: 3,
+  from: "",
+  to: "Bolt",
+  by: suggestedByRule,
+  confidence: "low",
+  basis: "Description names a bolt"
+})
 
 describe("an answer put into the import's view", () => {
   it.live("suggestions change only the suggestions of the view held when they arrive", () =>
     Effect.gen(function* () {
-      const answer = Deferred.makeUnsafe<{ readonly suggestions: ReadonlyArray<unknown> }>()
+      const answer = Deferred.makeUnsafe<SuggestAnswer>()
       const registry = registryWith({ imports: { suggest: () => Deferred.await(answer) } })
       const read = importView(importId)
       registry.mount(read)
@@ -31,7 +44,12 @@ describe("an answer put into the import's view", () => {
       // Three decisions are saved while the model works: the view moves to revision 13.
       const decisions = { "row-1": decisionFromFlags({ out: true }) }
       registry.set(read, viewAt({ revision: 13, decisions }))
-      yield* Deferred.succeed(answer, { suggestions: [suggestion] })
+      yield* Deferred.succeed(answer, {
+        suggestions: [suggestion],
+        made: [suggestion],
+        answeredBy: AnsweredBy.cases.Rules.make({ reason: "Rules supplied the name" }),
+        lines: []
+      })
       yield* settle
       const expectedSome1 = registry.get(read).pipe(AsyncResult.value)
       assertTrue(O.isSome(expectedSome1), "expected registry.get(read).pipe(AsyncResult.value)")

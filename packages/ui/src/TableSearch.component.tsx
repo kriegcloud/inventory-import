@@ -59,7 +59,10 @@ interface Shown {
 }
 
 /** The part of a data table the box works with: the search it holds, and the way to ask it for another. */
-type Searched = Pick<Table<DataTableFeatures, RowData>, "atoms" | "setGlobalFilter">
+type Searched = {
+  readonly atoms: Pick<Table<DataTableFeatures, RowData>["atoms"], "globalFilter">
+  readonly setGlobalFilter: Table<DataTableFeatures, RowData>["setGlobalFilter"]
+}
 
 /** One box's atoms and what its field can ask of them. */
 interface BoxScoped {
@@ -254,7 +257,12 @@ export function TableSearch<Row extends RowData>(props: TableSearchProps<Row>) {
   const fieldId = useId()
   return (
     // One scope serves every kind of row: the box reads the table's search and nothing of its rows.
-    <BoxScope.Provider value={{ fieldId, table: props.table as never }}>
+    <BoxScope.Provider
+      value={{
+        fieldId,
+        table: { atoms: { globalFilter: props.table.atoms.globalFilter }, setGlobalFilter: props.table.setGlobalFilter }
+      }}
+    >
       <SearchBox {...props} fieldId={fieldId} />
     </BoxScope.Provider>
   )

@@ -1,3 +1,4 @@
+import type { SaveAnswer } from "./support/catalog.ts"
 import * as MutableRef from "effect/MutableRef"
 import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 // The undo history behind a review's decisions, kept in this browser per person and import. The rule: it is written
@@ -19,12 +20,7 @@ import { DisplayName } from "@inventory/kernel/Text"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
-import {
-  decisionFromFlags,
-  type SavedDecisions,
-  type SaveRequest,
-  type DecidedSince
-} from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
@@ -66,12 +62,7 @@ const browser = vi.hoisted(() => {
 })
 
 /** What the server answers a save with. */
-type Saved = {
-  readonly revision: number
-  readonly changed: boolean
-  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
-  readonly decidedSince: ReadonlyArray<DecidedSince>
-}
+type Saved = SaveAnswer
 
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })

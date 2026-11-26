@@ -20,7 +20,7 @@ import {
   type SaveRequest,
   decisionFromFlags
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { draftOf } from "../src/Draft.atoms.ts"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -41,9 +41,9 @@ const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // What is said to the person.
 const page = vi.hoisted(() => ({
-  said: [] as Array<string>,
-  descriptions: [] as Array<O.Option<string>>,
-  actions: [] as Array<() => void>
+  said: Array<string>(),
+  descriptions: Array<O.Option<string>>(),
+  actions: Array<() => void>()
 }))
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => page.said.push(title), {

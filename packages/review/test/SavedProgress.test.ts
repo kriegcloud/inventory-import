@@ -34,7 +34,8 @@ const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // The browser's storage, which outlives a refresh. `refuse` makes it a full disk: every write throws.
 const browser = vi.hoisted(() => {
-  const state = { items: {} as Record<string, string>, refuse: false }
+  const items: Record<string, string> = {}
+  const state = { items, refuse: false }
   Object.assign(globalThis, {
     window: {
       localStorage: {

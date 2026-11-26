@@ -1,3 +1,5 @@
+import type { ConfirmRequest } from "@inventory/catalog-contract/Decision"
+import type { SaveAnswer } from "./support/catalog.ts"
 import * as MutableRef from "effect/MutableRef"
 import { RowId } from "@inventory/catalog-contract/Ids"
 import { identity } from "effect/Function"
@@ -23,7 +25,7 @@ import { DisplayName } from "@inventory/kernel/Text"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
 import { decisionFromFlags, type SaveRequest } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { DraftBusy, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
@@ -95,7 +97,7 @@ const browser = vi.hoisted(() => {
       }
     }
   })
-  return { kept, tab, listeners, said: [] as Array<string> }
+  return { kept, tab, listeners, said: Array<string>() }
 })
 
 // What is said to the person, by title.
@@ -172,9 +174,10 @@ const page = (
   }>,
   session: O.Option<ReturnType<typeof sessionStandIn>>
 ) => {
-  const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
+  const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<SaveAnswer, SaveFailure> }> =
+    []
   // The confirms sent; the server never answers one.
-  const commits: Array<SaveRequest & { readonly revision: number }> = []
+  const commits: Array<ConfirmRequest> = []
   const who = Atom.make(signedIn)
   const asking = Atom.make(false).pipe(Atom.keepAlive)
   const asked = { times: 0 }
@@ -198,13 +201,13 @@ const page = (
                 onSome: Effect.succeed
               }),
         decide: (request: { readonly payload: SaveRequest }) =>
-          Effect.suspend((): Effect.Effect<unknown, SaveFailure | NotSignedIn> => {
-            const answer = Deferred.makeUnsafe<unknown, SaveFailure>()
+          Effect.suspend((): Effect.Effect<SaveAnswer, SaveFailure | NotSignedIn> => {
+            const answer = Deferred.makeUnsafe<SaveAnswer, SaveFailure>()
             saves.push({ payload: request.payload, answer })
             if (server.current.signedOut) return Effect.fail(NotSignedIn.make({ reason: "Sign in to continue." }))
             return Deferred.await(answer)
           }),
-        commit: (request: { readonly payload: SaveRequest & { readonly revision: number } }) =>
+        commit: (request: { readonly payload: ConfirmRequest }) =>
           Effect.suspend(() => {
             commits.push(request.payload)
             return Deferred.await(Deferred.makeUnsafe<ImportView>())

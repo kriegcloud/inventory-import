@@ -1,3 +1,4 @@
+import { uploadDiscard } from "@inventory/catalog-contract/Upload"
 import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
 import * as O from "effect/Option"
@@ -17,16 +18,15 @@ import * as Result from "effect/Result"
 import { vi } from "vitest"
 import { makeApi } from "@inventory/client/ApiRuntime"
 import { leavingApp } from "@inventory/ui/Route"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { settledBeforeOwnSwitch } from "@inventory/client/MemberAtoms"
 import type * as Fiber from "effect/Fiber"
-import { type CatalogApiClient, CatalogClient, configureCatalog } from "../src/Catalog.runtime.ts"
+import { CatalogClient, configureCatalog } from "../src/Catalog.runtime.ts"
 import { ReadMessage, type PlainHead } from "../src/internal/protocol.ts"
 import { UploadState } from "../src/Upload.machine.ts"
 import { startUpload, UploadEnd, uploadState } from "../src/Upload.controller.ts"
-import { importId, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+import { catalogClientWith, importId, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its window, the reader's worker (the test says what it has read), and what is asked of the server as the
@@ -60,7 +60,7 @@ const browser = vi.hoisted(() => {
       return Promise.resolve(new Response(null, { status: 204 }))
     }
   })
-  return { readers, asked, said: [] as Array<string>, described: [] as Array<O.Option<string>> }
+  return { readers, asked, said: Array<string>(), described: Array<O.Option<string>>() }
 })
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => browser.said.push(title), {
@@ -74,7 +74,7 @@ vi.mock("sonner", () => ({
 vi.mock("../src/ReviewStep.screen.tsx", () => ({ ReviewStep: () => null }))
 
 const settle = Effect.sleep("20 millis")
-const uploadId = importId as ImportId
+const uploadId = importId
 const head = {
   fileName: "items.csv",
   kind: "csv",
@@ -95,18 +95,22 @@ const world = () => {
       return Result.succeed(answer)
     })
   // The stand-in holds only the endpoints an upload calls: the rest of the client is never reached.
-  const client = {
+  const client = catalogClientWith({
     imports: {
       beginUpload: () => step("begin", { id: uploadId }),
-      putChunk: () => step("chunk", {}),
+      putChunk: () => step("chunk", { seq: 0, rows: 0 }),
       finishUpload: () =>
         Effect.suspend(() => {
           sent.push("finish")
           return Deferred.await(finished)
         }),
-      discardUpload: () => Effect.sync(() => sent.push("discard"))
+      discardUpload: () =>
+        Effect.sync(() => {
+          sent.push("discard")
+          return uploadDiscard(true)
+        })
     }
-  } as unknown as CatalogApiClient
+  })
   const registry = registryFor({
     ...registryStart,
     endpoints: client,
@@ -129,7 +133,7 @@ const world = () => {
   const reader = requiredEntry1.value
   const says = (message: ReadMessage) => reader.onmessage?.({ data: message })
   /** The file's head is read: the upload begins. */
-  const begin = () => says(ReadMessage.Head({ head: head as never, chunkSizes: [1, 1], workbook: null }))
+  const begin = () => says(ReadMessage.Head({ head, chunkSizes: [1, 1], workbook: null }))
   const chunk = (seq: number) => says(ReadMessage.Chunk({ seq, rows: [] }))
   /** She picks her other organization, and the session answers it. */
   const switched = Effect.gen(function* () {

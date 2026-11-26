@@ -38,28 +38,32 @@ const dimensionsCell = (draft: DimensionsDraft): string =>
  * What one open form holds: what was typed (none until something is, the cell's value showing meanwhile) and why
  * the last save was refused. One per form on screen, made in the form's own provider and let go with it.
  */
-const FormScope = ScopedAtom.make(() =>
-  Atom.make<{ readonly typed: O.Option<unknown>; readonly error: O.Option<string> }>({
-    typed: O.none(),
-    error: O.none()
-  })
-)
+const makeFormScope = <Draft,>() =>
+  ScopedAtom.make(() =>
+    Atom.make<{ readonly typed: O.Option<Draft>; readonly error: O.Option<string> }>({
+      typed: O.none(),
+      error: O.none()
+    })
+  )
+
+const DimensionsScope = makeFormScope<DimensionsDraft>()
+const VendorsScope = makeFormScope<ReadonlyArray<VendorDraft>>()
 
 type CellFormProps = { readonly value: string; readonly onSave: (cell: string) => void }
 
 /** Length, width, height and their unit, saved as the cell's JSON once the three read; or no dimensions at all. */
 export function DimensionsForm(props: CellFormProps) {
   return (
-    <FormScope.Provider>
+    <DimensionsScope.Provider>
       <DimensionsFields {...props} />
-    </FormScope.Provider>
+    </DimensionsScope.Provider>
   )
 }
 
 function DimensionsFields(props: CellFormProps) {
   const id = useId()
-  const [held, setHeld] = useAtom(FormScope.use())
-  const draft = O.match(held.typed as O.Option<DimensionsDraft>, {
+  const [held, setHeld] = useAtom(DimensionsScope.use())
+  const draft = O.match(held.typed, {
     onNone: () => dimensionsDraft(props.value),
     onSome: (draft) => draft
   })
@@ -135,16 +139,16 @@ const vendorsCell = (vendors: ReadonlyArray<VendorDraft>): string =>
 /** Up to three vendors, each with a name, its SKU, a unit cost and a lead time, one of them preferred; or none. */
 export function VendorsForm(props: CellFormProps) {
   return (
-    <FormScope.Provider>
+    <VendorsScope.Provider>
       <VendorsFields {...props} />
-    </FormScope.Provider>
+    </VendorsScope.Provider>
   )
 }
 
 function VendorsFields(props: CellFormProps) {
   const id = useId()
-  const [held, setHeld] = useAtom(FormScope.use())
-  const vendors = O.match(held.typed as O.Option<ReadonlyArray<VendorDraft>>, {
+  const [held, setHeld] = useAtom(VendorsScope.use())
+  const vendors = O.match(held.typed, {
     onSome: (vendors) => vendors,
     onNone: () => {
       const found = vendorsDraft(props.value)

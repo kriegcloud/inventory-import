@@ -688,7 +688,7 @@ export function recheck(input: {
   const { cells } = input
   if (O.match(R.get(cells, "name"), { onNone: () => true, onSome: (name) => name.trim() === "" }))
     return Problem.makeOption({ kind: "name", column: O.some("name") })
-  if (!O.exists(R.get(cells, "unit"), (unit) => (units as ReadonlyArray<string>).includes(unit)))
+  if (!O.exists(R.get(cells, "unit"), (unit) => A.some(units, (known) => known === unit)))
     return Problem.makeOption({ kind: "unit", column: O.some("unit") })
   if (!O.exists(R.get(cells, "cost"), (cost) => /^\$?\d[\d,]*(\.\d+)?$/.test(cost.trim())))
     return Problem.makeOption({ kind: "cost", column: O.some("cost") })

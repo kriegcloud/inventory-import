@@ -23,10 +23,10 @@ import {
   XlsxErrorCode,
   XlsxNumberFormat,
   holdsSomething,
-  type XlsxDate,
-  type XlsxNumber,
-  type XlsxText,
-  type XlsxUnreadable,
+  XlsxDate,
+  XlsxNumber,
+  XlsxText,
+  XlsxUnreadable,
   type XlsxValue
 } from "../XlsxCell.schema.ts"
 import {
@@ -44,13 +44,13 @@ import {
   type XlsxLimit
 } from "../XlsxDiagnostic.schema.ts"
 import { MAX_SERIAL } from "../XlsxSerial.schema.ts"
-import type { XlsxRow } from "../XlsxWorkbook.schema.ts"
+import { XlsxRow } from "../XlsxWorkbook.schema.ts"
 import { stop, type Caps } from "./container.ts"
 import { shifted } from "./formula.ts"
 import { isTrue, localName, unescaped, type XmlEvent } from "./ooxml.ts"
 import { serialOf } from "./serial.ts"
 import { isXmlSafe } from "./text.ts"
-import { detached, trusted } from "./trusted.ts"
+import { detached } from "./trusted.ts"
 import { styleOf, type StyleFormat } from "./workbookPart.ts"
 
 /** A cell as a row holds it. */
@@ -498,13 +498,17 @@ export class SheetReader {
     const unreadable = (reason: UnreadableCell["reason"]): XlsxValue => {
       this.warn(UnreadableCell.make({ sheet: this.sheet, address: address(), reason }))
       const written = unescaped(raw)
-      return trusted<XlsxUnreadable>({
-        kind: "Unreadable",
-        raw: detached(S.is(XlsxErrorCode)(written) ? `'${written}` : written)
-      })
+      return XlsxUnreadable.make(
+        {
+          kind: "Unreadable",
+          raw: detached(S.is(XlsxErrorCode)(written) ? `'${written}` : written)
+        },
+        { disableChecks: true }
+      )
     }
     if (this.cellType.current === "inlineStr") {
-      if (this.hasInline.current) value = trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) })
+      if (this.hasInline.current)
+        value = XlsxText.make({ kind: "Text", text: detached(unescaped(raw)) }, { disableChecks: true })
     } else if (this.hasValue.current || this.hasInline.current) {
       value = CellType.matchOrElse(
         this.cellType.current,
@@ -512,9 +516,11 @@ export class SheetReader {
           s: () => {
             const index = Number(Str.trim(raw))
             const text = Number.isInteger(index) && index >= 0 ? this.strings[index] : undefined
-            return text === undefined ? unreadable("sharedString") : trusted<XlsxText>({ kind: "Text", text })
+            return text === undefined
+              ? unreadable("sharedString")
+              : XlsxText.make({ kind: "Text", text }, { disableChecks: true })
           },
-          str: () => trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) }),
+          str: () => XlsxText.make({ kind: "Text", text: detached(unescaped(raw)) }, { disableChecks: true }),
           b: () => {
             const text = Str.toLowerCase(Str.trim(raw))
             return text === "1" || text === "true" ? yes : text === "0" || text === "false" ? no : unreadable("boolean")
@@ -538,7 +544,7 @@ export class SheetReader {
                   })
             if (serial === undefined || serial > MAX_SERIAL) return unreadable("date")
             if (!style.dated) style = shortDate
-            return trusted<XlsxDate>({ kind: "Date", serial })
+            return XlsxDate.make({ kind: "Date", serial }, { disableChecks: true })
           }
         },
         // A number, which is also what a cell of no type or of a type nobody knows holds.
@@ -548,8 +554,8 @@ export class SheetReader {
           const number = numberText.test(text) ? Number(text) : Number.NaN
           if (!Number.isFinite(number)) return unreadable("number")
           return style.dated && number >= 0 && number <= MAX_SERIAL
-            ? trusted<XlsxDate>({ kind: "Date", serial: number })
-            : trusted<XlsxNumber>({ kind: "Number", value: number })
+            ? XlsxDate.make({ kind: "Date", serial: number }, { disableChecks: true })
+            : XlsxNumber.make({ kind: "Number", value: number }, { disableChecks: true })
         }
       )
     }
@@ -585,4 +591,4 @@ export class SheetReader {
 }
 
 /** A read row as the `XlsxRow` it is. */
-export const toRow = (row: ReadRow): XlsxRow => trusted<XlsxRow>(row)
+export const toRow = (row: ReadRow): XlsxRow => XlsxRow.make(row, { disableChecks: true })

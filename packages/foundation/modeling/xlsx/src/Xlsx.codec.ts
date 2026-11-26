@@ -41,7 +41,6 @@ import { renderGeneral } from "./internal/numberFormat.ts"
 import { eventsOf } from "./internal/ooxml.ts"
 import { SheetReader, toRow, type ReadRow, type SheetLayout } from "./internal/sheet.ts"
 import { open, type Opened, type SheetEntry } from "./internal/workbookPart.ts"
-import { trusted } from "./internal/trusted.ts"
 import { archiveOf, partsOf } from "./internal/writer.ts"
 
 type ReadOptions = XlsxCodecOptions["read"]
@@ -155,39 +154,45 @@ const readWorkbook = Effect.fnUntraced(function* (bytes: Uint8Array, options: Re
     const read = MutableHashMap.get(reads, entry.path)
     const layout = O.flatMap(read, (found) => found.layout.current)
     if (O.isSome(read)) for (const warning of read.value.reader.warnings) warnings.push(warning)
-    return trusted<XlsxWorksheet>({
-      info: infoOf(entry, layout),
-      rows: O.match(read, {
-        onNone: A.empty,
-        onSome: (found) =>
-          A.map(
-            settled(
-              MutableList.toArray(found.rows),
-              O.exists(found.layout.current, (l) => l.unordered)
-            ),
-            toRow
-          )
-      }),
-      merges: O.match(layout, { onNone: A.empty, onSome: (found) => found.merges }),
-      hiddenColumns: O.match(layout, { onNone: A.empty, onSome: (found) => A.dedupe(found.hiddenColumns) })
-    })
+    return XlsxWorksheet.make(
+      {
+        info: infoOf(entry, layout),
+        rows: O.match(read, {
+          onNone: A.empty,
+          onSome: (found) =>
+            A.map(
+              settled(
+                MutableList.toArray(found.rows),
+                O.exists(found.layout.current, (l) => l.unordered)
+              ),
+              toRow
+            )
+        }),
+        merges: O.match(layout, { onNone: A.empty, onSome: (found) => found.merges }),
+        hiddenColumns: O.match(layout, { onNone: A.empty, onSome: (found) => A.dedupe(found.hiddenColumns) })
+      },
+      { disableChecks: true }
+    )
   })
   const first = yield* O.match(A.head(sheets), {
     onNone: () => Effect.die("a workbook that opened has a sheet"),
     onSome: Effect.succeed
   })
   return {
-    workbook: trusted<XlsxWorkbook>({
-      dateSystem: opened.dateSystem,
-      sheets: [first, ...A.drop(sheets, 1)],
-      dropped: opened.dropped
-    }),
+    workbook: XlsxWorkbook.make(
+      {
+        dateSystem: opened.dateSystem,
+        sheets: [first, ...A.drop(sheets, 1)],
+        dropped: opened.dropped
+      },
+      { disableChecks: true }
+    ),
     warnings
   }
 })
 
 const readOf = (found: { readonly workbook: XlsxWorkbook; readonly warnings: ReadonlyArray<XlsxWarning> }): XlsxRead =>
-  trusted<XlsxRead>(found)
+  XlsxRead.make(found, { disableChecks: true })
 
 const parseError = (fatal: XlsxFatal): XlsxParseError => XlsxParseError.make({ fatal })
 

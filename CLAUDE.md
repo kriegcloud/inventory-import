@@ -359,7 +359,8 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
                         and write a CSV and an Excel workbook as Effect Schema codecs, and beep-effect's kit, vendored:
                         @beep/types (primitive/), @beep/identity, @beep/schema and @beep/utils (modeling/). Also this repository's own
                         @beep/vocabulary (modeling/vocabulary): the model a vocabulary is written in, its coherence
-                        rules and the makers of the typed helpers; it knows no term of the ERP. Never edit
+                        rules and the makers of the typed helpers; it knows no term of the ERP. `@beep/unsafe-assert` (typing/) holds
+                        the sole explicit compiler claim for approved library typing gaps. Never edit
                         the kit: each vendor.json
                         records its beep-effect commit and file hashes, and `bun run vendor:check` fails on a change.
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
@@ -549,6 +550,16 @@ profile, its copied tests included, with no override.
   happens). `return yield*` a failure; `yield*`, never a bare `yield`.
 - **Every service and error is accounted for**: a missing Layer shows as a type error in `worker.ts`; no `any` or
   `unknown` in an error or requirement channel; no type assertion that hides one.
+- **Type assertions**: decode application values with a Schema, narrow with a guard, or use a checked type annotation.
+  The only compiler claim written here is inside `unsafeAssert<T>(value, "reason")` from `@beep/unsafe-assert`
+  (`packages/foundation/typing/unsafe-assert`), a dependency-free foundation package owned here, outside the hashed
+  kit. Use it only for a library typing gap that cannot be expressed by the library's types. It performs no runtime
+  check. Each call needs an approved, nonempty string-literal reason in
+  `packages/tooling/tool/cli/ledgers/unsafe-asserts.json`, counted by file and exact reason. `assertions:check` refuses
+  unlisted calls, stale entries, indirect helper values and counts or reasons added against the branch's base, even when source and ledger
+  change together. The first ledger is a proposal for Benjamin's approval; later approvals only decrease. Fewer than
+  15 calls are allowed. The old `assertions.json` stays as a migration receipt; an own file removed from the old
+  override must hold zero assertions. The vendored kit and registry lists retain their existing accounting.
 - **Failures stay typed**: errors a caller can act on are `Schema.TaggedError`s (no class extending `Error`); no
   `try/catch` in a generator, no `async` function, no `new Promise`; `Effect.try` and `Effect.tryPromise` always have
   a `catch` that returns a typed error.

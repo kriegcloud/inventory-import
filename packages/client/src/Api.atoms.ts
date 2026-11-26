@@ -49,7 +49,7 @@ export const apiRuntime: Atom.AtomRuntime<unknown> = Effect.die(
  */
 export const provideApi = <R>(layer: Layer.Layer<R>): readonly [Atom.Atom<unknown>, unknown] =>
   // The runtime holds the layer as one that provides anything: what it provides is the app's promise (above).
-  Atom.initialValue(apiRuntime.layer, layer as Layer.Layer<never> as Layer.Layer<unknown>)
+  [apiRuntime.layer, layer]
 
 /**
  * The tab's one record of what changed: a write names its keys here and every read that shows one of them asks again.

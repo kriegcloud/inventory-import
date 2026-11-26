@@ -33,7 +33,7 @@ import {
   readConversation,
   writeConversation
 } from "./Conversation.machine.ts"
-import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "./internal/view.ts"
+import { applyAll, describe, overtaken, takeBack, ViewFilter, type ViewState } from "./internal/view.ts"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { rulesRead } from "@inventory/catalog-model/TableViewRules"
 import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
@@ -67,7 +67,7 @@ export type AssistedTable = {
     readonly globalFilter?: { get(): unknown }
   }
   setSorting(next: ReadonlyArray<{ readonly id: string; readonly desc: boolean }>): void
-  setColumnFilters(next: ReadonlyArray<never>): void
+  setColumnFilters(next: ReadonlyArray<ViewFilter>): void
   setColumnVisibility(next: Record<string, boolean>): void
   setGlobalFilter(next: string): void
 }
@@ -77,9 +77,12 @@ export function useTableView(table: AssistedTable, searchable: boolean) {
   return {
     read: (): ViewState => {
       const search = table.atoms.globalFilter?.get()
+      const filters = A.filter(table.atoms.columnFilters.get(), (filter): filter is ViewFilter =>
+        S.is(ViewFilter)(filter)
+      )
       return {
         sorting: table.atoms.sorting.get(),
-        filters: table.atoms.columnFilters.get() as ReadonlyArray<ViewFilter>,
+        filters,
         visibility: table.atoms.columnVisibility.get(),
         search: typeof search === "string" ? search : ""
       }
@@ -87,7 +90,7 @@ export function useTableView(table: AssistedTable, searchable: boolean) {
     write: (before: ViewState, next: ViewState) => {
       if (stringify(before.sorting) !== stringify(next.sorting)) table.setSorting([...next.sorting])
       if (stringify(before.filters) !== stringify(next.filters)) {
-        table.setColumnFilters(next.filters.map((filter) => ({ ...filter })) as Array<never>)
+        table.setColumnFilters(next.filters.map((filter) => ({ ...filter })))
       }
       if (stringify(before.visibility) !== stringify(next.visibility)) {
         table.setColumnVisibility({ ...next.visibility })

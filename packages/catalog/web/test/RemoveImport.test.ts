@@ -1,3 +1,4 @@
+import { emptyTable } from "./support/catalog.ts"
 import { assertSome } from "@effect/vitest/utils"
 // Removing an open import. The rules that hurt when wrong: a card for an import that no longer exists must not stay
 // on the first screen (after a refusal the list is asked again), an import somebody already removed counts as removed,
@@ -40,7 +41,7 @@ const world = (remove: () => Effect.Effect<void, ImportNotFound | AlreadyImporte
       table: () =>
         Effect.sync(() => {
           asked.table++
-          return { rows: asked.table }
+          return { ...emptyTable, fileName: `items-${asked.table}.csv` }
         }),
       remove
     }
@@ -118,7 +119,17 @@ describe("removing an open import", () => {
         refused: O.none()
       }
       const waits: Draft = { ...emptyDraft, unsent: { "row-2": side } }
-      const book = O.some({ file: new File([], "a.xlsx"), sheets: [], chosen: { name: "Items" } as never })
+      const book = O.some({
+        file: new File([], "a.xlsx"),
+        sheets: [],
+        chosen: {
+          name: "Items",
+          position: 1,
+          sheetCount: 1,
+          reason: "chosenByPerson" as const,
+          explanation: "Chosen sheet"
+        }
+      })
       for (const view of [t.first, t.second]) {
         t.registry.set(draftOf(view.id), waits)
         t.registry.set(openWorkbook(view.id), book)

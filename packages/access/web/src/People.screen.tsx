@@ -49,7 +49,7 @@ import { optimisticChange, optimisticWrite, shown } from "@inventory/client/Opti
 import { AddPerson as AddPersonCommand, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { Person } from "@inventory/access-contract/Person"
 import type { MemberId } from "@inventory/kernel/Ids"
-import { hasRole, type Role } from "@inventory/kernel/Role"
+import { hasRole, Role } from "@inventory/kernel/Role"
 import { when } from "@inventory/ui/Dates"
 import { sayError } from "@inventory/client/SayError"
 import { accessApi, accessKeys } from "./Access.runtime.ts"
@@ -195,7 +195,14 @@ function AddPerson() {
             </Field>
             <Field>
               <FieldLabel htmlFor={roleId}>Role</FieldLabel>
-              <NativeSelect id={roleId} value={role} onChange={(event) => setRole(event.target.value as Role)}>
+              <NativeSelect
+                id={roleId}
+                value={role}
+                onChange={(event) => {
+                  const role = event.target.value
+                  if (S.is(Role)(role)) setRole(role)
+                }}
+              >
                 {A.map(roles, (entry) => (
                   <NativeSelectOption key={entry.value} value={entry.value}>
                     {entry.label}
@@ -304,7 +311,10 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
             value={person.role}
             // This person's role is on its way to the server: the new one shows, and a second change waits for it.
             disabled={person.saving}
-            onChange={(event) => changeRole({ person: personOf(person), role: event.target.value as Role })}
+            onChange={(event) => {
+              const role = event.target.value
+              if (S.is(Role)(role)) changeRole({ person: personOf(person), role })
+            }}
           >
             {A.map(roles, (entry) => (
               <NativeSelectOption key={entry.value} value={entry.value}>

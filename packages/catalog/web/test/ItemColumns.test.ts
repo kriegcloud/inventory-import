@@ -31,6 +31,7 @@ const nothing = { min: O.none<number>(), max: O.none<number>() }
 
 /** A filters' answer with these categories; the rest is what an empty organization has. */
 const facets = (categories: ReadonlyArray<readonly [string, number]>, cost: readonly [number, number]) => ({
+  total: A.reduce(categories, 0, (sum, [, count]) => sum + count),
   category: listed(categories),
   uom: listed([["EA", 3]]),
   isActive: listed([["true", 3]]),

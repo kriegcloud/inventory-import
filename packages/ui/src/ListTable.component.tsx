@@ -1,3 +1,4 @@
+import { unsafeAssert } from "@beep/unsafe-assert"
 import * as R from "effect/Record"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -73,7 +74,8 @@ const SearchKey = S.String.pipe(S.decode(SchemaTransformation.toLowerCase())).an
 })
 const readSearchKey = S.decodeOption(SearchKey)
 
-const everyWord: FilterFn<DataTableFeatures, RowData> = (row, _columnId, filterValue) => {
+const everyWord = <Row extends RowData>(...args: Parameters<FilterFn<DataTableFeatures, Row>>): boolean => {
+  const [row, _columnId, filterValue] = args
   const words = O.map(readSearchKey(typeof filterValue === "string" ? filterValue : ""), (text) =>
     text.split(/\s+/).filter((word) => word !== "")
   )
@@ -181,9 +183,9 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
           meta: { label: column.label },
           enableHiding: false,
           size
-        }) as ColumnDef<DataTableFeatures, Row, unknown>
+        })
       }
-      return col.accessor((row) => value.value(row), {
+      return col.accessor((row): unknown => value.value(row), {
         id: column.id,
         header: ({ column: header }) => (
           <DataTableColumnHeader column={header} className={column.align === "right" ? "justify-end" : undefined} />
@@ -216,7 +218,7 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
         enableHiding: column.id !== first,
         enableGlobalFilter: column.searchable !== false,
         size
-      }) as ColumnDef<DataTableFeatures, Row, unknown>
+      })
     })
   })
   return { config, tableColumns }
@@ -252,7 +254,12 @@ type ListTableProps<Row extends RowData> = {
 export function ListTable<Row extends RowData>({ maxWidth = Number.POSITIVE_INFINITY, ...props }: ListTableProps<Row>) {
   return (
     // One scope serves every kind of row: inside it a row is whatever the columns read.
-    <ListScope.Provider value={{ columns: props.columns, rows: props.rows, maxWidth } as never}>
+    <ListScope.Provider
+      value={unsafeAssert<ListInput<RowData>>(
+        { columns: props.columns, rows: props.rows, maxWidth },
+        "This scope is paired with ListBody<Row>; ScopedAtom cannot preserve a component generic across its context."
+      )}
+    >
       <ListBody {...props} />
     </ListScope.Provider>
   )
@@ -264,16 +271,19 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
   const columns = useAtomValue(props.columns)
   const rows = useAtomValue(props.rows)
   const config = useAtomValue(list.config)
-  const tableColumns = useAtomValue(list.tableColumns) as unknown as Array<ColumnDef<DataTableFeatures, Row, unknown>>
+  const tableColumns = unsafeAssert<Array<ColumnDef<DataTableFeatures, Row, unknown>>>(
+    useAtomValue(list.tableColumns),
+    "ListScope was created from this ListTable<Row> columns; React context erases the shared row generic."
+  )
   const pinnedStart = A.map(A.take(columns, 1), (column) => column.id)
   const ends = columns.filter((column) => column.end === true).map((column) => column.id)
   const { table } = useDataTable({
     mode: "client",
-    data: rows as Array<Row>,
+    data: A.fromIterable(rows),
     columns: tableColumns,
     config,
     getRowId: props.rowKey,
-    globalFilterFn: everyWord as FilterFn<DataTableFeatures, Row>,
+    globalFilterFn: everyWord<Row>,
     enableRowSelection: false,
     initialState: { columnPinning: { start: pinnedStart, end: ends } }
   })

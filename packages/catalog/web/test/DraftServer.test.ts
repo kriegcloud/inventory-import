@@ -12,7 +12,7 @@ import * as R from "effect/Record"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportEvent, type ImportView } from "@inventory/catalog-contract/Import"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { UploadKey } from "@inventory/catalog-contract/Ids"
 import type { Field, StagedTable } from "@inventory/catalog-contract/Staged"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
@@ -138,7 +138,7 @@ const opened = Effect.gen(function* () {
   happen(DraftEvent.Opened({ kept: O.none() }))
   yield* look
   return {
-    id: id as ImportId,
+    id: ImportId.make(id),
     happen,
     taken,
     save,

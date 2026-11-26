@@ -20,7 +20,7 @@ import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
 import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import * as Order from "effect/Order"
@@ -34,11 +34,11 @@ const session: MutableRef.MutableRef<{ readonly now: Record<string, string> }> =
 }>({ now: {} })
 const server: MutableRef.MutableRef<{
   readonly revision: number
-  readonly decisions: Record<string, unknown>
+  readonly decisions: SavedDecisions
   readonly removed: boolean
 }> = MutableRef.make<{
   readonly revision: number
-  readonly decisions: Record<string, unknown>
+  readonly decisions: SavedDecisions
   readonly removed: boolean
 }>({
   revision: 4,
@@ -223,7 +223,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
             decide: (request: { readonly payload: SaveRequest }) =>
               Effect.suspend(() => {
                 saves.push(request.payload)
-                return Deferred.await(Deferred.makeUnsafe<unknown>())
+                return Deferred.await(Deferred.makeUnsafe<never>())
               }),
             open: () => Effect.succeed({ views: [], older: 0 }),
             remove: () => Effect.void
@@ -236,7 +236,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
         support.viewAt({
           id,
           revision: browser.server.current.revision,
-          decisions: browser.server.current.decisions as SavedDecisions,
+          decisions: browser.server.current.decisions,
           status: browser.closed ? "imported" : "open",
           fileName: "items_messy.csv"
         })
@@ -327,7 +327,7 @@ describe("two tabs of one person", () => {
   it.live("each keeps its own entry: a decision in one never writes over or erases the other's", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a1" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a1")
       const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
@@ -358,7 +358,7 @@ describe("two tabs of one person", () => {
   it.live("a tab opened later takes up nothing from a tab still open, and takes up the rows of one that is gone", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a2" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a2")
       const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
@@ -392,7 +392,7 @@ describe("two tabs of one person", () => {
     () =>
       Effect.gen(function* () {
         freshServer()
-        const id = "00000000-0000-4000-8000-0000000000a4" as ImportId
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000a4")
         const gone = yield* tab({}, dana)
         yield* settle
         gone.open(id)
@@ -417,7 +417,7 @@ describe("two tabs of one person", () => {
   it.live("two tabs that open the import together never both take up a gone tab's entry", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a5" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a5")
       const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
@@ -443,7 +443,7 @@ describe("two tabs of one person", () => {
     () =>
       Effect.gen(function* () {
         freshServer()
-        const id = "00000000-0000-4000-8000-0000000000a6" as ImportId
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000a6")
         const first = yield* tab({}, dana)
         yield* settle
         first.open(id)
@@ -475,7 +475,7 @@ describe("two tabs of one person", () => {
   it.live("a gone tab's rows for an import confirmed since are named on the result, never erased unnamed", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a7" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a7")
       const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
@@ -509,7 +509,7 @@ describe("two tabs of one person", () => {
   it.live("a copy of an open tab asks nothing before leaving for the rows the original keeps", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a8" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a8")
       const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
@@ -528,7 +528,7 @@ describe("two tabs of one person", () => {
   it.live("a tab on the sign-in page still holds its lock: nobody takes up its rows", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a9" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a9")
       const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
@@ -554,7 +554,7 @@ describe("a tab taken up from that comes back", () => {
     () =>
       Effect.gen(function* () {
         freshServer()
-        const id = "00000000-0000-4000-8000-0000000000c1" as ImportId
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000c1")
         const gone = yield* tab({}, dana)
         yield* settle
         gone.open(id)
@@ -612,7 +612,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
     () =>
       Effect.gen(function* () {
         freshServer()
-        const id = "00000000-0000-4000-8000-0000000000d1" as ImportId
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000d1")
         const discarded = yield* tab({}, dana)
         yield* settle
         discarded.open(id)
@@ -673,7 +673,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
     () =>
       Effect.gen(function* () {
         freshServer()
-        const id = "00000000-0000-4000-8000-0000000000d2" as ImportId
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000d2")
         const discarded = yield* tab({}, dana)
         yield* settle
         discarded.open(id)
@@ -716,7 +716,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
     () =>
       Effect.gen(function* () {
         freshServer()
-        const id = "00000000-0000-4000-8000-0000000000d3" as ImportId
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000d3")
         const discarded = yield* tab({}, dana)
         yield* settle
         discarded.open(id)
@@ -748,7 +748,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       for (const n of A.range(1, 30)) browser.kept[record(`tab-${n}`)] = left(now - n * 60_000)
       browser.kept[record("old")] = left(now - 31 * day)
       browser.kept["progress:v1:org_prairie:mem_marcus:notices%3Atheirs"] = left(now - 31 * day)
-      const id = "00000000-0000-4000-8000-0000000000d4" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000d4")
       const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
@@ -790,7 +790,7 @@ describe("a step drawn before this tab's id is its own", () => {
   it.live("reads the rows the tab kept before a reload once its id is, and writes nothing over them before", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000c2" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000c2")
       const before = yield* tab({}, dana)
       yield* settle
       before.open(id)
@@ -812,7 +812,7 @@ describe("a step drawn before this tab's id is its own", () => {
   it.live("keeps a row decided meanwhile as soon as its id is", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000c3" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000c3")
       // Another tab is in the middle of taking up what this one kept for some import: its id waits for that.
       const over = Deferred.makeUnsafe<void>()
       void navigator.locks.request("inventory-taking:tab-early", { mode: "shared" }, () => held(over))
@@ -835,7 +835,7 @@ describe("an import removed", () => {
   it.live("takes with it the rows a tab that is gone kept for it, and leaves a tab still open its own", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000b1" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000b1")
       const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
@@ -865,7 +865,7 @@ describe("an import removed", () => {
   it.live("found gone by a tab still open: its rows and those of her closed tabs are named there, and let go", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000b2" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000b2")
       const open = yield* tab({}, dana)
       yield* settle
       open.open(id)
@@ -899,7 +899,7 @@ describe("an import opened by its address and found removed", () => {
   it.live("names what the person's closed tabs kept for it, and lets it go", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000b3" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000b3")
       const closed = yield* tab({}, dana)
       yield* settle
       closed.open(id)
@@ -941,7 +941,7 @@ describe("after a reload", () => {
   it.live("the question before leaving is asked while this tab's rows wait, before their import is opened again", () =>
     Effect.gen(function* () {
       freshServer()
-      const id = "00000000-0000-4000-8000-0000000000a3" as ImportId
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000a3")
       const before = yield* tab({}, dana)
       yield* settle
       before.open(id)

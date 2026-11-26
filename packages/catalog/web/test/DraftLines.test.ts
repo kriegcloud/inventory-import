@@ -40,7 +40,7 @@ const notApplied = [{ rowId: "a", field: "unitCost", kind: "accept" as const }]
 
 /** Events one after another, from a draft: the last draft, and every effect on the way. */
 const play = (from: Draft, events: ReadonlyArray<DraftEvent>): Stepped =>
-  A.reduce(events, { draft: from, effects: [] } as Stepped, (before, event) => {
+  A.reduce(events, { draft: from, effects: Array<Stepped["effects"][number]>() } satisfies Stepped, (before, event) => {
     const next = step(before.draft, event)
     return { draft: next.draft, effects: [...before.effects, ...next.effects] }
   })

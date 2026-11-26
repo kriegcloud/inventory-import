@@ -1,3 +1,4 @@
+import type { SaveAnswer } from "./support/catalog.ts"
 import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
 // The review while who is signed in is asked again, on the page the app has: one session everything derives from. The
@@ -143,7 +144,8 @@ const page = (id: ImportId, who: typeof dana) => {
     notFoundIn: O.none(),
     reads: 0
   })
-  const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
+  const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<SaveAnswer, SaveFailure> }> =
+    []
   const commits: Array<unknown> = []
   const registry = registryFor({
     ...registryStart,
@@ -166,8 +168,8 @@ const page = (id: ImportId, who: typeof dana) => {
             )
           }),
         decide: (request: { readonly payload: SaveRequest }) =>
-          Effect.suspend((): Effect.Effect<unknown, SaveFailure> => {
-            const answer = Deferred.makeUnsafe<unknown, SaveFailure>()
+          Effect.suspend((): Effect.Effect<SaveAnswer, SaveFailure> => {
+            const answer = Deferred.makeUnsafe<SaveAnswer, SaveFailure>()
             saves.push({ payload: request.payload, answer })
             if (server.current.signedOut) return Effect.fail(NotSignedIn.make({ reason: "Sign in to continue." }))
             return Deferred.await(answer)

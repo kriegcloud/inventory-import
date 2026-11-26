@@ -1972,8 +1972,10 @@ Answer: I chose each; the agent recommended the same each time.
   (2 places, `{ type: "number", text: "123", shown: "00123" }`), because the table crosses the worker by
   `postMessage`, where an Option loses its prototype; `shownOf` and `formulaOf` read them as Options. Rejected:
   crossing the worker encoded, as upload chunks do; leaving them in the baseline.
-- The law counts `Result.getOrThrow` and `Effect.runSync` in src folders, as a fallback. One file of ours holds one
-  today (`packages/client/src/Http.runtime.ts`). Rejected: leaving it to review.
+- The law counts `Result.getOrThrow` and `Effect.runSync` in src folders, as a fallback. Rejected: leaving it to
+  review. The count the question gave was wrong: no file of ours holds a `Result.getOrThrow`; the one in
+  `packages/client/src/Http.runtime.ts` is `O.getOrThrow`, which the agent added to what is counted as the same
+  escape, and `Effect.runSync` is in six files (8 places).
 - Housekeeping: the seven merged `defaults` branches, local and on origin, and the worktrees `defaults-check` and
   `defaults-law` are removed. The `wf_*` worktrees stay: 26 of 27 hold uncommitted files and 4 hold commits not on
   main. The main checkout is on `main` again, and the sweep works only in worktrees.

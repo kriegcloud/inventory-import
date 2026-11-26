@@ -145,10 +145,11 @@ export const authOptions = (input: AuthOptionsInput) => {
           // way of making an account passes, so no route can make one the setting does not allow.
           before: (user) => {
             const email: unknown = user.email
-            return !O.exists(
-              settings.mayCreateAccount,
-              (mayCreate) => !O.exists(S.decodeUnknownOption(SignUpEmail)(email), mayCreate)
-            )
+            // No rule: anyone, as the schema script needs. An email that is no text is refused.
+            return O.match(settings.mayCreateAccount, {
+              onNone: () => true,
+              onSome: (mayCreate) => O.exists(S.decodeUnknownOption(SignUpEmail)(email), mayCreate)
+            })
               ? Promise.resolve()
               : Promise.reject(new APIError("FORBIDDEN", { message: signUpClosedMessage }))
           }

@@ -43,7 +43,8 @@ Places by package on 2026-11-23, from the baseline:
 ## Where the pilot stands
 
 Done on 2026-11-23. Baseline: 1,687 places in 204 files, down from 2,120 in 248; no line names the catalog's
-contract, model or host. Benjamin answered the last round the same day (SPEC, questions 4 to 6).
+contract, model or host. Merged as pull request 9 on 2026-11-26; the lanes after it (rows 5 to 15 above) are
+tracked in issue 13, which replaces issue 5. Benjamin answered the last round the same day (SPEC, questions 4 to 6).
 
 Checked: `bun run check` and `bun run check:full` on the final tree, the Verify lock equal to `main`'s, the two slow
 tests that write 50,000 rows, and on screen on a fresh database: `items_messy.csv` reviewed as 24 Needs a decision,

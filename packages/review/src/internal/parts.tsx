@@ -125,7 +125,7 @@ export function Overlay(props: OverlayProps) {
 function OverlayBody(props: OverlayProps) {
   const layout = useAtomValue(regionLayout)
   const [held, setHeld] = useAtom(OverlayScope.use())
-  const open = props.open ?? held.open
+  const { open = held.open, align = "start", side = "bottom" } = props
   const setOpen = (next: boolean) => {
     setHeld((before) => ({ ...before, open: next }))
     props.onOpenChange?.(next)
@@ -212,8 +212,8 @@ function OverlayBody(props: OverlayProps) {
         {props.trigger}
       </PopoverTrigger>
       <PopoverContent
-        align={props.align ?? "start"}
-        side={props.side ?? "bottom"}
+        align={align}
+        side={side}
         sideOffset={props.card === true ? 4 : 6}
         onOpenAutoFocus={(event) => {
           if (byHover) event.preventDefault()
@@ -299,7 +299,7 @@ export function ReasonTag(props: {
  * what a rule did carries a wand and a grey fill; an untouched row says Ready.
  */
 export function DecisionTag(props: { view: RowView; words?: ReviewWords }) {
-  const words = props.words ?? defaultReviewWords
+  const { words = defaultReviewWords } = props
   if (props.view.status === "stored") {
     return (
       <StatusPill tone="neutral" className="flex-none">
@@ -347,7 +347,8 @@ export function CellValue(props: {
 }) {
   const shown = (text: string): string => (props.display === undefined || text === "" ? text : props.display(text))
   const raw = props.mark
-  if (raw === undefined) return props.value === "" ? (props.empty ?? null) : <>{shown(props.value)}</>
+  const { empty = null } = props
+  if (raw === undefined) return props.value === "" ? empty : <>{shown(props.value)}</>
   const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
   if (mark.from === mark.to) return <>{mark.to}</>
   if (isCellMarkProposed(mark) && choicesOf(mark.fix) !== undefined) {

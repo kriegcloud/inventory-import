@@ -673,3 +673,69 @@ and `.dev.vars` was not read. Final protected hashes remain:
 - `packages/catalog/model/test/Catalog.lock.json`: `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`
 
 Needs the person: nothing
+
+## Review internal lane, row 9, 2026-11-26
+
+Scope: the eight files in `packages/review/src/internal` only. Before edits the scoped law holds 242 sites:
+79 fallback, 146 absence, 12 unwrap and five normalise. Other review source and tests belong to later lanes.
+This is a partial lane; no baseline or exemption is changed.
+
+| Owner / fields | Verdict | Boundary and reason |
+| --- | --- | --- |
+| `PhoneDrawer` open/change/focus handlers, title, description, children | Required | Screen inputs; quiet description and footer remain optional presentation props. |
+| `parts` Overlay trigger/title/about/children; align, side, open, callbacks, hover/card and className | Required core, optional screen props | Align starts at start and side at bottom. An uncontrolled overlay uses its held open state. Put these defaults in destructuring; keep the optional prop contracts. |
+| `parts` OverlayHeld open/opened/byHover/timer; CutScope cut/open; EditScope text | Required starting state | Existing atom starting values retain their meaning; no persisted encoding is changed. |
+| `parts` DecisionTag words; CellValue empty | Optional screen props | Existing review words and no empty-cell content are presentation defaults; destructure at the screen. |
+| `parts` CutText children/card; WhyBody actions; Reason source/detail; GroupChange choices/label/display | Optional presentation or dependency-owned absence | ReactNode includes null, so a destructuring default cannot replace the children/card nullish fallback without changing the display. Fix/column/word schemas are outside this lane. |
+| `ReviewGrid` RowActions/GroupActions, region atoms, virtualizer callbacks | Required capabilities or dependency-owned optional actions | Keep the callable contracts and DOM/virtualizer null conventions; do not wrap local values to disguise a boundary that belongs to another file. |
+| `ReviewGrid` typeIt guess | Required argument with explicit absence | Every call must state whether it carries a proposal; the local helper's argument need not be optional. |
+| `ReviewGrid` headings, signs, seen/drawn state, parts and sized columns | Required state or existing dependency-owned absence | Keep existing initial state and no per-row copy. ColumnPlan and ReviewTypes need a coordinated schema/caller lane. |
+| `ReviewQueue` Place at/shown, Card key/moved; Queue atoms/handlers | Required state | Existing starts at card zero and 30 shown; identity stays explicit, not schema-defaulted. |
+| `ReviewQueue` CardProps columns/labels/kinds/actions/excluded; rowAction/cellEditor | Required inputs, dependency-owned optional capabilities | ReviewTypes and ReviewRegion own these boundaries, outside this lane. |
+| `WorkList` items/active/onPick/mode; More left/right; viewport | Required inputs/state; DOM nullable edge | Undefined active means another view is selected; toggle API draws it as empty. DOM query and ref null semantics stay unchanged. |
+| `sizing` SizedColumn fields; ColumnPlan shown/folded/minWidth/scrolls/flex; priority/core | Required widths/state, Option flex, optional column metadata | The planner returns an Option for its flex column; candidate selection also stays Option until the loop consumes it. Missing priority/core remain the column owner's next-lane concern. |
+| `keptStore` storage lookup, getItem/key and KeyValueStore read/write results | Browser/library edge | Storage can refuse access, return null, or be absent. Preserve visit-only operation and bare-word compatibility. This file writes no progress shape itself. |
+| `identity` composer | Required | No optional field or fallback. |
+
+Remaining sites will be inventoried by file and kind after edits, with examples and reasons. No stored progress schema,
+wire representation, product fallback, or review words change in this lane. Not seen on screen (browser explicitly
+out of scope).
+
+### Review internal residual inventory
+
+The scoped law after edits holds 234 sites: 72 fallback, 145 absence, 12 unwrap and five normalise.
+Line numbers below count occurrences, so a repeated number means two sites on that line. These are retained sites,
+not approved exemptions. `identity.ts` has none. Files are relative to `packages/review/src/internal/`.
+
+| File | Kind | Count | Lines | Example | Reason retained |
+| --- | --- | --- | --- | --- | --- |
+| `PhoneDrawer.tsx` | absence | 1 | 36 | `props.footer === undefined` | Owned optional screen footer; presence decides whether a footer container is drawn. No default container is wanted. |
+| `ReviewGrid.tsx` | absence | 91 | 130, 137, 187, 236, 240, 283, 292, 301, 303, 316, 350, 351, 352, 353, 357, 357, 358, 359, 361, 364, 366, 369, 416, 419, 420, 421, 424, 427, 428, 434, 437, 439, 442, 445, 472, 488, 503, 552, 555, 569, 587, 621, 629, 638, 650, 685, 686, 686, 691, 745, 745, 747, 747, 773, 791, 805, 807, 831, 837, 853, 866, 893, 903, 903, 903, 912, 922, 966, 972, 981, 1041, 1050, 1152, 1243, 1263, 1269, 1416, 1427, 1435, 1502, 1564, 1596, 1711, 1829, 1829, 1832, 1838, 1844, 1890, 1961, 1961 | `first === undefined` | Dependency-owned ReviewTypes/Draft/Region cases, optional column metadata and actions; owned conditional presentation (headings, comparison and editor branches); DOM/virtualizer presence. Requires coordinated owner schemas, or remains an actual screen conditional. |
+| `ReviewGrid.tsx` | fallback | 46 | 130, 171, 171, 182, 183, 235, 237, 237, 257, 257, 258, 287, 292, 294, 354, 354, 358, 367, 424, 433, 478, 555, 557, 561, 622, 623, 626, 632, 632, 669, 709, 715, 831, 925, 1026, 1045, 1130, 1273, 1493, 1494, 1494, 1672, 1689, 1797, 1798, 1804 | `view.cells[first.id] ?? ""` | Dependency-owned cell text, problem/column/choice fields and measured-column metadata; local top-length selection and virtualizer self state. Preserve exact empty text, action words, width and previous-draw behavior; no fallback-only local codec. |
+| `ReviewGrid.tsx` | unwrap | 6 | 235, 416, 1426, 1626, 1686, 1771 | `O.getOrUndefined` | HashMap kinds and region action Options currently cross screen/helper boundaries as undefined; DOM scroll element and observer/ref callbacks use vendor null/undefined conventions. Early internal unwraps remain pending owner conversion. |
+| `ReviewGrid.tsx` | normalise | 1 | 310 | `mark.from.trim` | Compares before/after spaces to choose how a proposal is drawn; leaves the reviewed cell untouched. Presentation comparison is retained, not an approved cleanup exemption. |
+| `ReviewQueue.tsx` | absence | 31 | 95, 126, 219, 255, 276, 296, 297, 298, 299, 300, 301, 306, 306, 320, 320, 341, 347, 360, 368, 404, 413, 424, 433, 444, 444, 449, 449, 453, 463, 492, 641 | `shown === undefined` | Dependency-owned problem/fix/choice/action/column absence plus current-card/list bounds and optional custom editor branches. Preserve exact queue transitions and the controls offered. |
+| `ReviewQueue.tsx` | fallback | 15 | 126, 133, 139, 236, 276, 300, 348, 351, 355, 355, 387, 406, 418, 601, 603 | `view.cells[first.id] ?? ""` | Dependency-owned missing cell text, labels, problem ask and choice destination; custom editor display. Requires upstream field verdicts rather than local stand-in schemas. |
+| `ReviewQueue.tsx` | unwrap | 4 | 204, 404, 557, 601 | `O.getOrUndefined` | HashMap kind lookup and region optional capabilities are unwrapped into current screen props; retained until the owning review contracts move. |
+| `WorkList.tsx` | fallback | 3 | 53, 71, 85 | `props.active ?? ""` | Two active-view conversions to the external ToggleGroup empty selection; one nullable DOM query. Active remains a required explicit argument; these are browser/component edges. |
+| `WorkList.tsx` | absence | 2 | 98, 115 | `element === null` | Actual DOM element and first child may be null; observers subscribe only to elements that exist. |
+| `keptStore.ts` | unwrap | 1 | 16 | `O.getOrUndefined` | Browser localStorage access can throw; current lookup exposes undefined to the adapter. No storage or stored-progress representation change in this lane. |
+| `keptStore.ts` | absence | 3 | 33, 37, 47 | `storage === undefined` | Browser storage availability and getItem null contract; preserves visit-only fallback and compatibility text. Actual browser edge, not a review domain default. |
+| `parts.tsx` | absence | 17 | 227, 267, 318, 326, 348, 351, 354, 449, 538, 566, 574, 601, 605, 605, 619, 624, 631 | `props.className === undefined` | Owned screen optional className/display/actions/undo/all and custom render branches, dependency-owned marks/source/detail/decided, plus DOM ref absence. Optional actions stay absent to omit their control; no no-op defaults. |
+| `parts.tsx` | fallback | 7 | 285, 292, 503, 507, 542, 547, 550 | `props.tone ?? props.kind?.tone` | Tone and group label belong to dependency-owned models. CutText children/card ReactNode null falls back to text as before; destructuring would preserve null and change what is drawn. |
+| `parts.tsx` | normalise | 4 | 380, 668, 668, 682 | `mark.from.trim` | One before/after display comparison and three edit-form trims (two calls on submit, one disabled check). Moving edit normalization needs the real form boundary; no local sync decode or altered entered value. |
+| `parts.tsx` | unwrap | 1 | 571 | `O.getOrUndefined` | Confidence Option passed to the external ProposalSource helper; current boundary expects undefined. |
+| `sizing.ts` | fallback | 1 | 111 | `column.priority ?? (column.core === true ? 1 : 0)` | Column priority/core owner remains outside lane; keep priority 1 for core, 0 otherwise until the real column schema can carry it. |
+
+Changes outside the eight-file lane: `test/ReviewLayout.test.ts` changes its single direct `plan.flex` assertion
+from a string to `O.some("name")`; `packages/review/strict-ceiling.json` lowers 251 to 249 because two native array
+calls were removed. No other source/test caller changed. Existing collection processing never adds a per-row copy.
+The stored browser progress schemas and storage adapter are unchanged.
+
+Validation: final `bun run check --env-mode=loose` passed 105/105 tasks (54 cached), 2m51.104s; log
+`/tmp/review-internal-check.log`. It includes review 115 tests, strict count 249/249, catalog web 401 tests with no
+retries. The five separately targeted suites passed 41 tests. Scoped defaults, docs and diff checks pass. The first
+full-check attempt refused non-readonly comparator parameter properties; corrected before the passing rerun.
+No baseline or Verify-lock diff. Not seen on screen; no browser, commit, push or deployment.
+
+Needs the person: nothing.

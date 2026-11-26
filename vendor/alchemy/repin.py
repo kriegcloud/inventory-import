@@ -42,8 +42,16 @@ REGISTRY = "https://pkg.alchemy.run"
 REGISTRY_HOST = "pkg.alchemy.run"
 LIBRARY = "https://github.com/alchemy-run/alchemy"
 # `@alchemy.run/1password` is what the stacks of `packages/infra` read their secrets through (Benjamin, 2026-11-22:
-# "use alchemy's built in 1password").
-ROOTS = ["alchemy", "@alchemy.run/domain", "@alchemy.run/cloudflare", "@alchemy.run/github", "@alchemy.run/1password"]
+# "use alchemy's built in 1password"). `@alchemy.run/test` is the harness the stack test of `check:full` deploys the
+# stack locally with (goals/alchemy-uptake, step 4; Benjamin, 2026-11-26: "Yes, add it").
+ROOTS = [
+    "alchemy",
+    "@alchemy.run/domain",
+    "@alchemy.run/cloudflare",
+    "@alchemy.run/github",
+    "@alchemy.run/1password",
+    "@alchemy.run/test",
+]
 ADDRESS = re.compile(r"^https://pkg\.alchemy\.run/((?:@[^/]+/)?[^/]+)/-/([0-9a-f]{64})\.tgz$")
 PINNED_SPEC = re.compile(r"^.+-[0-9a-f]{7}$")
 HERE = Path(__file__).resolve().parent

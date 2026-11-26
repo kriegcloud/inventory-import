@@ -3,8 +3,10 @@ import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
@@ -26,15 +28,33 @@ const $I = $AccessWebId.create("SignIn")
 /** Better Auth's browser client, fetched when it is first needed. Asking again returns the same module. */
 const authClient = () => import("./internal/authClient.ts")
 
-/** A slug the organization plugin requires: the name in lowercase words, plus a short suffix so two names can match. */
+/**
+ * The words of an organization's slug, read from its name: lowercase letters and digits joined by hyphens, forty
+ * characters at most. A name with no letter or digit reads as "organization", so the plugin always gets a slug.
+ */
+const OrganizationSlugStem = S.String.pipe(
+  S.decode(SchemaTransformation.toLowerCase()),
+  S.decodeTo(
+    S.String,
+    SchemaTransformation.transform({
+      decode: (name) => {
+        const stem = name
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40)
+        return stem === "" ? "organization" : stem
+      },
+      encode: identity
+    })
+  )
+).annotate({ description: "The words of an organization's slug, read from the name the person typed." })
+
+/** A slug the organization plugin requires: the name's words, plus a short suffix so two names can match. */
 const slugFor = (name: string) =>
-  `${
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 40) || "organization"
-  }-${SecureRandom.uuidV4Unsafe().slice(0, 6)}`
+  S.decodeEffect(OrganizationSlugStem)(name).pipe(
+    Effect.orDie,
+    Effect.map((stem) => `${stem}-${SecureRandom.uuidV4Unsafe().slice(0, 6)}`)
+  )
 
 const roleWord = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
@@ -76,13 +96,15 @@ const submitAttempt = Atom.fn((attempt: Attempt) =>
         )
       ),
     SignUp: ({ name, email, password, organization }) =>
-      authStep(() =>
-        authClient().then(({ authClient: client, orThrow }) =>
-          client.signUp
-            .email({ name, email, password })
-            .then((answer) => orThrow(answer))
-            .then(() => client.organization.create({ name: organization, slug: slugFor(organization) }))
-            .then((answer) => orThrow(answer))
+      Effect.flatMap(slugFor(organization), (slug) =>
+        authStep(() =>
+          authClient().then(({ authClient: client, orThrow }) =>
+            client.signUp
+              .email({ name, email, password })
+              .then((answer) => orThrow(answer))
+              .then(() => client.organization.create({ name: organization, slug }))
+              .then((answer) => orThrow(answer))
+          )
         )
       )
   })
@@ -100,9 +122,11 @@ const organizationTyped = Atom.make("")
 
 /** Making the first organization of an account that has none. */
 const createOrganization = Atom.fn((name: string) =>
-  authStep(() =>
-    authClient().then(({ authClient: client, orThrow }) =>
-      client.organization.create({ name, slug: slugFor(name) }).then((answer) => orThrow(answer))
+  Effect.flatMap(slugFor(name), (slug) =>
+    authStep(() =>
+      authClient().then(({ authClient: client, orThrow }) =>
+        client.organization.create({ name, slug }).then((answer) => orThrow(answer))
+      )
     )
   )
 )

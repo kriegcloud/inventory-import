@@ -31,11 +31,11 @@ Places by package on 2026-11-23, from the baseline:
 | 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | done: items 1 to 3 counted (a test's branch on an Option, Result or Exit; a literal `onNone`; an unwrapped `optionalKey`). The 74 places they named in the pilot packages and the ontology's tests are cleared but for `Cell.shown` and `Cell.formula`. Decided 2026-11-25 and in a second lane: `onNone` narrowed to data stand-ins, `getOrThrow` and `runSync` counted, `Spreadsheet.rules.ts` exempt for absence |
 | 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | done in two rounds: the first cleared the law with `Result.getOrThrow` decodes and was refused. Left as on main: the session hook's null context and `undefined` result in `internal/authOptions.ts` (2 places, Better Auth's own API; an exemption candidate for row 15) |
 | 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | done in two rounds: a model policy and a script's options are stated by every caller; no line of the baseline names them |
-| 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | todo |
+| 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | partly: 74 places cleared, 81 exempt in eleven files that read bytes and markup (decided 2026-11-26), 31 left in the two codecs, three schema files and two test supports of xlsx, for a second lane |
 | 9 | `packages/review` | 586 | Codex lane | todo |
 | 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | todo |
 | 11 | `packages/catalog/web` | 572 | Codex lane | todo |
-| 12 | `packages/access/web` | 37 | Codex lane | todo |
+| 12 | `packages/access/web` | 37 | Codex lane | done: no line of the baseline names it but the two exempt edges (`Session.atoms.ts`, `internal/authClient.ts`: the browser's and Better Auth's own APIs, decided 2026-11-26). The slug of a new organization is a schema's (`OrganizationSlugStem`), compared with the old helper on five names; not seen on screen, since sign-up is closed in development |
 | 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | todo |
 | 14 | `packages/infra` | 7 | Codex lane | done: 15 places under the new reader, all cleared; the stage plan is unchanged and no alchemy command was run. Two `onFailure: () => []` branches stay, which the law does not count |
 | 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | todo |
@@ -118,6 +118,13 @@ change to a schema that the browser sends.
 2026-11-26, on `feat/defaults-sweep` (worktree `.claude/worktrees/defaults-sweep`, from `main` at `8d5accaa`): rows 5,
 6 and 7 merged. `bun run check:full` passes on the merged tree (112 tasks) and the Verify lock equals `main`'s. Not
 seen on screen: no lane so far changed a schema the browser sends or receives.
+
+2026-11-26, after rows 8 (first lane), 12 and 14 merged, on port 5174 from a fresh database, signed in as Dana
+Whitfield: pressed "Use items_messy.csv"; Review read Needs a decision 24, Cannot import 21, Ready 155, All 200;
+pressed "Import 155, skip 45", the dialog read "Import 155 items?" with "Fixed by a rule 17, Unchanged from the file
+138"; pressed "Import 155 items"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items read
+"155 items"; People read "Example Works (test) · 3 people" with each person's email. Screenshot
+`.scratch/shots/sweep-1-result.png`.
 
 What the lanes taught, beyond the pilot's list:
 

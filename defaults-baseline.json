@@ -60,8 +60,6 @@
     "apps/inventory/test/support/cost.ts": [0, 1, 0, 0],
     "apps/inventory/test/web/support/page.ts": [7, 0, 0, 0],
     "apps/inventory/test/web/workspace.test.ts": [1, 0, 0, 0],
-    "packages/access/web/src/People.screen.tsx": [2, 0, 0, 0],
-    "packages/access/web/src/SignIn.screen.tsx": [1, 0, 0, 1],
     "packages/catalog/web/src/Catalog.runtime.ts": [0, 1, 0, 0],
     "packages/catalog/web/src/Conversation.machine.ts": [2, 2, 0, 0],
     "packages/catalog/web/src/Draft.atoms.ts": [4, 4, 0, 0],

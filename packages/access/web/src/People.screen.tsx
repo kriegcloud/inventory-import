@@ -276,9 +276,9 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
     {
       id: "email",
       label: "Email",
-      value: (person) => O.getOrElse(person.email, () => ""),
+      value: (person) => O.match(person.email, { onNone: () => "", onSome: identity }),
       cell: (person) => O.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email }),
-      title: (person) => O.getOrElse(person.email, () => "Not set"),
+      title: (person) => O.match(person.email, { onNone: () => "Not set", onSome: identity }),
       blank: (person) => O.isNone(person.email)
     },
     {

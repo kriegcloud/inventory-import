@@ -95,6 +95,7 @@ the value moves.
 | `drivers/openrouter/src/internal/plan.ts` | provider input/output token totals missing, undefined or NULL | `0` each, on the provider response schema | 0 (model calls are optional assistance, not stored import rows) | a scripted reply with no usage reports 0 tokens |
 | `drivers/openrouter/src/internal/plan.ts` | provider response with no valid model name | the requested model, matched where the answer is built | 0 (no stored import row changes) | scripted reply without response metadata attributes the answer to `scripted/primary` |
 | `drivers/better-auth/src/BetterAuth.schema.ts` | library options with absent, undefined or NULL `basePath` | `/api/auth` | 0 (sign-in routing, not an import row) | the default sign-in endpoint `/api/auth/sign-in/email` |
+| `access/web/src/SignIn.screen.tsx` `OrganizationSlugStem` | the slug of a new organization whose name has no letter or digit | `organization` (plus the random suffix) | 0 (sign-up, not an import row) | a name of `!!!` gets the slug `organization-1a2b3c` |
 
 Foundation modeling row 8 (2026-11-26) moves no new undecided product fallback to a schema. CSV/XLSX API callers
 now explicitly select the already-existing options-schema defaults; fixture builders use named starting values.

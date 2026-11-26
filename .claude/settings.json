@@ -23,8 +23,10 @@
       "mcp__playwright",
       "mcp__playwright-qa"
     ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
     "deny": [
-      "Bash(git push:*)",
       "Bash(bunx wrangler deploy:*)",
       "Bash(bunx wrangler secret:*)",
       "Bash(npx wrangler deploy:*)",

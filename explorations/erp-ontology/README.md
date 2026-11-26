@@ -4,8 +4,8 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Specify slice 1 once its open decisions are answered. The thin thread is built (goals/erp-vocabulary).
-goals: [erp-vocabulary]
+next: Answer the party slice's open rows O1 to O19 (goals/party-slice/SPEC.md); its first five steps wait on none. The thin thread is built (goals/erp-vocabulary).
+goals: [erp-vocabulary, party-slice]
 ---
 
 # ERP ontology
@@ -29,7 +29,8 @@ passed a small test ontology, HermiT found it consistent with exit 0, and an inc
 is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job (written, not yet run on GitHub), with
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
-Slice 1, the party slice, follows the thread. Benjamin will take each of the 47 open decisions with a concrete record
+Slice 1, the party slice, follows the thread and is specified as [goals/party-slice](../../goals/party-slice/SPEC.md),
+which raises nineteen questions of its own (O1 to O19) that no decision answers. Benjamin will take each of the 47 open decisions with a concrete record
 when the slice that needs it is specified; slice 1's were answered on 2026-11-26. Decision 116 asks how a grant names the location or field it covers;
 organization scope remains enough for the thread (115). Gate 10 is not built (decision 27, answered (a)).
 
@@ -100,3 +101,5 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-26: Benjamin answered slice 1's open decisions and the alignment file's (12, 17 to 19, 27 to 31, 33, 35 to
   37, 44, 45, 87, 89, 125, 126) and report 17's P1 and P2, each on a `test_` fixture where it is about a record: his
   Sutton workspace is an empty trial (decision 36). Forty-seven are open; slice 1 waits on none but 47, which is deferred.
+- 2026-11-26: slice 1 specified as the goal [party-slice](../../goals/party-slice/SPEC.md): six readers, a draft, two
+  rounds of review. Nothing is built. Its rows O1 to O19 are open and not yet in this packet's Open table (its PLAN, step 6).

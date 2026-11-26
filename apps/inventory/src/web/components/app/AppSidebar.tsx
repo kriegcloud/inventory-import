@@ -118,24 +118,15 @@ const switchSaid = Atom.fn(
   })
 )
 
-/** Better Auth's client did not change who is signed in; its own error is kept for the sentence the toast says. */
-class AccountNotChanged extends S.TaggedError<AccountNotChanged, { readonly brand: unique symbol }>()(
-  "AccountNotChanged",
-  { cause: S.Defect() }
-) {}
-
 /** Signing in as another test account, said as it happens. When it works the page reloads, so only a refusal is said. */
 const signInSaid = Atom.fn(
   (target: { readonly email: string; readonly password: string; readonly name: string; readonly from: string }) => {
     const switching = toast.loading(`Signing in as ${target.name}`)
-    return Effect.tryPromise({
-      try: () => signInAs({ email: target.email, password: target.password }),
-      catch: (cause) => AccountNotChanged.make({ cause })
-    }).pipe(
+    return signInAs({ email: target.email, password: target.password }).pipe(
       Effect.catch((refused) =>
         Effect.sync(() => {
           toast.dismiss(switching)
-          toastError(refused.cause, { lead: O.some(`Still signed in as ${target.from}.`) })
+          toastError(refused, { lead: O.some(`Still signed in as ${target.from}.`) })
         })
       )
     )
@@ -144,10 +135,8 @@ const signInSaid = Atom.fn(
 
 /** Signing out; a refusal is said, and the person stays signed in. */
 const signOutSaid = Atom.fn(() =>
-  Effect.tryPromise({ try: () => signOut(), catch: (cause) => AccountNotChanged.make({ cause }) }).pipe(
-    Effect.catch((refused) =>
-      Effect.sync(() => toastError(refused.cause, { lead: O.some("You are still signed in.") }))
-    )
+  signOut.pipe(
+    Effect.catch((refused) => Effect.sync(() => toastError(refused, { lead: O.some("You are still signed in.") })))
   )
 )
 

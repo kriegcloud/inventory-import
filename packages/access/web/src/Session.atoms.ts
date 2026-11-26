@@ -9,6 +9,8 @@
 // decided (2026-11-19, "atoms, the reads after a sign-out or a switch"): a switch back shows the rows at once. Every tab
 // of the browser shares one session cookie, so each sign-in, sign-out, switch and session found ended is said to the
 // other tabs (`changedKey` in localStorage), and each of them asks again at once, as it does when it is shown again.
+import { betterAuthClient } from "@beep/better-auth/Client"
+import { type BetterAuthRefused, Credentials } from "@beep/better-auth/ClientSchema"
 import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
@@ -44,8 +46,6 @@ import { $AccessWebId } from "./internal/identity.ts"
 
 const $I = $AccessWebId.create("Session")
 
-/** Better Auth's browser client, fetched the first time a person signs in, switches or signs out. */
-const loadAuthClient = () => import("./internal/authClient.ts")
 const decoder = import("./internal/Session.decode.ts")
 
 /** What the app tells the session once, before anything is drawn. */
@@ -364,14 +364,16 @@ export const switchOrganization = Atom.fn((organizationId: string, get) =>
   settledBeforeOwnSwitch(get.registry).pipe(
     Effect.andThen(Effect.sync(() => get.set(switchingTo, O.some(organizationId)))),
     Effect.andThen(
-      Effect.tryPromise({
-        try: () =>
-          loadAuthClient().then(({ authClient, orThrow }) =>
-            authClient.organization.setActive({ organizationId }).then(orThrow)
-          ),
-        catch: (cause) =>
-          SwitchRefused.make({ message: cause instanceof Error ? cause.message : "The organization was not opened." })
-      })
+      betterAuthClient.setActiveOrganization(organizationId).pipe(
+        Effect.mapError((refused) =>
+          SwitchRefused.make({
+            message: O.match(refused.sentence, {
+              onNone: () => "The organization was not opened.",
+              onSome: (sentence) => sentence
+            })
+          })
+        )
+      )
     ),
     Effect.tapError(() => Effect.sync(() => get.set(switchingTo, O.none()))),
     Effect.andThen(() => {
@@ -387,38 +389,42 @@ export const switchOrganization = Atom.fn((organizationId: string, get) =>
 
 /**
  * Signs in as another account (a test account, from the person's menu): out of this one, into that one, then a full
- * reload, so nothing the previous person saw stays in memory.
+ * reload, so nothing the previous person saw stays in memory. A sign-out Better Auth refused does not stop it: the
+ * sign-in that follows replaces the session either way.
  */
-export const signInAs = (account: { readonly email: string; readonly password: string }): Promise<void> =>
-  loadAuthClient().then(({ authClient, orThrow }) =>
-    authClient
-      .signOut()
-      .then(() => authClient.signIn.email(account))
-      .then(orThrow)
-      .then(() => {
+export const signInAs = (account: {
+  readonly email: string
+  readonly password: string
+}): Effect.Effect<void, BetterAuthRefused> =>
+  betterAuthClient.signOut.pipe(
+    Effect.ignore,
+    Effect.andThen(betterAuthClient.signIn(Credentials.make(account))),
+    Effect.andThen(
+      Effect.sync(() => {
         rememberSignedOut(false)
         sayChanged()
         leavePage()
       })
+    )
   )
 
 /** Signs out, then a full reload: nothing the previous person saw stays in memory for the next one. */
-export const signOut = (): Promise<void> =>
-  loadAuthClient().then(({ authClient, orThrow }) =>
-    authClient
-      .signOut()
-      .then(orThrow)
-      .then(() => {
-        rememberSignedIn(false)
-        rememberSignedOut(true)
-        sayChanged()
-        leavePage()
-      })
+export const signOut: Effect.Effect<void, BetterAuthRefused> = betterAuthClient.signOut.pipe(
+  Effect.andThen(
+    Effect.sync(() => {
+      rememberSignedIn(false)
+      rememberSignedOut(true)
+      sayChanged()
+      leavePage()
+    })
   )
+)
 
 /**
  * Signs in with an email and a password through Better Auth's own sign-in: a real session, the one the sign-in page
  * makes. For the app's development sign-in as the first test account; the page then asks who is signed in again.
  */
-export const signInWithPassword = (account: { readonly email: string; readonly password: string }): Promise<unknown> =>
-  loadAuthClient().then(({ authClient, orThrow }) => authClient.signIn.email(account).then(orThrow))
+export const signInWithPassword = (account: {
+  readonly email: string
+  readonly password: string
+}): Effect.Effect<void, BetterAuthRefused> => betterAuthClient.signIn(Credentials.make(account))

@@ -2,6 +2,7 @@
 // asked again. The same member: everything stays, the page drawn with them all along. Anybody else, another
 // organization, nobody: the page is left with a full page load, never having been theirs. And what was typed, chosen or
 // open in it is one member's.
+import { BetterAuthRefused } from "@beep/better-auth/ClientSchema"
 import { describe, expect, it } from "@effect/vitest"
 import { assertSome } from "@effect/vitest/utils"
 import { RegistryContext } from "@effect/atom-react"
@@ -31,16 +32,22 @@ const auth: {
   readonly refuses: MutableRef.MutableRef<boolean>
   readonly hold: MutableRef.MutableRef<O.Option<Promise<void>>>
 } = { refuses: MutableRef.make(false), hold: MutableRef.make(O.none()) }
-vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
-  authClient: {
-    organization: {
-      setActive: () =>
+vi.mock("../../../../packages/drivers/better-auth/src/BetterAuthClient.service.ts", () => ({
+  betterAuthClient: {
+    // Read as the session's module loads; no test here signs in or out through Better Auth.
+    signOut: Effect.void,
+    signIn: () => Effect.void,
+    setActiveOrganization: () =>
+      Effect.suspend(() =>
         MutableRef.get(auth.refuses)
-          ? Promise.reject(new Error("Not a member."))
-          : O.match(MutableRef.get(auth.hold), { onNone: () => Promise.resolve(undefined), onSome: (held) => held })
-    }
-  },
-  orThrow: (answer: unknown) => answer
+          ? Effect.fail(BetterAuthRefused.make({ status: O.some(403), sentence: O.some("Not a member.") }))
+          : O.match(MutableRef.get(auth.hold), {
+              // Never within the press: Better Auth's answer comes over the network.
+              onNone: () => Effect.sleep("1 millis"),
+              onSome: (held) => Effect.promise(() => held)
+            })
+      )
+  }
 }))
 
 // A cold start of the app's modules, on a busy machine.

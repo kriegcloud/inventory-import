@@ -2,7 +2,6 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Effect from "effect/Effect"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
-import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { Fragment, type ReactNode } from "react"
@@ -35,11 +34,8 @@ const Waiting = () => <Skeleton className="mx-auto h-80 w-full max-w-sm" aria-la
  * atom that does it when read, then asks who is signed in again. "failed" draws the sign-in page instead, with the
  * test accounts on it; the reason is for whoever is debugging.
  */
-/** Signing in as the first test account did not work; the sign-in page is drawn instead. */
-class DevelopmentSignInFailed extends S.TaggedError<DevelopmentSignInFailed, { readonly brand: unique symbol }>()(
-  "DevelopmentSignInFailed",
-  { cause: S.Defect() }
-) {}
+/** Signing out from the page that asks for a first organization. A refusal leaves the person where they are. */
+const signOutHere = Atom.fn((_: void) => Effect.ignore(signOut))
 
 const developmentSignIn = Atom.make((get) => {
   const view = get(sessionView)
@@ -53,10 +49,7 @@ const developmentSignIn = Atom.make((get) => {
   }
   if (signedOutHere()) return Effect.succeed("idle" as const)
   const { email, password } = first.value
-  return Effect.tryPromise({
-    try: () => signInWithPassword({ email, password }),
-    catch: (cause) => DevelopmentSignInFailed.make({ cause })
-  }).pipe(
+  return signInWithPassword({ email, password }).pipe(
     Effect.andThen(Effect.sync(() => get.set(refreshSession, undefined))),
     Effect.as("idle" as const),
     Effect.catch((cause) =>
@@ -85,6 +78,7 @@ export function SignedIn(props: { readonly title: string; readonly children: Rea
   const { status, error, features, probablySignedOut } = useAtomValue(sessionView)
   const retry = useAtomRefresh(session)
   const refresh = useAtomSet(refreshSession)
+  const leave = useAtomSet(signOutHere)
   const signingIn = useAtomValue(developmentSignIn)
   const drawnFor = useAtomValue(memberKey)
   // On its way while the sign-in runs; "idle" or "failed" once it has ended or was not wanted.
@@ -115,7 +109,7 @@ export function SignedIn(props: { readonly title: string; readonly children: Rea
           <SignIn features={features} onSignedIn={() => refresh()} />
         </>
       ) : status === "no-organization" ? (
-        <CreateOrganization onCreated={() => refresh()} onSignOut={() => void signOut()} />
+        <CreateOrganization onCreated={() => refresh()} onSignOut={() => leave()} />
       ) : (
         <Waiting />
       )}

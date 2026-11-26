@@ -89,11 +89,6 @@ export const exemptions: ReadonlyArray<DefaultsExemption> = [
     why: "the browser's own API: window and document are undefined where no page is (Benjamin, 2026-11-26)"
   },
   {
-    file: "packages/access/web/src/internal/authClient.ts",
-    kinds: ["fallback", "absence"],
-    why: "Better Auth's own API: an answer's error is null or holds a message that may be left out (Benjamin, 2026-11-26)"
-  },
-  {
     file: "packages/foundation/modeling/csv/src/internal/encoding.ts",
     kinds: ["fallback"],
     why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"

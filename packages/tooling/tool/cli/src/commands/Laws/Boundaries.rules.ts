@@ -151,7 +151,11 @@ const contextMay = (a: Kind, b: Kind): boolean => {
   }
   if (a.layer === "web") {
     return (
-      (own && (b.layer === "contract" || b.layer === "model")) || b.family === "ui-system" || b.family === "web-kit"
+      (own && (b.layer === "contract" || b.layer === "model")) ||
+      b.family === "ui-system" ||
+      b.family === "web-kit" ||
+      // A driver's browser half (Better Auth's client as Effects, `@beep/better-auth/Client`): Benjamin, 2026-11-26.
+      b.family === "drivers"
     )
   }
   return false

@@ -1,4 +1,5 @@
 // Where an import's step lives in the address. The address helpers themselves are in @/ui-kit/Route.hook.
+import { parameter } from "./browser.ts"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { ImportId } from "@inventory/catalog-contract/Ids"
@@ -9,9 +10,9 @@ import { ImportId } from "@inventory/catalog-contract/Ids"
 export const importInAddress = (
   params: URLSearchParams
 ): { readonly id: O.Option<ImportId>; readonly malformed: boolean } => {
-  const text = params.get("import")
-  if (text === null) return { id: O.none(), malformed: false }
-  const id = S.decodeOption(ImportId)(text)
+  const text = parameter("import")(params)
+  if (O.isNone(text)) return { id: O.none(), malformed: false }
+  const id = S.decodeOption(ImportId)(text.value)
   return { id, malformed: O.isNone(id) }
 }
 

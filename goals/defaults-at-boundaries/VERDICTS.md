@@ -1976,3 +1976,122 @@ exemptions, Verify lock, vendored code and .dev.vars are unchanged. No commit or
 Needs the person: the narrow debt-ledger scope extension is pending; unchanged undecided defaults remain
 listed in SPEC. The saved-progress hook's one owned unwrap needs its producer's later Option API migration;
 this lane does not declare row 11 fully cleared or propose an exemption for it.
+
+
+## Row 15 browser boundary follow-up (2026-11-26): field verdicts before implementation
+
+This pass keeps browser absence at an actual browser read, then carries Option through owned consumers.
+Storage keys, lock names, selectors, encoded bytes and screen words retain their current meaning.
+
+| Input or field | Verdict | Boundary and reason |
+| --- | --- | --- |
+| Browser window, Web Locks capability and nullable ifAvailable callback | Option at the client browser reader | The platform may be absent in tests/server rendering; no locks still uses the existing immediate tab id and skips claims. Shared catalog readers use the existing client export. |
+| Storage getItem/key and URLSearchParams.get | Option at the browser read | Missing entries and parameters remain distinct from invalid stored text; existing codecs and malformed-address behavior remain. |
+| IndexedDB and review localStorage availability | Option at the review browser reader | Review cannot depend on client; refusal behavior, transaction completion and bare-word compatibility remain. |
+| DOM query/closest/dataset, nullable ref callbacks, platform string | Option at the package browser reader | Selectors and timing stay unchanged; focus, file delivery and scroll observers consume the actual read. |
+| SavedProgress scope | Required Option, already implemented | Current source already takes O.Option<ProgressScope>; None reads/writes nothing. No additional signature change is required. |
+| Component own optional props | Retain direct prop edge | No helper disguises a component own prop as a browser read. |
+| Review row/cell lookups and vendor table/virtualizer results | Retain where conversion would allocate in row/cell loops | This boundary pass must not add per-row/cell Options; unresolved owned data and vendor cases remain named, without an exemption. |
+| Text cleanup, owned null ReactNodes and stored nullable helper arguments | Review individually, retain unless producer can carry Option | No fallback-only schema, throwing extraction or synchronous Effect escape is introduced. |
+
+The final site inventory and validation receipts will be appended after implementation.
+
+### Browser boundary implementation and final remaining-site inventory
+
+The current scanner inventory for the 25 changed TypeScript files is **126 to 88 places**: fallback **42 to 39**,
+absence **67 to 33**, unwrap **2 to 1**, normalization **15 to 15**. This is a source measurement against HEAD,
+not a baseline rewrite. The two forced test callers have zero findings before and after. No existing row/cell
+loop was changed to allocate Options; ReviewGrid changes only its toTop event action.
+
+Shared catalog/client readers use the existing `@inventory/client/Storage` export. Review cannot depend on client
+under the package boundaries, so it has its own small edge module; UI stays independent as well. No package export
+or dependency was added. `useSavedProgress` already required `O.Option<ProgressScope>` before this pass and
+UploadStep already passed `O.map(signedIn, ...)` directly: there was no remaining unwrap or signature migration.
+
+The following are exemption-ready boundary descriptions, not approved exemptions. Most conversions are not counted
+by this syntax reader; they are named here so a zero scanner count cannot hide a browser edge. Each function reads
+the named browser API, or is the platform callback entry that receives its nullable argument.
+
+| Edge module | Kind | Actual read and reason |
+| --- | --- | --- |
+| `packages/client/src/Storage.browser.ts` | absence at storage read | `browserStorage.read/keys`, `storageText`, `storageKey`: getItem/key return null. The uncaught readers preserve owning transaction refusal handling; the existing BrowserStorage API keeps its refusal policy. |
+| `packages/client/src/Storage.browser.ts` | absence of browser capability | `browserWindow`, `browserLocks`: direct globalThis window/navigator reads and navigator.locks may be undefined in server rendering/tests/older browsers. Both return Options. |
+| `packages/client/src/Storage.browser.ts` | absence at platform callback | `requestAvailable`: Web Locks callback supplies null when ifAvailable does not acquire a lock. It passes Option at entry, preserving native promise resolution and lock lifetime. |
+| `packages/catalog/web/src/internal/browser.ts` | absence at DOM read | `query`, `inputInPicker`: querySelector and the actual ref.current read. `data`: missing dataset key. `refCallback`: React nullable DOM callback entry; the stable goToLine adapter preserves focus timing and callback identity. |
+| `packages/catalog/web/src/internal/browser.ts` | absence at URL/drop read | `parameter`: URLSearchParams.get; `droppedFiles`: DragEvent.dataTransfer/files. Empty text/list stays present; absent stays None. |
+| `packages/review/src/internal/browser.ts` | absence at storage read, one counted absence | `localStore`, `fileDatabase`, `storedJson`: localStorage lookup/refusal, absent indexedDB and getItem null. storedJson returns Effect because KVS requires an undefined missing result. No Option is unwrapped back into undefined. |
+| `packages/review/src/internal/browser.ts` | absence at DOM/platform read | `query`, `viewport`, `closest`, `data`, `firstChild`, `byId`, `platform`: actual selector, callback-root query, closest, dataset, firstElementChild, getElementById and navigator.platform reads. `refCallback` is React callback entry and preserves attach cleanup. |
+| `packages/ui/src/internal/browser.ts` | absence at DOM read | `closest`: nullable closest read for keyboard ownership by an existing dialog. |
+
+The complete scanner remainder is below. Lines are from the final inventory; examples are exact source tokens.
+Counts in a grouped row include every site of that file/kind, not only the example.
+
+| File | Kind | Count | Lines | Example | Verdict/reason |
+| --- | --- | ---: | --- | --- | --- |
+| `packages/catalog/web/src/ImportPage.screen.tsx` | absence | 1 | 238 | `barSlot !== null` | Owned derived ReactNode (`barSlot`) remains nullable. This is not a DOM read or the component own optional prop; retained unresolved. |
+| `packages/review/src/ReviewRegion.atoms.ts` | fallback | 12 | 180, 266, 269, 275, 279, 286, 292, 357, 411, 617, 640, 695 | `view.cells[column.id] ?? ""` | Owned sparse row/cell/facet records and counters, table core lookup, action/stop indices and synchronous text normalization remain. Converting them in row/cell/facet loops would add allocations and requires a separate canonical-data design; not exemptions. |
+| `packages/review/src/ReviewRegion.atoms.ts` | normalise | 5 | 264, 264, 275, 275, 963 | `value.trim().toLowerCase` | Owned sparse row/cell/facet records and counters, table core lookup, action/stop indices and synchronous text normalization remain. Converting them in row/cell/facet loops would add allocations and requires a separate canonical-data design; not exemptions. |
+| `packages/review/src/ReviewRegion.atoms.ts` | absence | 2 | 674, 816 | `first !== undefined` | Owned sparse row/cell/facet records and counters, table core lookup, action/stop indices and synchronous text normalization remain. Converting them in row/cell/facet loops would add allocations and requires a separate canonical-data design; not exemptions. |
+| `packages/review/src/ReviewRegion.component.tsx` | normalise | 3 | 401, 464, 476 | `(filter === "auto" ? words.auto : words[filter]).toLowerCase` | Seven direct own optional-prop checks are genuine React edges (onShowMatching, explain twice, activity twice, readOnlyNote, onRetry). The derived importButtonNode check and three label lower-case calls remain unresolved owned rendering; no helper relabels them. |
+| `packages/review/src/ReviewRegion.component.tsx` | absence | 8 | 524, 615, 626, 645, 722, 808, 869, 981 | `props.onShowMatching === undefined` | Seven direct own optional-prop checks are genuine React edges (onShowMatching, explain twice, activity twice, readOnlyNote, onRetry). The derived importButtonNode check and three label lower-case calls remain unresolved owned rendering; no helper relabels them. |
+| `packages/review/src/internal/ReviewGrid.tsx` | absence | 21 | 134, 192, 319, 474, 567, 619, 773, 889, 915, 921, 937, 997, 1075, 1604, 1671, 1703, 1935, 1936, 1939, 1947, 1999 | `first === undefined` | Sparse cells/marks, column/choice/index lookups, fitting measurements, derived ReactNodes, and text trimming remain owned. Direct onKeep/onMatch props are actual React edges; table.getColumn/virtualizer results and getScrollElement nullable return are vendor edges. Per-row/cell callbacks and lookup paths are unchanged, so no Option allocation was added there. |
+| `packages/review/src/internal/ReviewGrid.tsx` | fallback | 27 | 134, 176, 176, 187, 188, 269, 269, 270, 310, 312, 375, 470, 619, 621, 625, 689, 691, 739, 915, 1012, 1142, 1226, 1596, 1779, 1903, 1904, 1910 | `view.cells[first.id] ?? ""` | Sparse cells/marks, column/choice/index lookups, fitting measurements, derived ReactNodes, and text trimming remain owned. Direct onKeep/onMatch props are actual React edges; table.getColumn/virtualizer results and getScrollElement nullable return are vendor edges. Per-row/cell callbacks and lookup paths are unchanged, so no Option allocation was added there. |
+| `packages/review/src/internal/ReviewGrid.tsx` | normalise | 1 | 328 | `mark.from.trim` | Sparse cells/marks, column/choice/index lookups, fitting measurements, derived ReactNodes, and text trimming remain owned. Direct onKeep/onMatch props are actual React edges; table.getColumn/virtualizer results and getScrollElement nullable return are vendor edges. Per-row/cell callbacks and lookup paths are unchanged, so no Option allocation was added there. |
+| `packages/review/src/internal/ReviewGrid.tsx` | unwrap | 1 | 1733 | `O.getOrNull` | Sparse cells/marks, column/choice/index lookups, fitting measurements, derived ReactNodes, and text trimming remain owned. Direct onKeep/onMatch props are actual React edges; table.getColumn/virtualizer results and getScrollElement nullable return are vendor edges. Per-row/cell callbacks and lookup paths are unchanged, so no Option allocation was added there. |
+| `packages/review/src/internal/browser.ts` | absence | 1 | 24 | `text === null` | Actual Storage.getItem null at the KVS adapter. The installed KeyValueStore requires string|undefined; storedJson returns Effect and preserves that third-party representation, legacy bare words, errors and causes. Candidate absence exemption, not approved. |
+| `packages/ui/src/TableSearch.component.tsx` | normalise | 6 | 116, 126, 141, 141, 152, 152 | `after.value.text.trim` | Five search-trim calls and one KeyboardEvent key lower-case call are synchronous string policies. Browser strings are present; these are not nullable browser edges. Retained unresolved. |
+
+`ReviewGrid` keeps 50 sites, `ReviewRegion.atoms` 19, `ReviewRegion.component` 11, TableSearch 6,
+ImportPage 1 and the new review browser module 1: **88 total**. This remainder includes actual prop/vendor edges
+and unresolved owned places; the table does not grant blanket exemptions to any of these files.
+
+The changed canonical helper arguments are `noticesFromText`, `storedFromText`, `waitingFromText` (required Option
+text) and `browserLocks` (Option capability). All source callers and the two forced draft fixture callers were
+updated together. The read/remove transaction still removes a missing entry, and does not hand it over on either
+read or remove refusal. Storage keys, lock names, selectors, codecs, encoded representation and screen words
+remain unchanged.
+
+### Browser boundary validation and limits
+
+- Full `bun run check --env-mode=loose --continue=always` completed **103/105 tasks**, 76 cached, in
+  **3m11.482s**. All code checks, strict ceilings, lint, tests and proofs passed. The two failures are the expected
+  unapproved browser edge and a now-stale decreasing ledger entry below. Receipt: `/tmp/defaults-browser-final2-check.log`.
+- Catalog web passed **401 tests in 38 files**, review **115 in 7**, client **58 in 12**, app **70 in 19**; catalog
+  model passed **274 fast tests plus 5 proofs**. No test needed a second try. The final review-only code check
+  also passed at **225/225** after localStore was tightened to treat an explicitly undefined platform storage as absent.
+  Receipt: `/tmp/defaults-browser-review-final-check.log`. Other strict ceilings stay client 15, UI 39, catalog 148.
+- The focused defaults command over all 25 changed TypeScript files fails only
+  `packages/review/src/internal/browser.ts:24`, **one absence**: actual `Storage.getItem` null at the KVS boundary.
+  The reader returns Effect and KVS explicitly requires `string | undefined` (`effect/src/persistence/KeyValueStore.ts`).
+  Its exemption-ready path/kind/reason is above; no exemption or baseline was edited. Receipt:
+  `/tmp/defaults-browser-focused-law.log`. The other 24 changed files hold to the existing baseline.
+- The only additional required ledger decrease is **remove the keptStore.ts entry** from
+  `packages/tooling/tool/cli/ledgers/dual.json`: its exported uncurried multi-argument refusal helper no longer
+  exists there. That ledger is outside this lane's allowed file scope and remains unchanged. No increase is proposed.
+- `bun run beep laws boundaries` passes all **27 workspaces**. Formatting the 25 changed TypeScript files and
+  `git diff --check` pass. `bun run docs:check` passes with existing status-vocabulary warnings.
+- Local mocked-platform probes passed storage unavailable/missing/empty/refused reads, exact legacy JSON words,
+  error key/method/cause, missing browser globals, unavailable/acquired lock callbacks and held identity, exact
+  query/ref/viewport/closest/dataset selectors, absent/empty URL parameters, absent drop data, React callback
+  attached/detached node identity and the original cleanup function identity/invocation. Scratch receipts:
+  `.scratch/browser-edges-probe.ts`, `.scratch/browser-inventory.ts`; inventory JSON is
+  `/tmp/defaults-browser-inventory.json`. These are synthetic probes, not browser observations.
+- Effect 4.1.5 source was inspected for Option null/undefined construction and map/flatMap/match/exists,
+  Effect callback/try/undefined, and the KeyValueStore representation. No getOrThrow, runSync, decodeSync,
+  encodeSync, function-local schema or fallback-only schema was introduced.
+
+The final full command used temporary Bun/XDG/Turbo caches and Wrangler registry/log paths under `/tmp`, with
+Turbo loose environment mode. Earlier attempts exposed the required helper signatures, nested pipe diagnostics,
+React cleanup/undefined types and new helper strict findings; these were corrected. Earlier D1 attempts failed
+writing `/home/elpresidank/.config/.wrangler/registry/beep-d1-test`; the final temporary registry run completed
+with no D1 failure. The last full run has no failing code or test gate.
+
+No browser was opened: Upload, Match, Review, Result and Items were **not seen on screen**. No dedicated
+performance benchmark, `check:full`, hosted behavior or actual browser Worker was exercised. ReviewGrid row/cell
+loops retain their original reads, callbacks and allocations; this is source inspection, not performance proof.
+PLAN, defaults-baseline.json, Defaults.rules.ts/exemptions, the Verify lock, vendored files, stored data and
+bun.lock remain unchanged. No .dev.vars was read or written, UPDATE_VERIFY_LOCK was not set, and no commit or push
+was made. This lane does not declare the entire goal complete.
+
+Needs the person: approval of the named browser absence exemption and the narrow dual-ledger deletion; remaining
+owned sites and prior undecided defaults stay visible, without a new product decision in this lane.

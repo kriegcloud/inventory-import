@@ -8,6 +8,7 @@
 // two; Benjamin, 2026-11-20, G3); and under the tab that decided them ("Each tab keeps its own", G4): a tab keeps and
 // sends only its own, takes up rows only from a tab that is gone, and never writes over or erases another tab's entry.
 // Nothing here is a module-level variable a screen depends on: the tab, the owner and the counts are atoms.
+import { browserWindow, requestAvailable, storageText } from "@inventory/client/Storage"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
@@ -175,13 +176,13 @@ const claimOf = (entry: Entry): string => `inventory-kept:${entry.key}`
 const takeEntry = (registry: AtomRegistry.AtomRegistry, key: string, take: (stored: StoredWaiting) => void): void => {
   // Read and erased as one: where the browser refuses either, it is not taken.
   const text = sharedStorage.attempt((storage) => {
-    const found = storage.getItem(key)
+    const found = storageText(key)(storage)
     storage.removeItem(key)
     return found
   })
   if (O.isNone(text)) return
   registry.set(waitingAt(key), O.none())
-  take(storedFromText(text.value))
+  take(text.pipe(O.flatten, storedFromText))
 }
 
 /**
@@ -246,28 +247,35 @@ const claimKept = "500 millis"
 const claiming = (locks: LockManager, entry: Entry, then: () => void): void => {
   const nothing = () => Effect.runPromise(Effect.void)
   const claim = () =>
-    locks.request(claimOf(entry), { ifAvailable: true }, (lock) =>
-      lock === null
-        ? nothing()
-        : locks
-            .query()
-            .then((snapshot) =>
-              O.exists(entry.tab, (tab) =>
-                A.some(
-                  O.match(O.fromUndefinedOr(snapshot.held), { onNone: A.empty, onSome: identity }),
-                  (held) => held.name === lockOf(tab)
+    requestAvailable({
+      locks,
+      name: claimOf(entry),
+      options: { ifAvailable: true },
+      use: (lock) =>
+        O.isNone(lock)
+          ? nothing()
+          : locks
+              .query()
+              .then((snapshot) =>
+                O.exists(entry.tab, (tab) =>
+                  A.some(
+                    O.match(O.fromUndefinedOr(snapshot.held), { onNone: A.empty, onSome: identity }),
+                    (held) => held.name === lockOf(tab)
+                  )
                 )
+                  ? nothing()
+                  : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.sleep(claimKept))))
               )
-                ? nothing()
-                : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.sleep(claimKept))))
-            )
-    )
+    })
   O.match(entry.tab, {
     onNone: () => void claim(),
     onSome: (tab) =>
-      void locks.request(takingOf(tab), { mode: "shared", ifAvailable: true }, (lock) =>
-        lock === null ? nothing() : claim()
-      )
+      void requestAvailable({
+        locks,
+        name: takingOf(tab),
+        options: { mode: "shared", ifAvailable: true },
+        use: (lock) => (O.isNone(lock) ? nothing() : claim())
+      })
   })
 }
 
@@ -278,8 +286,12 @@ const claiming = (locks: LockManager, entry: Entry, then: () => void): void => {
 const takingGone = (entries: ReadonlyArray<Entry>, then: (entry: Entry) => void): void => {
   const locks = browserLocks()
   for (const entry of entries) {
-    if (locks !== undefined) claiming(locks, entry, () => then(entry))
-    else if (O.isNone(entry.tab)) then(entry)
+    O.match(locks, {
+      onSome: (locks) => claiming(locks, entry, () => then(entry)),
+      onNone: () => {
+        if (O.isNone(entry.tab)) then(entry)
+      }
+    })
   }
 }
 
@@ -559,7 +571,9 @@ const forgetIfRemoved = ({ id, of, registry }: DraftIn & { readonly of: Owner })
  * original's), and again when somebody else is signed in: what the last one's entries still have to send stays counted.
  */
 export const askBeforeLeaving = Atom.readable((get) => {
-  if (typeof window === "undefined") return
+  const browser = browserWindow()
+  if (O.isNone(browser)) return
+  const window = browser.value
   const registry = get.registry
   // Rows this tab kept before a reload wait to be sent wherever the person is, whether or not their import's step is
   // opened again: they count from the start.

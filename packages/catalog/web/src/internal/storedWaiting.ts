@@ -263,11 +263,11 @@ const encodeText = S.encodeOption(asText)
  * Waiting rows read from the text this browser keeps under their key: none where there is none or it cannot be read.
  * For a read that must see the browser's storage as it is now (another tab may have changed it since this page read).
  */
-export const waitingFromText = (text: string | null): O.Option<Waiting> => toWaiting(storedFromText(text))
+export const waitingFromText = (text: O.Option<string>): O.Option<Waiting> => text.pipe(storedFromText, toWaiting)
 
 /** The entry itself read from that text, with the name of the import's file: none where it cannot be read. */
-export const storedFromText = (text: string | null): StoredWaiting =>
-  text === null ? O.none() : O.flatten(decodeText(text))
+export const storedFromText = (text: O.Option<string>): StoredWaiting =>
+  O.flatMap(text, (text) => O.flatten(decodeText(text)))
 
 /**
  * The waiting rows as they come back after a reload: written as this browser keeps them, and read again.
@@ -275,4 +275,8 @@ export const storedFromText = (text: string | null): StoredWaiting =>
  * @example keptForm(waiting(draft)) // what `Opened` finds after the page is loaded again
  */
 export const keptForm = (waits: O.Option<Waiting>): O.Option<Waiting> =>
-  waits.pipe(toStored(O.none()), encodeText, O.flatMap(waitingFromText))
+  waits.pipe(
+    toStored(O.none()),
+    encodeText,
+    O.flatMap((text) => waitingFromText(O.some(text)))
+  )

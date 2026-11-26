@@ -1,3 +1,4 @@
+import { closest } from "./internal/browser.ts"
 import { Search, X } from "lucide-react"
 import type { RowData, Table } from "@tanstack/react-table"
 import { useAtomMount, useAtomValue } from "@effect/atom-react"
@@ -124,7 +125,7 @@ const makeBox = (
             event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingIn(event.target)
           const command = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey) && !event.altKey
           // A dialog open over the table keeps its keys.
-          const inDialog = event.target instanceof Element && event.target.closest("[role=dialog]") !== null
+          const inDialog = event.target instanceof Element && O.isSome(closest("[role=dialog]")(event.target))
           const node = field()
           if ((!slash && !command) || inDialog || !(node instanceof HTMLInputElement)) return
           event.preventDefault()

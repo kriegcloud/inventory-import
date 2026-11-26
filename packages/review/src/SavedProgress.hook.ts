@@ -1,6 +1,7 @@
 // The browser half of saved progress: the chosen file in IndexedDB, the progress as an atom per key that is the
 // browser's own record of it (`Atom.kvs` over `localStorage`), and the hook a screen reads it with. The stored shape
 // and its keys are in `SavedProgress.schema.ts`.
+import { fileDatabase } from "./internal/browser.ts"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
@@ -20,8 +21,9 @@ const files = "files"
 export class FileNotKept extends S.TaggedError<FileNotKept, { readonly brand: unique symbol }>()("FileNotKept", {}) {}
 
 const openFiles = Effect.callback<IDBDatabase, FileNotKept>((resume) => {
-  if (typeof indexedDB === "undefined") return resume(Effect.fail(FileNotKept.make()))
-  const request = indexedDB.open(database, 1)
+  const available = fileDatabase()
+  if (O.isNone(available)) return resume(Effect.fail(FileNotKept.make()))
+  const request = available.value.open(database, 1)
   request.onupgradeneeded = () => request.result.createObjectStore(files)
   request.onsuccess = () => resume(Effect.succeed(request.result))
   request.onerror = () => resume(Effect.fail(FileNotKept.make()))

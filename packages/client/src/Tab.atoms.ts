@@ -8,7 +8,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
-import { tabStorage } from "@inventory/client/Storage"
+import { tabStorage, browserLocks, requestAvailable } from "@inventory/client/Storage"
 
 /** Where a tab keeps its id: in the tab's own storage, which a reload of the tab keeps and a new tab does not. */
 const tabSlot = "inventory:tab"
@@ -41,8 +41,7 @@ export const lockOf = (tab: string): string => `inventory-tab:${tab}`
 export const takingOf = (tab: string): string => `inventory-taking:${tab}`
 
 /** The browser's locks, or none where it has none (an old browser, a test). */
-export const browserLocks = (): LockManager | undefined =>
-  typeof navigator === "undefined" || navigator.locks === undefined ? undefined : navigator.locks
+export { browserLocks } from "@inventory/client/Storage"
 
 /**
  * This tab's id, once it is the tab's own: none until the tab holds its lock. A tab opened as a copy of another (its
@@ -53,12 +52,16 @@ export const browserLocks = (): LockManager | undefined =>
  */
 export const thisTab: Atom.Atom<O.Option<string>> = Atom.readable((get): O.Option<string> => {
   const first = O.match(keptId(), { onSome: (id) => id, onNone: newId })
-  const locks = browserLocks()
-  if (locks === undefined) return O.some(first)
+  const available = browserLocks()
+  if (O.isNone(available)) return O.some(first)
+  const locks = available.value
   const hold = (tab: string): void =>
-    void locks
-      .request(lockOf(tab), { ifAvailable: true }, (lock) =>
-        lock === null
+    void requestAvailable({
+      locks,
+      name: lockOf(tab),
+      options: { ifAvailable: true },
+      use: (lock) =>
+        O.isNone(lock)
           ? Effect.runPromise(Effect.succeed("taken" as const))
           : // Held for the page's life; the id is the tab's own from now on. Said after this read has returned.
             Effect.runPromise(
@@ -66,10 +69,9 @@ export const thisTab: Atom.Atom<O.Option<string>> = Atom.readable((get): O.Optio
                 locks.request(takingOf(tab), { mode: "exclusive" }, () => Effect.runPromise(Effect.void))
               ).pipe(Effect.andThen(Effect.sync(() => get.setSelf(O.some(tab)))), Effect.andThen(Effect.never))
             )
-      )
-      .then((answer) => {
-        if (answer === "taken") hold(newId())
-      })
+    }).then((answer) => {
+      if (answer === "taken") hold(newId())
+    })
   hold(first)
   return O.none()
 }).pipe(Atom.keepAlive)

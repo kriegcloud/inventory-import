@@ -1,3 +1,4 @@
+import { refCallback } from "./internal/browser.ts"
 import { rowName } from "@inventory/review/ReviewDraft"
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
@@ -406,8 +407,9 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
 const linesShownOf = Atom.family((_key: string) => Atom.make(linesAtOnce))
 
 /** Takes the person to a line: where a press of Import stopped, or the next one once that is settled. */
-const goThere = (line: HTMLElement | null): void => {
-  if (line === null) return
+const goThere = (found: O.Option<HTMLElement>): void => {
+  if (O.isNone(found)) return
+  const line = found.value
   const go = () => {
     line.focus({ preventScroll: true })
     line.scrollIntoView({ block: "nearest" })
@@ -422,6 +424,8 @@ const goThere = (line: HTMLElement | null): void => {
   document.addEventListener("focusin", back)
   window.setTimeout(() => document.removeEventListener("focusin", back), 1000)
 }
+
+const goToLine = refCallback(goThere)
 
 /**
  * The rows that wait for the person, above the review, by what they ask (decided since by someone else or another tab,
@@ -490,7 +494,7 @@ function LinesOf(props: {
           <li
             // Stopped here: the first line takes the focus at each press of Import, and the next one once it is settled.
             key={at === 0 && stopped > 0 ? `${line.rowId}:${stopped}` : line.rowId}
-            {...(at === 0 && stopped > 0 ? { ref: goThere } : {})}
+            {...(at === 0 && stopped > 0 ? { ref: goToLine } : {})}
             tabIndex={-1}
             className="flex flex-wrap items-center gap-x-3 gap-y-1"
           >

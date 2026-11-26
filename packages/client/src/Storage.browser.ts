@@ -56,3 +56,30 @@ export const sharedStorage: BrowserStorage = browserStorage(() => window.localSt
 
 /** The tab's own storage (`window.sessionStorage`): a reload of the tab keeps it, a new tab starts without it. */
 export const tabStorage: BrowserStorage = browserStorage(() => window.sessionStorage)
+
+/** The actual browser window, absent during server rendering and tests without a DOM. */
+export const browserWindow = (): O.Option<Window> => O.fromUndefinedOr(globalThis.window)
+
+/** Web Locks capability, absent in older browsers and tests. */
+export const browserLocks = (): O.Option<LockManager> =>
+  O.flatMap(O.fromUndefinedOr(globalThis.navigator), (navigator) => O.fromUndefinedOr(navigator.locks))
+
+/** A nullable platform lock is converted at its callback entry; the caller handles both complete cases. */
+export const requestAvailable = <A>(input: {
+  readonly locks: LockManager
+  readonly name: string
+  readonly options: LockOptions
+  readonly use: (lock: O.Option<Lock>) => A
+}) => input.locks.request(input.name, input.options, (lock) => input.use(O.fromNullOr(lock)))
+
+/** Reads an entry without catching a refusal: the owning storage transaction decides its error policy. */
+export const storageText =
+  (key: string) =>
+  (storage: Storage): O.Option<string> =>
+    O.fromNullOr(storage.getItem(key))
+
+/** Reads one key in the browser's own order without catching a refusal. */
+export const storageKey =
+  (index: number) =>
+  (storage: Storage): O.Option<string> =>
+    O.fromNullOr(storage.key(index))

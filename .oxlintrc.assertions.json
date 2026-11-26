@@ -13,7 +13,11 @@
   // Only this rule: each package's own lint runs the rest.
   "categories": { "correctness": "off" },
   "rules": {
-    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }]
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+    // No `x!` either (Benjamin, 2026-11-26: "`!` non-null assertions should be banned."): it is the same claim as
+    // `x as NonNullable<T>`. Take the value as an Option (`A.get`, `R.get`, `O.fromNullishOr` at a library's edge), or
+    // in a test narrow it with an assert of `@effect/vitest/utils`. No list of files: our own code holds none.
+    "typescript/no-non-null-assertion": "error"
   },
   "ignorePatterns": [
     ".agents/**",
@@ -55,7 +59,7 @@
         "packages/foundation/modeling/utils/test/Option.test.ts",
         "packages/foundation/modeling/utils/test/Struct.test.ts"
       ],
-      "rules": { "typescript/consistent-type-assertions": "off" }
+      "rules": { "typescript/consistent-type-assertions": "off", "typescript/no-non-null-assertion": "off" }
     },
     {
       // Components and hooks copied from a registry (shadcn, tablecn, Dice UI; packages/ui/components.json names them)

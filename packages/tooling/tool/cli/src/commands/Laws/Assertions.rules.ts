@@ -45,6 +45,18 @@ const Override = S.Struct({
 })
 
 /**
+ * The vendored kit's list: both rules off, since its files are beep-effect's as published (`bun run vendor:check`) and
+ * one of them writes `x!`.
+ */
+const KitOverride = S.Struct({
+  files: S.Array(S.String).pipe(S.annotateKey({ description: "The kit's files the rules are off for, from the root" })),
+  rules: S.Struct({
+    "typescript/consistent-type-assertions": S.Literal("off"),
+    "typescript/no-non-null-assertion": S.Literal("off")
+  }).pipe(S.annotateKey({ description: "The two rules, off, and no other" }))
+})
+
+/**
  * The configuration as it must be: the one rule, an error with no assertion style allowed, every other rule off, the
  * folders not read as written here, and three lists. A path added to `ignorePatterns`, a rule changed or a fourth list
  * would let a file go unread, so any of them refuses the whole.
@@ -60,8 +72,11 @@ const Profile = S.fromJsonString(
       "typescript/consistent-type-assertions": S.Tuple([
         S.Literal("error"),
         S.Struct({ assertionStyle: S.Literal("never") })
-      ])
-    }).pipe(S.annotateKey({ description: "The one rule, an error, no assertion allowed" })),
+      ]),
+      "typescript/no-non-null-assertion": S.Literal("error")
+    }).pipe(
+      S.annotateKey({ description: "No `x as T` and no `x!` (Benjamin, 2026-11-26): both errors, no style allowed" })
+    ),
     ignorePatterns: S.Tuple([
       S.Literal(".agents/**"),
       S.Literal(".codex/**"),
@@ -73,7 +88,7 @@ const Profile = S.fromJsonString(
       S.Literal("**/.turbo/**"),
       S.Literal(".claude/**")
     ]).pipe(S.annotateKey({ description: "What is not read: what is no source of ours" })),
-    overrides: S.Tuple([Override, Override, Override]).pipe(
+    overrides: S.Tuple([KitOverride, Override, Override]).pipe(
       S.annotateKey({ description: "The three lists: the vendored kit, the registry's components, everyone else's" })
     )
   }).pipe(
@@ -83,7 +98,10 @@ const Profile = S.fromJsonString(
 
 /** Whether a directive turns the rule off: it names it, under either plugin's spelling. */
 const silences = (rules: ReadonlyArray<string>) =>
-  A.some(rules, (name) => Str.endsWith("consistent-type-assertions")(name))
+  A.some(
+    rules,
+    (name) => Str.endsWith("consistent-type-assertions")(name) || Str.endsWith("no-non-null-assertion")(name)
+  )
 
 /**
  * Whether `source` holds a type assertion: `x as T` with any type but `const`, or `<T>x`.

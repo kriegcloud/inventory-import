@@ -52,9 +52,18 @@ const config = (lists: ReadonlyArray<ReadonlyArray<string>>, change: Readonly<Re
   `// the ban\n${json({
     plugins: ["typescript"],
     categories: { correctness: "off" },
-    rules: { "typescript/consistent-type-assertions": ["error", { assertionStyle: "never" }] },
+    rules: {
+      "typescript/consistent-type-assertions": ["error", { assertionStyle: "never" }],
+      "typescript/no-non-null-assertion": "error"
+    },
     ignorePatterns: ignored,
-    overrides: A.map(lists, (files) => ({ files, rules: { "typescript/consistent-type-assertions": "off" } })),
+    overrides: A.map(lists, (files, at) => ({
+      files,
+      rules:
+        at === 0
+          ? { "typescript/consistent-type-assertions": "off", "typescript/no-non-null-assertion": "off" }
+          : { "typescript/consistent-type-assertions": "off" }
+    })),
     ...change
   })}`
 

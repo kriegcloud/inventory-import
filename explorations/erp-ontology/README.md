@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Specify the slice after the party slice; goals/party-slice is done, and its branch is not pushed.
+next: Specify the slice after the party slice; goals/party-slice is done and merged into main.
 goals: [erp-vocabulary, party-slice]
 ---
 

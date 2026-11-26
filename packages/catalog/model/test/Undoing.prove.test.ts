@@ -27,7 +27,7 @@ layer(NodeServices.layer)("Undoing", (it) => {
       expect(standingOf(report.schema), said).toBe("proved")
       expect(report.accepted, said).toBe(true)
       // Past 4,096 paths the prover proves nothing: a rule or a check that adds paths shows here first.
-      expect(report.paths, said).toBe(364)
+      expect(report.paths, said).toBe(138)
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.
       expect(report.unread).toEqual([])
       expect(report.unkept).toEqual([])

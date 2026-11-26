@@ -329,6 +329,59 @@ ${statement} * as Result from "effect/Result";
       );`,
     reason:
       "This repository bans the `try` statement (Benjamin, 2026-11-22: failures are Effects or effect/Result), the vendored kit included. The process is restored with Effect.ensuring where upstream has try and finally. Unnecessary once beep-effect's test does."
+  },
+  {
+    pkg: "@beep/utils",
+    file: "test/Option.test.ts",
+    from: `    expectTypeOf(O.getOrElseFalse(O.none())).toEqualTypeOf<false>();
+    expectTypeOf(O.getOrElseTrue(O.none())).toEqualTypeOf<true>();
+    expectTypeOf(O.getOrElse0(O.none())).toEqualTypeOf<0>();
+    expectTypeOf(O.getOrElseEmptyStr(O.none())).toEqualTypeOf<"">();
+
+    const value = O.some<"present">("present");
+    expectTypeOf(O.getOrElseFalse(value)).toEqualTypeOf<"present" | false>();
+    expectTypeOf(O.getOrElseTrue(value)).toEqualTypeOf<"present" | true>();
+    expectTypeOf(O.getOrElse0(value)).toEqualTypeOf<"present" | 0>();
+    expectTypeOf(O.getOrElseEmptyStr(value)).toEqualTypeOf<"present" | "">();
+
+    expect(O.getOrElseFalse(O.none())).toBe(false);
+    expect(O.getOrElseTrue(O.none())).toBe(true);
+    expect(O.getOrElse0(O.none())).toBe(0);
+    expect(O.getOrElseEmptyStr(O.none())).toBe("");
+    expect(O.getOrElseFalse(value)).toBe("present");
+    expect(O.getOrElseTrue(value)).toBe("present");
+    expect(O.getOrElse0(value)).toBe("present");
+    expect(O.getOrElseEmptyStr(value)).toBe("present");`,
+    to: `    const none = O.none();
+    const value = O.some<"present">("present");
+    const fallbackFalse = O.getOrElseFalse(none);
+    const fallbackTrue = O.getOrElseTrue(none);
+    const fallbackZero = O.getOrElse0(none);
+    const fallbackEmpty = O.getOrElseEmptyStr(none);
+    const valueOrFalse = O.getOrElseFalse(value);
+    const valueOrTrue = O.getOrElseTrue(value);
+    const valueOrZero = O.getOrElse0(value);
+    const valueOrEmpty = O.getOrElseEmptyStr(value);
+
+    expectTypeOf(fallbackFalse).toEqualTypeOf<false>();
+    expectTypeOf(fallbackTrue).toEqualTypeOf<true>();
+    expectTypeOf(fallbackZero).toEqualTypeOf<0>();
+    expectTypeOf(fallbackEmpty).toEqualTypeOf<"">();
+    expectTypeOf(valueOrFalse).toEqualTypeOf<"present" | false>();
+    expectTypeOf(valueOrTrue).toEqualTypeOf<"present" | true>();
+    expectTypeOf(valueOrZero).toEqualTypeOf<"present" | 0>();
+    expectTypeOf(valueOrEmpty).toEqualTypeOf<"present" | "">();
+
+    expect(fallbackFalse).toBe(false);
+    expect(fallbackTrue).toBe(true);
+    expect(fallbackZero).toBe(0);
+    expect(fallbackEmpty).toBe("");
+    expect(valueOrFalse).toBe("present");
+    expect(valueOrTrue).toBe("present");
+    expect(valueOrZero).toBe("present");
+    expect(valueOrEmpty).toBe("present");`,
+    reason:
+      "@effect/tsgo 0.73.4 reports each nested `O.getOrElse*(O.none())` inside `expectTypeOf(...)` as a missed pipeable form (missedPipeableOpportunity), an error in this repository's profile. The patch is beep-effect's own change to this test at 6f88be88e92 (#3549, the same tsgo move): each value is bound once, then checked. Unnecessary once the kit is synced at that commit or later."
   }
 ]
 

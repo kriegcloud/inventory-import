@@ -47,7 +47,7 @@
     "@floating-ui/react-dom": "catalog:",
     "@fontsource-variable/ibm-plex-sans": "catalog:",
     "@fontsource-variable/jetbrains-mono": "catalog:",
-    "@hookform/resolvers": "^7.0.6",
+    "@hookform/resolvers": "^7.0.9",
     "@inventory/access-contract": "workspace:*",
     "@inventory/access-host": "workspace:*",
     "@inventory/access-model": "workspace:*",
@@ -85,7 +85,7 @@
     "vaul": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.69.1",
+    "@cloudflare/vite-plugin": "^1.70.2",
     "@cloudflare/workers-types": "catalog:",
     "@effect/tsgo": "catalog:",
     "@effect/vitest": "catalog:",
@@ -95,16 +95,16 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-react": "^6.3.0",
     "compression": "1.8.2",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "playwright-core": "1.65.1",
-    "rollup-plugin-visualizer": "7.0.1",
+    "rollup-plugin-visualizer": "7.3.0",
     "tailwindcss": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:",
-    "vite": "^8.3.6",
+    "vite": "^8.3.8",
     "vitest": "catalog:",
     "wrangler": "catalog:"
   }

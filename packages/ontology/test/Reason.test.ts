@@ -15,6 +15,7 @@ import {
   JarNotPinned,
   JavaNotPinned,
   Machine,
+  Run,
   RunRefused,
   documentOf,
   majorOf,
@@ -27,7 +28,10 @@ import {
   RobotResult
 } from "../src/Reason.ts"
 import { linesOf } from "../src/Graph.schema.ts"
+import { threadHandWritten } from "../src/Thread.ts"
 import { readTurtle } from "../src/Turtle.ts"
+import threadGraph from "../generated/fixtures/CQ-P06.graph.ttl?raw"
+import { handWrittenFixtures } from "./support/fixtures.ts"
 
 const java17 = JavaFound.make({ where: "/opt/java-17/bin/java", version: O.some("17.0.2") })
 const java27 = JavaFound.make({ where: "java", version: O.some("27.0.1.1") })
@@ -50,7 +54,12 @@ type Case = {
   readonly robot?: (command: "validate-profile" | "reason", document: string) => RobotResult
 }
 
-const refusedFiles = ["test_Ravi> a inv:Tenant", "inv:AuditEntry , inv:Person", "inv:AuditEntry , inv:Tenant"]
+const refusedFiles = [
+  "test_Ravi> a inv:Tenant",
+  "inv:AuditEntry , inv:Person",
+  "inv:AuditEntry , inv:Tenant",
+  "test_WorksCoPacker> a inv:Organization"
+]
 const honest = (command: "validate-profile" | "reason", document: string): RobotResult =>
   command === "reason" && A.some(refusedFiles, (text) => Str.includes(text)(document)) ? inconsistent : fine
 
@@ -96,16 +105,27 @@ const refusalOf = (given: Case) =>
   }))
 
 describe("gate 9, the reasoner's checks", () => {
-  it.effect("passes on Java 17 and the approved jar: the five runs, each named for its ban", () =>
+  it.effect("passes on Java 17 and the approved jar: every run, each named for its ban or its fixture", () =>
     Effect.gen(function* () {
       const run = yield* gate({})
       expect(Result.isSuccess(run.result) ? run.result.success : []).toStrictEqual([
-        `ROBOT v1.9.11 (sha256 ${run.pin.sha256}) with HermiT under the Java at /opt/java-17/bin/java`,
+        `ROBOT v1.9.11 (sha256 ${run.pin.sha256}) with HermiT under Java 17.0.2 at /opt/java-17/bin/java`,
         "ban 1, the near miss: the same person is a member of two tenants: the thread's graph is in the DL profile and consistent",
         "ban 2, the near miss: an audit entry names a member of the person, in the tenant: fixtures/reason/entry-names-member.ttl is in the DL profile and consistent",
         "ban 1, refused: a person is a tenant: fixtures/reason/person-is-tenant.ttl is in the DL profile and reported inconsistent",
         "ban 2, refused: an audit entry is the person it is about: fixtures/reason/entry-is-person.ttl is in the DL profile and reported inconsistent",
-        "ban 2, refused: an audit entry is the organization it is about: fixtures/reason/entry-is-tenant.ttl is in the DL profile and reported inconsistent"
+        "ban 2, refused: an audit entry is the organization it is about: fixtures/reason/entry-is-tenant.ttl is in the DL profile and reported inconsistent",
+        "slice 1, step 5's fixture: a node typed only a tenant: cq/bare-type.fixture.ttl is in the DL profile and consistent",
+        "decision 34, the near miss: each tenant's record of an organization is of it, and is not it: cq/CQ-P01.fixture.ttl is in the DL profile and consistent",
+        "slice 1, CQ-P02's fixture: records that state no trading role, and the open reading, which states no flag: cq/CQ-P02.fixture.ttl is in the DL profile and consistent",
+        "slice 1, CQ-P09's fixture: a record held by one tenant, one held by none and one held by two: cq/CQ-P09.fixture.ttl is in the DL profile and consistent",
+        "slice 1, CQ-P04's fixture: a tenant's decisions on its records, each at its date-time: cq/CQ-P04.fixture.ttl is in the DL profile and consistent",
+        "slice 1, CQ-P05's fixture beside CQ-P04's: two records stated the same, the way identity is never stated: cq/CQ-P05.fixture.ttl is in the DL profile and consistent",
+        "slice 1, model-call.ttl: one model call of each purpose: cq/model-call.ttl is in the DL profile and consistent",
+        "slice 1, CQ-P07's fixture: a tenant with an active admin, one whose only admin is revoked, one with no members: cq/CQ-P07.fixture.ttl is in the DL profile and consistent",
+        "slice 1, CQ-P03's fixture: contacts at two accounts, each for its purpose: cq/CQ-P03.fixture.ttl is in the DL profile and consistent",
+        "slice 1, sutton-party.ttl: one record of each Sutton type the coverage table places: cq/sutton-party.ttl is in the DL profile and consistent",
+        "decision 34, refused: a tenant's record of an organization is that organization: fixtures/reason/record-is-organization.ttl is in the DL profile and reported inconsistent"
       ])
       // Each run is the profile check and then the reasoner, with the pinned Java and no other.
       expect(run.calls).toStrictEqual(
@@ -225,7 +245,7 @@ describe("gate 9, the reasoner's checks", () => {
       expect(run.sentence).toContain(
         "fixtures/reason/person-is-tenant.ttl: the joined files must be in the OWL 2 DL profile"
       )
-      // The reasoner is not asked of a file the profile check refused.
+      // The reasoner is not asked of a file the profile check refused: it stops at the third run.
       expect(A.filter(run.calls, Str.endsWith("reason"))).toHaveLength(2)
     })
   )
@@ -281,14 +301,56 @@ describe("gate 9, the reasoner's checks", () => {
     ])
   })
 
-  it("each run joins the generated ontology and the thread's graph, the refusals and the near miss with one file more", () => {
+  it("each run joins the generated ontology and its files: the thread's graph, or one fixture of the slice", () => {
     expect(A.map(runs, (run) => [run.name, run.must, run.files.length])).toStrictEqual([
       ["the thread's graph", "consistent", 2],
       ["fixtures/reason/entry-names-member.ttl", "consistent", 3],
       ["fixtures/reason/person-is-tenant.ttl", "inconsistent", 3],
       ["fixtures/reason/entry-is-person.ttl", "inconsistent", 3],
-      ["fixtures/reason/entry-is-tenant.ttl", "inconsistent", 3]
+      ["fixtures/reason/entry-is-tenant.ttl", "inconsistent", 3],
+      ["cq/bare-type.fixture.ttl", "consistent", 2],
+      ["cq/CQ-P01.fixture.ttl", "consistent", 2],
+      ["cq/CQ-P02.fixture.ttl", "consistent", 2],
+      ["cq/CQ-P09.fixture.ttl", "consistent", 2],
+      ["cq/CQ-P04.fixture.ttl", "consistent", 2],
+      ["cq/CQ-P05.fixture.ttl", "consistent", 3],
+      ["cq/model-call.ttl", "consistent", 2],
+      ["cq/CQ-P07.fixture.ttl", "consistent", 2],
+      ["cq/CQ-P03.fixture.ttl", "consistent", 2],
+      ["cq/sutton-party.ttl", "consistent", 2],
+      ["fixtures/reason/record-is-organization.ttl", "inconsistent", 3]
     ])
     expect(A.every(runs, (run) => O.exists(A.head(run.files), Str.includes("inv:Tenant a owl:Class")))).toBe(true)
   })
+
+  it("decision 34's refusal and its near miss differ by one file: the refused file beside CQ-P01's fixture", () => {
+    const named = (name: string) => A.findFirst(runs, (run) => run.name === name)
+    const refused = named("fixtures/reason/record-is-organization.ttl")
+    const nearMiss = named("cq/CQ-P01.fixture.ttl")
+    expect(O.map(refused, (run) => A.take(run.files, 2))).toStrictEqual(O.map(nearMiss, (run) => run.files))
+  })
+
+  it.effect("every hand-written fixture is reasoned over: each is a file of a run, the thread's by its graph", () =>
+    Effect.gen(function* () {
+      const base = "https://example.invalid/unused/"
+      // The texts of `handWrittenFixtures` that no run joins, by name: what a fixture with no run of its own shows.
+      const unrun = (given: ReadonlyArray<Run>) =>
+        A.map(
+          A.filter(handWrittenFixtures, ([, text]) => !A.some(given, (run) => A.contains(run.files, text))),
+          ([name]) => name
+        )
+      // The thread's hand-written text is not a file of its own: the thread's graph, the lift beside it, holds it.
+      expect(unrun(runs)).toStrictEqual(["CQ-P06.fixture.ttl"])
+      const thread = yield* Effect.map(readTurtle(base, threadGraph), linesOf)
+      const written = yield* Effect.map(readTurtle(base, threadHandWritten), linesOf)
+      expect(written.length).toBeGreaterThan(0)
+      expect(A.difference(written, thread)).toStrictEqual([])
+      expect(O.exists(A.head(runs), (run) => A.contains(run.files, threadGraph))).toBe(true)
+      // Planted: with CQ-P03's run left out, its fixture is reasoned over by no run, and the check names it.
+      expect(unrun(A.filter(runs, (run) => run.name !== "cq/CQ-P03.fixture.ttl"))).toStrictEqual([
+        "CQ-P06.fixture.ttl",
+        "CQ-P03.fixture.ttl"
+      ])
+    })
+  )
 })

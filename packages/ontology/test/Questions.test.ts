@@ -349,19 +349,21 @@ ASK { ?organization ${walk} inv:Organization }`
         [tenancyGraph, tenancy.query, tenancyVariables],
         [identityGraph, identity.query, identityVariables]
       ]
+      // Rows in code point order: the engine's order is not fixed for rows the query's ORDER BY ties, as M5's are.
+      const sorted = (rows: ReadonlyArray<ReadonlyArray<string>>) => A.sort(A.map(rows, A.join("\t")), byCodePoint)
       for (const [given, query, variables] of questions) {
         const moved = movedDown(given)
         expect(query).toContain(walk)
         const rows = yield* asked(given, query, variables)
         const below = yield* asked(moved, query, variables)
         expect(rows).not.toStrictEqual([])
-        expect(below).toStrictEqual(rows)
+        expect(sorted(below)).toStrictEqual(sorted(rows))
         // Planted: the same question with bare type steps answers the graph as typed, and nothing one class down.
         const bare = bareStep(query)
         expect(bare).not.toContain(walk)
         const bareRows = yield* asked(given, bare, variables)
         const bareBelow = yield* asked(moved, bare, variables)
-        expect(bareRows).toStrictEqual(rows)
+        expect(sorted(bareRows)).toStrictEqual(sorted(rows))
         expect(bareBelow).toStrictEqual([])
       }
     })

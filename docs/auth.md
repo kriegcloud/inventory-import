@@ -63,8 +63,9 @@ browser ── cookie inventory.session_token ──> Worker
   there), and `TEST_ACCOUNTS` is off there, so it always shows the sign-in page.
 - **Drawn at once, loaded when needed.** For a browser that was not signed in last time (a hint in local storage
   that grants nothing), the sign-in page is drawn with the first paint, before the session answer; the test accounts
-  appear with the answer. Better Auth's browser client (`packages/access/web/src/internal/authClient.ts`, 14 kB gzip) is imported with
-  `import()` only when a person signs in, switches or signs out, so the first page does not carry it. Measured with
+  appear with the answer. Better Auth's browser client (14 kB gzip) is imported with `import()` only when a person
+  signs in, switches or signs out, so the first page does not carry it: the screens ask `betterAuthClient` of
+  `@beep/better-auth/Client`, which gives each call as an Effect and fetches the client the first time one runs. Measured with
   Lighthouse on a phone: mobile Performance 76 for a sign-in page drawn only after the answer, 97 drawn at once.
 - **`HeaderIdentity`** in `@inventory/access-host/AccessTest` (a header names the member) is for tests only. It is marked pure, the Worker never
   provides it, and `bun run build` fails if it appears in the Worker bundle (`scripts/check-production-identity.mjs`).

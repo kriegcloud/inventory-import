@@ -2,7 +2,6 @@ import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -18,15 +17,16 @@ import { Input } from "@inventory/ui/components/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { Spinner } from "@inventory/ui/components/spinner"
 import type { SignInFeatures, TestAccount } from "@inventory/access-contract/SessionState"
-import { $AccessWebId } from "./internal/identity.ts"
-
-const $I = $AccessWebId.create("SignIn")
+import { betterAuthClient } from "@beep/better-auth/Client"
+import { type BetterAuthRefused, Credentials, NewAccount, NewOrganization } from "@beep/better-auth/ClientSchema"
+import { authSentence } from "./internal/authWords.ts"
 
 // The sign-in page, drawn with the first paint (the app's sign-in gate says why). Better Auth's client is loaded
-// only when a person reaches for the page or presses, so the first page of the app does not carry it.
+// only when a person reaches for the page or presses, so the first page of the app does not carry it
+// (`betterAuthClient`, which fetches it when first run).
 
-/** Better Auth's browser client, fetched when it is first needed. Asking again returns the same module. */
-const authClient = () => import("./internal/authClient.ts")
+/** Fetches Better Auth's client as soon as the person reaches for the page, so the press itself does not wait. */
+const preloadAuth = Atom.fn((_: void) => betterAuthClient.preload)
 
 /**
  * The words of an organization's slug, read from its name: lowercase letters and digits joined by hyphens, forty
@@ -74,45 +74,21 @@ type Attempt = Data.TaggedEnum<{
 }>
 const Attempt = Data.taggedEnum<Attempt>()
 
-/** Better Auth said no, in a sentence already written for the person ("Invalid email or password"). */
-class AuthRefused extends S.TaggedError<AuthRefused, { readonly brand: unique symbol }>()(
-  "AuthRefused",
-  { message: S.String },
-  $I.annote("AuthRefused", { description: "Better Auth refused a sign-in, a sign-up or a new organization." })
-) {}
-
-/** A Better Auth step as an Effect: its refusal is `AuthRefused` with Better Auth's own sentence. */
-const authStep = (step: () => Promise<unknown>): Effect.Effect<void, AuthRefused> =>
-  Effect.tryPromise({
-    try: () => step().then(() => undefined),
-    catch: (cause) =>
-      AuthRefused.make({
-        message: cause instanceof Error ? cause.message : "Something went wrong. Try again."
-      })
-  })
-
-/** Sends one attempt to Better Auth: a sign-in, or a sign-up followed by the new organization. */
-const submitAttempt = Atom.fn((attempt: Attempt) =>
-  Attempt.$match(attempt, {
-    SignIn: ({ email, password }) =>
-      authStep(() =>
-        authClient().then(({ authClient: client, orThrow }) =>
-          client.signIn.email({ email, password }).then((answer) => orThrow(answer))
-        )
-      ),
+/**
+ * Sends one attempt to Better Auth: a sign-in, or a sign-up followed by the new organization. `onSignedIn` runs when
+ * Better Auth has done it, never after a refusal.
+ */
+const submitAttempt = Atom.fn((sent: { readonly attempt: Attempt; readonly onSignedIn: () => void }) =>
+  Attempt.$match(sent.attempt, {
+    SignIn: ({ email, password }) => betterAuthClient.signIn(Credentials.make({ email, password })),
     SignUp: ({ name, email, password, organization }) =>
-      Effect.flatMap(slugFor(organization), (slug) =>
-        authStep(() =>
-          authClient().then(({ authClient: client, orThrow }) =>
-            client.signUp
-              .email({ name, email, password })
-              .then((answer) => orThrow(answer))
-              .then(() => client.organization.create({ name: organization, slug }))
-              .then((answer) => orThrow(answer))
-          )
+      slugFor(organization).pipe(
+        Effect.tap(() => betterAuthClient.signUp(NewAccount.make({ name, email, password }))),
+        Effect.flatMap((slug) =>
+          betterAuthClient.createOrganization(NewOrganization.make({ name: organization, slug }))
         )
       )
-  })
+  }).pipe(Effect.tap(() => Effect.sync(sent.onSignedIn)))
 )
 
 /** The attempt last sent, so the button pressed shows that it is working. */
@@ -125,14 +101,11 @@ const passwordTyped = Atom.make("")
 const nameTyped = Atom.make("")
 const organizationTyped = Atom.make("")
 
-/** Making the first organization of an account that has none. */
-const createOrganization = Atom.fn((name: string) =>
-  Effect.flatMap(slugFor(name), (slug) =>
-    authStep(() =>
-      authClient().then(({ authClient: client, orThrow }) =>
-        client.organization.create({ name, slug }).then((answer) => orThrow(answer))
-      )
-    )
+/** Making the first organization of an account that has none; `onCreated` runs when Better Auth has made it. */
+const createOrganization = Atom.fn((sent: { readonly name: string; readonly onCreated: () => void }) =>
+  slugFor(sent.name).pipe(
+    Effect.flatMap((slug) => betterAuthClient.createOrganization(NewOrganization.make({ name: sent.name, slug }))),
+    Effect.tap(() => Effect.sync(sent.onCreated))
   )
 )
 const organizationName = Atom.make("")
@@ -141,14 +114,14 @@ const organizationName = Atom.make("")
  * What to say under the form after a refusal, while nothing is on its way: Better Auth's own sentence, or a general one
  * for a failure that is not a refusal.
  */
-const refusalOf = (result: AsyncResult.AsyncResult<void, AuthRefused>): O.Option<string> =>
+const refusalOf = (result: AsyncResult.AsyncResult<void, BetterAuthRefused>): O.Option<string> =>
   !AsyncResult.isFailure(result) || result.waiting
     ? O.none()
     : result.pipe(
         AsyncResult.error,
         O.match({
           onNone: () => "Something went wrong. Try again.",
-          onSome: (refused) => refused.message
+          onSome: authSentence
         }),
         O.some
       )
@@ -162,8 +135,8 @@ export function SignIn(props: { readonly features: O.Option<SignInFeatures>; rea
   const [name, setName] = useAtom(nameTyped)
   const [organization, setOrganization] = useAtom(organizationTyped)
   const result = useAtomValue(submitAttempt)
-  const submit = useAtomSet(submitAttempt, { mode: "promiseExit" })
-  const reset = useAtomSet(submitAttempt)
+  const submit = useAtomSet(submitAttempt)
+  const preload = useAtomSet(preloadAuth)
   const [last, setLast] = useAtom(lastAttempt)
   const testAccounts = O.flatMap(props.features, (features) => features.testAccounts)
   // Until the features are known nothing is offered that may then be refused.
@@ -171,9 +144,7 @@ export function SignIn(props: { readonly features: O.Option<SignInFeatures>; rea
 
   const send = (attempt: Attempt) => {
     setLast(O.some(attempt))
-    void submit(attempt).then((exit) => {
-      if (Exit.isSuccess(exit)) props.onSignedIn()
-    })
+    submit({ attempt, onSignedIn: props.onSignedIn })
   }
   const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -194,9 +165,8 @@ export function SignIn(props: { readonly features: O.Option<SignInFeatures>; rea
   return (
     <div
       className={`mx-auto grid w-full gap-6 ${O.isNone(testAccounts) ? "max-w-sm" : "max-w-3xl md:grid-cols-2 md:items-start"}`}
-      // Fetch Better Auth's client as soon as the person reaches for the page, so the press itself does not wait.
-      onPointerEnter={() => void authClient()}
-      onFocus={() => void authClient()}
+      onPointerEnter={() => preload()}
+      onFocus={() => preload()}
     >
       <Card>
         <CardHeader>
@@ -286,7 +256,7 @@ export function SignIn(props: { readonly features: O.Option<SignInFeatures>; rea
                     type="button"
                     variant="ghost"
                     onClick={() => {
-                      reset(Atom.Reset)
+                      submit(Atom.Reset)
                       setMode(signUp ? "sign-in" : "sign-up")
                     }}
                   >
@@ -358,7 +328,7 @@ export function CreateOrganization(props: { readonly onCreated: () => void; read
   const id = useId()
   const [name, setName] = useAtom(organizationName)
   const result = useAtomValue(createOrganization)
-  const create = useAtomSet(createOrganization, { mode: "promiseExit" })
+  const create = useAtomSet(createOrganization)
   const refused = refusalOf(result)
   return (
     <Card className="mx-auto w-full max-w-sm">
@@ -372,9 +342,7 @@ export function CreateOrganization(props: { readonly onCreated: () => void; read
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            void create(name).then((exit) => {
-              if (Exit.isSuccess(exit)) props.onCreated()
-            })
+            create({ name, onCreated: props.onCreated })
           }}
         >
           <FieldGroup>

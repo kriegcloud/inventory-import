@@ -7,6 +7,7 @@
 import type { D1Database } from "@cloudflare/workers-types"
 import { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { BetterAuthSettings } from "@beep/better-auth/BetterAuthConfig"
+import type { AuthBackgroundTasks } from "@beep/better-auth/Hooks"
 import { RequestSource } from "@inventory/kernel/SameOrigin"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -32,7 +33,7 @@ export const signIn = (options: {
   readonly database: D1Database
   readonly production: boolean
   /** The Worker's `waitUntil`, so Better Auth's work after an answer is not cut off. Absent in tests. */
-  readonly backgroundTasks: O.Option<(promise: Promise<unknown>) => void>
+  readonly backgroundTasks: O.Option<AuthBackgroundTasks>
   /** Off only in tests that sign in many times from one address. */
   readonly rateLimit: boolean
 }) =>

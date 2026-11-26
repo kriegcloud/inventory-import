@@ -3,7 +3,8 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import type { BetterAuthOptions } from "better-auth"
-import { APIError } from "better-auth/api"
+import { type AuthBackgroundTasks, HookRefused, hook } from "@beep/better-auth/Hooks"
+import * as Effect from "effect/Effect"
 import { verifyPassword } from "better-auth/crypto"
 import { haveIBeenPwned } from "better-auth/plugins/haveibeenpwned"
 import { organization } from "better-auth/plugins/organization"
@@ -53,7 +54,7 @@ type AuthOptionsInput = {
    */
   readonly passwordToVerify: O.Option<(typed: string) => O.Option<string>>
   /** Runs work Better Auth does after answering (rate-limit updates, cleanup). The Worker passes `waitUntil`. */
-  readonly backgroundTasks: O.Option<(promise: Promise<unknown>) => void>
+  readonly backgroundTasks: O.Option<AuthBackgroundTasks>
   /** Off only in tests that sign in many times from one address. On in `bun run dev` and in production. */
   readonly rateLimit: boolean
 }
@@ -66,10 +67,12 @@ export const authOptions = (input: AuthOptionsInput) => {
   const passwordOptions: Pick<NonNullable<BetterAuthOptions["emailAndPassword"]>, "password"> = R.getSomes({
     password: O.map(settings.passwordToVerify, (select) => ({
       verify: ({ hash, password }: { readonly hash: string; readonly password: string }) =>
-        O.match(select(password), {
-          onNone: () => Promise.resolve(false),
-          onSome: (held) => verifyPassword({ hash, password: held })
-        })
+        hook(
+          O.match(select(password), {
+            onNone: () => Effect.succeed(false),
+            onSome: (held) => Effect.promise(() => verifyPassword({ hash, password: held }))
+          })
+        )
     }))
   })
   const backgroundOptions: Pick<NonNullable<BetterAuthOptions["advanced"]>, "backgroundTasks"> = R.getSomes({
@@ -146,12 +149,11 @@ export const authOptions = (input: AuthOptionsInput) => {
           before: (user) => {
             const email: unknown = user.email
             // No rule: anyone, as the schema script needs. An email that is no text is refused.
-            return O.match(settings.mayCreateAccount, {
+            const allowed = O.match(settings.mayCreateAccount, {
               onNone: () => true,
               onSome: (mayCreate) => O.exists(S.decodeUnknownOption(SignUpEmail)(email), mayCreate)
             })
-              ? Promise.resolve()
-              : Promise.reject(new APIError("FORBIDDEN", { message: signUpClosedMessage }))
+            return hook(allowed ? Effect.void : Effect.fail(HookRefused.make({ message: signUpClosedMessage })))
           }
         }
       },
@@ -160,20 +162,32 @@ export const authOptions = (input: AuthOptionsInput) => {
           // A new session opens in the person's earliest organisation, so the app has a tenant from the first
           // request. They switch with the plugin's `set-active`, which checks membership on the server.
           before: (session, context) =>
-            context === null
-              ? Promise.resolve()
-              : context.context.adapter
-                  .findMany<{ readonly organizationId: string }>({
-                    model: "member",
-                    where: [{ field: "userId", value: session.userId }],
-                    sortBy: { field: "createdAt", direction: "asc" },
-                    limit: 1
-                  })
-                  .then((rows) =>
-                    rows[0] === undefined
-                      ? undefined
-                      : { data: { ...session, activeOrganizationId: rows[0].organizationId } }
+            hook(
+              O.match(O.fromNullOr(context), {
+                // No request behind it (Better Auth's own bookkeeping): the session is left as it is.
+                onNone: () => Effect.undefined,
+                onSome: ({ context: { adapter } }) =>
+                  Effect.promise(() =>
+                    adapter.findMany<{ readonly organizationId: string }>({
+                      model: "member",
+                      where: [{ field: "userId", value: session.userId }],
+                      sortBy: { field: "createdAt", direction: "asc" },
+                      limit: 1
+                    })
+                  ).pipe(
+                    // Nobody's member yet: Better Auth wants undefined back when there is nothing to change.
+                    Effect.flatMap(
+                      A.match({
+                        onEmpty: () => Effect.undefined,
+                        onNonEmpty: (rows) =>
+                          Effect.succeed({
+                            data: { ...session, activeOrganizationId: A.headNonEmpty(rows).organizationId }
+                          })
+                      })
+                    )
                   )
+              })
+            )
         }
       }
     },
@@ -195,7 +209,7 @@ export const authOptions = (input: AuthOptionsInput) => {
           member: { additionalFields: { name: { type: "string", required: false, input: false } } }
         },
         organizationHooks: {
-          beforeAddMember: ({ member, user }) => Promise.resolve({ data: { ...member, name: user.name } })
+          beforeAddMember: ({ member, user }) => hook(Effect.succeed({ data: { ...member, name: user.name } }))
         }
       })
     ]

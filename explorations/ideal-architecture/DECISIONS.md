@@ -2087,3 +2087,35 @@ types ask for Express's request where Vite's Connect supplies what it uses); `pa
 `packages/ui/src/ListTable.component.tsx` (a scoped atom and React context erase the table's row generic).
 
 Reverse: a call is taken out and its ledger line with it; the ledger only shrinks without a new approval.
+
+### 2026-11-26 — Better Auth: Alchemy's package at move 2, the driver stays the seam, and its Promises go to the driver's edge
+
+Read first: Better Auth's Effect integration (https://better-auth.com/docs/integrations/effect) is a page, not a
+package. It mounts `auth.handler` with `HttpEffect.fromWebHandler` and wraps `auth.api.getSession` in
+`Effect.tryPromise`; `@beep/better-auth` already does both, with typed errors, spans, a decoded session and the
+cross-site guard. Nothing is adopted from it. `@alchemy.run/better-auth` (https://alchemy.run/better-auth/) gives the
+server as Effects (`BetterAuth(options)`, `auth.fetch`, `auth.getSession()`, `auth.api.*`), the database as a Layer, a
+minted secret and migrations at deploy; it needs Alchemy's runtime and is not in `vendor/alchemy`. Neither has a
+browser client, and neither changes Better Auth's hooks, which return Promises. Read from the documents; the package
+was not installed or compiled.
+
+1. **When is `@alchemy.run/better-auth` adopted?** I chose; the agent recommended the same. At move 2 of
+   `explorations/alchemy-domain`, when the Worker becomes an Alchemy `Cloudflare.Worker` and the pin widens. Infra I3
+   stands: the tables stay a migration written by hand (`migrate: false`). Rejected: now, ahead of the domain work;
+   never.
+2. **What becomes of `@beep/better-auth` then?** I chose; the agent recommended the same. Its service keeps its shape
+   (`handle`, `session`, `publicOrigin`, `route`) and is built on Alchemy's `BetterAuth` instead of `betterAuth()`, so
+   `@inventory/access-host` and its tests do not change. Rejected: deleting the driver; deciding at move 2.
+3. **The browser's `better-auth/client` calls** (`SignIn.screen.tsx`, `Session.atoms.ts`, `AppSidebar.tsx`,
+   `SignedIn.tsx`)? I chose; the agent recommended the same. One module in `@beep/better-auth` wraps the client and
+   gives sign-in, sign-up, sign-out, a new organization and the active organization as Effects with a typed refusal;
+   a screen writes no Promise. Rejected: our own `HttpClient` calls to `/api/auth/*`; leaving them.
+4. **The hooks in `authOptions.ts`** (seven Promise sites)? I chose; the agent recommended the same. Each hook is an
+   Effect with a typed refusal, and one helper in `@beep/better-auth` turns it into the Promise Better Auth asks for.
+   Rejected: leaving them as a recorded exception; waiting for Alchemy's package.
+
+Next: 3 and 4 are work for now, schema and contract of the driver's client first; 1 and 2 wait for move 2. Not built.
+
+Reverse: 1, the brief's move 2 names the driver for the session lookup instead; 2, the host imports Alchemy's package
+and the driver is deleted; 3 and 4, the screens and `authOptions.ts` call Better Auth as before and the ledger's
+counts for them stay.

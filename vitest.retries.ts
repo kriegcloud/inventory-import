@@ -111,7 +111,7 @@ export class RetriedTests implements Reporter {
         : `Retried: ${count} test(s) passed only on a later try (named above with RETRIED). Why is not known: each is a fault to find, and one that waits in real time belongs on TestClock.\n`
     )
     const againstTheRule = MutableRef.get(this.againstTheRule)
-    if (A.isArrayNonEmpty(againstTheRule)) {
+    if (A.isReadonlyArrayNonEmpty(againstTheRule)) {
       process.stdout.write(
         `Retried against the rule: ${againstTheRule.length} test(s) were tried again after a hang or a falsified property (named above). The run fails.\n`
       )

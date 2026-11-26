@@ -1,3 +1,4 @@
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 // The review table's newer rules, each tested where it would hurt: a column that must not be cut being cut, a redo
 // that brings back something other than what was undone, a work list whose counts do not add up, a button that reads
@@ -96,9 +97,11 @@ describe("column sizing", () => {
       }))
       const plan = planColumns({ columns: sized, fixed: 200, room })
       for (const shown of plan.shown) {
-        const column = O.getOrUndefined(A.findFirst(sized, (candidate) => candidate.id === shown.id))
-        if (column?.size === "fit") expect(shown.width).toBe(column.need)
-        else expect(shown.width).toBeGreaterThanOrEqual(column?.need ?? 0)
+        const found = A.findFirst(sized, (candidate) => candidate.id === shown.id)
+        assertTrue(O.isSome(found), "expected a present test value")
+        const column = found.value
+        if (column.size === "fit") expect(shown.width).toBe(column.need)
+        else expect(shown.width).toBeGreaterThanOrEqual(column.need)
       }
       if (!plan.scrolls) expect(plan.minWidth).toBeLessThanOrEqual(room)
       // A column moves only while the table is short of room: one more shown would not have fitted.
@@ -124,17 +127,19 @@ describe("undo and redo", () => {
     at: S.Int.check(S.isBetween({ minimum: 0, maximum: 40 }))
   })
   const actionOf = (pick: typeof Pick.Type): Action => {
-    const one = ready[pick.at % ready.length] ?? ready[0]!
-    const open = needing[pick.at % needing.length] ?? needing[0]!
+    const one = ready[pick.at % ready.length]
+    assertDefined(one)
+    const open = needing[pick.at % needing.length]
+    assertDefined(open)
+    assertTrue(O.isSome(open.problem), "expected a present test value")
+    assertTrue(O.isSome(open.problem.value.column), "expected a present test value")
+    const column = open.problem.value.column.value
     return PickKind.match(pick.kind, {
       leaveOut: (): Action => ({ type: "leaveOut", rowIds: [one.id] }),
       edit: (): Action => ({
         type: "edit",
         rowId: open.id,
-        column: O.match(open.problem, {
-          onNone: () => "name",
-          onSome: (problem) => O.match(problem.column, { onNone: () => "name", onSome: (column) => column })
-        }),
+        column,
         value: `v${pick.at}`
       }),
       accept: (): Action => ({ type: "accept", rowIds: [open.id] }),
@@ -175,7 +180,7 @@ describe("undo and redo", () => {
       }).state
       expect(plain(redone)).toEqual(plain(state))
       expect(redone.undo.length).toBe(state.undo.length)
-      expect(redone.redo?.length ?? 0).toBe(state.redo?.length ?? 0)
+      expect(redone.redo.length).toBe(state.redo.length)
     }
   )
 
@@ -184,7 +189,7 @@ describe("undo and redo", () => {
     { picks: S.Array(Pick).check(S.isMaxLength(15)) },
     ({ picks }) => {
       const state = play(picks)
-      if ((state.redo ?? []).length === 0) return
+      if (state.redo.length === 0) return
       const redone = act({
         fixable: fixableBy([]),
         rejects: false,
@@ -219,7 +224,7 @@ describe("undo and redo", () => {
       state,
       action: { type: "edit", rowId: row.id, column: "name", value: "New" }
     })
-    expect(outcome.state.redo ?? []).toEqual([])
+    expect(outcome.state.redo).toEqual([])
   })
 
   it("undo moves a step to redo, redo moves it back, and each says what it did", () => {
@@ -298,10 +303,12 @@ describe("the work list", () => {
     const counts = count(views(emptyState))
     const list = workList({ counts, problemKinds, seen: HashSet.empty() })
     const [a, b] = list
-    expect(nextKind({ list, from: O.fromNullishOr(a?.kind.id) })).toEqual(O.fromNullishOr(b?.kind.id))
-    expect(nextKind({ list, from: O.map(A.last(list), (item) => item.kind.id) })).toEqual(O.fromNullishOr(a?.kind.id))
+    assertDefined(a)
+    assertDefined(b)
+    expect(nextKind({ list, from: O.some(a.kind.id) })).toEqual(O.some(b.kind.id))
+    expect(nextKind({ list, from: O.map(A.last(list), (item) => item.kind.id) })).toEqual(O.some(a.kind.id))
     const done = A.map(list, (item) => ({ ...item, left: 0, done: true }))
-    expect(nextKind({ list: done, from: O.fromNullishOr(a?.kind.id) })).toEqual(O.none())
+    expect(nextKind({ list: done, from: O.some(a.kind.id) })).toEqual(O.none())
   })
 
   it("counts a group of identical fixes as one decision", () => {

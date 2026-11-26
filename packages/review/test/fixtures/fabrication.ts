@@ -8,6 +8,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 export const problemKinds: ReadonlyArray<ProblemKind> = [
@@ -45,7 +46,7 @@ export const problemKinds: ReadonlyArray<ProblemKind> = [
 
 const units = ["pcs", "kg", "m", "L"] as const
 
-const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") =>
+const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model") =>
   ({ state: "matched", source, by, samples }) as const
 
 export const columns: ReadonlyArray<ReviewColumn> = [
@@ -56,7 +57,7 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     size: "fill",
     width: O.some(200),
     core: true,
-    match: O.some(matched("Item name", ["Flat bar 40 × 5", "Hex bolt M8 × 30", "Weld wire 0.9 mm"]))
+    match: O.some(matched("Item name", ["Flat bar 40 × 5", "Hex bolt M8 × 30", "Weld wire 0.9 mm"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
@@ -67,7 +68,7 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     label: "SKU",
     core: true,
     under: true,
-    match: O.some(matched("SKU", ["FB-40-5", "HB-M8-30", "WW-09"]))
+    match: O.some(matched("SKU", ["FB-40-5", "HB-M8-30", "WW-09"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
@@ -82,7 +83,7 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     label: "Unit",
     core: true,
     priority: O.some(2),
-    match: O.some(matched("UOM", ["m", "PCS", "kg"]))
+    match: O.some(matched("UOM", ["m", "PCS", "kg"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
@@ -91,7 +92,7 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     label: "On hand",
     align: O.some("right"),
     core: true,
-    match: O.some(matched("Qty on hand", ["120", "1,200", "45"]))
+    match: O.some(matched("Qty on hand", ["120", "1,200", "45"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
@@ -99,14 +100,14 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     hidden: true,
     label: "Reorder at",
     align: O.some("right"),
-    match: O.some(matched("Reorder point", ["20", "200", "10"]))
+    match: O.some(matched("Reorder point", ["20", "200", "10"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
     id: "cost",
     label: "Cost",
     align: O.some("right"),
-    match: O.some(matched("Unit cost", ["$4.85", "$0.18", "$3.40"]))
+    match: O.some(matched("Unit cost", ["$4.85", "$0.18", "$3.40"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
@@ -122,7 +123,7 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     code: true,
     hidden: true,
     label: "Bin",
-    match: O.some(matched("Bin", ["A-04", "C-11", "D-02"]))
+    match: O.some(matched("Bin", ["A-04", "C-11", "D-02"], "name"))
   }),
   ReviewColumn.make({
     display: identity,
@@ -131,7 +132,7 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     label: "Lead time",
     unit: O.some("days"),
     align: O.some("right"),
-    match: O.some(matched("Lead time (days)", ["5", "3", "7"]))
+    match: O.some(matched("Lead time (days)", ["5", "3", "7"], "name"))
   })
 ]
 
@@ -523,7 +524,10 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     const id = `r${position + 1}`
     const line = position + 2
     const onHand = ((position * 37) % 23) * (family.unit === "pcs" ? 50 : 5) + (family.unit === "pcs" ? 100 : 10)
-    const cells: Record<string, string> = {
+    const cells: Record<
+      "name" | "sku" | "category" | "unit" | "onHand" | "reorder" | "cost" | "supplier" | "bin" | "lead",
+      string
+    > = {
       name: `${family.name} ${size[0]}${suffix}`,
       sku: `${family.code}-${size[1]}${suffix === "" ? "" : `-${suffix.slice(3)}`}`,
       category: family.category,
@@ -535,14 +539,14 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
       bin: `${"ABCDEF"[position % 6]}-${String((position % 14) + 1).padStart(2, "0")}`,
       lead: String(3 + (position % 5) * 2)
     }
-    let problem: Problem | undefined
-    let applied: ReadonlyArray<Fix> | undefined
+    let problem: O.Option<Problem> = O.none()
+    let applied: ReadonlyArray<Fix> = []
     // Ranks pair up (21 with 22, 23 with 24, ...): the later row repeats the earlier row's SKU.
     const copy = (): void => {
       const otherRank = role === "copyA" ? rank + 1 : rank - 1
       const otherPosition = lot * block + ((otherRank * 51) % block)
       if (otherPosition >= input.size) return
-      problem = Problem.make({
+      problem = Problem.makeOption({
         kind: "copy",
         column: O.some("sku"),
         ask: O.some("Type a new SKU"),
@@ -552,31 +556,31 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     Role.match(role, {
       each: () => {
         cells.unit = rank < 6 ? "ea" : "each"
-        problem = Problem.make({ kind: "unit", column: O.some("unit"), fix: O.some(eachFix(cells.unit)) })
+        problem = Problem.makeOption({ kind: "unit", column: O.some("unit"), fix: O.some(eachFix(cells.unit)) })
       },
       length: () => {
         cells.unit = "length"
-        problem = Problem.make({ kind: "unit", column: O.some("unit"), fix: O.some(lengthFix) })
+        problem = Problem.makeOption({ kind: "unit", column: O.some("unit"), fix: O.some(lengthFix) })
       },
       cost: () => {
         cells.cost = ""
-        problem = Problem.make({ kind: "cost", column: O.some("cost"), ask: O.some("Type a cost") })
+        problem = Problem.makeOption({ kind: "cost", column: O.some("cost"), ask: O.some("Type a cost") })
       },
       copyA: copy,
       copyB: copy,
       below: () => {
         cells.onHand = `-${(position % 9) + 3}`
-        problem = Problem.make({ kind: "below", column: O.some("onHand"), ask: O.some("Type the count") })
+        problem = Problem.makeOption({ kind: "below", column: O.some("onHand"), ask: O.some("Type the count") })
       },
       name: () => {
         cells.name = ""
-        problem = Problem.make({
+        problem = Problem.makeOption({
           kind: "name",
           column: O.some("name"),
           fix: O.some(
             Fix.make({
               column: "name",
-              to: cells.sku ?? "",
+              to: cells.sku,
               by: O.some("rule"),
               confidence: O.some("medium"),
               kind: "name",
@@ -600,33 +604,41 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     })
     if (input.withoutUnit === true) {
       cells.unit = ""
-      applied = undefined
-      if (problem?.kind === "unit") problem = undefined
+      applied = []
+      problem = O.filter(problem, (value) => value.kind !== "unit")
     }
     rows.push(
       ReviewRow.make({
         id,
         line,
         cells,
-        ...(applied === undefined ? {} : { applied }),
-        problem: O.fromNullishOr(problem)
+        applied,
+        problem
       })
     )
   }
   // The guess for "length" is made from the file, not from a sentence: which unit the other rows of the same
   // categories use decides what is suggested, and the count is the basis shown to the person.
-  const guessed = rows.filter(
-    (row) => O.isSome(row.problem) && O.exists(row.problem.value.fix, (fix) => O.contains(fix.group, "unit:length"))
+  const guessed = rows.filter((row) =>
+    O.exists(
+      O.flatMap(row.problem, (problem) => problem.fix),
+      (fix) => O.contains(fix.group, "unit:length")
+    )
   )
   if (guessed.length > 0) {
     const categories = A.dedupe(guessed.map((row) => row.cells.category ?? ""))
     const tally = MutableHashMap.empty<string, number>()
     const counted = (unit: string): number => O.getOrElse(MutableHashMap.get(tally, unit), () => 0)
     for (const row of rows) {
-      const unit = row.cells.unit ?? ""
-      if (O.isSome(row.problem) || row.applied.length > 0) continue
-      if (!categories.includes(row.cells.category ?? "") || (unit !== "m" && unit !== "pcs")) continue
-      MutableHashMap.set(tally, unit, counted(unit) + 1)
+      O.match(row.problem, {
+        onNone: () => {
+          const unit = row.cells.unit ?? ""
+          if (row.applied.length > 0) return
+          if (!categories.includes(row.cells.category ?? "") || (unit !== "m" && unit !== "pcs")) return
+          MutableHashMap.set(tally, unit, counted(unit) + 1)
+        },
+        onSome: () => undefined
+      })
     }
     const m = counted("m")
     const pcs = counted("pcs")
@@ -641,8 +653,13 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
       }
     })
     for (const [index, row] of rows.entries()) {
-      if (O.isSome(row.problem) && O.exists(row.problem.value.fix, (fix) => O.contains(fix.group, "unit:length")))
-        rows[index] = { ...row, problem: O.some({ ...row.problem.value, fix: O.some(fix) }) }
+      if (
+        O.exists(
+          O.flatMap(row.problem, (problem) => problem.fix),
+          (fix) => O.contains(fix.group, "unit:length")
+        )
+      )
+        rows[index] = { ...row, problem: O.map(row.problem, (problem) => ({ ...problem, fix: O.some(fix) })) }
     }
   }
   // The later row of each pair repeats the earlier row's SKU: that is what makes them copies.
@@ -652,21 +669,24 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
       O.flatMap(row.problem, (problem) => problem.rivals),
       A.head
     )
-    const other = O.isNone(rival) ? undefined : O.getOrUndefined(MutableHashMap.get(byId, rival.value))
-    if (other === undefined || other.line > row.line) return row
-    return { ...row, cells: { ...row.cells, sku: other.cells.sku ?? "" } }
+    const other = O.flatMap(rival, (id) => MutableHashMap.get(byId, id))
+    return O.match(other, {
+      onNone: () => row,
+      onSome: (other) => (other.line > row.line ? row : { ...row, cells: { ...row.cells, sku: other.cells.sku ?? "" } })
+    })
   })
 }
 
 /** The gallery's pure check of one row after the person typed a value. Copies need the whole file, so not here. */
 export function recheck(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }): O.Option<Problem> {
   const { cells } = input
-  if ((cells.name ?? "").trim() === "") return Problem.makeOption({ kind: "name", column: O.some("name") })
-  if (!(units as ReadonlyArray<string>).includes(cells.unit ?? ""))
+  if (O.match(R.get(cells, "name"), { onNone: () => true, onSome: (name) => name.trim() === "" }))
+    return Problem.makeOption({ kind: "name", column: O.some("name") })
+  if (!O.exists(R.get(cells, "unit"), (unit) => (units as ReadonlyArray<string>).includes(unit)))
     return Problem.makeOption({ kind: "unit", column: O.some("unit") })
-  if (!/^\$?\d[\d,]*(\.\d+)?$/.test((cells.cost ?? "").trim()))
+  if (!O.exists(R.get(cells, "cost"), (cost) => /^\$?\d[\d,]*(\.\d+)?$/.test(cost.trim())))
     return Problem.makeOption({ kind: "cost", column: O.some("cost") })
-  if ((cells.onHand ?? "").trim().startsWith("-"))
+  if (O.exists(R.get(cells, "onHand"), (onHand) => onHand.trim().startsWith("-")))
     return Problem.makeOption({ kind: "below", column: O.some("onHand") })
   return O.none()
 }

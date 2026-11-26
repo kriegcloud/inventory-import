@@ -1,3 +1,6 @@
+import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 // The review region with no screen: its atoms in a registry, a table made and drawn as the screen's hook makes and
 // draws one, the grid's own virtual list in a frame, and the person's actions called as a button, a key or a toast calls
 // them. The rules here are the ones a wrong result breaks without a word: a decision that is not undone or brought
@@ -86,7 +89,8 @@ const passFrames = () => {
 }
 
 /** Raises a key on the page; says whether somebody took it. */
-const press = (key: string, held: { ctrl?: boolean; shift?: boolean } = {}): boolean => {
+const noModifiers = { ctrl: false, shift: false }
+const press = (key: string, held: { ctrl: boolean; shift: boolean }): boolean => {
   const event: Key = {
     key,
     ctrlKey: held.ctrl === true,
@@ -107,9 +111,10 @@ const press = (key: string, held: { ctrl?: boolean; shift?: boolean } = {}): boo
 const node = {} as HTMLElement
 
 /** One region in a registry of its own, with the caller's decisions atom counting every write it is sent. */
-const world = (
-  given: { readonly kinds?: ReadonlyArray<ProblemKind>; readonly rows?: ReadonlyArray<ReviewRow> } = {}
-) => {
+const SearchName = S.String.pipe(S.decodeTo(S.String, SchemaTransformation.toLowerCase()))
+
+const startWorld = { kinds: problemKinds, rows: makeRows({ size: 178 }) }
+const world = (given: { readonly kinds: ReadonlyArray<ProblemKind>; readonly rows: ReadonlyArray<ReviewRow> }) => {
   // The registry as the app makes it: an atom nobody mounts is kept for its idle time, unless it has none of its own.
   const tasks: Array<() => void> = []
   const registry = AtomRegistry.make({
@@ -126,7 +131,7 @@ const world = (
   const settle = () => {
     for (const task of tasks.splice(0)) task()
   }
-  const rows = given.rows ?? makeRows({ size: 178 })
+  const rows = given.rows
   const held = Atom.make<ReviewState>(proposing(rows))
   const told: Array<ReviewState> = []
   const decisions = Atom.writable(
@@ -143,7 +148,7 @@ const world = (
       columns: Atom.make(columns),
       recheck: Atom.make(O.some(recheck)),
       decisions,
-      problemKinds: Atom.make(given.kinds ?? problemKinds),
+      problemKinds: Atom.make(given.kinds),
       ruleFixes: Atom.make<"propose" | "apply">("propose"),
       words: Atom.make({}),
       rowAction: Atom.make(O.none()),
@@ -184,7 +189,8 @@ const world = (
     // What the region's parts read while they are drawn.
     registry.get(regionTable.ordered)
     source.markCommitted(snapshot)
-    table_publishExternalState(core, controlled ?? null, shallow)
+    assertDefined(controlled)
+    table_publishExternalState(core, controlled, shallow)
   }
   // The hook hands the screen a copy of the table, made when it is first drawn: the region is given that.
   const table = { ...core, options: options() }
@@ -236,7 +242,7 @@ const world = (
 }
 
 /** A world whose region's section is on the page, as it is once the region is drawn. */
-const onPage = (given?: Parameters<typeof world>[0]) => {
+const onPage = (given: Parameters<typeof world>[0]) => {
   const at = world(given)
   const leave = at.region.attach(node)
   return { ...at, leave }
@@ -245,13 +251,13 @@ const onPage = (given?: Parameters<typeof world>[0]) => {
 /** The first group of identical fixes waiting under "Needs you". */
 const firstGroup = (at: ReturnType<typeof world>) => {
   const group = waitingGroups({ views: at.registry.get(at.region.views), kind: O.none() })[0]
-  if (group === undefined) throw new Error("the fixture has no group of fixes waiting")
+  assertDefined(group)
   return group
 }
 
 describe("the review region's atoms", () => {
   it("undoes and brings back a decision on the caller's atom, telling the caller once per change", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     const before = at.needs()
     const group = firstGroup(at)
     const start = saved(at.registry.get(at.region.input.decisions))
@@ -276,7 +282,7 @@ describe("the review region's atoms", () => {
   })
 
   it("hears the undo key while it is on the page, and nothing once its section has left", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     const group = firstGroup(at)
     const heard = page.keys.length
     const stopKeys = at.registry.mount(at.regionTable.keys)
@@ -285,7 +291,7 @@ describe("the review region's atoms", () => {
     at.regionTable.run({ type: "acceptGroup" as const, groupId: group.id, except: [] }, O.none())
     expect(at.told).toHaveLength(1)
     // On the page, Ctrl+Z is the region's: it takes the key and undoes the step.
-    expect(press("z", { ctrl: true })).toBe(true)
+    expect(press("z", { ...noModifiers, ctrl: true })).toBe(true)
     expect(at.told).toHaveLength(2)
     expect(press("z", { ctrl: true, shift: true })).toBe(true)
     expect(at.told).toHaveLength(3)
@@ -295,17 +301,21 @@ describe("the review region's atoms", () => {
     // The bulk step's toast is still up when the region goes (the import was confirmed, or the region was drawn
     // again from a newer draft): the region takes it down, and its Undo, pressed all the same, reaches nobody.
     const offered = page.toasts[page.toasts.length - 1]
-    at.leave?.()
-    expect(page.dismissed).toContain(offered?.id)
-    offered?.undo()
+    assertDefined(at.leave)
+    at.leave()
+    assertDefined(offered)
+    expect(page.dismissed).toContain(offered.id)
+    offered.undo()
     // A key raised while the listener is still there reaches nobody either, and is left for whoever is on the page:
     // the region does not take it.
-    expect(press("z", { ctrl: true })).toBe(false)
-    expect(press("y", { ctrl: true })).toBe(false)
-    expect(press("j")).toBe(false)
+    expect(press("z", { ...noModifiers, ctrl: true })).toBe(false)
+    expect(press("y", { ...noModifiers, ctrl: true })).toBe(false)
+    expect(press("j", noModifiers)).toBe(false)
     at.regionTable.run({ type: "undo" as const }, O.none())
-    at.regionTable.actions.leaveOut(group.rowIds[0] ?? "")
-    at.regionTable.groupActions.toggle(group.rowIds[0] ?? "")
+    const rowId = group.rowIds[0]
+    assertDefined(rowId)
+    at.regionTable.actions.leaveOut(rowId)
+    at.regionTable.groupActions.toggle(rowId)
     at.regionTable.step(false)
 
     expect(at.told).toHaveLength(3)
@@ -320,15 +330,17 @@ describe("the review region's atoms", () => {
   })
 
   it("does nothing before its section is on the page either", () => {
-    const at = world()
+    const at = world(startWorld)
     at.regionTable.run({ type: "acceptGroup" as const, groupId: firstGroup(at).id, except: [] }, O.none())
-    at.regionTable.groupActions.toggle(firstGroup(at).rowIds[0] ?? "")
+    const rowId = firstGroup(at).rowIds[0]
+    assertDefined(rowId)
+    at.regionTable.groupActions.toggle(rowId)
     expect(at.told).toHaveLength(0)
     expect(at.registry.get(at.region.ui).excluded.pipe((set) => [...set])).toEqual([])
   })
 
   it("works the rows out once per change of the decisions, and not for a change that is not theirs", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     let worked = 0
     at.release.push(at.registry.subscribe(at.region.views, () => (worked += 1)))
     const first = at.registry.get(at.region.views)
@@ -348,7 +360,7 @@ describe("the review region's atoms", () => {
     // One kind nothing on this screen can settle: the test of that is made once for the region and its table. Made
     // twice, each decision built every undecided row again and handed every row a new view.
     const kinds = A.map(problemKinds, (kind) => (kind.id === "below" ? { ...kind, fixable: false } : kind))
-    const at = onPage({ kinds })
+    const at = onPage({ ...startWorld, kinds })
     const group = firstGroup(at)
     const before = at.registry.get(at.region.views)
     const decided = at.registry.get(at.region.input.decisions).decisions
@@ -369,7 +381,7 @@ describe("the review region's atoms", () => {
   })
 
   it("draws nothing for a change that changes nothing", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     let drawn = 0
     at.release.push(at.registry.subscribe(at.region.ui, () => (drawn += 1)))
     at.region.change(() => ({}))
@@ -380,12 +392,13 @@ describe("the review region's atoms", () => {
   })
 
   it("filters the rows by the facets the person ticked before the table has them, and counts each choice", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     at.region.change(() => ({ picked: O.some("all") }))
     const all = at.registry.get(at.regionTable.ordered).length
     const facet = at.registry.get(at.region.facets)[0]
-    const option = facet?.options[0]
-    if (facet === undefined || option === undefined) throw new Error("the fixture has no facet")
+    assertDefined(facet)
+    const option = facet.options[0]
+    assertDefined(option)
 
     at.region.change(() => ({ facetPicked: { [facet.column.id]: [option.key] } }))
     const shown = at.registry.get(at.regionTable.ordered)
@@ -394,9 +407,15 @@ describe("the review region's atoms", () => {
     // The table is given the filtered rows; it holds no filter of its own.
     expect(at.registry.get(at.region.tableData)).toHaveLength(option.n)
     expect(at.table.atoms.columnFilters.get()).toEqual([])
-    expect(A.every(shown, (view) => A.contains(option.values, view.cells[facet.column.id] ?? ""))).toBe(true)
+    for (const view of shown) {
+      const value: string | undefined = view.cells[facet.column.id]
+      assertDefined(value)
+      expect(A.contains(option.values, value)).toBe(true)
+    }
     // The choices and their counts are of the view showing, not of what is ticked: every choice is still offered.
-    expect(at.registry.get(at.region.facets)[0]?.options).toEqual(facet.options)
+    const currentFacet = at.registry.get(at.region.facets)[0]
+    assertDefined(currentFacet)
+    expect(currentFacet.options).toEqual(facet.options)
     // A search narrows what the facet left, and the tab's own list is untouched.
     expect(at.registry.get(at.region.list)).toHaveLength(all)
 
@@ -407,7 +426,7 @@ describe("the review region's atoms", () => {
   })
 
   it("gives the table the rows in the change that works them out, so no read of the order writes its options", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     // Only the region's table stays: nothing reads the order until the reads below, the first since the change.
     for (const stop of at.release.splice(1)) stop()
     at.region.change(() => ({ picked: O.some("all") }))
@@ -426,11 +445,18 @@ describe("the review region's atoms", () => {
   })
 
   it("shows the rows of each search and sort in turn: the second search is not the first one's rows", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     at.region.change(() => ({ picked: O.some("all") }))
     const all = at.ordered()
-    const nameOf = (id: string) =>
-      Str.toLowerCase(O.getOrUndefined(A.findFirst(at.rows, (row) => row.id === id))?.cells.name ?? "")
+    const nameOf = (id: string) => {
+      const row = A.findFirst(at.rows, (row) => row.id === id)
+      assertTrue(O.isSome(row), "expected a present test value")
+      const name = row.value.cells.name
+      assertDefined(name)
+      const read = O.getSuccess(S.decodeResult(SearchName)(name))
+      assertTrue(O.isSome(read), "a fixture name is search text")
+      return read.value
+    }
     // Two words from the file's own names that find different rows.
     const words = A.dedupe(A.flatMap(all, (id) => Str.split(nameOf(id), " ")))
     const found = (word: string) =>
@@ -439,8 +465,12 @@ describe("the review region's atoms", () => {
         ","
       )
     const narrows = (word: string) => word.length > 3 && found(word) !== "" && found(word) !== A.join(all, ",")
-    const first = O.getOrThrow(A.findFirst(words, narrows))
-    const second = O.getOrThrow(A.findFirst(words, (word) => narrows(word) && found(word) !== found(first)))
+    const firstWord = A.findFirst(words, narrows)
+    assertTrue(O.isSome(firstWord), "expected a present test value")
+    const first = firstWord.value
+    const secondWord = A.findFirst(words, (word) => narrows(word) && found(word) !== found(first))
+    assertTrue(O.isSome(secondWord), "expected a present test value")
+    const second = secondWord.value
 
     at.search(first)
     const afterFirst = at.ordered()
@@ -464,23 +494,27 @@ describe("the review region's atoms", () => {
     at.sort([{ id: "name", desc: true }])
     const backwards = at.ordered()
     expect(backwards).not.toEqual(sorted)
-    expect(nameOf(backwards[0] ?? "")).toBe(nameOf(sorted[sorted.length - 1] ?? ""))
+    const firstBackwards = backwards[0]
+    const lastSorted = sorted[sorted.length - 1]
+    assertDefined(firstBackwards)
+    assertDefined(lastSorted)
+    expect(nameOf(firstBackwards)).toBe(nameOf(lastSorted))
     at.sort([])
     expect(at.ordered()).toEqual(all)
   })
 
   it("goes to the next kind on the work list when the kind the table chose by itself is finished", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     // Nothing is picked on the work list: the table shows the first kind with rows left.
     const work = at.registry.get(at.region.work)
     const onScreen = at.registry.get(at.region.activeKind)
     expect(onScreen).toEqual(O.map(A.head(work), (item) => item.kind.id))
     expect(at.registry.get(at.region.ui).kind).toEqual(O.none())
     const waiting = A.filter(work, (item) => item.left > 0)
-    const next = waiting[1]?.kind.id
-    const after = waiting[2]?.kind.id
-    expect(next).toBeDefined()
-    expect(after).toBeDefined()
+    const next = waiting[1]
+    const after = waiting[2]
+    assertDefined(next)
+    assertDefined(after)
 
     // Every row of the kind on screen is settled in one step.
     const mine = A.filter(at.registry.get(at.region.list), (view) => view.status === "needs")
@@ -488,9 +522,9 @@ describe("the review region's atoms", () => {
     // The move carries the kind the person was on, not the one the table has moved on to by itself.
     expect(at.registry.get(at.region.nav).wanted).toEqual(O.some(Wanted.Advance({ from: onScreen })))
     passFrames()
-    expect(at.registry.get(at.region.ui).kind).toEqual(O.fromNullishOr(next))
-    expect(at.registry.get(at.region.activeKind)).toEqual(O.fromNullishOr(next))
-    expect(at.registry.get(at.region.activeKind)).not.toEqual(O.fromNullishOr(after))
+    expect(at.registry.get(at.region.ui).kind).toEqual(O.some(next.kind.id))
+    expect(at.registry.get(at.region.activeKind)).toEqual(O.some(next.kind.id))
+    expect(at.registry.get(at.region.activeKind)).not.toEqual(O.some(after.kind.id))
   })
 })
 
@@ -531,12 +565,13 @@ describe("the review grid's atoms", () => {
   const leadable = (line: Entry) => Entry.guards.group(line) && !line.applied && O.isNone(choicesOf(line.group))
 
   it("keeps the columns' parts while a decision changes no width, so the rows drawn are not drawn again", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     at.release.push(at.registry.mount(at.grid.parts), at.registry.mount(at.grid.plan))
     const parts = at.registry.get(at.grid.parts)
     const plan = at.registry.get(at.grid.plan)
     const row = A.findFirst(at.registry.get(at.region.list), (view) => view.status === "needs")
-    at.regionTable.actions.leaveOut(O.getOrThrow(row).row.id)
+    assertTrue(O.isSome(row), "expected a present test value")
+    at.regionTable.actions.leaveOut(row.value.row.id)
     expect(at.told).toHaveLength(1)
     expect(at.registry.get(at.grid.parts)).toBe(parts)
     expect(at.registry.get(at.grid.plan)).toBe(plan)
@@ -548,7 +583,7 @@ describe("the review grid's atoms", () => {
   })
 
   it("names the lead from the lines in view, and follows the list, the lines and what the person may do", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     at.release.push(at.registry.mount(at.grid.lead), at.registry.mount(at.grid.leadInView))
     // Before the list has a frame nothing is in view, and nothing leads.
     expect(at.registry.get(at.grid.lead)).toEqual(O.none())
@@ -557,7 +592,8 @@ describe("the review grid's atoms", () => {
     const lines = () => at.registry.get(at.grid.entries) as ReadonlyArray<Entry>
     const groupsAt = () => A.filter(lines(), leadable)
     const first = groupsAt()[0]
-    if (first === undefined || !Entry.guards.group(first)) throw new Error("the fixture has no rule group waiting")
+    assertDefined(first)
+    assertTrue(Entry.guards.group(first), "the fixture has a rule group waiting")
     // The first rule group waiting is in view: its accept is the screen's filled button, and Import waits.
     expect(at.registry.get(at.grid.lead)).toEqual(O.some(first.group.id))
     expect(at.registry.get(at.grid.leadInView)).toBe(true)
@@ -567,13 +603,11 @@ describe("the review grid's atoms", () => {
     expect(O.map(at.registry.get(at.grid.seen), (seen) => seen.startIndex > 20)).toEqual(O.some(true))
     const far = at.registry.get(at.grid.seen)
     const inView = O.match(far, {
-      onNone: () => [],
+      onNone: A.empty,
       onSome: (seen) => lines().slice(seen.startIndex, seen.endIndex + 1)
     })
     expect(at.registry.get(at.grid.lead)).toEqual(
-      O.fromNullishOr(
-        (A.findFirst(inView, leadable).pipe(O.getOrUndefined) as { group: { id: string } } | undefined)?.group.id
-      )
+      O.map(O.filter(A.findFirst(inView, leadable), Entry.guards.group), (line) => line.group.id)
     )
     scrollTo(0)
     expect(at.registry.get(at.grid.lead)).toEqual(O.some(first.group.id))
@@ -583,11 +617,9 @@ describe("the review grid's atoms", () => {
     const before = lines().length
     at.regionTable.groupActions.accept(first.group.id)
     expect(lines().length).toBeLessThan(before)
-    const next = groupsAt()[0]
-    expect(next).toBeDefined()
-    expect(at.registry.get(at.grid.lead)).toEqual(
-      O.map(O.filter(O.fromNullishOr(next), Entry.guards.group), (line) => line.group.id)
-    )
+    const next = A.head(groupsAt())
+    assertTrue(O.isSome(next), "expected a present test value")
+    expect(at.registry.get(at.grid.lead)).toEqual(O.map(O.filter(next, Entry.guards.group), (line) => line.group.id))
     expect(virtual.options.count).toBe(lines().length)
 
     // While the confirm step is open its own button is the filled one; someone only looking is offered none.
@@ -604,12 +636,15 @@ describe("the review grid's atoms", () => {
   })
 
   it("gives the virtual list its lines' number in the decision that changes them, so no read of the view writes it", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     const { virtual } = listed(at)
     // Nothing mounts the lead or the lines drawn: the reads below are the first to ask since the decision.
     const lines = () => at.registry.get(at.grid.entries) as ReadonlyArray<Entry>
-    const first = A.findFirst(lines(), leadable).pipe(O.getOrUndefined)
-    if (first === undefined || !Entry.guards.group(first)) throw new Error("the fixture has no rule group waiting")
+    const found = A.findFirst(lines(), leadable)
+    assertTrue(O.isSome(found), "expected a present test value")
+    const first = found.value
+    assertDefined(first)
+    assertTrue(Entry.guards.group(first), "the fixture has a rule group waiting")
     const setOptions = vi.spyOn(virtual, "setOptions")
     const before = lines().length
 
@@ -627,17 +662,15 @@ describe("the review grid's atoms", () => {
     expect(setOptions).not.toHaveBeenCalled()
     expect(virtual.options).toBe(options)
     // What is read is of these lines: the lead is the first rule group in view among them, and every line drawn is one.
-    const next = A.findFirst(lines(), leadable).pipe(O.getOrUndefined)
-    expect(at.registry.get(at.grid.lead)).toEqual(
-      O.map(O.filter(O.fromNullishOr(next), Entry.guards.group), (line) => line.group.id)
-    )
+    const next = A.findFirst(lines(), leadable)
+    expect(at.registry.get(at.grid.lead)).toEqual(O.map(O.filter(next, Entry.guards.group), (line) => line.group.id))
     expect(drawn.items.length).toBeGreaterThan(0)
     expect(A.every(drawn.items, (item) => item.index < lines().length)).toBe(true)
     setOptions.mockRestore()
   })
 
   it("scrolls the list to the row the region asks to see, with one function for the grid's life", () => {
-    const at = onPage()
+    const at = onPage(startWorld)
     const { virtual } = listed(at)
     const asked: Array<number> = []
     virtual.scrollToIndex = (index) => {
@@ -645,7 +678,8 @@ describe("the review grid's atoms", () => {
     }
     at.release.push(at.registry.subscribe(at.region.reveal, at.grid.bring))
     const row = A.findLast(at.registry.get(at.region.list), (view) => view.status === "needs")
-    const rowId = O.getOrThrow(row).row.id
+    assertTrue(O.isSome(row), "expected a present test value")
+    const rowId = row.value.row.id
     at.registry.set(at.region.reveal, O.some({ rowId, n: 1 }))
     expect(asked).toEqual(O.toArray(at.grid.indexOf(rowId)))
     // The same row asked for again is a new ask.

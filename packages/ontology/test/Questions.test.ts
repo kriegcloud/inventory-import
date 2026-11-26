@@ -1,7 +1,8 @@
 // Gate 8, the question suite (report 14 sections 5 and 6.8; decision 120): CQ-P06 and CQ-P11 asked of
 // `threadGraph()` in Oxigraph, with no reasoner, and the party slice's CQ-P01, CQ-P02, CQ-P09, CQ-P04 and the CQ-P05
-// ASK asked of their hand-written fixtures, which no record holds (report 18 section 10). Every question walks `rdf:type/rdfs:subClassOf*`
-// and is asked of its graph with the committed OWL file beside it (decision 27), so a node typed by a subclass is found.
+// ASK asked of their hand-written fixtures, which no record holds (report 18 section 10). Every question walks
+// `rdf:type/rdfs:subClassOf*` and is asked of its graph with the committed OWL file beside it (decision 27), so a node
+// typed by a subclass is found.
 //
 // The expected rows below are the lock on each question's answer (decision 118): there is no lock file and no update
 // flag. A commit that changes them says so, and the release notes name the question with its old and its new answer.
@@ -749,6 +750,43 @@ const recordsOfAnyTenant = Str.replaceAll(
   "inv:SourceRecord ."
 )
 
+/** CQ-P04 as committed, with the record `?a` read whatever tenant holds it, and `?b` still the tenant's. */
+const firstOfAnyTenant = Str.replace(
+  `?a rdf:type/rdfs:subClassOf* inv:SourceRecord ;
+     inv:inTenant ?tenant .`,
+  "?a rdf:type/rdfs:subClassOf* inv:SourceRecord ."
+)
+
+/** CQ-P04 as committed, with the record `?b` read whatever tenant holds it, and `?a` still the tenant's. */
+const secondOfAnyTenant = Str.replace(
+  `?b rdf:type/rdfs:subClassOf* inv:SourceRecord ;
+     inv:inTenant ?tenant .`,
+  "?b rdf:type/rdfs:subClassOf* inv:SourceRecord ."
+)
+
+/** CQ-P04 as committed, with a later decision about `?a` taken as one about the pair, whatever its other record. */
+const laterAboutFirst = Str.replace(
+  `inv:decidesOn ?a , ?b ;
+           inv:eventTime ?laterAt .`,
+  `inv:decidesOn ?a ;
+           inv:eventTime ?laterAt .`
+)
+
+/** CQ-P04 as committed, with a later decision about `?b` taken as one about the pair, whatever its other record. */
+const laterAboutSecond = Str.replace(
+  `inv:decidesOn ?a , ?b ;
+           inv:eventTime ?laterAt .`,
+  `inv:decidesOn ?b ;
+           inv:eventTime ?laterAt .`
+)
+
+/** CQ-P04 as committed, with any node that states a decision's properties read as a decision, typed or not. */
+const decisionOfAnyType = Str.replace(
+  `?decision rdf:type/rdfs:subClassOf* inv:IdentityDecision ;
+            inv:inTenant ?tenant ;`,
+  "?decision inv:inTenant ?tenant ;"
+)
+
 /** CQ-P04's one row on its fixture: the pair test_Dana decided at 09:00, with the evidence it cites. */
 const pairInForce = Effect.map(partyNames, (n) => [
   n.works,
@@ -784,6 +822,78 @@ const decisionTriples = Effect.fnUntraced(function* (given: {
     n.instant(given.at)(decision)
   ]
 })
+
+/** The objects `graph` states of `subject` by `predicate`: each an IRI, or a value as written. */
+const objectsOf = (graph: ReadonlyArray<Triple>, subject: string, predicate: string) =>
+  A.map(
+    A.filter(graph, (triple) => triple.subject === subject && triple.predicate === predicate),
+    (triple) =>
+      ObjectNode.match(triple.object, {
+        iri: (node) => node.iri,
+        literal: (node) => node.value,
+        text: (node) => node.value
+      })
+  )
+
+/** The subjects `graph` types as `kind`, with no walk: a fixture states its nodes' own classes. */
+const typedAs = (graph: ReadonlyArray<Triple>, kind: string) =>
+  A.map(
+    A.filter(graph, (triple) => triple.predicate === type && iriOf(triple) === kind),
+    (triple) => triple.subject
+  )
+
+/**
+ * What CQ-P04's fixture states beside what the question reads (report 18 section 10), each fault a sentence: every
+ * record, piece of evidence and decision typed and stating one tenant, every record its three source keys, every
+ * decider a member of the decision's tenant, and every tenant typed. None for the committed fixture.
+ */
+const holdingFaults = (graph: ReadonlyArray<Triple>, inv: (local: string) => string): ReadonlyArray<string> => {
+  const held = A.flatMap(["SourceRecord", "IdentityEvidence", "IdentityDecision"], (key) => typedAs(graph, inv(key)))
+  const members = typedAs(graph, inv("Member"))
+  const tenants = typedAs(graph, inv("Tenant"))
+  const subjectsOf = (predicate: string) =>
+    A.dedupe(A.map(A.filter(graph, withPredicate(predicate)), (triple) => triple.subject))
+  const objectsBy = (predicate: string) =>
+    A.flatMap(subjectsOf(predicate), (subject) => objectsOf(graph, subject, predicate))
+  const once = (subject: string, predicate: string) =>
+    A.length(objectsOf(graph, subject, predicate)) === 1
+      ? []
+      : [`${subject} states ${predicate} ${String(A.length(objectsOf(graph, subject, predicate)))} times`]
+  return [
+    ...A.map(A.difference(subjectsOf(inv("inTenant")), held), (node) => `${node} states a tenant and holds no type`),
+    ...A.flatMap(held, (node) => once(node, inv("inTenant"))),
+    ...A.flatMap(typedAs(graph, inv("SourceRecord")), (record) =>
+      A.flatMap(["sourceSystem", "sourceType", "sourceId"], (key) => once(record, inv(key)))
+    ),
+    ...A.flatMap(A.dedupe([...subjectsOf(inv("membershipIn")), ...members]), (member) =>
+      once(member, inv("membershipIn"))
+    ),
+    ...A.flatMap(typedAs(graph, inv("IdentityDecision")), (decision) =>
+      A.flatMap(objectsOf(graph, decision, inv("decidedBy")), (member) =>
+        A.contains(members, member) &&
+        A.every(objectsOf(graph, decision, inv("inTenant")), (tenant) =>
+          A.contains(objectsOf(graph, member, inv("membershipIn")), tenant)
+        )
+          ? []
+          : [`${decision} is decided by ${member}, no member of its tenant`]
+      )
+    ),
+    ...A.flatMap(A.dedupe([...objectsBy(inv("inTenant")), ...objectsBy(inv("membershipIn"))]), (tenant) =>
+      A.contains(tenants, tenant) ? [] : [`${tenant} is named as a tenant and not typed one`]
+    )
+  ]
+}
+
+/** The source ids of the records `graph` gives `tenant`, in code point order. */
+const idsHeld = (graph: ReadonlyArray<Triple>, inv: (local: string) => string, tenant: string) => {
+  const records = A.filter(typedAs(graph, inv("SourceRecord")), (record) =>
+    A.contains(objectsOf(graph, record, inv("inTenant")), tenant)
+  )
+  return A.sort(
+    A.flatMap(records, (record: string) => objectsOf(graph, record, inv("sourceId"))),
+    byCodePoint
+  )
+}
 
 describe("gate 8, CQ-P04: the pairs of a tenant's records decided to be one party", () => {
   it.effect(
@@ -967,6 +1077,201 @@ describe("gate 8, CQ-P04: the pairs of a tenant's records decided to be one part
         [n.works, n.record("test_AcmeA"), n.record("test_AcmeB"), n.member("test_Dana"), "2026-11-01T09:00:00Z", ""]
       ])
     })
+  )
+
+  it.effect("must-fail: a decision pairing a record of one tenant with a record of the other gives no row", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const rows = yield* asked(graph, identity.query, identityVariables)
+      // Planted: each tenant decides that its own record and the other tenant's are one party. test_AcmeC sorts before
+      // test_SecondAcmeA, so the second tenant's decision has the other's record as ?a, the first tenant's as ?b.
+      const foreign = yield* decisionTriples({
+        name: "test_ForeignPair",
+        tenant: n.second,
+        pair: ["test_SecondAcmeA", "test_AcmeC"],
+        outcome: "sameParty",
+        decider: "test_Kim",
+        at: "2026-11-01T14:00:00Z"
+      })
+      const mixed = yield* decisionTriples({
+        name: "test_MixedPair",
+        tenant: n.works,
+        pair: ["test_AcmeC", "test_SecondAcmeA"],
+        outcome: "sameParty",
+        decider: "test_Dana",
+        at: "2026-11-01T14:00:00Z"
+      })
+      const crossed = [...graph, ...foreign, ...mixed]
+      const answer = yield* asked(crossed, identity.query, identityVariables)
+      expect(answer).toStrictEqual(rows)
+      const crossing = [n.record("test_AcmeC"), n.record("test_SecondAcmeA")]
+      // Without ?a's tenant, the second tenant's decision lists the first tenant's test_AcmeC.
+      const firstFree = firstOfAnyTenant(identity.query)
+      expect(firstFree).not.toBe(identity.query)
+      const firstRows = yield* asked(crossed, firstFree, identityVariables)
+      expect(firstRows).toStrictEqual([
+        ...rows,
+        [n.second, ...crossing, n.member("test_Kim"), "2026-11-01T14:00:00Z", ""]
+      ])
+      // Without ?b's tenant, the first tenant's decision lists the second tenant's test_SecondAcmeA.
+      const secondFree = secondOfAnyTenant(identity.query)
+      expect(secondFree).not.toBe(identity.query)
+      const secondRows = yield* asked(crossed, secondFree, identityVariables)
+      expect(secondRows).toStrictEqual([
+        ...rows,
+        [n.works, ...crossing, n.member("test_Dana"), "2026-11-01T14:00:00Z", ""]
+      ])
+      // Near miss: the second tenant's decision about its own two records, later than its reversal, is its row.
+      const own = yield* decisionTriples({
+        name: "test_OwnPair",
+        tenant: n.second,
+        pair: ["test_SecondAcmeA", "test_SecondAcmeB"],
+        outcome: "sameParty",
+        decider: "test_Kim",
+        at: "2026-11-01T14:00:00Z"
+      })
+      const owned = yield* asked([...graph, ...own], identity.query, identityVariables)
+      expect(owned).toStrictEqual([
+        ...rows,
+        [
+          n.second,
+          n.record("test_SecondAcmeA"),
+          n.record("test_SecondAcmeB"),
+          n.member("test_Kim"),
+          "2026-11-01T14:00:00Z",
+          ""
+        ]
+      ])
+    })
+  )
+
+  it.effect("must-fail: a later decision about one record of the pair and a third leaves the pair in force", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const inForce = yield* pairInForce
+      // Planted: at noon test_Dana finds test_AcmeA and test_AcmeC two parties, and test_AcmeB and test_AcmeC two.
+      // Neither is about the pair test_Decision1 joined.
+      const withA = yield* decisionTriples({
+        name: "test_DecisionAC",
+        tenant: n.works,
+        pair: ["test_AcmeA", "test_AcmeC"],
+        outcome: "differentParties",
+        decider: "test_Dana",
+        at: "2026-11-01T12:00:00Z"
+      })
+      const withB = yield* decisionTriples({
+        name: "test_DecisionBC",
+        tenant: n.works,
+        pair: ["test_AcmeB", "test_AcmeC"],
+        outcome: "differentParties",
+        decider: "test_Dana",
+        at: "2026-11-01T12:00:00Z"
+      })
+      const aside = [...graph, ...withA, ...withB]
+      const rows = yield* asked(aside, identity.query, identityVariables)
+      expect(rows).toStrictEqual([inForce])
+      // A later decision read as the pair's when it names ?a alone, or ?b alone, hides the pair.
+      const aboutFirst = laterAboutFirst(identity.query)
+      expect(aboutFirst).not.toBe(identity.query)
+      const firstRows = yield* asked([...graph, ...withA], aboutFirst, identityVariables)
+      expect(firstRows).toStrictEqual([])
+      const aboutSecond = laterAboutSecond(identity.query)
+      expect(aboutSecond).not.toBe(identity.query)
+      const secondRows = yield* asked([...graph, ...withB], aboutSecond, identityVariables)
+      expect(secondRows).toStrictEqual([])
+      // Near miss: on the fixture alone, which has no such decision, each reading gives the committed answer.
+      const fixtureRows = yield* asked(graph, identity.query, identityVariables)
+      const firstOnFixture = yield* asked(graph, aboutFirst, identityVariables)
+      const secondOnFixture = yield* asked(graph, aboutSecond, identityVariables)
+      expect(firstOnFixture).toStrictEqual(fixtureRows)
+      expect(secondOnFixture).toStrictEqual(fixtureRows)
+    })
+  )
+
+  it.effect("must-fail: a node that states a decision's properties and no type is no decision", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const rows = yield* asked(graph, identity.query, identityVariables)
+      // Planted: every property of a sameParty decision about test_AcmeC and test_AcmeD, and no type.
+      const decided = yield* decisionTriples({
+        name: "test_UntypedDecision",
+        tenant: n.works,
+        pair: ["test_AcmeC", "test_AcmeD"],
+        outcome: "sameParty",
+        decider: "test_Dana",
+        at: "2026-11-01T14:00:00Z"
+      })
+      const untyped = A.filter(decided, (triple) => triple.predicate !== type)
+      expect(untyped).toHaveLength(decided.length - 1)
+      const answer = yield* asked([...graph, ...untyped], identity.query, identityVariables)
+      expect(answer).toStrictEqual(rows)
+      // Without the decision's type step, the untyped node joins C and D.
+      const anyType = decisionOfAnyType(identity.query)
+      expect(anyType).not.toBe(identity.query)
+      const joined = yield* asked([...graph, ...untyped], anyType, identityVariables)
+      expect(joined).toStrictEqual([
+        ...rows,
+        [n.works, n.record("test_AcmeC"), n.record("test_AcmeD"), n.member("test_Dana"), "2026-11-01T14:00:00Z", ""]
+      ])
+      // Near miss: the same node typed a decision is one, and the committed question lists it.
+      const typed = yield* asked([...graph, ...decided], identity.query, identityVariables)
+      expect(typed).toStrictEqual(joined)
+    })
+  )
+
+  it.effect(
+    "the fixture states what the question does not read: tenants, source keys and deciders (report 18 section 10)",
+    () =>
+      Effect.gen(function* () {
+        const n = yield* partyNames
+        const graph = yield* fixtureGraph(identity.fixture)
+        expect(holdingFaults(graph, n.inv)).toStrictEqual([])
+        // The two tenants' records reuse the ids A0001 and A0002 and stay four records (decision 34).
+        expect(idsHeld(graph, n.inv, n.works)).toStrictEqual(["A0001", "A0002", "A0003", "A0004", "A0005", "A0006"])
+        expect(idsHeld(graph, n.inv, n.second)).toStrictEqual(["A0001", "A0002"])
+        // Planted, one at a time: the evidence's tenant dropped, its type dropped, test_Decision3 decided by
+        // test_Kim, test_Dana's membership dropped, and test_AcmeC's source id dropped. Each is one fault.
+        const evidence = n.evidence("test_SameTaxId")
+        const third = n.decision("test_Decision3")
+        const dana = n.member("test_Dana")
+        const acmeC = n.record("test_AcmeC")
+        const plants = [
+          dropped(graph, evidence, n.inv("inTenant")),
+          dropped(graph, evidence, type),
+          [...dropped(graph, third, n.inv("decidedBy")), link(third, n.inv("decidedBy"), n.member("test_Kim"))],
+          dropped(graph, dana, n.inv("membershipIn")),
+          dropped(graph, acmeC, n.inv("sourceId"))
+        ]
+        expect(A.map(plants, (planted) => holdingFaults(planted, n.inv))).toStrictEqual([
+          [`${evidence} states ${n.inv("inTenant")} 0 times`],
+          [`${evidence} states a tenant and holds no type`],
+          [`${third} is decided by ${n.member("test_Kim")}, no member of its tenant`],
+          [
+            `${dana} states ${n.inv("membershipIn")} 0 times`,
+            `${n.decision("test_Decision1")} is decided by ${dana}, no member of its tenant`,
+            `${n.decision("test_Decision2")} is decided by ${dana}, no member of its tenant`,
+            `${third} is decided by ${dana}, no member of its tenant`
+          ],
+          [`${acmeC} states ${n.inv("sourceId")} 0 times`]
+        ])
+        // test_SecondAcmeA's id changed is no fault of its own: the ids it holds say it.
+        const secondA = n.record("test_SecondAcmeA")
+        const renumbered = [
+          ...dropped(graph, secondA, n.inv("sourceId")),
+          literal(secondA, n.inv("sourceId"), "A0009", `${RdfVocab.xsd.iri}string`)
+        ]
+        expect(holdingFaults(renumbered, n.inv)).toStrictEqual([])
+        expect(idsHeld(renumbered, n.inv, n.second)).toStrictEqual(["A0002", "A0009"])
+        // Near miss: the evidence's text reworded is no holding, and no fault.
+        const reworded = [
+          ...dropped(graph, evidence, n.inv("evidenceText")),
+          literal(evidence, n.inv("evidenceText"), "same bank account", `${RdfVocab.xsd.iri}string`)
+        ]
+        expect(holdingFaults(reworded, n.inv)).toStrictEqual([])
+      })
   )
 })
 

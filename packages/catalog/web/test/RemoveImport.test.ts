@@ -1,3 +1,4 @@
+import { assertSome } from "@effect/vitest/utils"
 // Removing an open import. The rules that hurt when wrong: a card for an import that no longer exists must not stay
 // on the first screen (after a refusal the list is asked again), an import somebody already removed counts as removed,
 // and nothing of a removed import is kept in the tab, its staged rows least of all.
@@ -48,8 +49,7 @@ const world = (remove: () => Effect.Effect<void, ImportNotFound | AlreadyImporte
   const listed = () =>
     registry.get(openImports).pipe(
       AsyncResult.value,
-      O.map((list) => A.map(list.views, (view) => view.fileName)),
-      O.getOrNull
+      O.map((list) => A.map(list.views, (view) => view.fileName))
     )
   const press = (view: typeof first) => {
     registry.mount(removeImport(view.id))
@@ -79,7 +79,7 @@ describe("removing an open import", () => {
       const exit = yield* t.press(t.first)
       yield* settle
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(t.listed()).toEqual(["a.csv", "b.csv"])
+      assertSome(t.listed(), ["a.csv", "b.csv"])
       expect(t.asked.open).toBe(2)
     })
   )

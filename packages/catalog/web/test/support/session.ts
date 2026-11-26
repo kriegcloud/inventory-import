@@ -27,16 +27,17 @@ class Unread extends S.TaggedError<Unread, { readonly brand: unique symbol }>()(
  * says otherwise): one account is one person, a member of each of their organizations. The account is the member's
  * name here, as the app tells it by the session's email.
  */
+export const memberStart = { organization: "org_prairie" }
 export const memberOf = (who: {
   readonly id: string
-  readonly organization?: string
-  readonly account?: string
+  readonly organization: string
+  readonly account: string
 }): Who => {
-  const organization = who.organization ?? "org_prairie"
+  const organization = who.organization
   return O.some(
     Member.make({
       id: MemberId.make(who.id),
-      name: DisplayName.make(who.account ?? who.id),
+      name: DisplayName.make(who.account),
       role: "admin",
       organizationId: OrganizationId.make(organization),
       organizationName: DisplayName.make(organization)
@@ -48,7 +49,7 @@ export const memberOf = (who: {
  * A page's session: `first` is who it is for. Its `signedIn` and `asked` are what `registryFor` takes. Each time it is
  * asked again is counted (`times`) and stays out until `answer` or `fail`.
  *
- * @example const s = sessionStandIn(memberOf({ id: "mem_dana" }))
+ * @example const s = sessionStandIn(memberOf({ ...memberStart, id: "mem_dana", account: "mem_dana" }))
  *          const registry = registryFor({ endpoints, signedIn: s.signedIn, asked: s.asked })
  */
 export const sessionStandIn = (first: Who) => {
@@ -57,29 +58,35 @@ export const sessionStandIn = (first: Who) => {
   const chosen: { organization: string | undefined } = { organization: undefined }
   const session: Atom.Atom<AsyncResult.AsyncResult<Who, Unread>> = Atom.make((get): Effect.Effect<Who, Unread> => {
     const before = get.self<AsyncResult.AsyncResult<Who, Unread>>()
-    if (O.isNone(before)) return Effect.succeed(first)
-    return Effect.suspend(() => {
-      const question = Deferred.makeUnsafe<Who, Unread>()
-      out.push(question)
-      return Deferred.await(question)
-    }).pipe(
-      Effect.flatMap((answer) => {
-        const had = O.flatten(O.flatMap(before, AsyncResult.value))
-        const to = chosen.organization
-        // Over with this answer, whatever it is: as the app's own switch is.
-        chosen.organization = undefined
-        return answeredFor({
-          answer,
-          before: had,
-          after: answer,
-          // The organization chosen, for the same account.
-          chosen: O.exists(answer, (one) => one.organizationId === to && O.exists(had, (was) => was.name === one.name)),
-          leave: () => {
-            left.times += 1
-          }
-        })
-      })
-    )
+    return O.match(before, {
+      onNone: () => Effect.succeed(first),
+      onSome: () =>
+        Effect.suspend(() => {
+          const question = Deferred.makeUnsafe<Who, Unread>()
+          out.push(question)
+          return Deferred.await(question)
+        }).pipe(
+          Effect.flatMap((answer) => {
+            const had = O.flatten(O.flatMap(before, AsyncResult.value))
+            const to = chosen.organization
+            // Over with this answer, whatever it is: as the app's own switch is.
+            chosen.organization = undefined
+            return answeredFor({
+              answer,
+              before: had,
+              after: answer,
+              // The organization chosen, for the same account.
+              chosen: O.exists(
+                answer,
+                (one) => one.organizationId === to && O.exists(had, (was) => was.name === one.name)
+              ),
+              leave: () => {
+                left.times += 1
+              }
+            })
+          })
+        )
+    })
   }).pipe(Atom.keepAlive)
   /** The question that is out: the last one asked. */
   const question = () => O.getOrThrow(O.fromUndefinedOr(out[out.length - 1]))

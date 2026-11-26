@@ -83,10 +83,9 @@ const memberOf = (member: string) =>
   )
 
 /** The Review step of one import opened in a page of its own: a refresh is another page on the same storage. */
-const visit = (
-  id: ImportId,
-  options: { readonly member?: string; readonly saves?: "taken" | "lost"; readonly reads?: "answered" } = {}
-) => {
+const visitStart: { readonly member: string; readonly saves: "taken" | "lost"; readonly reads: "answered" | "silent" } =
+  { member: "mem_dana", saves: "taken", reads: "silent" }
+const visit = (id: ImportId, options: typeof visitStart) => {
   const server: { revision: number; decisions: SavedDecisions } = { revision: 0, decisions: {} }
   const sent: Array<SaveRequest> = []
   const registry = registryFor({
@@ -106,7 +105,7 @@ const visit = (
         }
       }
     },
-    signedIn: Atom.make(memberOf(options.member ?? "mem_dana"))
+    signedIn: Atom.make(memberOf(options.member))
   })
   return {
     registry,
@@ -146,7 +145,7 @@ describe("the undo history kept in the browser", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(60)
-        const first = visit(id)
+        const first = visit(id, { ...visitStart })
         first.open(10, {})
         yield* settle
         expect(labels(first.state())).toEqual([])
@@ -158,7 +157,7 @@ describe("the undo history kept in the browser", () => {
         expect(R.keys(browser.kept)).toHaveLength(1)
 
         // A refresh: another page, the same browser. The server holds the two decisions the person made.
-        const again = visit(id)
+        const again = visit(id, { ...visitStart })
         again.open(12, { "row-2": out, "row-3": out })
         yield* settle
         expect(labels(again.state())).toEqual(labels(left))
@@ -173,14 +172,14 @@ describe("the undo history kept in the browser", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(61)
-        const first = visit(id)
+        const first = visit(id, { ...visitStart })
         first.open(10, {})
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
 
         // Somebody else has since put row 2 back and left row 3 out: the kept history ends somewhere else.
-        const again = visit(id)
+        const again = visit(id, { ...visitStart })
         again.open(13, { "row-3": out })
         yield* settle
         expect(labels(again.state())).toEqual([])
@@ -194,7 +193,7 @@ describe("the undo history kept in the browser", () => {
       Effect.gen(function* () {
         const id = importNo(63)
         // The network loses the save: row 2 is on the screen, kept in this browser, and not on the server.
-        const first = visit(id, { saves: "lost" })
+        const first = visit(id, { ...visitStart, saves: "lost" })
         first.open(10, {})
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
@@ -202,7 +201,7 @@ describe("the undo history kept in the browser", () => {
         expect(first.sent).toEqual([{ madeOn: { "row-2": 10 }, over: {}, set: { "row-2": out }, clear: [] }])
 
         // A refresh. Somebody else has left row 3 out meanwhile: the server holds that, and not row 2.
-        const again = visit(id, { reads: "answered" })
+        const again = visit(id, { ...visitStart, reads: "answered" })
         again.open(13, { "row-3": out })
         yield* settle
         // Both are on the screen: what the server holds, with the person's waiting row over it.
@@ -224,13 +223,13 @@ describe("the undo history kept in the browser", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(62)
-        const first = visit(id)
+        const first = visit(id, { ...visitStart })
         first.open(10, {})
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
 
-        const other = visit(id, { member: "mem_lee" })
+        const other = visit(id, { ...visitStart, member: "mem_lee" })
         other.open(11, { "row-2": out })
         yield* settle
         expect(labels(other.state())).toEqual([])

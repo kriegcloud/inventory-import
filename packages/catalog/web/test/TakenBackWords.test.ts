@@ -69,7 +69,7 @@ const taken = [
 ] as const
 
 /** The Review step on one import at revision 10: each save and confirm answers only when the test says. */
-const world = (id: ImportId, parts: Partial<ImportView> = {}) => {
+const world = (id: ImportId, parts: Partial<ImportView>) => {
   const saves: Array<Deferred.Deferred<Saved, HttpApiError.InternalServerErrorProblem>> = []
   const confirms: Array<Deferred.Deferred<ImportView, AcceptsTakenBack>> = []
   const registry = registryWith({
@@ -107,7 +107,7 @@ const decides = DraftEvent.Decided({ changes: { "row-7": O.some(replaced), "row-
 describe("a Replace and a Keep-stored taken back because another column than the SKU was matched again", () => {
   it.live("are named by a save's answer, with the field and the rows, and each row is undecided again", () =>
     Effect.gen(function* () {
-      const t = world(importNo(91))
+      const t = world(importNo(91), {})
       yield* settle
       page.said.length = 0
       t.happened(decides)
@@ -125,7 +125,7 @@ describe("a Replace and a Keep-stored taken back because another column than the
   it.live("are named by a confirm's refusal, in the toast and above the review, where nothing was imported", () =>
     Effect.gen(function* () {
       const id = importNo(92)
-      const t = world(id)
+      const t = world(id, {})
       yield* settle
       t.happened(decides)
       yield* settle

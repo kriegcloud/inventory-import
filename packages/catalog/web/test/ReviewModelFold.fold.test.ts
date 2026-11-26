@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 // The review's model holds no "what a row's decision is now": a row's own instance holds only its own acts, and an act
 // on a group of rows is one instance of its own. What a row reads as is a fold, written here: the row's own decision,
 // then the patch of every group in force that names it and came after that decision, oldest first. A group's two
@@ -9,6 +10,7 @@
 // instances are read back and folded.
 import { Story } from "@alchemy.run/domain/Story"
 import { expect, it } from "@effect/vitest"
+import { assertSome } from "@effect/vitest/utils"
 import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId, RowId } from "@inventory/catalog-contract/Ids"
 import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -229,10 +231,14 @@ const patchesFor = (input: {
     patches = R.set(patches, row, patch)
   }
   const accept = (view: RowView): void => {
-    const fix = view.problem?.fix
-    if (view.status !== "needs" || fix === undefined) return
-    const lift = A.some(view.row.applied ?? [], (applied) => applied.column === fix.column)
-    set(view.row.id, Patch.cases.accept.make({ kind: "accept", column: fix.column, lift }))
+    if (view.status !== "needs") return
+    O.map(O.fromUndefinedOr(view.problem?.fix), (fix) => {
+      const lift = A.some(
+        O.match(O.fromUndefinedOr(view.row.applied), { onNone: A.empty, onSome: identity }),
+        (applied) => applied.column === fix.column
+      )
+      set(view.row.id, Patch.cases.accept.make({ kind: "accept", column: fix.column, lift }))
+    })
   }
   const each = (rows: ReadonlyArray<string>, f: (view: RowView) => void): void => {
     for (const row of rows) O.map(R.get(byId, row), f)
@@ -258,20 +264,25 @@ const patchesFor = (input: {
           each(
             A.filter(group.rowIds, (row) => except?.includes(row) !== true),
             (view) => {
-              const fix = view.problem?.fix
-              if (value === fix?.to) return accept(view)
-              const column = fix === undefined ? group.column : columnFor(fix, value)
-              set(view.row.id, Patch.cases.edit.make({ kind: "edit", column, value }))
+              O.match(O.fromUndefinedOr(view.problem?.fix), {
+                onNone: () => set(view.row.id, Patch.cases.edit.make({ kind: "edit", column: group.column, value })),
+                onSome: (fix) => {
+                  if (value === fix.to) return accept(view)
+                  set(view.row.id, Patch.cases.edit.make({ kind: "edit", column: columnFor(fix, value), value }))
+                }
+              })
             }
           )
       ),
     keep: ({ rowId }) =>
       each([rowId], (view) => {
-        if (view.status !== "needs" || view.problem?.rivals === undefined) return
-        set(rowId, Patch.cases.keep.make({ kind: "keep" }))
-        for (const rival of view.problem.rivals) {
-          if (R.has(byId, rival) && !decidedByPerson(decisionOf(rival))) set(rival, leaving)
-        }
+        if (view.status !== "needs") return
+        O.map(O.fromUndefinedOr(view.problem?.rivals), (rivals) => {
+          set(rowId, Patch.cases.keep.make({ kind: "keep" }))
+          for (const rival of rivals) {
+            if (R.has(byId, rival) && !decidedByPerson(decisionOf(rival))) set(rival, leaving)
+          }
+        })
       }),
     leaveOut: ({ rowIds }) =>
       each(rowIds, (view) => {
@@ -289,9 +300,10 @@ const patchesFor = (input: {
       }),
     revert: ({ rowId, column }) =>
       each([rowId], (view) => {
-        const mark = R.get(view.marks, column)
-        if (O.isNone(mark) || mark.value.by === "you" || view.status === "stored") return
-        set(rowId, Patch.cases.revert.make({ kind: "revert", column }))
+        O.map(R.get(view.marks, column), (mark) => {
+          if (mark.by === "you" || view.status === "stored") return
+          set(rowId, Patch.cases.revert.make({ kind: "revert", column }))
+        })
       }),
     revertGroup: ({ groupId }) =>
       O.map(
@@ -483,7 +495,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
   // Press sequences the bookkeeping cannot foresee the model's answer to: a failure, not a guess.
   const odd: Array<string> = []
   const readings: Array<Reading> = []
-  const stackOf = (row: string): ReadonlyArray<Held> => O.getOrElse(R.get(own, row), () => [])
+  const stackOf = (row: string): ReadonlyArray<Held> => O.match(R.get(own, row), { onNone: A.empty, onSome: identity })
   const topOf = (stack: ReadonlyArray<Held>): number =>
     O.match(A.last(stack), { onNone: () => 0, onSome: (held) => held.level.change })
   const undoneChange = (row: string): number =>
@@ -581,11 +593,14 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
             ? O.some(noChangeHere)
             : O.none()
     })
-    return O.getOrElse(onRow, () => {
-      const undone = O.getOrElse(R.get(undoneOf, input.row), () => ({ change: 0, by: "" }))
-      return seen.sawUndone !== undone.change
-        ? refused("UndoneSince", Story.rejected(UndoneSince.make({ by: undone.by, change: undone.change })))
-        : { name: "Taken" as const, step: O.none() }
+    return O.match(onRow, {
+      onSome: identity,
+      onNone: () => {
+        const undone = O.getOrElse(R.get(undoneOf, input.row), () => ({ change: 0, by: "" }))
+        return seen.sawUndone !== undone.change
+          ? refused("UndoneSince", Story.rejected(UndoneSince.make({ by: undone.by, change: undone.change })))
+          : { name: "Taken" as const, step: O.none() }
+      }
     })
   }
 
@@ -740,7 +755,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
         heldBack("UndoRowStep", "GroupedSince")
         return
       }
-      const then = O.getOrElse(R.get(stale.own, row), () => A.empty<Held>())
+      const then = O.match(R.get(stale.own, row), { onNone: A.empty, onSome: identity })
       const mineThen = O.exists(A.last(then), (top) => top.level.change === undo && top.level.by === actor.memberId)
       if (!mineThen) return
       const sawUndone = O.getOrElse(R.get(stale.undone, row), () => 0)
@@ -1138,7 +1153,7 @@ const liveReview = (input: {
   readonly rows: (decisions: Readonly<Record<string, ReviewDecision>>) => ReadonlyArray<ReviewRow>
   readonly recheck: Recheck
   /** Which steps count as naming a row: any whose rows hold it (the default), or only one that changed it. */
-  readonly touching?: "named" | "changed"
+  readonly touching: "named" | "changed"
 }) => {
   let decisions = HashMap.empty<string, ReviewDecision>()
   let people: Readonly<Record<string, Person>> = {}
@@ -1147,14 +1162,20 @@ const liveReview = (input: {
   let presses = 0
   const expected: Array<O.Option<Readonly<Record<string, string>>>> = []
   const apart: Array<string> = []
-  const checking = input.recheck === undefined ? {} : { recheck: input.recheck }
+  const checking = O.fromUndefinedOr(input.recheck)
   const stateOf = (steps: Person["steps"]): ReviewState => ({ decisions, undo: steps.undo, redo: steps.redo })
   const personOf = (actor: Actor): Person => O.getOrElse(R.get(people, actor.memberId), () => nobody)
   const touchOf = (row: string): number => O.getOrElse(R.get(touch, row), () => 0)
   const rowsOf = (step: UndoStep): ReadonlyArray<string> => step.before.pipe(HashMap.keys, A.fromIterable)
   const look = () => {
     const rows = input.rows(saved(stateOf(nobody.steps)))
-    return { rows, views: viewRows({ rows, state: stateOf(nobody.steps), ...checking }) }
+    return {
+      rows,
+      views: O.match(checking, {
+        onNone: () => viewRows({ rows, state: stateOf(nobody.steps) }),
+        onSome: (recheck) => viewRows({ rows, state: stateOf(nobody.steps), recheck })
+      })
+    }
   }
   /**
    * Each row of a step gets a new touch (with `touching: "changed"`, only a row whose decision it changed from
@@ -1229,26 +1250,31 @@ const liveReview = (input: {
     }
     for (const w of unit) {
       const ours = applyPatch(HashMap.get(decisions, w.row), w.patch)
-      const acts = HashMap.get(next.decisions, w.row)
-      if (O.isNone(acts) || !sameDecision(ours, acts.value)) apart.push(`${step} ${w.row}: the patch is not act's`)
+      O.match(HashMap.get(next.decisions, w.row), {
+        onNone: () => apart.push(`${step} ${w.row}: the patch is not act's`),
+        onSome: (acts) => {
+          if (!sameDecision(ours, acts)) apart.push(`${step} ${w.row}: the patch is not act's`)
+        }
+      })
     }
   }
 
-  const press = Effect.fnUntraced(function* (actor: Actor, action: Action, how: How = right) {
+  const press = Effect.fnUntraced(function* (actor: Actor, action: Action, how: How) {
     const shown = look()
     const person = personOf(actor)
     const step = `press-${presses}`
     presses += 1
     const actOn = (steps: Person["steps"], pressed: Action) =>
-      act({ rows: shown.rows, state: stateOf(steps), action: pressed, ...checking })
+      O.match(checking, {
+        onNone: () => act({ rows: shown.rows, state: stateOf(steps), action: pressed }),
+        onSome: (recheck) => act({ rows: shown.rows, state: stateOf(steps), action: pressed, recheck })
+      })
     let pressed: Pressed = { kind: "new", sent: Sent.Nothing(), answer: true, undid: "taken", rows: [] }
     if (action.type === "undo") {
-      const done = A.last(person.undo)
-      const taken = A.last(person.steps.undo)
-      if (O.isSome(done) && O.isSome(taken)) {
-        const answer = stands(rowsOf(taken.value), O.some(done.value.after))
-        const undid = input.side.undo(actor, step, done.value.sent, how.screen)
-        pressed = { kind: "undo", sent: done.value.sent, answer, undid, rows: A.map(done.value.unit, (w) => w.row) }
+      O.map(O.all([A.last(person.undo), A.last(person.steps.undo)]), ([done, taken]) => {
+        const answer = stands(rowsOf(taken), O.some(done.after))
+        const undid = input.side.undo(actor, step, done.sent, how.screen)
+        pressed = { kind: "undo", sent: done.sent, answer, undid, rows: A.map(done.unit, (w) => w.row) }
         if (undid === "NotYourStep") {
           people = R.set(people, actor.memberId, {
             ...person,
@@ -1257,66 +1283,65 @@ const liveReview = (input: {
           })
         }
         if (undid === "taken") {
-          const out = actOn({ undo: [taken.value], redo: [] }, action)
+          const out = actOn({ undo: [taken], redo: [] }, action)
           if (answer) {
             decisions = out.state.decisions
-            touch = { ...touch, ...done.value.prior }
+            touch = { ...touch, ...done.prior }
           } else {
-            follow([...R.keys(done.value.after), ...A.map(done.value.unit, (w) => w.row)])
+            follow([...R.keys(done.after), ...A.map(done.unit, (w) => w.row)])
           }
           people = R.set(people, actor.memberId, {
             undo: A.dropRight(person.undo, 1),
             redo: A.append(person.redo, {
-              action: done.value.action,
-              unit: done.value.unit,
-              expect: answer ? O.some(done.value.prior) : O.none(),
-              after: done.value.after
+              action: done.action,
+              unit: done.unit,
+              expect: answer ? O.some(done.prior) : O.none(),
+              after: done.after
             }),
             steps: { undo: A.dropRight(person.steps.undo, 1), redo: [...person.steps.redo, ...out.state.redo] }
           })
         }
-      }
+      })
     } else if (action.type === "redo") {
-      const back = A.last(person.redo)
-      const mirror = A.last(person.steps.redo)
-      if (O.isSome(back) && O.isSome(mirror)) {
-        const answer = stands(rowsOf(mirror.value), back.value.expect)
-        const out = actOn({ undo: [], redo: [mirror.value] }, action)
-        // A redo is a new act. "same": the undone unit's own rows and patches, on the decisions as they are now.
-        const unit =
-          how.redo === "same"
-            ? back.value.unit
-            : patchesFor({ views: shown.views, decisions, action: back.value.action })
-        const sent = yield* send(actor, step, back.value.action, unit, how)
-        pressed = { kind: "redo", sent, answer, undid: "taken", rows: A.map(unit, (w) => w.row) }
-        let done: Done
-        let taken: UndoStep
-        if (answer) {
-          decisions = out.state.decisions
-          touch = { ...touch, ...back.value.after }
-          taken = O.getOrElse(A.head(out.state.undo), () => mirror.value)
-          done = {
-            action: back.value.action,
-            unit,
-            sent,
-            prior: O.getOrElse(back.value.expect, () => ({})),
-            after: back.value.after
+      yield* O.match(O.all([A.last(person.redo), A.last(person.steps.redo)]), {
+        onNone: () => Effect.void,
+        onSome: Effect.fnUntraced(function* ([back, mirror]) {
+          const answer = stands(rowsOf(mirror), back.expect)
+          const out = actOn({ undo: [], redo: [mirror] }, action)
+          // A redo is a new act. "same": the undone unit's own rows and patches, on the decisions as they are now.
+          const unit =
+            how.redo === "same" ? back.unit : patchesFor({ views: shown.views, decisions, action: back.action })
+          const sent = yield* send(actor, step, back.action, unit, how)
+          pressed = { kind: "redo", sent, answer, undid: "taken", rows: A.map(unit, (w) => w.row) }
+          let done: Done
+          let taken: UndoStep
+          if (answer) {
+            decisions = out.state.decisions
+            touch = { ...touch, ...back.after }
+            taken = O.getOrElse(A.head(out.state.undo), () => mirror)
+            done = {
+              action: back.action,
+              unit,
+              sent,
+              prior: O.getOrElse(back.expect, () => ({})),
+              after: back.after
+            }
+          } else {
+            const before = follow([])
+            taken = stepFrom(
+              before,
+              A.map(unit, (w) => w.row)
+            )
+            const touched = touchStep(taken, before)
+            done = { action: back.action, unit, sent, ...touched }
           }
-        } else {
-          const before = follow([])
-          taken = stepFrom(
-            before,
-            A.map(unit, (w) => w.row)
-          )
-          const touched = touchStep(taken, before)
-          done = { action: back.value.action, unit, sent, ...touched }
-        }
-        people = R.set(people, actor.memberId, {
-          undo: A.append(person.undo, done),
-          redo: A.dropRight(person.redo, 1),
-          steps: { undo: A.append(person.steps.undo, taken), redo: A.dropRight(person.steps.redo, 1) }
+          people = R.set(people, actor.memberId, {
+            undo: A.append(person.undo, done),
+            redo: A.dropRight(person.redo, 1),
+            steps: { undo: A.append(person.steps.undo, taken), redo: A.dropRight(person.steps.redo, 1) }
+          })
         })
-      }
+      })
     } else {
       const unit = patchesFor({ views: shown.views, decisions, action })
       const out = actOn(nobody.steps, action)
@@ -1326,15 +1351,14 @@ const liveReview = (input: {
       const before = decisions
       decisions = out.state.decisions
       // `act` takes a step only when it wrote a row, and only then starts a new future.
-      const taken = A.head(out.state.undo)
-      if (O.isSome(taken)) {
-        const touched = touchStep(taken.value, before)
+      O.map(A.head(out.state.undo), (taken) => {
+        const touched = touchStep(taken, before)
         people = R.set(people, actor.memberId, {
           undo: A.append(person.undo, { action, unit, sent, ...touched }),
           redo: [],
-          steps: { undo: A.append(person.steps.undo, taken.value), redo: [] }
+          steps: { undo: A.append(person.steps.undo, taken), redo: [] }
         })
-      }
+      })
     }
     input.side.mark()
     const held = yield* textsOf(toServerDecisions(saved(stateOf(nobody.steps))))
@@ -1381,7 +1405,11 @@ const flagsOf = (decisions: Readonly<Record<string, ReviewDecision>>) => R.map(d
 const typedSku = ReviewDecision.make({ edits: { sku: "HB-8" } })
 const typeUom = (value: string) => Patch.cases.edit.make({ kind: "edit", column: "uom", value })
 const acceptUom = Patch.cases.accept.make({ kind: "accept", column: "uom", lift: false })
-const groupOf = (change: number, parts: ReadonlyArray<Part>, undoneAt = 0): GroupUnit => ({ change, undoneAt, parts })
+const groupOf = (change: number, parts: ReadonlyArray<Part>, undoneAt: number): GroupUnit => ({
+  change,
+  undoneAt,
+  parts
+})
 
 it("the fold: a row's own decision is what it reads as when no group is over it", () => {
   const instances: Instances = { own: { "row-1": { change: 3, decision: typedSku } }, groups: [] }
@@ -1391,7 +1419,7 @@ it("the fold: a row's own decision is what it reads as when no group is over it"
 it("the fold: a group in force over a row applies its patch, to a row with no decision of its own too", () => {
   const instances: Instances = {
     own: { "row-1": { change: 3, decision: typedSku } },
-    groups: [groupOf(5, [{ patch: acceptUom, rows: ["row-1", "row-2"] }])]
+    groups: [groupOf(5, [{ patch: acceptUom, rows: ["row-1", "row-2"] }], 0)]
   }
   expect(flagsOf(fold(instances))).toEqual({
     "row-1": { accepted: ["uom"], edits: { sku: "HB-8" } },
@@ -1410,13 +1438,13 @@ it("the fold: a group taken back gives no row anything", () => {
 it("the fold: a row decided after a group keeps its whole decision; the group stays on its other rows", () => {
   const instances: Instances = {
     own: { "row-1": { change: 7, decision: ReviewDecision.make({ edits: { uom: "KG" } }) } },
-    groups: [groupOf(5, [{ patch: typeUom("EA"), rows: ["row-1", "row-2"] }])]
+    groups: [groupOf(5, [{ patch: typeUom("EA"), rows: ["row-1", "row-2"] }], 0)]
   }
   expect(flagsOf(fold(instances))).toEqual({ "row-1": { edits: { uom: "KG" } }, "row-2": { edits: { uom: "EA" } } })
 })
 
 it("the fold: of two groups over a row the later is laid over the earlier, and its undo uncovers the earlier", () => {
-  const earlier = groupOf(5, [{ patch: typeUom("EA"), rows: ["row-1"] }])
+  const earlier = groupOf(5, [{ patch: typeUom("EA"), rows: ["row-1"] }], 0)
   const later = (undoneAt: number) => groupOf(8, [{ patch: typeUom("KG"), rows: ["row-1"] }], undoneAt)
   // Listed out of order on purpose: the fold orders groups by their number, not by how they are read back.
   expect(flagsOf(fold({ own: {}, groups: [later(0), earlier] }))).toEqual({ "row-1": { edits: { uom: "KG" } } })
@@ -1427,8 +1455,13 @@ it("the fold: of two groups over a row the later is laid over the earlier, and i
 // saved decision names only fields, so made-up columns would be refused where the fold saves them.
 const [fieldProposed, fieldTyped, fieldApplied] = fields
 const why = Why.make({ basis: "the file's other rows" })
-const unitFix = (column: string, to: string, group?: string) =>
-  Fix.make({ column, to, kind: "unit", confidence: O.none(), ...(group === undefined ? {} : { group }), why })
+const unitFix = (column: string, to: string, group: O.Option<string>) => {
+  const fields = { column, to, kind: "unit", confidence: O.none(), why }
+  return O.match(group, {
+    onNone: () => Fix.make(fields),
+    onSome: (group) => Fix.make({ ...fields, group })
+  })
+}
 const plainRow = (id: string, line: number) =>
   ReviewRow.make({ id, line, cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" } })
 const groupedRow = (id: string, line: number, to: string) =>
@@ -1436,7 +1469,7 @@ const groupedRow = (id: string, line: number, to: string) =>
     id,
     line,
     cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
-    problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, to, "g") })
+    problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, to, O.some("g")) })
   })
 
 it.effect("the fold equals `act` on a group only when the group's rows are split by exactly what each got", () =>
@@ -1450,8 +1483,8 @@ it.effect("the fold equals `act` on a group only when the group's rows are split
     const split = partsOf(unit)
     expect(split.length).toBe(2)
     const one: ReadonlyArray<Part> = A.map(A.take(split, 1), (part) => ({ ...part, rows: A.map(unit, (w) => w.row) }))
-    const splitByPatch = yield* regionTexts(fold({ own: {}, groups: [groupOf(1, split)] }))
-    const onePatch = yield* regionTexts(fold({ own: {}, groups: [groupOf(1, one)] }))
+    const splitByPatch = yield* regionTexts(fold({ own: {}, groups: [groupOf(1, split, 0)] }))
+    const onePatch = yield* regionTexts(fold({ own: {}, groups: [groupOf(1, one, 0)] }))
     expect(splitByPatch).toEqual(acted)
     expect(onePatch).not.toEqual(acted)
   })
@@ -1492,19 +1525,30 @@ const rowPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> =>
     return [
       ...(view.status === "needs" || view.status === "ready" ? [{ type: "leaveOut" as const, rowIds: [id] }] : []),
       ...(view.status === "out" ? [{ type: "putBack" as const, rowId: id }] : []),
-      ...(view.status === "needs" && view.problem?.fix !== undefined
-        ? [{ type: "accept" as const, rowIds: [id] }]
-        : []),
-      ...(view.problem?.rivals !== undefined ? [{ type: "keep" as const, rowId: id }] : []),
-      ...(view.status === "needs" && column !== undefined
-        ? A.map(
-            A.append(
-              A.map(view.problem?.choices ?? [], (choice) => choice.value),
-              "ZZZ-9999"
-            ),
-            (value) => ({ type: "edit" as const, rowId: id, column, value })
-          )
-        : []),
+      ...O.match(O.fromUndefinedOr(view.problem?.fix), {
+        onNone: A.empty,
+        onSome: () => (view.status === "needs" ? [{ type: "accept" as const, rowIds: [id] }] : [])
+      }),
+      ...O.match(O.fromUndefinedOr(view.problem?.rivals), {
+        onNone: A.empty,
+        onSome: () => [{ type: "keep" as const, rowId: id }]
+      }),
+      ...O.match(O.fromUndefinedOr(column), {
+        onNone: A.empty,
+        onSome: (column) =>
+          view.status === "needs"
+            ? A.map(
+                A.append(
+                  A.map(
+                    O.match(O.fromUndefinedOr(view.problem?.choices), { onNone: A.empty, onSome: identity }),
+                    (choice) => choice.value
+                  ),
+                  "ZZZ-9999"
+                ),
+                (value) => ({ type: "edit" as const, rowId: id, column, value })
+              )
+            : []
+      }),
       ...A.map(R.keys(view.marks), (marked) => ({
         type: "revert" as const,
         rowId: id,
@@ -1521,7 +1565,7 @@ const rowPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> =>
 const groupPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> => {
   const busy = A.take(views, BUSY_ROWS)
   const open = A.filter(busy, (view) => view.status === "needs" || view.status === "ready")
-  const fixable = A.filter(busy, (view) => view.status === "needs" && view.problem?.fix !== undefined)
+  const fixable = A.filter(busy, (view) => view.status === "needs" && O.isSome(O.fromUndefinedOr(view.problem?.fix)))
   return [
     ...(open.length > 1 ? [{ type: "leaveOut" as const, rowIds: A.map(A.take(open, 3), (view) => view.row.id) }] : []),
     ...(fixable.length > 1
@@ -1546,7 +1590,7 @@ const pressFor = (
   pick: number,
   history: Person["steps"],
   views: ReadonlyArray<RowView>,
-  focus: ReadonlyArray<string> = []
+  focus: ReadonlyArray<string>
 ): O.Option<Action> => {
   const turn = pick % 100
   if (turn < 30 && A.isReadonlyArrayNonEmpty(history.undo)) return O.some({ type: "undo" as const })
@@ -1644,11 +1688,14 @@ const howFor = (pick: number, people: "one" | "two"): How => ({
  * change", nothing is recorded, and the screen catches up and sends it again.
  * `touching` is the reference's: which steps count as naming a row.
  */
+const walkStart: { readonly people: "one" | "two"; readonly touching: "named" | "changed" } = {
+  people: "one",
+  touching: "named"
+}
 const walk = Effect.fnUntraced(function* (
   table: StagedTable,
   picks: ReadonlyArray<number>,
-  people: "one" | "two" = "one",
-  touching: "named" | "changed" = "named"
+  { people, touching }: { readonly people: "one" | "two"; readonly touching: "named" | "changed" }
 ) {
   const screen = messy(table)
   // With rule fixes in force a review starts with no decision, as every row of the model does.
@@ -1804,7 +1851,7 @@ it.effect.prop(
   ({ picks, presses }) =>
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
-      const walked = yield* walk(table, A.take(picks, presses))
+      const walked = yield* walk(table, A.take(picks, presses), walkStart)
       runs += 1
       shortest = Math.min(shortest, presses)
       longest = Math.max(longest, presses)
@@ -1861,7 +1908,7 @@ it.effect.prop(
   ({ picks, presses }) =>
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
-      const walked = yield* walk(table, A.take(picks, presses), "two")
+      const walked = yield* walk(table, A.take(picks, presses), { ...walkStart, people: "two" })
       twoRuns += 1
       twoTally = addUp(twoTally, walked)
       // The story names each refusal exactly (GroupedAfter with the group in force, NotYourStep, and for a screen
@@ -1953,7 +2000,7 @@ it.effect.prop(
   ({ picks, presses }) =>
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
-      const walked = yield* walk(table, A.take(picks, presses), "two", "changed")
+      const walked = yield* walk(table, A.take(picks, presses), { people: "two", touching: "changed" })
       changedRuns += 1
       changedTally = addUp(changedTally, walked)
       expect(walked.apart).toEqual([])
@@ -1981,7 +2028,7 @@ const twoOn = Effect.fnUntraced(function* (
   rows: ReadonlyArray<ReviewRow>,
   presses: ReadonlyArray<readonly [Actor, Action]>,
   how: How,
-  touching: "named" | "changed" = "named"
+  touching: "named" | "changed"
 ) {
   const side = modelSide({ rows: rows.length, first: dana })
   const live = liveReview({ side, rows: () => rows, recheck: undefined, touching })
@@ -1992,7 +2039,7 @@ const twoOn = Effect.fnUntraced(function* (
   const instances = yield* decoded(read)
   return {
     translation: live.apart,
-    answered: O.isSome(O.getOrElse(A.last(live.expected), () => O.none())),
+    answered: O.exists(A.last(live.expected), O.isSome),
     last: A.filter(apart, (line) => Str.startsWith(`press ${presses.length - 1},`)(line)),
     // What each row reads as on the model after the last press, and each group act as the model holds it.
     folded: flagsOf(fold(instances)),
@@ -2014,9 +2061,9 @@ it.effect(
         // `act`'s redo leaves row-2 out again, and row-1 stays in, as Ana put it back.
         [dana, { type: "redo" }]
       ]
-      const again = yield* twoOn(rows, presses, { ...right, redo: "again" })
+      const again = yield* twoOn(rows, presses, { ...right, redo: "again" }, walkStart.touching)
       expect(again.last).toEqual([`press 4, row-1: the fold {"out":true}, act {}`])
-      const same = yield* twoOn(rows, presses, right)
+      const same = yield* twoOn(rows, presses, right, walkStart.touching)
       expect(same.last).toEqual([])
       for (const run of [again, same]) {
         expect(run.answered).toBe(true)
@@ -2039,7 +2086,7 @@ it.effect(
           id: "row-14",
           line: 14,
           cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
-          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", "g") })
+          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", O.some("g")) })
         })
       ]
       const presses: ReadonlyArray<readonly [Actor, Action]> = [
@@ -2047,7 +2094,7 @@ it.effect(
         [dana, { type: "edit", rowId: "row-14", column: fieldTyped, value: "KG" }],
         [ana, { type: "undo" }]
       ]
-      const run = yield* twoOn(rows, presses, right)
+      const run = yield* twoOn(rows, presses, right, walkStart.touching)
       // Ana's undo took the group out of force on the model (change 3), and the group's accept stays on row 14,
       // inside the decision Dana made over it.
       expect(A.map(run.groups, (group) => ({ change: group.change, undoneAt: group.undoneAt }))).toEqual([
@@ -2068,10 +2115,10 @@ it.effect("a row's undo from a screen that has not received an undo on the row i
   Effect.gen(function* () {
     const rows = [groupedRow("row-1", 1, "EA")]
     const side = modelSide({ rows: rows.length, first: dana })
-    const live = liveReview({ side, rows: () => rows, recheck: undefined })
-    yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" })
-    yield* live.press(ana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "LB" })
-    const anas = yield* live.press(ana, { type: "undo" })
+    const live = liveReview({ side, rows: () => rows, recheck: undefined, touching: walkStart.touching })
+    yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" }, right)
+    yield* live.press(ana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "LB" }, right)
+    const anas = yield* live.press(ana, { type: "undo" }, right)
     const danas = yield* live.press(dana, { type: "undo" }, { ...right, screen: "behindAll" })
     // The story asserts the refusal, UndoneSince naming Ana and the change her undo took back, and nothing new on
     // row-1 or the import, before the same undo sent with what the row holds is taken.
@@ -2094,15 +2141,15 @@ it.effect("a row's undo under a later group is refused naming the group, and tak
   Effect.gen(function* () {
     const rows = [groupedRow("row-1", 1, "EA"), groupedRow("row-2", 2, "EA")]
     const side = modelSide({ rows: rows.length, first: dana })
-    const live = liveReview({ side, rows: () => rows, recheck: undefined })
+    const live = liveReview({ side, rows: () => rows, recheck: undefined, touching: walkStart.touching })
     const changeOf = (sent: Sent): number =>
       Sent.$match(sent, { Nothing: () => 0, RowAct: ({ change }) => change, GroupAct: ({ change }) => change })
     // Dana types KG in row-1; Ana then sets the whole group to its proposal, row-1 included.
-    const typed = yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" })
-    const grouped = yield* live.press(ana, { type: "acceptGroup", groupId: "g", except: [] })
-    const refused = yield* live.press(dana, { type: "undo" })
-    const groupUndone = yield* live.press(ana, { type: "undo" })
-    const taken = yield* live.press(dana, { type: "undo" })
+    const typed = yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" }, right)
+    const grouped = yield* live.press(ana, { type: "acceptGroup", groupId: "g", except: [] }, right)
+    const refused = yield* live.press(dana, { type: "undo" }, right)
+    const groupUndone = yield* live.press(ana, { type: "undo" }, right)
+    const taken = yield* live.press(dana, { type: "undo" }, right)
     // The story asserts the refusal, GroupedAfter naming Ana's group, and nothing new on row-1 or the import.
     const apart = yield* verdict(side, live.expected)
     expect(changeOf(typed.sent)).toBe(1)
@@ -2121,7 +2168,10 @@ it.effect("a row's undo under a later group is refused naming the group, and tak
     // Once the group is taken back, the same undo is taken: row-1 holds nothing, and `act` says the same.
     const takenIn = yield* readAt(4)
     expect(flagsOf(fold(takenIn))).toEqual({})
-    expect(O.isSome(O.getOrElse(A.get(live.expected, 4), () => O.none()))).toBe(true)
+    assertSome(
+      O.map(O.flatten(A.get(live.expected, 4)), () => true),
+      true
+    )
     expect(apart).toEqual([])
     expect(live.apart).toEqual([])
   })
@@ -2136,8 +2186,8 @@ it.effect(
           id: "row-1",
           line: 1,
           cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
-          applied: [unitFix(fieldApplied, "X")],
-          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", "g") })
+          applied: [unitFix(fieldApplied, "X", O.none())],
+          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", O.some("g")) })
         })
       ]
       const presses: ReadonlyArray<readonly [Actor, Action]> = [

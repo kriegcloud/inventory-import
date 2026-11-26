@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // The CSV reader reads text in pieces so the upload screen can say how far it is. The rule that would hurt if wrong:
 // reading in pieces gives exactly the rows, Notes and delimiter of reading at once, wherever a piece ends (inside a
 // quoted line break, between \r and \n, on a doubled quote; csvDifferential.test.ts proves that over the corpus). And
@@ -34,7 +35,10 @@ describe("reading CSV text in pieces", () => {
               rows: rowsOf(report)
             })
           })
-          expect(done).toBeLessThanOrEqual(total ?? Infinity)
+          O.match(O.fromNullOr(total), {
+            onNone: () => expect(done).toBeLessThanOrEqual(Infinity),
+            onSome: (total) => expect(done).toBeLessThanOrEqual(total)
+          })
         }
         // Rows of the file: the heading and 40,000 rows, not the empty record after the last line break.
         const last = reports[reports.length - 1]

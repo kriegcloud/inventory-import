@@ -6,6 +6,7 @@ import { ImportId } from "@inventory/catalog-contract/Ids"
 import { rowsAbout, savedRows } from "@inventory/catalog-model/Upload"
 import { progressOf, rowsOf, UploadState } from "@inventory/catalog-web/UploadMachine"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 
@@ -25,7 +26,10 @@ describe("progress", () => {
     ({ read, about }) => {
       const { done, total } = progressOf({ state: reading(read, about) })
       expect(done).toBe(read)
-      if (total !== null) expect(done).toBeLessThanOrEqual(total)
+      O.match(O.fromNullOr(total), {
+        onNone: () => {},
+        onSome: (total) => expect(done).toBeLessThanOrEqual(total)
+      })
     }
   )
 
@@ -60,7 +64,10 @@ describe("progress", () => {
       const about = rowsAbout({ rowsRead: rows, charsRead: chars, charsTotal: total })
       const { done, total: shown } = progressOf({ state: reading(rows, about) })
       expect(shown).not.toBeNull()
-      expect(done).toBeLessThanOrEqual(shown ?? 0)
+      O.match(O.fromNullOr(shown), {
+        onNone: () => expect.fail("Expected the CSV row total"),
+        onSome: (total) => expect(done).toBeLessThanOrEqual(total)
+      })
     }
     expect(rowsAbout({ rowsRead: rows, charsRead: total, charsTotal: total })).toBe(rows)
   })

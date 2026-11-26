@@ -22,7 +22,7 @@ import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { ImportPage, readAgainWhenBack } from "../src/ImportPage.screen.tsx"
 import { followRemoval, importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
-import { memberOf, sessionStandIn } from "./support/session.ts"
+import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 const id = importNo(98)
 
@@ -61,10 +61,11 @@ const settle = Effect.sleep("30 millis")
 type Refusal = ImportNotFound | HttpApiError.InternalServerErrorProblem
 
 /** A page on one import, whose reads answer as the test says. */
-const world = (first?: Effect.Effect<ImportView, Refusal>) => {
-  const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+const pageStart = Effect.succeed(viewAt({ id, revision: 4, fileName: "items.csv", result: O.none() }))
+const world = (first: Effect.Effect<ImportView, Refusal>) => {
+  const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
   const server: { answer: Effect.Effect<ImportView, Refusal>; reads: number } = {
-    answer: first ?? Effect.succeed(viewAt({ id, revision: 4, fileName: "items.csv", result: O.none() })),
+    answer: first,
     reads: 0
   }
   const registry = registryFor({
@@ -119,7 +120,7 @@ const inStepBox = (html: string) =>
 describe("the import page", () => {
   it.live("keeps the step drawn, the same one, when a later read fails, also while it is asked once more", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(pageStart)
       yield* settle
       const before = yield* drawn(t.registry)
       expect([says(before), inStepBox(before)]).toEqual([["THE REVIEW"], true])
@@ -142,7 +143,7 @@ describe("the import page", () => {
 
   it.live("draws nothing from before for an import found gone, also while it is asked once more", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(pageStart)
       yield* settle
       t.server.answer = notFound
       importView(id).askAgain(t.registry)
@@ -167,7 +168,7 @@ describe("the import page", () => {
 
   it.live("follows the import being removed, and what could not be read being read again, on any of its steps", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(pageStart)
       yield* settle
       yield* drawn(t.registry)
       const follows = (atom: Atom.Atom<unknown>) => A.some(browser.mounted, (one) => one === atom)
@@ -183,7 +184,7 @@ describe("the import page", () => {
 
   it.live("reads what could not be read again by itself: online, or once the server has answered anything", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world(pageStart)
       t.registry.mount(readAgainWhenBack(id))
       yield* settle
       for (const back of [() => window.dispatchEvent(new Event("online")), () => serverAnswered(200)]) {

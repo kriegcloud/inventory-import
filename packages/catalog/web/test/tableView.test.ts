@@ -1,3 +1,4 @@
+import { assertDefined } from "@effect/vitest/utils"
 // The pure part of applying an assistant's answer: a request's changes land in the table's own state, removing one
 // change takes back only that change, and undoing the request puts the view back as it was before it.
 import { describe, expect, it } from "@effect/vitest"
@@ -13,21 +14,30 @@ import {
   type ViewState
 } from "@inventory/catalog-web/TableViewState"
 
-const column = (input: Partial<CatalogColumn> & Pick<CatalogColumn, "id" | "label" | "type">): CatalogColumn => ({
-  sortable: true,
-  hideable: true,
-  operators: [],
-  values: [],
-  ...input
-})
+const columnStart = { sortable: true, hideable: true, operators: [], values: [] }
+const column = (input: CatalogColumn): CatalogColumn => input
 
 /** The Records table's columns, as the page hands them over. */
 const records: ColumnCatalog = [
-  column({ id: "name", label: "Name", type: "text", hideable: false, operators: ["iLike", "notILike"] }),
-  column({ id: "code", label: "Code", type: "text", operators: ["iLike"] }),
-  column({ id: "unit", label: "Unit", type: "select", operators: ["inArray", "notInArray"], values: ["Each", "Box"] }),
-  column({ id: "price", label: "Price", type: "number", operators: ["lt", "gt", "isEmpty"] }),
-  column({ id: "note", label: "Note", type: "text", sortable: false, operators: ["iLike"] })
+  column({
+    ...columnStart,
+    id: "name",
+    label: "Name",
+    type: "text",
+    hideable: false,
+    operators: ["iLike", "notILike"]
+  }),
+  column({ ...columnStart, id: "code", label: "Code", type: "text", operators: ["iLike"] }),
+  column({
+    ...columnStart,
+    id: "unit",
+    label: "Unit",
+    type: "select",
+    operators: ["inArray", "notInArray"],
+    values: ["Each", "Box"]
+  }),
+  column({ ...columnStart, id: "price", label: "Price", type: "number", operators: ["lt", "gt", "isEmpty"] }),
+  column({ ...columnStart, id: "note", label: "Note", type: "text", sortable: false, operators: ["iLike"] })
 ]
 
 const opened: ViewState = { sorting: [], filters: [], visibility: { note: false }, search: "" }
@@ -64,7 +74,9 @@ describe("applying an answer to a table's view", () => {
 
   it("removing one change takes back only that one; undoing the request ends where it started", () => {
     const after = applyAll({ state: before, changes, columns: records, opened })
-    const withoutFilter = revert(after.state, after.patches[1] ?? {})
+    const filterPatch = after.patches[1]
+    assertDefined(filterPatch)
+    const withoutFilter = revert(after.state, filterPatch)
     expect(withoutFilter.filters).toEqual(before.filters)
     expect(withoutFilter.sorting).toEqual([{ id: "name", desc: true }])
     expect(withoutFilter.visibility).toEqual({ note: true })
@@ -90,7 +102,9 @@ describe("a search the assistant puts in the box", () => {
     const after = applyAll({ state: searching, changes: [search], columns: records, opened })
     expect(after.state.search).toBe("steel brackets")
     expect(say(records, search)).toBe("Searched for “steel brackets”")
-    expect(revert(after.state, after.patches[0] ?? {})).toEqual(searching)
+    const searchPatch = after.patches[0]
+    assertDefined(searchPatch)
+    expect(revert(after.state, searchPatch)).toEqual(searching)
     const cleared = applyAll({
       state: after.state,
       changes: [{ kind: "clear", what: "everything" }],
@@ -120,12 +134,14 @@ describe("taking a change back", () => {
     const byCode: ViewChange = { kind: "sort", column: "code", direction: "desc" }
     const first = applyAll({ state: opened, changes: [byName], columns: records, opened })
     const second = applyAll({ state: first.state, changes: [byCode], columns: records, opened })
-    const removedFirst = { change: byName, patch: first.patches[0] ?? {}, removed: true }
-    const back = takeBack(second.state, { change: byCode, patch: second.patches[0] ?? {}, removed: false }, [
-      removedFirst
-    ])
+    const firstPatch = first.patches[0]
+    const secondPatch = second.patches[0]
+    assertDefined(firstPatch)
+    assertDefined(secondPatch)
+    const removedFirst = { change: byName, patch: firstPatch, removed: true }
+    const back = takeBack(second.state, { change: byCode, patch: secondPatch, removed: false }, [removedFirst])
     expect(back.sorting).toEqual([])
-    const kept = takeBack(second.state, { change: byCode, patch: second.patches[0] ?? {}, removed: false }, [
+    const kept = takeBack(second.state, { change: byCode, patch: secondPatch, removed: false }, [
       { ...removedFirst, removed: false }
     ])
     expect(kept.sorting).toEqual([{ id: "name", desc: false }])

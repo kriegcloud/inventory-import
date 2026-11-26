@@ -24,7 +24,7 @@ import { ReadMessage, type PlainHead } from "../src/internal/protocol.ts"
 import { UploadState } from "../src/Upload.machine.ts"
 import { startUpload, UploadEnd, uploadState } from "../src/Upload.controller.ts"
 import { importId, registryFor, viewAt } from "./support/catalog.ts"
-import { memberOf, sessionStandIn } from "./support/session.ts"
+import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its window, the reader's worker (the test says what it has read), and what is asked of the server as the
 // page goes.
@@ -80,7 +80,7 @@ const head = {
 
 /** A page on which Dana has chosen a file: the server takes each step, or not until the test says. */
 const world = () => {
-  const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+  const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
   const sent: Array<string> = []
   const finished = Deferred.makeUnsafe<Result.Result<ImportView, FileProblem>>()
   const step = <A>(name: string, answer: A) =>
@@ -123,7 +123,9 @@ const world = () => {
     session.choose("org_northline")
     registry.refresh(session.signedIn)
     yield* settle
-    yield* session.answer(memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" }))
+    yield* session.answer(
+      memberOf({ ...memberStart, id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
+    )
     yield* settle
   })
   const state = () => registry.get(uploadState)
@@ -141,7 +143,7 @@ describe("an upload", () => {
       t.chunk(0)
       yield* settle
       expect(t.sent).toEqual(["begin"])
-      yield* t.session.answer(memberOf({ id: "mem_dana" }))
+      yield* t.session.answer(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
       yield* settle
       expect(t.sent).toEqual(["begin", "chunk"])
       t.says(ReadMessage.Crashed({ message: "Enough." }))
@@ -158,7 +160,7 @@ describe("an upload", () => {
       yield* settle
       t.chunk(0)
       t.chunk(1)
-      yield* t.session.answer(memberOf({ id: "mem_marcus" }))
+      yield* t.session.answer(memberOf({ ...memberStart, account: "mem_marcus", id: "mem_marcus" }))
       yield* settle
       // The app leaves the page: what the page asks as it goes would be asked as Marcus.
       window.dispatchEvent(new Event(leavingApp))

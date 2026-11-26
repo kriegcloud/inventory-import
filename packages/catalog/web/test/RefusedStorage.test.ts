@@ -10,7 +10,7 @@ import { askBeforeLeaving, takeUpGoneTabs } from "../src/Draft.atoms.ts"
 import { emptyConversation, readConversation, writeConversation } from "../src/Conversation.machine.ts"
 import { leaveTakenUp, notices } from "../src/Notices.atoms.ts"
 import { importId, registryFor } from "./support/catalog.ts"
-import { memberOf } from "./support/session.ts"
+import { memberStart, memberOf } from "./support/session.ts"
 
 const refused = (): never => {
   throw new DOMException("The operation is insecure.", "SecurityError")
@@ -52,7 +52,7 @@ const inWindow = (storage: () => unknown) => {
   vi.stubGlobal("navigator", {})
 }
 
-const dana = memberOf({ id: "mem_dana" })
+const dana = memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" })
 
 describe.each(windows)("when %s", (_, { storage }) => {
   it("the table assistant's conversation starts empty, and a write is dropped", () => {

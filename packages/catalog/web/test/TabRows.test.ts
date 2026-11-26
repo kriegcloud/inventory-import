@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 // Two tabs of one person on one import (Benjamin, 2026-11-20, "Each tab keeps its own"): each keeps and sends only
 // its own waiting rows, a tab opened later takes up rows only from a tab that is gone (closed or crashed), never from
 // one still open, and no tab writes over or erases another tab's entry. Each tab is a page of its own: here, the
@@ -77,7 +78,7 @@ const browser = vi.hoisted(() => {
       localStorage: storage(() => kept),
       sessionStorage: storage(() => session.now),
       addEventListener: (name: string, listener: (event: unknown) => void) => {
-        listeners[name] = [...(listeners[name] ?? []), listener]
+        listeners[name] = [...O.match(R.get(listeners, name), { onNone: A.empty, onSome: identity }), listener]
       },
       removeEventListener: () => undefined
     }
@@ -158,7 +159,7 @@ const entriesOf = (id: ImportId) => R.filter(browser.kept, (_value, key) => Str.
  * A tab: the app's modules loaded afresh, with this tab's own storage (empty for a new tab, kept for a reload). As the
  * app does at page start, it reads its id and holds its lock, whoever is signed in (`signedIn` none: the sign-in page).
  */
-const tab = (own: Record<string, string> = {}, signedIn: O.Option<Member> = dana) =>
+const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
   Effect.promise(() => {
     vi.resetModules()
     browser.session.now = own
@@ -227,7 +228,7 @@ const tab = (own: Record<string, string> = {}, signedIn: O.Option<Member> = dana
           registry.mount(review.reviewLocal(id))
           return registry.mount(review.followDraft(id))
         },
-        decide: (id: ImportId, rowId: string, to = out) =>
+        decide: (id: ImportId, rowId: string, to: typeof out) =>
           registry.set(review.draftEvents(id), machine.DraftEvent.Decided({ changes: { [rowId]: O.some(to) } })),
         /** The lines above the review, each row's: its sides, as decision and whether this tab's, and theirs. */
         lines: (id: ImportId) =>
@@ -249,7 +250,10 @@ const tab = (own: Record<string, string> = {}, signedIn: O.Option<Member> = dana
         asks: () => {
           registry.mount(drafts.askBeforeLeaving)
           let asked = false
-          for (const listener of browser.listeners["beforeunload"] ?? []) {
+          for (const listener of O.match(R.get(browser.listeners, "beforeunload"), {
+            onNone: A.empty,
+            onSome: identity
+          })) {
             listener({
               preventDefault: () => {
                 asked = true
@@ -289,18 +293,18 @@ describe("two tabs of one person", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a1" as ImportId
-      const first = yield* tab()
+      const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
       yield* settle
-      first.decide(id, "row-2")
+      first.decide(id, "row-2", out)
       yield* settle
-      const second = yield* tab()
+      const second = yield* tab({}, dana)
       yield* settle
       expect(second.id).not.toBe(first.id)
       second.open(id)
       yield* settle
-      second.decide(id, "row-3")
+      second.decide(id, "row-3", out)
       yield* settle
       // Two entries, each with its own tab's row: neither replaced the other.
       const kept = R.values(entriesOf(id))
@@ -320,14 +324,14 @@ describe("two tabs of one person", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a2" as ImportId
-      const first = yield* tab()
+      const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
       yield* settle
-      first.decide(id, "row-2")
+      first.decide(id, "row-2", out)
       yield* settle
       // The first tab is still open: a new tab sends nothing of its rows, and leaves its entry.
-      const second = yield* tab()
+      const second = yield* tab({}, dana)
       yield* settle
       second.open(id)
       yield* settle
@@ -336,7 +340,7 @@ describe("two tabs of one person", () => {
       // the server has it now (nobody decided it otherwise), sends it, and its entry goes.
       const firstId = first.id
       first.close()
-      const third = yield* tab()
+      const third = yield* tab({}, dana)
       yield* settle
       third.open(id)
       yield* settle
@@ -354,17 +358,17 @@ describe("two tabs of one person", () => {
       Effect.gen(function* () {
         freshServer()
         const id = "00000000-0000-4000-8000-0000000000a4" as ImportId
-        const gone = yield* tab()
+        const gone = yield* tab({}, dana)
         yield* settle
         gone.open(id)
         yield* settle
-        gone.decide(id, "row-5")
+        gone.decide(id, "row-5", out)
         yield* settle
         gone.close()
         // Marcus keeps row 5: the server is at revision 5.
         browser.server.revision = 5
         browser.server.decisions = { "row-5": kept }
-        const later = yield* tab()
+        const later = yield* tab({}, dana)
         yield* settle
         later.open(id)
         yield* settle
@@ -379,15 +383,15 @@ describe("two tabs of one person", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a5" as ImportId
-      const gone = yield* tab()
+      const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
       yield* settle
-      gone.decide(id, "row-2")
+      gone.decide(id, "row-2", out)
       yield* settle
       gone.close()
-      const one = yield* tab()
-      const other = yield* tab()
+      const one = yield* tab({}, dana)
+      const other = yield* tab({}, dana)
       yield* settle
       // Opened at the same moment, before either has done anything with what it found.
       one.open(id)
@@ -405,13 +409,13 @@ describe("two tabs of one person", () => {
       Effect.gen(function* () {
         freshServer()
         const id = "00000000-0000-4000-8000-0000000000a6" as ImportId
-        const first = yield* tab()
+        const first = yield* tab({}, dana)
         yield* settle
         first.open(id)
         yield* settle
         first.decide(id, "row-12", out)
         yield* settle
-        const second = yield* tab()
+        const second = yield* tab({}, dana)
         yield* settle
         const leave = second.open(id)
         yield* settle
@@ -437,17 +441,17 @@ describe("two tabs of one person", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a7" as ImportId
-      const gone = yield* tab()
+      const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
       yield* settle
-      gone.decide(id, "row-7")
+      gone.decide(id, "row-7", out)
       yield* settle
       gone.close()
       // Somebody confirmed the import without row 7.
       browser.server.revision = 5
       browser.closed = true
-      const result = yield* tab()
+      const result = yield* tab({}, dana)
       yield* settle
       result.open(id)
       yield* settle
@@ -459,9 +463,9 @@ describe("two tabs of one person", () => {
 
   it.live("a copy of an open tab (its storage copied, the id with it) takes an id of its own", () =>
     Effect.gen(function* () {
-      const first = yield* tab()
+      const first = yield* tab({}, dana)
       yield* settle
-      const copy = yield* tab({ ...first.session })
+      const copy = yield* tab({ ...first.session }, dana)
       yield* settle
       expect(copy.id).not.toBe(first.id)
     })
@@ -471,14 +475,14 @@ describe("two tabs of one person", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a8" as ImportId
-      const first = yield* tab()
+      const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
       yield* settle
-      first.decide(id, "row-2")
+      first.decide(id, "row-2", out)
       yield* settle
       browser.listeners["beforeunload"] = []
-      const copy = yield* tab({ ...first.session })
+      const copy = yield* tab({ ...first.session }, dana)
       // The copy counts its rows as the page starts, before its lock has answered.
       expect(copy.asks()).toBe(false)
       yield* settle
@@ -490,17 +494,17 @@ describe("two tabs of one person", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a9" as ImportId
-      const first = yield* tab()
+      const first = yield* tab({}, dana)
       yield* settle
       first.open(id)
       yield* settle
-      first.decide(id, "row-2")
+      first.decide(id, "row-2", out)
       yield* settle
       // Signed out: the tab loads the sign-in page, the same tab, and nobody is signed in there.
       first.close()
       const signInPage = yield* tab(first.session, O.none())
       yield* settle
-      const other = yield* tab()
+      const other = yield* tab({}, dana)
       yield* settle
       other.open(id)
       yield* settle
@@ -516,26 +520,26 @@ describe("a tab taken up from that comes back", () => {
       Effect.gen(function* () {
         freshServer()
         const id = "00000000-0000-4000-8000-0000000000c1" as ImportId
-        const gone = yield* tab()
+        const gone = yield* tab({}, dana)
         yield* settle
         gone.open(id)
         yield* settle
-        gone.decide(id, "row-2")
+        gone.decide(id, "row-2", out)
         yield* settle
         const goneSession = { ...gone.session }
         gone.close()
-        const later = yield* tab()
+        const later = yield* tab({}, dana)
         yield* settle
         const leave = later.open(id)
         yield* settle
         expect(A.map(later.saves, (save) => R.keys(save.set))).toEqual([["row-2"]])
         // The gone tab is loaded again (the same tab), decides row 3, and is closed again.
-        const back = yield* tab(goneSession)
+        const back = yield* tab(goneSession, dana)
         // Loaded while the take-up's claim lasts: it has its id, and reads what it kept, once that is let go.
         yield* Effect.sleep("600 millis")
         back.open(id)
         yield* settle
-        back.decide(id, "row-3")
+        back.decide(id, "row-3", out)
         yield* settle
         back.close()
         yield* Effect.sleep("700 millis")
@@ -574,16 +578,16 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       Effect.gen(function* () {
         freshServer()
         const id = "00000000-0000-4000-8000-0000000000d1" as ImportId
-        const discarded = yield* tab()
+        const discarded = yield* tab({}, dana)
         yield* settle
         discarded.open(id)
         yield* settle
-        discarded.decide(id, "row-31")
-        discarded.decide(id, "row-12")
+        discarded.decide(id, "row-31", out)
+        discarded.decide(id, "row-12", out)
         yield* settle
         const session = discarded.session
         discarded.close()
-        const taker = yield* tab()
+        const taker = yield* tab({}, dana)
         yield* settle
         taker.open(id)
         yield* settle
@@ -602,7 +606,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
         expect([asMarcus.id, asMarcus.says()]).toEqual([discarded.id, []])
         asMarcus.close()
         // Dana loads it: it says so, and it has nothing of them, on the screen, in the browser or on their way.
-        const back = yield* tab(session)
+        const back = yield* tab(session, dana)
         yield* settle
         expect([back.id, back.says()]).toEqual([discarded.id, [taken12And31]])
         back.open(id)
@@ -616,14 +620,14 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
         ])
         // Not dismissed: said again when it loads again. Dismissed: never again.
         back.close()
-        const again = yield* tab(session)
+        const again = yield* tab(session, dana)
         yield* settle
         expect(again.says()).toEqual([taken12And31])
         again.dismiss()
         yield* settle
         expect(again.says()).toEqual([])
         again.close()
-        const last = yield* tab(session)
+        const last = yield* tab(session, dana)
         yield* settle
         expect([last.says(), A.filter(R.keys(browser.kept), Str.endsWith(`notices%3A${last.id}`))]).toEqual([[], []])
       })
@@ -635,15 +639,15 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       Effect.gen(function* () {
         freshServer()
         const id = "00000000-0000-4000-8000-0000000000d2" as ImportId
-        const discarded = yield* tab()
+        const discarded = yield* tab({}, dana)
         yield* settle
         discarded.open(id)
         yield* settle
-        discarded.decide(id, "row-2")
+        discarded.decide(id, "row-2", out)
         yield* settle
         const session = discarded.session
         discarded.close()
-        const taker = yield* tab()
+        const taker = yield* tab({}, dana)
         yield* settle
         // The taker has asked the browser which locks are held (the discarded tab's is not), and has not read yet.
         const answer = Deferred.makeUnsafe<void>()
@@ -651,7 +655,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
         taker.open(id)
         yield* settle
         // The discarded tab loads at that moment, and its step is drawn.
-        const back = yield* tab(session)
+        const back = yield* tab(session, dana)
         back.open(id)
         yield* settle
         browser.gate.answer = undefined
@@ -677,17 +681,17 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       Effect.gen(function* () {
         freshServer()
         const id = "00000000-0000-4000-8000-0000000000d3" as ImportId
-        const discarded = yield* tab()
+        const discarded = yield* tab({}, dana)
         yield* settle
         discarded.open(id)
         yield* settle
-        discarded.decide(id, "row-2")
+        discarded.decide(id, "row-2", out)
         yield* settle
         const session = discarded.session
         discarded.close()
-        const taker = yield* tab()
+        const taker = yield* tab({}, dana)
         yield* settle
-        const back = yield* tab(session)
+        const back = yield* tab(session, dana)
         yield* settle
         taker.open(id)
         back.open(id)
@@ -709,14 +713,14 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       browser.kept[record("old")] = left(now - 31 * day)
       browser.kept["progress:v1:org_prairie:mem_marcus:notices%3Atheirs"] = left(now - 31 * day)
       const id = "00000000-0000-4000-8000-0000000000d4" as ImportId
-      const gone = yield* tab()
+      const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
       yield* settle
-      gone.decide(id, "row-2")
+      gone.decide(id, "row-2", out)
       yield* settle
       gone.close()
-      const taker = yield* tab()
+      const taker = yield* tab({}, dana)
       yield* settle
       taker.open(id)
       yield* settle
@@ -733,10 +737,10 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       // Fewer than twenty: one from longer ago than a month still goes when the next is left.
       for (const n of A.range(1, 30)) delete browser.kept[record(`tab-${n}`)]
       browser.kept[record("old")] = left(now - 31 * day)
-      taker.decide(id, "row-5")
+      taker.decide(id, "row-5", out)
       yield* settle
       taker.close()
-      const next = yield* tab()
+      const next = yield* tab({}, dana)
       yield* settle
       next.open(id)
       yield* settle
@@ -751,15 +755,15 @@ describe("a step drawn before this tab's id is its own", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000c2" as ImportId
-      const before = yield* tab()
+      const before = yield* tab({}, dana)
       yield* settle
       before.open(id)
       yield* settle
-      before.decide(id, "row-2")
+      before.decide(id, "row-2", out)
       yield* settle
       before.close()
       // The reload draws the step at once, before the tab's lock has answered.
-      const after = yield* tab(before.session)
+      const after = yield* tab(before.session, dana)
       after.open(id)
       yield* settle
       // The row kept came back, was checked by an answer of the import, and was sent.
@@ -776,10 +780,10 @@ describe("a step drawn before this tab's id is its own", () => {
       // Another tab is in the middle of taking up what this one kept for some import: its id waits for that.
       const over = Deferred.makeUnsafe<void>()
       void navigator.locks.request("inventory-taking:tab-early", { mode: "shared" }, () => held(over))
-      const early = yield* tab({ "inventory:tab": "tab-early" })
+      const early = yield* tab({ "inventory:tab": "tab-early" }, dana)
       early.open(id)
       yield* settle
-      early.decide(id, "row-2")
+      early.decide(id, "row-2", out)
       yield* settle
       expect([early.id, R.keys(entriesOf(id))]).toEqual(["", []])
       yield* Deferred.succeed(over, undefined)
@@ -796,23 +800,23 @@ describe("an import removed", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000b1" as ImportId
-      const gone = yield* tab()
+      const gone = yield* tab({}, dana)
       yield* settle
       gone.open(id)
       yield* settle
-      gone.decide(id, "row-2")
+      gone.decide(id, "row-2", out)
       yield* settle
       // Another tab has its own row of the import, opened while the first was still open (it took nothing up).
-      const open = yield* tab()
+      const open = yield* tab({}, dana)
       yield* settle
       open.open(id)
       yield* settle
-      open.decide(id, "row-3")
+      open.decide(id, "row-3", out)
       yield* settle
       const goneId = gone.id
       gone.close()
       // A third tab removes the import before taking anything up.
-      const remover = yield* tab()
+      const remover = yield* tab({}, dana)
       yield* settle
       remover.remove(id)
       yield* settle
@@ -826,18 +830,18 @@ describe("an import removed", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000b2" as ImportId
-      const open = yield* tab()
+      const open = yield* tab({}, dana)
       yield* settle
       open.open(id)
       yield* settle
-      open.decide(id, "row-3")
+      open.decide(id, "row-3", out)
       yield* settle
       // Another tab opened meanwhile decides row 12 otherwise than nobody, and row 3 otherwise; then it is closed.
-      const closed = yield* tab()
+      const closed = yield* tab({}, dana)
       yield* settle
       closed.open(id)
       yield* settle
-      closed.decide(id, "row-12")
+      closed.decide(id, "row-12", out)
       closed.decide(id, "row-3", kept)
       yield* settle
       closed.close()
@@ -860,15 +864,15 @@ describe("an import opened by its address and found removed", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000b3" as ImportId
-      const closed = yield* tab()
+      const closed = yield* tab({}, dana)
       yield* settle
       closed.open(id)
       yield* settle
-      closed.decide(id, "row-12")
+      closed.decide(id, "row-12", out)
       yield* settle
       closed.close()
       browser.server.removed = true
-      const later = yield* tab()
+      const later = yield* tab({}, dana)
       yield* settle
       later.openAddress(id)
       yield* settle
@@ -883,7 +887,7 @@ describe("an import opened by its address and found removed", () => {
 describe("one tab", () => {
   it.live("keeps one id for its life: the leave question drawn afresh asks for no lock again", () =>
     Effect.gen(function* () {
-      const one = yield* tab()
+      const one = yield* tab({}, dana)
       yield* settle
       const before = one.id
       const stop = one.mountsAskAgain()
@@ -902,16 +906,16 @@ describe("after a reload", () => {
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000a3" as ImportId
-      const before = yield* tab()
+      const before = yield* tab({}, dana)
       yield* settle
       before.open(id)
       yield* settle
-      before.decide(id, "row-2")
+      before.decide(id, "row-2", out)
       yield* settle
       // The reload: the same tab (its own storage kept), on another page; its lock was let go with the old page.
       before.close()
       browser.listeners["beforeunload"] = []
-      const after = yield* tab(before.session)
+      const after = yield* tab(before.session, dana)
       yield* settle
       expect(after.id).toBe(before.id)
       expect(after.asks()).toBe(true)

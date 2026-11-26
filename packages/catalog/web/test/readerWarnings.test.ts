@@ -5,7 +5,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { readerWarnings, stageTable } from "@inventory/catalog-model/Staging"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
-import { built } from "./xlsxCorpus.ts"
+import { built, workbookStart } from "./xlsxCorpus.ts"
 
 const text = (ref: string) => (value: string) => `<c r="${ref}" t="inlineStr"><is><t>${value}</t></is></c>`
 const row = (r: number, cells: string) =>
@@ -21,7 +21,7 @@ describe("the reader's warnings shown on the Review step", () => {
     Effect.gen(function* () {
       const rows =
         row(2, `<c r="C2" s="1"><v>4</v></c><c r="D2" t="s"><v>900</v></c>`) + row(3, `<c r="C3" s="1"><v>5</v></c>`)
-      const bytes = yield* built({ sheet: sheetOf(heading + rows), codes: ["# ?/?"] })
+      const bytes = yield* built({ ...workbookStart, sheet: sheetOf(heading + rows), codes: ["# ?/?"] })
       const table = yield* staged(new File([bytes as Uint8Array<ArrayBuffer>], "stock.xlsx"))
       expect(kinds(table.notes)).toEqual(["unreadableCells", "formatNotShown"])
       const warnings = readerWarnings(table)

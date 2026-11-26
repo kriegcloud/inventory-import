@@ -1,3 +1,5 @@
+import { assertDefined } from "@effect/vitest/utils"
+import { identity } from "effect/Function"
 // What the review says must be true and must be enough to act on. Each test is a sentence that was wrong on a screen
 // built from this starter: a rule's suggestion called "a guess by the model", a row with no fix that said nothing
 // about why, rows nothing here can fix counted as decisions, an enabled import button that could do nothing, a table
@@ -9,7 +11,6 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as Str from "effect/String"
 import { firstDecisions, itemsOfRow, noHistory, review } from "@inventory/catalog-model/Review"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -55,7 +56,7 @@ const stage = (file: File): Effect.Effect<StagedTable> =>
   Effect.orDie(Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table })))
 
 // As the screen opens a file: the draft a new import starts with (the rules' own fixes held back as proposals).
-const sampleRows = (name = "items_messy.csv", storedItems: ReadonlyArray<ItemFields> = []) =>
+const sampleRows = (name: string, storedItems: ReadonlyArray<ItemFields>) =>
   Effect.map(stage(sample(name)), (table) => {
     const decisions = firstDecisions({ table, choices: [], mode: "propose", itemsOf: itemsOfRow })
     const current = review({ ...noHistory, table, choices: [], decisions, storedItems })
@@ -67,25 +68,23 @@ describe("who is behind a suggestion", () => {
     expect(sourceWordsFor("model").tip).toContain("model")
     for (const source of ["rule", "person", undefined] as const) {
       const words = sourceWordsFor(source)
-      expect(Str.toLowerCase(`${words.tag} ${words.hidden} ${words.tip}`)).not.toContain("model")
+      expect(`${words.tag} ${words.hidden} ${words.tip}`).not.toMatch(/model/i)
     }
     expect(sourceLead({ by: "rule", confidence: "low" })).toBe("Rule, low confidence")
     expect(sourceLead({ confidence: "low" })).toBe("Suggestion, low confidence")
   })
 
   it.effect("calls the sample's low-confidence date reading a rule's, never a model's", () =>
-    Effect.map(sampleRows(), ({ rows }) => {
+    Effect.map(sampleRows("items_messy.csv", []), ({ rows }) => {
       const fixes = A.flatMap(rows, (row) => [
-        ...(row.applied ?? []),
+        ...O.match(O.fromUndefinedOr(row.applied), { onNone: A.empty, onSome: identity }),
         ...(row.problem?.fix === undefined ? [] : [row.problem.fix])
       ])
       const questions = A.filter(fixes, (fix) => O.contains(fix.confidence, "low"))
       expect(questions.length).toBeGreaterThan(0)
       for (const fix of fixes) expect(fix.by).toBe("rule")
       for (const fix of questions)
-        expect(Str.toLowerCase(sourceLead({ by: fix.by, confidence: O.getOrUndefined(fix.confidence) }))).not.toContain(
-          "model"
-        )
+        expect(sourceLead({ by: fix.by, ...R.getSomes({ confidence: fix.confidence }) })).not.toMatch(/model/i)
     })
   )
 })
@@ -152,7 +151,7 @@ describe("an open import's card on the Upload step", () => {
 
 describe("every row says why", () => {
   it.effect("gives each row of the sample that is not ready a sentence, the row with no fix included", () =>
-    Effect.map(sampleRows(), ({ current, decisions, rows }) => {
+    Effect.map(sampleRows("items_messy.csv", []), ({ current, decisions, rows }) => {
       const views = viewRows({ rows, state: restored(toRegionDecisions(decisions)) })
       const kinds = kindsOf(regionKinds)
       const open = A.filter(views, (view) => view.status === "needs")
@@ -175,7 +174,7 @@ const kinds: ReadonlyArray<ProblemKind> = [
   ProblemKind.make({ id: "unknown", label: "Not in system", tone: "blocker", fixable: false })
 ]
 const columns: ReadonlyArray<ReviewColumn> = [ReviewColumn.make({ id: "name", label: "Name" })]
-const row = (line: number, extra: Partial<typeof ReviewRow.Encoded> = {}): ReviewRow =>
+const row = (line: number, extra: Partial<typeof ReviewRow.Encoded>): ReviewRow =>
   ReviewRow.make({
     id: `row-${line}`,
     line,
@@ -186,7 +185,7 @@ const unknownItem = (line: number) =>
   row(line, { problem: { kind: "unknown", reason: `Item ${line} is not in the system yet.` } })
 
 describe("rows that cannot be fixed here", () => {
-  const rows = [row(2), unknownItem(3), unknownItem(4), row(5, { problem: { kind: "unit", column: "name" } })]
+  const rows = [row(2, {}), unknownItem(3), unknownItem(4), row(5, { problem: { kind: "unit", column: "name" } })]
   const fixable = fixableBy(kinds)
   const views = viewRows({ rows, state: emptyState, fixable })
 
@@ -197,10 +196,9 @@ describe("rows that cannot be fixed here", () => {
     expect(decisionsLeft(views)).toBe(1)
     expect(A.map(visible({ views, filter: "cannot" }), (view) => view.row.line)).toEqual([3, 4])
     expect(A.map(visible({ views, filter: "needs" }), (view) => view.row.line)).toEqual([5])
-    const cannot = O.getOrUndefined(A.findFirst(views, (view) => view.row.line === 3))
-    expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
-      "Item 3 is not in the system yet."
-    )
+    const cannot = A.filter(views, (view) => view.row.line === 3)[0]
+    assertDefined(cannot)
+    expect(reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe("Item 3 is not in the system yet.")
     expect(
       act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] }, fixable }).label
     ).toBe("")
@@ -230,7 +228,7 @@ describe("a button that could do nothing is never offered", () => {
   it.effect("ends a second load of the same file on 'Nothing new' once every row is already there", () =>
     Effect.gen(function* () {
       // Every item of the clean sample is stored, as after a first import of every row.
-      const first = yield* sampleRows("items_clean.csv")
+      const first = yield* sampleRows("items_clean.csv", [])
       const items = A.flatMap(first.current.rows, (each) => A.fromOption(each.item))
       expect(items.length).toBe(25)
       const { rows } = yield* sampleRows("items_clean.csv", items)
@@ -246,7 +244,7 @@ describe("a button that could do nothing is never offered", () => {
 describe("status words", () => {
   it("are set once by the caller and said everywhere they show", () => {
     const words = reviewWords({ out: "Skipped", stored: "In stock already", needs: "Waiting on you" })
-    const rows = [row(2, { problem: { kind: "unit", column: "name" } }), row(3), row(4, { stored: true })]
+    const rows = [row(2, { problem: { kind: "unit", column: "name" } }), row(3, {}), row(4, { stored: true })]
     const left = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] } }).state
     const views = viewRows({ rows, state: left })
     const csv = heldCsv({ views, columns, problemKinds: kinds, words })
@@ -266,14 +264,14 @@ describe("status words", () => {
 describe("the table fits at 1440", () => {
   // At 1440 by 900 with the sidebar open the review's table has about 1,130 px, less the work list on Needs you.
   const room = 1134
-  const fit = (id: string, need: number, priority = 0): SizedColumn => ({
+  const fit = (id: string, need: number, priority: number): SizedColumn => ({
     id,
     size: "fit",
     need,
     priority,
     keep: false
   })
-  const fill = (id: string, need: number, priority = 0): SizedColumn => ({
+  const fill = (id: string, need: number, priority: number): SizedColumn => ({
     id,
     size: "fill",
     need,
@@ -283,16 +281,16 @@ describe("the table fits at 1440", () => {
 
   it("moves columns into the row's detail, a second description included, before it scrolls sideways", () => {
     const columns = [
-      { ...fill("name", 200), keep: true },
-      { ...fill("reason", 180), keep: true },
+      { ...fill("name", 200, 0), keep: true },
+      { ...fill("reason", 180, 0), keep: true },
       fill("description", 200, 1),
       fill("supplier", 200, 1),
       fit("part", 150, 2),
       fit("pack", 140, 1),
       fit("price", 110, 2),
-      fit("lead", 90),
-      fit("date", 110),
-      fill("note", 200)
+      fit("lead", 90, 0),
+      fit("date", 110, 0),
+      fill("note", 200, 0)
     ]
     const plan = planColumns({ columns, fixed: 360 + 120, room })
     expect(plan.scrolls).toBe(false)
@@ -345,13 +343,12 @@ describe("a cost, the dimensions and the vendors in the review", () => {
         current: review({ ...noHistory, table, choices: [], decisions: {}, storedItems: [] })
       })),
       ({ table, current }) => {
-        const cost = O.getOrUndefined(
-          A.findFirst(
-            regionColumns(current.mapping, current.unusedColumns, table),
-            (column) => column.id === "unitCost"
-          )
-        )
-        expect(cost?.unit).toBeUndefined()
+        const cost = A.filter(
+          regionColumns(current.mapping, current.unusedColumns, table),
+          (column) => column.id === "unitCost"
+        )[0]
+        assertDefined(cost)
+        expect(cost.unit).toBeUndefined()
         expect(cost?.display?.("31.4")).toBe("$31.40")
       }
     )

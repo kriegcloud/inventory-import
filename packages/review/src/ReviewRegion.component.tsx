@@ -667,30 +667,34 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const finished = isPrimaryDone(main)
   const idle = isPrimaryIdle(main)
   const importButtonNode =
-    readOnly || loading || rows.length === 0 || embedded ? null : finished ? (
-      // On a phone the words take two lines rather than push the next step past the screen's edge.
-      <span className="flex min-w-0 items-center gap-2">
-        <span role="status" className="min-w-0 text-sm leading-tight font-medium">
-          {main.label}
-        </span>
-        <span className="flex flex-none">{props.emptyAction}</span>
-      </span>
-    ) : (
-      <Button
-        ref={importButton}
-        data-import-button=""
-        variant={waits || idle ? "outline" : "default"}
-        size={narrow ? "touch" : "sm"}
-        className={confirmOpen ? "invisible flex-none" : "flex-none"}
-        disabled={props.importing === true || idle}
-        onClick={pressMain}
-      >
-        {/* The same words on every tab: only the button's weight says whether a decision waits. While the caller
+    readOnly || loading || rows.length === 0 || embedded
+      ? O.none()
+      : O.some(
+          finished ? (
+            // On a phone the words take two lines rather than push the next step past the screen's edge.
+            <span className="flex min-w-0 items-center gap-2">
+              <span role="status" className="min-w-0 text-sm leading-tight font-medium">
+                {main.label}
+              </span>
+              <span className="flex flex-none">{props.emptyAction}</span>
+            </span>
+          ) : (
+            <Button
+              ref={importButton}
+              data-import-button=""
+              variant={waits || idle ? "outline" : "default"}
+              size={narrow ? "touch" : "sm"}
+              className={confirmOpen ? "invisible flex-none" : "flex-none"}
+              disabled={props.importing === true || idle}
+              onClick={pressMain}
+            >
+              {/* The same words on every tab: only the button's weight says whether a decision waits. While the caller
             writes the import, the button says so: what is written is the server's to decide. */}
-        {props.importing === true ? <Spinner /> : null}
-        {importLabel}
-      </Button>
-    )
+              {props.importing === true ? <Spinner /> : null}
+              {importLabel}
+            </Button>
+          )
+        )
 
   // The one line under the title: what the run found, and the rules' own fixes when they arrived applied.
   const facts = props.summary.length > 0 ? props.summary : [`${whole.format(counts.total)} rows`]
@@ -927,7 +931,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                 <span role="status" className="sr-only">
                   {said}
                 </span>
-                {importButtonNode}
+                {O.match(importButtonNode, { onNone: () => null, onSome: (button) => button })}
               </div>
             </>
           )}
@@ -978,12 +982,17 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                     </div>
                     <div className="ml-auto flex min-w-0 items-center gap-2">
                       {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
-                      {importButtonNode === null ? null : <span className="flex">{importButtonNode}</span>}
+                      {O.match(importButtonNode, {
+                        onNone: () => null,
+                        onSome: (button) => <span className="flex">{button}</span>
+                      })}
                     </div>
                   </>
                 ) : (
                   <>
-                    <span className="ml-auto flex flex-none">{importButtonNode}</span>
+                    <span className="ml-auto flex flex-none">
+                      {O.match(importButtonNode, { onNone: () => null, onSome: (button) => button })}
+                    </span>
                     <div className="flex w-full items-center gap-1">
                       {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
                       <span className="flex-1" />

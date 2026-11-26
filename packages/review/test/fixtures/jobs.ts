@@ -68,7 +68,7 @@ export const lineColumns: ReadonlyArray<ReviewColumn> = [
 
 type Material = { name: string; sku: string; unit: "m" | "pcs" | "kg" | "L" }
 
-const materials: ReadonlyArray<Material> = [
+const materials: A.NonEmptyReadonlyArray<Material> = [
   { name: "Flat bar 40 × 5", sku: "FB-40-5", unit: "m" },
   { name: "Square tube 40 × 2", sku: "ST-40-2", unit: "m" },
   { name: "Angle 50 × 5", sku: "AN-50-5", unit: "m" },
@@ -138,14 +138,14 @@ const questions: ReadonlyArray<readonly [job: number, line: number, kind: "unit"
   [16, 0, "stock"]
 ]
 // A quantity with a decimal comma, on material bought by length, weight or volume.
-const commas: ReadonlyArray<readonly [qty: string, material: Material]> = [
+const commas: A.NonEmptyReadonlyArray<readonly [qty: string, material: Material]> = [
   ["1,5", { name: "Flat bar 40 × 5", sku: "FB-40-5", unit: "m" }],
   ["2,25", { name: "Weld wire ER70S 0.9 mm", sku: "WW-ER70S-09", unit: "kg" }],
   ["0,75", { name: "Primer grey 5 L tin", sku: "PG-5-L-tin", unit: "L" }]
 ]
 const days = ["Mon 23 Nov", "Tue 24 Nov", "Wed 25 Nov", "Thu 26 Nov", "Fri 27 Nov", "Mon 30 Nov", "Tue 1 Dec"] as const
 // Material the shop does not stock: the SKU is not on the item list.
-const strangers: ReadonlyArray<Material> = [
+const strangers: A.NonEmptyReadonlyArray<Material> = [
   { name: "Hex bolt M8 × 90", sku: "HB-M8-90", unit: "pcs" },
   { name: "Square tube 45 × 2", sku: "ST-45-2", unit: "m" },
   { name: "Zinc primer 2 L tin", sku: "PG-zinc-2L", unit: "L" }
@@ -369,10 +369,10 @@ export function reviewJobs(input: {
     const out = answers.filter((item) => item.answer === "out").length
     const importing = answers.length - out - open.length
     if (open.length > 0) {
-      const what = open.map(({ entry }) =>
+      const what = open.map(({ entry }, index) =>
         O.match(entry.problem, {
           onNone: () =>
-            `line ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`,
+            `${index === 0 ? "Line" : "line"} ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`,
           onSome: (problem) => {
             if (problem.kind === "unit") {
               const hint = O.flatMap(
@@ -380,19 +380,20 @@ export function reviewJobs(input: {
                 A.findFirst((choice) => choice.suggested)
               )
               return O.match(hint, {
-                onNone: () => `line ${entry.line} says “length” for ${entry.material}: pick m or pcs`,
+                onNone: () =>
+                  `${index === 0 ? "Line" : "line"} ${entry.line} says “length” for ${entry.material}: pick m or pcs`,
                 onSome: (hint) =>
-                  `line ${entry.line} says “length” for ${entry.material}: pick m or pcs (${hint.label}, ${O.match(hint.note, { onNone: () => "suggested", onSome: (note) => note })})`
+                  `${index === 0 ? "Line" : "line"} ${entry.line} says “length” for ${entry.material}: pick m or pcs (${hint.label}, ${O.match(hint.note, { onNone: () => "suggested", onSome: (note) => note })})`
               })
             }
             if (problem.kind === "comma")
               return O.match(problem.fix, {
                 onNone: () =>
-                  `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as `,
+                  `${index === 0 ? "Line" : "line"} ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as `,
                 onSome: (fix) =>
-                  `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as ${fix.to}`
+                  `${index === 0 ? "Line" : "line"} ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as ${fix.to}`
               })
-            return `line ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`
+            return `${index === 0 ? "Line" : "line"} ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`
           }
         })
       )
@@ -400,7 +401,7 @@ export function reviewJobs(input: {
       return {
         job,
         status: "waiting",
-        reason: `${reason.charAt(0).toUpperCase()}${reason.slice(1)}`,
+        reason,
         importing,
         waiting: open.length
       }

@@ -917,20 +917,24 @@ export function primary(input: {
   words: ReviewWords
 }): Primary {
   const words = input.words
-  const unmatched = input.columns.find((column) => O.exists(column.match, isColumnMatchUnmatched))
-  if (unmatched !== undefined) {
-    return Primary.Blocked({ label: `Match ${unmatched.label} to import`, columnId: unmatched.id })
-  }
-  const { counts } = input
-  if (counts.ready === 0) {
-    // Reopened to look, with every remaining row left out: there is nothing to add, and the way out is to close.
-    if (O.isSome(input.closing) && counts.needs === 0) return Primary.Import({ label: input.closing.value })
-    if (counts.needs + counts.blocked > 0) return Primary.Idle({ label: `No ${input.noun[1]} ready yet` })
-    return Primary.Done({
-      label: counts.total > 0 && counts.stored === counts.total ? words.nothingNew : words.nothingToImport
-    })
-  }
-  return Primary.Import({ label: `Import ${plural(counts.ready, input.noun[0], input.noun[1])}` })
+  return O.match(
+    A.findFirst(input.columns, (column) => O.exists(column.match, isColumnMatchUnmatched)),
+    {
+      onSome: (unmatched) => Primary.Blocked({ label: `Match ${unmatched.label} to import`, columnId: unmatched.id }),
+      onNone: () => {
+        const { counts } = input
+        if (counts.ready === 0) {
+          // Reopened to look, with every remaining row left out: there is nothing to add, and the way out is to close.
+          if (O.isSome(input.closing) && counts.needs === 0) return Primary.Import({ label: input.closing.value })
+          if (counts.needs + counts.blocked > 0) return Primary.Idle({ label: `No ${input.noun[1]} ready yet` })
+          return Primary.Done({
+            label: counts.total > 0 && counts.stored === counts.total ? words.nothingNew : words.nothingToImport
+          })
+        }
+        return Primary.Import({ label: `Import ${plural(counts.ready, input.noun[0], input.noun[1])}` })
+      }
+    }
+  )
 }
 
 /** "Needs you 6, Left out 2": the counts that are not zero, each under the word its tab says. */

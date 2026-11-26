@@ -267,8 +267,7 @@ export const codeFace = (column: ReviewColumn | undefined): string | undefined =
  * truncated line holds nothing that reaches past its edge.
  */
 export function ColumnText(props: { column: ReviewColumn | undefined; children: ReactNode }) {
-  const face = codeFace(props.column)
-  return face === undefined ? props.children : <span className={face}>{props.children}</span>
+  return props.column?.code === true ? <span className="font-mono">{props.children}</span> : props.children
 }
 
 /** A mark's source as the shared mark takes it: `unknown` is a source the caller did not name. */

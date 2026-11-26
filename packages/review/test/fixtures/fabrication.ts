@@ -158,12 +158,13 @@ type Family = {
   category: string
   unit: (typeof units)[number]
   supplier: string
-  sizes: ReadonlyArray<readonly [label: string, code: string]>
+  sizes: A.NonEmptyReadonlyArray<readonly [label: string, code: string]>
   cost: number
 }
 
-const pairs = (list: ReadonlyArray<string>): ReadonlyArray<readonly [string, string]> =>
-  list.map(
+const pairs = (list: A.NonEmptyReadonlyArray<string>): A.NonEmptyReadonlyArray<readonly [string, string]> =>
+  A.map(
+    list,
     (label) => [label, label.replace(/ mm$/, "").replace(/ × /g, "-").replace(/ /g, "-").replace(/\./g, "")] as const
   )
 
@@ -497,9 +498,14 @@ const caseFix = (to: "kg" | "pcs"): Fix =>
     why: { basis: `The same unit as ${to}, spelled another way.` }
   })
 
+type StockCells = Record<
+  "name" | "sku" | "category" | "unit" | "onHand" | "reorder" | "cost" | "supplier" | "bin" | "lead",
+  string
+>
+
 /** The file as the review reads it: `size` rows, the same mix in every block of 178. `clean` removes every problem. */
 export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: boolean }): ReadonlyArray<ReviewRow> {
-  const rows: Array<ReviewRow> = []
+  const rows: Array<ReviewRow & { readonly cells: StockCells }> = []
   const used = MutableHashMap.empty<string, number>()
   for (let position = 0; position < input.size; position += 1) {
     const rank = rankOf(position % block)
@@ -524,10 +530,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     const id = `r${position + 1}`
     const line = position + 2
     const onHand = ((position * 37) % 23) * (family.unit === "pcs" ? 50 : 5) + (family.unit === "pcs" ? 100 : 10)
-    const cells: Record<
-      "name" | "sku" | "category" | "unit" | "onHand" | "reorder" | "cost" | "supplier" | "bin" | "lead",
-      string
-    > = {
+    const cells: StockCells = {
       name: `${family.name} ${size[0]}${suffix}`,
       sku: `${family.code}-${size[1]}${suffix === "" ? "" : `-${suffix.slice(3)}`}`,
       category: family.category,
@@ -607,15 +610,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
       applied = []
       problem = O.filter(problem, (value) => value.kind !== "unit")
     }
-    rows.push(
-      ReviewRow.make({
-        id,
-        line,
-        cells,
-        applied,
-        problem
-      })
-    )
+    rows.push({ ...ReviewRow.make({ id, line, cells, applied, problem }), cells })
   }
   // The guess for "length" is made from the file, not from a sentence: which unit the other rows of the same
   // categories use decides what is suggested, and the count is the basis shown to the person.
@@ -626,22 +621,21 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     )
   )
   if (guessed.length > 0) {
-    const categories = A.dedupe(guessed.map((row) => row.cells.category ?? ""))
-    const tally = MutableHashMap.empty<string, number>()
-    const counted = (unit: string): number => O.getOrElse(MutableHashMap.get(tally, unit), () => 0)
+    const categories = A.dedupe(guessed.map((row) => row.cells.category))
+    const tally = { m: 0, pcs: 0 }
     for (const row of rows) {
       O.match(row.problem, {
         onNone: () => {
-          const unit = row.cells.unit ?? ""
+          const unit = row.cells.unit
           if (row.applied.length > 0) return
-          if (!categories.includes(row.cells.category ?? "") || (unit !== "m" && unit !== "pcs")) return
-          MutableHashMap.set(tally, unit, counted(unit) + 1)
+          if (!categories.includes(row.cells.category) || (unit !== "m" && unit !== "pcs")) return
+          tally[unit] += 1
         },
         onSome: () => undefined
       })
     }
-    const m = counted("m")
-    const pcs = counted("pcs")
+    const m = tally.m
+    const pcs = tally.pcs
     const [to, other] = m >= pcs ? (["m", "pcs"] as const) : (["pcs", "m"] as const)
     const fix: Fix = Fix.make({
       ...lengthFix,
@@ -672,7 +666,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     const other = O.flatMap(rival, (id) => MutableHashMap.get(byId, id))
     return O.match(other, {
       onNone: () => row,
-      onSome: (other) => (other.line > row.line ? row : { ...row, cells: { ...row.cells, sku: other.cells.sku ?? "" } })
+      onSome: (other) => (other.line > row.line ? row : { ...row, cells: { ...row.cells, sku: other.cells.sku } })
     })
   })
 }

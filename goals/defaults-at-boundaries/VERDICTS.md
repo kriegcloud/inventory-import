@@ -2452,3 +2452,166 @@ hosted behavior or deployment. Not seen on screen. The byte comparison is local 
 an on-screen 155-item acceptance run. This lane does not claim zero foundation places or the whole goal complete.
 
 Needs the person: nothing. The five retained places are follow-up work, not newly approved exemptions or policies.
+
+## Review row 9, third lane: field verdicts (2026-11-26)
+
+This follow-up owns the remaining review source and gallery fixtures. The stored decision and progress codecs,
+file-cell spellings, screen words and caller authority retain their existing meanings. No exemption is approved.
+
+| Data or entry | Field verdict | Work in this lane |
+| --- | --- | --- |
+| Sparse review cells | A missing column means an empty displayed cell today. Original sparse records must remain sparse for caller rechecks and exports. | Keep unresolved rule lookups named unless a row-set boundary can preserve that distinction; draw optional cells with a single Option lookup at the final drawing. |
+| Counters and facet groups | A new fold starts at zero; an existing group's count is present. | Derive counts from grouped arrays instead of inventing a missing count at each update. |
+| Fixture cyclic choices | Materials, sizes and due days are populated fixed collections; a valid cycle cannot miss. | Express nonempty collections and use the nonempty array API; no fallback material or due day. |
+| Gallery builder inputs | Clean and without-unit modes belong to the caller. | Require callers to state flags where doing so removes a fallback honestly. |
+| Fixture rule comparisons | Raw file cells remain unchanged. Comparison-only trimming belongs at a schema boundary if a real complete reader owns it. | Keep unresolved raw cell readers named rather than add a fallback-only decode. |
+| Browser storage test | Storage returns a string or null, while its backing dictionary can miss. | Keep this real string/null boundary visible; replacing its literal null fallback with an uncounted match would not remove the question. |
+| Own React props | Optional props retain `?:`; their checks and destructuring defaults remain counted. | In particular PhoneDrawer.footer is its only counted place and cannot honestly decrease under this instruction. |
+| Presentation words | Sentence case, whitespace hints and keyboard key matching are presentation algorithms, not new data defaults. | Retain unresolved sites unless the owned representation removes the question. |
+
+The requested strict decrease in every named file conflicts with the instruction to retain own optional React props
+for PhoneDrawer. Its one footer check stays visible; this lane does not disguise it as an Option field or null default.
+
+### Third lane: results and performance holds
+
+The retained implementation removes one counted site in ReviewDraft (the complete blocked/import primary-button decision), three in
+the region atoms (trim reuse, optional picked list and folded stop), one
+derived nullable button check, one derived class-name absence check, four impossible generated-cell fallbacks and one sparse unit counter in
+fabrication, and one capitalization call in jobs. Original sparse file records, caller rechecks, held CSV cells,
+decision/progress schemas and stored bytes are unchanged. Generated stock rows retain their known cell keys until
+the public result widens them to ReviewRow. Job sentence fragments start with Line only in their first position,
+yielding the same sentence without a capitalization pass.
+
+The requested decrease in all ten files and zero test sites was **not achieved**. Grid and queue changes were
+reverted under the mandatory performance gate; PhoneDrawer's only site is an own optional React prop that must stay
+counted; SavedProgress's storage-twin null fallback was retained rather than renamed to an uncounted onNone. None
+of these is an approved exemption or a claim that the remaining work is impossible.
+
+Microbenchmarks used the same 200 generated review rows, alternating original/current modules in nine measured
+batches after warmup. They are representative local CPU measurements, not the real messy sample, browser interaction
+latency or hosted proof. Temporary original source modules were deleted before validation. Generated row bytes and
+grid SSR markup were compared with the original modules. For the rejected groupBy attempt, prototype-key safety
+was checked in Effect Array source (InternalRecord.assignProperty), and first-seen order was explicitly preserved.
+
+| Attempt or retained path | Before median | After median | Decision |
+| --- | ---: | ---: | --- |
+| Grouped facet rewrite | 0.16747 ms | 0.22412 ms | Reverted; 34% slower |
+| Facet workflow counters | 0.21086 ms | 0.24024 ms | Reverted hot counter changes; kept label fold, trim reuse and picked list |
+| Rotation-based fixture selection | 0.72315 ms | 0.81393 ms | Reverted rotations in both fixtures |
+| Full grid Option-cell drawing, production SSR | 32.10374 ms | 34.06140 ms | Reverted; repeated positive median difference |
+| Queue Option context, production | 0.03533 ms | 0.06006 ms | Reverted; 70% slower |
+| Isolated Option nameOf over 200 rows | 0.001106 ms | 0.009886 ms | Reverted grid and queue names; all nine batches slower |
+| Intermediate facet path | 0.17276 ms | 0.17428 ms | Unresolved within noise: ranges 0.16466–0.23378 and 0.16014–0.22027 ms overlap |
+| Generated-row group lifecycle and spelling counts | 0.01135 ms | 0.00829 ms | Reverted later: actual sample showed a regression |
+| Intermediate typed fabrication cells | 0.76000 ms | 0.80303 ms | Unresolved within noise: ranges 0.67897–0.81856 and 0.64659–0.83855 ms overlap; earlier batch favored current 1.24032 vs 1.25169 ms |
+
+Receipts: `/tmp/review-benchmark.txt`, `/tmp/review-benchmark-2.txt`, `/tmp/review-benchmark-3.txt`,
+`/tmp/review-benchmark-4.txt`, `/tmp/review-render-benchmark-production.txt`, `/tmp/review-name-benchmark.txt`.
+The shared Option-cell helper was removed when its consumers were reverted. Grid and queue are byte-identical to
+HEAD. No fallback-only decode, Option-to-undefined conversion, synchronous codec, new unsafe assertion or
+function-local schema was retained.
+
+### Actual messy sample: accepted performance gate
+
+The final harness read `apps/inventory/public/samples/items_messy.csv` through readSpreadsheet, stageTable, review
+and toRegionRows (200 rows, 16 actual region columns), with file reading and staging outside timing. It asserted
+original/current output parity. In 21 alternating paired batches the attempted rule rewrites slowed waitingGroups
+from 0.011784 to 0.014962 ms (all 21 differences positive), appliedGroups 0.004953 to 0.005946 ms, and count 0.007915
+to 0.008520 ms. All three hot rewrites were reverted, including ordered groupBy variants. The final retained rule
+change is the cold primary-button Option match; count, waitingGroups, appliedGroups and their original helpers are
+unchanged from HEAD. The label-fold facet change was also reverted.
+
+The accepted actual-sample facet run measured 0.235409 ms before and 0.214926 ms after, with paired median difference
+-0.008558 ms and 9 positive pairs out of 21. The final typed fabrication fixture, after replacing its known m/pcs
+sparse counter with a stated two-key zero start, measured 0.766240 versus 0.769115 ms, paired median +0.001074 ms,
+11 positive pairs out of 21 and differences spanning -0.128072 to +0.113573 ms. These paired outcomes show no
+resolved directional regression; they do not prove exact timing equality. A preceding actual-sample facet run also
+had 9/21 positive pairs. Logs: `/tmp/review-actual-benchmark.txt`, `/tmp/review-actual-benchmark-final.txt`,
+`/tmp/review-actual-benchmark-accepted.txt`.
+
+### Third lane: every remaining counted place
+
+The line lists enumerate all 143 remaining scanner occurrences in the ten requested files (12 fewer than 155).
+Each example is a counted expression, not an exemption. A future change must remove the actual question with a real
+representation, boundary or measured algorithm. The sites below are unresolved work, not justified by age alone.
+
+| File (under packages/review) | Kind | Count and every line | Example | Why retained / required follow-up |
+| --- | --- | --- | --- | --- |
+| `src/ReviewDraft.rules.ts` | fallback | 18: 90, 231, 249, 270, 292, 398, 419, 457, 478, 484, 511, 708, 785, 817, 851, 864, 879, 1036 | `O.getOrElse` | Sparse cells, absent decisions and zero kind counts need total internal domains that preserve original sparse rechecks and exports; no onNone data default was substituted. |
+| `src/ReviewDraft.rules.ts` | absence | 5: 176, 402, 509, 642, 1214 | `known !== undefined` | Weak cache hits, marks, undo steps and next-row access remain optional. Tighten their entry/result types while preserving cache identity and navigation. |
+| `src/ReviewDraft.rules.ts` | normalise | 7: 545, 956, 1266, 1267, 1349, 1349, 1359 | `from.trim` | Whitespace evidence, displayed units and sentence case need owned comparison/presentation boundaries, with exact words and latency preserved. |
+| `src/ReviewRegion.atoms.ts` | fallback | 11: 181, 267, 270, 277, 281, 288, 361, 415, 621, 644, 698 | `view.cells[column.id] ?? ""` | Sparse accessor/facet cells, facet group/spelling starts, atom self state and the TanStack table edge remain. Two measured counter alternatives regressed and were reverted. |
+| `src/ReviewRegion.atoms.ts` | absence | 1: 819 | `step !== undefined` | An undo toast acts only while its optional step exists; represent its complete decision while preserving undo and focus. |
+| `src/ReviewRegion.atoms.ts` | normalise | 4: 265, 265, 276, 966 | `value.trim().toLowerCase` | Facet keys, display spellings and keyboard-key matching remain raw-string presentation operations; no fallback-only decode hides them. |
+| `src/ReviewRegion.component.tsx` | absence | 7: 524, 615, 626, 645, 726, 812, 873 | `props.onShowMatching === undefined` | All seven checks read own optional React props, explicitly kept optional and counted by the task. |
+| `src/ReviewRegion.component.tsx` | normalise | 3: 401, 464, 476 | `(filter === "auto" ? words.auto : words[filter]).toLowerCase` | Status, undo and redo captions derive case from caller words; a presentation representation must preserve each sentence. |
+| `src/internal/ReviewGrid.tsx` | fallback | 27: 134, 176, 176, 187, 188, 269, 269, 270, 310, 312, 375, 470, 619, 621, 625, 689, 691, 739, 915, 1012, 1142, 1226, 1596, 1779, 1903, 1904, 1910 | `view.cells[first.id] ?? ""` | Sparse cells, sizing and virtual/table lookups remain. Final Option-cell and name drawing regressed and was reverted; totalization must preserve sparse caller rows and untouched-row cache. |
+| `src/internal/ReviewGrid.tsx` | absence | 21: 134, 192, 319, 474, 567, 619, 773, 889, 915, 921, 937, 997, 1075, 1604, 1671, 1703, 1935, 1936, 1939, 1947, 1999 | `first === undefined` | Optional marks, columns, actions, nullable renderings and virtual/table results need complete Option-bearing entry types; own optional props must stay counted. |
+| `src/internal/ReviewGrid.tsx` | unwrap | 1: 1733 | `O.getOrNull` | The scroll callback converts an optional element to the null required by the virtualizer API; a named boundary migration remains unresolved. |
+| `src/internal/ReviewGrid.tsx` | normalise | 1: 328 | `mark.from.trim` | The whitespace-only proposal hint compares original spelling with the proposal; a genuine comparison reader remains unresolved. |
+| `src/internal/ReviewQueue.tsx` | fallback | 7: 129, 136, 142, 329, 382, 430, 472 | `view.cells[first.id] ?? ""` | Sparse row/editor cells and the subject-column lookup remain. Option context and name replacements were slower and reverted. |
+| `src/internal/ReviewQueue.tsx` | absence | 5: 98, 129, 517, 559, 708 | `shown === undefined` | Queue entries, first column and nullable main renderings need a complete Option-bearing representation with timing proof. |
+| `src/internal/parts.tsx` | fallback | 2: 514, 518 | `props.children ?? props.text` | CutText children/card are own optional React props with existing text defaults; the task retains these defaults. |
+| `src/internal/parts.tsx` | absence | 7: 231, 460, 621, 625, 639, 644, 651 | `props.className === undefined` | Six checks read own optional React props. The remaining DOM-ref null belongs at the existing browser edge and has not been migrated. |
+| `src/internal/parts.tsx` | normalise | 1: 389 | `mark.from.trim` | The whitespace hint remains a raw-spelling comparison; no fallback-only decode was added. |
+| `src/internal/PhoneDrawer.tsx` | absence | 1: 36 | `props.footer === undefined` | Its sole site is the own optional footer prop. Clearing it contradicts the explicit own-prop rule; unchanged. |
+| `test/fixtures/fabrication.ts` | fallback | 3: 523, 524, 526 | `pool[position % pool.length] ?? families[0]!` | Family/size cyclic selection and one fold counter remain. Nonempty sizes are explicit; rotation indexing regressed and was reverted. Faster safe selection/folds remain unresolved. |
+| `test/fixtures/fabrication.ts` | normalise | 3: 677, 681, 683 | `name.trim` | Measured real module-level S.Trim/check schemas with hoisted decodeOption readers regressed 0.029552 to 0.081829 ms per 200 rows (all 21 pairs slower). Candidate rejected under the per-row gate; raw cells and original trims remain. |
+| `test/fixtures/jobs.ts` | fallback | 5: 161, 178, 190, 200, 231 | `materials[(index * 3 + at * 7) % materials.length] ?? materials[0]!` | Five fixed cyclic selections remain. Nonempty domains are explicit, but rotation was rejected under the per-row gate; preserve material/day selection. |
+| `test/fixtures/jobs.ts` | absence | 2: 187, 187 | `job === undefined` | A question names a job and line by index and currently skips if invalid. A complete fixture representation must remove this possibility. |
+| `test/SavedProgress.test.ts` | fallback | 1: 37 | `state.items[key] ?? null` | The storage twin must return null for a missing key. An uncounted literal onNone would rename the same fallback. Genuine twin redesign remains unresolved; test debt is not zero. |
+
+Uncounted literal data/render defaults also remain visible debt: empty/ready labels and whyWords zero in ReviewDraft;
+empty draw/width counts in ReviewGrid; the subject-less empty input in ReviewQueue; jobs answerOf's literal empty
+answer; undefined callbacks; and the empty optional-list match for facet picks. The attempted facet-label fold was reverted. No uncounted
+literal replaced a counted data fallback in the retained implementation.
+
+ColumnText's retained change removes the derived nullable class-name value entirely: final markup branches on the
+column's semantic code flag. Missing-column and present non-code columns already share plain-text markup. No
+replacement data default, absence check or Option allocation was introduced; codeFace remains shared by cn callers.
+
+The three retained fabrication recheck trims were also tested with genuine module-level comparison schemas:
+Name = S.Trim with a nonempty check, Cost = S.Trim with the unchanged cost regex, and NegativeHand = S.Trim with
+a leading-minus check. Their decodeOption readers were hoisted once at module scope. The candidate matched the
+original result on all 200 generated rows plus 32 blank-name, spaced-cost, negative-on-hand and invalid-cost cases.
+Over 21 paired batches of 200 rows, original median was 0.029552 ms and candidate 0.081829 ms; all 21 paired
+differences were positive (0.048530 to 0.057702 ms, median 0.051675 ms). It was rejected under the mandatory
+per-row gate, leaving production/fixture source frozen. This candidate was a genuine normalized comparison, not
+a decode used solely to supply a fallback. Receipt: `/tmp/review-recheck-benchmark.txt`.
+
+### Third lane: final verification and limits
+
+| Check | Before | Final | Receipt |
+| --- | --- | --- | --- |
+| Review package tests | 115 tests / 7 files; Vitest 2.61 s, elapsed 3.62 s | 115 / 7; Vitest 0.626 s, elapsed 0.90 s | `/tmp/review-before-actual.txt`, `/tmp/review-tests-accepted.txt` |
+| Catalog web reviewParity | 6 tests / 1 file; Vitest 3.03 s, elapsed 3.47 s | 6 / 1; Vitest 1.96 s, elapsed 2.23 s | `/tmp/review-parity-before.txt`, `/tmp/review-parity-accepted.txt` |
+| Catalog web ReviewModelFold | 17 tests / 1 file; Vitest 170.47 s, elapsed 170.79 s | 17 / 1; Vitest 143.55 s, elapsed 143.81 s | `/tmp/review-fold-before.txt`, `/tmp/review-fold-accepted.txt` |
+
+No focused test needed a retry. These suite times include startup/cache effects; the paired actual-sample timings
+above carry the hot-path performance judgment. The literal requested `bun run test packages/review` fails before
+running tests because the root script forwards packages/review as a nonexistent Turbo task (before 0.05 s, after
+0.04 s). The package's actual test command, timed above, is `bun run --cwd packages/review test`.
+
+`bun run check` ran 99/105 tasks successfully, 73 cached, in 4.976 s (5.01 s elapsed), then canceled other work when
+review's strict ledger refused a decrease. The follow-up `bun run check --continue=always` completed **104/105**
+tasks successfully, 73 cached, in **2m30.76s** (150.80 s elapsed). The **only failure** is
+`@inventory/review#check`: both TypeScript configurations pass, then the existing strict ledger requires its held
+ceiling to decrease from **225 to 219**. That ledger is outside this lane's permitted edits and was preserved.
+All previously canceled tasks completed in the continued run. Catalog web passed all **401 tests in 38 files**,
+no retry; app passed **70 tests in 19 files**, no retry. Receipts: `/tmp/review-check-accepted.txt`,
+`/tmp/review-check-continued.txt`.
+
+The explicit ten-file defaults law passes at **74 fallback, 49 absence, 1 unwrap and 19 normalise**, with six files
+holding fewer sites than their baseline. No write mode was used. Receipt: `/tmp/review-law-accepted.txt`.
+Formatting, docs validation (existing status-vocabulary warnings only), and git diff whitespace validation pass.
+Effect APIs retained or evaluated were checked in Effect 4.1.5 source, including Array.findFirst/head/groupBy/map,
+Option.match/fromUndefinedOr/toArray, Record.get and the Schema.Trim/check/decodeOption comparison candidate.
+
+Only this appended verdict section and six authorized review source/fixture files changed. PLAN, SPEC, all locks,
+ledgers, baselines, exemptions and vendored files are unchanged. No .dev.vars file was read; no synchronous codec,
+unsafe unwrap, function-local schema, secret operation, commit or push was added. Source and test debt remain as
+listed; the goal is not complete. No browser/on-screen import, Confirm/storage end-to-end test, hosted execution or
+deployment was run in this lane. No contract field or persisted wire shape changed.
+
+Needs the person: nothing. The incomplete sites are implementation/performance follow-up, not a request for a new
+product decision or exemption.

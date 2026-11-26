@@ -15,7 +15,7 @@
  */
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import { pipe } from "effect/Function"
+import { dual, pipe } from "effect/Function"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
@@ -106,8 +106,16 @@ const dayFits = (value: string): boolean =>
       )
   )
 
-/** Why a literal's text is not one its datatype writes, or none when it is. */
-const misread = (datatype: Iri, value: string): O.Option<string> => {
+/**
+ * Why a literal's text is not one its datatype writes, or none when it is. The writer refuses such a literal, and the
+ * lift asks the same before it states one, so a value the lift writes is one the files can hold.
+ *
+ * @example misread("2026-02-30T00:00:00Z", term("xsd", "dateTime")) // Some('is no xsd:dateTime: "2026-02-30T00:00:00Z"')
+ */
+export const misread: {
+  (datatype: Iri): (value: string) => O.Option<string>
+  (value: string, datatype: Iri): O.Option<string>
+} = dual(2, (value: string, datatype: Iri): O.Option<string> => {
   if (datatype === term("xsd", "boolean") && !A.contains(booleans, value)) {
     return O.some(`is no boolean the files write: "${value}" is neither true nor false`)
   }
@@ -115,7 +123,7 @@ const misread = (datatype: Iri, value: string): O.Option<string> => {
     return O.some(`is no xsd:dateTime: "${value}"`)
   }
   return O.none()
-}
+})
 
 /**
  * The file's text for one projection, or a refusal.
@@ -176,7 +184,7 @@ export const writeTurtle = Effect.fnUntraced(function* (projection: Projection) 
         return yield* WriteRefused.make({ reason: `a value of ${triple.subject} is not NFC` })
       }
       if (ObjectNode.guards.literal(triple.object)) {
-        const wrong = misread(triple.object.datatype, triple.object.value)
+        const wrong = misread(triple.object.value, triple.object.datatype)
         if (O.isSome(wrong)) {
           return yield* WriteRefused.make({ reason: `a value of ${triple.subject} ${wrong.value}` })
         }

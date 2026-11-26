@@ -6,11 +6,12 @@
  * mark on the record it is given, from the vocabulary it is given, or from the record's own values; a lift that wrote
  * a grant for every member whatever the mark said would pass a test on the real `Member` and be wrong, which is why
  * the questions' must-fail cases M6 and M7 call it with a changed mark. It types the subject and each node a path
- * creates, and nothing else: the tenant's type is the fixture's to state.
+ * creates, and nothing else: the tenant's type is the fixture's to state. A literal's text is the field's value as its
+ * own schema encodes it, so an instant is written as the ISO text the wire carries, never as code formats it.
  *
  * @packageDocumentation
  */
-import { RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
+import { RangeTarget, type Vocabulary, type XsdDatatype } from "@beep/vocabulary/Model"
 import { fieldsOf, MarkReading, readKeyMark, type LiftPathRead } from "@beep/vocabulary/Pointer"
 import { RdfVocab } from "@beep/vocabulary/Rdf"
 import * as A from "effect/Array"
@@ -20,9 +21,11 @@ import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import type * as SchemaAST from "effect/SchemaAST"
-import { link, type Iri, type Triple } from "./Graph.schema.ts"
+import * as Str from "effect/String"
+import { link, literal, type Iri, type Triple } from "./Graph.schema.ts"
 import { $OntologyId } from "./internal/identity.ts"
 import { classOf, localOf, propertyOf, schemaTermOf, schemeOf, type Property } from "./internal/terms.ts"
+import { misread } from "./Write.ts"
 
 const $I = $OntologyId.create("Lift")
 
@@ -42,16 +45,24 @@ export class LiftRefused extends S.TaggedError<LiftRefused, { readonly brand: un
 ) {}
 
 /**
- * What the lift is given beside the record: the decoded vocabulary, the prefix its CURIEs carry, and the class whose
- * instances are tenants, which decides the one field a record's IRIs take their organization from (section 4.1).
+ * What the lift is given beside the record: the decoded vocabulary, the prefix its CURIEs carry, the class whose
+ * instances are tenants, which decides the one field a record's IRIs take their organization from (section 4.1), and
+ * the organization given beside the rows, for a record that has no such field.
+ *
+ * `organization` is none for a record that names its own tenant, and the lift refuses one given for it: two sources of
+ * the organization could disagree. The People page's `Person` names none, since the page lists one organization's
+ * members, so its caller gives it (PLAN, "Choices made"; reversing that choice changes this field alone).
  */
 export type LiftContext = {
   readonly vocabulary: Vocabulary
   readonly prefix: string
   readonly tenant: string
+  readonly organization: O.Option<string>
 }
 
 type Field = { readonly name: string; readonly ast: SchemaAST.AST; readonly mark: MarkReading }
+
+type Attribute = Extract<Property, { readonly kind: "datatype" }>
 
 const refused = (field: O.Option<string>, reason: string) => Effect.fail(LiftRefused.make({ field, reason }))
 
@@ -71,8 +82,8 @@ const objectOf = Effect.fnUntraced(function* (
   const { vocabulary } = context
   const at = O.some(field.name)
   if (property.kind === "datatype") {
-    // Case (a). No record the thread lifts has one; it is built by the slice that first lifts a literal.
-    return yield* refused(at, `${property.key} takes a literal, which the lift does not write yet`)
+    // A path's last step: no mark ends a path at an attribute, so the node it would make is not built for one.
+    return yield* refused(at, `${property.key} takes a literal, which the lift writes for a field's own property only`)
   }
   const pointed = O.flatMap(O.flatMap(schemaTermOf(field.ast), localOf(context.prefix)), (local) =>
     schemeOf(vocabulary, local)
@@ -103,6 +114,80 @@ const objectOf = Effect.fnUntraced(function* (
     return yield* refused(at, `${property.key}'s range does not admit the concept ${scheme}-${value}`)
   }
   return `${vocabulary.namespace}${scheme}-${value}`
+})
+
+/** A datatype's IRI under the `xsd` namespace of the RDF registry. */
+const datatypeIri = (datatype: XsdDatatype): Iri => `${RdfVocab.xsd.iri}${Str.slice(Str.length("xsd:"))(datatype)}`
+
+/** A literal's text from a field's encoded value: a boolean's `true` or `false` for `xsd:boolean`, else a string. */
+const textOf = (datatype: XsdDatatype, encoded: unknown): O.Option<string> => {
+  if (datatype === "xsd:boolean") {
+    return P.isBoolean(encoded) ? O.some(encoded ? "true" : "false") : O.none()
+  }
+  return P.isString(encoded) ? O.some(encoded) : O.none()
+}
+
+/**
+ * What a field marked with an attribute states (section 4.1, case (a)): one literal of the attribute's datatype, its
+ * text the field's encoded value, or nothing when the decoded value is an absent `Option`. A value its datatype does
+ * not write is refused, as the writer would refuse it: a number for a string, a text for a boolean, a text that is no
+ * `xsd:dateTime`.
+ */
+const literalsOf = Effect.fnUntraced(function* (
+  property: Attribute,
+  field: Field,
+  subject: Iri,
+  predicate: Iri,
+  value: unknown,
+  encoded: O.Option<unknown>
+) {
+  const at = O.some(field.name)
+  if (O.isOption(value) && O.isNone(value)) {
+    return []
+  }
+  const text = O.flatMap(encoded, (written) => textOf(property.datatype, written))
+  if (O.isNone(text)) {
+    return yield* refused(at, `the field's value is no ${property.datatype} the lift writes`)
+  }
+  const datatype = datatypeIri(property.datatype)
+  const problem = misread(text.value, datatype)
+  if (O.isSome(problem)) {
+    return yield* refused(at, `the field's value ${problem.value}`)
+  }
+  return [literal(subject, predicate, text.value, datatype)]
+})
+
+/**
+ * The organization a record's IRIs take (section 4.1): its one field that names a property ranging over the tenant, or,
+ * when it has none, the organization given beside the rows. A record that names its tenant and is given one too, a
+ * record that names it twice, and one that names none and is given none are refused.
+ */
+const organizationOf = Effect.fnUntraced(function* (
+  context: LiftContext,
+  tenants: ReadonlyArray<Field>,
+  valueOf: (field: Field) => unknown
+) {
+  const none = O.none<string>()
+  const tenant = A.head(tenants)
+  if (tenants.length > 1) {
+    return yield* refused(none, `${tenants.length} fields name a property ranging over the tenant; the lift needs one`)
+  }
+  if (O.isSome(tenant)) {
+    const at = O.some(tenant.value.name)
+    if (O.isSome(context.organization)) {
+      return yield* refused(at, "the record names its tenant here, and another is given beside it")
+    }
+    const value = valueOf(tenant.value)
+    return isSegment(value) ? value : yield* refused(at, "the field's value is no id")
+  }
+  if (O.isNone(context.organization)) {
+    return yield* refused(
+      none,
+      "0 fields name a property ranging over the tenant, and none is given beside the record; the lift needs one"
+    )
+  }
+  const given = context.organization.value
+  return isSegment(given) ? given : yield* refused(none, "the organization given beside the record is no id")
 })
 
 /** A CURIE of the vocabulary's prefix as its IRI, or a refusal naming it. */
@@ -166,12 +251,13 @@ const pathTriples = Effect.fnUntraced(function* (
  * what each path creates. A field that names the record's own class is its id and is in the IRI; a field that stands
  * for no term states nothing.
  *
- * It fails with `LiftRefused` when the record names no class, when not exactly one field is its id or not exactly one
- * names a property ranging over the tenant, when a field is unmarked, or when a mark cannot be followed.
+ * It fails with `LiftRefused` when the record names no class, when not exactly one field is its id, when its tenant is
+ * not named by exactly one field or given beside it (and not both), when a field is unmarked, when a mark cannot be
+ * followed, or when a literal's value is not one its datatype writes.
  *
  * @example lift(context, Member, member) // six triples: the member, its tenant, and the grant its role is
  */
-export const lift = Effect.fnUntraced(function* <Record extends S.Top>(
+export const lift = Effect.fnUntraced(function* <Record extends S.Top & { readonly EncodingServices: never }>(
   context: LiftContext,
   record: Record,
   value: Record["Type"]
@@ -200,23 +286,21 @@ export const lift = Effect.fnUntraced(function* <Record extends S.Top>(
         property.kind === "object" && RangeTarget.guards.class(property.range) && property.range.key === context.tenant
     )
   const ids = A.filter(fields, isId)
-  const tenants = A.filter(fields, isTenant)
   const id = A.head(ids)
-  const tenant = A.head(tenants)
   if (ids.length !== 1 || O.isNone(id)) {
     return yield* refused(none, `${ids.length} fields name the record's class; exactly one is its id`)
   }
-  if (tenants.length !== 1 || O.isNone(tenant)) {
-    return yield* refused(none, `${tenants.length} fields name a property ranging over the tenant; the lift needs one`)
-  }
+  const organization = yield* organizationOf(context, A.filter(fields, isTenant), valueOf)
   const identifier = valueOf(id.value)
-  const organization = valueOf(tenant.value)
   if (!isSegment(identifier)) {
     return yield* refused(O.some(id.value.name), "the field's value is no id")
   }
-  if (!isSegment(organization)) {
-    return yield* refused(O.some(tenant.value.name), "the field's value is no id")
-  }
+  // The record as its schema encodes it: where a literal's text is read, so a value is written as the wire writes it.
+  const encoded = yield* Effect.mapError(S.encodeUnknownEffect(record)(value), () =>
+    LiftRefused.make({ field: none, reason: "the value does not encode through the record's schema" })
+  )
+  const encodedOf = (field: Field): O.Option<unknown> =>
+    P.hasProperty(encoded, field.name) ? O.some(encoded[field.name]) : O.none()
   const subject = `${vocabulary.base}/data/${organization}/${own.value}/${identifier}`
   const triples: Array<Triple> = [link(subject, typeIri, `${vocabulary.namespace}${own.value}`)]
   for (const field of fields) {
@@ -227,6 +311,11 @@ export const lift = Effect.fnUntraced(function* <Record extends S.Top>(
     if (MarkReading.guards.term(field.mark)) {
       const property = yield* propertyNamed(context, at, field.mark.term)
       const predicate = yield* iriOf(context, at, field.mark.term)
+      if (property.kind === "datatype") {
+        const stated = yield* literalsOf(property, field, subject, predicate, valueOf(field), encodedOf(field))
+        triples.push(...stated)
+        continue
+      }
       const object = yield* objectOf(context, organization, property, field, valueOf(field))
       triples.push(link(subject, predicate, object))
       continue

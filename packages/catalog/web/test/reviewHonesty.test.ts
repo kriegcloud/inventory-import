@@ -126,6 +126,7 @@ describe("a second load after a confirm that took accepted proposals", () => {
         expect(A.flatMap([148, 195], statusOf)).toEqual(["needs", "needs"])
         const counts = count(
           viewRows({
+            columns,
             recheck: O.none(),
             fixable: fixableBy([]),
             rejects: false,
@@ -162,6 +163,7 @@ describe("every row says why", () => {
   it.effect("gives each row of the sample that is not ready a sentence, the row with no fix included", () =>
     Effect.map(sampleRows("items_messy.csv", []), ({ current, decisions, rows }) => {
       const views = viewRows({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,
@@ -215,7 +217,7 @@ describe("rows that cannot be fixed here", () => {
     row(5, { problem: O.some(Problem.make({ kind: "unit", column: O.some("name") })) })
   ]
   const fixable = fixableBy(kinds)
-  const views = viewRows({ recheck: O.none(), rejects: false, rows, state: emptyState, fixable })
+  const views = viewRows({ columns, recheck: O.none(), rejects: false, rows, state: emptyState, fixable })
 
   it("are counted apart from the decisions, with their reason, and never offer an answer", () => {
     const counts = count(views)
@@ -230,6 +232,7 @@ describe("rows that cannot be fixed here", () => {
     )
     expect(
       act({
+        columns,
         recheck: O.none(),
         rejects: false,
         rows,
@@ -254,6 +257,7 @@ describe("a button that could do nothing is never offered", () => {
   it("is idle while decisions are open and nothing is ready", () => {
     const counts = count(
       viewRows({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,
@@ -269,6 +273,7 @@ describe("a button that could do nothing is never offered", () => {
   it("gives way to words when only rows nothing here can fix are left", () => {
     const counts = count(
       viewRows({
+        columns,
         recheck: O.none(),
         rejects: false,
         rows: [unknownItem(2)],
@@ -289,7 +294,7 @@ describe("a button that could do nothing is never offered", () => {
       expect(items.length).toBe(25)
       const { rows } = yield* sampleRows("items_clean.csv", items)
       const counts = count(
-        viewRows({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state: emptyState })
+        viewRows({ columns, recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state: emptyState })
       )
       expect(counts.stored).toBe(25)
       expect(primary({ closing: O.none(), words: defaultReviewWords, columns, counts, noun })).toEqual(
@@ -308,6 +313,7 @@ describe("status words", () => {
       row(4, { stored: true })
     ]
     const left = act({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -315,7 +321,7 @@ describe("status words", () => {
       state: emptyState,
       action: { type: "leaveOut" as const, rowIds: ["row-3"] }
     }).state
-    const views = viewRows({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state: left })
+    const views = viewRows({ columns, recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state: left })
     const csv = heldCsv({ views, columns, problemKinds: kinds, words })
     expect(csv).toContain("3,Skipped,Item 3")
     expect(csv).toContain("4,In stock already,Item 4")

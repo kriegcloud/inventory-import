@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 // The review region's own state beside the draft, wired: the region holds its decisions with their undo history
 // (`reviewState`), and the draft says when it must start again from what is shown now. What is held here is that the
 // region really does: after another person's row arrives, what the region reads is what the screen shows, said once
@@ -34,6 +35,9 @@ import {
   rowsNotSaved
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // What is said to the person.
 const page = vi.hoisted(() => ({
@@ -112,6 +116,7 @@ const world = (id: ImportId, network: { down: boolean }, reads: boolean) => {
       registry.set(
         reviewState(id),
         act({
+          columns: reviewColumns,
           rows,
           state: registry.get(reviewState(id)),
           action: { type: "leaveOut" as const, rowIds: [rowId] },

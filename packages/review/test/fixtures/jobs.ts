@@ -158,7 +158,7 @@ export function makeJobs(): ReadonlyArray<Job> {
     const count = 4 + ((index * 5) % 4)
     const lines: Array<Line> = []
     for (let at = 0; at < count; at += 1) {
-      const material = materials[(index * 3 + at * 7) % materials.length] ?? materials[0]!
+      const material = materials[(index * 3 + at * 7) % materials.length] ?? A.headNonEmpty(materials)
       const qty = material.unit === "pcs" ? String(8 + ((index + at) % 5) * 4) : String(2 + ((index * at) % 5))
       // Now and then a bar is counted in cut pieces, not metres: both are on the unit list.
       const unit = material.unit === "m" && (index + at) % 6 === 0 ? "pcs" : material.unit
@@ -187,7 +187,7 @@ export function makeJobs(): ReadonlyArray<Job> {
     if (job === undefined || target === undefined) continue
     const lines = [...job.lines]
     if (kind === "unit") {
-      const bar = materials[(jobAt + lineAt) % 4] ?? materials[0]!
+      const bar = materials[(jobAt + lineAt) % 4] ?? A.headNonEmpty(materials)
       lines[lineAt] = {
         ...target,
         material: bar.name,
@@ -197,7 +197,7 @@ export function makeJobs(): ReadonlyArray<Job> {
       }
     }
     if (kind === "comma") {
-      const [qty, material] = commas[comma % commas.length] ?? ["1,5", materials[0]!]
+      const [qty, material] = commas[comma % commas.length] ?? ["1,5", A.headNonEmpty(materials)]
       comma += 1
       const to = qty.replace(",", ".")
       lines[lineAt] = {
@@ -228,7 +228,7 @@ export function makeJobs(): ReadonlyArray<Job> {
       }
     }
     if (kind === "stock") {
-      const material = strangers[stranger % strangers.length] ?? strangers[0]!
+      const material = strangers[stranger % strangers.length] ?? A.headNonEmpty(strangers)
       stranger += 1
       lines[lineAt] = {
         ...target,

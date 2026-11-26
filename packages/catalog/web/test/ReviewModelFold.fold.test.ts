@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { identity } from "effect/Function"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 // The review's model holds no "what a row's decision is now": a row's own instance holds only its own acts, and an act
@@ -79,6 +80,9 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { sample, stage } from "./support/files.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // ---------------------------------------------------------------------------------------------------------------
 // What a group act does to one row, and the fold
@@ -1172,7 +1176,14 @@ const liveReview = (input: {
     const rows = input.rows(saved(stateOf(nobody.steps)))
     return {
       rows,
-      views: viewRows({ fixable: fixableBy([]), rejects: false, rows, state: stateOf(nobody.steps), ...checking })
+      views: viewRows({
+        columns: reviewColumns,
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state: stateOf(nobody.steps),
+        ...checking
+      })
     }
   }
   /**
@@ -1264,6 +1275,7 @@ const liveReview = (input: {
     presses += 1
     const actOn = (steps: Person["steps"], pressed: Action) =>
       act({
+        columns: reviewColumns,
         fixable: fixableBy([]),
         rejects: false,
         rows: shown.rows,
@@ -1478,12 +1490,22 @@ it.effect("the fold equals `act` on a group only when the group's rows are split
     const state: ReviewState = { decisions: HashMap.empty(), undo: [], redo: [] }
     const action: Action = { type: "chooseGroup", groupId: "g", value: "EA", except: [] }
     const unit = patchesFor({
-      views: viewRows({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state }),
+      views: viewRows({
+        columns: reviewColumns,
+        recheck: O.none(),
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state
+      }),
       decisions: state.decisions,
       action
     })
     const acted = yield* regionTexts(
-      saved(act({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state, action }).state)
+      saved(
+        act({ columns: reviewColumns, recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state, action })
+          .state
+      )
     )
     const split = partsOf(unit)
     expect(split.length).toBe(2)

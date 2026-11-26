@@ -1,3 +1,4 @@
+import { TotalCells } from "@inventory/review/ReviewDraft"
 // One review region's atoms, made once per region by `RegionScope` from the atoms its caller gives it: the rows, the
 // columns, the re-check and the decisions with their undo. What the region owns (the tab, the kind on screen, the
 // folds, the search, where focus goes next) is state here; everything worked out from that and from the caller's atoms
@@ -178,7 +179,7 @@ const col = createColumnHelper<DataTableFeatures, RowView>()
 const defsOf = (columns: ReadonlyArray<ReviewColumn>) =>
   col.columns(
     columns.map((column, index) =>
-      col.accessor((view) => view.cells[column.id] ?? "", {
+      col.accessor((view) => TotalCells.text(view.cells, column.id), {
         id: column.id,
         header: column.label,
         enableHiding: index !== 0,
@@ -264,7 +265,7 @@ const facetsOf = (
     >()
     const keyOf = (value: string): string => value.trim().toLowerCase()
     for (const view of views) {
-      const value = view.cells[column.id] ?? ""
+      const value = TotalCells.text(view.cells, column.id)
       const key = keyOf(value)
       if (key === "") continue
       const entry = O.getOrElse(MutableHashMap.get(found, key), () => ({
@@ -278,14 +279,18 @@ const facetsOf = (
       MutableHashMap.set(found, key, entry)
     }
     for (const view of list) {
-      O.map(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")), (entry) => {
+      O.map(MutableHashMap.get(found, keyOf(TotalCells.text(view.cells, column.id))), (entry) => {
         entry.n += 1
       })
     }
     const options = [...found]
       .map(([key, entry]) => ({
         key,
-        label: Object.entries(entry.spellings).sort((a, b) => b[1] - a[1])[0]?.[0] ?? key,
+        label: A.reduce(
+          Object.entries(entry.spellings).sort((a, b) => b[1] - a[1]),
+          key,
+          (label, [spelling], at) => (at === 0 ? spelling : label)
+        ),
         values: [...entry.values],
         n: entry.n
       }))
@@ -327,6 +332,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
 
   const views = Atom.readable((get) =>
     viewRows({
+      columns: get(input.columns),
       rows: get(input.rows),
       state: get(input.decisions),
       recheck: get(input.recheck),
@@ -412,7 +418,9 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     // Nothing ticked: the very list, so nothing that follows it is worked out again.
     return wanted.length === 0
       ? rows
-      : A.filter(rows, (view) => A.every(wanted, (facet) => HashSet.has(facet.values, view.cells[facet.column] ?? "")))
+      : A.filter(rows, (view) =>
+          A.every(wanted, (facet) => HashSet.has(facet.values, TotalCells.text(view.cells, facet.column)))
+        )
   })
   const tableData = Atom.map(shown, (rows) => [...rows])
   const groups = Atom.readable((get): ReadonlyArray<FixGroup> => {
@@ -749,6 +757,7 @@ const makeRegionTable = (
   const run = (action: Action, from: O.Option<string>) => {
     if (!onPage()) return
     const outcome = act({
+      columns: registry.get(region.input.columns),
       rows: registry.get(region.input.rows),
       state: registry.get(region.input.decisions),
       action,

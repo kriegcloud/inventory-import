@@ -7,6 +7,7 @@ import { identity } from "effect/Function"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
@@ -168,7 +169,7 @@ const pairs = (list: A.NonEmptyReadonlyArray<string>): A.NonEmptyReadonlyArray<r
     (label) => [label, label.replace(/ mm$/, "").replace(/ × /g, "-").replace(/ /g, "-").replace(/\./g, "")] as const
   )
 
-const families: ReadonlyArray<Family> = [
+const families: A.NonEmptyReadonlyArray<Family> = [
   {
     name: "Flat bar",
     code: "FB",
@@ -506,7 +507,10 @@ type StockCells = Record<
 /** The file as the review reads it: `size` rows, the same mix in every block of 178. `clean` removes every problem. */
 export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: boolean }): ReadonlyArray<ReviewRow> {
   const rows: Array<ReviewRow & { readonly cells: StockCells }> = []
-  const used = MutableHashMap.empty<string, number>()
+  const cycling = A.map(families, (family) => {
+    const turn = MutableRef.make(0)
+    return { ...family, next: () => MutableRef.getAndIncrement(turn) }
+  })
   for (let position = 0; position < input.size; position += 1) {
     const rank = rankOf(position % block)
     const lot = Math.floor(position / block)
@@ -514,16 +518,17 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     // The role picks the kind of item so the mess is believable: bolts counted "each", bar bought in "lengths".
     const pool =
       role === "each" || role === "pcs"
-        ? families.filter((family) => family.unit === "pcs")
+        ? cycling.filter((family) => family.unit === "pcs")
         : role === "length"
-          ? families.filter((family) => family.unit === "m")
+          ? cycling.filter((family) => family.unit === "m")
           : role === "kg"
-            ? families.filter((family) => family.unit === "kg")
-            : families
-    const family = pool[position % pool.length] ?? families[0]!
-    const turn = O.getOrElse(MutableHashMap.get(used, family.code), () => 0)
-    MutableHashMap.set(used, family.code, turn + 1)
-    const size = family.sizes[turn % family.sizes.length] ?? family.sizes[0]!
+            ? cycling.filter((family) => family.unit === "kg")
+            : cycling
+    const family = pool[position % pool.length] ?? A.headNonEmpty(cycling)
+    const turn = family.next()
+    const size = A.reduce(family.sizes, A.headNonEmpty(family.sizes), (chosen, size, index) =>
+      index === turn % family.sizes.length ? size : chosen
+    )
     const series = Math.floor(turn / family.sizes.length)
     const suffix =
       series === 0 ? "" : ` / ${String.fromCharCode(65 + (series % 26))}${series > 25 ? Math.floor(series / 26) : ""}`

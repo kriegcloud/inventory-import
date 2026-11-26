@@ -32,7 +32,7 @@ import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication
 
 const rows = makeRows({ size: 178 })
 const views = (state: ReviewState) =>
-  viewRows({ fixable: fixableBy([]), rejects: false, rows, state, recheck: O.some(recheck) })
+  viewRows({ columns, fixable: fixableBy([]), rejects: false, rows, state, recheck: O.some(recheck) })
 const plain = (state: ReviewState) => R.fromEntries(state.decisions)
 
 describe("column sizing", () => {
@@ -152,8 +152,15 @@ describe("undo and redo", () => {
       picks,
       emptyState,
       (state, pick) =>
-        act({ fixable: fixableBy([]), rejects: false, rows, state, action: actionOf(pick), recheck: O.some(recheck) })
-          .state
+        act({
+          columns,
+          fixable: fixableBy([]),
+          rejects: false,
+          rows,
+          state,
+          action: actionOf(pick),
+          recheck: O.some(recheck)
+        }).state
     )
 
   it.prop(
@@ -163,6 +170,7 @@ describe("undo and redo", () => {
       const state = play(picks)
       if (state.undo.length === 0) return
       const undone = act({
+        columns,
         fixable: fixableBy([]),
         rejects: false,
         rows,
@@ -171,6 +179,7 @@ describe("undo and redo", () => {
         recheck: O.some(recheck)
       }).state
       const redone = act({
+        columns,
         fixable: fixableBy([]),
         rejects: false,
         rows,
@@ -191,6 +200,7 @@ describe("undo and redo", () => {
       const state = play(picks)
       if (state.redo.length === 0) return
       const redone = act({
+        columns,
         fixable: fixableBy([]),
         rejects: false,
         rows,
@@ -201,6 +211,7 @@ describe("undo and redo", () => {
       expect(
         plain(
           act({
+            columns,
             fixable: fixableBy([]),
             rejects: false,
             rows,
@@ -215,8 +226,10 @@ describe("undo and redo", () => {
 
   it.prop("any new decision empties the redo stack", { picks: S.Array(Pick).check(S.isMaxLength(15)) }, ({ picks }) => {
     const state = play(picks)
-    const row = ready[0]!
+    const row = ready[0]
+    assertDefined(row)
     const outcome = act({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -228,8 +241,10 @@ describe("undo and redo", () => {
   })
 
   it("undo moves a step to redo, redo moves it back, and each says what it did", () => {
-    const row = ready[0]!
+    const row = ready[0]
+    assertDefined(row)
     const left = act({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -238,6 +253,7 @@ describe("undo and redo", () => {
       action: { type: "leaveOut", rowIds: [row.id] }
     })
     const undone = act({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -248,6 +264,7 @@ describe("undo and redo", () => {
     expect([undone.state.undo.length, undone.state.redo.length]).toEqual([0, 1])
     expect(undone.label).toBe("Undone: 1 row left out")
     const redone = act({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -261,6 +278,7 @@ describe("undo and redo", () => {
     // Nothing to redo: nothing happens.
     expect(
       act({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,
@@ -279,12 +297,14 @@ describe("the work list", () => {
     const list = workList({ counts, problemKinds, seen })
     expect(A.reduce(list, 0, (sum, item) => sum + item.left)).toBe(counts.needs)
     // Leave every row of the first kind out: it stays on the list, ticked, with none left.
-    const first = list[0]!
+    const first = list[0]
+    assertDefined(first)
     const ids = A.map(
       A.filter(rows, (row) => O.exists(row.problem, (problem) => problem.kind === first.kind.id)),
       (row) => row.id
     )
     const state = act({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -340,7 +360,7 @@ describe("a row already in the system", () => {
   })
   const all = [...rows, stored]
   const viewsOf = (state: ReviewState) =>
-    viewRows({ fixable: fixableBy([]), rejects: false, rows: all, state, recheck: O.some(recheck) })
+    viewRows({ columns, fixable: fixableBy([]), rejects: false, rows: all, state, recheck: O.some(recheck) })
 
   it("counts apart, shows under All only, and is held with its own reason", () => {
     const counts = count(viewsOf(emptyState))
@@ -363,6 +383,7 @@ describe("a row already in the system", () => {
   it("cannot be left out or edited: there is nothing to decide", () => {
     expect(
       act({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,
@@ -373,6 +394,7 @@ describe("a row already in the system", () => {
     ).toBe("")
     expect(
       act({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,

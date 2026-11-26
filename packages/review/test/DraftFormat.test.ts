@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 // A draft saved before the review region became a package, and before its decision became a tagged union, still
@@ -16,6 +17,9 @@ import { act } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
 import { restoredReview, SavedProgress } from "@inventory/review/SavedProgress"
 import before from "./fixtures/draft-before-the-move.txt?raw"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 const asText = S.fromJsonString(SavedProgress)
 
@@ -55,6 +59,7 @@ describe("a draft saved by the build before the move", () => {
         })
       )
       const after = act({
+        columns: reviewColumns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,

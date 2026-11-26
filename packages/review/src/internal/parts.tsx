@@ -1,3 +1,4 @@
+import { refCallback } from "./browser.ts"
 import { identity } from "effect/Function"
 import { CellMark } from "@inventory/review/ReviewTypes"
 import * as O from "effect/Option"
@@ -455,17 +456,21 @@ const CutScope = ScopedAtom.make(() =>
   Atom.readable((get) => {
     const registry = get.registry
     const held = Atom.make({ cut: false, open: false })
-    const measured = (element: HTMLSpanElement | null) => {
-      if (element === null) return undefined
-      const measure = () => {
-        const now = element.scrollWidth > element.clientWidth + 1
-        registry.update(held, (before) => (before.cut === now ? before : { ...before, cut: now }))
-      }
-      measure()
-      const observer = new ResizeObserver(measure)
-      observer.observe(element)
-      return () => observer.disconnect()
-    }
+    const measured = refCallback<HTMLSpanElement, undefined | (() => void)>((element) =>
+      O.match(element, {
+        onNone: () => undefined,
+        onSome: (element) => {
+          const measure = () => {
+            const now = element.scrollWidth > element.clientWidth + 1
+            registry.update(held, (before) => (before.cut === now ? before : { ...before, cut: now }))
+          }
+          measure()
+          const observer = new ResizeObserver(measure)
+          observer.observe(element)
+          return () => observer.disconnect()
+        }
+      })
+    )
     return { held, measured }
   })
 )

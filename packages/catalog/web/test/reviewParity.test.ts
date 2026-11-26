@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 import { assertDefined, assertTrue } from "@effect/vitest/utils"
@@ -42,6 +43,9 @@ import {
 } from "@inventory/catalog-web/ImportReview"
 import { stageTable } from "@inventory/catalog-model/Staging"
 
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
+
 /** A file from `public/samples/`, as the browser would hold it after the person chose it. */
 const sample = (name: string): File =>
   new File([new Uint8Array(readFileSync(new URL(`./fixtures/samples/${name}`, import.meta.url)))], name)
@@ -71,7 +75,14 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
     return {
       current,
       rows,
-      views: viewRows({ fixable: fixableBy([]), rejects: false, rows, state, recheck: O.some(recheck) })
+      views: viewRows({
+        columns: reviewColumns,
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state,
+        recheck: O.some(recheck)
+      })
     }
   }
   return {
@@ -82,7 +93,15 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
     /** One action of the person's, then what the screen does next: keep the decisions and derive the rows again. */
     press(action: Action) {
       const { rows } = derive()
-      state = act({ fixable: fixableBy([]), rejects: false, rows, state, action, recheck: O.some(recheck) }).state
+      state = act({
+        columns: reviewColumns,
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state,
+        action,
+        recheck: O.some(recheck)
+      }).state
       decisions = toServerDecisions(saved(state))
     },
     /** Every row stands the same in the region and in the domain. */

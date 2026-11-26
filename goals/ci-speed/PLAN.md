@@ -19,14 +19,14 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 3 | Split the check: `catalog-web:test`; `app:test:slow` with the grid test; everything else; "Check, test and build" stays as the job that waits for them | 3 to 5 min | nothing | built |
 | 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | todo |
 | 5 | Bring the vendored kit into the hash of prove, verify, mutants and mutants:sample; then take `@beep/repo-cli` out of the root's devDependencies, and bring the CLI's source to the tasks that run it through its own `transit`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | done ("Step 5, the experiment" below) |
-| 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | todo |
+| 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | built; CI's run waits on a push ("Step 6" below) |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | todo |
 | 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
 | 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | todo |
 | 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | todo |
 
-Steps 1 to 7 wait on nothing of Benjamin's. Every estimate is capped by the other job: steps 2 and 3 reach their
+Steps 1 to 8 and 10 wait on nothing of Benjamin's. Every estimate is capped by the other job: steps 2 and 3 reach their
 figures together, not apart.
 
 ## Blocker
@@ -101,6 +101,23 @@ install from nothing).
 
 Found on the way, and not this goal's: a new file git does not yet track in a kit package changed no proof's hash
 before this change, since the root's dependency hashed tracked files only. It does now.
+
+## Step 6, what a task sees
+
+`envMode` is `strict`. A task sees its own `env`, which turbo hashes, the pass-through list, which it does not, and
+the few turbo always lets through (PATH, HOME, the terminal's). The list, with the reason for each, is in
+`turbo.json`: `CI`, `GITHUB_ACTIONS`, `VITEST_MAX_WORKERS`, `LEDGER_BASE`, `JAVA_HOME`, `XDG_CACHE_HOME` and
+`MISE_*`. `build` names `CLOUDFLARE_ENV`, `BUNDLE_REPORT` and `ALCHEMY_CLOUDFLARE_VITE_INJECTED` in its `env`;
+`verify` already named `CI`. Run on 2026-11-26:
+
+| Trial | Result |
+| --- | --- |
+| `bun run check:full -- --force --continue` under strict | 114 of 114 tasks passed, none replayed, 3 min 39 s |
+| The 87 tasks' hashes with `AI_ENABLED=false` and a made-up `OPENROUTER_API_KEY` in the shell, against none | 0 of 87 change |
+| `@beep/types#test` with its script swapped for one that prints what it sees, under `AI_ENABLED=false VITEST_MAX_WORKERS=1` (put back after) | it saw `VITEST_MAX_WORKERS=1` and no `AI_ENABLED` |
+
+Not yet seen: a run of CI under strict. The workflows set only listed variables and the ones a step names for its
+own command, so none is expected to fail; a variable a task needs and the list lacks shows as that task failing.
 
 ## Step 7, what the build stores and which Node runs
 

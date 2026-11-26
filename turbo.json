@@ -9,9 +9,28 @@
     // And the one Node that runs every task (`.tool-versions`: the workflows set it up from this file, and a version
     // manager runs it on a workstation), so a result made under one Node is never replayed under another.
     "inputs": [".bun-version", ".tool-versions", "bunfig.toml", "packages/patches/*.patch"],
-    // Tasks see the whole environment (the slow tests start workerd and wrangler, which read many variables); none
-    // of it changes a cached result, so none of it is hashed.
-    "envMode": "loose"
+    // A task sees only the variables named for it: its own `env`, which are in its hash, and the ones below, which
+    // are not, beside the few turbo always lets through (PATH, HOME, the terminal's). So a variable set in a shell
+    // and named nowhere (a key, `AI_ENABLED`) reaches no task and changes no result, on the workstation or on CI:
+    // a result stored on one may be replayed on the other (goals/ci-speed).
+    "envMode": "strict",
+    // Let through and not hashed, because none of them changes whether a task passes:
+    // - `CI` and `GITHUB_ACTIONS`: Vitest refuses to write a new snapshot under CI, and a retried test is reported as
+    //   an annotation on GitHub's runner (vitest.retries.ts). The one task whose answer depends on `CI` is the
+    //   model's `verify`, which names it in its own `env`.
+    // - `VITEST_MAX_WORKERS`: how many workers a test run may start; CI gives one (docs/standards/engineering.md).
+    // - `LEDGER_BASE`: the commit CI names for the laws with a ledger, which are never replayed.
+    // - `JAVA_HOME` and `XDG_CACHE_HOME`: where the reasoner finds Java and keeps its jar; `reason` is never replayed.
+    // - `MISE_*`: the version manager's own, so its shims find the Node `.tool-versions` pins.
+    "passThroughEnv": [
+      "CI",
+      "GITHUB_ACTIONS",
+      "VITEST_MAX_WORKERS",
+      "LEDGER_BASE",
+      "JAVA_HOME",
+      "XDG_CACHE_HOME",
+      "MISE_*"
+    ]
   },
   "tasks": {
     // A task with no script anywhere: depending on `^transit` folds every workspace dependency's source into a
@@ -71,8 +90,11 @@
     // The production build and its identity check. Cloudflare's Vite plugin copies a `.dev.vars` (and a `.env`) it
     // finds beside the app into `dist`, for `vite preview`; that file holds the workstation's secrets, so it is
     // never part of the result turbo stores and may share. `test/TurboCache.test.ts` of the CLI holds these lines.
+    // What the build reads from the environment is in its hash: which of wrangler's environments it builds for, the
+    // bundle report's switch, and the mark Alchemy sets when it runs the build itself.
     "build": {
       "dependsOn": ["transit"],
+      "env": ["CLOUDFLARE_ENV", "BUNDLE_REPORT", "ALCHEMY_CLOUDFLARE_VITE_INJECTED"],
       "outputs": ["dist/**", "!dist/**/.dev.vars", "!dist/**/.dev.vars.*", "!dist/**/.env", "!dist/**/.env.*"]
     },
     "dev": { "dependsOn": ["//#patches:installed"], "cache": false, "persistent": true },

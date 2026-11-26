@@ -7,6 +7,7 @@
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Str from "effect/String"
 import { $XlsxId } from "./internal/identity.ts"
 
@@ -83,6 +84,11 @@ export const columnLetters = (column: XlsxColumn): string => {
   return letters
 }
 
+const ColumnLetters = S.String.pipe(
+  S.decode(SchemaTransformation.toUpperCase()),
+  $I.annoteSchema("ColumnLetters", { description: "Column reference letters in uppercase" })
+)
+
 /**
  * The column a run of letters names, when it is one a worksheet has. Lower case is accepted.
  *
@@ -99,13 +105,15 @@ export const columnLetters = (column: XlsxColumn): string => {
  */
 export const columnFromLetters = (letters: string): O.Option<XlsxColumn> => {
   if (letters.length === 0 || letters.length > 3) return O.none()
-  let n = 0
-  for (const letter of Str.toUpperCase(letters)) {
-    const place = Str.indexOf(letter)(ALPHABET)
-    if (O.isNone(place)) return O.none()
-    n = n * 26 + place.value + 1
-  }
-  return n - 1 > MAX_COLUMN ? O.none() : O.some(n - 1)
+  return O.flatMap(S.decodeOption(ColumnLetters)(letters), (uppercase) => {
+    let n = 0
+    for (const letter of uppercase) {
+      const place = Str.indexOf(letter)(ALPHABET)
+      if (O.isNone(place)) return O.none()
+      n = n * 26 + place.value + 1
+    }
+    return n - 1 > MAX_COLUMN ? O.none() : O.some(n - 1)
+  })
 }
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

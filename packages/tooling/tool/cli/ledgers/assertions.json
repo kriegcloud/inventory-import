@@ -24,7 +24,7 @@
   "packages/catalog/web/test/xlsxParity.test.ts": 1,
   "packages/client/src/Api.atoms.ts": 2,
   "packages/client/src/ApiRuntime.runtime.ts": 2,
-  "packages/foundation/modeling/csv/src/Csv.codec.ts": 9,
+  "packages/foundation/modeling/csv/src/Csv.codec.ts": 8,
   "packages/foundation/modeling/csv/test/CsvSchemas.property.test.ts": 2,
   "packages/foundation/modeling/csv/test/oracle.property.test.ts": 1,
   "packages/foundation/modeling/identity/src/Curie.ts": 1,

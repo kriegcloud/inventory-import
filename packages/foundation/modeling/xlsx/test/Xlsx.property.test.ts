@@ -7,6 +7,7 @@ import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { Xlsx, type XlsxRecord } from "@beep/xlsx/Xlsx"
 import { XlsxAddress, XlsxRange } from "@beep/xlsx/XlsxAddress"
@@ -22,7 +23,7 @@ import {
   XlsxUnreadable
 } from "@beep/xlsx/XlsxCell"
 import { XlsxWriteOptions, XlsxReadOptions, XlsxCodecOptions } from "@beep/xlsx/XlsxOptions"
-import { XlsxRow, XlsxSheetInfo, XlsxWorkbook, XlsxWorksheet } from "@beep/xlsx/XlsxWorkbook"
+import { XlsxRow, XlsxSheetInfo, XlsxWorkbook, XlsxWorksheet, XlsxSheetNameKey } from "@beep/xlsx/XlsxWorkbook"
 
 const runs = { arbitrary: { runs: 150 } }
 const workbooks = Arbitrary.schema(XlsxWorkbook)
@@ -234,6 +235,30 @@ describe("the codecs", () => {
       const bytes = yield* codec.encode([record])
       const back = yield* codec.decode(bytes)
       expect(back).toEqual([record])
+    })
+  )
+})
+
+describe("sheet comparison keys", () => {
+  it.prop("generate only valid values", [Arbitrary.schema(XlsxSheetNameKey)], ([key]) => {
+    expect(S.is(S.toType(XlsxSheetNameKey))(key)).toBe(true)
+  })
+
+  it.effect("compare case without changing the sheet name or its encoding", () =>
+    Effect.gen(function* () {
+      const name = "MiXeD İ Σ"
+      const key = yield* S.decodeEffect(XlsxSheetNameKey)(name)
+      expect(key).toBe("mixed i̇ σ")
+      const workbook = XlsxWorkbook.make({ sheets: [XlsxWorksheet.make({ info: XlsxSheetInfo.make({ name }) })] })
+      const sheet = XlsxWorkbook.sheet(workbook, "MIXED İ Σ")
+      expect(sheet).toEqual(O.some(workbook.sheets[0]))
+      const bytes = yield* Xlsx.stringify(workbook, XlsxWriteOptions.default)
+      const read = yield* Xlsx.parse(bytes, XlsxReadOptions.default)
+      expect(read.workbook.sheets[0].info.name).toBe(name)
+      const duplicate = yield* XlsxWorkbook.makeEffect({
+        sheets: [workbook.sheets[0], XlsxWorksheet.make({ info: XlsxSheetInfo.make({ name: "MIXED İ Σ" }) })]
+      }).pipe(Effect.result)
+      expect(Result.isFailure(duplicate)).toBe(true)
     })
   )
 })

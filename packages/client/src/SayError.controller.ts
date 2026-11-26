@@ -1,3 +1,4 @@
+import { UnknownError } from "./internal/unknownError.adapter.ts"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { dual } from "effect/Function"
 // The one place a failure becomes words for the person: what went wrong and what to do next. The rule this file
@@ -121,7 +122,7 @@ const logged = new WeakSet<object>()
 
 /** The raw failure, for whoever is debugging: in the console once, never on the screen. */
 const logOnce = (error: unknown) => {
-  if (typeof error === "object" && error !== null) {
+  if (UnknownError.isWeakKey(error)) {
     if (logged.has(error)) return Effect.void
     logged.add(error)
   }

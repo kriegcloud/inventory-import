@@ -79,6 +79,37 @@ export interface DefaultsExemption {
  */
 export const exemptions: ReadonlyArray<DefaultsExemption> = [
   {
+    file: "packages/review/src/internal/atomContext.adapter.ts",
+    kinds: ["fallback"],
+    why: "AtomContext.get.self has no prior value on its first read; each owner supplies the exact original initial value (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/review/src/internal/tanstackTable.adapter.ts",
+    kinds: ["fallback"],
+    why: "TanStack leaf columns can be empty; the hook copy then retains the supplied table as its owner (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/review/src/internal/tanstackVirtual.adapter.ts",
+    kinds: ["fallback", "unwrap"],
+    why: "TanStack virtual items may be empty while counts catch up, and getScrollElement explicitly requires a nullable DOM element (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/dataTable.adapter.ts",
+    kinds: ["fallback"],
+    why: "The vendored table hook requires numeric pageCount zero until the server supplies its first answer (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/test/support/webLocks.adapter.ts",
+    kinds: ["fallback"],
+    why: "The browser Web Locks API specifies exclusive mode when request options omit mode (Benjamin, 2026-11-26)"
+  },
+
+  {
+    file: "packages/ui/test/support/Storage.twin.ts",
+    kinds: ["fallback"],
+    why: "Browser Storage.getItem returns null for any missing key; this test twin shares that browser API boundary across all test pages (Benjamin, 2026-11-26)"
+  },
+  {
     file: "packages/access/host/src/internal/authOptions.ts",
     kinds: ["absence"],
     why: "Better Auth's own API: its session hook passes a null context and wants undefined back when there is nothing to change (Benjamin, 2026-11-26)"

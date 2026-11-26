@@ -1,3 +1,5 @@
+import { CountStart } from "./internal/CountStart.schema.ts"
+import { ReviewText } from "./internal/ReviewText.rules.ts"
 /**
  * The review region's rules as pure functions, so they can be tested without a browser: how a row stands after the
  * person's decisions, the counts that must add up, what one accept may touch, and what the import button says.
@@ -52,7 +54,7 @@ import * as S from "effect/Schema"
 import * as R from "effect/Record"
 import { $ReviewId } from "./internal/identity.ts"
 
-import { dual } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as P from "effect/Predicate"
 import * as SchemaGetter from "effect/SchemaGetter"
 
@@ -450,10 +452,10 @@ export function viewRows(input: {
   const byRow: Readonly<Record<string, O.Option<RowDecision>>> = Object.fromEntries(
     HashMap.map(decisions, (decision) => O.some(decision))
   )
-  // Missing decisions keep the existing shared None. The sparse lookup remains a counted fallback.
+  // Missing decisions remain None; existing wrapped decisions are reused without copying.
   Object.setPrototypeOf(byRow, null)
   const noDecision = O.none<RowDecision>()
-  const decisionOf = (rowId: string): O.Option<RowDecision> => byRow[rowId] ?? noDecision
+  const decisionOf = (rowId: string): O.Option<RowDecision> => O.flatten(O.fromUndefinedOr(byRow[rowId]))
   // A copy is settled once it is left out, or once the person typed a new value into the cell they shared.
   const settled = (rowId: string, column: O.Option<string>): boolean => {
     const decision = decisionOf(rowId)
@@ -523,7 +525,8 @@ export function count(views: ReadonlyArray<RowView>): Counts {
 }
 
 /** Undecided rows of one problem kind: none when the kind has no row waiting. */
-export const kindCount = (counts: Counts, kind: string): number => O.getOrElse(HashMap.get(counts.kinds, kind), () => 0)
+export const kindCount = (counts: Counts, kind: string): number =>
+  O.match(HashMap.get(counts.kinds, kind), { onNone: () => CountStart.make({}).value, onSome: identity })
 
 /** The rows a filter shows, in file order. A problem kind narrows the needs view only. */
 export function visible(input: {
@@ -666,7 +669,8 @@ export const variantsText = (group: FixGroup, display: (value: string) => string
  * A value from the file as the person can tell it apart: "empty" for nothing, and quotation marks around a value
  * with spaces at its ends, because `Foot ` beside `Foot` otherwise reads as no change at all.
  */
-export const spellingOf = (from: string): string => (from === "" ? "empty" : from !== from.trim() ? `“${from}”` : from)
+export const spellingOf = (from: string): string =>
+  from === "" ? "empty" : from !== ReviewText.comparison(from) ? `“${from}”` : from
 
 // ---------------------------------------------------------------------------------------------------------------
 // The person's actions. Each is one undo step.
@@ -1100,7 +1104,7 @@ const tabTally = (counts: Counts, words: ReviewWords): string =>
 export function heldLine(counts: Counts, words: ReviewWords): string {
   if (counts.total === 0) return ""
   const held = counts.needs + counts.cannot + counts.out
-  if (held === 0) return counts.stored === 0 ? `All ${counts.total} ${words.ready.toLowerCase()}` : ""
+  if (held === 0) return counts.stored === 0 ? `All ${counts.total} ${ReviewText.word(words.ready)}` : ""
   // Every row that is not imported is in the number, the ones already there too: it is the download's count.
   return `${held + counts.stored} won't be imported: ${tabTally(counts, words)}`
 }
@@ -1423,8 +1427,8 @@ export const shownWith = (
   return O.match(column.unitFrom, {
     onNone: () => shown,
     onSome: (id) => {
-      const unit = TotalCells.text(cells, id).trim()
-      return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
+      const unit = ReviewText.comparison(TotalCells.text(cells, id))
+      return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(ReviewText.comparison(shown)) ? `${shown} ${unit}` : shown
     }
   })
 }
@@ -1505,7 +1509,7 @@ export function otherAnswers(input: {
 
 /** A column's name inside a sentence: lower case, except a name in capitals ("SKU") or one with a capital inside it. */
 export const inSentence = (label: string): string =>
-  label === label.toUpperCase() || /.[A-Z]/.test(label) ? label : label.toLowerCase()
+  label === ReviewText.capital(label) || /.[A-Z]/.test(label) ? label : ReviewText.word(label)
 
 /**
  * The button that opens the one field for a value the person types, when the caller gave no `ask`: "Set" and the
@@ -1515,7 +1519,7 @@ export const inSentence = (label: string): string =>
  * @example askFor("Item #") // "Set item #"
  * @example askFor("SKU") // "Set SKU"
  */
-export const askFor = (label: string): string => `Set ${inSentence(label.trim())}`
+export const askFor = (label: string): string => `Set ${inSentence(ReviewText.comparison(label))}`
 
 /** One line of the work list: a problem kind, how many of its rows still need the person, and whether it is done. */
 export type WorkItem = { readonly kind: ProblemKind; readonly left: number; readonly done: boolean }

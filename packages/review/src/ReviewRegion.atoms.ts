@@ -1,3 +1,7 @@
+import { CountStart, FacetStart } from "./internal/CountStart.schema.ts"
+import { ReviewText } from "./internal/ReviewText.rules.ts"
+import { AtomContext } from "./internal/atomContext.adapter.ts"
+import { TanStackTable } from "./internal/tanstackTable.adapter.ts"
 import { TotalCells } from "@inventory/review/ReviewDraft"
 // One review region's atoms, made once per region by `RegionScope` from the atoms its caller gives it: the rows, the
 // columns, the re-check and the decisions with their undo. What the region owns (the tab, the kind on screen, the
@@ -270,26 +274,21 @@ const facetsOf = (
         readonly spellings: Record<string, number>
       }
     >()
-    const keyOf = (value: string): string => value.trim().toLowerCase()
+    const keyOf = (value: string): string => ReviewText.facet(value)
     for (const view of views) {
       const value = TotalCells.text(view.cells, column.id)
       const key = keyOf(value)
       if (key === "") continue
-      const entry = O.getOrElse(
-        MutableHashMap.get(found, key),
-        (): {
-          readonly values: MutableHashSet.MutableHashSet<string>
-          readonly n: number
-          readonly spellings: Record<string, number>
-        } => ({
-          values: MutableHashSet.empty<string>(),
-          n: 0,
-          spellings: {}
-        })
-      )
+      const entry = O.match(MutableHashMap.get(found, key), {
+        onNone: () => ({ ...FacetStart.make({}), values: MutableHashSet.empty<string>() }),
+        onSome: identity
+      })
       MutableHashSet.add(entry.values, value)
-      const spelling = value.trim()
-      entry.spellings[spelling] = (entry.spellings[spelling] ?? 0) + 1
+      const spelling = ReviewText.comparison(value)
+      entry.spellings[spelling] = O.match(O.fromUndefinedOr(entry.spellings[spelling]), {
+        onNone: () => CountStart.make({}).value + 1,
+        onSome: (count) => count + 1
+      })
       MutableHashMap.set(found, key, entry)
     }
     for (const view of list) {
@@ -382,7 +381,7 @@ const makeRegion: {
   // The work list: every kind that has had rows since the review opened stays on it, ticked once done.
   const seenKinds: Atom.Atom<HashSet.HashSet<string>> = Atom.readable((get) => {
     const now = get(counts)
-    const before = O.getOrElse(get.self<HashSet.HashSet<string>>(), () => HashSet.empty<string>())
+    const before = AtomContext.previous(get, () => HashSet.empty<string>())
     const more = get(problemKinds).filter((entry) => kindCount(now, entry.id) > 0 && !HashSet.has(before, entry.id))
     return more.length === 0 ? before : more.reduce((seen, entry) => HashSet.add(seen, entry.id), before)
   })
@@ -654,7 +653,7 @@ const makeRegionTable: {
       return said()
     })
     // The hook hands the screen a copy of the table; the table itself is the one its columns belong to.
-    const core = () => table.getAllLeafColumns()[0]?.table ?? table
+    const core = () => TanStackTable.core(table)
     // How many times the table was given rows here: the order is read again after each.
     const given = Atom.make(0)
     ctx.mount(given)
@@ -677,7 +676,7 @@ const makeRegionTable: {
       get(sorted)
       // Between the region working the rows out and the table being given them (the same change), the table still
       // holds the rows before: the order already read is kept, and `given` reads it again a moment later.
-      if (core().options.data !== data) return O.getOrElse(get.self<ReadonlyArray<RowView>>(), A.empty)
+      if (core().options.data !== data) return AtomContext.previous<ReadonlyArray<RowView>>(get, A.empty)
       return table.getPrePaginatedRowModel().rows.map((row) => row.original)
     })
     const visibility = Atom.readable((get): Readonly<Record<string, boolean>> => {
@@ -731,7 +730,7 @@ const makeRegionTable: {
       // Held here so the region's presence and its toasts are kept for as long as its moves are followed.
       get(region.present)
       get(region.toasts)
-      return O.getOrElse(get.self<number>(), () => 0) + 1
+      return AtomContext.previous(get, () => 0) + 1
     })
 
     const want = (wanted: O.Option<Wanted>) => registry.update(region.nav, (before) => ({ ...before, wanted }))
@@ -1001,7 +1000,7 @@ const makeRegionTable: {
         const onKey = (event: KeyboardEvent) => {
           // Inside a text field the browser's own undo applies.
           if (!onPage() || event.defaultPrevented || isTyping(event.target)) return
-          const key = event.key.toLowerCase()
+          const key = ReviewText.word(event.key)
           if ((event.ctrlKey || event.metaKey) && !event.altKey && key === "z") {
             event.preventDefault()
             run(event.shiftKey ? { type: "redo" as const } : { type: "undo" as const }, O.none())

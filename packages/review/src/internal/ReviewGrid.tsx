@@ -1,3 +1,7 @@
+import { ReviewText } from "./ReviewText.rules.ts"
+import { AtomContext } from "./atomContext.adapter.ts"
+import { TanStackTable } from "./tanstackTable.adapter.ts"
+import { TanStackVirtual } from "./tanstackVirtual.adapter.ts"
 import * as S from "effect/Schema"
 import * as Effect from "effect/Effect"
 import { $ReviewId } from "./identity.ts"
@@ -341,7 +345,7 @@ const measureNeeds = (input: {
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono, medium: false })
-        : isCellMarkProposed(mark) && mark.from.trim() === mark.to && to.length > longValue
+        : isCellMarkProposed(mark) && ReviewText.comparison(mark.from) === mark.to && to.length > longValue
           ? chip
           : from + arrowGap + chip
       // A proposal carries its "Why?" in the cell, except under a group heading, which says why for all its rows.
@@ -1643,7 +1647,10 @@ const makeGrid: {
       const sized = columns.map((column, index) => ({
         id: column.id,
         size: column.size,
-        need: measured[index] ?? O.match(column.width, { onNone: () => fillLeast, onSome: (width) => width }),
+        need: O.match(A.get(measured, index), {
+          onNone: () => O.match(column.width, { onNone: () => fillLeast, onSome: identity }),
+          onSome: identity
+        }),
         priority: priorityOf(column),
         keep: index === 0 || column.id === reasonColumn.id || HashSet.has(kept, column.id)
       }))
@@ -1758,16 +1765,18 @@ const makeGrid: {
   )
 
   const sizeOf = (index: number): number => {
-    const line = registry.get(entries)[index]
-    return line === undefined
-      ? bandHeight
-      : lineMatch(line, {
+    const line = TanStackVirtual.entry(registry.get(entries), index)
+    return O.match(line, {
+      onNone: () => bandHeight,
+      onSome: (line) =>
+        lineMatch(line, {
           Row: () => registry.get(rowSize),
           Group: () => groupHeight,
           Kind: () => bandHeight,
           Rest: () => bandHeight,
           Detail: () => bandHeight
         })
+    })
   }
 
   // -- The virtual list is TanStack's: where the frame is scrolled to and how tall each line was measured are its
@@ -1789,7 +1798,7 @@ const makeGrid: {
   }
   const list: Lines = new Virtualizer<HTMLDivElement, Element>({
     count: registry.get(entries).length,
-    getScrollElement: () => O.getOrNull(registry.get(scroller)),
+    getScrollElement: () => TanStackVirtual.scroller(registry.get(scroller)),
     estimateSize: sizeOf,
     overscan: 12,
     // A new size of the frame is told even when the range stays: the lines in view are read again all the same.
@@ -1835,7 +1844,7 @@ const makeGrid: {
       get(heard)
       get(rowSize)
       get(scroller)
-      if (!inStep(lines)) return O.getOrElse(get.self<Drawn>(), () => nothingDrawn)
+      if (!inStep(lines)) return AtomContext.previous(get, () => nothingDrawn)
       return { items: list.getVirtualItems(), total: list.getTotalSize() }
     }),
     (before, next) => before.items === next.items && before.total === next.total
@@ -1959,14 +1968,13 @@ export function ReviewGrid(props: GridProps) {
   // The region asks for a row to be in view before it puts the focus there.
   useAtomSubscribe(region.reveal, grid.bring)
 
-  const padTop = items[0]?.start ?? 0
-  const padBottom = total - (items[items.length - 1]?.end ?? 0)
+  const { top: padTop, bottom: padBottom } = TanStackVirtual.padding(items, total)
   const span = columns.length + (showStatus ? 2 : 1)
   // The flex column is drawn without a width and takes what the others leave, so rounding never opens a gap.
   const widthOf = (id: string): number | undefined =>
     O.contains(plan.flex, id) ? undefined : plan.shown.find((shown) => shown.id === id)?.width
   const widths = [
-    widthOf(columns[0]?.id ?? ""),
+    O.match(A.head(columns), { onNone: () => widthOf(""), onSome: (column) => widthOf(column.id) }),
     ...(showStatus ? [statusWidth] : []),
     ...columns.slice(1).map((column) => widthOf(column.id)),
     actionsWidth
@@ -1983,7 +1991,7 @@ export function ReviewGrid(props: GridProps) {
         <StickyTableHeader>
           <StickyTableRow aria-rowindex={1}>
             {columns.map((column, index) => {
-              const sortable = column.id === reasonColumn.id ? undefined : props.table.getColumn(column.id)
+              const sortable = column.id === reasonColumn.id ? O.none() : TanStackTable.column(props.table, column.id)
               return (
                 <Fragment key={column.id}>
                   <StickyTableColumn
@@ -1991,7 +1999,7 @@ export function ReviewGrid(props: GridProps) {
                     {...R.getSomes({ align: column.align })}
                     // A sortable heading is one control as large as its cell, so the cell keeps no padding of its own.
                     flush={
-                      sortable !== undefined &&
+                      O.isSome(sortable) &&
                       !(O.exists(column.match, isColumnMatchUnmatched) && props.onMatch !== undefined)
                     }
                   >
@@ -2003,11 +2011,11 @@ export function ReviewGrid(props: GridProps) {
                       >
                         {index === 0 && folded.length > 0 ? <span aria-hidden className="w-6 flex-none" /> : null}
                         {index === 0 ? <span className="mr-0.5 w-7 flex-none text-right text-xs">Row</span> : null}
-                        {sortable === undefined ? (
+                        {O.isNone(sortable) ? (
                           column.label
                         ) : (
                           <DataTableColumnHeader
-                            column={sortable}
+                            column={sortable.value}
                             label={column.label}
                             {...R.getSomes({ unit: column.unit })}
                             // The sort mark sits beside its own label, never at the cell's far edge, where it read
@@ -2054,9 +2062,9 @@ export function ReviewGrid(props: GridProps) {
             <>
               {padTop > 0 ? <StickyTableFill span={span} height={padTop} /> : null}
               {items.map((item) => {
-                const entry = entries[item.index]
-                if (entry === undefined) return null
-                return lineMatch<ReactNode>(entry, {
+                const entry = TanStackVirtual.entry(entries, item.index)
+                if (O.isNone(entry)) return null
+                return lineMatch<ReactNode>(entry.value, {
                   Detail: ({ view }) => (
                     <StickyTableBand
                       key={`detail:${view.row.id}`}

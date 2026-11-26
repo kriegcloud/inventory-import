@@ -1,7 +1,7 @@
 ---
 type: Research
 title: The party slice's terms
-description: The design of slice 1's terms for one accepting decision (129), revised to decisions 154 to 167 and after its second review - every new and changed class, property, scheme and concept with its text, tag, parents, identity criterion, basis and gist names, the evidence each property enters on and the PLAN step that adds it, the gist facts read from the pinned file, the Sutton coverage as answered, the questions each term serves, the choices this report makes, and the ten questions still open.
+description: The final design of slice 1's terms for one accepting decision (129), revised to decisions 154 to 175 - every new and changed class, property, scheme and concept with its text, tag, parents, identity criterion, basis and gist names, the evidence each property enters on and the PLAN step that adds it, the gist facts read from the pinned file, the Sutton coverage as answered, the questions each term serves, the choices this report makes, the questions answered since the first draft, and the one question still open, the accepting decision's number.
 ---
 
 # The party slice's terms
@@ -10,18 +10,18 @@ This is step 8 of [goals/party-slice](../../../goals/party-slice/PLAN.md): the t
 vocabulary module, or changes in it, written so that Benjamin can accept it as one decision (decision 129). Nothing
 here is built. `packages/kernel/src/Terms.vocab.ts` and every file under `packages/ontology/generated/` are unchanged
 by this report; steps 9 to 12 write the terms, each with the marks or the named fixtures that show its properties in
-use. The decisions this report applies are 129 to 167 with the earlier ones they cite: 129 to 153 answered the goal's
-open rows, and 154 to 167 answered the first draft's questions 2 to 16 and step 7's open points (section 13.2). Where
-a source left a name or a wording open, this report chooses, and section 11 lists the choice so that the accepting
-decision covers it. Section 11 also lists the modelling choices no decision rules but that a decision's words or the
-metamodel leave to this report, such as `maxRole` entering as a term or `IdentityEvidence`'s basis, so that accepting
-the report accepts them knowingly. Where no decision rules a point that a term rests on and the choice is a term-model
-call, the point is a question in section 13.1 and nothing that depends on it is built.
+use. The decisions this report applies are 129 to 175 with the earlier ones they cite: 129 to 153 answered the goal's
+open rows, 154 to 167 answered the first draft's questions 2 to 16 and step 7's open points, and 168 to 175 answered
+the second list's questions 2 to 10 (section 14). Where a source left a name or a wording open, this report chooses,
+and section 11 lists the choice so that the accepting decision covers it. Section 11 also lists the modelling choices
+no decision rules but that a decision's words or the metamodel leave to this report, such as `maxRole` entering as a
+term or `IdentityEvidence`'s basis, so that accepting the report accepts them knowingly. No point a term rests on is
+left open: the one question in section 13 is the accepting decision's number.
 
 ## 1. What this rests on, and what was read
 
 - The goal's [SPEC](../../../goals/party-slice/SPEC.md) and [PLAN](../../../goals/party-slice/PLAN.md), steps 1 to 7
-  as built, and the answered decisions 129 to 167 in [DECISIONS.md](../DECISIONS.md), with 12, 16 to 18, 33 to 37,
+  as built, and the answered decisions 129 to 175 in [DECISIONS.md](../DECISIONS.md), with 12, 16 to 18, 33 to 37,
   45, 89, 93, 94, 100, 101, 104, 124 to 126, 128, P1 and P2.
 - Term text: [report 06](06-party-and-access-terms.md) (classes, properties, the axiom plan), [report
   04](04-requirements.md) (`SourceRecord`, its four properties, CQ-P01 to CQ-P11 and the drafted queries),
@@ -54,7 +54,7 @@ reach no Turtle (decision 19).
 | | New | Changed |
 | --- | --- | --- |
 | Classes | 10: `Party`, `SourceRecord`, `IdentityDecision`, `IdentityEvidence`, `AgentRun`, `ModelCall`, `SignInAccount`, `PostalAddress`, `ContactPoint`, `ContactAssignment` | 3: `Member` (definition, criterion and basis: P2, 137, 154, 158), `Person` (category parent `Party`, decision 12, and `storesId: false`, decision 161), `Organization` (category parent `Party`, decision 12) |
-| Object properties | 27 | 1: `grantScope` (under `gist:isCategorizedBy`, decision 17) |
+| Object properties | 27 | 2: `grantScope` (under `gist:isCategorizedBy`, decision 17), `membershipIn` (definition, decision 169) |
 | Datatype properties | 26 | none |
 | Schemes | 7: `IdentityOutcomeScheme`, `MembershipStatusScheme`, `ModelCallPurposeScheme`, `ContactPurposeScheme`, `ContactPointKindScheme`, `ContactTypeScheme`, `AccountStatusScheme` | none |
 | Concepts | 24 | none |
@@ -64,27 +64,26 @@ reach no Turtle (decision 19).
 After step 12 the module holds 17 classes, 62 properties (34 object, 28 datatype), 9 schemes and 28 concepts, against
 the thread's 7, 9 (7 object, 2 datatype), 2 and 4. Its gist list holds 12 classes, 4 disjoint pairs and 5 properties,
 against the thread's 7, 3 and none; 7 properties carry a designation, against none; the exception list holds 2
-entries, `Role` and `Party`. Section 13.1's questions add or remove no term, so none of these counts moves: question 2
-rewords one thread property, questions 5 and 8 may each add one gist link, questions 3 and 4 change placements and a
-criterion's wording, question 6 narrows two definitions, question 10 may change `Party`'s `storesId`, and questions 7
-and 9 change how the lift and guard 1 read terms already listed.
+entries, `Role` and `Party`. Fifteen properties sit under a gist property, against the thread's none: nine under
+`gist:isCategorizedBy`, three under `gist:hasAddress`, and one each under `gist:isAbout`, `gist:atDateTime` and
+`gist:name`. Decisions 168 to 175 added and removed no term: 169 rewords one thread property, 174 adds one gist link
+(`memberContactPoint`) and keeps `defaultFor` without one, 172 and 173 change placements and a criterion's wording, 168
+narrows two definitions, 170 sets `Party`'s `storesId`, and 171 and 175 settle how guard 1 and the lift read terms
+already listed.
 
 | Step | Classes | Object properties | Datatype properties | Schemes (concepts) | gist names |
 | --- | --- | --- | --- | --- | --- |
-| 9 | `Party`, `SourceRecord`; `Person` and `Organization` gain `Party`, `Person` `storesId: false` | `recordOf`; `grantScope`'s gist link | `sourceSystem`, `sourceType`, `sourceId`, `capturedAt`, `isCustomer`, `isVendor` | none | `isCategorizedBy`, `isAbout` |
+| 9 | `Party` (`storesId: false`), `SourceRecord`; `Person` and `Organization` gain `Party`, `Person` `storesId: false` | `recordOf`; `grantScope`'s gist link | `sourceSystem`, `sourceType`, `sourceId`, `capturedAt`, `isCustomer`, `isVendor` | none | `isCategorizedBy`, `isAbout` |
 | 10 | `IdentityDecision`, `IdentityEvidence` | `decidesOn`, `identityOutcome`, `decidedBy`, `citesEvidence` | `eventTime`, `evidenceText` | `IdentityOutcomeScheme` (2) | `Event`, `Determination`, `atDateTime` |
 | 11 | `AgentRun`, `ModelCall`, `SignInAccount`; `Member` changed | `membershipStatus`, `memberAccount`, `recordedAgentRun`, `maxRole`, `callPurpose`, `calledFor` | `joinedAt`, `accountEmail`, `name`, `agentName`, `calledAt` | `MembershipStatusScheme` (4), `ModelCallPurposeScheme` (3) | `name` |
-| 12 | `PostalAddress`, `ContactPoint`, `ContactAssignment` | `hasPostalAddress`, `addressPurpose`, `defaultFor`, `hasContactPoint`, `contactPointKind`, `contactPerson`, `contactAccount`, `assignmentPoint`, `servesPurpose`, `contactAt`, `contactType`, `contactOwner`, `primaryContact`, `accountStatus`, `membershipWorkspace`, `memberContactPoint` | `addressLines`, `locality`, `region`, `postalCode`, `countryCode`, `contactValue`, `extension`, `givenName`, `middleName`, `familyName`, `jobTitle`, `profileImage`, `profileText` | `ContactPurposeScheme` (7), `ContactPointKindScheme` (2), `ContactTypeScheme` (4), `AccountStatusScheme` (2) | `Address`, `PhysicalAddress`, `ElectronicAddress`, their pair, `hasAddress` |
-| Sum | 10 new, 3 changed | 27 new, 1 changed | 26 new | 7 (24) | 5 classes, 1 pair, 5 properties |
+| 12 | `PostalAddress`, `ContactPoint`, `ContactAssignment` | `membershipIn`'s text changed; `hasPostalAddress`, `addressPurpose`, `defaultFor`, `hasContactPoint`, `contactPointKind`, `contactPerson`, `contactAccount`, `assignmentPoint`, `servesPurpose`, `contactAt`, `contactType`, `contactOwner`, `primaryContact`, `accountStatus`, `membershipWorkspace`, `memberContactPoint` | `addressLines`, `locality`, `region`, `postalCode`, `countryCode`, `contactValue`, `extension`, `givenName`, `middleName`, `familyName`, `jobTitle`, `profileImage`, `profileText` | `ContactPurposeScheme` (7), `ContactPointKindScheme` (2), `ContactTypeScheme` (4), `AccountStatusScheme` (2) | `Address`, `PhysicalAddress`, `ElectronicAddress`, their pair, `hasAddress` |
+| Sum | 10 new, 3 changed | 27 new, 2 changed | 26 new | 7 (24) | 5 classes, 1 pair, 5 properties |
 
-A placement marked **(waits: question n)** rests on question n of section 13.1: it is written as this report proposes
-it, and nothing that depends on it is built until that question is answered.
-
-**Which decision each term names** (decision 129). Each new term, `Member` and `Party`'s exception entry name the
-decision that accepts this report. `Person`, `Organization` and `grantScope` keep decision 111: their text does not
-change, and the accepting decision lists their new links and `Person`'s `storesId: false` (section 3.3, decision
-161). Whether the accepting decision is decision 129 itself or a new heading, `### 168.`, is question 1; this report
-calls it "the accepting decision".
+**Which decision each term names** (decision 129). Each new term, `Member`, `membershipIn` (decision 169) and `Party`'s
+exception entry name the decision that accepts this report. `Person`, `Organization` and `grantScope` keep decision
+111: their text does not change, and the accepting decision lists their new links and `Person`'s `storesId: false`
+(section 3.3, decision 161). Whether the accepting decision is decision 129 itself or a new heading, `### 176.`, is
+section 13's one question; this report calls it "the accepting decision".
 
 ## 3. Classes
 
@@ -94,26 +93,29 @@ Every criterion below is stated with its basis (`restsOn`): the properties of th
 stored id is said in its sentence and is not a key of `restsOn`, which holds property keys only; a basis may be left
 empty (decision 160). Section 6 checks each against rule C16 as step 7 built it. Every criterion that does not name
 the system that issued its id holds this app's ids only: for `Member`, `SignInAccount` and `ContactAssignment`, which
-decision 158 names, an id a source such as Sutton issued waits until that source's records are lifted and their IRIs
-are decided (section 12). `SourceRecord`'s criterion names its system and is keyed by the source's own opaque id by
-design (decision 34). `PostalAddress`'s is keyed by its id within the tenant, which in this slice only a Sutton
-`Address` gives; whether 158's rule covers it is question 4.
+decision 158 names, and for `PostalAddress`, to which decision 173 applies 158's rule, an id a source such as Sutton
+issued waits until that source's records are lifted and their IRIs are decided (section 12). `SourceRecord`'s
+criterion names its system and is keyed by the source's own opaque id by design (decision 34). In this slice only a
+Sutton `Address` gives a postal address, so no address is identified beyond the fixtures, which name theirs
+(decision 173).
 
 | Key | Label | Definition | Tag | Parent | Category parents | Named gist ancestors | Identity criterion | Basis (`restsOn`) | `storesId` | Step |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `Party` | Party | An agent that is either a human being or an organized body, named so that the properties persons and organizations share have one range. | category | none, on the exception list (section 3.4) | none | none | none: a category supplies no criterion (decision 12, rule C7) | none | true, the default (waits: question 10) | 9 |
+| `Party` | Party | An agent that is either a human being or an organized body, named so that the properties persons and organizations share have one range. | category | none, on the exception list (section 3.4) | none | none | none: a category supplies no criterion (decision 12, rule C7) | none | false (decision 170) | 9 |
 | `SourceRecord` | Source record | Content an external system or the tenant holds about one thing, named by its system, its record type and its opaque id, so that a later read of the same record is the same source record; the tenant's assertions about that thing, such as its customer and vendor flags, sit on it. | information | `gist:Content` | none | none | Stated: the tenant, the source system, the record's type and its opaque id, each kept as written (case, leading zeros, punctuation); equal ids in two systems or two tenants are two records (decision 34). | `inTenant`, `sourceSystem`, `sourceType`, `sourceId` | true | 9 |
 | `IdentityDecision` | Identity decision | A determination by a member that two source records the tenant holds describe the same party, or different parties, resting on the evidence it cites. | event | `gist:Determination` | none | `gist:Event` | Stated: the tenant and the decision's own id. | `inTenant` | true | 10 |
 | `IdentityEvidence` | Identity evidence | A statement of one observed likeness or difference between two source records the tenant holds, such as a shared tax number or names one letter apart, cited by an identity decision. | information | `gist:Content` | none | none | Stated: the tenant and the evidence's own id; one piece of evidence may be cited by more than one decision. | `inTenant` | true | 10 |
 | `AgentRun` | Agent run | An event in which a software agent acts for one signed-in member, never above that member's role nor above its own role cap. | event | `gist:Event` | none | none | Stated: the request it runs in; never the agent's name, which many runs share (decision 160). | none | false (decision 135) | 11 |
 | `ModelCall` | Model call | An event in which the app asks a language model one question for a tenant, taken from that tenant's daily allowance before it is asked. | event | `gist:Event` | none | none | Stated: the tenant and the call's id, the `modelCall` table's key. | `inTenant` | true | 11 |
 | `SignInAccount` | Sign-in account | A credential record that lets one person sign in to an application, this one or a source such as Sutton, before any organization is chosen. | information | `gist:Content` | none | none | Stated: the UserId this application gives the account, never its email, which can change (decision 104); an account another system issued, such as a Sutton User, waits until that system's records are lifted (decision 158). | none | true | 11 |
-| `PostalAddress` | Postal address | A physical address, written as lines, locality, region, postal code and country, that a tenant's record of a party gives for receiving or sending goods, documents or invoices. | information | `gist:PhysicalAddress` | none | `gist:Address`, `gist:Content` | Stated: its own record id within the tenant; equal text on two records is two addresses (decision 138). (waits: question 4) | `inTenant` | true | 12 |
-| `ContactPoint` | Contact point | An electronic address, an email address or a telephone number, at which a party is reached. | information | `gist:ElectronicAddress` | none | `gist:Address`, `gist:Content` | Stated: the record that gives it and the field it is read from, so a contact's email is one point and its phone another, never its value alone (decision 159). | none | true: its IRI is made from that record and field, as the lift makes a `Grant`'s node (decision 159); how a lift of a path that ends in `contactValue` reaches that node is question 7, which no slice-1 step waits on | 12 |
+| `PostalAddress` | Postal address | A physical address, written as lines, locality, region, postal code and country, that a tenant's record of a party gives for receiving or sending goods, documents or invoices. | information | `gist:PhysicalAddress` | none | `gist:Address`, `gist:Content` | Stated: its own record id within the tenant; equal text on two records is two addresses (decision 138), and an id a source issued waits until that source's records are lifted (decisions 158 and 173). | `inTenant` | true | 12 |
+| `ContactPoint` | Contact point | An electronic address, an email address or a telephone number, at which a party is reached. | information | `gist:ElectronicAddress` | none | `gist:Address`, `gist:Content` | Stated: the record that gives it and the field it is read from, so a contact's email is one point and its phone another, never its value alone (decision 159). | none | true: its IRI is made from that record and field, as the lift makes a `Grant`'s node (decision 159); in this slice every contact point is written on fixtures by hand, and how a lift of a path that ends in `contactValue` reaches that node is asked when Sutton records are first lifted (decision 175) | 12 |
 | `ContactAssignment` | Contact assignment | A relationship naming one person to reach at one account for a stated purpose using a particular contact point. | relator | `gist:Assignment` | none | `gist:TemporalRelation` | Stated: the tenant and the assignment's own id within its tenant, never the person or the contact point alone (decisions 39 and 43); an id a source issued waits until that source's records are lifted (decision 158). | `inTenant` | true | 12 |
 
 `Party` is never typed directly: a property whose range is `Party` takes a `Person` or an `Organization` (decision
-12), found by the questions through `rdfs:subClassOf*` (decision 27). `ContactPoint`'s basis is empty because the
+12), found by the questions through `rdfs:subClassOf*` (decision 27). `Party` stores no id (decision 170): a category
+has none of its own, so the lift writes no `Party` node, and a record's party is stated on fixtures as a `Person` or an
+`Organization`. `ContactPoint`'s basis is empty because the
 record that gives the point reaches it by `hasContactPoint` or `memberContactPoint`, which point from that record at
 the point, and its field is no property; decision 160 lets the basis be empty, and the sentence says what identifies
 the point. A `ContactAssignment` gives no point: `assignmentPoint` names one a record already gives, so two
@@ -134,16 +136,17 @@ The widening is breaking under decision 24: a pending invitee was not a member a
 let its person act in a source's workspace rather than this app's. Step 11's commit marks the release line "0.2.0:
 the party slice" breaking and names `Member` and decision P2 (SPEC, Constraints), and decision 154, whose clause the
 widened definition also carries. The definition enters whole in step 11; its clause "where it names one" has no
-instance until step 12 brings `membershipWorkspace` and the first Sutton membership, on `sutton-party.ttl`. The thread's "until it is removed" and "kept after removal" are kept
+instance until step 12 brings `membershipWorkspace` and the first Sutton membership, on `sutton-party.ttl`. Step 12
+adds `membershipIn` and decision 169 to the same breaking line (section 4.4). The thread's "until it is removed" and "kept after removal" are kept
 beside the stages, not equated with `revoked`: this app's removal (`member.removedAt`) ends a membership that states no
 stage, and whether it is the stage `revoked` is not decided (section 12). "Invited or added": this app makes a
 membership when an admin adds a person by the email they signed up with, and invites nobody to a membership (the
 access code's one `invited` is a value of `SignUpOffer`, who may make an account); Sutton makes one at the invitation
 (P2). "Where it names one": a Sutton membership names its workspace by `membershipWorkspace` (section 4.1), and none
-of this app's does (decision 154); CQ-P06 and CQ-P07 leave out a membership that names one. Whether the thread's
-`membershipIn` keeps its text beside this definition is question 2. The new terms this report writes about acting
+of this app's does (decision 154); CQ-P06 and CQ-P07 leave out a membership that names one. Decision 169 rewords the
+thread's `membershipIn` to agree with this definition (section 4.4). The new terms this report writes about acting
 under a membership, `memberAccount` and the concepts `pending`, `active` and `suspended`, already say the workspace
-the membership lets its person act in, not the tenant's, so question 2 does not reach them.
+the membership lets its person act in, not the tenant's, so decision 169 changes none of them.
 
 ### 3.3 `Person`, `Organization` and `grantScope`: new links, decision 111 kept
 
@@ -156,7 +159,8 @@ the membership lets its person act in, not the tenant's, so question 2 does not 
 
 No label, definition, tag, parent or criterion of the three changes. Step 9 rewrites the header of `Terms.vocab.ts`,
 which says every term is decision 111's text, to say that the thread's terms keep 111 with these links and `Person`'s
-`storesId`, and that the party slice's terms name the accepting decision.
+`storesId`, and that the party slice's terms name the accepting decision; step 11 adds `Member` to the thread terms
+that name it, and step 12 `membershipIn` (section 4.4), each as its text changes.
 
 ### 3.4 `Party`'s exception entry
 
@@ -201,7 +205,7 @@ that test at `handWrittenFixtures` and keeps its plant (without CQ-P06's text, `
 | `calledFor` | called for | Links a model call to the member whose action asked for it. | `ModelCall` | `Member` | none | fixture: `model-call.ttl` | 11 |
 | `hasPostalAddress` | has postal address | Links the tenant's record of a party to a postal address that record gives (decision 138). | `SourceRecord` | `PostalAddress` | `gist:hasAddress` (decision 166) | fixture: `sutton-party.ttl` | 12 |
 | `addressPurpose` | address purpose | Links a postal address to a purpose its record types it for, such as billing, shipping or ship from; one address may have several (decision 126). | `PostalAddress` | `ContactPurposeScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
-| `defaultFor` | default for | Links a postal address to a purpose for which it is the one used when an order names no other. | `PostalAddress` | `ContactPurposeScheme` | none (waits: question 8) | fixture: `sutton-party.ttl` | 12 |
+| `defaultFor` | default for | Links a postal address to a purpose for which it is the one used when an order names no other. | `PostalAddress` | `ContactPurposeScheme` | none (decision 174) | fixture: `sutton-party.ttl` | 12 |
 | `hasContactPoint` | has contact point | Links the tenant's record of a party to an email address or telephone number that record gives (decision 138). | `SourceRecord` | `ContactPoint` | `gist:hasAddress` (decision 166) | fixture: CQ-P03 (the person's record gives the point); `sutton-party.ttl` | 12 |
 | `contactPointKind` | contact point kind | Links a contact point to what kind of electronic address it is: an email address or a telephone number. | `ContactPoint` | `ContactPointKindScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
 | `contactPerson` | contact person | Links a contact assignment to the person to reach on it. | `ContactAssignment` | `Person` | none | fixture: CQ-P03 | 12 |
@@ -214,15 +218,17 @@ that test at `handWrittenFixtures` and keeps its plant (without CQ-P06's text, `
 | `primaryContact` | primary contact | Links the tenant's record of a company to the tenant's record of the contact it names first (decision 139). | `SourceRecord` | `SourceRecord` | none | fixture: `sutton-party.ttl` | 12 |
 | `accountStatus` | account status | Links the tenant's record of a party to whether the tenant still trades with the party or has archived the record (decision 130). | `SourceRecord` | `AccountStatusScheme` | `gist:isCategorizedBy` | fixture: `sutton-party.ttl` | 12 |
 | `membershipWorkspace` | membership workspace | Links a membership to the source's record of the workspace it lets its person act in, stated only where that workspace is another system's, such as a Sutton organization's (decision 154). | `Member` | `SourceRecord` | none | fixture: `sutton-party.ttl`; CQ-P06's and CQ-P07's must-fail memberships (section 10) | 12 |
-| `memberContactPoint` | member contact point | Links a membership to an email address or telephone number that its profile in the tenant gives for its person, such as a personal email or phone (decision 162). | `Member` | `ContactPoint` | none (waits: question 5) | fixture: `sutton-party.ttl` | 12 |
+| `memberContactPoint` | member contact point | Links a membership to an email address or telephone number that its profile in the tenant gives for its person, such as a personal email or phone (decision 162). | `Member` | `ContactPoint` | `gist:hasAddress` (decision 174) | fixture: `sutton-party.ttl` | 12 |
 
-Every property whose range is a scheme but `defaultFor` sits under `gist:isCategorizedBy` (decision 17); whether
-`defaultFor` is a classification property in decision 17's sense is question 8. C9 passes each, since
-`gist:isCategorizedBy` declares no domain and no range (decision 153). The three other gist links pass C9 as the pinned
-file states their gist properties (section 8, decision 166): `gist:isAbout` declares the domain `gist:Content`, which
-`SourceRecord` reaches through its gist parent, and no range; `gist:hasAddress` declares no domain and the range
-`gist:Address`, which `PostalAddress` reaches through `gist:PhysicalAddress` and `ContactPoint` through
-`gist:ElectronicAddress`. As in the thread, the OWL file writes no `rdfs:range` for a scheme range.
+Every property whose range is a scheme but `defaultFor` sits under `gist:isCategorizedBy` (decision 17). Decision 174
+reads decision 17 as covering the properties that classify a thing: `defaultFor` says which purpose an address is the
+default for, not what kind of thing it is, so it sits under no gist property. C9 passes each of the nine, since
+`gist:isCategorizedBy` declares no domain and no range (decision 153). The four other object properties' gist links
+pass C9 as the pinned file states their gist properties (section 8, decisions 166 and 174): `gist:isAbout` declares
+the domain `gist:Content`, which `SourceRecord` reaches through its gist parent, and no range; `gist:hasAddress`
+declares no domain and the range `gist:Address`, which `PostalAddress` reaches through `gist:PhysicalAddress` and
+`ContactPoint`, the range of `hasContactPoint` and `memberContactPoint`, through `gist:ElectronicAddress`. As in the
+thread, the OWL file writes no `rdfs:range` for a scheme range.
 
 ### 4.2 Datatype properties
 
@@ -232,13 +238,13 @@ file states their gist properties (section 8, decision 166): `gist:isAbout` decl
 | `sourceType` | source type | The record type the external system gives a source record, as written. | `SourceRecord` | `xsd:string` | none | none | fixture: CQ-P01 | 9 |
 | `sourceId` | source id | The opaque id the external system gives a source record, kept exactly as written. | `SourceRecord` | `xsd:string` | none | none | fixture: CQ-P01 | 9 |
 | `capturedAt` | captured at | The instant a source record was last read from its system: one value, which each later read of the same record replaces (decision 156). | `SourceRecord` | `xsd:dateTime` | none | none | fixture: CQ-P01 | 9 |
-| `isCustomer` | is customer (altLabels Customer, Client, Buyer) | Whether the tenant's record of a party states that the party buys from the tenant, true or false on every stored record of a trading account, such as a Sutton company's (decisions 34 and 35). (waits: question 6) | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
-| `isVendor` | is vendor (altLabels Vendor, Supplier) | Whether the tenant's record of a party states that the party sells to the tenant, true or false on every stored record of a trading account, such as a Sutton company's (decisions 34 and 35). (waits: question 6) | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
+| `isCustomer` | is customer (altLabels Customer, Client, Buyer) | Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party buys from the tenant: true or false on every such stored record, and stated on no other record (decisions 34, 35 and 168). | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
+| `isVendor` | is vendor (altLabels Vendor, Supplier) | Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party sells to the tenant: true or false on every such stored record, and stated on no other record (decisions 34, 35 and 168). | `SourceRecord` | `xsd:boolean` | none | none | fixture: CQ-P01, CQ-P02 | 9 |
 | `eventTime` | event time | The instant at which an event occurred, as its record states it. | none declared | `xsd:dateTime` | `gist:atDateTime` (decision 166) | none | fixture: CQ-P04 | 10 |
 | `evidenceText` | evidence text | The evidence in a sentence a person reads, naming the two values compared. | `IdentityEvidence` | `xsd:string` | none | none | fixture: CQ-P04 | 10 |
 | `joinedAt` | joined at | When the person could first act in the membership, as its record states it: for this app's members the moment an admin added them, for an invitee the moment the invitation was accepted. | `Member` | `xsd:dateTime` | none | none | mark: `Person.joinedAt` | 11 |
 | `accountEmail` | account email | The email a sign-in account signs in with, compared whatever its case. | `SignInAccount` | `xsd:string` | none | email | mark: `Person.email`'s path, its value step | 11 |
-| `name` | name | The name people read for a party, a record or a place, which is never unique and never decides identity or permission. | none declared | `xsd:string` | `gist:name` (decisions 132 and 153) | name | marks: `Member.name` and `Member.organizationName` (each a path's value step), `OrganizationChoice.name`, `Person.name` (section 7) | 11 |
+| `name` | name | The name people read for a party, a membership, a record or a place, which is never unique and never decides identity or permission. | none declared | `xsd:string` | `gist:name` (decisions 132 and 153) | name | marks: `Member.name` and `Member.organizationName` (each a path's value step), `OrganizationChoice.name`, `Person.name` (section 7) | 11 |
 | `agentName` | agent name | The agent's name as people read it in the activity list, such as "Assistant". | `AgentRun` | `xsd:string` | none | name | marks: `AgentRun.agent`; `Activity.agent`'s path, its value step | 11 |
 | `calledAt` | called at | When a model call was taken from the tenant's daily allowance. | `ModelCall` | `xsd:dateTime` | none | none | fixture: `model-call.ttl` | 11 |
 | `addressLines` | address lines | The street lines of a postal address, in order and as written, one line break between two lines. | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
@@ -248,10 +254,10 @@ file states their gist properties (section 8, decision 166): `gist:isAbout` decl
 | `countryCode` | country code | The country of a postal address as a two-letter ISO 3166 code, stated only once a person accepts the code read from the source's own text (decision 138). | `PostalAddress` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `contactValue` | contact value | The text of an email address or telephone number, as written in the source. | `ContactPoint` | `xsd:string` | none | email | fixture: CQ-P03; `sutton-party.ttl` | 12 |
 | `extension` | extension | The extension to dial after a telephone number, as written in the source. | `ContactPoint` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
-| `givenName` | given name | A person's given name as a record writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
-| `middleName` | middle name | A person's middle name as a record writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
-| `familyName` | family name | A person's family name as a record writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
-| `jobTitle` | job title | The title of a person's job at the organization a record names, as written. | none declared | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
+| `givenName` | given name | A person's given name as a record or a membership's profile writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
+| `middleName` | middle name | A person's middle name as a record or a membership's profile writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
+| `familyName` | family name | A person's family name as a record or a membership's profile writes it. | none declared | `xsd:string` | none | name | fixture: `sutton-party.ttl` | 12 |
+| `jobTitle` | job title | The title of a person's job at the organization a record or a membership names, as written. | none declared | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `profileImage` | profile image | The picture the profile of a membership shows for its person, as the source gives it, such as a link to an image file (decision 163). | `Member` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 | `profileText` | profile text (altLabel About) | The text a person writes about themselves on the profile of one membership, as written in the source (decision 163). | `Member` | `xsd:string` | none | none | fixture: `sutton-party.ttl` | 12 |
 
@@ -272,6 +278,22 @@ needs a class over both kinds of record it links (an identity decision, a later 
 decision rules that a later identity decision replaces an earlier one. CQ-P04 reads the decision in force as the
 latest of the tenant's about a pair by `eventTime`, as report 04's sketch does (section 10), and states nothing about
 the earlier one.
+
+### 4.4 `membershipIn`, changed (decision 169)
+
+| Field | Thread text (decision 111) | Text accepted here |
+| --- | --- | --- |
+| Definition | Links a membership to the tenant it lets its person act in. | Links a membership to the tenant it belongs to, in whose workspace, or in a source's workspace it names, it lets its person act. |
+| Label, domain, range, super | membership in, `Member`, `Tenant`, none | unchanged |
+| Ratification | 111 | the accepting decision |
+
+The thread's text is wrong for a Sutton membership, whose `membershipIn` is this repository's tenant (decision 133)
+while it lets its person act in Sutton's workspace (decision 154). The new text is decision 169's, word for word. Its
+text changed, so it names the accepting decision, as `Member` does, and the change is breaking under decision 24. It
+enters in step 12 with `membershipWorkspace` and the first Sutton membership, and step 12 adds `membershipIn` and
+decision 169 to the release line "0.2.0: the party slice", marked breaking in step 11. From step 12 the thread's terms
+name 111 for all but `Member` and `membershipIn`, which the SPEC's acceptance line and its `Coherence.test.ts`
+assertion read.
 
 ## 5. Schemes and concepts
 
@@ -376,7 +398,7 @@ in this slice (decision 165).
 ### 6.2 The other rules of gate 4, read against the terms
 
 Checked by reading the terms of sections 3 to 5 and 8 against `Rules.rules.ts` as built; nothing was decoded or run
-(section 14).
+(section 15).
 
 | Rule | What it asks | After step 12 |
 | --- | --- | --- |
@@ -387,18 +409,30 @@ Checked by reading the terms of sections 3 to 5 and 8 against `Rules.rules.ts` a
 | C6 | each pair names two classes on the list, no pair twice | holds: four pairs, the new one `PhysicalAddress` with `ElectronicAddress` |
 | C7 | criterion agrees with tag | holds: `Party` (category) states none; the information, event and relator classes each state one |
 | C8 | domains and ranges are terms of the vocabulary | holds: every domain is a class, every class range a class and every scheme range a scheme of sections 3 and 5 or the thread |
-| C9 | a property's domain and range fall under its gist property's | holds for all fourteen gist links (nine under `gist:isCategorizedBy`, two under `gist:hasAddress`, one each under `gist:isAbout`, `gist:atDateTime` and `gist:name`; one more under question 5's (a) and one more under question 8's (b)) (sections 4.1 and 4.2); each gist property's declared domain or class range, `gist:Content` and `gist:Address`, is on the list in the step that brings the property |
+| C9 | a property's domain and range fall under its gist property's | holds for all fifteen gist links (nine under `gist:isCategorizedBy`, three under `gist:hasAddress`, one each under `gist:isAbout`, `gist:atDateTime` and `gist:name`; `defaultFor` has none, decision 174) (sections 4.1 and 4.2); each gist property's declared domain or class range, `gist:Content` and `gist:Address`, is on the list in the step that brings the property |
 | C10 | each scheme has a concept; `alsoInstanceOf` names a class | holds: every scheme has one to seven concepts (the thread's `GrantScopeKindScheme` one, decision 96; each new scheme two to seven); none is also an individual |
 | C11 | a `role` class has a local parent | holds: no new class is tagged role |
-| C12 | every term and exception entry names a decision with a heading | holds once the accepting decision's heading exists (question 1); concepts name it too |
+| C12 | every term and exception entry names a decision with a heading | holds once the accepting decision's heading exists (section 13); concepts and `membershipIn` name it too |
 | C13 | the version is `0.y.0` | holds at `0.2.0` (decision 144) |
 | C14 | a category parent is tagged category; a category is no class's one parent | holds: `Party` is tagged category and is the one parent of nothing |
 | C15 | retirements | not reached: nothing is retired |
 | C16 | basis keys are undesignated properties | holds (section 6.1) |
 
-Label and definition lengths were measured by a script over this report's tables (2026-11-26, again after the second
-review's rewording): every label is 1 to 80 characters and every definition, criterion and reason 12 to 400 (`Label` and
-`Definition` in `Model.schema.ts`); the longest is `Member`'s new definition, 312 characters. Every class key fits
+The terms decisions 168 to 175 changed, read again against C1 to C16 (2026-11-26). `isCustomer` and `isVendor` (168)
+keep their keys, domain and datatype; only their definitions narrow, within the length limits. `membershipIn` (169)
+keeps its key, domain `Member` and range `Tenant` (C8) and no gist link; it names the accepting decision (C12).
+`Party`'s `storesId: false` (170) is read by no rule of gate 4, only by gate 5's P4, which no record of `Party` reaches,
+and by the lift (section 7); C7 and C14 hold as before. `PostalAddress`'s criterion (173) keeps its basis `inTenant`
+(C16) and its tag's stated criterion (C7). `memberContactPoint` under `gist:hasAddress` (174) passes C9 as
+`hasContactPoint` does, and `gist:Address` is on the list in step 12, the step that brings it; `defaultFor` with no gist
+link is not read by C9. `name`, `givenName`, `middleName`, `familyName` and `jobTitle` (172) keep their keys,
+undeclared domains and designations. Decisions 171 and 175 change no term.
+
+Label and definition lengths were measured by a script over this report's tables (2026-11-26, again after decisions
+168 to 175, `membershipIn`'s new text and the exception entry's reason included): every label is 1 to 80 characters
+and every definition, criterion and reason 12 to 400 (`Label` and `Definition` in `Model.schema.ts`); the longest is
+`Member`'s new definition, 312 characters. The same script counted the terms, gist links and designations of section
+2 from the tables of sections 3 to 5. Every class key fits
 `ClassKey`, every property key `PropertyKey`, every scheme key `SchemeKey` and every notation `Notation` (`ship_from`
 included: the pattern admits an underscore).
 
@@ -454,19 +488,26 @@ step 11 builds it:
   `packages/ontology/src/Lift.ts`), so the thread's hand-written `inv:Tenant` types stay its own. This is the one path
   of slice 1's marks that decision 155's rule does not cover, as the first draft's question 2 recommended it, "with the
   tenant's path as question 10 settles" (the first draft's question 10, which 161 answers). A second case, a contact
-  point's path that ends in `contactValue`, is question 7; no slice-1 record reaches it.
-- **Guard 1 against decisions 155 and 161** (waits: question 9). Once step 11 lifts the thread's rows, which carry
-  `organizationName`, the lifted part holds `inv:name` on each tenant's node, and guard 1 (`overreach` in
-  `packages/ontology/src/Fixture.rules.ts`) flags every hand-written triple whose predicate is a lifted triple's,
-  whatever its subject. The person's name that decision 155 has CQ-P06's fixture state by hand is such a triple, and
-  guard 1's test in `Questions.test.ts` expects none.
+  point's path that ends in `contactValue`, is reached by no slice-1 record: contact points are written on fixtures by
+  hand, and the lift's rule for such a path is asked when Sutton records are first lifted, on a real record (decision
+  175).
+- **Guard 1 compares subject and property** (decision 171, built in step 11 with its test). Once step 11 lifts the
+  thread's rows, which carry `organizationName`, the lifted part holds `inv:name` on each tenant's node, while decision
+  155 has CQ-P06's fixture state the person's `inv:name` by hand. Guard 1 (`overreach` in
+  `packages/ontology/src/Fixture.rules.ts`) flags today every hand-written triple whose predicate is a lifted triple's,
+  whatever its subject, so its test in `Questions.test.ts`, which expects none, would fail. Step 11 changes it to flag
+  a hand-written triple only when the lift states that property of that subject: a fixture may state by hand a property
+  the lift writes on other subjects, so the person's name passes and a hand-written tenant name is still caught, as
+  are the planted grant, tenant link and member type of its second test.
 - **`Grant`'s path**, which ends in a relation, is lifted as today, its node `<subject>/<field>`.
 - **The lift's refusals of step 7 stay.** The refusal of a record whose class stores no id is reached by `AgentRun`'s
   enrolment in step 11, as decision 135 intends ("a lift that refuses to write a run's node"): the lift refuses an
   `AgentRun` record, and a run's values are stated on fixtures by hand. The refusals of such a class as the node of a
   path that ends in a relation, or as a link's object, are reached by no slice-1 mark; `Person`'s `storesId: false`
-  (161) makes a later path through the person that ends in a relation one of them. A link whose range is `Party` is
-  refused only if `Party` itself stores no id, since the lift reads the range class alone: question 10.
+  (161) makes a later path through the person that ends in a relation one of them. The lift reads a link's range
+  class alone, so `Party`'s `storesId: false` (decision 170) makes a later lift refuse a link whose range is `Party`
+  (`recordOf`, `contactAccount`) rather than mint a node typed only `Party`; a record's party is stated on fixtures as
+  a `Person` or an `Organization`.
 
 `OrganizationChoice.name` is no path: the record is the tenant's own, and its name is a field's own property, lifted
 as one.
@@ -495,11 +536,11 @@ none of them.
 
 | gist property | Kind in the pinned file | Domain | Range | Its own gist parent | Taken for | Step |
 | --- | --- | --- | --- | --- | --- | --- |
-| `gist:isCategorizedBy` | `owl:ObjectProperty` | none | none (only `gist:rangeIncludes gist:Category`, a hint, decision 153) | none | every scheme-ranged property but `defaultFor` (question 8), `grantScope` first | 9 |
+| `gist:isCategorizedBy` | `owl:ObjectProperty` | none | none (only `gist:rangeIncludes gist:Category`, a hint, decision 153) | none | every scheme-ranged property but `defaultFor` (decision 174), `grantScope` first | 9 |
 | `gist:isAbout` | `owl:ObjectProperty` | `gist:Content` | none | none | `recordOf` | 9 |
 | `gist:atDateTime` | `owl:DatatypeProperty` | none | `xsd:dateTime` | none (it has three sub-properties: `endDateTime`, `isRecordedAt`, `startDateTime`) | `eventTime` | 10 |
 | `gist:name` | `owl:DatatypeProperty` | none | none | none | `name` | 11 |
-| `gist:hasAddress` | `owl:ObjectProperty` | none | `gist:Address` | none | `hasPostalAddress`, `hasContactPoint` | 12 |
+| `gist:hasAddress` | `owl:ObjectProperty` | none | `gist:Address` | none | `hasPostalAddress`, `hasContactPoint`, `memberContactPoint` (decision 174) | 12 |
 
 The module's gist list states each gist property as the table does, its domain and range held for C9 alone and never
 projected (decision 16); none of the five has a gist parent of its own in the file, so decision 150's deferral costs
@@ -527,8 +568,8 @@ reaches `Determination` and `Event`; `AgentRun` and `ModelCall` reach `Event`; `
 `PhysicalIdentifiableItem`; `Organization` and `Tenant` reach `Organization`. No set holds both sides of a pair the
 file states. `Party` is over `Person` and `Organization`, which are disjoint, but it is their category, not their
 subclass, and no class is under it with a gist parent of its own. The gist domains and ranges agree too, were gist's
-axioms read beside ours: `recordOf`'s subjects are records, which are content, and `hasPostalAddress`'s and
-`hasContactPoint`'s objects are addresses.
+axioms read beside ours: `recordOf`'s subjects are records, which are content, and the objects of `hasPostalAddress`,
+`hasContactPoint` and `memberContactPoint` are addresses.
 
 **What the first draft had wrong.** It read `gist:Event`'s pairs from report 11 as four (`Aspect`, `Category`,
 `Magnitude`, `UnitOfMeasure`); the file states six, adding `Language` (deprecated in 14.1.0, `gist-categories.md`) and
@@ -537,17 +578,16 @@ and the other three gist properties' domains and ranges were not in the reposito
 
 ## 9. Sutton's slice-1 records, as answered
 
-Decisions 130, 131, 133, 134, 136, 138, 139, 142 and 154 to 164 answer SPEC's coverage table; this is the table with
-those answers. "Later" names report 17's slice. "Unplaced" is a field a decision holds back with its reason; a row
-marked "(waits: question n)" waits on section 13.1 and gets nothing built. A placement on a property is stated on
-`sutton-party.ttl` in step 12 unless a question's fixture states it.
+Decisions 130, 131, 133, 134, 136, 138, 139, 142, 154 to 164 and 168 to 175 answer SPEC's coverage table; this is the
+table with those answers. "Later" names report 17's slice. "Unplaced" is a field a decision holds back with its
+reason. A placement on a property is stated on `sutton-party.ttl` in step 12 unless a question's fixture states it.
 
 | Sutton type | Field | Placed as |
 | --- | --- | --- |
 | `Company` | the record | the tenant's `SourceRecord`, `recordOf` a `Person` when `kind` is `individual` and an `Organization` when it is `company` (125) |
 | `Company` | `id` | `sourceId` |
 | `Company` | `kind` | chooses the class of `recordOf`'s object; no property |
-| `Company` | `type` | `isCustomer` and `isVendor`, each true or false (34, 35, 89) |
+| `Company` | `type` | `isCustomer` and `isVendor`, each true or false (34, 35, 89, 168) |
 | `Company` | `name` | `name`, on the record (157) |
 | `Company` | `status` | `accountStatus` (130) |
 | `Company` | `addresses` | `hasPostalAddress` (138) |
@@ -555,7 +595,7 @@ marked "(waits: question n)" waits on section 13.1 and gets nothing built. A pla
 | `Company` | `primaryContact` | `primaryContact` (139) |
 | `Company` | `customFields`, `files` | later: slice 8 |
 | `Company` | `logo`, `notes`, `website` | no term (142) |
-| `Contact` | the record | the tenant's `SourceRecord`, `recordOf` a `Person`; whether it states the two flags is question 6 |
+| `Contact` | the record | the tenant's `SourceRecord`, `recordOf` a `Person`; it states neither flag, since its source has no trading-role field (168) |
 | `Contact` | `id` | `sourceId` |
 | `Contact` | `fullName` | `name`, on the record (157) |
 | `Contact` | `firstName`, `lastName` | `givenName`, `familyName`, on the record (157) |
@@ -569,7 +609,7 @@ marked "(waits: question n)" waits on section 13.1 and gets nothing built. A pla
 | `Contact` | `customFields` | later: slice 8 |
 | `Contact` | `notes`, `dateCreated` | no term (142) |
 | `Address` | the record | `PostalAddress`, reached by `hasPostalAddress` from its company's or contact's record (138) |
-| `Address` | `id` | the address's own id within the tenant (its criterion) (waits: question 4) |
+| `Address` | `id` | unplaced: `PostalAddress`'s criterion is its own id within the tenant, and an id a source issued waits until that source's records are lifted; fixtures name their addresses (158, 173) |
 | `Address` | `title` | `name`, on the `PostalAddress` (130; `readings.json`: "title is a name"; section 11) |
 | `Address` | `addressLineOne`, `addressLineTwo` | `addressLines`, in that order |
 | `Address` | `city`, `state`, `zip` | `locality`, `region`, `postalCode` |
@@ -578,7 +618,7 @@ marked "(waits: question n)" waits on section 13.1 and gets nothing built. A pla
 | `Address` | the four `is*Default` flags | `defaultFor`, one per flag that is true |
 | `Address` | `customerPaymentTerm`, `vendorPaymentTerm` | later: slice 2 |
 | `Address` | `customFields` | later: slice 8 |
-| `Organization` | the record | a `SourceRecord` whose `recordOf` is the tenant's `Organization`, `inTenant` this repository's tenant (P1); whether it states the two flags is question 6 |
+| `Organization` | the record | a `SourceRecord` whose `recordOf` is the tenant's `Organization`, `inTenant` this repository's tenant (P1); it states neither flag, since its source has no trading-role field (168) |
 | `Organization` | `id` | `sourceId` |
 | `Organization` | `name` | `name`, on the record (157) |
 | `Organization` | `members` | no path: each listed member is a `Member` whose `membershipIn` is the record's tenant and whose `membershipWorkspace` is this record (133, 154) |
@@ -595,9 +635,9 @@ marked "(waits: question n)" waits on section 13.1 and gets nothing built. A pla
 | `UserProfile` | `status` | `membershipStatus` (P2, 137) |
 | `UserProfile` | `user` | `memberAccount`, the link `OrganizationMember.user` states, stated once (134); that the two name one `User` was not checked |
 | `UserProfile` | `email` | unplaced: one account with two memberships may hold two different values, so it may not be the sign-in email; placed once a person has checked it on Sutton records (164) |
-| `UserProfile` | `fullName` | `name`, on the `Member` (waits: question 3) |
-| `UserProfile` | `firstName`, `middleName`, `lastName` | `givenName`, `middleName`, `familyName`, on the `Member` (waits: question 3) |
-| `UserProfile` | `jobTitle` | `jobTitle`, on the `Member`, since it is said per membership (waits: question 3) |
+| `UserProfile` | `fullName` | `name`, on the `Member` (172) |
+| `UserProfile` | `firstName`, `middleName`, `lastName` | `givenName`, `middleName`, `familyName`, on the `Member` (172) |
+| `UserProfile` | `jobTitle` | `jobTitle`, on the `Member`, since it is said per membership (172) |
 | `UserProfile` | `personalEmail`, `phoneNumber`, `personalPhoneNumber` | `memberContactPoint` to a `ContactPoint` each, with `contactValue` and `contactPointKind` `email` or `phone`; each point is the membership and that field (159, 162) |
 | `UserProfile` | `phoneNumberExt` | `extension` on `phoneNumber`'s `ContactPoint` (162) |
 | `UserProfile` | `image`, `about` | `profileImage`, `profileText`, on the `Member` (163) |
@@ -635,11 +675,11 @@ report 04 asks more, the row says what is left out and why.
 | Question | What it asks | Terms it reads | Fixture | Step |
 | --- | --- | --- | --- | --- |
 | CQ-P01 | Which organizations does our tenant both buy from and sell to? | `SourceRecord`, `inTenant`, `recordOf`, `isCustomer`, `isVendor`, `Organization` (and `Party`, the range it walks from) | `test_ExampleWorks`, `test_SecondOrg` and their records, each stating its source keys and one `capturedAt`, its latest read (156) | 9 |
-| CQ-P02 | Which of our organizations hold no trading role at all? | `SourceRecord`, `inTenant`, `recordOf`, `Organization`, `isCustomer` and `isVendor` stated false | CQ-P01's tenants with records whose flags are false, and the open-reading record | 9 |
+| CQ-P02 | Which of our organizations hold no trading role at all? | `SourceRecord`, `inTenant`, `recordOf`, `Organization`, `isCustomer` and `isVendor` stated false | CQ-P01's tenants with records whose flags are false, and the open-reading record; a record that states neither flag, such as a contact's or a workspace's (168), gives no row | 9 |
 | CQ-P09, party half | Does any party record belong to no tenant, or to two? | `SourceRecord`, `inTenant` | records with no `inTenant` and with two | 9 |
 | CQ-P04 | Which two source records a tenant holds were decided to be about one party, by whom, when, and on what evidence? | `IdentityDecision`, `inTenant`, `decidesOn`, `SourceRecord`, `identityOutcome`, `IdentityOutcomeScheme` (`sameParty`), `decidedBy`, `Member`, `eventTime`, `citesEvidence`, `IdentityEvidence`, `evidenceText` | report 04's `test_AcmeA` to `test_AcmeF`, `test_Decision1` to `test_Decision5`, `test_Dana`, `test_Kim`, each piece of evidence stating its `inTenant`. The decision in force about a pair is the tenant's latest by `eventTime`, as report 04's sketch reads it, so a reversed decision gives no row; no term states that one decision replaces another (section 4.3) | 10 |
 | CQ-P05 | Does any party, item or record stand in `owl:sameAs` with another? | no term: `owl:sameAs` itself, an ASK | CQ-P04's, and a fixture `.ttl` with the `owl:sameAs` triple | 10 |
-| CQ-P06 | Who are the members of this organization and which role does each hold, with the person's name and the sign-in email? | the thread's (`Member`, `membershipIn`, `membershipOf`, `Grant`, `grantedTo`, `grantScope`, `grantsRole`) and `Person`, `name`, `memberAccount`, `SignInAccount`, `accountEmail`; from step 12 `membershipWorkspace`, whose memberships it leaves out (154) | the thread's, with the person's name and the sign-in email written by hand (155; the name's line waits: question 9, since guard 1 flags it beside the lifted tenant names); from step 12, a membership that names a workspace, which gives no row | 11; the exclusion in 12 |
+| CQ-P06 | Who are the members of this organization and which role does each hold, with the person's name and the sign-in email? | the thread's (`Member`, `membershipIn`, `membershipOf`, `Grant`, `grantedTo`, `grantScope`, `grantsRole`) and `Person`, `name`, `memberAccount`, `SignInAccount`, `accountEmail`; from step 12 `membershipWorkspace`, whose memberships it leaves out (154) | the thread's, with the person's name and the sign-in email written by hand (155; guard 1, comparing subject and property from step 11, passes the name beside the lifted tenant names, 171); from step 12, a membership that names a workspace, which gives no row | 11; the exclusion in 12 |
 | CQ-P07 | Does every tenant keep at least one admin who is not removed? | `Tenant`, `Member`, `membershipIn`, `membershipStatus`, `MembershipStatusScheme` (`active`, decision 136), `Grant`, `grantedTo`, `grantsRole`, `MemberRoleScheme` (`admin`); from step 12 `membershipWorkspace` (154) | a tenant whose only admin is not active, a tenant with no members, and `test_FlourMill`, each member's stage stated; from step 12, a tenant whose only active admin is a membership that names a workspace, which counts no admin (a plant: decision 131 gives a Sutton member no grant) | 11; the exclusion in 12 |
 | CQ-P11 | At which scope does each member hold which role? | `Grant`, `grantedTo`, `grantsRole`, `grantScope` | the thread's; rows unchanged | already built |
 | CQ-P03 | Which people are contacts at an organization, for which purpose? | `ContactAssignment`, `contactPerson`, `Person`, `contactAccount`, `Party`, `servesPurpose`, `ContactPurposeScheme`, `assignmentPoint`, `ContactPoint`, `contactValue`, `inTenant` | a source that records a contact's purpose (decision 140): one person billing contact at one account and receiving contact at another, both assignments naming one contact point, which the tenant's `SourceRecord` of the person (`recordOf` that `Person`) gives by `hasContactPoint` (decision 159; the query reads neither the record nor the link), and an assignment with no purpose. Report 04's variant, one point for billing at A and receiving at B, is this fixture: the point is the record's and the field's, not an assignment's, so the two assignments share it. Report 04's other half, "is a person who is a contact at two organizations one person?", and its two must-fails on the source keys (a second `recordOf` person on one source record gives one violation; the same id "001" in another system gives zero) are left out: the SPEC's acceptance for CQ-P03 names the purpose cases only, `contactPerson` points at the `Person`, not at a source record, so the terms state no record to count, "at most one `recordOf`" is a cardinality for SHACL (section 12), and that two records are one person is CQ-P04's decision | 12 |
@@ -662,15 +702,17 @@ The accepting decision covers each. Each is reversible by changing the entry bef
   gives a term. `primaryContact`, `contactType`, `ContactTypeScheme`, `accountStatus` and the rest are the decisions'
   or report 06's keys.
 - **Labels and definitions** are report 06's and report 10's where those exist, with these edits: the flags say "the
-  tenant's record of a party" (decision 125) and "true or false on every stored record of a trading account" (decision
-  35, narrowed as question 6 recommends); `IdentityEvidence` and `citesEvidence` drop the suspicion, which is not a term
+  tenant's record of a trading account", true or false on every such record and stated on no other (decisions 35, 125
+  and 168); `IdentityEvidence` and `citesEvidence` drop the suspicion, which is not a term
   of this slice; `SignInAccount` and `PostalAddress` are widened to Sutton's records; `SourceRecord`'s definition adds
   where the tenant's assertions sit (decision 34); `AccountStatusScheme` says "party" (decision 125); `agentName`'s
   example is the kernel schema's, "Assistant"; `memberAccount` and the stages `pending`, `active` and `suspended` say
   the membership's workspace, not the tenant's (decision 154's reason, section 5). The flags' prefLabels are report 06's
   ("is customer", "is vendor"), with report 10 section 4.8's words as altLabels. `Member`'s definition joins P2's
   widening to decision 154's quoted clause, and `capturedAt`'s states decision 156; `AgentRun`'s criterion is decision
-  160's words.
+  160's words; `membershipIn`'s definition is decision 169's words. `name`, `givenName`, `middleName`, `familyName` and
+  `jobTitle` add "a membership" or "a membership's profile" to the record that writes them, since decision 172 states
+  a Sutton `UserProfile`'s names and job title on the `Member`.
 - **`hasPostalAddress` and `hasContactPoint` keep report 06's keys** with the domain decision 138 gives,
   `SourceRecord`, not `Party`.
 - **`contactAccount` ranges over `Party`**, not report 06's `Organization`, since an account of kind `individual` is a
@@ -711,16 +753,17 @@ The accepting decision covers each. Each is reversible by changing the entry bef
   fills it in this slice (`startDate`, decision 136).
 - **`Contact.jobTitle` sits on the contact's record**, as decision 157 places the contact's names: one tenant's
   record says it, and on the person two tenants' titles would merge. 157 rules names, and a job title is no name, so
-  this is a choice; `UserProfile.jobTitle`, held per membership, waits on question 3 with the profile's names.
+  this is a choice; `UserProfile.jobTitle`, held per membership, sits on the `Member` with the profile's names
+  (decision 172).
 - **`Address.title` is `name` on the `PostalAddress`**: decision 130 gives the field a term, `readings.json` says
   "title is a name", and decision 157, which names companies, contacts and workspaces, does not reach an address.
-- **`name` declares no domain**: its subjects are persons, tenants, source records and postal addresses, and no class
-  of the vocabulary covers them all. So decision 132's reason, "a property of our own has a definition, a domain and
+- **`name` declares no domain**: its subjects are persons, tenants, memberships (decision 172), source records and
+  postal addresses, and no class of the vocabulary covers them all. So decision 132's reason, "a property of our own has a definition, a domain and
   marks our gates can check", is met for the definition and the marks but not for the domain; `givenName`,
-  `middleName`, `familyName` and `jobTitle` declare none for the same reason. The reverse is a domain over parties and
-  records once a category over them exists.
+  `middleName`, `familyName` and `jobTitle`, stated on source records and on memberships, declare none for the same
+  reason. The reverse is a domain over parties and records once a category over them exists.
 - **`UserProfile.user` is `memberAccount`**, the link `OrganizationMember.user` already states, stated once. That the
-  two name one `User` is a reading (section 14).
+  two name one `User` is a reading (section 15).
 - **`addressLines` is one literal**, the lines in order with one line break between, since two values of one property
   keep no order.
 - **A contact point states its kind and extension**: `contactPointKind` with report 10's `ContactPointKindScheme`,
@@ -736,11 +779,13 @@ The accepting decision covers each. Each is reversible by changing the entry bef
   step 9 links to a person. `membershipWorkspace` enters in step 12 with `sutton-party.ttl`, its fixture, and CQ-P06 and
   CQ-P07 gain the clause that leaves its memberships out in the same step, with a must-fail membership each; until step
   12 no fixture holds a Sutton membership. `memberContactPoint`, `profileImage` and `profileText` enter in step 12 for
-  the same fixture.
+  the same fixture, and so does `membershipIn`'s new text (decision 169), which step 12 adds to the breaking release
+  line with the decision's number. The guard 1 change of decision 171 enters in step 11 with CQ-P06's name line, the
+  first fixture line it would otherwise flag.
 - **Decision 155's rule is read with decision 161 as its one exception among slice 1's marks** (section 7): the first
   draft's question 2, which decision 155 answers, recommended its option "with the tenant's path as question 10
-  settles", and 161 settles that question, the first draft's tenth. A contact point's path, which decision 159 has
-  minted, is question 7.
+  settles", and 161 settles that question, the first draft's tenth. A contact point's path, whose node decision 159
+  gives an id, is left to the first lift of Sutton records (decision 175).
 - **Closed or open**: `MembershipStatusScheme` closed (P2 and 137 name every stage), `IdentityOutcomeScheme` and
   `ModelCallPurposeScheme` closed (report 10), `ContactPurposeScheme`, `ContactPointKindScheme` and
   `AccountStatusScheme` open (report 10), `ContactTypeScheme` open (a source other than Sutton may file contacts
@@ -759,8 +804,11 @@ The accepting decision covers each. Each is reversible by changing the entry bef
 - Any disjointness gist does not state (decision 15), including report 06's pairs between `inv:` classes.
 - How a Sutton record's IRI is made when Sutton data is lifted, and what `sourceSystem` holds for Sutton: no Sutton
   record is lifted in this slice, and the fixtures name their records. The Sutton halves of the criteria of `Member`,
-  `SignInAccount` and `ContactAssignment` wait for it (decision 158), and the reading of an absent issuing system as
-  this app's is not made.
+  `SignInAccount`, `ContactAssignment` (decision 158) and `PostalAddress` (decision 173) wait for it, and the reading
+  of an absent issuing system as this app's is not made.
+- How a lift writes a contact point, whose path ends in `contactValue` while its node stores an id made from record and
+  field: asked when Sutton records are first lifted, on a real record (decision 175); in this slice contact points are
+  written on fixtures by hand.
 - How a second read of a Sutton record shows a changed flag to the person before it is written (decision 156): a
   screen, not a term.
 - Whether this repository's removal (`member.removedAt`) is the stage `revoked`: the kernel's `Member` stores no stage,
@@ -773,150 +821,68 @@ The accepting decision covers each. Each is reversible by changing the entry bef
   goal's closing note).
 - A gist property's own gist parent (decision 150): none of the five gist properties this slice takes has one.
 
-## 13. Questions for Benjamin
+## 13. Question for Benjamin
 
-### 13.1 Still open
-
-Each question gives its options with this report's recommendation, and names what waits on it. Question 1 is the
-first draft's; questions 2 to 5 come from applying decisions 154 to 166 and reading the pinned file, and questions 6
-to 10 from the report's second review. A row that waits on one is marked "(waits: question n)".
+Every other point a term rests on is answered (section 14). One question is left, and it is the act of acceptance
+itself.
 
 1. **Which decision number accepts this report?** Decision 129 says the terms name "that number". (a) A new heading,
-   `### 168.`, the next free number in `DECISIONS.md`, written when you accept, each new term, `Member` and `Party`'s
-   entry naming 168; (b) decision 129 itself, whose heading exists. Recommended: (a), so the number names the text
-   accepted and not the method chosen before it was written. Step 9 waits on it, and with it every step after.
-2. **`membershipIn`'s text beside decision 154.** The thread's `membershipIn` (decision 111) "links a membership to
-   the tenant it lets its person act in". Under decision 154 a Sutton membership's `membershipIn` is this repository's
-   tenant (133) while the membership lets its person act in Sutton's workspace, which `Member`'s new definition says
-   and `membershipIn`'s does not. (a) Reword it: "Links a membership to the tenant it belongs to, in whose workspace,
-   or in a source's workspace it names, it lets its person act.", naming the accepting decision; breaking under
-   decision 24, in the release line that already names `Member` (reverse: 111's text); (b) keep 111's text, reading
-   "act in the tenant" as acting for that organization in any of its workspaces, the workspace being `Member`'s to
-   name. Recommended: (a), for the reason decision 154 gave for `Member`: the definition then holds for every
-   instance the slice places. It adds no term. Under (a) `membershipIn` names the accepting decision, so the SPEC's
-   acceptance line and its `Coherence.test.ts` assertion read "111 for all but `Member` and `membershipIn`" instead of
-   "111 for all but `Member`". The new terms with the same flaw, `memberAccount` and the stages `pending`, `active` and
-   `suspended`, are this report's own and already say the membership's workspace (section 5), so they do not wait on
-   it. Step 12, which brings the first Sutton membership, waits on it.
-3. **Where a Sutton `UserProfile`'s names sit under decision 157.** Decision 157 puts a name on the record "wherever a
-   tenant's record states it", names the Sutton company's, contact's and workspace's, and keeps this app's member and
-   tenant names on the person and the tenant. A `UserProfile`'s `fullName`, `firstName`, `middleName` and `lastName` are
-   a Sutton record's, held per membership, and the membership is a `Member`, not a `SourceRecord`; its `jobTitle` asks
-   the same question, which the SPEC groups with the names (O4, O5) and decision 157, which rules names only, does not
-   reach. (a) On the `Member`, the tenant's record of that membership, as decision 163 places `image` and `about`: one
-   tenant's spelling of a person or of their title stays off another's; (b) through the person, written on fixtures by
-   hand, as decision 133 has for this app's members and the first draft had: on the shared person node, where two
-   tenants' spellings merge (157's reason against it). Recommended: (a). It changes no term (the five properties declare
-   no domain). The three section 9 rows of the names and `jobTitle`, and their `sutton-party.ttl` lines, wait on it.
-4. **`PostalAddress`'s criterion beside decision 158.** Decision 138 keys an address "by its id within the tenant",
-   and the only slice-1 source of addresses is Sutton's `Address`, so the id is a source's: two systems' equal ids in
-   one tenant would read as one address, the case decision 158 settles for `Member`, `SignInAccount` and
-   `ContactAssignment` and does not name here. (a) Apply 158: the criterion reads "its own record id within the
-   tenant; equal text on two records is two addresses (decision 138), and an id a source issued waits until that
-   source's records are lifted (decision 158)", so no address is identified in this slice beyond the fixtures, which
-   name theirs; (b) keep decision 138's words unqualified, the two-systems case left to section 12's IRI question.
-   Recommended: (a), so every criterion this report writes follows one rule. Basis, `storesId` and every other field
-   stay as written. `PostalAddress`'s criterion and the row `Address.id` wait on it.
-5. **Whether `memberContactPoint` sits under `gist:hasAddress`.** Decision 166 put the four properties report 11
-   named under gist; `memberContactPoint` came later (162). `gist:hasAddress` declares no domain and the range
-   `gist:Address`, which `ContactPoint` reaches through `gist:ElectronicAddress`, so C9 passes it as it passes
-   `hasContactPoint`. (a) Under `gist:hasAddress`, as `hasContactPoint`: a gist query for an address finds a member's
-   points too; (b) under none in this slice, the property standing without it (reverse: add the link). Recommended:
-   (a), the same test decision 16 asks and the same answer decision 166 gave. It adds no term and no gist name. Step
-   12's entry for the property waits on it.
-6. **Which source records decision 35's closure covers.** `isCustomer` and `isVendor` have the domain `SourceRecord`,
-   and decision 35 has each "true or false" in every stored record, a record whose source is silent waiting as Needs a
-   decision. Section 9 also makes a Sutton `Contact` and a Sutton `Organization` workspace tenant `SourceRecord`s, and
-   neither source states a trading role, so read literally every contact and workspace record would wait on two flags
-   forever, the harm decision 89 gave for refusing two more flags. No decision says which records the closure covers.
-   (a) Only the records of a trading account, whose source has a trading-role field (a Sutton `Company`): the two
-   definitions say "true or false on every stored record of a trading account, such as a Sutton company's", and a
-   contact or workspace record states neither flag (reverse: widen the definitions); (b) every source record, with
-   contacts and workspaces stated false by a rule that reads their record type, so CQ-P02 lists the tenant's own
-   organization, through its workspace record, as one holding no trading role. Recommended: (a): a flag the source never states is not the
-   tenant's assertion, and (b) has a rule say "not a customer" for every contact, which decision 35's reason, one
-   reading of a field, does not ask. It adds no term. The two definitions (written as (a) has them), step 9, which
-   brings them, and the flag lines of `sutton-party.ttl`'s contact and workspace records wait on it.
-7. **How a lift would write a contact point.** Decision 159 has `ContactPoint` store an id "made from that record and
-   field, as the lift makes a `Grant`'s node". But a contact point's path, `hasContactPoint` (node `ContactPoint`) then
-   `contactValue`, ends in an attribute, and decision 155's rule has the lift state nothing for such a path, reading
-   only the last step's property kind; `Grant`'s path ends in a relation. Read together, a lift could never write a
-   contact point. (a) A path whose node class stores an id made from record and field mints that node and writes the
-   literal there, a second exception to 155 beside decision 161's tenant path, built when a Sutton record is first
-   lifted; (b) contact points are stated by hand, as `sutton-party.ttl` and CQ-P03's fixture state them, until Sutton
-   records are lifted, and the lift's rule for them is put to you then. Recommended: (b): no slice-1 record is lifted
-   with such a path, so (a) would build a rule no record uses, and 159's IRI shape stands either way. It adds and
-   changes no term, and no slice-1 step waits on it; section 7 names it beside 161.
-8. **Whether `defaultFor` sits under `gist:isCategorizedBy`.** `defaultFor` ranges over `ContactPurposeScheme` and holds
-   a concept, as decision 23 has a classification property hold one, and decision 17 puts "the classification
-   properties" under `gist:isCategorizedBy`; the first draft left it out on its own argument, listed as a choice. (a)
-   Under no gist property, decision 17 read as covering the properties that say what kind a thing is: a default flag
-   says which address is used for a purpose when an order names no other, so under `gist:isCategorizedBy` a gist query
-   reads "default for billing" as "categorized billing" (reverse: add the link); (b) under `gist:isCategorizedBy`, as
-   every other property whose range is a scheme, C9 passing it since that property declares no domain and no range
-   (decision 153). Recommended: (a), because `addressPurpose` already says that an address is for billing, and
-   `defaultFor` under the same gist property would say it twice. It adds no term and no gist name. Step 12's entry for
-   `defaultFor` waits on it.
-9. **Guard 1 beside decisions 155 and 161.** Guard 1 (`overreach`, `packages/ontology/src/Fixture.rules.ts`) flags a
-   hand-written triple whose predicate is the predicate of any lifted triple, whatever its subject. From step 11 the
-   thread's rows, which carry `organizationName`, lift `inv:name` on each tenant's node (161), while decision 155 has
-   CQ-P06's fixture state the person's `inv:name` by hand; guard 1's test in `Questions.test.ts` expects no overreach,
-   so it fails. (a) Guard 1 compares the subject with the predicate: a hand-written triple is overreach when the lift
-   states that predicate of that subject, so the person's name passes and a hand-written tenant name is still caught,
-   as are the planted grant, tenant link and member type of its second test; (b) keep guard 1, and state the person's
-   name in a packet fixture under `assets/requirements/cq/` that CQ-P06 reads and guard 1 does not compare with the
-   thread's lift; (c) reverse decision 161 for the thread, writing each tenant's name by hand and lifting none.
-   Recommended: (a): the person and the tenant are different nodes, and the guard's purpose, catching a hand-written
-   copy of what the lift states, is kept. It adds no term. The lift writes no `rdf:type` on a node it reuses, under
-   every option (section 7). Step 11's CQ-P06 name line, and under (a) the change to guard 1 and its test, wait on it.
-10. **`Party`'s `storesId`.** `Party` takes the default, `storesId: true`, and two object properties range over it,
-    `recordOf` and `contactAccount`. The lift refuses a link only when its range class itself stores no id
-    (`storesNoId` in `packages/ontology/src/Lift.ts` reads the range alone), so a later lift of such a link would mint
-    `.../data/<org>/Party/<id>`: a person reached through the category, around `Person`'s `storesId: false` (decisions
-    133 and 161), and a party id no record holds (decision 34). No decision rules a category's `storesId`. (a) `Party`
-    takes `storesId: false`, so the lift never mints a node from a link to it, as decision 34 says no record holds a
-    party's id (reverse: the default); (b) keep true, and have the lift refuse a link whose range is a category; (c)
-    keep true, and record the gap for the slice that first lifts a source record. Recommended: (a): it is one fact on
-    the term, needs no new rule, and matches what the criteria already say. It adds no term. `Party`'s row and step 9,
-    which brings it, wait on it.
+   `### 176.`, the next free number in `DECISIONS.md`, written when you accept, each new term, `Member`, `membershipIn`
+   and `Party`'s entry naming 176; (b) decision 129 itself, whose heading exists. Recommended: (a), so the number names
+   the text accepted and not the method chosen before it was written. Step 9 waits on it, and with it every step after.
 
-### 13.2 Answered since the first draft
+## 14. Answered since the first draft
 
-| First draft | Decision | What it settled |
+The first draft put sixteen questions, and step 7 left open points; applying decisions 154 to 167 and the second
+review put a second list of ten.
+Question 1 of each list is the same question, section 13's, and is still open. Every other one is answered as this
+report recommended.
+
+| List and question | Decision | What it settled |
 | --- | --- | --- |
-| Question 2, what the lift writes for step 11's five paths | 155 | nothing for a path ending in an attribute, the record still lifted; values on fixtures by hand (section 7) |
-| Question 3, `Person` with `storesId: false` | 161 | `Person` takes it and keeps 111, listed with its category parent (section 3.3) |
-| Question 4, the account node | 155 | folded into 155: no account node until a record holds the account's id |
-| Question 5, a criterion's basis | 160 | `restsOn` optional; `AgentRun`'s criterion restated (section 3.1) |
-| Question 6, the gist super-properties | 166 | all four, the gist properties read from the pinned file (sections 4 and 8) |
-| Question 7, a member's own contact points | 162 | `memberContactPoint`, from `Member` to `ContactPoint` (section 4.1) |
-| Question 8, `UserProfile.image` and `about` | 163 | `profileImage` and `profileText` on the `Member` (section 4.2) |
-| Question 9, `UserProfile.id` | 164 | unplaced until a person checks it on Sutton records (section 9) |
-| Question 10, the tenant's node behind `Member.organizationName` | 161 | the tenant's name lifted on the node `organizationId` names (section 7) |
-| Question 11, whether a Sutton member is a `Member` of this tenant | 154 | yes, naming its workspace by `membershipWorkspace`; CQ-P06 and CQ-P07 leave such memberships out (sections 3.2 and 10) |
-| Question 12, how a criterion tells this app's ids from a source's | 158 | the accepted criteria hold this app's ids only (section 3.1). Its quote, "criterion for a Sutton member's id", is SPEC O1's option (a), which decision 129 chose |
-| Question 13, what identifies a contact point | 159 | the record that gives it and the field, `storesId` true (section 3.1) |
-| Question 14, a name the record's or the party's | 157 | the record's where a tenant's record states it (section 9; question 3 above for `UserProfile`) |
-| Question 15, `UserProfile.email` | 164 | unplaced; `CurrentUser.email` gives `accountEmail` meanwhile (section 9) |
-| Question 16, `capturedAt` on a second read | 156 | the latest read, one value (section 4.2) |
+| First draft, question 2: what the lift writes for step 11's five paths | 155 | nothing for a path ending in an attribute, the record still lifted; values on fixtures by hand (section 7) |
+| First draft, question 3: `Person` with `storesId: false` | 161 | `Person` takes it and keeps 111, listed with its category parent (section 3.3) |
+| First draft, question 4: the account node | 155 | folded into 155: no account node until a record holds the account's id |
+| First draft, question 5: a criterion's basis | 160 | `restsOn` optional; `AgentRun`'s criterion restated (section 3.1) |
+| First draft, question 6: the gist super-properties | 166 | all four, the gist properties read from the pinned file (sections 4 and 8) |
+| First draft, question 7: a member's own contact points | 162 | `memberContactPoint`, from `Member` to `ContactPoint` (section 4.1) |
+| First draft, question 8: `UserProfile.image` and `about` | 163 | `profileImage` and `profileText` on the `Member` (section 4.2) |
+| First draft, question 9: `UserProfile.id` | 164 | unplaced until a person checks it on Sutton records (section 9) |
+| First draft, question 10: the tenant's node behind `Member.organizationName` | 161 | the tenant's name lifted on the node `organizationId` names (section 7) |
+| First draft, question 11: whether a Sutton member is a `Member` of this tenant | 154 | yes, naming its workspace by `membershipWorkspace`; CQ-P06 and CQ-P07 leave such memberships out (sections 3.2 and 10) |
+| First draft, question 12: how a criterion tells this app's ids from a source's | 158 | the accepted criteria hold this app's ids only (section 3.1). Its quote, "criterion for a Sutton member's id", is SPEC O1's option (a), which decision 129 chose |
+| First draft, question 13: what identifies a contact point | 159 | the record that gives it and the field, `storesId` true (section 3.1) |
+| First draft, question 14: a name the record's or the party's | 157 | the record's where a tenant's record states it (section 9; decision 172 for `UserProfile`) |
+| First draft, question 15: `UserProfile.email` | 164 | unplaced; `CurrentUser.email` gives `accountEmail` meanwhile (section 9) |
+| First draft, question 16: `capturedAt` on a second read | 156 | the latest read, one value (section 4.2) |
 | Step 7's open points | 155, 160, 161, 165, 167 | an absent agent and "refuse or state nothing" (155); a basis optional, the own id in the sentence (160); `Person`'s `storesId` (161); no SKU designation or sentence review list this slice (165); the fields' names and the stricter readings of P4 and C16 (167) |
+| Second list, question 2: `membershipIn`'s text beside decision 154 | 169 | reworded in decision 169's words, naming the accepting decision; breaking, in the release line from step 12; the thread's terms name 111 for all but `Member` and `membershipIn` (section 4.4) |
+| Second list, question 3: where a Sutton `UserProfile`'s names and job title sit | 172 | on the `Member`, per tenant; this app's member names stay through the person, decision 133 (sections 4.2 and 9) |
+| Second list, question 4: `PostalAddress`'s criterion beside decision 158 | 173 | decision 138's criterion with 158's clause, an id a source issued waiting until its records are lifted; fixtures name their addresses (sections 3.1 and 9) |
+| Second list, question 5: `memberContactPoint` under `gist:hasAddress` | 174 | yes, a third link under `gist:hasAddress` (sections 4.1 and 8) |
+| Second list, question 6: which source records decision 35's closure covers | 168 | only a record of a trading account, whose source has a trading-role field; a contact's or workspace's record states neither flag, and the two definitions say so (sections 4.2 and 9) |
+| Second list, question 7: how a lift would write a contact point | 175 | by hand in this slice; the lift's rule is asked when Sutton records are first lifted (sections 3.1, 7 and 12) |
+| Second list, question 8: `defaultFor` under `gist:isCategorizedBy` | 174 | no gist parent; decision 17 read as covering the properties that classify a thing (section 4.1) |
+| Second list, question 9: guard 1 beside decisions 155 and 161 | 171 | guard 1 compares subject and property, built in step 11 with its test (section 7) |
+| Second list, question 10: `Party`'s `storesId` | 170 | `storesId: false`; the lift writes no `Party` node (sections 3.1 and 7) |
 
-## 14. Not checked
+## 15. Not checked
 
 - The pinned gist file was read for the facts of section 8 only, by a script outside the repository; nothing of gist's
   but names and links enters the module (decision 16). Whether gist's own axioms, read beside the generated file,
   leave the fixtures consistent is gate 9's question (step 13), not this report's.
-- No term here was decoded with `Vocabulary`, run through gate 4 or gate 5 or projected: the counts of section 2, the
-  rule tables of section 6 and the key patterns were checked by reading, and the lengths of labels and definitions
-  and the distinctness of keys by a script over this report's tables (2026-11-26). Steps 9 to 12 decode each.
+- No term here was decoded with `Vocabulary`, run through gate 4 or gate 5 or projected: the rule tables of section 6
+  and the key patterns were checked by reading, and the counts of section 2 (with the thread's, read from
+  `Terms.vocab.ts`), the lengths of labels and definitions and the distinctness of keys by a script over this report's
+  tables (2026-11-26, after decisions 168 to 175). Steps 9 to 12 decode each.
 - Sutton's schema was not re-read; its field and enum names are the SPEC's, report 16's, report 17's and
   `readings.json`'s, and the definitions of `marketing`, `sales`, `manufacturing` and `other` are readings. So is
   `revoked`'s: whether Sutton's `revoked` is a removed member or a withdrawn invitation was not checked, and the
   definition is worded to hold for both (section 5). Whether `UserProfile.image` holds a link or a file's id, and
   which phone `phoneNumberExt` extends, were not checked.
-- What section 4 says of guard 3, section 7 of guard 1 and of the lift's refusals, and question 10 of a link to
-  `Party` were read from `Fixture.rules.ts`, `Lift.ts`, `Questions.test.ts` and `test/support/fixtures.ts` as they
-  stand; no test was run on a changed vocabulary.
+- What section 4 says of guard 3, and section 7 of guard 1, of the lift's refusals and of a link to `Party`, were
+  read from `Fixture.rules.ts`, `Lift.ts`, `Questions.test.ts` and `test/support/fixtures.ts` as they stand; no test
+  was run on a changed vocabulary.
 - That `UserProfile.user` and `OrganizationMember.user` name one `User` was not checked; section 9 states the link
   once on that reading.
 - Nothing here was put to the foundational auditor (decision 107 made the audit advisory for the thread; no decision

@@ -617,7 +617,7 @@ const Row = memo(function Row(props: {
 
   // The person types the value: the panel that asks for it. A weak guess (`weakGuess`) is offered inside it, as one
   // outline button with its evidence, never as the row's own answer.
-  const typeIt = (subject: string, guess?: Fix): ReactNode => {
+  const typeIt = (subject: string, guess: Fix | undefined): ReactNode => {
     if (problem === undefined) return null
     const label = O.getOrElse(HashMap.get(props.labels, subject), () => subject)
     const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
@@ -789,7 +789,7 @@ const Row = memo(function Row(props: {
         </Tooltip>
       )
     } else if (subject !== undefined) {
-      main = typeIt(subject)
+      main = typeIt(subject, undefined)
     }
   }
 
@@ -1799,7 +1799,7 @@ export function ReviewGrid(props: GridProps) {
   const span = columns.length + (showStatus ? 2 : 1)
   // The flex column is drawn without a width and takes what the others leave, so rounding never opens a gap.
   const widthOf = (id: string): number | undefined =>
-    id === plan.flex ? undefined : plan.shown.find((shown) => shown.id === id)?.width
+    O.contains(plan.flex, id) ? undefined : plan.shown.find((shown) => shown.id === id)?.width
   const widths = [
     widthOf(columns[0]?.id ?? ""),
     ...(showStatus ? [statusWidth] : []),

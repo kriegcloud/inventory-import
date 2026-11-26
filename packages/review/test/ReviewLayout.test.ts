@@ -49,7 +49,7 @@ describe("column sizing", () => {
       { id: "unit", width: 90 },
       { id: "buy", width: 60 }
     ])
-    expect(plan.flex).toBe("name")
+    expect(plan.flex).toEqual(O.some("name"))
   })
 
   it("moves the lowest priority into the detail first, and between equals the one furthest right", () => {

@@ -53,6 +53,7 @@ it.live("after a refused connection, the next requests build nothing for the col
         Effect.sync(() =>
           toTracedServe({
             app: inMemoryApp({
+              docs: false,
               member: tom,
               ai: OpenRouterTest.off("noKey", ModelId.make("test/model")),
               http: network,

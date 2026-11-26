@@ -113,8 +113,12 @@ describe("the document's components", () => {
         const folded = !R.has(spec["components"]["schemas"], "Part_1")
         expect(R.keys(spec["components"]["schemas"])).toContain("Part")
         const [original, copied] = [written(pair.original), written(copy)]
-        if (O.isSome(original) && O.isSome(copied)) expect(folded).toBe(original.value === copied.value)
-        else expect(folded && first !== second).toBe(false)
+        expect(
+          O.match(O.all([original, copied]), {
+            onNone: () => !folded || first === second,
+            onSome: ([original, copied]) => folded === (original === copied)
+          })
+        ).toBe(true)
       }),
     { arbitrary: { runs: 500 } }
   )

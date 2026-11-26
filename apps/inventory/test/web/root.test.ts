@@ -6,7 +6,7 @@ import * as Str from "effect/String"
 import { isValidElement } from "react"
 import { vi } from "vitest"
 import mainSource from "../../src/web/main.tsx?raw"
-import { openPage, signedInAs } from "./support/page.ts"
+import { openPage, signedInAs, pageStart } from "./support/page.ts"
 
 vi.mock("sonner", () => ({
   Toaster: () => null,
@@ -19,7 +19,7 @@ const settle = Effect.sleep("30 millis")
 describe("the page's registry", () => {
   it.live("is the root's, the one the page is drawn in, and the only one", () =>
     Effect.gen(function* () {
-      const page = openPage()
+      const page = openPage({ ...pageStart() })
       vi.resetModules()
       const [root, member] = yield* Effect.all(
         [
@@ -29,7 +29,7 @@ describe("the page's registry", () => {
         { concurrency: "unbounded" }
       )
       yield* settle
-      page.asked[0]?.answer(signedInAs("dana"))
+      page.asked[0]?.answer(signedInAs({ who: "dana", organization: "prairie" }), 200)
       yield* settle
       const drawn = root.Root()
       // Made by `rootRegistry`: its member is the session's, and this tab's lock was taken as it was made.

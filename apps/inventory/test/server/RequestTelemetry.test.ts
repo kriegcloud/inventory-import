@@ -13,7 +13,15 @@ import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedServe } from "../../src/server/App.ts"
 import { Collector, RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
-import { afterAnswerInto, inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
+import {
+  afterAnswerInto,
+  inMemoryApp,
+  settingsLayer,
+  settled,
+  testOrigin,
+  testSettings,
+  noNetwork
+} from "./support/app.ts"
 
 // Tracing that leaves the Worker is built per request (src/server/RequestTelemetry.ts): each request gets its own
 // exporters, its handler's spans go to them, and they are closed (which sends what they hold) only after the answer,
@@ -28,7 +36,13 @@ const dana = Member.make({
   organizationName: "Example Works (test)"
 })
 
-const app = inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")) })
+const app = inMemoryApp({
+  docs: false,
+  http: noNetwork,
+  settings: testSettings,
+  member: dana,
+  ai: OpenRouterTest.off("noKey", ModelId.make("test/model"))
+})
 
 /** One recording exporter per request: the spans it was handed, and whether its scope has been closed. */
 type Exported = { spans: Array<string>; ended: number; closed: boolean }

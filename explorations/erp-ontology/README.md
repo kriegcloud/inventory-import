@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Build step 7 of goals/party-slice, then write report 18, the design of the party slice's terms, for one accepting decision (129).
+next: Benjamin accepts report 18, the design of the party slice's terms, as one decision (129) and answers its nine questions; then steps 9 to 12 of goals/party-slice add the terms.
 goals: [erp-vocabulary, party-slice]
 ---
 
@@ -53,6 +53,7 @@ organization scope remains enough for the thread (115). Gate 10 is not built (de
 | [15 What the foundational audit of the thread found](research/15-audit-findings.md) | The auditor's two runs, what its adversary landed, why the audit is advisory (decision 107) and five design points still to rule on. |
 | [16 Sutton's API schema against the packet's Sutton rows](research/16-sutton-schema-check.md) | What the schema confirms and overturns in report 11's 28 Sutton rows, the records Sutton has that the packet lacks, and three questions (decisions 125 to 127). |
 | [17 A plan for modelling Sutton whole](research/17-sutton-whole-model-plan.md) | Sutton's 200 record types placed against the packet, eight slices with what each waits on and which pointers run forward, 45 findings where schema and design disagree, 24 new questions, and what a review disputed. The readers' output is `assets/sutton/readings.json`. |
+| [18 The party slice's terms](research/18-party-slice-terms.md) | Slice 1's terms for one accepting decision: 10 new classes, 49 properties, 7 schemes and 24 concepts with `Member`'s new wording and `Party`'s exception entry, each property's evidence and step, Sutton's slice-1 fields as placed, the questions each term serves, the choices it makes and nine questions for Benjamin. Nothing is built from it. |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).
@@ -106,3 +107,5 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-26: steps 1 to 6 of `goals/party-slice` done. The metamodel, projector, gates 3 to 5, the lift and gate 8's
   groundwork are built with no term added; O1 to O19 and five readings are decisions 129 to 152, each answered as
   recommended, and 153 rules gist's `rangeIncludes` note a hint.
+- 2026-11-26: step 8 of `goals/party-slice`: [report 18](research/18-party-slice-terms.md) designs slice 1's terms for
+  one accepting decision (129). No term is added until Benjamin accepts it; its nine questions are his.

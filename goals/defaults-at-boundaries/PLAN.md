@@ -32,9 +32,9 @@ Places by package on 2026-11-23, from the baseline:
 | 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | done in two rounds: the first cleared the law with `Result.getOrThrow` decodes and was refused. Left as on main: the session hook's null context and `undefined` result in `internal/authOptions.ts` (2 places, Better Auth's own API; an exemption candidate for row 15) |
 | 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | done in two rounds: a model policy and a script's options are stated by every caller; no line of the baseline names them |
 | 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | partly, in two lanes: 88 places cleared, 81 exempt in eleven files that read bytes and markup (decided 2026-11-26), 17 left in the two codecs and the xlsx schema files (sheet and column names compared without case; a codec's own cell reading) |
-| 9 | `packages/review` | 586 | Codex lane | partly, in three lanes: the region's optional data are Options from `ReviewRow` to the last step of each screen (321 of 474 source places), the tests narrow with asserts (74 of 94), and the browser's reads are in `internal/browser.ts` (exempt for absence, decided 2026-11-26). Left: about 120 in source, most in `internal/ReviewGrid.tsx` (50) and `ReviewRegion.atoms.ts` (19): sparse cell lookups (`view.cells[id] ?? ""`), counters, and a component's own optional props, which stay counted (decided 2026-11-26); 20 in two test fixtures the gallery imports, which cannot use the test asserts |
+| 9 | `packages/review` | 586 | Codex lane | partly, in four lanes (the fourth made a row's cells total; 110 places left, see the evidence below): the region's optional data are Options from `ReviewRow` to the last step of each screen (321 of 474 source places), the tests narrow with asserts (74 of 94), and the browser's reads are in `internal/browser.ts` (exempt for absence, decided 2026-11-26). Left: about 120 in source, most in `internal/ReviewGrid.tsx` (50) and `ReviewRegion.atoms.ts` (19): sparse cell lookups (`view.cells[id] ?? ""`), counters, and a component's own optional props, which stay counted (decided 2026-11-26); 20 in two test fixtures the gallery imports, which cannot use the test asserts |
 | 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | partly, in three lanes: every caller states its reactivity keys, `keep`, toast lead and `sayError` fields; the browser's reads are in `client/src/Storage.browser.ts` and `ui/src/internal/browser.ts` (exempt for absence). Left: about 55, named in VERDICTS: `Effect.runSync` in `Json.codec.ts` and `Api.atoms.ts`, `ListTable`'s facet counts and search clean-ups, `SayError`'s path wording, and components' own optional props |
-| 11 | `packages/catalog/web` | 572 | Codex lane | done but for 46 places in its tests and two in source: 292 of 324 source places cleared, the editor is Closed or Open, worker messages cross encoded; five files that show or repair a reviewed cell are exempt for clean-ups and `internal/browser.ts` for absence (decided 2026-11-26). Left in source: the table hook's page count before the first read (`ItemsPage.screen.tsx`) and a ReactNode check in `ImportPage.screen.tsx` |
+| 11 | `packages/catalog/web` | 572 | Codex lane | done but for 19 places in its tests and two in source: 292 of 324 source places cleared, the editor is Closed or Open, worker messages cross encoded; five files that show or repair a reviewed cell are exempt for clean-ups and `internal/browser.ts` for absence (decided 2026-11-26). Left in source: the table hook's page count before the first read (`ItemsPage.screen.tsx`) and a ReactNode check in `ImportPage.screen.tsx` |
 | 12 | `packages/access/web` | 37 | Codex lane | done: no line of the baseline names it but the two exempt edges (`Session.atoms.ts`, `internal/authClient.ts`: the browser's and Better Auth's own APIs, decided 2026-11-26). The slug of a new organization is a schema's (`OrganizationSlugStem`), compared with the old helper on five names; not seen on screen, since sign-up is closed in development |
 | 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | partly: tests 95 to 4 (a first round that read `.valueOrUndefined` was refused and redone; the law now counts it), source 51 to 18. Left: the OpenAPI document's JSON (`api/v1/Document.ts`), `SameOrigin`'s header reads, and gallery pages |
 | 14 | `packages/infra` | 7 | Codex lane | done: 15 places under the new reader, all cleared; the stage plan is unchanged and no alchemy command was run. Two `onFailure: () => []` branches stay, which the law does not count |
@@ -146,6 +146,28 @@ import 21, Ready 155, All 200; pressed "Import 155, skip 45", then "Import 155 i
 items?"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items read "155 items". Screenshot
 `.scratch/shots/sweep-3-result.png`. Not seen on screen: Match (the sample needs none), the table assistant, People
 after the last lanes, sign-up, and a phone width.
+
+2026-11-26, after a second round of six lanes run one after the other (app, foundation, review, ui and client, the
+review region's total cells, catalog/web's last pass), at `54149b01`: the baseline names 34 files and 162 places (70
+fallback, 68 absence, 1 unwrap, 23 clean-up; main: 1,687). By package: review 98 in source and 12 in tests, catalog/web
+2 and 19, ui 16, apps/inventory 7 and 1, the csv and xlsx codecs 5, client 2. A review row's cells are a complete
+record for the region's columns, built once where rows enter (decided 2026-11-26); drawing the grid for the 200-row
+sample measured +0.6% unpinned and -2.0% pinned over 21 paired runs. What review still holds is mostly counters and
+groupings whose folds measured 10% to 52% slower and were left, layout and navigation absence, and a component's own
+optional props. No `!` non-null assertion is left in our own code; the four `schemaSync:off` comments are gone (seven
+`@effect-diagnostics` comments remain: six tests that read a binary file, one in `packages/infra`). `bun run
+check:full` passes (112 tasks) and the Verify lock equals `main`'s. On port 5174 from a fresh database: pressed "Use
+items_messy.csv"; Review read Needs a decision 24, Cannot import 21, Ready 155, All 200; pressed "Import 155, skip
+45", then "Import 155 items" in the dialog "Import 155 items?"; Result read Not imported 45, Imported 155, Already
+there 0, All 200; Items read "155 items". Pressed "Use items_messy.csv" again: Needs a decision 24, Cannot import 21,
+Ready 0, Already there 155, All 200; pressed "Leave out 2": Needs a decision 20, Ready 2, Left out 2; pressed Undo:
+the first counts again. Screenshot `.scratch/shots/sweep-4-result.png`. Not seen on screen: typing in a cell, Match,
+the item editor, the table assistant, People, Activity, and a phone width.
+
+Found on the way, and not the sweep's: the generated property "with reloads, sign-outs and closed tabs taken up" in
+`packages/catalog/web/test/Draft.machine.test.ts` has a rare counterexample that also fails on `main` (a 13-step
+ordering after which row c is said to be decided since by someone else when only this tab wrote it). Its replay token
+is in `VERDICTS.md`, in the review package's fourth lane. Nothing was changed for it.
 
 What the lanes taught, beyond the pilot's list:
 

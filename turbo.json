@@ -22,10 +22,11 @@
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"]
     },
     // Type-check with the Effect diagnostics.
-    // A package's check may run the repository's own commands (quality strict, laws exports): their source is an input.
+    // A package's check may run the repository's own commands (quality strict, laws exports). Their source, and the
+    // kit it is built on, reach the hash through the CLI's own `transit`, and nothing else does it: the root has no
+    // dependency on the CLI, which would put its source into every task's hash, a proof's included (goals/ci-speed).
     "check": {
-      "dependsOn": ["transit"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/tool/cli/src/**"],
+      "dependsOn": ["transit", "@beep/repo-cli#transit"],
       "outputs": []
     },
     // oxlint, and the design-system lint in packages with screens. A package's own lint profile is in its files; the
@@ -89,6 +90,8 @@
     "//#alchemy:check": { "cache": false },
     // The stage C ceilings of the packages with screens add up to at most 678 (`beep quality ceilings`).
     "//#ceilings:check": {
+      // The CLI's source is named below; the kit it imports comes with its `transit`, as for a package's `check`.
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
@@ -113,6 +116,7 @@
     },
     // Every package with screens is in both lists Tailwind reads class names from (`beep laws screens`).
     "//#screens:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "apps/inventory/package.json",
         "apps/inventory/src/web/index.css",
@@ -128,6 +132,7 @@
     // scratchpad left out; and
     // every package.json, whose exports name the modules of hooks.
     "//#refs:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "**/*.tsx",
         "!**/node_modules/**",
@@ -225,6 +230,7 @@
     // (a vitest.config.ts, a vendor.json, a ceiling file). An installed file a `$schema` names is hashed through
     // bun.lock.
     "//#config-sync:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "packages/foundation/modeling/identity/src/**",
         "packages/foundation/modeling/schema/src/**",
@@ -483,6 +489,7 @@
     // Each patch's test fails beside the package with that one patch left out and the others applied (`beep patches
     // prove`): the patches and their tests, the kept files they are applied to, and what the tests are run with.
     "//#patches:prove": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "packages/patches/**",
         "!packages/patches/node_modules/**",
@@ -495,6 +502,7 @@
     },
     // No home path or private folder is named in the scratchpad (`beep laws private-paths`): every file in it.
     "//#private-paths:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": ["scratchpad/**", "!scratchpad/**/node_modules/**", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
@@ -502,6 +510,7 @@
     // key in an experiment is refused like any other, and this is the one root task an edit there re-runs.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "docs/**",
         "explorations/**",

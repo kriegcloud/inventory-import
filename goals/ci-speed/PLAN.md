@@ -8,16 +8,17 @@ from: explorations/ideal-architecture
 # Plan
 
 [SPEC](SPEC.md) holds the objective and acceptance; [AUDIT](AUDIT.md) holds the measurements each step rests on.
-Status is one of `todo`, `doing`, `done`. Nothing is built yet. The decisions were answered on 2026-11-26 and are in
+Status is one of `todo`, `doing`, `done`; `built` is written and passing `bun run check` here, and not yet seen on a
+run of CI, which needs a push that is Benjamin's to ask for. The work is on the branch `ci/speed`. The decisions were answered on 2026-11-26 and are in
 the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS.md), three entries titled "CI speed".
 
 | # | Step | Returns (estimate, of the run) | Waits on | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Upload `.turbo/runs/*.json` from both jobs; record ten runs as the baseline | nothing; turns every estimate into a number | nothing | todo |
-| 2 | Start the proofs' three long tasks at once: jobs for prove, verify, and fold with mutants:sample; "Proofs and search of the model" stays as the job that waits for them | 1 to 2 min on a full miss alone; about 4 min with step 3 | nothing | todo |
-| 3 | Split the check: `catalog-web:test`; `app:test:slow` with the grid test; everything else; "Check, test and build" stays as the job that waits for them | 3 to 5 min | nothing | todo |
+| 1 | Upload `.turbo/runs/*.json` from both jobs; record ten runs as the baseline | nothing; turns every estimate into a number | nothing | built; the ten runs wait on a push |
+| 2 | Start the proofs' three long tasks at once: jobs for prove, verify, and fold with mutants:sample; "Proofs and search of the model" stays as the job that waits for them | 1 to 2 min on a full miss alone; about 4 min with step 3 | nothing | built |
+| 3 | Split the check: `catalog-web:test`; `app:test:slow` with the grid test; everything else; "Check, test and build" stays as the job that waits for them | 3 to 5 min | nothing | built |
 | 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | todo |
-| 5 | Name the vendored kit in the inputs of prove, verify, mutants and mutants:sample; then move `@beep/repo-cli` from the root's devDependencies to the six packages whose `check` runs it, and the CLI's source out of the generic `check.inputs`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | todo |
+| 5 | Bring the vendored kit into the hash of prove, verify, mutants and mutants:sample; then take `@beep/repo-cli` out of the root's devDependencies, and bring the CLI's source to the tasks that run it through its own `transit`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | done ("Step 5, the experiment" below) |
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | todo |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | todo |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | todo |
@@ -76,7 +77,40 @@ Before any change, from GitHub Actions on 2026-11-26. Step 1 replaces it with tu
 | `catalog-web:test` | 190 to 449 s |
 | `app:test:slow` | 191 to 311 s |
 
+## Step 5, the experiment
+
+`turbo run check lint test prove verify fold mutants:sample mutants test:slow build --dry=json`, 87 tasks, one line
+appended to one file, the hashes compared before and after. Run on 2026-11-26.
+
+| Edit | Before the change | After |
+| --- | --- | --- |
+| A CLI source file (`packages/tooling/tool/cli/src/bin.ts`) | 87 of 87 hashes change, every proof task among them | 31 of 87: every package's `check` and the CLI's own four tasks. No `prove`, `verify`, `fold`, `mutants`, no other test, no build |
+| `@beep/schema` (a file under its `src`) | 87 of 87 | 57 of 87, with `catalog-model#prove`, `#verify`, `#mutants:sample`, `#mutants` and `catalog-web#fold` |
+| `@beep/types`, which the kernel reaches only through the kit | 87 of 87 | 60 of 87, with the same five |
+| The kernel (`packages/kernel/src/Role.schema.ts`) | not run | 31 of 87, with the same five |
+| A handler of the model's package, which no proof reads | not run | 12 of 87; of the five only the fold |
+
+The root tasks, the same way (19 of them are cached): a CLI edit changes 18, all but `lockfile:check`, which runs
+bun and not the CLI; an edit to `@beep/types` changes the same 18.
+
+How: `prove`, `verify` and the two mutants tasks depend on `@inventory/kernel#transit` (the mutants on the
+contract's too), which folds the kernel's dependencies into their hash; a package's `check` and the seven root
+tasks whose inputs did not reach the kit depend on `@beep/repo-cli#transit`. `beep-cli` still resolves with no
+package depending on the CLI: bun links a workspace's command whether or not anything asks for it (seen after an
+install from nothing).
+
+Found on the way, and not this goal's: a new file git does not yet track in a kit package changed no proof's hash
+before this change, since the root's dependency hashed tracked files only. It does now.
+
 ## Choices made along the way
+
+- 2026-11-26: the CLI is not made a dependency of the six packages whose `check` runs it, as the audit proposed.
+  The boundaries law says nothing depends on tooling, and changing a law to save the other packages' type-checks on
+  a CLI-only merge is not worth it: those are seconds, in the job that is not the longest. Every package's `check`
+  still reruns on a CLI edit, as before; no test, proof or build does.
+- 2026-11-26: `check:ci` no longer runs the slow tests. The law on the three check scripts lets a job's command be
+  one of them with a filter, not a fourth list of root tasks kept by hand; so `rest` is `check:ci` without the
+  catalog's screens, and `slow` runs `turbo run test:slow` itself.
 
 - 2026-11-26: main's forced run covers the check job's tasks and not the proofs. His answer named tests, slow tests
   and the build; type-check and lint are forced with them because they are seconds. Forcing the proofs on every

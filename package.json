@@ -78,7 +78,6 @@
     "imports:fix": "bun packages/tooling/tool/cli/src/bin.ts laws effect-imports --write"
   },
   "devDependencies": {
-    "@beep/repo-cli": "workspace:*",
     "@effect/tsgo": "catalog:",
     "oxfmt": "^0.80.0",
     "oxlint": "catalog:",

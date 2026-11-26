@@ -3,16 +3,19 @@
  * OWL file and of the SKOS file, and a graph becomes those of a fixture file, each with the header, the prefixes and
  * the order the writer needs to turn it into bytes.
  *
- * Do not break: the projector states only what the vocabulary holds. A class is a name, its labels, its definition
- * and its one parent; a property its domain and, where it ranges over a class or a datatype, its range; a gist class
- * a name, a link and the pairs gist states. Nothing here writes an inverse, a characteristic, a key, a restriction
- * or a sameness: the vocabulary has no field for one, and gate 3 refuses each in a file. A property that ranges over
- * a scheme gets no `rdfs:range` (section 2.2), and a concept that is also an individual is typed in the OWL file and
- * described in the SKOS file, so no file holds a punned IRI (section 2.4).
+ * Do not break: the projector states only what the vocabulary holds. A class is a name, its labels, its definition,
+ * its one parent and its category parents (decision 12); a property its domain, where it ranges over a class or a
+ * datatype its range, and the gist property it sits under (decision 16); a gist class a name, a link and the pairs
+ * gist states; a gist property its declaration alone, never gist's domain or range (decision 16). A retired term keeps
+ * its words, gains `owl:deprecated true`, its successor and the version, and loses every logical axiom (decision 33).
+ * No kind tag, identity criterion, scope or ratification is written (decision 19). Nothing here writes an inverse, a
+ * characteristic, a key, a restriction or a sameness: the vocabulary has no field for one, and gate 3 refuses each in
+ * a file. A property that ranges over a scheme gets no `rdfs:range` (section 2.2), and a concept that is also an
+ * individual is typed in the OWL file and described in the SKOS file, so no file holds a punned IRI (section 2.4).
  *
  * @packageDocumentation
  */
-import { ParentLink, RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
+import { Deprecation, GistProperty, ParentLink, RangeTarget, type Vocabulary } from "@beep/vocabulary/Model"
 import { RdfVocab } from "@beep/vocabulary/Rdf"
 import * as A from "effect/Array"
 import { dual } from "effect/Function"
@@ -113,6 +116,55 @@ const wordsOf = (subject: Iri, described: Described): ReadonlyArray<Triple> => [
 ]
 
 /**
+ * A retired term's three statements (decision 33): `owl:deprecated true`, the successor named at that retirement, and
+ * the version as a history note, which also says why when nothing replaces it. Its words are kept elsewhere; its
+ * logical axioms are left out by the caller.
+ */
+const retirementOf = (
+  subject: Iri,
+  deprecation: Deprecation,
+  successor: (key: string) => Iri
+): ReadonlyArray<Triple> => {
+  const since = `${deprecation.since.major}.${deprecation.since.minor}.${deprecation.since.patch}`
+  return [
+    literal(subject, term("owl", "deprecated"), "true", term("xsd", "boolean")),
+    ...Deprecation.match(deprecation, {
+      replaced: (retired) => [
+        link(subject, term("dcterms", "isReplacedBy"), successor(retired.replacedBy)),
+        text(subject, term("skos", "historyNote"), `Deprecated in ${since}.`, language)
+      ],
+      withdrawn: (retired) => [
+        text(subject, term("skos", "historyNote"), `Deprecated in ${since}. ${retired.reason}`, language)
+      ]
+    })
+  ]
+}
+
+/**
+ * A term's logical axioms while it is live, or its three retirement statements once it is retired: a retired term
+ * states no parent, category parent, domain, range or gist link (decision 33).
+ */
+const liveOrRetired = (
+  subject: Iri,
+  deprecation: O.Option<Deprecation>,
+  successor: (key: string) => Iri,
+  axioms: () => ReadonlyArray<Triple>
+): ReadonlyArray<Triple> =>
+  O.match(deprecation, { onNone: axioms, onSome: (retired) => retirementOf(subject, retired, successor) })
+
+/** Every retirement the vocabulary states, of a class, a property, a scheme or a concept. */
+const deprecationsOf = (vocabulary: Vocabulary): ReadonlyArray<Deprecation> =>
+  A.getSomes([
+    ...A.map(R.values(vocabulary.classes), (entry) => entry.deprecation),
+    ...A.map(R.values(vocabulary.objectProperties), (entry) => entry.deprecation),
+    ...A.map(R.values(vocabulary.datatypeProperties), (entry) => entry.deprecation),
+    ...A.flatMap(R.values(vocabulary.schemes), (scheme) => [
+      scheme.deprecation,
+      ...A.map(R.values(scheme.concepts), (concept) => concept.deprecation)
+    ])
+  ])
+
+/**
  * A concept's IRI: the namespace, its scheme's key and its notation (decision 10).
  *
  * @example conceptIri(vocabulary, "MemberRoleScheme", "admin") // "…/ontology/MemberRoleScheme-admin"
@@ -124,6 +176,20 @@ export const conceptIri: {
   3,
   (vocabulary: Vocabulary, scheme: string, notation: string): Iri => `${vocabulary.namespace}${scheme}-${notation}`
 )
+
+/** A concept's retirement statements, its successor a concept of the same scheme; nothing while it is live. */
+const retiredOnly = (
+  vocabulary: Vocabulary,
+  scheme: string,
+  notation: string,
+  deprecation: O.Option<Deprecation>
+): ReadonlyArray<Triple> =>
+  liveOrRetired(
+    conceptIri(vocabulary, scheme, notation),
+    deprecation,
+    (successor) => conceptIri(vocabulary, scheme, successor),
+    () => []
+  )
 
 /** The predicates of the OWL file, in the order section 6.3's table lists them. */
 const owlPredicates: ReadonlyArray<Iri> = [
@@ -138,7 +204,10 @@ const owlPredicates: ReadonlyArray<Iri> = [
   term("dcterms", "source"),
   term("skos", "prefLabel"),
   term("skos", "altLabel"),
-  term("skos", "definition")
+  term("skos", "definition"),
+  term("owl", "deprecated"),
+  term("dcterms", "isReplacedBy"),
+  term("skos", "historyNote")
 ]
 
 /** The predicates of the SKOS file, in the order section 6.3's table lists them. */
@@ -151,7 +220,10 @@ const skosPredicates: ReadonlyArray<Iri> = [
   term("skos", "definition"),
   term("skos", "notation"),
   term("skos", "inScheme"),
-  term("skos", "topConceptOf")
+  term("skos", "topConceptOf"),
+  term("owl", "deprecated"),
+  term("dcterms", "isReplacedBy"),
+  term("skos", "historyNote")
 ]
 
 const owlProjectionOf = (context: ProjectContext, source: string): Projection => {
@@ -160,8 +232,18 @@ const owlProjectionOf = (context: ProjectContext, source: string): Projection =>
   const gist = (name: string): Iri => `${vocabulary.gist.namespace}${name}`
   const document = ontologyIri(vocabulary)
   const type = term("rdf", "type")
+  const retirements = deprecationsOf(vocabulary)
+  // The two annotation properties of a retirement are declared only by a file that states one, so a vocabulary with
+  // no retired term writes the file it wrote before decision 33 was built. `owl:deprecated` is OWL's own.
   const annotations = A.map(
-    [term("skos", "prefLabel"), term("skos", "altLabel"), term("skos", "definition"), term("dcterms", "source")],
+    [
+      term("skos", "prefLabel"),
+      term("skos", "altLabel"),
+      term("skos", "definition"),
+      term("dcterms", "source"),
+      ...(A.isReadonlyArrayNonEmpty(retirements) ? [term("skos", "historyNote")] : []),
+      ...(A.some(retirements, Deprecation.guards.replaced) ? [term("dcterms", "isReplacedBy")] : [])
+    ],
     (property) => link(property, type, term("owl", "AnnotationProperty"))
   )
   const gistClasses = [
@@ -182,37 +264,69 @@ const owlProjectionOf = (context: ProjectContext, source: string): Projection =>
   const classes = A.flatMap(R.toEntries(vocabulary.classes), ([key, entry]) => [
     link(inv(key), type, term("owl", "Class")),
     ...wordsOf(inv(key), entry),
-    ...ParentLink.match(entry.parent, {
-      gist: (parent) => [link(inv(key), term("rdfs", "subClassOf"), gist(parent.name))],
-      local: (parent) => [link(inv(key), term("rdfs", "subClassOf"), inv(parent.key))],
-      none: () => []
-    })
+    ...liveOrRetired(inv(key), entry.deprecation, inv, () => [
+      ...ParentLink.match(entry.parent, {
+        gist: (parent) => [link(inv(key), term("rdfs", "subClassOf"), gist(parent.name))],
+        local: (parent) => [link(inv(key), term("rdfs", "subClassOf"), inv(parent.key))],
+        none: () => []
+      }),
+      // Decision 12: each category the class also falls under is one more `rdfs:subClassOf`, beside its one parent.
+      ...A.map(entry.categoryParents, (category) => link(inv(key), term("rdfs", "subClassOf"), inv(category)))
+    ])
   ])
   const domainOf = (key: string, domain: O.Option<string>): ReadonlyArray<Triple> =>
     O.match(domain, { onNone: () => [], onSome: (named) => [link(inv(key), term("rdfs", "domain"), inv(named))] })
-  const objectProperties = A.flatMap(R.toEntries(vocabulary.objectProperties), ([key, entry]) => [
-    link(inv(key), type, term("owl", "ObjectProperty")),
-    ...wordsOf(inv(key), entry),
-    ...domainOf(key, entry.domain),
-    ...RangeTarget.match(entry.range, {
-      class: (range) => [link(inv(key), term("rdfs", "range"), inv(range.key))],
-      // Section 2.2: a concept of a scheme is no class, so no range is written.
-      scheme: () => []
+  const gistParentOf = (key: string, parent: O.Option<{ readonly name: string }>): ReadonlyArray<Triple> =>
+    O.match(parent, {
+      onNone: () => [],
+      onSome: (named) => [link(inv(key), term("rdfs", "subPropertyOf"), gist(named.name))]
     })
-  ])
-  const datatypeProperties = A.flatMap(R.toEntries(vocabulary.datatypeProperties), ([key, entry]) => [
-    link(inv(key), type, term("owl", "DatatypeProperty")),
-    ...wordsOf(inv(key), entry),
-    ...domainOf(key, entry.domain),
-    link(inv(key), term("rdfs", "range"), `${w3.xsd}${Str.slice(Str.length("xsd:"))(entry.datatype)}`)
-  ])
+  // Decision 16: a gist property is declared, so the OWL file says what the sub-property link points at, and no more:
+  // gist's domain and range stay in the module for rule C9. Each sits among the properties of its kind.
+  const gistRelations = A.flatMap(R.toEntries(vocabulary.gist.properties), ([name, entry]) =>
+    GistProperty.guards.object(entry) ? [link(gist(name), type, term("owl", "ObjectProperty"))] : []
+  )
+  const gistAttributes = A.flatMap(R.toEntries(vocabulary.gist.properties), ([name, entry]) =>
+    GistProperty.guards.datatype(entry) ? [link(gist(name), type, term("owl", "DatatypeProperty"))] : []
+  )
+  const objectProperties = [
+    ...gistRelations,
+    ...A.flatMap(R.toEntries(vocabulary.objectProperties), ([key, entry]) => [
+      link(inv(key), type, term("owl", "ObjectProperty")),
+      ...wordsOf(inv(key), entry),
+      ...liveOrRetired(inv(key), entry.deprecation, inv, () => [
+        ...domainOf(key, entry.domain),
+        ...RangeTarget.match(entry.range, {
+          class: (range) => [link(inv(key), term("rdfs", "range"), inv(range.key))],
+          // Section 2.2: a concept of a scheme is no class, so no range is written.
+          scheme: () => []
+        }),
+        ...gistParentOf(key, entry.subPropertyOf)
+      ])
+    ])
+  ]
+  const datatypeProperties = [
+    ...gistAttributes,
+    ...A.flatMap(R.toEntries(vocabulary.datatypeProperties), ([key, entry]) => [
+      link(inv(key), type, term("owl", "DatatypeProperty")),
+      ...wordsOf(inv(key), entry),
+      ...liveOrRetired(inv(key), entry.deprecation, inv, () => [
+        ...domainOf(key, entry.domain),
+        link(inv(key), term("rdfs", "range"), `${w3.xsd}${Str.slice(Str.length("xsd:"))(entry.datatype)}`),
+        ...gistParentOf(key, entry.subPropertyOf)
+      ])
+    ])
+  ]
+  // A retired concept is still an individual a stored code names: it keeps its types and states its retirement here
+  // as in the SKOS file (report 12 section 3).
   const individuals = A.flatMap(R.toEntries(vocabulary.schemes), ([scheme, entry]) =>
     A.flatMap(R.toEntries(entry.concepts), ([notation, concept]) => [
       link(conceptIri(vocabulary, scheme, notation), type, term("owl", "NamedIndividual")),
       ...O.match(concept.alsoInstanceOf, {
         onNone: () => [],
         onSome: (key) => [link(conceptIri(vocabulary, scheme, notation), type, inv(key))]
-      })
+      }),
+      ...retiredOnly(vocabulary, scheme, notation, concept.deprecation)
     ])
   )
   return {
@@ -232,9 +346,10 @@ const owlProjectionOf = (context: ProjectContext, source: string): Projection =>
 }
 
 /**
- * The OWL file (section 8): the document, the four annotation properties it uses, the gist classes with their links
- * and pairs, the vocabulary's classes and properties, and every concept as a named individual, typed by its class
- * where it is also an instance of one.
+ * The OWL file (section 8): the document, the annotation properties it uses (four, and the two of a retirement when it
+ * states one), the gist classes with their links and pairs, the vocabulary's classes and properties with each gist
+ * property among those of its kind, and every concept as a named individual, typed by its class where it is also an
+ * instance of one.
  *
  * @example owlProjection(context, "packages/kernel/src/Terms.vocab.ts") // seven sections
  */
@@ -247,9 +362,12 @@ const skosProjectionOf = (context: ProjectContext, source: string): Projection =
   const { vocabulary } = context
   const inv = (key: string): Iri => `${vocabulary.namespace}${key}`
   const type = term("rdf", "type")
+  // A retired scheme or concept keeps its notation, its scheme and its words, so a stored code still resolves; the
+  // taxonomy alone says which codes are retired (report 12 section 3).
   const schemes = A.flatMap(R.toEntries(vocabulary.schemes), ([key, entry]) => [
     link(inv(key), type, term("skos", "ConceptScheme")),
-    ...wordsOf(inv(key), entry)
+    ...wordsOf(inv(key), entry),
+    ...liveOrRetired(inv(key), entry.deprecation, inv, () => [])
   ])
   const concepts = A.flatMap(R.toEntries(vocabulary.schemes), ([scheme, entry]) =>
     A.flatMap(R.toEntries(entry.concepts), ([notation, concept]) => {
@@ -259,7 +377,8 @@ const skosProjectionOf = (context: ProjectContext, source: string): Projection =
         ...wordsOf(subject, concept),
         literal(subject, term("skos", "notation"), notation, term("xsd", "string")),
         link(subject, term("skos", "inScheme"), inv(scheme)),
-        link(subject, term("skos", "topConceptOf"), inv(scheme))
+        link(subject, term("skos", "topConceptOf"), inv(scheme)),
+        ...retiredOnly(vocabulary, scheme, notation, concept.deprecation)
       ]
     })
   )

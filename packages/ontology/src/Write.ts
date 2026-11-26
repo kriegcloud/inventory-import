@@ -7,8 +7,9 @@
  * within one, by IRI in code-point order; predicates in the projection's order, `rdf:type` written `a`; a name
  * written with its prefix where one leaves a plain local name, and as `<iri>` otherwise; the objects of one
  * predicate one a line, in the order of their N-Triples form, which is used to sort and never written; no blank node, no `@base`, and no date, host, path outside the repository or
- * commit anywhere. A predicate the projection's order lacks, or words that are not NFC, are refused: nothing is
- * written around them.
+ * commit anywhere. A boolean is written `true` or `false`, Turtle's own form (report 12 section 3.1, rule 8), and a
+ * date-time with its datatype. A predicate the projection's order lacks, words that are not NFC, a boolean that is not
+ * `true` or `false` and a date-time that is no `xsd:dateTime` are refused: nothing is written around them.
  *
  * @packageDocumentation
  */
@@ -63,6 +64,27 @@ const renderIri = (prefixes: ReadonlyArray<readonly [string, Iri]>, iri: Iri): R
 
 const isNfc = (value: string): boolean => Str.normalize("NFC")(value) === value
 
+/** The one spelling of each boolean the files write; XSD's `1` and `0` are refused, so a value has one text. */
+const booleans: ReadonlyArray<string> = ["true", "false"]
+
+/**
+ * The lexical space of `xsd:dateTime` (XML Schema 1.1 part 2, section 3.3.7): a year of four digits or more, the month,
+ * the day, the time to the second with an optional fraction, or 24:00:00, and an optional zone. A day alone is none.
+ */
+const dateTimeForm =
+  /^-?(?:[1-9][0-9]{3,}|0[0-9]{3})-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]+)?|24:00:00(?:\.0+)?)(?:Z|[+-](?:(?:0[0-9]|1[0-3]):[0-5][0-9]|14:00))?$/
+
+/** Why a literal's text is not one its datatype writes, or none when it is. */
+const misread = (datatype: Iri, value: string): O.Option<string> => {
+  if (datatype === term("xsd", "boolean") && !A.contains(booleans, value)) {
+    return O.some(`is no boolean the files write: "${value}" is neither true nor false`)
+  }
+  if (datatype === term("xsd", "dateTime") && !dateTimeForm.test(value)) {
+    return O.some(`is no xsd:dateTime: "${value}"`)
+  }
+  return O.none()
+}
+
 /**
  * The file's text for one projection, or a refusal.
  *
@@ -87,8 +109,16 @@ export const writeTurtle = Effect.fnUntraced(function* (projection: Projection) 
   const object = (node: ObjectNode): string =>
     ObjectNode.match(node, {
       iri: (thing) => iri(thing.iri),
-      literal: (value) =>
-        value.datatype === plain ? `"${quoted(value.value)}"` : `"${quoted(value.value)}"^^${iri(value.datatype)}`,
+      literal: (value) => {
+        if (value.datatype === plain) {
+          return `"${quoted(value.value)}"`
+        }
+        // Checked below to be `true` or `false`, so the bare word is Turtle's boolean and nothing else.
+        if (value.datatype === term("xsd", "boolean")) {
+          return value.value
+        }
+        return `"${quoted(value.value)}"^^${iri(value.datatype)}`
+      },
       text: (words) => `"${quoted(words.value)}"@${words.language}`
     })
   // A comment ends at a line break, so a header line that held one would be read as statements.
@@ -112,6 +142,12 @@ export const writeTurtle = Effect.fnUntraced(function* (projection: Projection) 
       }
       if (!ObjectNode.guards.iri(triple.object) && !isNfc(triple.object.value)) {
         return yield* WriteRefused.make({ reason: `a value of ${triple.subject} is not NFC` })
+      }
+      if (ObjectNode.guards.literal(triple.object)) {
+        const wrong = misread(triple.object.datatype, triple.object.value)
+        if (O.isSome(wrong)) {
+          return yield* WriteRefused.make({ reason: `a value of ${triple.subject} ${wrong.value}` })
+        }
       }
     }
     const subjects = A.sort(A.dedupe(A.map(section, (triple) => triple.subject)), byCodePoint)

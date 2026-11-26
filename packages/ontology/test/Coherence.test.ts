@@ -5,6 +5,8 @@
 // among the test's inputs; an edit to any of the three runs this file again.
 //
 // The planted mistake and the C12 negative are copies of the literal made in the test: no committed input changes.
+// So are the party slice's constructs (PLAN, step 2): a copy of the literal holding each of them, with a copy of the
+// list that adds `Party`'s entry, read beside the real log, and that copy with one mistake planted per new rule.
 import { describe, expect, it } from "@effect/vitest"
 import { Vocabulary } from "@beep/vocabulary/Model"
 import { coherenceFindings, decisionHeadings, ExceptionList, type Finding } from "@beep/vocabulary/Rules"
@@ -15,6 +17,7 @@ import * as S from "effect/Schema"
 import { vocabulary } from "@inventory/kernel/Terms"
 import decisionLog from "../../../explorations/erp-ontology/DECISIONS.md?raw"
 import exceptionFile from "../exceptions/no-gist-parent.json" with { type: "json" }
+import { constructsExceptions, constructsVocabulary } from "./support/constructs.ts"
 
 const strict = { onExcessProperty: "error", errors: "all" } as const
 const decodeVocabulary = S.decodeUnknownEffect(Vocabulary, strict)
@@ -35,6 +38,13 @@ const termDecisions = (decoded: Vocabulary): ReadonlyArray<number> => [
     ...A.map(R.values(scheme.concepts), (concept) => concept.ratification.decision)
   ])
 ]
+
+/** Gate 4 on a copy of the constructs' literal, read with the copied list and the real log. */
+const findingsOfCopy = Effect.fn("findingsOfCopy")(function* (copy: unknown) {
+  const decoded = yield* decodeVocabulary(copy)
+  const exceptions = yield* decodeExceptions(constructsExceptions)
+  return named(coherenceFindings({ vocabulary: decoded, exceptions, decisions }))
+})
 
 describe("gate 4, vocabulary coherence", () => {
   it.effect("finds nothing in the kernel's vocabulary, the committed exception list and the decision log", () =>
@@ -96,6 +106,92 @@ describe("gate 4, vocabulary coherence", () => {
       expect(named(coherenceFindings({ vocabulary: decoded, exceptions, decisions }))).toEqual([
         ["C12", "class", "Member"]
       ])
+    })
+  )
+
+  it.effect(
+    "near miss: a copy holding a category, retired terms and gist sub-properties, with Party's entry, passes",
+    () =>
+      Effect.gen(function* () {
+        const decoded = yield* decodeVocabulary(constructsVocabulary)
+        const exceptions = yield* decodeExceptions(constructsExceptions)
+        expect(coherenceFindings({ vocabulary: decoded, exceptions, decisions })).toEqual([])
+        // The copy's new terms name decisions 12, 33 and 35, each a heading of the real log (rule C12).
+        expect(A.dedupe(termDecisions(decoded))).toEqual([111, 12, 33, 35])
+      })
+  )
+
+  it.effect(
+    "reports exactly C4 on Party when the copy is read with the committed list, which has no entry for it",
+    () =>
+      Effect.gen(function* () {
+        const decoded = yield* decodeVocabulary(constructsVocabulary)
+        const exceptions = yield* decodeExceptions(exceptionFile)
+        expect(named(coherenceFindings({ vocabulary: decoded, exceptions, decisions }))).toEqual([
+          ["C4", "class", "Party"]
+        ])
+      })
+  )
+
+  it.effect("reports exactly C7 on Party when the category states an identity criterion", () =>
+    Effect.gen(function* () {
+      const planted = {
+        ...constructsVocabulary,
+        classes: {
+          ...constructsVocabulary.classes,
+          Party: {
+            ...constructsVocabulary.classes.Party,
+            identity: { kind: "stated", criterion: "the person or the organization it is." }
+          }
+        }
+      }
+      const found = yield* findingsOfCopy(planted)
+      expect(found).toEqual([["C7", "class", "Party"]])
+    })
+  )
+
+  it.effect("reports exactly C14 on Person when its category parent is Tenant, which is no category", () =>
+    Effect.gen(function* () {
+      const planted = {
+        ...constructsVocabulary,
+        classes: {
+          ...constructsVocabulary.classes,
+          Person: { ...constructsVocabulary.classes.Person, categoryParents: ["Tenant"] }
+        }
+      }
+      const found = yield* findingsOfCopy(planted)
+      expect(found).toEqual([["C14", "class", "Person"]])
+    })
+  )
+
+  it.effect("reports exactly C15 on Workspace when its successor is no class", () =>
+    Effect.gen(function* () {
+      const planted = {
+        ...constructsVocabulary,
+        classes: {
+          ...constructsVocabulary.classes,
+          Workspace: {
+            ...constructsVocabulary.classes.Workspace,
+            deprecation: { kind: "replaced", replacedBy: "membershipIn", since: vocabulary.version }
+          }
+        }
+      }
+      const found = yield* findingsOfCopy(planted)
+      expect(found).toEqual([["C15", "class", "Workspace"]])
+    })
+  )
+
+  it.effect("reports exactly C9 on grantScope when the gist property it sits under leaves the gist list", () =>
+    Effect.gen(function* () {
+      const planted = {
+        ...constructsVocabulary,
+        gist: {
+          ...constructsVocabulary.gist,
+          properties: { plantedAttribute: constructsVocabulary.gist.properties.plantedAttribute }
+        }
+      }
+      const found = yield* findingsOfCopy(planted)
+      expect(found).toEqual([["C9", "objectProperty", "grantScope"]])
     })
   )
 })

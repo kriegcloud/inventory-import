@@ -40,8 +40,8 @@ import type {
   ReviewState,
   RowAction,
   RowDecision,
-  ReviewWords,
   RowView,
+  ReviewWords,
   SavedDecisions,
   UndoStep,
   Why,
@@ -52,12 +52,81 @@ import * as S from "effect/Schema"
 import * as R from "effect/Record"
 import { $ReviewId } from "./internal/identity.ts"
 
+import { dual } from "effect/Function"
+import * as P from "effect/Predicate"
+import * as SchemaGetter from "effect/SchemaGetter"
+
 const $I = $ReviewId.create("ReviewDraft")
 
+class Completed extends S.Opaque<Completed, { readonly brand: unique symbol }>()(
+  S.Record(S.String, S.String).pipe(
+    $I.annoteSchema("Completed", { description: "A row completed by the region's sole cell constructor" })
+  )
+) {}
+
+const completed = new WeakSet<object>()
+const completedSources = new WeakMap<
+  Readonly<Record<string, string>>,
+  { readonly columns: ReadonlyArray<{ readonly id: string }>; readonly cells: Completed }
+>()
+
+/** A region row's text, already completed for its columns; its raw constructor is private. */
+export const TotalCells = Object.assign(
+  S.declare<Completed>((value): value is Completed => P.isObject(value) && completed.has(value), {
+    toCodecArbitrary: () =>
+      S.link<Completed>()(S.Record(S.String, S.String), {
+        decode: SchemaGetter.transform((source) => totalCells([], source)),
+        encode: SchemaGetter.forbiddenEncoding
+      })
+  }).pipe($I.annoteSchema("TotalCells", { description: "A row's text completed for every region column" })),
+  {
+    /** Reads complete text; the single fallback covers a column outside the declared domain. */
+    text: (cells: Completed, column: string): string => cells[column] ?? ""
+  }
+)
+
+/** Complete row text; a sparse record cannot be assigned to this type. */
+export type TotalCells = Completed
+
+/**
+ * Completes one row at entry and retains extra file keys. Only this constructor grants membership in TotalCells.
+ * A null prototype makes unknown reserved names empty while explicitly supplied reserved keys retain their text.
+ */
+export const totalCells = dual<
+  (source: Readonly<Record<string, string>>) => (columns: ReadonlyArray<{ readonly id: string }>) => TotalCells,
+  (columns: ReadonlyArray<{ readonly id: string }>, source: Readonly<Record<string, string>>) => TotalCells
+>(2, (columns, source) =>
+  O.match(O.fromUndefinedOr(completedSources.get(source)), {
+    onSome: (known) => (known.columns === columns ? known.cells : completeSource(columns, source)),
+    onNone: () => completeSource(columns, source)
+  })
+)
+
+const completeSource = (
+  columns: ReadonlyArray<{ readonly id: string }>,
+  source: Readonly<Record<string, string>>
+): Completed => {
+  const cells = Completed.make(source)
+  Object.setPrototypeOf(cells, null)
+  for (const column of columns) if (!Object.hasOwn(cells, column.id)) Object.assign(cells, { [column.id]: "" })
+  completed.add(cells)
+  completedSources.set(source, { columns, cells })
+  return cells
+}
+
 // Each enum's own guard, made once: these run for every row and every cell.
-const isCellMarkApplied = CellMark.guards.applied
-const isCellMarkProposed = CellMark.guards.proposed
-const isColumnMatchUnmatched = ColumnMatch.guards.unmatched
+let isCellMarkApplied = (mark: CellMark): mark is typeof CellMark.cases.applied.Type => {
+  isCellMarkApplied = CellMark.guards.applied
+  return isCellMarkApplied(mark)
+}
+let isCellMarkProposed = (mark: CellMark): mark is typeof CellMark.cases.proposed.Type => {
+  isCellMarkProposed = CellMark.guards.proposed
+  return isCellMarkProposed(mark)
+}
+let isColumnMatchUnmatched = (column: ColumnMatch): column is typeof ColumnMatch.cases.unmatched.Type => {
+  isColumnMatchUnmatched = ColumnMatch.guards.unmatched
+  return isColumnMatchUnmatched(column)
+}
 
 /**
  * How a sentence names a row after "row": its label when the caller gave one ("8 · Feb", one of several records on
@@ -72,7 +141,10 @@ export const rowName = (row: Pick<ReviewRow, "line" | "label">): string =>
  * Two fixes that say the same thing. A rule's fix held back as a proposal is a checked copy of the row's own
  * (`Problem.make`), so the two are told to be one by what they say, never by being one object.
  */
-const sameFix = S.toEquivalence(Fix)
+let sameFix = (left: Fix, right: Fix): boolean => {
+  sameFix = S.toEquivalence(Fix)
+  return sameFix(left, right)
+}
 
 /** A decision that says nothing yet: what a row without one starts from. */
 const undecided = ReviewDecision.make({})
@@ -168,14 +240,17 @@ export const fixableBy = (kinds: ReadonlyArray<ProblemKind>): Fixable => {
 // How a row stands
 // ---------------------------------------------------------------------------------------------------------------
 
-const untouched = new WeakMap<ReviewRow, { fixable: Fixable; view: RowView }>()
+const untouched = new WeakMap<
+  ReviewRow,
+  { readonly columns: ReadonlyArray<ReviewColumn>; fixable: Fixable; view: RowView }
+>()
 
 /** A row nobody has decided on: the rules' applied fixes are in force and its problem, if any, is open. */
-function viewUntouched(row: ReviewRow, fixable: Fixable): RowView {
+function viewUntouched(row: ReviewRow, fixable: Fixable, columns: ReadonlyArray<ReviewColumn>): RowView {
   const known = untouched.get(row)
-  if (known !== undefined && known.fixable === fixable) return known.view
-  const view = build(row, O.none(), () => false, O.none(), fixable, false)
-  untouched.set(row, { fixable, view })
+  if (known !== undefined && known.fixable === fixable && known.columns === columns) return known.view
+  const view = build(row, O.none(), () => false, O.none(), fixable, false, columns)
+  untouched.set(row, { columns, fixable, view })
   return view
 }
 
@@ -195,11 +270,22 @@ function build(
   settled: (rowId: string, column: O.Option<string>) => boolean,
   recheck: O.Option<Recheck>,
   fixable: Fixable,
-  rejects: boolean
+  rejects: boolean,
+  columns: ReadonlyArray<ReviewColumn>
 ): RowView {
+  const original = totalCells(columns, row.cells)
   if (row.stored === true)
-    return { row, status: "stored", cells: row.cells, marks: {}, problem: O.none(), blocked: false, decided: O.none() }
-  const cells: Record<string, string> = { ...row.cells }
+    return {
+      row,
+      status: "stored",
+      cells: original,
+      original,
+      written: row.cells,
+      marks: {},
+      problem: O.none(),
+      blocked: false,
+      decided: O.none()
+    }
   const marks: Record<string, CellMark> = {}
   const reverted = O.isSome(decision) ? decision.value.reverted : noColumns
   // Where a fix the person undid or rejected stays rejected (`rejects`), its problem is left without the proposal:
@@ -210,6 +296,9 @@ function build(
   )
   const accepted = O.isSome(decision) ? decision.value.accepted : noColumns
   const edits = O.isSome(decision) ? decision.value.edits : noEdits
+  // Only a write needs its own sparse working copy; a plain row already has an immutable source record.
+  const cells: Record<string, string> =
+    row.applied.length === 0 && accepted.length === 0 && R.isEmptyRecord(edits) ? row.cells : { ...row.cells }
   let auto = false
   let took = false
 
@@ -228,7 +317,7 @@ function build(
       else auto = true
       marks[fix.column] = {
         state: "applied" as const,
-        from: row.cells[fix.column] ?? "",
+        from: TotalCells.text(original, fix.column),
         to: fix.to,
         by: sourceOf(fix),
         fix: O.some(fix),
@@ -246,7 +335,7 @@ function build(
       const fix = candidate.fix.value
       marks[fix.column] = {
         state: "applied" as const,
-        from: row.cells[fix.column] ?? "",
+        from: TotalCells.text(original, fix.column),
         to: fix.to,
         by: sourceOf(fix),
         fix: O.some(fix),
@@ -267,7 +356,7 @@ function build(
   for (const [column, value] of R.toEntries(edits)) {
     marks[column] = {
       state: "applied" as const,
-      from: row.cells[column] ?? "",
+      from: TotalCells.text(original, column),
       to: value,
       by: "you",
       fix: O.none(),
@@ -284,12 +373,13 @@ function build(
     problem = O.orElse(recheck.value({ row, cells }), () => O.filter(problem, (problem) => O.isSome(problem.rivals)))
   problem = O.map(problem, (problem) => (gone(problem.fix) ? withoutFix(problem) : problem))
 
+  const complete = auto || took || typed ? totalCells(columns, cells) : original
   const proposal = O.flatMap(problem, (problem) => problem.fix)
   if (O.isSome(proposal) && !leftOutRow(decision)) {
     const fix = proposal.value
     marks[fix.column] = {
       state: "proposed" as const,
-      from: cells[fix.column] ?? "",
+      from: TotalCells.text(complete, fix.column),
       to: fix.to,
       by: sourceOf(fix),
       fix
@@ -307,7 +397,7 @@ function build(
     const blocked =
       status === "needs" &&
       O.match(row.blocked, { onNone: () => O.contains(problem.value.tone, "blocker"), onSome: (blocked) => blocked })
-    return { row, status, cells, marks, problem, blocked, decided: O.none() }
+    return { row, status, cells: complete, original, written: cells, marks, problem, blocked, decided: O.none() }
   }
   const decided: O.Option<Decided> = typed
     ? O.some("edited")
@@ -321,7 +411,9 @@ function build(
   return {
     row,
     status,
-    cells,
+    cells: complete,
+    original,
+    written: cells,
     marks,
     problem: O.none(),
     blocked: false,
@@ -331,6 +423,7 @@ function build(
 
 /** Every row as it stands now, in file order. Rows without a decision reuse one cached answer. */
 export function viewRows(input: {
+  readonly columns: ReadonlyArray<ReviewColumn>
   rows: ReadonlyArray<ReviewRow>
   state: ReviewState
   recheck: O.Option<Recheck>
@@ -351,9 +444,10 @@ export function viewRows(input: {
   const byRow: Readonly<Record<string, O.Option<RowDecision>>> = Object.fromEntries(
     HashMap.map(decisions, (decision) => O.some(decision))
   )
+  // Missing decisions keep the existing shared None. The sparse lookup remains a counted fallback.
+  Object.setPrototypeOf(byRow, null)
   const noDecision = O.none<RowDecision>()
-  const decisionOf = (rowId: string): O.Option<RowDecision> =>
-    Object.hasOwn(byRow, rowId) ? byRow[rowId]! : noDecision
+  const decisionOf = (rowId: string): O.Option<RowDecision> => byRow[rowId] ?? noDecision
   // A copy is settled once it is left out, or once the person typed a new value into the cell they shared.
   const settled = (rowId: string, column: O.Option<string>): boolean => {
     const decision = decisionOf(rowId)
@@ -364,9 +458,9 @@ export function viewRows(input: {
   return input.rows.map((row) => {
     const decision = none ? noDecision : decisionOf(row.id)
     if (O.isNone(decision) && (!O.exists(row.problem, (problem) => O.isSome(problem.rivals)) || none)) {
-      return viewUntouched(row, fixable)
+      return viewUntouched(row, fixable, input.columns)
     }
-    return build(row, decision, settled, input.recheck, fixable, input.rejects === true)
+    return build(row, decision, settled, input.recheck, fixable, input.rejects === true, input.columns)
   })
 }
 
@@ -481,7 +575,7 @@ export function waitingGroups(input: {
       froms: [],
       mixed: false
     }))
-    MutableHashMap.set(found, groupId, gather(group, view.row.id, view.row.cells[fix.column] ?? "", fix))
+    MutableHashMap.set(found, groupId, gather(group, view.row.id, TotalCells.text(view.original, fix.column), fix))
   }
   return [...found]
     .map(([id, group]) => ({
@@ -674,6 +768,7 @@ interface Deciding {
 }
 
 type ActInput = {
+  readonly columns: ReadonlyArray<ReviewColumn>
   rows: ReadonlyArray<ReviewRow>
   state: ReviewState
   action: Action
@@ -689,6 +784,7 @@ type ActInput = {
 const decide = (input: ActInput, focus: O.Option<string>, write: (deciding: Deciding) => string): Outcome => {
   const { state } = input
   const views = viewRows({
+    columns: input.columns,
     rows: input.rows,
     state,
     recheck: input.recheck,
@@ -1033,7 +1129,7 @@ export function heldCsv(input: {
   for (const view of input.views) {
     if (view.status === "ready") continue
     const reason = reasonOf({ view, kinds, words: input.words })
-    lines.push([rowName(view.row), reason, ...input.columns.map((column) => view.row.cells[column.id] ?? "")])
+    lines.push([rowName(view.row), reason, ...input.columns.map((column) => TotalCells.text(view.original, column.id))])
   }
   return lines.map((line) => line.map(csvField).join(",")).join("\n")
 }
@@ -1177,7 +1273,7 @@ export function result(input: {
         ReadyRow.make({
           id: view.row.id,
           line: view.row.line,
-          cells: view.cells,
+          cells: view.written,
           changes,
           kept: O.contains(view.decided, "kept")
         })
@@ -1254,20 +1350,17 @@ export const columnFor = (
 export const shownWith = (
   column: { display: ReviewColumn["display"]; unitFrom: ReviewColumn["unitFrom"] },
   text: string,
-  cells: Readonly<Record<string, string>>
+  cells: TotalCells
 ): string => {
   if (text === "") return text
   const shown = column.display(text)
-  return O.match(
-    O.flatMap(column.unitFrom, (id) => R.get(cells, id)),
-    {
-      onNone: () => shown,
-      onSome: (text) => {
-        const unit = text.trim()
-        return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
-      }
+  return O.match(column.unitFrom, {
+    onNone: () => shown,
+    onSome: (id) => {
+      const unit = TotalCells.text(cells, id).trim()
+      return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
     }
-  )
+  })
 }
 
 /** Words in a "Why?" answer, heading excluded. The region's budget is 25. */
@@ -1296,7 +1389,7 @@ export const pickedChoice = (view: RowView): O.Option<Choice> => {
   const choices = O.flatMap(view.row.problem, (problem) => problem.choices)
   if (O.isNone(column) || O.isNone(choices) || !O.exists(R.get(view.marks, column.value), (mark) => mark.by === "you"))
     return O.none()
-  return A.findFirst(choices.value, (choice) => choice.value === view.cells[column.value])
+  return A.findFirst(choices.value, (choice) => choice.value === TotalCells.text(view.cells, column.value))
 }
 
 /**

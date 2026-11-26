@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { assertTrue } from "@effect/vitest/utils"
 // The review's draft while its screen is open, without the screen: the machine (`Draft.machine.ts`, tested on its own
 // against every ordering) wired to the import's read and to the server. What is held here is the wiring: that a save
@@ -41,6 +42,9 @@ import {
   whileCurrent
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // What is said to the person.
 const page = vi.hoisted(() => ({ said: [] as Array<string> }))
@@ -514,6 +518,7 @@ describe("the region's decisions for one import", () => {
       const before = t.registry.get(reviewState(id))
       const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} })]
       const left = act({
+        columns: reviewColumns,
         rows,
         state: before,
         action: { type: "leaveOut" as const, rowIds: ["row-2"] },
@@ -530,6 +535,7 @@ describe("the region's decisions for one import", () => {
 
       // The undo takes back exactly the row of the step it undoes, while the first save is still out.
       const undone = act({
+        columns: reviewColumns,
         rows,
         state: left,
         action: { type: "undo" as const },
@@ -576,6 +582,7 @@ describe("the region's decisions for one import", () => {
       // And a write the replaced region still makes reaches nobody.
       const rowsOf = [ReviewRow.make({ id: "row-2", line: 2, cells: {} })]
       const late = act({
+        columns: reviewColumns,
         rows: rowsOf,
         state: t.registry.get(mine),
         action: { type: "leaveOut" as const, rowIds: ["row-2"] },

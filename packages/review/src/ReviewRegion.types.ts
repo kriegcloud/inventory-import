@@ -33,6 +33,8 @@ import type * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
 import { $ReviewId } from "./internal/identity.ts"
 
+import { TotalCells } from "@inventory/review/ReviewDraft"
+
 const $I = $ReviewId.create("ReviewRegion")
 
 /** A count of rows: a whole number, never negative. */
@@ -645,7 +647,11 @@ export type Decided = typeof Decided.Type
 export const RowView = S.Struct({
   row: ReviewRow,
   status: RowStatus.pipe(S.annotateKey({ description: "Where the row stands now" })),
-  cells: Cells.pipe(S.annotateKey({ description: "The values that would be imported, by column id" })),
+  cells: S.suspend(() => TotalCells).pipe(S.annotateKey({ description: "Complete text for every region column" })),
+  original: S.suspend(() => TotalCells).pipe(
+    S.annotateKey({ description: "Complete original file text for drawing before and after" })
+  ),
+  written: Cells.pipe(S.annotateKey({ description: "Sparse values handed to the caller and imported unchanged" })),
   problem: S.Option(Problem).pipe(S.annotateKey({ description: "What is still open on the row" })),
   blocked: S.Boolean.pipe(
     S.annotateKey({

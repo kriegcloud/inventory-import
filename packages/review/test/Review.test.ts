@@ -1,3 +1,4 @@
+import { totalCells } from "@inventory/review/ReviewDraft"
 import { identity } from "effect/Function"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { fixableBy } from "@inventory/review/ReviewDraft"
@@ -50,16 +51,16 @@ import {
 import { Choice } from "@inventory/review/ReviewTypes"
 import type { ReviewRow, ReviewState, SavedDecisions } from "@inventory/review/ReviewTypes"
 import { columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
-import { lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./fixtures/jobs.ts"
+import { lineColumns, lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./fixtures/jobs.ts"
 
 // The gallery's made-up stock file drives these tests: 178 rows, 136 ready, 42 that need the person.
 const rows = makeRows({ size: 178 })
 const noun = ["item", "items"] as const
 
 const views = (state: ReviewState) =>
-  viewRows({ fixable: fixableBy([]), rejects: false, rows, state, recheck: O.some(recheck) })
+  viewRows({ columns, fixable: fixableBy([]), rejects: false, rows, state, recheck: O.some(recheck) })
 const run = (state: ReviewState, action: Action) =>
-  act({ fixable: fixableBy([]), rejects: false, rows, state, action, recheck: O.some(recheck) })
+  act({ columns, fixable: fixableBy([]), rejects: false, rows, state, action, recheck: O.some(recheck) })
 const after = (...actions: ReadonlyArray<Action>): ReviewState =>
   A.reduce(actions, emptyState, (state, action) => run(state, action).state)
 const firstOf = (kind: string): ReviewRow => {
@@ -120,6 +121,7 @@ describe("counts", () => {
 
   it("says so when nothing is held", () => {
     const clean = viewRows({
+      columns,
       recheck: O.none(),
       fixable: fixableBy([]),
       rejects: false,
@@ -287,6 +289,7 @@ describe("the import button and the queue", () => {
   it("names the blocker when a column has no match", () => {
     const counts = count(
       viewRows({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,
@@ -333,6 +336,7 @@ describe("the import button and the queue", () => {
   it("scales: 5,000 rows keep the same proportions", () => {
     const counts = count(
       viewRows({
+        columns,
         recheck: O.none(),
         fixable: fixableBy([]),
         rejects: false,
@@ -475,6 +479,7 @@ describe("the approved standards", () => {
     const safe = A.flatMap(lines, (line) => (Entry.guards.kind(line) ? line.safe : []))
     expect(safe).toHaveLength(17)
     const taken = act({
+      columns,
       fixable: fixableBy([]),
       rejects: false,
       rows,
@@ -551,7 +556,15 @@ describe("the approved standards", () => {
         ] satisfies ReadonlyArray<Action>,
         proposing(rows),
         (before, action) =>
-          act({ fixable: fixableBy([]), rejects: false, rows, state: before, action, recheck: O.some(recheck) }).state
+          act({
+            columns,
+            fixable: fixableBy([]),
+            rejects: false,
+            rows,
+            state: before,
+            action,
+            recheck: O.some(recheck)
+          }).state
       )
       const Json = S.fromJsonString(S.Unknown)
       const text = yield* S.encodeEffect(Json)(saved(state))
@@ -577,9 +590,24 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   const jobs = makeJobs()
   const lines = questionRows(jobs, [])
   const lineViews = (state: ReviewState) =>
-    viewRows({ fixable: fixableBy([]), rejects: false, rows: lines, state, recheck: O.some(recheckLine) })
+    viewRows({
+      columns: lineColumns,
+      fixable: fixableBy([]),
+      rejects: false,
+      rows: lines,
+      state,
+      recheck: O.some(recheckLine)
+    })
   const lineRun = (state: ReviewState, action: Action) =>
-    act({ fixable: fixableBy([]), rejects: false, rows: lines, state, action, recheck: O.some(recheckLine) })
+    act({
+      columns: lineColumns,
+      fixable: fixableBy([]),
+      rejects: false,
+      rows: lines,
+      state,
+      action,
+      recheck: O.some(recheckLine)
+    })
   const lineOf = (kind: string): ReviewRow => {
     const row = A.findFirst(lines, (candidate) => O.exists(candidate.problem, (problem) => problem.kind === kind))
     assertTrue(O.isSome(row), `no ${kind} line in the gallery's jobs`)
@@ -766,11 +794,11 @@ describe("a model's weak guess", () => {
 describe("a quantity in the review", () => {
   it("is shown in its row's unit, and only a plain number takes one", () => {
     const onHand = { display: identity, unitFrom: O.some("uom") }
-    expect(shownWith(onHand, "120", { uom: "EA" })).toBe("120 EA")
-    expect(shownWith(onHand, "1,250", { uom: "BX" })).toBe("1,250 BX")
+    expect(shownWith(onHand, "120", totalCells([], { uom: "EA" }))).toBe("120 EA")
+    expect(shownWith(onHand, "1,250", totalCells([], { uom: "BX" }))).toBe("1,250 BX")
     // A value that does not read stays as the file has it, so the person sees what is wrong with it.
-    expect(shownWith(onHand, "12 boxes", { uom: "BX" })).toBe("12 boxes")
-    expect(shownWith(onHand, "", { uom: "EA" })).toBe("")
-    expect(shownWith(onHand, "4", { uom: "" })).toBe("4")
+    expect(shownWith(onHand, "12 boxes", totalCells([], { uom: "BX" }))).toBe("12 boxes")
+    expect(shownWith(onHand, "", totalCells([], { uom: "EA" }))).toBe("")
+    expect(shownWith(onHand, "4", totalCells([], { uom: "" }))).toBe("4")
   })
 })

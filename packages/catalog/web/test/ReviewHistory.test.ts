@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 // The undo history behind a review's decisions, kept in this browser per person and import. The rule: it is written
 // with every decision, and used when the review is opened again only while it ends at the decisions the server
 // holds. A change made on another screen since starts a new history from the server's: "Undo last step" must never
@@ -28,6 +29,9 @@ import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import { followDraft, reviewLocal, reviewState } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // The browser's storage, which outlives a refresh: looked up once when the saved progress is first read. And the tab's
 // own storage, which a refresh of the tab keeps: every visit here is a refresh of one tab.
@@ -125,6 +129,7 @@ const visit = (id: ImportId, options: typeof visitStart) => {
     /** The person takes a step on the region. */
     run: (action: Action) => {
       const next = act({
+        columns: reviewColumns,
         rows: A.map(["row-2", "row-3"], (rowId, index) => ReviewRow.make({ id: rowId, line: index + 2, cells: {} })),
         state: registry.get(reviewState(id)),
         action,

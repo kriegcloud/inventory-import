@@ -1,3 +1,4 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { assertDefined } from "@effect/vitest/utils"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 // What a refresh brings back. The rules that would hurt if wrong: progress saved for one person in one organization is
@@ -27,6 +28,9 @@ import {
 } from "@inventory/review/SavedProgress"
 import { progressOf } from "@inventory/review/SavedProgressHook"
 import { density } from "../src/Density.atoms.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // The browser's storage, which outlives a refresh. `refuse` makes it a full disk: every write throws.
 const browser = vi.hoisted(() => {
@@ -203,10 +207,19 @@ describe("saved progress", () => {
           const action = step.leaveOut
             ? { type: "leaveOut" as const, rowIds: [row.id] }
             : { type: "edit" as const, rowId: row.id, column: "qty", value: step.value }
-          state = act({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state, action }).state
+          state = act({
+            columns: reviewColumns,
+            recheck: O.none(),
+            fixable: fixableBy([]),
+            rejects: false,
+            rows,
+            state,
+            action
+          }).state
         }
         for (let i = 0; i < undos; i++)
           state = act({
+            columns: reviewColumns,
             recheck: O.none(),
             fixable: fixableBy([]),
             rejects: false,
@@ -217,6 +230,7 @@ describe("saved progress", () => {
         // And one redo, so the redo history makes the trip too.
         if (undos > 1)
           state = act({
+            columns: reviewColumns,
             recheck: O.none(),
             fixable: fixableBy([]),
             rejects: false,
@@ -241,6 +255,7 @@ describe("saved progress", () => {
           expect(
             plainOf(
               act({
+                columns: reviewColumns,
                 recheck: O.none(),
                 fixable: fixableBy([]),
                 rejects: false,
@@ -252,6 +267,7 @@ describe("saved progress", () => {
           ).toEqual(
             plainOf(
               act({
+                columns: reviewColumns,
                 recheck: O.none(),
                 fixable: fixableBy([]),
                 rejects: false,

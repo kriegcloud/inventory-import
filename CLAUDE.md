@@ -530,7 +530,8 @@ profile, its copied tests included, with no override.
   `O.getOrUndefined` or `O.getOrNull`, no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema, and
   in a `.ts` file no default on a parameter or a destructured name (`(n = 0) =>`). Two things stay on purpose
   (Benjamin, 2026-11-23). A React component's optional prop stays `?:` and takes its default in the destructuring
-  (`{ size = "sm" }`), never with `??` in the body; `Option` is for data that came through a schema. And a cell of a
+  (`{ size = "sm" }`), never with `??` in the body. A strict `=== undefined` or `!== undefined`
+  comparison on that component's own props in `.tsx` may distinguish omission from explicit null; `Option` is for data that came through a schema. And a cell of a
   file the person reviews keeps its reader: its trim or change of case is a proposal shown as before and after, so
   code that reads a cell lives in a file the law names (`exemptions` in `Laws/Defaults.rules.ts`, each with its
   kinds and its reason) and nowhere else. Adding a file to that list is Benjamin's decision.

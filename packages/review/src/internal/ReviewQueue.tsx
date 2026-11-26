@@ -152,21 +152,25 @@ export const decided = (progress: {
   return { done, all: done + progress.left }
 }
 
+// Decide how an absent cell is drawn only where the screen needs text.
+const cellText = (cells: TotalCells, column: string): string =>
+  O.match(TotalCells.text(cells, column), { onNone: () => "", onSome: (text) => text })
+
 const nameOf = (view: RowView, first: O.Option<ReviewColumn>): string => {
-  const name = O.match(first, { onNone: () => "", onSome: (column) => TotalCells.text(view.cells, column.id) })
+  const name = O.match(first, { onNone: () => "", onSome: (column) => cellText(view.cells, column.id) })
   return name === "" ? `Row ${rowName(view.row)}` : name
 }
 
 /** One line of context under the name: the columns the caller marked, with their labels; a code in its own face. */
 const contextOf = (view: RowView, columns: ReadonlyArray<ReviewColumn>, skip: string | undefined): ReactNode =>
   columns
-    .filter((column) => column.context === true && column.id !== skip && TotalCells.text(view.cells, column.id) !== "")
+    .filter((column) => column.context === true && column.id !== skip && cellText(view.cells, column.id) !== "")
     .slice(0, 3)
     .map((column, at) => (
       <Fragment key={column.id}>
         {at === 0 ? "" : " · "}
         {column.label}{" "}
-        <ColumnText column={column}>{shownWith(column, TotalCells.text(view.cells, column.id), view.cells)}</ColumnText>
+        <ColumnText column={column}>{shownWith(column, cellText(view.cells, column.id), view.cells)}</ColumnText>
       </Fragment>
     ))
 
@@ -311,7 +315,7 @@ function GroupCard(props: CardProps & { readonly group: FixGroup }) {
                         </span>
                         <span className="flex-none font-normal text-muted-foreground">
                           <ColumnText column={columnOf(group.column)}>
-                            {TotalCells.text(view.original, group.column)}
+                            {cellText(view.original, group.column)}
                           </ColumnText>{" "}
                           →{" "}
                           {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
@@ -411,7 +415,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
     )
   } else if (O.isSome(subject)) {
     const own = O.flatMap(props.cellEditor, (editor) =>
-      editor({ row: view.row, column: subject.value, value: TotalCells.text(view.cells, subject.value) })
+      editor({ row: view.row, column: subject.value, value: cellText(view.cells, subject.value) })
     )
     main = O.some(
       <Overlay
@@ -459,7 +463,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
                 <EditForm
                   label={label}
                   size="touch"
-                  value={TotalCells.text(view.cells, subject.value)}
+                  value={cellText(view.cells, subject.value)}
                   onSave={(next) => {
                     close()
                     actions.edit(view.row.id, subject.value, next)
@@ -501,7 +505,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
             <span className="text-muted-foreground">{label}</span>
             <ColumnText column={columnOf(subject.value)}>
               <CellValue
-                value={TotalCells.text(view.cells, subject.value)}
+                value={cellText(view.cells, subject.value)}
                 display={columnOf(subject.value)?.display}
                 mark={mark}
                 empty={<span className="text-destructive">Empty</span>}

@@ -1,3 +1,5 @@
+import { cycle } from "./cycle.ts"
+import { ReviewText } from "../../src/internal/ReviewText.rules.ts"
 import { identity } from "effect/Function"
 /**
  * Made-up stock for a small fabrication shop, for the review gallery and its tests. Development only: nothing in
@@ -533,7 +535,10 @@ export function makeRows(input: {
           : role === "kg"
             ? cycling.filter((family) => family.unit === "kg")
             : cycling
-    const family = pool[position % pool.length] ?? A.headNonEmpty(cycling)
+    const family = A.match(pool, {
+      onEmpty: () => A.headNonEmpty(cycling),
+      onNonEmpty: (pool) => cycle(pool, position)
+    })
     const turn = family.next()
     const size = A.reduce(family.sizes, A.headNonEmpty(family.sizes), (chosen, size, index) =>
       index === turn % family.sizes.length ? size : chosen
@@ -691,13 +696,13 @@ export function recheck(input: {
   readonly cells: Readonly<Record<string, string>>
 }): O.Option<Problem> {
   const { cells } = input
-  if (O.match(R.get(cells, "name"), { onNone: () => true, onSome: (name) => name.trim() === "" }))
+  if (O.match(R.get(cells, "name"), { onNone: () => true, onSome: (name) => ReviewText.comparison(name) === "" }))
     return Problem.makeOption({ kind: "name", column: O.some("name") })
   if (!O.exists(R.get(cells, "unit"), (unit) => A.some(units, (known) => known === unit)))
     return Problem.makeOption({ kind: "unit", column: O.some("unit") })
-  if (!O.exists(R.get(cells, "cost"), (cost) => /^\$?\d[\d,]*(\.\d+)?$/.test(cost.trim())))
+  if (!O.exists(R.get(cells, "cost"), (cost) => /^\$?\d[\d,]*(\.\d+)?$/.test(ReviewText.comparison(cost))))
     return Problem.makeOption({ kind: "cost", column: O.some("cost") })
-  if (O.exists(R.get(cells, "onHand"), (onHand) => onHand.trim().startsWith("-")))
+  if (O.exists(R.get(cells, "onHand"), (onHand) => ReviewText.comparison(onHand).startsWith("-")))
     return Problem.makeOption({ kind: "below", column: O.some("onHand") })
   return O.none()
 }

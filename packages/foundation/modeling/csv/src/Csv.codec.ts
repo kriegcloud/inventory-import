@@ -1,3 +1,5 @@
+import { $CsvId } from "./internal/identity.ts"
+const $I = $CsvId.create("Csv.codec")
 /**
  * The `Csv` facade: reading text or bytes into one table model, leniently by default and strictly on request,
  * writing it back canonically, the whole round trip as one `effect/Schema` codec, and the same through streaming
@@ -33,6 +35,12 @@ import {
   CsvWriteOptions,
   CsvDelimiter
 } from "./CsvOptions.schema.ts"
+
+class CsvWrittenCell extends S.Opaque<CsvWrittenCell, { readonly brand: unique symbol }>()(
+  S.Struct({
+    text: S.String.pipe(S.withConstructorDefault(Effect.succeed("")), S.withDecodingDefaultTypeKey(Effect.succeed("")))
+  }).pipe($I.annoteSchema("CsvWrittenCell", { description: "A CSV cell left out of a sparse header row" }))
+) {}
 
 type CodecOptions = CsvCodecOptions | { readonly read: ReadOptions; readonly write: WriteOptions }
 type ReadOptions = CsvCodecOptions["read"]
@@ -109,14 +117,7 @@ const prepare: {
     text,
     bom,
     delimiter,
-    config: MachineConfig.make({
-      delimiter: delimiter.delimiter,
-      quotes: options.quotes,
-      ragged: options.ragged,
-      blankLines: options.blankLines,
-      trim: options.trim,
-      limits: options.limits
-    })
+    config: MachineConfig.make({ ...options, delimiter: delimiter.delimiter })
   }
 })
 
@@ -671,8 +672,19 @@ export class Csv {
             ),
           encode: (rows: ReadonlyArray<HeaderRow>) => {
             const header = O.match(A.head(rows), { onNone: A.empty<string>, onSome: R.keys })
-            const records = A.map([header, ...A.map(rows, (row) => A.map(header, (name) => row[name] ?? ""))], (r) =>
-              A.isReadonlyArrayNonEmpty(r) ? r : ([""] as const)
+            const records = A.map(
+              [
+                header,
+                ...A.map(rows, (row) =>
+                  A.map(header, (name) =>
+                    O.match(O.fromUndefinedOr(row[name]), {
+                      onNone: () => CsvWrittenCell.make({}).text,
+                      onSome: (text) => text
+                    })
+                  )
+                )
+              ],
+              (r) => (A.isReadonlyArrayNonEmpty(r) ? r : ([""] as const))
             )
             return Effect.succeed(
               writeTable({

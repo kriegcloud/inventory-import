@@ -7,6 +7,7 @@ import { expect } from "@effect/vitest"
 import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Eq from "effect/Equal"
+import * as Effect from "effect/Effect"
 import * as Formatter from "effect/Formatter"
 import { identity, dual } from "effect/Function"
 import * as MutableRef from "effect/MutableRef"
@@ -308,7 +309,16 @@ const moves = (world: World, next: Partial<Snapshot>): void => {
 }
 
 /** Who wrote a decision the server holds. */
-type Writer = "this tab" | "another tab" | "somebody else"
+const Writer = S.Literals(["this tab", "another tab", "somebody else"])
+type Writer = typeof Writer.Type
+class WriterStart extends S.Opaque<WriterStart, { readonly brand: unique symbol }>()(
+  S.Struct({
+    by: Writer.pipe(
+      S.withConstructorDefault(Effect.succeed<Writer>("somebody else")),
+      S.withDecodingDefaultTypeKey(Effect.succeed<Writer>("somebody else"))
+    )
+  }).annotate({ identifier: "WriterStart", description: "The oracle's attribution before it recorded a writer" })
+) {}
 
 /** The server stores one row's decision, written by this tab, another tab of the person's, or somebody else. */
 const stores = (world: World, row: string, value: Value, by: Writer): void => {
@@ -1159,13 +1169,10 @@ const runIn = (world: World, command: Command): void => {
           ])
         })
         // What a match left of a decision is still its writer's.
-        const by = O.getOrElse(
-          O.map(
-            A.last(O.match(R.get(world.current.writes, row), { onNone: A.empty, onSome: identity })),
-            (one) => one.by
-          ),
-          (): Writer => "somebody else"
-        )
+        const by = O.match(A.last(O.match(R.get(world.current.writes, row), { onNone: A.empty, onSome: identity })), {
+          onNone: () => WriterStart.make({}).by,
+          onSome: (one) => one.by
+        })
         updateWorld(world, {
           writes: R.set(world.current.writes, row, [
             ...O.match(R.get(world.current.writes, row), { onNone: A.empty, onSome: identity }),
@@ -1237,13 +1244,19 @@ const runIn = (world: World, command: Command): void => {
           if (current) {
             const since = A.map(answer.decidedSince, (one) => one.rowId)
             // Somebody saved in between: what waits behind it is no live press any more.
-            if (
-              !answer.changed ||
-              !O.exists(world.current.draft.held, (held) => held.revision + 1 === answer.revision) ||
-              O.isSome(world.current.draft.landed)
-            ) {
+            const keepWaiting = () => {
               if (!O.exists(world.current.draft.held, (held) => answer.revision <= held.revision)) allWaited(world)
             }
+            O.match(world.current.draft.landed, {
+              onSome: keepWaiting,
+              onNone: () => {
+                if (
+                  !answer.changed ||
+                  !O.exists(world.current.draft.held, (held) => held.revision + 1 === answer.revision)
+                )
+                  keepWaiting()
+              }
+            })
             for (const row of since) updateWorld(world, { waited: R.set(world.current.waited, row, true) })
             for (const [row, value] of R.toEntries(rowsOf(save.delta))) {
               const taken = A.some(answer.notApplied, (one) => one.rowId === row)
@@ -1814,10 +1827,15 @@ const playIn = (choices: typeof Choices.Type, may: Play): void => {
     const kinds = enabledIn(world, may)
     const of = kinds[kind % Math.max(1, kinds.length)]
     const command = of?.[which % of.length]
-    if (command === undefined) break
-    commands.push(command)
-    // The world moves on so the next draw is from what is enabled then; what must hold is checked by `broken`.
-    if (O.isNone(O.liftThrowable(runIn)(world, command))) break
+    const proceed = O.match(O.fromUndefinedOr(command), {
+      onNone: () => false,
+      onSome: (command) => {
+        commands.push(command)
+        // The world moves on so the next draw is enabled by it; `broken` checks what must hold afterwards.
+        return O.match(O.liftThrowable(runIn)(world, command), { onNone: () => false, onSome: () => true })
+      }
+    })
+    if (!proceed) break
   }
   const failure = broken(commands)
   O.map(failure, () => {

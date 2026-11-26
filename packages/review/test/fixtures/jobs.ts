@@ -1,3 +1,4 @@
+import { cycle } from "./cycle.ts"
 import { identity } from "effect/Function"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -159,31 +160,38 @@ const strangers: A.NonEmptyReadonlyArray<Material> = [
   { name: "Zinc primer 2 L tin", sku: "PG-zinc-2L", unit: "L" }
 ]
 
+// The immutable source cycles select each job's members once; each generation below still makes fresh jobs and lines.
+const jobPlans = A.map(making, (what, index) => ({
+  what,
+  due: cycle(days, index * 2),
+  lines: A.makeBy(4 + ((index * 5) % 4), (at) => {
+    const material = cycle(materials, index * 3 + at * 7)
+    const qty = material.unit === "pcs" ? String(8 + ((index + at) % 5) * 4) : String(2 + ((index * at) % 5))
+    // The source plan is fixed; generation still constructs each row afresh.
+    const unit = material.unit === "m" && (index + at) % 6 === 0 ? "pcs" : material.unit
+    return { job: `J-${2041 + index}`, material: material.name, sku: material.sku, qty, unit }
+  })
+}))
+
 /** The file as the page reads it: 24 jobs, 4 to 7 lines each, the same every time. */
 export function makeJobs(): ReadonlyArray<Job> {
   let line = 2
-  const jobs = making.map((what, index) => {
-    const count = 4 + ((index * 5) % 4)
+  const jobs = A.map(jobPlans, ({ what, due, lines: planned }, index) => {
     const lines: Array<Line> = []
-    for (let at = 0; at < count; at += 1) {
-      const material = materials[(index * 3 + at * 7) % materials.length] ?? A.headNonEmpty(materials)
-      const qty = material.unit === "pcs" ? String(8 + ((index + at) % 5) * 4) : String(2 + ((index * at) % 5))
-      // Now and then a bar is counted in cut pieces, not metres: both are on the unit list.
-      const unit = material.unit === "m" && (index + at) % 6 === 0 ? "pcs" : material.unit
+    for (const source of planned) {
       lines.push(
         Line.make({
           line,
-          job: `J-${2041 + index}`,
-          material: material.name,
-          sku: material.sku,
-          qty,
-          unit,
+          job: source.job,
+          material: source.material,
+          sku: source.sku,
+          qty: source.qty,
+          unit: source.unit,
           problem: O.none()
         })
       )
       line += 1
     }
-    const due = days[(index * 2) % days.length] ?? "Mon 23 Nov"
     return { code: `J-${2041 + index}`, making: what, due, lines }
   })
   // The questions, then the suggestion for a unit: what the other lines with that SKU say.
@@ -195,7 +203,7 @@ export function makeJobs(): ReadonlyArray<Job> {
     O.map(O.all({ job: foundJob, target: foundTarget }), ({ job, target }) => {
       const lines = [...job.lines]
       if (kind === "unit") {
-        const bar = materials[(jobAt + lineAt) % 4] ?? A.headNonEmpty(materials)
+        const bar = cycle(materials, (jobAt + lineAt) % 4)
         lines[lineAt] = {
           ...target,
           material: bar.name,
@@ -205,7 +213,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         }
       }
       if (kind === "comma") {
-        const [qty, material] = commas[comma % commas.length] ?? ["1,5", A.headNonEmpty(materials)]
+        const [qty, material] = cycle(commas, comma)
         comma += 1
         const to = qty.replace(",", ".")
         lines[lineAt] = {
@@ -236,7 +244,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         }
       }
       if (kind === "stock") {
-        const material = strangers[stranger % strangers.length] ?? A.headNonEmpty(strangers)
+        const material = cycle(strangers, stranger)
         stranger += 1
         lines[lineAt] = {
           ...target,

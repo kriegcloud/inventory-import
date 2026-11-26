@@ -12,5 +12,5 @@
       "@inventory/ui/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

@@ -1,47 +1,64 @@
 // The one in-memory state the twins of the four ports share, so a person added through the people store can sign in
 // through the directory and their audit line reads back from the audit trail, as on D1.
-import type { ModelCallPurpose } from "@inventory/access-contract/ModelAllowance"
-import type { AccountEmail } from "@inventory/access-contract/SessionState"
-import type { Activity } from "@inventory/kernel/Activity"
-import type { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
-import type { Member } from "@inventory/kernel/Member"
-import type { DisplayName } from "@inventory/kernel/Text"
+import { ModelCallPurpose } from "@inventory/access-contract/ModelAllowance"
+import { AccountEmail } from "@inventory/access-contract/SessionState"
+import { Activity } from "@inventory/kernel/Activity"
+import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { DisplayName } from "@inventory/kernel/Text"
 import * as Context from "effect/Context"
-import type * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
 import * as Layer from "effect/Layer"
-import type * as O from "effect/Option"
 import * as Ref from "effect/Ref"
+import { EmailToFind } from "@inventory/access-contract/PeopleCommand"
 import { $AccessModelId } from "./identity.ts"
 
 const $I = $AccessModelId.create("internal/memory")
 
-/** A sign-in account, as the `user` table holds it. */
-export type MemoryAccount = { readonly userId: UserId; readonly name: DisplayName; readonly email: AccountEmail }
+/** A sign-in account, including the email key normalized when the twin is seeded. */
+export const MemoryAccount = S.Struct({
+  userId: UserId,
+  name: DisplayName,
+  email: AccountEmail,
+  emailKey: EmailToFind.pipe(S.toType, S.check(S.isTrimmed(), S.isLowercased()))
+}).pipe($I.annoteSchema("MemoryAccount", { description: "A sign-in account and its normalized lookup key" }))
+/** The account row held by the access twin. */
+export type MemoryAccount = typeof MemoryAccount.Type
 
-/** A membership row: the member, the account linked to it (none once removed), and when it began. */
-export type MemoryMembership = {
-  readonly member: Member
-  readonly userId: O.Option<UserId>
-  readonly joinedAt: O.Option<DateTime.Utc>
-  readonly removed: boolean
-}
+/** A membership row, including its account link and joining time when known. */
+export const MemoryMembership = S.Struct({
+  member: Member,
+  userId: S.Option(UserId),
+  joinedAt: S.Option(S.DateTimeUtc),
+  removed: S.Boolean
+}).pipe($I.annoteSchema("MemoryMembership", { description: "A membership row in the access twin" }))
+/** The membership row held by the access twin. */
+export type MemoryMembership = typeof MemoryMembership.Type
 
 /** One model call taken from an organization's allowance. */
-export type MemoryCall = {
-  readonly organization: OrganizationId
-  readonly actor: MemberId
-  readonly purpose: ModelCallPurpose
-  readonly at: DateTime.Utc
-}
+export const MemoryCall = S.Struct({
+  organization: OrganizationId,
+  actor: MemberId,
+  purpose: ModelCallPurpose,
+  at: S.DateTimeUtc
+}).pipe($I.annoteSchema("MemoryCall", { description: "One model call charged to an organization" }))
+/** The charged model call held by the access twin. */
+export type MemoryCall = typeof MemoryCall.Type
 
-/** Everything the access tables hold, in memory. Memberships are in the order they were created. */
-export type AccessMemoryState = {
-  readonly accounts: ReadonlyArray<MemoryAccount>
-  readonly memberships: ReadonlyArray<MemoryMembership>
-  /** Audit lines, oldest first. */
-  readonly lines: ReadonlyArray<Activity>
-  readonly calls: ReadonlyArray<MemoryCall>
-}
+const emptyTable = <Schema extends S.Constraint>(row: Schema) =>
+  S.Array(row).pipe(S.withConstructorDefault(Effect.succeed([])), S.withDecodingDefaultTypeKey(Effect.succeed([])))
+
+/** Everything the access tables hold, in memory. Memberships are in creation order, and fresh tables are empty. */
+export const AccessMemoryState = S.Struct({
+  accounts: emptyTable(MemoryAccount),
+  memberships: emptyTable(MemoryMembership),
+  lines: emptyTable(Activity.pipe(S.toType)),
+  calls: emptyTable(MemoryCall)
+}).pipe($I.annoteSchema("AccessMemoryState", { description: "The access tables in memory, initially empty" }))
+
+/** The decoded access tables held by the twin. */
+export type AccessMemoryState = typeof AccessMemoryState.Type
 
 /** The shared state of the in-memory twins. */
 export class AccessMemoryRef extends Context.Service<AccessMemoryRef, Ref.Ref<AccessMemoryState>>()(

@@ -1,7 +1,7 @@
 // Who may add, promote and remove people, over the in-memory twins: the rules the People page relies on. The same
 // scenario runs on D1 through HTTP in the app's People.slow.test.ts.
 import { describe, expect, layer } from "@effect/vitest"
-import { AddPerson, ChangeRole } from "@inventory/access-contract/PeopleCommand"
+import { AddPerson, AddPersonProblem, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { LastAdmin, PersonNotFound } from "@inventory/access-contract/PeopleRejection"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import { accessMemory } from "@inventory/access-model/Memory"
@@ -16,7 +16,7 @@ import * as Layer from "effect/Layer"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
-import * as Result from "effect/Result"
+import { assertFailure } from "@effect/vitest/utils"
 import * as S from "effect/Schema"
 import { as, dana, elena, marcus, priya, seed } from "./support.ts"
 
@@ -40,34 +40,40 @@ describe("people", () => {
     it.effect("everyone sees the list; only an admin adds, and an add is one audit line", () =>
       Effect.gen(function* () {
         const seen = yield* listPeople().pipe(as(priya))
-        expect(A.map(seen, (person) => [person.name, person.role, O.getOrNull(person.email)])).toEqual([
-          ["Dana Whitfield", "admin", "dana@example-works.test"],
-          ["Marcus Oyelaran", "editor", "marcus@example-works.test"],
-          ["Priya Raman", "viewer", null]
+        expect(A.map(seen, (person) => [person.name, person.role, person.email])).toEqual([
+          ["Dana Whitfield", "admin", O.some("dana@example-works.test")],
+          ["Marcus Oyelaran", "editor", O.some("marcus@example-works.test")],
+          ["Priya Raman", "viewer", O.none()]
         ])
         yield* refusedAs(add("sam@example.test", "editor").pipe(as(priya)), Forbidden)
         yield* refusedAs(add("sam@example.test", "editor").pipe(as(marcus)), Forbidden)
 
         // Typed with spaces and capitals, found whatever the case the account was made with.
         const sam = yield* add("  SAM@example.TEST ", "editor").pipe(as(dana), Effect.flatMap(Effect.fromResult))
-        expect([sam.name, sam.role, O.getOrNull(sam.email)]).toEqual(["Sam Okafor", "editor", "Sam@Example.test"])
+        expect([sam.name, sam.role, sam.email]).toEqual(["Sam Okafor", "editor", O.some("Sam@Example.test")])
         // A second press is the same add: the person comes back and nothing more is written.
         const again = yield* add("sam@example.test", "editor").pipe(as(dana), Effect.flatMap(Effect.fromResult))
         expect(again).toEqual(sam)
         yield* reads(lines.pipe(as(dana)), ["Added a person: Sam Okafor as editor"])
 
         const other = yield* add("sam@example.test", "viewer").pipe(as(dana))
-        expect(Result.isFailure(other) ? other.failure : undefined).toMatchObject({
-          kind: "alreadyMember",
-          problem: "Sam Okafor is already in Example Works (test) as an editor.",
-          todo: "Change their role in the list instead."
-        })
+        assertFailure(
+          other,
+          AddPersonProblem.make({
+            kind: "alreadyMember",
+            problem: "Sam Okafor is already in Example Works (test) as an editor.",
+            todo: "Change their role in the list instead."
+          })
+        )
         const nobody = yield* add(" Nobody@Example.test", "viewer").pipe(as(dana))
-        expect(Result.isFailure(nobody) ? nobody.failure : undefined).toMatchObject({
-          kind: "noAccount",
-          problem: "Nobody has signed up with nobody@example.test yet.",
-          todo: "Ask them to create an account, then add them here."
-        })
+        assertFailure(
+          nobody,
+          AddPersonProblem.make({
+            kind: "noAccount",
+            problem: "Nobody has signed up with nobody@example.test yet.",
+            todo: "Ask them to create an account, then add them here."
+          })
+        )
         yield* reads(lines.pipe(as(dana)), ["Added a person: Sam Okafor as editor"])
         // The other organization saw none of it.
         yield* reads(lines.pipe(as(elena)), [])

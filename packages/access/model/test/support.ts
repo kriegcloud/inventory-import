@@ -7,6 +7,7 @@ import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import type { Role } from "@inventory/kernel/Role"
 import * as DateTime from "effect/DateTime"
+import type * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 
@@ -47,7 +48,7 @@ const account = (userId: string, name: string, email: string) => ({
   email: AccountEmail.make(email)
 })
 
-export const seed: AccessSeed = {
+export const seed = {
   accounts: [
     account("usr_dana", "Dana Whitfield", "dana@example-works.test"),
     account("usr_marcus", "Marcus Oyelaran", "marcus@example-works.test"),
@@ -56,7 +57,7 @@ export const seed: AccessSeed = {
     account("usr_sam", "Sam Okafor", "Sam@Example.test")
   ],
   memberships: [dana, marcus, priya, elena, danaAtSupply]
-}
+} satisfies AccessSeed
 
 /**
  * Runs an effect as one of the seeded members, as the directory has them now: after a change of role the next
@@ -64,13 +65,13 @@ export const seed: AccessSeed = {
  */
 export const as =
   (who: MemoryMembership) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, CurrentActor> | MemberDirectory> =>
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>
+  ): Effect.Effect<A, E | Cause.NoSuchElementError, Exclude<R, CurrentActor> | MemberDirectory> =>
     Effect.flatMap(MemberDirectory, (directory) =>
-      Effect.flatMap(directory.byId(who.member.id), (now) =>
-        Effect.provideService(
-          effect,
-          CurrentActor,
-          O.getOrElse(now, () => who.member)
-        )
+      Effect.provideServiceEffect(
+        effect,
+        CurrentActor,
+        directory.byId(who.member.id).pipe(Effect.flatMap(Effect.fromOption))
       )
     )

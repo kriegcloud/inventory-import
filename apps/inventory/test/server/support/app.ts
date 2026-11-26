@@ -101,6 +101,7 @@ export const TestAuth = (options: { readonly rateLimit?: boolean; readonly produ
   Layer.unwrap(
     Effect.gen(function* () {
       return signIn({
+        backgroundTasks: O.none(),
         database: yield* D1Binding,
         production: options.production ?? false,
         rateLimit: options.rateLimit ?? false

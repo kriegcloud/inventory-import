@@ -165,3 +165,48 @@ holds in the code.
 Each lane starts by writing its package's verdicts here, in the form above, before it changes code. Draft
 inventories of the boundaries of every other package were made by Codex lanes on 2026-11-23; they are machine
 heuristics, not verdicts, and are not copied here.
+
+## Access contract, model and host (PLAN row 6)
+
+Reworked on 2026-11-26 after review. Paths below are under `packages/access/`. The access contract's stored
+columns and HTTP shapes have no changes. Optional input from the platform is decoded where it enters; internal
+configuration receives explicit choices.
+
+| Schema or boundary | Field | Verdict | Reason |
+| --- | --- | --- | --- |
+| Contract session states, people commands, audit reads and allowance gateway | all | Required / State / Absent, as main | Existing Options and tagged states already express absence and outcomes; no authority is invented |
+| `MemoryAccount`, `MemoryMembership`, `MemoryCall` | row fields | Required / Absent | Named schemas own the rows; the matching types are derived with `typeof X.Type` |
+| `AccessMemoryState` | accounts, memberships, lines, calls | Empty tables on constructor and decoding schemas | A fresh twin contains no records; partial seeds preserve supplied rows |
+| Memory seed boundary | account email key | Normalised once | `EmailToFind` decodes the stored key when seeding; lookup compares that key directly and preserves the original account email |
+| `SignUpSetting` / `SignUpEmail` | setting text / candidate email | Normalised at entry | `Config.schema` decodes setting words into `SignUpRule`; Better Auth decodes a trimmed, lower-case branded email key before admission, refusing a failed decode |
+| Stage-password comparison | absent right-hand code units | Algorithmic padding | `A.pad` fills the right array to the left length, `A.zipWith` compares code units, and the initial length XOR distinguishes unequal lengths; no fallback schema |
+| Already-member message | existing membership | Derived sentences | `O.match` chooses a complete sentence; no role suffix is joined from an Option |
+| D1 membership `Chosen` | organizationId | `OptionFromNullOr` at SQL boundary | One query uses `coalesce` and stable creation/id ordering; no active organization chooses the earliest membership |
+| Better Auth internal input | baseURL, mayCreateAccount, passwordToVerify, backgroundTasks | Required Options | Every caller states its choice; selected passwords remain Options through the model and adapter |
+| Better Auth internal input | secureCookies, pwnedPasswordCheck, rateLimit | Required booleans | Production, development, tests and schema generation state their own flags explicitly |
+| Better Auth optional output | baseURL, password, backgroundTasks | Absent keys omitted | `R.getSomes` creates the third-party property bags; no decode/encode wrapper or function declaration schema |
+| Better Auth session callback | context / first membership | Two absence places retained exactly as main | Third-party callback uses null context and undefined when no row exists; these are exemption candidates, not newly cleared places |
+| Settings | blank secret / stage password / public URL | Absent | One named nonblank-text schema checks redacted values; blank public URL is decoded in Config |
+| Cross-site warning | origin, fetch site | Omit missing annotation | `R.getSomes` reads the already-checked source Options; no empty strings are manufactured |
+| Session identity | optional page header | Absent at request boundary | Header schema decodes the platform dictionary once before identity comparison |
+| Test identity / actingAs | missing header / audit lines | Header decoding default / required lines | The header default stays only in `S.decodeEffect`; `actingAs` requires its caller's audit lines |
+| Audit count | missing COUNT row | Defect | A COUNT aggregate always produces a row; absence dies rather than reporting a false zero |
+
+The only forced callers outside this lane are `apps/inventory/src/server/worker.ts`,
+`apps/inventory/scripts/auth-schema.mjs`, `apps/inventory/test/server/support/app.ts`,
+`Auth.slow.test.ts`, `AuthSchema.slow.test.ts`, and `Pwned.test.ts`: they supply the new required choices.
+
+The scoped defaults audit reports **0 fallback, 2 absence, 0 unwrap, 0 normalise** across 57 access source/test
+files. Both remaining places are in `host/src/internal/authOptions.ts`'s session hook, restored exactly from main:
+`context === null ? Promise.resolve() : ...` and `rows[0] === undefined ? undefined : { data: ... }`.
+They are third-party callback exemption candidates. No exemption or baseline change was made, and this lane does
+not claim zero absence. No `Result.getOrThrow`, `Effect.runSync`, synchronous schema decoder/encoder, or `S.declare`
+remains in these packages.
+
+Validation: access model tests pass (31 tests); host tests pass (15 tests). `bun run check` passed all 105 tasks
+(11.314 seconds, 73 cached). The direct app slow-test command first failed because Wrangler attempted to write its
+registry outside the sandbox. Rerunning with `WRANGLER_REGISTRY_PATH=/tmp/defaults-access-rework-wrangler` passed
+all 133 tests in 24 files in 61.07 seconds, with no individual test retries. Formatting was run on the changed
+files; the formatter excludes Markdown, and the repository documentation check passed. No browser or production
+deployment was inspected. No commit or push was made; the held baseline, `Catalog.lock.json`, vendor files and
+`.dev.vars` were untouched.

@@ -23,7 +23,7 @@ import { MemberDirectoryD1 } from "./MemberDirectory.adapter.ts"
 // `requireRole` (@inventory/kernel/Actor) is shared by both: role checks run on the server whichever identity is in place.
 
 /** Who a request without the header acts as in a test. */
-const defaultMemberId = "mem_dana"
+const ActingHeader = MemberId.pipe(S.withDecodingDefault(Effect.succeed("mem_dana")))
 
 /**
  * The test implementation of the `Identity` middleware: resolves the member named by the header. Marked pure, so a
@@ -38,7 +38,7 @@ export const HeaderIdentity = /* @__PURE__ */ Layer.effect(
       Effect.fn("Identity")(function* (httpEffect) {
         const request = yield* HttpServerRequest.HttpServerRequest
         const header = request.headers[actingAsHeader]
-        const id = yield* S.decodeEffect(MemberId)(header ?? defaultMemberId).pipe(Effect.option)
+        const id = yield* S.decodeEffect(ActingHeader)(header).pipe(Effect.option)
         const member = O.isSome(id) ? yield* directory.byId(id.value) : O.none()
         if (O.isNone(member)) {
           // The header's value is not echoed: what a request sent is not repeated to the screen or the log.
@@ -64,7 +64,7 @@ export const HeaderIdentity = /* @__PURE__ */ Layer.effect(
  * The access ports in memory for a fast test that acts as one member whatever the header says: the directory
  * resolves every request to `member`, and the audit trail starts with `lines`.
  */
-export const actingAs = (options: { readonly member: Member; readonly lines?: ReadonlyArray<Activity> }) =>
+export const actingAs = (options: { readonly member: Member; readonly lines: ReadonlyArray<Activity> }) =>
   Layer.effect(
     MemberDirectory,
     Effect.gen(function* () {
@@ -83,7 +83,7 @@ export const actingAs = (options: { readonly member: Member; readonly lines?: Re
     Layer.provideMerge(
       accessMemory({
         memberships: [{ member: options.member, userId: O.none(), joinedAt: O.none(), removed: false }],
-        lines: options.lines ?? []
+        lines: options.lines
       })
     )
   )

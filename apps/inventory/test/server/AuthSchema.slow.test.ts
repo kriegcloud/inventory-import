@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { D1Binding } from "@beep/d1/D1"
 import { getMigrations } from "better-auth/db/migration"
 import * as A from "effect/Array"
@@ -18,7 +19,17 @@ layer(TestDatabase, { timeout: "60 seconds" })("the Better Auth schema", (it) =>
   it.effect("is fully created by migrations/", () =>
     Effect.gen(function* () {
       const database = yield* D1Binding
-      const options = authOptions({ database, secret: Str.repeat(32)("x") })
+      const options = authOptions({
+        baseURL: O.none(),
+        secureCookies: false,
+        pwnedPasswordCheck: false,
+        rateLimit: true,
+        mayCreateAccount: O.none(),
+        passwordToVerify: O.none(),
+        backgroundTasks: O.none(),
+        database,
+        secret: Str.repeat(32)("x")
+      })
       const plan = yield* Effect.promise(() => getMigrations(options, { throwOnUnsafe: false }))
       expect(A.map(plan.toBeCreated, (change) => change.table)).toEqual([])
       expect(A.map(plan.toBeAdded, (change) => `${change.table}: ${A.join(R.keys(change.fields), ", ")}`)).toEqual([])

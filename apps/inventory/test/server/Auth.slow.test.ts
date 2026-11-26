@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -418,7 +419,7 @@ layer(settingsLayer({ ...testSettings, BETTER_AUTH_SECRET: "" }), { timeout: "60
     it.effect("a production build refuses to start, and says how to set one", () =>
       Effect.gen(function* () {
         const started = yield* Effect.gen(function* () {
-          return signIn({ database: yield* D1Binding, production: true })
+          return signIn({ database: yield* D1Binding, production: true, backgroundTasks: O.none(), rateLimit: true })
         }).pipe(Layer.unwrap, Layer.provide(TestDatabase), Layer.build, Effect.scoped, Effect.exit)
         expect(Exit.isFailure(started)).toBe(true)
         expect(String(Exit.isFailure(started) ? started.cause : "")).toContain(

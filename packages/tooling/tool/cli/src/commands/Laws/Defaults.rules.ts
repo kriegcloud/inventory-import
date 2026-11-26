@@ -5,7 +5,8 @@
  *
  * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`, `??=`,
  * `||` and `||=` before a value written out, `getOrElse`, and outside a `.tsx` file a default given to a parameter or
- * a destructured name), a comparison with `null` or `undefined`, an Option turned
+ * a destructured name, and a literal `onNone` arrow in contract/model/host), a comparison with `null` or `undefined`,
+ * a test if/ternary guarded by Option/Result/Exit, an unwrapped `S.optionalKey` in contract/model/host, an Option turned
  * back into a missing value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not
  * `SchemaGetter`'s or `SchemaTransformation`'s. The law does not judge whether a place is "really" a default: a law
  * that judges is argued with, and one that reads types costs the whole program on every run.
@@ -233,9 +234,9 @@ export type DefaultsFinding = typeof DefaultsFinding.Type
 /** What to write instead, for each kind: the line an agent reads the moment it wrote the place. */
 const remedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
-    "a `??`, a `||` before a value, a getOrElse, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
+    "a `??`, a `||` before a value, a getOrElse, a literal onNone arrow in contract/model/host, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
   absence:
-    "a comparison with null or undefined. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
+    "a comparison with null or undefined, or an unwrapped S.optionalKey in contract/model/host. Give the optional key an OptionFrom*, a decoding default, absentAsNone or emptyWhenLeftOut wrapper. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
   unwrap:
     "O.getOrUndefined or O.getOrNull turns an Option back into a missing value. Keep the Option and O.match it where it is used",
   normalise:
@@ -246,7 +247,7 @@ const testRemedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
     "a `??` or a getOrElse in a test hides a value that is missing. Narrow with assertSome, assertDefined or assertSuccess from @effect/vitest/utils, which fail with the value",
   absence:
-    "a comparison with null or undefined in a test. Narrow with assertSome, assertNone or assertDefined from @effect/vitest/utils"
+    "a comparison with null or undefined, an unwrapped optionalKey, or an Option/Result/Exit guard in a test if or ternary. Narrow with assertSome, assertNone or assertDefined from @effect/vitest/utils; for Result use assertSuccess/assertFailure, and for Exit use assertExitSuccess/assertExitFailure"
 }
 
 /** One line of the code at a place: its first line, cut where a longer one would fill the screen. */

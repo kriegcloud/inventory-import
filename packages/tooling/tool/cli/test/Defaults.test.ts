@@ -113,6 +113,103 @@ export const either = (a: boolean, b: boolean, n = 0, { m = 1 } = {}) => (a || b
     deepStrictEqual(places(source, "a.tsx"), [])
   })
 
+  it("counts Option, Result and Exit guards only in a test's if or ternary condition", () => {
+    const source = `if (O.isSome(x)) expect(x.value).toBe(1)
+if (!O.isNone(x) && ready) expect(x.value).toBe(1)
+const a = Result.isSuccess(x) ? x.success : 0
+if (Result.isFailure(x)) expect(x.failure).toBe(1)
+if (Exit.isSuccess(x)) expect(x.value).toBe(1)
+const b = Exit.isFailure(x) ? 0 : 1
+const c = O.isSome(x)
+expect(O.isNone(x)).toBe(true)
+if (other.isSuccess(x)) expect(x).toBe(1)
+if (ready) O.isSome(x)
+const callback = () => O.isSome(x)
+while (O.isSome(x)) break`
+    const expected = [
+      "1 absence O.isSome(x)",
+      "2 absence O.isNone(x)",
+      "3 absence Result.isSuccess(x)",
+      "4 absence Result.isFailure(x)",
+      "5 absence Exit.isSuccess(x)",
+      "6 absence Exit.isFailure(x)"
+    ]
+    deepStrictEqual(places(source, "packages/a/model/test/A.test.ts"), expected)
+    deepStrictEqual(places(source, "apps/a/test/helper.tsx"), expected)
+    deepStrictEqual(places(source, "packages/a/src/A.spec.ts"), expected)
+    deepStrictEqual(places(source, "packages/a/model/src/a.ts"), [])
+  })
+
+  it("counts only literal expression arrows named onNone in contract, model or host", () => {
+    const source = `const a = { onNone: () => 0 }
+const b = { onNone: () => "" }
+const c = { "onNone": () => [] }
+const d = { onNone: () => ({}) }
+const e = { onNone: () => true }
+const f = { onNone: () => false }
+const g = { onNone: () => null }
+const h = { onNone: () => undefined }
+const i = { onNone: () => -1 }
+const j = { onNone: () => value, onSome: () => 0 }
+const k = { onNone: () => makeValue() }
+const l = { onNone: () => { return 0 } }
+const m = { onNone: function() { return 0 } }
+const n = { onNone: () => /pattern/ }
+const o = { onNone: () => \`text\` }
+const p = { onNone: async () => 0 }
+const q = { onNone: () => [compute()] }
+const r = { onNone: () => ({ value: compute() }) }
+const s = { onNone: (value) => 0 }
+const t = { onNone: () => [1] }`
+    for (const layer of ["contract", "model", "host"])
+      strictEqual(places(source, `packages/a/${layer}/src/a.ts`).length, 9)
+    for (const file of [
+      "packages/a/web/src/a.ts",
+      "packages/a/src/model/a.ts",
+      "apps/a/model/a.ts",
+      "packages/a/modelish/src/a.ts"
+    ])
+      deepStrictEqual(places(source, file), [])
+  })
+
+  it("follows only the optionalKey's own schema chain when looking for an absence wrapper", () => {
+    const source = `const a = S.optionalKey(S.String)
+const b = S.String.pipe(S.optionalKey).annotateKey({ description: "b" })
+const c = S.optionalKey(S.String).pipe(S.withConstructorDefault(Effect.succeed("")))
+const d = S.Struct({ x: S.optionalKey(S.String), y: S.String.pipe(S.withDecodingDefaultKey(Effect.succeed(""))) })
+const e = S.Struct({ x: S.optionalKey(S.String) }).pipe(S.withDecodingDefaultKey(Effect.succeed({})))
+const f = S.optionalKey(S.String).pipe(S.withDecodingDefaultTypeKey(Effect.succeed("")))
+const g = S.String.pipe(S.optionalKey, S.withDecodingDefaultKey(Effect.succeed("")))
+const h = S.OptionFromOptionalKey(S.String)
+const i = S.OptionFromNullOr(S.optionalKey(S.String))
+const j = absentAsNone(S.optionalKey(S.String))
+const k = S.optionalKey(S.String).pipe(absentAsNone({ description: "k" }))
+const l = emptyWhenLeftOut(S.optionalKey(S.String), noValue)
+const m = pipe(S.optionalKey(S.String), S.withDecodingDefaultKey(Effect.succeed("")))
+const n = S.optionalKey(S.String).annotateKey({ description: "n" }).pipe(S.OptionFromOptionalKey)
+const storedFlag = S.optionalKey(StoredFlag).pipe(
+  S.decodeTo(StoredFlagRead, {
+    decode: SchemaGetter.withDefault(Effect.succeed("undecided")),
+    encode: SchemaGetter.transformOptional(O.filter(isStoredFlag))
+  }),
+  S.withConstructorDefault(Effect.succeed("undecided"))
+)
+const o = S.optionalKey(S.String).pipe(S.decodeTo(Read, { encode: SchemaGetter.withDefault(Effect.succeed("")) }))
+const p = S.optionalKey(S.String).pipe(S.decodeTo(Read, { decode: SchemaGetter.transform(read) }))
+const q = S.optionalKey(S.String).pipe(S.check(() => S.withDecodingDefaultKey(Effect.succeed(""))))`
+    deepStrictEqual(places(source, "packages/catalog/contract/src/a.ts"), [
+      "1 absence S.optionalKey",
+      "2 absence S.optionalKey",
+      "3 absence S.optionalKey",
+      "4 absence S.optionalKey",
+      "5 absence S.optionalKey",
+      "22 absence S.optionalKey",
+      "23 absence S.optionalKey",
+      "24 absence S.optionalKey"
+    ])
+    deepStrictEqual(places(source, "packages/catalog/web/src/a.ts"), [])
+  })
+
   it("says why a file was not read", () => {
     assertNone(readDefaults({ file: "a.ts", source: "export const a = 1" }).unread)
     const broken = readDefaults({ file: "a.ts", source: "export const = (x ?? 1" })
@@ -228,6 +325,64 @@ describe("the baseline", () => {
       )
       deepStrictEqual(said, [
         "out: defaults:check OK  1 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+    })
+  )
+})
+
+describe("new places still only fall", () => {
+  it.effect("records the fuller reader once, refuses growth for every addition, and permits reductions", () =>
+    Effect.gen(function* () {
+      const optional = "packages/a/contract/src/Optional.ts"
+      const fallback = "packages/a/model/src/Fallback.ts"
+      const guard = "packages/a/host/test/Guard.test.ts"
+      const sources = {
+        [optional]: "const a = S.optionalKey(S.String)\n",
+        [fallback]: "const a = { onNone: () => 0 }\n",
+        [guard]: "if (Exit.isFailure(x)) expect(x).toBe(1)\n"
+      }
+      const said = yield* inTree(
+        { ...sources, [baselineFile]: baseline({}, ["??"]) },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* onMain()
+          const wrote = yield* defaults(true, [], [])
+          const initial = yield* defaults(false, [], [])
+          const grew = yield* Effect.forEach(
+            R.toEntries(sources),
+            ([file, source]) =>
+              Effect.gen(function* () {
+                yield* repo.write(repo.join(repo.root, file), source + Str.replace("const a", "const b")(source))
+                const refused = yield* defaults(true, [], [])
+                yield* repo.write(repo.join(repo.root, file), source)
+                return printed(render(defaultsSentence)(refused))
+              }),
+            { concurrency: 1 }
+          )
+          yield* Effect.forEach(R.keys(sources), (file) => repo.write(repo.join(repo.root, file), "const a = 1\n"), {
+            concurrency: 1
+          })
+          const lowered = yield* defaults(true, [], [])
+          const final = yield* defaults(false, [], [])
+          return { wrote, initial, grew, lowered, final }
+        })
+      )
+      deepStrictEqual(printed(render(defaultsSentence)(said.wrote)), [
+        "out: defaults:check OK  defaults-baseline.json lowered: it names 3 files"
+      ])
+      deepStrictEqual(printed(render(defaultsSentence)(said.initial)), [
+        "out: defaults:check OK  3 files hold to the baseline (still held: 1 fallback, 2 absence, 0 unwrap, 0 normalise)"
+      ])
+      for (const refused of said.grew)
+        strictEqual(
+          A.some(refused, (line) => Str.startsWith("err: defaults:check FAIL")(line)),
+          true
+        )
+      deepStrictEqual(printed(render(defaultsSentence)(said.lowered)), [
+        "out: defaults:check OK  defaults-baseline.json lowered: it names 0 files"
+      ])
+      deepStrictEqual(printed(render(defaultsSentence)(said.final)), [
+        "out: defaults:check OK  3 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"
       ])
     })
   )

@@ -136,7 +136,7 @@ export const effectImportsCommand = Command.make("effect-imports", { write, chec
 ).pipe(Command.withDescription("Every Effect import comes from its module's own path under its one name"))
 
 /**
- * `beep-cli laws defaults [--write] [file...]`: no file holds more fallbacks, comparisons with null or undefined,
+ * `beep-cli laws defaults [--write] [file...]`: no file holds more fallbacks, absence checks (including test guards and unwrapped optionalKey),
  * Options turned back into missing values, or clean-ups outside a schema than the baseline allows. Given files it
  * reads only those, which is how an edit is answered at once.
  */

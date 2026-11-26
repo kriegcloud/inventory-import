@@ -59,7 +59,7 @@
   "packages/review/src/ReviewRegion.component.tsx": 5,
   "packages/review/test/Review.test.ts": 1,
   "packages/review/test/ReviewDecision.property.test.ts": 2,
-  "packages/review/test/ReviewRegion.atoms.test.ts": 11,
+  "packages/review/test/ReviewRegion.atoms.test.ts": 10,
   "packages/review/test/SavedProgress.test.ts": 1,
   "packages/review/test/fixtures/fabrication.ts": 1,
   "packages/ui/src/ListTable.component.tsx": 7,

@@ -2042,3 +2042,35 @@ once, where rows enter the region, so a lookup cannot miss and no Option is made
 slower than today, or the places stay. Rejected: accepting the 6%; leaving the places counted.
 
 Reverse: a row's cells go back to a sparse record and each lookup says its missing case.
+
+### 2026-11-26 — a service method is dual on the record it acts on
+
+Question: 24 methods of a `Context.Service` take two or more arguments (12 in `ImportStore`, for example
+`history(organizationId, importId)`), none is dual, and the dual law reads only a parameter named `cause`, `error`,
+`self` or `input`. Which argument is the one a method is dual on?
+Answer: I chose; the agent recommended the same. The record acted on comes first and is `self`; the organization is
+the setting: `history(importId, organizationId)` and `pipe(importId, store.history(organizationId))`. The nine methods
+that start with `organizationId` swap their arguments. A check requires every method of a `Context.Service` with two
+or more arguments to be dual. Rejected: one request value a method; the organization first.
+
+Reverse: the methods go back to plain argument lists and the check to the four names.
+
+### 2026-11-26 — a type assertion we need is written in one named helper
+
+Question: 96 files are listed as allowed to write `x as T`, with no reason (348 assertions: the kit 133, the
+registry's components 106, catalog/web 72, review 21, the rest 16). How is one we truly need marked?
+Answer: I chose; the agent recommended the same. One function is the only place `as` is written in our own code:
+`unsafeAssert<T>(value, "reason")`. Each use states its reason where it stands, a ledger lists each call with its
+reason, and a new one fails the check until I approve the line. `x!` is refused outright (the same day). Rejected: a
+list of files with reasons; zero with no exception.
+
+Reverse: the list of files comes back.
+
+### 2026-11-26 — the bans leave the registry's components as published
+
+Question: do the readonly, assertion and Promise bans reach `packages/ui/src/components` and `hooks` (readonly 1,265
+of 2,127 places, assertions 106, Promises 71)?
+Answer: I chose; the agent recommended the same. They stay as published, in lists of their own, so an update from the
+registry applies cleanly. Our own code goes to zero. Rejected: migrating them too.
+
+Reverse: the components are held to the bans and each update from a registry is edited again.

@@ -27,7 +27,11 @@ describe("the sign-in settings", () => {
         onFailure: (error) => error.problem
       })
       expect(kind).toBe(
-        long ? "configured" : !production ? "ephemeral" : O.isNone(text) ? "missingSecret" : "shortSecret"
+        long
+          ? "configured"
+          : !production
+            ? "ephemeral"
+            : O.match(text, { onNone: () => "missingSecret", onSome: () => "shortSecret" })
       )
     },
     runs

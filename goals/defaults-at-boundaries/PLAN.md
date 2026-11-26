@@ -169,6 +169,29 @@ Found on the way, and not the sweep's: the generated property "with reloads, sig
 ordering after which row c is said to be decided since by someone else when only this tab wrote it). Its replay token
 is in `VERDICTS.md`, in the review package's fourth lane. Nothing was changed for it.
 
+2026-11-26, the five bans that followed the sweep, on the same branch (decisions in
+`explorations/ideal-architecture/DECISIONS.md`, same date). `x!` is refused by `assertions:check` with no list. Every
+property of our own code is `readonly` (862 places in 91 files; the ledger holds the registry's components only). No
+`@effect-diagnostics` comment is left and its ledger is empty: a test's binary file is read through Vite
+(`packages/catalog/web/test/support/fixture.ts`), and the two parity tests record through scripts
+(`apps/inventory/scripts/record-csv-parity.mjs`, `record-xlsx-parity.mjs`). A `Context.Service` method of two or more
+arguments is dual with the record first, and `dual:check` reads service shapes (34 methods in seven services, 17
+helpers). No type assertion is left in our own code (124 removed); five claims go through `unsafeAssert` of
+`@beep/unsafe-assert`, each with its reason in `packages/tooling/tool/cli/ledgers/unsafe-asserts.json`, waiting for
+Benjamin's approval. `bun run check:full` passed (114 tasks, the Verify lock equal to `main`'s) before the fix below,
+and `bun run check` (107 tasks) after it.
+
+Looking found what the tests did not: with the cast gone from the review region's facet control, the column handed
+to `DataTableFacetedFilter` was a spread of the table's column, which drops `table` (not an own property), and the
+Review step drew nothing ("Cannot read properties of undefined (reading 'atoms')"). Fixed by naming `table` in the
+object. Seen after the fix, on port 5174 from a fresh database: "Use items_messy.csv", Review read Needs a decision
+24, Cannot import 21, Ready 155, All 200; opened Category and picked Component, the control read "Category Component";
+"Import 155, skip 45", "Import 155 items"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items
+read "155 items"; "Edit Brass Washer M6" opened with 26.99 and 2455; People listed three members; Activity listed the
+import's changes. Screenshot `.scratch/shots/followups-result.png`. Not seen: typing in a review cell, Match, the
+table assistant, a save in the editor, a phone width. No test draws the review region's facet control with a real
+table: that gap is open.
+
 What the lanes taught, beyond the pilot's list:
 
 - **Two lanes that rewrite the same files conflict on every line both reshaped.** The review lane and the catalog/web

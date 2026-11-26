@@ -559,6 +559,9 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
                 key={facet.column.id}
                 column={{
                   ...column,
+                  // The table is not an own property of a column, so a spread alone drops it and the filter,
+                  // which follows the table's filters to redraw, would find none.
+                  table,
                   getFilterValue: () => facet.picked,
                   setFilterValue: (next: unknown) =>
                     setFacetPicked((before) => ({

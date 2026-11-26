@@ -4,6 +4,7 @@
  *
  * @packageDocumentation
  */
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -132,13 +133,14 @@ export class XlsxAddress extends S.Opaque<XlsxAddress, { readonly brand: unique 
   }).pipe($I.annoteSchema("XlsxAddress", { description: "One cell's place on a sheet" }))
 ) {
   /** The address a reference such as `B7` or `$B$7` names, when it is on the sheet. */
-  static readonly parse = (reference: string): O.Option<XlsxAddress> => {
-    const found = addressPattern.exec(reference)
-    if (found === null) return O.none()
-    const row = Number(found[2])
-    if (row > MAX_ROW) return O.none()
-    return O.map(columnFromLetters(found[1] ?? ""), (column) => XlsxAddress.make({ column, row }))
-  }
+  static readonly parse = (reference: string): O.Option<XlsxAddress> =>
+    O.flatMap(O.fromNullishOr(addressPattern.exec(reference)), (found) =>
+      O.flatMap(O.all([A.get(found, 1), A.get(found, 2)]), ([letters, digits]) => {
+        const row = Number(digits)
+        if (row > MAX_ROW) return O.none()
+        return O.map(columnFromLetters(letters), (column) => XlsxAddress.make({ column, row }))
+      })
+    )
 
   /** The reference Excel writes for an address: `B7`. */
   static readonly format = (address: Pick<XlsxAddress, "column" | "row">): string =>
@@ -181,13 +183,12 @@ export class XlsxRange extends S.Opaque<XlsxRange, { readonly brand: unique symb
     })
 
   /** The range a reference such as `A1:C3` names, ordered; one cell alone is the range of that cell. */
-  static readonly parse = (reference: string): O.Option<XlsxRange> => {
-    const found = rangePattern.exec(reference)
-    if (found === null) return O.none()
-    const first = XlsxAddress.parse(found[1] ?? "")
-    const last = found[2] === undefined ? first : XlsxAddress.parse(found[2])
-    return O.flatMap(first, (a) => O.map(last, (b) => XlsxRange.ordered({ first: a, last: b })))
-  }
+  static readonly parse = (reference: string): O.Option<XlsxRange> =>
+    O.flatMap(O.fromNullishOr(rangePattern.exec(reference)), (found) => {
+      const first = O.flatMap(A.get(found, 1), XlsxAddress.parse)
+      const last = O.match(O.fromUndefinedOr(found[2]), { onNone: () => first, onSome: XlsxAddress.parse })
+      return O.flatMap(first, (a) => O.map(last, (b) => XlsxRange.ordered({ first: a, last: b })))
+    })
 
   /** The reference Excel writes for a range, top-left corner first: `A1:C3`. */
   static readonly format = (range: Pick<XlsxRange, "first" | "last">): string => {

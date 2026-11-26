@@ -9,7 +9,7 @@ import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { Xlsx } from "@beep/xlsx/Xlsx"
 import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
-import { archive, partsOf, sheet, workbook, type Recipe } from "./support/workbooks.ts"
+import { archive, partsOf, recipeStart, sheet, workbook, type RecipeInput } from "./support/workbooks.ts"
 
 const big = { maxInputBytes: ByteSize.mebibytes(64) }
 const findingOf = (bytes: Uint8Array, limits: Parameters<typeof XlsxLimits.make>[0]) =>
@@ -17,9 +17,9 @@ const findingOf = (bytes: Uint8Array, limits: Parameters<typeof XlsxLimits.make>
     Effect.flip,
     Effect.map((error) => error.fatal.finding)
   )
-const builtFindingOf = (recipe: Recipe, limits: Parameters<typeof XlsxLimits.make>[0]) =>
+const builtFindingOf = (recipe: RecipeInput, limits: Parameters<typeof XlsxLimits.make>[0]) =>
   Effect.flatMap(workbook(recipe), (bytes) => findingOf(bytes, limits))
-const one = (xml: string): Recipe => ({ sheets: [{ name: "S", xml }] })
+const one = (xml: string): RecipeInput => ({ ...recipeStart, sheets: [{ name: "S", xml }] })
 const cell = "<c><v>1</v></c>"
 
 describe("hostile files", () => {
@@ -115,7 +115,7 @@ describe("hostile files", () => {
 
   it.effect("one path twice in the archive", () =>
     Effect.gen(function* () {
-      const parts = partsOf(one(sheet('<row r="1"><c r="A1"><v>1</v></c></row>')))
+      const parts = yield* partsOf(one(sheet('<row r="1"><c r="A1"><v>1</v></c></row>')))
       const bytes = yield* archive([
         ...parts,
         ["xl/worksheets/sheet1.xml", sheet('<row r="1"><c r="A1"><v>2</v></c></row>')]

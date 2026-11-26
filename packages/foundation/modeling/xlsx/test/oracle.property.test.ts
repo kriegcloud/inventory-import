@@ -3,6 +3,7 @@
 // what the package writes, the package reads what SheetJS writes, and the text the package displays for a number or
 // a date is the text SheetJS displayed, except where the comments below say the old text was wrong.
 import { describe, expect, it } from "@effect/vitest"
+import { assertDefined } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
@@ -171,7 +172,14 @@ describe("SheetJS reads what the package writes", () => {
         const theirs = read(bytes, { type: "array", dense: true, cellFormula: true, cellNF: true, cellStyles: true })
         expect(theirs.SheetNames).toEqual(A.map(workbook.sheets, (sheet) => sheet.info.name))
         expect(theirs.Workbook?.WBProps?.date1904 === true).toBe(book.dateSystem === "1904")
-        expect(A.map(theirs.Workbook?.Sheets ?? [], (sheet) => sheet.Hidden ?? 0)).toEqual(
+        assertDefined(theirs.Workbook)
+        assertDefined(theirs.Workbook.Sheets)
+        expect(
+          A.map(theirs.Workbook.Sheets, (sheet) => {
+            assertDefined(sheet.Hidden)
+            return sheet.Hidden
+          })
+        ).toEqual(
           A.map(workbook.sheets, (sheet) =>
             sheet.info.state === "visible" ? 0 : sheet.info.state === "hidden" ? 1 : 2
           )

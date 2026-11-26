@@ -150,7 +150,7 @@ const readWorkbook = Effect.fnUntraced(function* (bytes: Uint8Array, options: Re
     return trusted<XlsxWorksheet>({
       info: infoOf(entry, layout),
       rows: O.match(read, {
-        onNone: () => [],
+        onNone: A.empty,
         onSome: (found) =>
           A.map(
             settled(
@@ -160,12 +160,14 @@ const readWorkbook = Effect.fnUntraced(function* (bytes: Uint8Array, options: Re
             toRow
           )
       }),
-      merges: O.match(layout, { onNone: () => [], onSome: (found) => found.merges }),
-      hiddenColumns: O.match(layout, { onNone: () => [], onSome: (found) => A.dedupe(found.hiddenColumns) })
+      merges: O.match(layout, { onNone: A.empty, onSome: (found) => found.merges }),
+      hiddenColumns: O.match(layout, { onNone: A.empty, onSome: (found) => A.dedupe(found.hiddenColumns) })
     })
   })
-  const first = sheets[0]
-  if (first === undefined) return yield* Effect.die("a workbook that opened has a sheet")
+  const first = yield* O.match(A.head(sheets), {
+    onNone: () => Effect.die("a workbook that opened has a sheet"),
+    onSome: Effect.succeed
+  })
   return {
     workbook: trusted<XlsxWorkbook>({
       dateSystem: opened.dateSystem,
@@ -336,8 +338,8 @@ export class Xlsx {
             cellsWithValues: O.match(layout, { onNone: () => 0, onSome: (found) => found.cellsWithValues }),
             lastRow: O.flatMap(layout, (found) => found.lastRow)
           }),
-          merges: O.match(layout, { onNone: () => [], onSome: (found) => found.merges }),
-          hiddenColumns: O.match(layout, { onNone: () => [], onSome: (found) => A.dedupe(found.hiddenColumns) })
+          merges: O.match(layout, { onNone: A.empty, onSome: (found) => found.merges }),
+          hiddenColumns: O.match(layout, { onNone: A.empty, onSome: (found) => A.dedupe(found.hiddenColumns) })
         })
       })
     })
@@ -396,8 +398,8 @@ export class Xlsx {
     const layout = O.flatMap(MutableHashMap.get(reads, entry.value.path), (found) => found.layout)
     return XlsxWorksheet.make({
       info: infoOf(entry.value, layout),
-      merges: O.match(layout, { onNone: () => [], onSome: (found) => found.merges }),
-      hiddenColumns: O.match(layout, { onNone: () => [], onSome: (found) => A.dedupe(found.hiddenColumns) })
+      merges: O.match(layout, { onNone: A.empty, onSome: (found) => found.merges }),
+      hiddenColumns: O.match(layout, { onNone: A.empty, onSome: (found) => A.dedupe(found.hiddenColumns) })
     })
   }, Effect.mapError(parseError))
 

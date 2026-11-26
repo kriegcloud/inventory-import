@@ -387,8 +387,9 @@ const concatBytes = (left: Uint8Array, right: Uint8Array): Uint8Array => {
 
 /** How many trailing bytes start a UTF-8 sequence that the chunk does not finish. */
 const incompleteTail = (bytes: Uint8Array): number => {
-  for (let back = 1; back <= Math.min(3, bytes.length); back += 1) {
-    const b = bytes[bytes.length - back] ?? 0
+  let back = 0
+  for (const b of bytes.slice(Math.max(0, bytes.length - 3)).reverse()) {
+    back += 1
     if ((b & 0xc0) === 0x80) continue
     const need = b >= 0xf0 ? 4 : b >= 0xe0 ? 3 : b >= 0xc0 ? 2 : 1
     return need > back ? back : 0
@@ -641,9 +642,7 @@ export class Csv {
    * A codec of rows keyed by the first record's headings. An empty or repeated heading fails the decode; a heading
    * named `__proto__` is an ordinary key.
    */
-  static recordsFromString(
-    options: CsvCodecOptions = CsvCodecOptions.default
-  ): S.Codec<ReadonlyArray<HeaderRow>, string> {
+  static recordsFromString(options: CsvCodecOptions): S.Codec<ReadonlyArray<HeaderRow>, string> {
     return S.String.pipe(
       S.decodeTo(
         S.Array(S.Record(S.String, S.String)),
@@ -676,7 +675,10 @@ export class Csv {
 
   /** Composes the header view with a target schema: `Csv.schema(S.Array(Row))`. */
   static readonly schema: TextDecodeTo<CsvCodecOptions> = makeTextDecodeTo((options?: CsvCodecOptions) =>
-    Csv.recordsFromString(options)
+    O.match(O.fromUndefinedOr(options), {
+      onNone: () => Csv.recordsFromString(CsvCodecOptions.default),
+      onSome: Csv.recordsFromString
+    })
   )
 
   /** Binds a target schema to the header view once, with its two directions. */

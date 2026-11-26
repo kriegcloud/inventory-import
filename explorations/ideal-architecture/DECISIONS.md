@@ -2074,3 +2074,16 @@ Answer: I chose; the agent recommended the same. They stay as published, in list
 registry applies cleanly. Our own code goes to zero. Rejected: migrating them too.
 
 Reverse: the components are held to the bans and each update from a registry is edited again.
+
+### 2026-11-26 — the first five `unsafeAssert` calls are approved
+
+Question: with the 124 type assertions gone from our own code, five claims are left that a library's types cannot
+express, each written through `unsafeAssert` with its reason
+(`packages/tooling/tool/cli/ledgers/unsafe-asserts.json`). Are they approved?
+Answer: I approved all five; the agent proposed them. `apps/inventory/vite.config.ts` (the compression middleware's
+types ask for Express's request where Vite's Connect supplies what it uses); `packages/catalog/web/test/support/catalog.ts`
+(test stand-ins implement only the decoded response mode of the generated client's endpoints);
+`packages/review/test/ReviewRegion.atoms.test.ts` (a partial DOM fixture for the virtualizer's frame); and two in
+`packages/ui/src/ListTable.component.tsx` (a scoped atom and React context erase the table's row generic).
+
+Reverse: a call is taken out and its ledger line with it; the ledger only shrinks without a new approval.

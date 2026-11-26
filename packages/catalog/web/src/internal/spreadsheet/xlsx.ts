@@ -97,7 +97,7 @@ export const containerOf = (bytes: Uint8Array): XlsxContainer => Xlsx.container(
 const reportEvery = 2000
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-const listed = (items: ReadonlyArray<string>, limit = 5): string =>
+const listed = (items: ReadonlyArray<string>, limit: number): string =>
   items.length <= limit ? A.join(items, ", ") : `${A.join(A.take(items, limit), ", ")} and ${items.length - limit} more`
 
 /** Reads a workbook the person chose into a table from one sheet (`sheet`, or the one with the most data). */
@@ -106,7 +106,7 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
   bytes: Uint8Array
   sheet: O.Option<string>
   notes: ReadonlyArray<Note>
-  onProgress?: (progress: ReadProgress) => void
+  onProgress: (progress: ReadProgress) => void
 }) {
   const { fileName, bytes } = input
   const failed = (error: XlsxParseError): FileProblem => problemOf(fileName, bytes.length, error)
@@ -123,8 +123,10 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
     sheet: input.sheet,
     notes: input.notes,
     grid: Effect.fnUntraced(function* (index: number) {
-      const sheet = outline.sheets[index]
-      if (sheet === undefined) return yield* Effect.die("sheet index out of range")
+      const sheet = yield* O.match(A.get(outline.sheets, index), {
+        onNone: () => Effect.die("sheet index out of range"),
+        onSome: Effect.succeed
+      })
       const total = sheet.count.rows
       const kept: Array<XlsxRow> = []
       let lastColumn = -1
@@ -134,18 +136,17 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
         Stream.runForEach((row) =>
           Effect.sync(() => {
             kept.push(row)
-            const last = row.cells[row.cells.length - 1]
-            if (last !== undefined) {
+            O.map(A.last(row.cells), (last) => {
               lastRow = Math.max(lastRow, row.number)
               lastColumn = Math.max(lastColumn, last.column)
-            }
+            })
             if (kept.length % reportEvery === 0) {
-              input.onProgress?.({ rowsRead: kept.length, rowsAbout: total, exact: true })
+              input.onProgress({ rowsRead: kept.length, rowsAbout: total, exact: true })
             }
           })
         )
       )
-      input.onProgress?.({ rowsRead: total, rowsAbout: total, exact: true })
+      input.onProgress({ rowsRead: total, rowsAbout: total, exact: true })
       // The grid runs from A1 to the last cell the sheet writes, whatever extent the file declares for itself.
       const width = lastColumn + 1
       const blank = (): Array<Cell> => A.makeBy(width, () => emptyCell)
@@ -169,7 +170,10 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
             XlsxNumberFormat.kind(cell.format).kind !== "General"
           ) {
             const code = cell.format.code
-            MutableHashMap.set(notShown, code, O.getOrElse(MutableHashMap.get(notShown, code), () => 0) + 1)
+            O.match(MutableHashMap.get(notShown, code), {
+              onNone: () => MutableHashMap.set(notShown, code, 1),
+              onSome: (count) => MutableHashMap.set(notShown, code, count + 1)
+            })
           }
         }
         rows[row.number - 1] = { rowNumber: row.number, cells, hidden: row.hidden }
@@ -179,7 +183,7 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
         notes.push({
           kind: "unreadableCells",
           level: "warning",
-          message: `${plural(unreadable.length, "cell", "cells")} could not be read and ${unreadable.length === 1 ? "was" : "were"} left empty: ${listed(unreadable)}. The file itself holds no usable value there; open it in Excel and retype ${unreadable.length === 1 ? "it" : "them"} if ${unreadable.length === 1 ? "it matters" : "they matter"}.`,
+          message: `${plural(unreadable.length, "cell", "cells")} could not be read and ${unreadable.length === 1 ? "was" : "were"} left empty: ${listed(unreadable, 5)}. The file itself holds no usable value there; open it in Excel and retype ${unreadable.length === 1 ? "it" : "them"} if ${unreadable.length === 1 ? "it matters" : "they matter"}.`,
           rows: unreadableRows
         })
       }

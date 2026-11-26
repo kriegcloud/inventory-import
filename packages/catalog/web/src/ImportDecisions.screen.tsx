@@ -4,6 +4,7 @@ import { answerOf } from "@inventory/client/Api"
 // became, who proposed it and who accepted or typed it. The app's Activity page shows it beside the audit trail.
 import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
+import * as A from "effect/Array"
 import { Code } from "@inventory/ui/Code"
 import { ProposedValue } from "@inventory/ui/ProposedValue"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
@@ -26,9 +27,11 @@ const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 
 const proposedBy = (record: ChangeRecord): string => sourceWords[changeSource(record.change)]
 const decidedBy = (record: ChangeRecord): string =>
-  changeDecidedBy(record.change) === "rule" ? "Rule" : O.getOrElse(record.decidedByName, () => "Person")
+  changeDecidedBy(record.change) === "rule"
+    ? "Rule"
+    : O.match(record.decidedByName, { onNone: () => "Person", onSome: (name) => name })
 /** How sure the proposal's source was, when the value came from a proposal. */
-const confidenceOf = (record: ChangeRecord): string | null => O.getOrNull(changeConfidence(record.change))
+const confidenceOf = (record: ChangeRecord): O.Option<string> => changeConfidence(record.change)
 
 /** The columns of the decisions list. */
 export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
@@ -86,13 +89,17 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     cell: (change) => (
       <>
         {proposedBy(change)}
-        {confidenceOf(change) === null ? null : (
-          <span className="text-muted-foreground"> · {confidenceOf(change)}</span>
-        )}
+        {O.match(confidenceOf(change), {
+          onNone: () => null,
+          onSome: (confidence) => <span className="text-muted-foreground"> · {confidence}</span>
+        })}
       </>
     ),
     title: (change) =>
-      `${proposedBy(change)}${confidenceOf(change) === null ? "" : `, confidence ${confidenceOf(change)}`}`,
+      O.match(confidenceOf(change), {
+        onNone: () => proposedBy(change),
+        onSome: (confidence) => `${proposedBy(change)}, confidence ${confidence}`
+      }),
     value: proposedBy,
     facet: true
   },
@@ -107,7 +114,8 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     id: "basis",
     label: "Basis",
     // What the proposal rested on; for a value the person typed, the words that say so.
-    value: ({ change }) => O.getOrElse(changeBasis(change), () => changeHowWords[change.how]),
+    value: ({ change }) =>
+      O.match(changeBasis(change), { onNone: () => changeHowWords[change.how], onSome: (basis) => basis }),
     sortable: false,
     wrap: true
   },
@@ -145,10 +153,11 @@ export const importDecisions = catalogApi.query((api) => api.imports.changes(), 
   reactivityKeys: catalogKeys.changes
 })
 
-const noChanges: ReadonlyArray<ChangeRecord> = []
 const importDecisionAnswer = answerOf(importDecisions)
 /** The decisions' rows and columns as the list follows them: empty until the decisions have been read. */
-const importDecisionRows = Atom.map(importDecisionAnswer, (answer) => answer ?? noChanges)
+const importDecisionRows = Atom.map(importDecisionAnswer, (answer) =>
+  O.match(O.fromUndefinedOr(answer), { onNone: A.empty, onSome: (answer) => answer })
+)
 const importDecisionColumnsAtom = Atom.make(importDecisionColumns)
 
 /** The decisions list. The person searches it, sorts it and narrows it by field, by who proposed and by file. */
@@ -161,7 +170,12 @@ export function ImportDecisions() {
       columns={importDecisionColumnsAtom}
       rows={importDecisionRows}
       rowKey={(change) =>
-        `${change.importId}:${change.rowNumber}.${O.getOrElse(change.part, () => 0)}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
+        O.match(change.part, {
+          onNone: () =>
+            `${change.importId}:${change.rowNumber}.0:${change.change.field}:${DateTime.formatIso(change.createdAt)}`,
+          onSome: (part) =>
+            `${change.importId}:${change.rowNumber}.${part}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
+        })
       }
       empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
     />

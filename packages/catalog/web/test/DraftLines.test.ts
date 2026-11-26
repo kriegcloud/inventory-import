@@ -36,7 +36,7 @@ const nothing = decisionFromFlags({})
 const accepted = decisionFromFlags({ accepted: ["unitCost"] })
 const acceptedOut = decisionFromFlags({ out: true, accepted: ["unitCost"] })
 const keptAccepted = decisionFromFlags({ kept: true, accepted: ["unitCost"] })
-const notApplied = [{ rowId: "a", field: "unitCost" }]
+const notApplied = [{ rowId: "a", field: "unitCost", kind: "accept" as const }]
 
 /** Events one after another, from a draft: the last draft, and every effect on the way. */
 const play = (from: Draft, events: ReadonlyArray<DraftEvent>): Stepped =>
@@ -46,7 +46,7 @@ const play = (from: Draft, events: ReadonlyArray<DraftEvent>): Stepped =>
   })
 
 const view = (revision: number, decisions: SavedDecisions = {}, matches: ReadonlyArray<number> = []) =>
-  DraftEvent.ViewArrived({ revision, decisions, open: true, confirms: 0, matches })
+  DraftEvent.ViewArrived({ waiting: false, takenBack: [], revision, decisions, open: true, confirms: 0, matches })
 
 /** The Review step drawn over revision 4, with these decisions stored. */
 const at4 = (decisions: SavedDecisions = {}) =>
@@ -59,7 +59,7 @@ const lastSend = (stepped: Stepped) => A.last(sends(stepped))
 interface Answer {
   readonly changed?: boolean
   readonly decidedSince?: ReadonlyArray<{ readonly rowId: string; readonly theirs: O.Option<Decision> }>
-  readonly notApplied?: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+  readonly notApplied?: ReadonlyArray<{ readonly rowId: string; readonly field: string; readonly kind: "accept" }>
 }
 const answered = (id: number, revision: number, more: Answer = {}) =>
   DraftEvent.SaveAnswered({ id, revision, changed: true, notApplied: [], decidedSince: [], ...more })
@@ -86,7 +86,7 @@ const entry = (parts: Partial<Waiting>): Waiting => ({
   ...parts
 })
 const lineOfA = (sides: ReadonlyArray<Side>): Waiting => entry({ lines: { a: { sides, theirs: O.none() } } })
-const takeUp = (kept: Waiting) => DraftEvent.TakenUp({ kept })
+const takeUp = (kept: Waiting) => DraftEvent.TakenUp({ here: false, kept })
 const pick = (keep: Keep) => DraftEvent.Settled({ picks: [{ rowId: "a", keep }] })
 
 /** Row a's line as the screen reads it: each side's decision, whether it is this tab's and refused; and theirs. */
@@ -114,7 +114,15 @@ describe("a row that waited (the server decides whether it may be written)", () 
     const failed = play(at4(), [decide("a", O.some(out)), DraftEvent.SaveFailed({ id: 1 })]).draft
     const again = step(
       failed,
-      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0, waiting: true })
+      DraftEvent.ViewArrived({
+        matches: [],
+        takenBack: [],
+        revision: 4,
+        decisions: {},
+        open: true,
+        confirms: 0,
+        waiting: true
+      })
     )
     expect(sends(again)).toEqual([])
     expect(O.map(lastSend(step(again.draft, view(5, { b: kept }))), (send) => send.over)).toEqual(
@@ -148,6 +156,7 @@ describe("a row that waited (the server decides whether it may be written)", () 
     const failed = play(at4({ a: accepted }), [decide("a", O.some(keptAccepted)), DraftEvent.SaveFailed({ id: 1 })])
     // The match takes the stored accept back at revision 5, and names row a.
     const taken = DraftEvent.ViewArrived({
+      waiting: false,
       revision: 5,
       decisions: { a: nothing },
       open: true,
@@ -193,8 +202,24 @@ describe("an answer belongs to its save", () => {
     const sent = step(at4(), decide("a", O.some(out))).draft
     // Somebody confirms and opens the import again while the save is out: the draft starts again.
     const reopened = play(sent, [
-      DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: false, confirms: 1 }),
-      DraftEvent.ViewArrived({ revision: 6, decisions: {}, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 5,
+        decisions: {},
+        open: false,
+        confirms: 1
+      }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: {},
+        open: true,
+        confirms: 1
+      }),
       decide("b", O.some(kept))
     ])
     expect(O.map(lastSend(reopened), (send) => send.id)).toEqual(O.some(2))
@@ -225,7 +250,15 @@ describe("one line per row", () => {
   it("is named whole when somebody else confirms the import: each side, and theirs", () => {
     const ended = step(
       takenUp.draft,
-      DraftEvent.ViewArrived({ revision: 6, decisions: { a: kept }, open: false, confirms: 1 })
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: { a: kept },
+        open: false,
+        confirms: 1
+      })
     )
     expect(ended.draft.leftOver).toEqual(O.some({ rows: { a: O.some(out) }, beside: {}, theirs: { a: O.some(kept) } }))
   })
@@ -248,12 +281,34 @@ describe("one line per row", () => {
     )
     const whole = { rows: { a: O.some(kept) }, beside: { a: [O.some(out)] }, theirs: {} }
     expect(
-      step(asks, DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: false, confirms: 1 })).draft.leftOver
+      step(
+        asks,
+        DraftEvent.ViewArrived({
+          waiting: false,
+          matches: [],
+          takenBack: [],
+          revision: 5,
+          decisions: {},
+          open: false,
+          confirms: 1
+        })
+      ).draft.leftOver
     ).toEqual(O.some(whole))
     // Removed: what this browser keeps of it is named, whole.
     expect(O.map(waiting(asks), decisionsIn)).toEqual(O.some(whole))
     // Confirmed and opened again: said, whole, and not sent into it.
-    const outlived = step(asks, DraftEvent.ViewArrived({ revision: 6, decisions: {}, open: true, confirms: 1 }))
+    const outlived = step(
+      asks,
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: {},
+        open: true,
+        confirms: 1
+      })
+    )
     expect([
       A.filter(outlived.effects, DraftEffect.$is("Say")).length,
       A.length(sends(outlived)),
@@ -472,7 +527,15 @@ describe("pictures that come late or show what she saw", () => {
     const answeredLater = play(at4(), [decide("a", O.some(out)), answered(1, 7), decide("b", O.some(kept))])
     const late = step(
       answeredLater.draft,
-      DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: false, confirms: 1 })
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 5,
+        decisions: {},
+        open: false,
+        confirms: 1
+      })
     )
     expect([late.draft.ended, O.isSome(late.draft.flight)]).toEqual([false, true])
   })

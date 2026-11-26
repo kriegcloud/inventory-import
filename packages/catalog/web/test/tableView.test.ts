@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import type { CatalogColumn, ColumnCatalog, ViewChange } from "@inventory/catalog-contract/TableView"
 import {
+  Patch,
   applyAll,
   describe as say,
   overtaken,
@@ -64,7 +65,7 @@ describe("applying an answer to a table's view", () => {
 
   it("removing one change takes back only that one; undoing the request ends where it started", () => {
     const after = applyAll({ state: before, changes, columns: records, opened })
-    const withoutFilter = revert(after.state, after.patches[1] ?? {})
+    const withoutFilter = revert(after.state, after.patches[1] ?? Patch.make({}))
     expect(withoutFilter.filters).toEqual(before.filters)
     expect(withoutFilter.sorting).toEqual([{ id: "name", desc: true }])
     expect(withoutFilter.visibility).toEqual({ note: true })
@@ -90,7 +91,7 @@ describe("a search the assistant puts in the box", () => {
     const after = applyAll({ state: searching, changes: [search], columns: records, opened })
     expect(after.state.search).toBe("steel brackets")
     expect(say(records, search)).toBe("Searched for “steel brackets”")
-    expect(revert(after.state, after.patches[0] ?? {})).toEqual(searching)
+    expect(revert(after.state, after.patches[0] ?? Patch.make({}))).toEqual(searching)
     const cleared = applyAll({
       state: after.state,
       changes: [{ kind: "clear", what: "everything" }],
@@ -120,14 +121,18 @@ describe("taking a change back", () => {
     const byCode: ViewChange = { kind: "sort", column: "code", direction: "desc" }
     const first = applyAll({ state: opened, changes: [byName], columns: records, opened })
     const second = applyAll({ state: first.state, changes: [byCode], columns: records, opened })
-    const removedFirst = { change: byName, patch: first.patches[0] ?? {}, removed: true }
-    const back = takeBack(second.state, { change: byCode, patch: second.patches[0] ?? {}, removed: false }, [
-      removedFirst
-    ])
+    const removedFirst = { change: byName, patch: first.patches[0] ?? Patch.make({}), removed: true }
+    const back = takeBack(
+      second.state,
+      { change: byCode, patch: second.patches[0] ?? Patch.make({}), removed: false },
+      [removedFirst]
+    )
     expect(back.sorting).toEqual([])
-    const kept = takeBack(second.state, { change: byCode, patch: second.patches[0] ?? {}, removed: false }, [
-      { ...removedFirst, removed: false }
-    ])
+    const kept = takeBack(
+      second.state,
+      { change: byCode, patch: second.patches[0] ?? Patch.make({}), removed: false },
+      [{ ...removedFirst, removed: false }]
+    )
     expect(kept.sorting).toEqual([{ id: "name", desc: false }])
   })
 })

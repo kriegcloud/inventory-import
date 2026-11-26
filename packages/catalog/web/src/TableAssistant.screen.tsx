@@ -4,12 +4,15 @@ import { useAtom, useAtomMount, useAtomSet, useAtomSubscribe } from "@effect/ato
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
+import * as Eq from "effect/Equal"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { type SubmitEvent, useRef } from "react"
-import * as Clock from "effect/Clock"
-import * as Effect from "effect/Effect"
+import * as DateTime from "effect/DateTime"
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import * as Result from "effect/Result"
+import * as S from "effect/Schema"
 import { Button } from "@inventory/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/ui/components/collapsible"
 import { Input } from "@inventory/ui/components/input"
@@ -34,6 +37,12 @@ import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewStat
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { rulesRead } from "@inventory/catalog-model/TableViewRules"
 import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
+/** What a submitted table request says after its surrounding spaces are removed. */
+const TablePrompt = S.Trim.check(S.isMinLength(1)).annotate({
+  description: "Words asking for a table view, with no surrounding spaces"
+})
+const readPrompt = S.decodeOption(TablePrompt)
+
 /**
  * Who answered and the line under it, as the conversation keeps them: who answered as its case, with the reason no
  * model answered, or with what the model said it could not do.
@@ -41,11 +50,11 @@ import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/Table
 const whoAnswered = (answer: {
   readonly answeredBy: AnsweredBy
   readonly note: O.Option<string>
-}): { readonly answeredBy: AnsweredBy; readonly note: string | null } => ({
-  answeredBy: answer.answeredBy,
+}): { readonly answeredBy: O.Option<AnsweredBy>; readonly note: O.Option<string> } => ({
+  answeredBy: O.some(answer.answeredBy),
   note: AnsweredBy.match(answer.answeredBy, {
-    Rules: (by) => by.reason,
-    Model: () => O.getOrNull(answer.note)
+    Rules: (by) => O.some(by.reason),
+    Model: () => answer.note
   })
 })
 
@@ -89,22 +98,28 @@ export function useTableView(table: AssistedTable, searchable: boolean) {
 }
 
 /** The columns the assistant has hidden or shown, kept from before a refresh, for the table's first state. */
-export function keptVisibility(table: string, organizationId: string | undefined, memberId: string | undefined) {
-  if (organizationId === undefined || memberId === undefined) return {}
-  return readConversation(conversationKey({ organizationId, memberId }, table)).visibility
+export function keptVisibility(
+  table: string,
+  scope: O.Option<{ readonly organizationId: string; readonly memberId: string }>
+): O.Option<Readonly<Record<string, boolean>>> {
+  return O.map(scope, (scope) => readConversation(conversationKey(scope, table)).visibility)
 }
 
-const suggestionsFor = (columns: ColumnCatalog): ReadonlyArray<string> => {
-  const sortable = columns.find((column) => column.sortable && column.type === "text")
-  const hideable = columns.find((column) => column.hideable && column.type === "text")
-  const listed = columns.find((column) => column.type === "select" && column.values.length > 0)
-  return [
-    ...(sortable === undefined ? [] : [`Sort by ${sortable.label}`]),
-    ...(listed === undefined ? [] : [`Only ${listed.values[0]}`]),
-    ...(hideable === undefined ? [] : [`Hide ${hideable.label}`]),
-    "Clear"
-  ]
-}
+const suggestionsFor = (columns: ColumnCatalog): ReadonlyArray<string> => [
+  ...O.match(
+    A.findFirst(columns, (column) => column.sortable && column.type === "text"),
+    { onNone: A.empty, onSome: (column) => [`Sort by ${column.label}`] }
+  ),
+  ...O.match(
+    A.findFirst(columns, (column) => column.type === "select" && column.values.length > 0),
+    { onNone: A.empty, onSome: (column) => [`Only ${column.values[0]}`] }
+  ),
+  ...O.match(
+    A.findFirst(columns, (column) => column.hideable && column.type === "text"),
+    { onNone: A.empty, onSome: (column) => [`Hide ${column.label}`] }
+  ),
+  "Clear"
+]
 
 /** One person's conversation with the assistant about one table, kept in this browser (`writeConversation`). */
 const conversationOf = perKey((key: string) =>
@@ -213,7 +228,12 @@ const askAssistant = apiRuntime.fn<Asked>()((asked: Asked) =>
 )
 
 /** Where one table's conversation ends now: a new value when it has a new last line. */
-type LastLine = { readonly table: string; readonly line: string }
+type LastLine = {
+  readonly table: string
+  readonly entries: number
+  readonly pending: O.Option<string>
+  readonly open: boolean
+}
 
 /**
  * What says the conversation about one table has a new last line: a line was added, a request started or ended, or
@@ -224,13 +244,16 @@ const lastLine = perKey((table: string) =>
     Atom.withEquality(
       Atom.readable((get): LastLine => ({
         table,
-        line: `${get(conversationOf(conversation)).entries.length}:${O.getOrElse(get(assistantPending(conversation)), () => "")}:${get(assistantOf(table)).open}`
+        entries: get(conversationOf(conversation)).entries.length,
+        pending: get(assistantPending(conversation)),
+        open: get(assistantOf(table)).open
       })),
-      (before, next) => before.line === next.line
+      (before, next) =>
+        before.entries === next.entries && before.open === next.open && Eq.equals(before.pending, next.pending)
     )
   )
 )
-const noLine: Atom.Atom<LastLine> = Atom.make<LastLine>({ table: "", line: "" })
+const noLine: Atom.Atom<LastLine> = Atom.make<LastLine>({ table: "", entries: 0, pending: O.none(), open: false })
 
 /** For `lastLine`: brings the newest line of that table's conversation into view, a frame later, when it is drawn. */
 const bringNewest = (now: LastLine): void => {
@@ -253,22 +276,20 @@ export function TableAssistant(props: {
   readonly opened: ViewState
 }) {
   const signedIn = useAtomValue(member)
-  const actor = O.getOrUndefined(signedIn)
-  const key =
-    actor === undefined
-      ? undefined
-      : conversationKey({ organizationId: actor.organizationId, memberId: actor.id }, props.name)
-  const conversationAtom = key === undefined ? noConversation : conversationOf(key)
+  const key = O.map(signedIn, (actor) =>
+    conversationKey({ organizationId: actor.organizationId, memberId: actor.id }, props.name)
+  )
+  const conversationAtom = O.match(key, { onNone: () => noConversation, onSome: conversationOf })
   const [conversation, save] = useAtom(conversationAtom)
   const [ui, setUi] = useAtom(assistantOf(props.name))
   const { open, prompt } = ui
-  const [out, setOut] = useAtom(key === undefined ? noPending : assistantPending(key))
-  const pending = O.getOrNull(out)
+  const [out, setOut] = useAtom(O.match(key, { onNone: () => noPending, onSome: assistantPending }))
+  const pending = out
   const registry = useAtomValue(registryOf)
   // This drawing of the assistant is the one on screen for as long as it is mounted.
   useAtomMount(assistantPresent(props.name))
   // The newest line is brought into view when it arrives.
-  useAtomSubscribe(key === undefined ? noLine : lastLine(props.name)(key), bringNewest)
+  useAtomSubscribe(O.match(key, { onNone: () => noLine, onSome: lastLine(props.name) }), bringNewest)
   const setOpen = (next: boolean) => setUi((now) => ({ ...now, open: next }))
   const setPrompt = (next: string) => setUi((now) => ({ ...now, prompt: next }))
   const view = useTableView(props.table, props.searchable)
@@ -276,108 +297,111 @@ export function TableAssistant(props: {
   const ask = useAtomSet(askAssistant, { mode: "promiseExit" })
 
   // Added to the conversation as it stands when the answer lands, not as it stood when the question was asked.
-  const record = (entry: Entry, visibility?: Readonly<Record<string, boolean>>) => {
+  const record = (entry: Entry, visibility: O.Option<Readonly<Record<string, boolean>>>) => {
     const now = registry.get(conversationAtom)
     registry.set(conversationAtom, {
       ...now,
       entries: [...now.entries, entry],
-      visibility: { ...(visibility ?? now.visibility) }
+      visibility: { ...O.match(visibility, { onNone: () => now.visibility, onSome: (visibility) => visibility }) }
     })
   }
 
-  const send = (words: string) => {
-    const typed = words.trim()
-    if (typed === "" || pending !== null) return
-    setUi((now) => ({ ...now, prompt: "" }))
-    setOut(O.some(typed))
-    const id = `${Effect.runSync(Clock.currentTimeMillis)}`
-    // Who asked, and from which drawing of this table's assistant: an answer that arrives after the person has left
-    // it (another screen, the same table opened again, another organization) changes nothing.
-    const asked = askingFrom(registry, props.name)
-    void ask({ prompt: typed, table: props.name, columns: props.columns, searchable: props.searchable }).then(
-      (exit) => {
-        setOut(O.none())
-        if (!stillAsked({ registry, table: props.name, asked })) {
-          // The request outlives the screen. Applied now, the view would be written through the table the person
-          // left into the address of whatever they are on, and the conversation would list changes the table never
-          // showed.
-          record({
-            id,
-            prompt: typed,
-            outcome: "failed",
-            answeredBy: null,
-            note: null,
-            reason: `The answer came after you left ${props.name}, so nothing was changed. Ask again.`,
-            applied: [],
-            undone: false
-          })
-          return
-        }
-        if (Exit.isFailure(exit)) {
-          const error = exit.cause.pipe(Cause.squash)
-          record(
-            {
-              id,
-              prompt: typed,
-              outcome: "failed",
-              answeredBy: null,
-              note: null,
-              reason: sayError(error, { fields: {} }).sentence,
-              applied: [],
-              undone: false
-            },
-            view.read().visibility
-          )
-          return
-        }
-        const outcome = exit.value
-        {
-          if (Result.isFailure(outcome)) {
-            const failure = outcome.failure
+  const send = (words: string) =>
+    O.map(readPrompt(words), (typed) => {
+      if (O.isSome(pending)) return
+      setUi((now) => ({ ...now, prompt: "" }))
+      setOut(O.some(typed))
+      const id = `${DateTime.toEpochMillis(DateTime.nowUnsafe())}`
+      // Who asked, and from which drawing of this table's assistant: an answer that arrives after the person has left
+      // it (another screen, the same table opened again, another organization) changes nothing.
+      const asked = askingFrom(registry, props.name)
+      void ask({ prompt: typed, table: props.name, columns: props.columns, searchable: props.searchable }).then(
+        (exit) => {
+          setOut(O.none())
+          if (!stillAsked({ registry, table: props.name, asked })) {
+            // The request outlives the screen. Applied now, the view would be written through the table the person
+            // left into the address of whatever they are on, and the conversation would list changes the table never
+            // showed.
             record(
               {
                 id,
                 prompt: typed,
-                outcome: "refused",
-                ...whoAnswered(failure),
-                reason: failure.reason,
+                outcome: "failed",
+                answeredBy: O.none(),
+                note: O.none(),
+                reason: O.some(`The answer came after you left ${props.name}, so nothing was changed. Ask again.`),
                 applied: [],
                 undone: false
               },
-              view.read().visibility
+              O.none()
             )
             return
           }
-          const answer = outcome.success
-          const before = view.read()
-          const after = applyAll({
-            state: before,
-            changes: answer.changes,
-            columns: props.columns,
-            opened: props.opened
-          })
-          view.write(before, after.state)
-          record(
-            {
-              id,
-              prompt: typed,
-              outcome: "applied",
-              ...whoAnswered(answer),
-              reason: null,
-              applied: answer.changes.map((change, index) => ({
-                change,
-                label: describe(props.columns, change),
-                patch: after.patches[index] ?? {},
-                removed: false
-              })),
-              undone: false
-            },
-            after.state.visibility
-          )
+          if (Exit.isFailure(exit)) {
+            const error = exit.cause.pipe(Cause.squash)
+            record(
+              {
+                id,
+                prompt: typed,
+                outcome: "failed",
+                answeredBy: O.none(),
+                note: O.none(),
+                reason: O.some(sayError(error, { fields: {} }).sentence),
+                applied: [],
+                undone: false
+              },
+              O.some(view.read().visibility)
+            )
+            return
+          }
+          const outcome = exit.value
+          {
+            if (Result.isFailure(outcome)) {
+              const failure = outcome.failure
+              record(
+                {
+                  id,
+                  prompt: typed,
+                  outcome: "refused",
+                  ...whoAnswered(failure),
+                  reason: O.some(failure.reason),
+                  applied: [],
+                  undone: false
+                },
+                O.some(view.read().visibility)
+              )
+              return
+            }
+            const answer = outcome.success
+            const before = view.read()
+            const after = applyAll({
+              state: before,
+              changes: answer.changes,
+              columns: props.columns,
+              opened: props.opened
+            })
+            view.write(before, after.state)
+            record(
+              {
+                id,
+                prompt: typed,
+                outcome: "applied",
+                ...whoAnswered(answer),
+                reason: O.none(),
+                applied: A.map(after.applied, ({ change, patch }) => ({
+                  change,
+                  label: describe(props.columns, change),
+                  patch,
+                  removed: false
+                })),
+                undone: false
+              },
+              O.some(after.state.visibility)
+            )
+          }
         }
-      }
-    )
-  }
+      )
+    })
 
   const update = (id: string, change: (entry: Entry, now: ViewState) => { entry: Entry; next: ViewState }) => {
     const now = view.read()
@@ -410,14 +434,23 @@ export function TableAssistant(props: {
 
   // A change a later one has overtaken is only marked removed: taking it back would undo the later change too.
   const removeChange = (id: string, index: number) =>
-    update(id, (entry, now) => {
-      const applied = entry.applied[index]
-      if (applied === undefined || applied.removed) return { entry, next: now }
-      return {
-        entry: { ...entry, applied: entry.applied.map((a, i) => (i === index ? { ...a, removed: true } : a)) },
-        next: overtaken(applied.change, laterThan(id, index)) ? now : takeBack(now, applied, earlierThan(id, index))
-      }
-    })
+    update(id, (entry, now) =>
+      O.match(A.get(entry.applied, index), {
+        onNone: () => ({ entry, next: now }),
+        onSome: (applied) =>
+          applied.removed
+            ? { entry, next: now }
+            : {
+                entry: {
+                  ...entry,
+                  applied: A.map(entry.applied, (a, i) => (i === index ? { ...a, removed: true } : a))
+                },
+                next: overtaken(applied.change, laterThan(id, index))
+                  ? now
+                  : takeBack(now, applied, earlierThan(id, index))
+              }
+      })
+    )
 
   // The request's changes are taken back last first, each as if the person removed it.
   const undo = (id: string) =>
@@ -425,9 +458,8 @@ export function TableAssistant(props: {
       const after = laterThan(id, entry.applied.length)
       let next = now
       const applied = entry.applied.map((a) => ({ ...a }))
-      for (let i = applied.length - 1; i >= 0; i--) {
-        const one = applied[i]
-        if (one === undefined || one.removed) continue
+      for (const { one, i } of A.reverse(A.map(applied, (one, i) => ({ one, i })))) {
+        if (one.removed) continue
         if (!overtaken(one.change, after)) {
           next = takeBack(next, one, [...earlierThan(id, 0), ...applied.slice(0, i)])
         }
@@ -437,7 +469,7 @@ export function TableAssistant(props: {
     })
 
   const suggestions = suggestionsFor(props.columns)
-  const latest = pending ?? conversation.entries[conversation.entries.length - 1]?.prompt
+  const latest = O.orElse(pending, () => O.map(A.last(conversation.entries), (entry) => entry.prompt))
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
@@ -464,8 +496,11 @@ export function TableAssistant(props: {
         <div className="flex items-start gap-2 border-b pb-2">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold">Table assistant</h2>
-            <p className="truncate text-xs text-muted-foreground" title={latest}>
-              {latest ?? `Say what you want to see in ${props.name}`}
+            <p className="truncate text-xs text-muted-foreground" {...R.getSomes({ title: latest })}>
+              {O.match(latest, {
+                onNone: () => `Say what you want to see in ${props.name}`,
+                onSome: (latest) => latest
+              })}
             </p>
           </div>
           <Button
@@ -473,7 +508,7 @@ export function TableAssistant(props: {
             size="icon-sm"
             aria-label="New conversation"
             title="New conversation"
-            disabled={conversation.entries.length === 0 || pending !== null}
+            disabled={conversation.entries.length === 0 || O.isSome(pending)}
             onClick={() => save({ ...conversation, entries: [] })}
           >
             <MessageSquarePlus />
@@ -483,7 +518,7 @@ export function TableAssistant(props: {
           </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto py-2" aria-live="polite">
-          {conversation.entries.length === 0 && pending === null ? (
+          {conversation.entries.length === 0 && O.isNone(pending) ? (
             <p className="py-4 text-sm text-muted-foreground">
               {props.searchable
                 ? "Ask for a view: find items, sort, filter, hide or show columns."
@@ -495,13 +530,23 @@ export function TableAssistant(props: {
             {conversation.entries.map((entry, index) => (
               <li key={entry.id} className="flex flex-col gap-1">
                 <p className="text-sm font-medium">{entry.prompt}</p>
-                {entry.answeredBy === null ? null : (
-                  <p className="text-xs text-muted-foreground">Answered by {answererName(entry.answeredBy)}</p>
-                )}
-                {entry.reason === null ? null : <p className="text-sm text-destructive">{entry.reason}</p>}
-                {entry.note === null || entry.note === conversation.entries[index - 1]?.note ? null : (
-                  <p className="text-xs text-muted-foreground">{entry.note}</p>
-                )}
+                {O.match(entry.answeredBy, {
+                  onNone: () => null,
+                  onSome: (by) => <p className="text-xs text-muted-foreground">Answered by {answererName(by)}</p>
+                })}
+                {O.match(entry.reason, {
+                  onNone: () => null,
+                  onSome: (reason) => <p className="text-sm text-destructive">{reason}</p>
+                })}
+                {O.match(entry.note, {
+                  onNone: () => null,
+                  onSome: (note) =>
+                    O.exists(A.get(conversation.entries, index - 1), (previous) =>
+                      O.contains(previous.note, note)
+                    ) ? null : (
+                      <p className="text-xs text-muted-foreground">{note}</p>
+                    )
+                })}
                 {entry.applied.length === 0 ? null : (
                   <Collapsible defaultOpen>
                     <div className="flex items-center gap-1">
@@ -550,15 +595,18 @@ export function TableAssistant(props: {
                 )}
               </li>
             ))}
-            {pending === null ? null : (
-              <li className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{pending}</p>
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Spinner />
-                  Working…
-                </p>
-              </li>
-            )}
+            {O.match(pending, {
+              onNone: () => null,
+              onSome: (pending) => (
+                <li className="flex flex-col gap-1">
+                  <p className="text-sm font-medium">{pending}</p>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Spinner />
+                    Working…
+                  </p>
+                </li>
+              )
+            })}
           </ol>
           {/* Where the conversation ends: brought into view when a line arrives (`lastLine`). */}
           <div data-assistant-end={props.name} />
@@ -575,7 +623,12 @@ export function TableAssistant(props: {
               maxLength={maxPrompt}
               onChange={(event) => setPrompt(event.target.value)}
             />
-            <Button type="submit" size="icon" aria-label="Send" disabled={pending !== null || prompt.trim() === ""}>
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Send"
+              disabled={O.isSome(pending) || O.isNone(readPrompt(prompt))}
+            >
               <ArrowUp />
             </Button>
           </form>
@@ -584,7 +637,7 @@ export function TableAssistant(props: {
           ) : null}
           <div className="flex flex-wrap gap-1.5">
             {suggestions.map((words) => (
-              <Button key={words} variant="outline" size="xs" disabled={pending !== null} onClick={() => send(words)}>
+              <Button key={words} variant="outline" size="xs" disabled={O.isSome(pending)} onClick={() => send(words)}>
                 {words}
               </Button>
             ))}

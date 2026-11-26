@@ -1,3 +1,5 @@
+import * as O from "effect/Option"
+import * as A from "effect/Array"
 // The imports that were confirmed, as the columns of a list: the way back to a past import's result, from the first
 import * as Atom from "effect/reactivity/Atom"
 import { answerOf } from "@inventory/client/Api"
@@ -114,10 +116,14 @@ export const pastImportColumnsShort: ReadonlyArray<ListColumn<PastImport>> = [
 /** What the imports list is, for its caption and its skeleton. */
 export const pastImportsCaption = "Imports that were confirmed"
 
-const noImports: ReadonlyArray<PastImport> = []
 const pastImportsAnswer = answerOf(pastImports)
 /** The confirmed imports as a list follows them: empty until they have been read. */
-export const pastImportRows = Atom.map(pastImportsAnswer, (answer) => answer?.imports ?? noImports)
+export const pastImportRows = Atom.map(pastImportsAnswer, (answer) =>
+  O.match(
+    O.map(O.fromUndefinedOr(answer), (answer) => answer.imports),
+    { onNone: A.empty, onSome: (imports) => imports }
+  )
+)
 const pastImportColumnsAtom = Atom.make(pastImportColumns)
 /** The few columns that fit the first screen, as its list follows them. */
 export const pastImportColumnsShortAtom = Atom.make(pastImportColumnsShort)

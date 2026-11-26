@@ -8,11 +8,11 @@ import { ImportId } from "@inventory/catalog-contract/Ids"
  */
 export const importInAddress = (
   params: URLSearchParams
-): { readonly id: ImportId | undefined; readonly malformed: boolean } => {
+): { readonly id: O.Option<ImportId>; readonly malformed: boolean } => {
   const text = params.get("import")
-  if (text === null) return { id: undefined, malformed: false }
-  const id = O.getOrUndefined(S.decodeOption(ImportId)(text))
-  return { id, malformed: id === undefined }
+  if (text === null) return { id: O.none(), malformed: false }
+  const id = S.decodeOption(ImportId)(text)
+  return { id, malformed: O.isNone(id) }
 }
 
 /** The address of an import's step ("/?import=…&step=review"). */

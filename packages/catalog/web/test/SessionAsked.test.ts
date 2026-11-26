@@ -175,7 +175,7 @@ const page = (id: ImportId, who = dana) => {
     const step: { leave: (() => void) | undefined } = { leave: undefined }
     const draw = () => {
       const view = openedOf({ read: registry.get(importViewShown(id)), isGone: S.is(ImportNotFound) })
-      const now = view.gone ? "gone" : view.data === undefined ? "skeleton" : "review"
+      const now = view.gone ? "gone" : O.isNone(view.data) ? "skeleton" : "review"
       if (drew[drew.length - 1] !== now) drew.push(now)
       if (now === "review") step.leave ??= registry.mount(followDraft(id))
       else {

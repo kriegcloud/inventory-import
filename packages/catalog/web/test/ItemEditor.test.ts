@@ -5,6 +5,8 @@
 // And once a save has answered, the next edit is made on the revision it answered with, even while the table, read
 // again only after it, still shows the saved values on the old one.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
+import { EditorState } from "../src/ItemEditor.state.ts"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -83,7 +85,19 @@ const item = S.decodeSync(StoredItem)({
   revision: 3
 })
 const itemId = item.id
-const typed = { name: "Hex bolt M6 × 16", unitCost: "0.21" } as unknown as ItemForm
+const typed: ItemForm = {
+  name: "Hex bolt M6 × 16",
+  unitCost: "0.21",
+  category: item.category,
+  uom: item.uom,
+  quantityOnHand: `${item.quantityOnHand}`,
+  isActive: true,
+  lotTracked: item.lotTracked,
+  description: "",
+  reorderPoint: "",
+  firstReceivedOn: "",
+  discontinuedOn: ""
+}
 const edit = { name: "Hex bolt M6 × 16", revision: 3 } as unknown as ItemEdit
 const save = { base: item, edit, form: typed }
 
@@ -162,9 +176,9 @@ describe("a save of an item whose row has left the screen", () => {
       // And the editor is open on what they typed, for as long as it takes the row to be drawn.
       yield* afterIdle
       const editor = t.registry.get(itemEditor(itemId))
-      expect(editor.open).toBe(true)
-      expect(editor.form).toEqual(O.some(typed))
-      expect(editor.base).toEqual(O.some(item))
+      assertTrue(EditorState.guards.Open(editor))
+      expect(editor.form).toEqual(typed)
+      expect(editor.base).toEqual(item)
     })
   )
 
@@ -188,13 +202,13 @@ describe("a save of an item whose row has left the screen", () => {
       page.drawn = false
       expect(page.went).toEqual([])
       const editor = t.registry.get(itemEditor(itemId))
-      expect(editor.open).toBe(true)
+      assertTrue(EditorState.guards.Open(editor))
       // Their values are the base the next save is made on; the form is the person's own.
-      expect(editor.base).toEqual(O.some(theirs))
-      expect(editor.form).toEqual(O.some(typed))
+      expect(editor.base).toEqual(theirs)
+      expect(editor.form).toEqual(typed)
       // Closed again, the editor holds nothing.
-      t.registry.set(itemEditor(itemId), { ...editor, open: false })
-      expect(t.registry.get(itemEditor(itemId)).form).toEqual(O.none())
+      t.registry.set(itemEditor(itemId), EditorState.cases.Closed.make({}))
+      expect(t.registry.get(itemEditor(itemId))).toEqual(EditorState.cases.Closed.make({}))
     })
   )
 })
@@ -257,14 +271,19 @@ describe("an item edited again after its save has answered, before the table is 
       expect(rowShown()).toMatchObject({ name: "Hex bolt M6 × 16", revision: 3 })
 
       // The person opens the editor from that row, as the pencil does, and saves again on the editor's base.
-      registry.set(itemEditor(itemId), {
-        open: true,
-        base: O.some(rowShown()),
-        form: O.some(typed),
-        problems: {},
-        notice: null
+      registry.set(
+        itemEditor(itemId),
+        EditorState.cases.Open.make({
+          base: rowShown(),
+          form: typed,
+          problems: {},
+          notice: O.none()
+        })
+      )
+      const base = yield* EditorState.match(registry.get(itemEditor(itemId)), {
+        Closed: () => Effect.die("the test opened the editor"),
+        Open: (editor) => Effect.succeed(editor.base)
       })
-      const base = O.getOrThrow(registry.get(itemEditor(itemId)).base)
       const again = { name: "Hex bolt M6 × 20", revision: base.revision } as unknown as ItemEdit
       registry.set(editItem(itemId), { base, edit: again, form: typed })
       yield* Effect.sleep("20 millis")
@@ -311,19 +330,31 @@ describe("an open editor and the server's answers to the item saves", () => {
         registry.mount(itemEditor(itemId))
         registry.set(editItem(itemId), save)
         yield* Effect.sleep("20 millis")
-        const opened = { open: true, base: O.some(item), form: O.some(typed), problems: {}, notice: null }
+        const opened = EditorState.cases.Open.make({ base: item, form: typed, problems: {}, notice: O.none() })
         registry.set(itemEditor(itemId), opened)
         // Dana's save answered at revision 4: her editor opened on the row's revision 3 is on 4.
-        expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(4))
+        expect(
+          O.map(
+            O.liftPredicate(EditorState.guards.Open)(registry.get(itemEditor(itemId))),
+            (editor) => editor.base.revision
+          )
+        ).toEqual(O.some(4))
         // The same member, as the session answers when it is asked again: everything stays.
         registry.set(who, member("mem_dana", "org_prairie"))
-        expect(registry.get(itemEditor(itemId)).form).toEqual(O.some(typed))
+        expect(
+          O.map(O.liftPredicate(EditorState.guards.Open)(registry.get(itemEditor(itemId))), (editor) => editor.form)
+        ).toEqual(O.some(typed))
         // She switches to her other organization: no editor is open there, and nothing is typed in one.
         registry.set(who, member("mem_dana_northline", "org_northline"))
-        expect(registry.get(itemEditor(itemId))).toMatchObject({ open: false, base: O.none(), form: O.none() })
+        expect(registry.get(itemEditor(itemId))).toEqual(EditorState.cases.Closed.make({}))
         // Opened anew on the row's revision 3: the answer of the other organization's save is not taken for its base.
         registry.set(itemEditor(itemId), opened)
-        expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(3))
+        expect(
+          O.map(
+            O.liftPredicate(EditorState.guards.Open)(registry.get(itemEditor(itemId))),
+            (editor) => editor.base.revision
+          )
+        ).toEqual(O.some(3))
       })
   )
 
@@ -360,11 +391,11 @@ describe("an open editor and the server's answers to the item saves", () => {
       registry.set(who, member("mem_dana_northline", "org_northline"))
       page.went.length = 0
       again?.()
-      expect([registry.get(itemEditor(itemId)).open, page.went, page.toasts[page.toasts.length - 1]?.title]).toEqual([
-        false,
-        [],
-        "Hex bolt M6 is not in this organization"
-      ])
+      expect([
+        EditorState.guards.Open(registry.get(itemEditor(itemId))),
+        page.went,
+        page.toasts[page.toasts.length - 1]?.title
+      ]).toEqual([false, [], "Hex bolt M6 is not in this organization"])
     })
   )
 })
@@ -402,15 +433,22 @@ describe("the answer of an item's last save", () => {
       yield* afterIdle
       registry.set(who, member("mem_dana", "org_prairie"))
       registry.mount(itemEditor(itemId))
-      registry.set(itemEditor(itemId), {
-        open: true,
-        base: O.some(item),
-        form: O.some(typed),
-        problems: {},
-        notice: null
-      })
+      registry.set(
+        itemEditor(itemId),
+        EditorState.cases.Open.make({
+          base: item,
+          form: typed,
+          problems: {},
+          notice: O.none()
+        })
+      )
       // Nothing of Prairie waited in memory while she was in Northline: the editor opens on the row's revision.
-      expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(3))
+      expect(
+        O.map(
+          O.liftPredicate(EditorState.guards.Open)(registry.get(itemEditor(itemId))),
+          (editor) => editor.base.revision
+        )
+      ).toEqual(O.some(3))
     })
   )
 })

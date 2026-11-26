@@ -64,13 +64,19 @@ const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
   input.column === "dimensions"
     ? {
         label: "Fix dimensions",
-        title: `Dimensions, row ${input.row.label ?? input.row.line}`,
+        title: O.match(O.fromUndefinedOr(input.row.label), {
+          onNone: () => `Dimensions, row ${input.row.line}`,
+          onSome: (label) => `Dimensions, row ${label}`
+        }),
         render: (save: (value: string) => void) => <DimensionsForm value={input.value} onSave={save} />
       }
     : input.column === "vendors"
       ? {
           label: "Fix vendors",
-          title: `Vendors, row ${input.row.label ?? input.row.line}`,
+          title: O.match(O.fromUndefinedOr(input.row.label), {
+            onNone: () => `Vendors, row ${input.row.line}`,
+            onSome: (label) => `Vendors, row ${label}`
+          }),
           render: (save: (value: string) => void) => <VendorsForm value={input.value} onSave={save} />
         }
       : undefined
@@ -120,7 +126,10 @@ const recheckOf = perKey((id: ImportId) =>
         const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
         if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
         // The region takes no problem as undefined: the screen's last step.
-        return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
+        return O.match(problem, {
+          onNone: () => undefined,
+          onSome: (problem) => toRegionProblem(problem, { withoutRivals: false })
+        })
       }
     })
   )
@@ -165,13 +174,13 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // The person picked a file column for a field the headings left without one, from inside the review.
   const matching = useAtomValue(matchColumn).waiting
   const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
-  const match = (pick: { field: Field; column: number }, done?: () => void) => {
+  const match = (pick: { field: Field; column: number }, done: () => void) => {
     // True between a match made on this screen and the new view it returns, so the update is not announced as
     // someone else's.
     happened(DraftEvent.MatchStarted())
     void matchOne({ id: view.id, field: pick.field, column: O.some(pick.column) }).then((exit) => {
       happened(DraftEvent.MatchEnded())
-      done?.()
+      done()
       if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), {})
     })
   }
@@ -183,7 +192,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       if (Exit.isSuccess(exit)) setLocal((now) => ({ ...now, suggested: O.some(exit.value) }))
       else toastError(exit.cause.pipe(Cause.squash), { lead: "No suggestions were made." })
     })
-  const suggested = O.getOrUndefined(local.suggested)
+  const suggested = local.suggested
 
   // The confirm is the draft's to send (`ReviewDraft.atoms.ts`): it names the picture this screen holds and carries
   // the person's rows not saved yet. Made on a picture somebody has changed since, it is refused and nothing is
@@ -217,13 +226,6 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       suggestion.kind === "column" &&
       current.mapping.some((matched) => matched.field === suggestion.field && O.isNone(matchedColumn(matched)))
   )
-  const answered =
-    suggested === undefined
-      ? undefined
-      : AnsweredBy.match(suggested.answeredBy, {
-          Model: (by) => `Answered by the model ${by.model}.`,
-          Rules: (by) => `Answered by the fixed rules, not a model: ${by.reason}`
-        })
   // Offered for a row that cannot be imported, and for a heading no field reads while a field has no column.
   const canSuggest = offersSuggestions({
     cannot: counts.cannot,
@@ -231,7 +233,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     unusedColumns: current.unusedColumns
   })
   const summaryAction =
-    !props.canImport || (!canSuggest && columnSuggestions.length === 0 && suggested === undefined) ? null : (
+    !props.canImport || (!canSuggest && columnSuggestions.length === 0 && O.isNone(suggested)) ? null : (
       <>
         {!canSuggest ? null : (
           <Button variant="outline" size="xs" disabled={suggesting} onClick={suggest}>
@@ -245,15 +247,27 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
             variant="outline"
             size="xs"
             disabled={matching}
-            onClick={() => match({ field: suggestion.field, column: suggestion.column })}
+            onClick={() => match({ field: suggestion.field, column: suggestion.column }, () => {})}
           >
             Use column “{suggestion.heading}” for {fieldLabels[suggestion.field]}
           </Button>
         ))}
-        {suggested === undefined || suggesting ? null : (
-          <span role="status" className="min-w-0 text-foreground">
-            {[...(suggested.lines.length === 0 ? ["Suggested nothing new"] : suggested.lines), answered].join(". ")}
-          </span>
+        {O.match(
+          O.filter(suggested, () => !suggesting),
+          {
+            onNone: () => null,
+            onSome: (suggested) => (
+              <span role="status" className="min-w-0 text-foreground">
+                {[
+                  ...(suggested.lines.length === 0 ? ["Suggested nothing new"] : suggested.lines),
+                  AnsweredBy.match(suggested.answeredBy, {
+                    Model: (by) => `Answered by the model ${by.model}.`,
+                    Rules: (by) => `Answered by the fixed rules, not a model: ${by.reason}`
+                  })
+                ].join(". ")}
+              </span>
+            )
+          }
         )}
       </>
     )
@@ -330,13 +344,17 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         {...(view.createdRows.length > 0 ? { closingLabel: "Close this import" } : {})}
         importing={committing}
         onMatchColumn={(columnId, source) => {
-          const column = table.columns.find((candidate) => candidate.label === source)
-          const field = fields.find((candidate) => candidate === columnId)
-          if (column === undefined || field === undefined) return
-          // The server decides what a new match takes back (accepts, keep-or-replace answers, rows kept of two and
-          // undone fixes that rest on the column): the review starts again from its answer, and names them above.
-          const working = toast.loading(`Matching ${column.label}`)
-          match({ field, column: column.index }, () => toast.dismiss(working))
+          O.map(
+            O.all({
+              column: A.findFirst(table.columns, (candidate) => candidate.label === source),
+              field: A.findFirst(fields, (candidate) => candidate === columnId)
+            }),
+            ({ column, field }) => {
+              // The server decides what this new match takes back and the review follows its answer.
+              const working = toast.loading(`Matching ${column.label}`)
+              match({ field, column: column.index }, () => toast.dismiss(working))
+            }
+          )
         }}
         onShowMatching={() => navigate(importAddress(view.id, "match"), { replace: false })}
         emptyAction={

@@ -33,13 +33,21 @@ describe("@beep/csv reads every CSV as the papaparse reader did", () => {
       Effect.gen(function* () {
         const record = yield* Config.Boolean("CSV_RECORD").pipe(Config.withDefault(false))
         if (record) {
-          const old = yield* readCsv({ fileName: name, bytes, notes: [] }).pipe(Effect.result)
+          const old = yield* readCsv({
+            fileName: name,
+            bytes,
+            notes: [],
+            pieceChars: 256 * 1024,
+            onProgress: () => {}
+          }).pipe(Effect.result)
           const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
           writeFileSync(expectedUrl(name), `${text}\n`)
         }
         const expected = yield* S.decodeEffect(Json)(readFileSync(expectedUrl(name), "utf8"))
         for (const pieceChars of pieces) {
-          const next = yield* readCsv({ fileName: name, bytes, notes: [], pieceChars }).pipe(Effect.result)
+          const next = yield* readCsv({ fileName: name, bytes, notes: [], pieceChars, onProgress: () => {} }).pipe(
+            Effect.result
+          )
           const nextText = yield* next.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
           const nextJson = yield* S.decodeEffect(Json)(nextText)
           expect(nextJson, `${name} in pieces of ${pieceChars}`).toEqual(expected)

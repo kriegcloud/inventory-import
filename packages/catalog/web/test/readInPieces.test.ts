@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // The CSV reader reads text in pieces so the upload screen can say how far it is. The rule that would hurt if wrong:
 // reading in pieces gives exactly the rows, Notes and delimiter of reading at once, wherever a piece ends (inside a
 // quoted line break, between \r and \n, on a doubled quote; csvDifferential.test.ts proves that over the corpus). And
@@ -18,6 +19,7 @@ describe("reading CSV text in pieces", () => {
           "\n"
         )}\n`
         const table = yield* readSpreadsheet({
+          sheet: O.none(),
           file: new File([big], "big.csv"),
           onProgress: (progress) => reports.push(progress)
         })
@@ -31,10 +33,10 @@ describe("reading CSV text in pieces", () => {
             state: UploadState.cases.Reading.make({
               fileName: "big.csv",
               rowsRead: report.rowsRead,
-              rows: rowsOf(report)
+              rows: rowsOf({ ...report, rowsAbout: O.fromNullOr(report.rowsAbout) })
             })
           })
-          expect(done).toBeLessThanOrEqual(total ?? Infinity)
+          expect(O.match(total, { onNone: () => true, onSome: (total) => done <= total })).toBe(true)
         }
         // Rows of the file: the heading and 40,000 rows, not the empty record after the last line break.
         const last = reports[reports.length - 1]

@@ -1,3 +1,4 @@
+import * as A from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
 import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
@@ -62,10 +63,12 @@ const line = (state: UploadState): string => {
     state,
     {
       Reading: ({ rows }) =>
-        total === null
-          ? "Reading"
-          : `Reading ${whole.format(done)} of ${rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`,
-      Saving: () => `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`,
+        O.match(total, {
+          onNone: () => "Reading",
+          onSome: (total) =>
+            `Reading ${whole.format(done)} of ${rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`
+        }),
+      Saving: ({ rows }) => `Saving ${whole.format(done)} of ${whole.format(rows)} rows`,
       Preparing: () => "Preparing the review",
       Cancelling: () => "Cancelling"
     },
@@ -84,7 +87,10 @@ function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
       <div role="status" className="flex w-full flex-col gap-1.5">
         <span className="truncate text-sm font-medium">{fileName}</span>
         <Progress
-          value={total === null || total === 0 ? null : Math.round((done / total) * 100)}
+          value={O.match(total, {
+            onNone: () => null,
+            onSome: (total) => (total === 0 ? null : Math.round((done / total) * 100))
+          })}
           aria-label={`Progress of ${fileName}`}
         />
         <span className="text-sm text-muted-foreground tabular-nums">{line(state)}</span>
@@ -147,7 +153,8 @@ const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
     const step = stepOnPage()
     if (!event.defaultPrevented && step !== null) {
       event.preventDefault()
-      if (step.dataset.takesFiles !== undefined) giveStep(step, Array.from(event.dataTransfer?.files ?? []))
+      if (step.dataset.takesFiles !== undefined)
+        giveStep(step, O.match(O.fromNullishOr(event.dataTransfer?.files), { onNone: A.empty, onSome: A.fromIterable }))
     }
     depth = 0
     get.setSelf(false)
@@ -250,7 +257,13 @@ function PastImports() {
         <Alert>
           <AlertTitle>Past imports could not be listed</AlertTitle>
           <AlertDescription>
-            <p>They are safe. {sayError(past.error, { fields: {} }).sentence}</p>
+            <p>
+              They are safe.{" "}
+              {O.match(past.error, {
+                onNone: () => "Past imports could not be listed.",
+                onSome: (error) => sayError(error, { fields: {} }).sentence
+              })}
+            </p>
             <Button variant="outline" size="sm" onClick={askPastAgain}>
               Try again
             </Button>
@@ -259,9 +272,12 @@ function PastImports() {
       </div>
     )
   }
-  const listed = past.data?.imports ?? []
+  const listed = O.match(
+    O.map(past.data, (data) => data.imports),
+    { onNone: A.empty, onSome: (imports) => imports }
+  )
   if (listed.length === 0) return null
-  const older = past.data?.older ?? 0
+  const older = O.map(past.data, (data) => data.older)
   return (
     <section aria-labelledby="past-imports" className="flex flex-col pt-6">
       <h2 id="past-imports" className="px-4 pb-2 text-sm font-medium sm:px-9">
@@ -276,17 +292,21 @@ function PastImports() {
         empty="No file has been imported yet."
         maxWidth={672}
       />
-      {older === 0 ? null : (
-        <p className="px-4 text-sm text-muted-foreground sm:px-9">
-          {whole.format(older)} older {older === 1 ? "import is" : "imports are"} listed under Activity, Imports.
-        </p>
-      )}
+      {O.match(older, {
+        onNone: () => null,
+        onSome: (older) =>
+          older === 0 ? null : (
+            <p className="px-4 text-sm text-muted-foreground sm:px-9">
+              {whole.format(older)} older {older === 1 ? "import is" : "imports are"} listed under Activity, Imports.
+            </p>
+          )
+      })}
     </section>
   )
 }
 
 /** A sentence for a file the screen itself could not take (a sample that would not load, a file no longer kept). */
-export const uploadProblem = ofMember((): string | undefined => undefined)
+export const uploadProblem = ofMember(() => O.none<string>())
 
 /**
  * The first screen: choose or drop a file, or take the sample list, which goes through the same code. The chosen
@@ -298,9 +318,11 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const startOne = useAtomSet(startUpload)
   const cancel = useAtomSet(cancelUpload)
   const signedIn = useAtomValue(member)
-  const actor = O.getOrUndefined(signedIn)
   const progress = useSavedProgress(
-    actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" },
+    signedIn.pipe(
+      O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: "upload" })),
+      O.getOrUndefined
+    ),
     catalogRuntime()
   )
   const [problem, setProblem] = useAtom(uploadProblem)
@@ -310,7 +332,10 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const openImports = resultOf(openRead)
   const askOpenAgain = useAtomRefresh(openImportsRead)
   const open = openImports.data
-  const views = open?.views ?? []
+  const views = O.match(
+    O.map(open, (data) => data.views),
+    { onNone: A.empty, onSome: (views) => views }
+  )
   const busy = isBusy(state)
 
   // Keeps the file until the upload ends: arrived or cancelled, nothing is left to continue; a file that cannot be
@@ -332,6 +357,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
     })
     startOne({
       file,
+      sheet: O.none(),
       // A save that failed keeps the file, for Continue; any other ending lets it go.
       onEnd: UploadEnd.$match({
         Arrived: () => clear(),
@@ -345,42 +371,49 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   }
   // A file whose upload stopped with the page. Not offered once an import of it exists: a reload while the server
   // was preparing it still finished it, and it is in the list above.
-  const saved = progress.saved
-  const stopped = saved?.step === "upload" ? O.getOrNull(saved.file) : null
-  const landed =
-    stopped !== null &&
-    saved !== undefined &&
-    views.some(
-      (view) => view.fileName === stopped.name && DateTime.isGreaterThanOrEqualTo(view.createdAt, saved.savedAt)
-    )
+  const stopped = O.flatMap(O.fromUndefinedOr(progress.saved), (saved) =>
+    saved.step === "upload" ? O.map(saved.file, (file) => ({ file, savedAt: saved.savedAt })) : O.none()
+  )
+  const landed = O.exists(stopped, ({ file, savedAt }) =>
+    A.some(views, (view) => view.fileName === file.name && DateTime.isGreaterThanOrEqualTo(view.createdAt, savedAt))
+  )
   // One filled button on the screen: Continue when a file stopped, else the first open import, else Choose file.
-  const offered = stopped !== null && !landed && !busy && props.canImport
-  const resume = () => {
-    if (stopped === null) return
-    void progress.file().then((file) => {
-      if (file !== undefined) return send(file)
-      clear()
-      setProblem(`${stopped.name} is no longer kept in this browser. Choose it again.`)
+  const offered = O.isSome(stopped) && !landed && !busy && props.canImport
+  const resume = () =>
+    O.map(stopped, ({ file: stopped }) => {
+      void progress.file().then((file) =>
+        O.match(O.fromUndefinedOr(file), {
+          onSome: send,
+          onNone: () => {
+            clear()
+            setProblem(O.some(`${stopped.name} is no longer kept in this browser. Choose it again.`))
+          }
+        })
+      )
     })
-  }
 
   const takeSample = (sample: (typeof samples)[number]) => {
-    setProblem(undefined)
+    setProblem(O.none())
     return request(sample.href)
       .then((response) => {
         if (!response.ok) throw new Error(String(response.status))
         return response.blob().then((blob) => send(new File([blob], sample.name)))
       })
       .catch(() => {
-        setProblem(`The sample ${sample.name} could not be loaded. Download it with the link beside it and choose it.`)
+        setProblem(
+          O.some(`The sample ${sample.name} could not be loaded. Download it with the link beside it and choose it.`)
+        )
       })
   }
 
-  const fileInput = () => picker.current?.querySelector<HTMLInputElement>('input[type="file"]') ?? null
+  const fileInput = () =>
+    O.flatMap(O.fromNullOr(picker.current), (picker) =>
+      O.fromNullOr(picker.querySelector<HTMLInputElement>('input[type="file"]'))
+    )
   const dragging = useAtomValue(fileOverPage) && props.canImport && !busy
 
-  const failed = UploadState.guards.Failed(state) ? state : undefined
-  const refused = UploadState.guards.Refused(state) ? state.problem : undefined
+  const failed = O.liftPredicate(UploadState.guards.Failed)(state)
+  const refused = O.map(O.liftPredicate(UploadState.guards.Refused)(state), (state) => state.problem)
   return (
     <div
       data-upload-step=""
@@ -396,32 +429,44 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
             <Alert>
               <AlertTitle>Files loaded earlier could not be listed</AlertTitle>
               <AlertDescription>
-                <p>They are safe. {sayError(openImports.error, { fields: {} }).sentence}</p>
+                <p>
+                  They are safe.{" "}
+                  {O.match(openImports.error, {
+                    onNone: () => "Files loaded earlier could not be listed.",
+                    onSome: (error) => sayError(error, { fields: {} }).sentence
+                  })}
+                </p>
                 <Button variant="outline" size="sm" onClick={askOpenAgain}>
                   Try again
                 </Button>
               </AlertDescription>
             </Alert>
           ) : null}
-          {!offered || stopped === null ? null : (
-            <Item variant="outline" className="flex-wrap">
-              <ItemContent className="min-w-56">
-                <ItemTitle className="max-w-full">
-                  <span className="truncate">{stopped.name}</span>
-                </ItemTitle>
-                <ItemDescription>
-                  Stopped before it was saved. Continue reads it again from this browser.
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Button variant="ghost" onClick={clear}>
-                  Start again
-                </Button>
-                <Button onClick={resume}>
-                  Continue<span className="sr-only"> {stopped.name}</span>
-                </Button>
-              </ItemActions>
-            </Item>
+          {O.match(
+            O.filter(stopped, () => offered),
+            {
+              onNone: () => null,
+              onSome: ({ file: stopped }) => (
+                <Item variant="outline" className="flex-wrap">
+                  <ItemContent className="min-w-56">
+                    <ItemTitle className="max-w-full">
+                      <span className="truncate">{stopped.name}</span>
+                    </ItemTitle>
+                    <ItemDescription>
+                      Stopped before it was saved. Continue reads it again from this browser.
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Button variant="ghost" onClick={clear}>
+                      Start again
+                    </Button>
+                    <Button onClick={resume}>
+                      Continue<span className="sr-only"> {stopped.name}</span>
+                    </Button>
+                  </ItemActions>
+                </Item>
+              )
+            }
           )}
           {views.length === 0 ? null : (
             <ul aria-label="Files not imported yet" className="flex flex-col gap-2">
@@ -432,14 +477,18 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
               ))}
             </ul>
           )}
-          {open === undefined || open.older === 0 ? null : (
-            <p className="text-sm text-muted-foreground">
-              {whole.format(open.older)} older {open.older === 1 ? "file is" : "files are"} not shown.{" "}
-              {props.canImport
-                ? `Remove or import one above to see ${open.older === 1 ? "it" : "them"}.`
-                : `${open.older === 1 ? "It appears" : "They appear"} once an editor removes or imports one above.`}
-            </p>
-          )}
+          {O.match(open, {
+            onNone: () => null,
+            onSome: (open) =>
+              open.older === 0 ? null : (
+                <p className="text-sm text-muted-foreground">
+                  {whole.format(open.older)} older {open.older === 1 ? "file is" : "files are"} not shown.{" "}
+                  {props.canImport
+                    ? `Remove or import one above to see ${open.older === 1 ? "it" : "them"}.`
+                    : `${open.older === 1 ? "It appears" : "They appear"} once an editor removes or imports one above.`}
+                </p>
+              )
+          })}
           {props.viewOnly ? (
             // A viewer is told why, where the control would be: a dimmed button that does nothing explains nothing.
             <div
@@ -449,8 +498,12 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
             >
               <p className="text-sm font-medium">Importing needs an editor</p>
               <p className="max-w-sm text-sm text-muted-foreground">
-                You are a viewer{actor === undefined ? "" : ` in ${actor.organizationName}`}, so you can open what is
-                here and cannot load a file. An admin changes roles under People.
+                {O.match(signedIn, {
+                  onNone: () =>
+                    "You are a viewer, so you can open what is here and cannot load a file. An admin changes roles under People.",
+                  onSome: (actor) =>
+                    `You are a viewer in ${actor.organizationName}, so you can open what is here and cannot load a file. An admin changes roles under People.`
+                })}
               </p>
             </div>
           ) : busy ? (
@@ -470,18 +523,20 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
               disabled={!props.canImport}
               // onAccept, not onValueChange: the kit calls onValueChange twice for one controlled choice, which staged
               // every chosen file twice.
-              onAccept={(files) => {
-                const file = files[0]
-                if (file === undefined) return
-                setProblem(undefined)
-                send(file)
-              }}
+              onAccept={(files) =>
+                O.map(A.head(files), (file) => {
+                  setProblem(O.none())
+                  send(file)
+                })
+              }
               // The kit's own words ("File type not accepted") are not the person's: say what the file is not.
               onFileReject={(file, why) =>
                 setProblem(
-                  why === "File type not accepted"
-                    ? `"${file.name}" is not a spreadsheet. Choose a .csv or .xlsx file.`
-                    : why
+                  O.some(
+                    why === "File type not accepted"
+                      ? `"${file.name}" is not a spreadsheet. Choose a .csv or .xlsx file.`
+                      : why
+                  )
                 )
               }
             >
@@ -497,7 +552,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
                   disabled={!props.canImport}
                   onClick={(event) => {
                     event.stopPropagation()
-                    fileInput()?.click()
+                    O.map(fileInput(), (input) => input.click())
                   }}
                 >
                   Choose file
@@ -531,21 +586,34 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
             ))}
           </div>
 
-          {refused === undefined ? null : (
-            // The file's own problem, as data: what is wrong with it, then what to do. Nothing was saved.
-            <Alert variant="destructive" aria-live="polite">
-              <AlertTitle>{fileProblemTitle(refused.kind, "items")}</AlertTitle>
-              <AlertDescription>
-                <p>{refused.problem}</p>
-                <p>{refused.todo}</p>
-              </AlertDescription>
-            </Alert>
-          )}
-          {problem === undefined && failed === undefined ? null : (
-            <Alert variant="destructive">
-              <AlertTitle>{failed?.step === "save" ? "The file was not saved" : "The file was not read"}</AlertTitle>
-              <AlertDescription>{problem ?? failed?.message}</AlertDescription>
-            </Alert>
+          {O.match(refused, {
+            onNone: () => null,
+            onSome: (refused) => (
+              // The file's own problem, as data: what is wrong with it, then what to do. Nothing was saved.
+              <Alert variant="destructive" aria-live="polite">
+                <AlertTitle>{fileProblemTitle(refused.kind, "items")}</AlertTitle>
+                <AlertDescription>
+                  <p>{refused.problem}</p>
+                  <p>{refused.todo}</p>
+                </AlertDescription>
+              </Alert>
+            )
+          })}
+          {O.match(
+            O.orElse(problem, () => O.map(failed, (failure) => failure.message)),
+            {
+              onNone: () => null,
+              onSome: (message) => (
+                <Alert variant="destructive">
+                  <AlertTitle>
+                    {O.exists(failed, (failure) => failure.step === "save")
+                      ? "The file was not saved"
+                      : "The file was not read"}
+                  </AlertTitle>
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              )
+            }
           )}
         </div>
         <PastImports />

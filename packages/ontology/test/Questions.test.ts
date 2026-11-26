@@ -143,6 +143,7 @@ const partyNames = Effect.gen(function* () {
     individual: fixture("Person"),
     decision: fixture("IdentityDecision"),
     member: fixture("Member"),
+    grant: fixture("Grant"),
     evidence: fixture("IdentityEvidence"),
     instant: (value: string) => literal(n.inv("eventTime"), value, `${RdfVocab.xsd.iri}dateTime`)
   }
@@ -200,6 +201,11 @@ describe("gate 8, the questions", () => {
       expect(A.some(nameless, withPredicate(n.inv("name")))).toBe(true)
       const unnamed = yield* asked(nameless, membersAndRoles, membersVariables)
       expect(unnamed).toStrictEqual([])
+      // Planted: the person's type left out. A node with a name that the vocabulary calls no person gives no row.
+      const untypedPerson = A.filter(graph, (triple) => !(triple.subject === n.person && triple.predicate === type))
+      expect(untypedPerson).toHaveLength(graph.length - 1)
+      const unpersoned = yield* asked(untypedPerson, membersAndRoles, membersVariables)
+      expect(unpersoned).toStrictEqual([])
     })
   )
 
@@ -542,6 +548,55 @@ describe("gate 8, CQ-P07 and its must-fail cases", () => {
       const rows = yield* asked(restored, stewardship.query, stewardshipVariables)
       expect(rows).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")]])
     })
+  )
+
+  // Decision 136: only an active admin counts. With the active admin's stage left out, test_ExampleWorks keeps only
+  // test_WorksInvitee, whose stage is pending, and becomes a row; read as "any stage but revoked", it would stay out.
+  it.effect("the pending stage counts for nothing: test_ExampleWorks with only its pending admin is a row", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(stewardship.fixture)
+      const unstaged = dropped(graph, n.member("test_WorksAdmin"), n.inv("membershipStatus"))
+      expect(unstaged).toHaveLength(graph.length - 1)
+      const rows = yield* asked(unstaged, stewardship.query, stewardshipVariables)
+      expect(rows).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")], [n.works], [n.second]])
+      // Planted: the stage read as "any stage but revoked", the reading decision 136 rejects. The pending admin
+      // then counts, and test_ExampleWorks is no row.
+      const notRevoked = plantedStewardship(
+        "inv:membershipStatus inv:MembershipStatusScheme-active .",
+        `inv:membershipStatus ?stage .
+    FILTER (?stage != inv:MembershipStatusScheme-revoked)`
+      )
+      const lenient = yield* asked(unstaged, notRevoked, stewardshipVariables)
+      expect(lenient).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")], [n.second]])
+    })
+  )
+
+  // The member and the grant are each found by their type: a node that states a member's or a grant's properties and
+  // no type is neither. The revoked admin made active is the near miss, typed, which keeps test_SecondOrg out.
+  it.effect(
+    "a node with a member's properties and no Member type, or a grant's and no Grant type, is not counted",
+    () =>
+      Effect.gen(function* () {
+        const n = yield* partyNames
+        const graph = yield* fixtureGraph(stewardship.fixture)
+        const former = n.member("test_SecondFormerAdmin")
+        const formerGrant = n.grant("test_SecondFormerAdminGrant")
+        const status = n.inv("membershipStatus")
+        const restored = [
+          ...dropped(graph, former, status),
+          link(former, status, n.inv("MembershipStatusScheme-active"))
+        ]
+        const kept = yield* asked(restored, stewardship.query, stewardshipVariables)
+        expect(kept).toStrictEqual([[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")]])
+        const memberless = dropped(restored, former, type)
+        const grantless = dropped(restored, formerGrant, type)
+        expect([memberless.length, grantless.length]).toStrictEqual([graph.length - 1, graph.length - 1])
+        const withoutMember = yield* asked(memberless, stewardship.query, stewardshipVariables)
+        const withoutGrant = yield* asked(grantless, stewardship.query, stewardshipVariables)
+        const expected = [[n.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")], [n.second]]
+        expect([withoutMember, withoutGrant]).toStrictEqual([expected, expected])
+      })
   )
 
   it.effect("planted: without the stage, the revoked admin still counts, and test_SecondOrg is no row", () =>
@@ -1490,19 +1545,26 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
-  it.effect("guard 1 reports a hand-written grant, a hand-written tenant link and a hand-written member type", () =>
-    Effect.gen(function* () {
-      const { written, lifted } = yield* parts
-      const n = yield* names
-      const grant = `${n.raviWorks}/role`
-      const taken = [
-        link(grant, n.inv("grantsRole"), n.admin),
-        link(n.raviWorks, n.inv("membershipIn"), n.works),
-        link(n.raviWorks, type, n.inv("Member")),
-        link(grant, type, n.inv("Grant"))
-      ]
-      expect(linesOf(overreach([...written, ...taken], lifted))).toStrictEqual(linesOf(taken))
-    })
+  it.effect(
+    "guard 1 reports a hand-written grant, tenant link and type on lifted nodes, and passes a type on another",
+    () =>
+      Effect.gen(function* () {
+        const { written, lifted } = yield* parts
+        const n = yield* names
+        const grant = `${n.raviWorks}/role`
+        const taken = [
+          link(grant, n.inv("grantsRole"), n.admin),
+          link(n.raviWorks, n.inv("membershipIn"), n.works),
+          link(n.raviWorks, type, n.inv("Member")),
+          link(grant, type, n.inv("Grant"))
+        ]
+        expect(linesOf(overreach([...written, ...taken], lifted))).toStrictEqual(linesOf(taken))
+        // Near miss (report 18 section 7, "only when"): a member type on a node no record holds is stated by no lifted
+        // triple of that subject, so it passes, as CQ-P07's fixture writes its members.
+        const p = yield* partyNames
+        const unlifted = link(p.member("test_Dana"), type, n.inv("Member"))
+        expect(linesOf(overreach([...written, unlifted], lifted))).toStrictEqual([])
+      })
   )
 
   // Decision 171: the lift writes each tenant's name, so a predicate alone would take the person's hand-written name

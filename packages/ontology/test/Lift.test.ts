@@ -26,6 +26,7 @@ import { pointerFor } from "@beep/vocabulary/Pointer"
 import { RdfVocab } from "@beep/vocabulary/Rdf"
 import { Person } from "@inventory/access-contract/Person"
 import { Activity } from "@inventory/kernel/Activity"
+import { AgentRun } from "@inventory/kernel/AgentRun"
 import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
@@ -671,6 +672,17 @@ const actedValue = S.decodeEffect(actedEntry)({
 })
 
 describe("a class that stores no id (decision 135)", () => {
+  // Report 18 section 7: AgentRun's enrolment reaches the refusal on the kernel's own terms, with no copy.
+  it.effect("refuses the kernel's AgentRun, whose class stores no id, naming no field", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const run = yield* S.decodeEffect(AgentRun)({ agent: "Assistant", maxRole: "editor" })
+      const refusal = yield* Effect.flip(lift(context, AgentRun, run))
+      expect(refusal.field).toStrictEqual(O.none())
+      expect(refusal.reason).toBe("AgentRun stores no id, so the lift makes no node of it (decision 135)")
+    })
+  )
+
   it.effect("refuses a Member once Member stores no id, naming no field", () =>
     Effect.gen(function* () {
       const context = yield* storingNoId("Member")

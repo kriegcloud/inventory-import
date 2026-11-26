@@ -9,23 +9,18 @@
  * @packageDocumentation
  */
 import type { Vocabulary } from "@beep/vocabulary/Model"
-import { RdfVocab } from "@beep/vocabulary/Rdf"
 import * as A from "effect/Array"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import { ObjectNode, type Iri, type Triple } from "./Graph.schema.ts"
-
-const type: Iri = `${RdfVocab.rdf.iri}type`
-
-const typeOf = (triple: Triple): O.Option<Iri> =>
-  triple.predicate === type && ObjectNode.guards.iri(triple.object) ? O.some(triple.object.iri) : O.none()
+import type { Triple } from "./Graph.schema.ts"
 
 /**
- * Guard 1: the hand-written triples that state what the lift states. A triple is one when its subject and predicate
- * are those of a lifted triple, the type included, or when it gives any subject a type the lift gives. A predicate
- * alone is not enough (decision 171): the lift writes a tenant's `name`, and the fixture writes a person's, whom no
- * record identifies. None when the hand-written part holds only what no record holds.
+ * Guard 1: the hand-written triples that state what the lift states. A triple is one only when the lift states that
+ * property of that subject, the type included (report 18 section 7). A predicate alone is not enough (decision 171):
+ * the lift writes a tenant's `name`, and the fixture writes a person's, whom no record identifies; a fixture may state
+ * by hand a property the lift writes on other subjects. None when the hand-written part holds only what no record
+ * holds.
  *
  * @example overreach(handWritten, lifted) // [] for the committed fixture
  */
@@ -35,11 +30,7 @@ export const overreach: {
 } = dual(2, (handWritten: ReadonlyArray<Triple>, lifted: ReadonlyArray<Triple>): ReadonlyArray<Triple> => {
   const stated = (triple: Triple): boolean =>
     A.some(lifted, (given) => given.subject === triple.subject && given.predicate === triple.predicate)
-  const types = A.dedupe(A.getSomes(A.map(lifted, typeOf)))
-  return A.filter(
-    handWritten,
-    (triple) => stated(triple) || O.exists(typeOf(triple), (given) => A.contains(types, given))
-  )
+  return A.filter(handWritten, stated)
 })
 
 /**

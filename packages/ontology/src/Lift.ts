@@ -251,9 +251,9 @@ const attributePath = Effect.fnUntraced(function* (
   }
   const linking = step.value.property
   const key = localOf(context.prefix)(linking)
-  const filling = A.filter(
-    siblings.fields,
-    (other) => other.name !== field.name && O.exists(key, (local) => O.contains(siblings.termOf(other), local))
+  // The path's own field is never among them: a field marked with a path names no term of its own.
+  const filling = A.filter(siblings.fields, (other) =>
+    O.exists(key, (local) => O.contains(siblings.termOf(other), local))
   )
   const filler = A.head(filling)
   if (O.isNone(filler)) {

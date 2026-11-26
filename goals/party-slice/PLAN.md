@@ -639,9 +639,10 @@ Choices the sources left open, each the agent's:
   concept is refused, since the lift would state on another record's node a fact no field states; a reverse step is not
   reused, the other field's triple pointing the other way; two fields naming the property are refused, the node being
   undecided. A path that ends in a relation is lifted as before, its refusals kept.
-- **Guard 1** flags a hand-written triple whose subject and property the lift states together, the type included, and,
-  as before, one that gives any subject a type the lift gives. Decision 171 changes the first clause; the type clause
-  is kept, so a hand-written `inv:Member` on a node no record holds is still caught.
+- **Guard 1** flags a hand-written triple only when the lift states that property of that subject, the type included
+  (decision 171, report 18 section 7). The clause that flagged any subject given a type the lift gives was dropped in
+  step 11's review, since the accepted text says "only when": a hand-written `inv:Member` on a node no record holds
+  passes, as CQ-P07's fixture writes them, and its test holds that near miss beside the plants on lifted subjects.
 - **CQ-P06's new columns**: `?name`, read on the person (decision 133), required, and `?email`, read through
   `memberAccount` and `accountEmail` (134), optional, since the People page's `email` is none for a member with no
   account; a member with no account is still listed. Both persons' rows name one account, `test_RaviAccount`, with the
@@ -666,6 +667,11 @@ Choices the sources left open, each the agent's:
   `OrganizationChoice`, `Membership`, `TestAccount`, `SessionState`, `Ready`, `NoOrganization` and `ModelCallPurpose`,
   and the API's OpenAPI document, byte for byte the same before the marks and after; `bun run --cwd packages/ontology
   reason` on the cached jar passed (What the design left unchecked).
+- **Step 11's review** (2026-11-26) added the plants no test held: CQ-P07 with the active admin's stage left out,
+  where `test_ExampleWorks` keeps only its pending admin and is a row, beside the rejected reading "any stage but
+  revoked", which keeps it out (decision 136); CQ-P07's member and grant each untyped; CQ-P06's person untyped; the
+  lift of the kernel's own `AgentRun` refused (decision 135). Each was seen to fail with its clause taken out of the
+  committed query. The lift's attribute path no longer compares a field with itself, since a path field names no term.
 
 Needs Benjamin: carried from step 10, the name `test_AcmeC` and `test_AcmeD` share; `name` now exists, and option (a)
 of step 10 would add `inv:name "Acme Industrial"` to both in CQ-P04's fixture. Not built here: the option is not

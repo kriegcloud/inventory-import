@@ -41,7 +41,7 @@ const play = (from: Draft, events: ReadonlyArray<DraftEvent>): Stepped =>
     return { draft: next.draft, effects: [...before.effects, ...next.effects] }
   })
 const view = (revision: number, decisions: SavedDecisions) =>
-  DraftEvent.ViewArrived({ revision, decisions, open: true, confirms: 0 })
+  DraftEvent.ViewArrived({ waiting: false, matches: [], takenBack: [], revision, decisions, open: true, confirms: 0 })
 const at4 = (decisions: SavedDecisions) =>
   play(emptyDraft, [DraftEvent.Opened({ kept: O.none() }), view(4, decisions)]).draft
 const decide = (rowId: string, decision: O.Option<Decision>) => DraftEvent.Decided({ changes: { [rowId]: decision } })
@@ -64,7 +64,7 @@ const lineOfA = (sides: ReadonlyArray<Side>): Waiting => ({
   confirms: O.some(0),
   leftOver: O.none()
 })
-const takeUp = (kept: Waiting) => DraftEvent.TakenUp({ kept })
+const takeUp = (kept: Waiting) => DraftEvent.TakenUp({ here: false, kept })
 const pick = (keep: Keep) => DraftEvent.Settled({ picks: [{ rowId: "a", keep }] })
 const wordsOfA = (draft: Draft, canDecide: boolean) =>
   O.map(R.get(linesShown(draft), "a"), (line) => {
@@ -192,7 +192,10 @@ describe("the confirm and a row that waits", () => {
     expect(A.map(confirmed.effects, DraftEffect.$is("Confirm"))).toEqual([true])
     const stale = step(
       confirmed.draft,
-      DraftEvent.ConfirmStale({ id: confirmed.draft.lastId, accepts: [{ rowId: "a", field: "unitCost" }] })
+      DraftEvent.ConfirmStale({
+        id: confirmed.draft.lastId,
+        accepts: [{ rowId: "a", field: "unitCost", kind: "accept" as const }]
+      })
     )
     expect(A.map(sends(stale), (send) => send.delta)).toEqual([{ set: { a: nothing }, clear: [] }])
   })
@@ -265,7 +268,7 @@ describe("what a tab is told of its decisions taken up", () => {
     const at = 0
     const of = { importId: "imp_1", fileName: O.some("items_messy.csv"), rows: ["row-12"], at }
     expect([
-      noticeWords(Notice.cases.TakenUp.make({ ...of, named: true })).text,
+      noticeWords(Notice.cases.TakenUp.make({ ...of, named: O.some(true) })).text,
       noticeWords(Notice.cases.TakenUp.make(of)).text
     ]).toEqual([
       "Row 12 of items_messy.csv: your decision was not part of the import that was confirmed, and another tab of yours names it now.",

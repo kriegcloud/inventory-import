@@ -1165,6 +1165,107 @@ Only this verdict appendix and the following 31 test/support files changed. Sour
 - `packages/catalog/web/test/TakenBackWords.test.ts`
 - `packages/catalog/web/test/UploadMachine.test.ts`
 - `packages/catalog/web/test/UploadOwner.test.ts`
+
+
+## Catalog web source sweep, PLAN row 11 (2026-11-26)
+
+Written before this sweep's code changes. Scope is all of `packages/catalog/web/src`, including the earlier
+internal lane's unfinished work. Effect-first-development, schema-first-development, crispen and the repository's
+OKF documentation rules apply. This section records the working verdicts and will receive the final inventory.
+
+| Owner / boundary | Fields | Verdict and preservation requirement |
+| --- | --- | --- |
+| Draft machine events | TakenUp.here; ViewArrived.waiting, matches, takenBack; holdingBack.accepts | Required values supplied explicitly by every caller; no optional owned helper inputs. |
+| Draft stale accepts | kind, rowId, field | Required kind, rowId and field; legacy missing kind means accept at the actual stored boundary. |
+| Draft and review atoms | member, owner, lookup results, decisions, held state | Options remain Options through derived atoms; absent collections fold to empty lists; own helper arguments required. |
+| Upload controller and machine | chosen sheet, completion and progress callbacks, owner/upload, reader head | Required inputs and Option absence; wire remains schema encoded before clone/postMessage, decoded at receipt. |
+| Spreadsheet readers | sheet, progress callback, piece size, listed limit | Required arguments explicitly supplied by callers. Native file bytes, library lookup/captures remain named boundary cases. |
+| StoredWaiting | waits, lines, confirms, beside, theirs, seen, held, fileName, older forms | Decode optional keys as Options while preserving omitted versus explicit-null keys and exact writer form. |
+| Conversation and notices | optional legacy attribution, patch fields, names, named/theirs | Decode at module-level storage schemas; keep legacy generations readable and writer omission behavior identical. |
+| Table Patch and view | independent changed fields, column lookup, visibility | Optional patch fields become Options with constructor None; encoded omission unchanged. Third-party dictionaries stay named edges. |
+| Screens | owned props, optional values and final labels | Required own data or Option; component optional props keep ?: with destructuring defaults. Final screen draw uses O.match. |
+| Reviewed file cells and forms | dimensions, vendor text, numbers, labels | Preserve permissive reading and shown proposals; clean-ups remain reviewed-cell boundaries, capture absence becomes Option. |
+| DOM and third-party APIs | storage/URL/file/ref nullable values; installed table/component optional props | Named real edges retained, with file, kind, count and an example in the final inventory. |
+
+No product outcome, stored progress or draft representation, baseline, exemption, Verify lock, vendored code,
+PLAN or .dev.vars will be changed. Existing undecided values move unchanged only onto their owning schema and
+are listed in SPEC when moved. No browser proof is claimed by this source lane.
+
+### Final field verdicts and compatibility
+
+The owned editor state now lives in `ItemEditor.state.ts`: Closed has no form; Open requires base, complete form,
+problems and Option notice. Form defaults belong to the form maker. Functional atom updates preserve edits queued
+between draws. Items retains its stable table hook and common header/actions while data is loading or failed.
+`result.ts` exposes Option data and errors; error consumers match the Option before passing its actual payload to
+error wording. Draft event/helper inputs are required, and Side, Named and HeldBack own their initial fields.
+
+StoredWaiting, conversation entries and Patch decode optional/null keys at their real module-level boundaries.
+Their encoded omissions and explicit nulls remain distinct. The shared empty conversation retains its identity.
+LegacySide and LegacyRules own unchanged legacy defaults. Reader requests, heads, chunks and progress cross the
+worker boundary in schema encoded form, with decoding at receipt; no decoded Option object is posted as wire data.
+The terminal RegionProblem/Fix display adapter compacts Option properties with R.getSomes into one constructor
+call, preserving property omission without copying a whole record for every optional field. These are the owned
+review library's published optional display properties, not third-party data or newly invented defaults.
+Reviewed permissive cell parsing retains malformed/truncated recovery. Its form makers produce complete drafts, with one fresh mutable draft per parsed vendor.
+
+No source `getOrThrow`, `runSync`, synchronous decoder/encoder, `S.declare` function schema, local schema,
+Option-to-undefined codec, `A.join(O.toArray(...))`, or new React state/memo/effect hook was introduced. No
+performance improvement is claimed: collection folds avoid added copies per row, but no benchmark was run.
+The original law's 324 measured source places fell to 32; its syntax counts do not prove every pre-existing
+uncounted Option branch is semantically settled. In particular, older machine branches outside the measured
+syntax still merit the goal's later semantic review.
+
+### Exact remaining source inventory
+
+`bun run beep laws defaults <all 43 source files>` passes: **1 fallback, 15 absence, 1 unwrap, 15 normalise**.
+The explicit file list includes the new untracked state module. Receipt: `/tmp/catalog-source-scoped-defaults.log`;
+complete line/code inventory: `/tmp/catalog-source-residual.json` and `/tmp/catalog-source-residual.txt`.
+These are retained candidates, not added or approved exemptions. The owned hook gap is unfinished work.
+
+| Source file | Kind / count | Exact lines and example | Ownership / disposition |
+| --- | --- | --- | --- |
+| `Conversation.machine.ts` | absence 1 | 119; `text === null` | Browser localStorage nullable read. |
+| `Draft.atoms.ts` | absence 4 | 250, 269, 281, 562; `lock === null` | Native Web Locks nullable results and optional browser API/global availability. |
+| `ImportPage.screen.tsx` | absence 1 | 235; `barSlot !== null` | DOM ref slot presence before drawing its portal. |
+| `ItemEditor.screen.tsx` | absence 1 | 214; `querySelector(...) !== null` | DOM querySelector nullable result when checking the mounted editor. |
+| `ItemsPage.screen.tsx` | fallback 1 | 714; `O.getOrElse` | Vendored useDataTable requires numeric pageCount before the first read; retains existing 0 at that API edge. |
+| `Notices.atoms.ts` | absence 1 | 86; `key === null` | Browser storage event nullable key. |
+| `ReviewStep.screen.tsx` | absence 1 | 419; `line === null` | DOM row lookup before navigation/focus. |
+| `UploadStep.screen.tsx` | absence 3, unwrap 1 | 116, 154, 156, 324; `input === null` | Three DOM input/closest/dataset checks. One unresolved OWN SavedProgressHook.useSavedProgress(scope-or-undefined) signature: React hook must be called unconditionally; producer must accept Option in its future package lane. This unwrap is not a third-party exemption. |
+| `internal/CellForms.tsx` | normalise 5 | 127, 128, 128, 129, 130; `vendor.name.trim` | Five reviewed repair-form vendor text clean-ups; candidate cell clean-ups only. |
+| `internal/WhyFlagged.tsx` | normalise 2 | 76, 77; `row.file.name.trim` | Two reviewed raw name/SKU display clean-ups; candidate cell clean-ups only. |
+| `internal/cellDrafts.ts` | normalise 1 | 20; `text.trim` | Reviewed numeric/text cell repair trim; candidate cell clean-up only. |
+| `internal/format.tsx` | normalise 1 | 8; `props.value.trim` | Reviewed cell ValuePill whitespace display; candidate cell clean-up only. |
+| `internal/itemText.ts` | normalise 6 | 30, 61, 62, 75, 167, 188; `text.trim` | Six reviewed numeric/vendor/tag cell display clean-ups; candidate cell clean-ups only. |
+| `internal/notices.ts` | absence 1 | 54; `text === null` | Browser localStorage nullable read. |
+| `internal/route.ts` | absence 1 | 13; `text === null` | URLSearchParams nullable get. |
+| `internal/storedWaiting.ts` | absence 1 | 270; `text === null` | Browser localStorage nullable read. |
+
+All 43 source files were visited; the other 27 have zero measured places. No source normalization outside the
+15 reviewed-cell candidate sites remains. Existing SPEC decisions distinguish cell clean-ups from fallback and
+absence work: none of these candidates licenses an exemption edit in this lane.
+
+### Forced callers and validation
+
+The following existing tests/support files changed only for the required signatures, encoded wire fixtures, or
+Closed/Open editor representation. The editor fixture now supplies the complete form formerly hidden by a cast.
+No new permanent tests were added; test assertion logic was retained.
+
+- `apps/inventory/test/server/support/files.ts`
+- `apps/inventory/src/web/Workspace.tsx` (forced route Option caller; final JSX match keeps existing Crumbs props)
+- `apps/inventory/test/web/session.test.ts` (forced Option atom value)
+- `packages/catalog/web/test/TableAssistant.test.ts` (forced Option visibility expectations)
+- `packages/catalog/web/test/Conversation.test.ts`
+- `packages/catalog/web/test/Draft.machine.test.ts`
+- `packages/catalog/web/test/DraftLines.test.ts`
+- `packages/catalog/web/test/DraftPicks.test.ts`
+- `packages/catalog/web/test/DraftServer.test.ts`
+- `packages/catalog/web/test/ItemEditor.test.ts`
+- `packages/catalog/web/test/ReviewModelFold.fold.test.ts`
+- `packages/catalog/web/test/SessionAsked.test.ts`
+- `packages/catalog/web/test/UploadMachine.test.ts`
+- `packages/catalog/web/test/UploadOwner.test.ts`
+- `packages/catalog/web/test/csvDifferential.test.ts`
 - `packages/catalog/web/test/readInPieces.test.ts`
 - `packages/catalog/web/test/readSpreadsheet.test.ts`
 - `packages/catalog/web/test/readerWarnings.test.ts`
@@ -1831,3 +1932,47 @@ rule changed. The 41 unresolved owned sites are retained work, not approved edge
 zero. The 20 real edge sites are named candidates; this pass grants no exemptions.
 
 Needs the person: the existing defaults/exemption judgments for the named retained sites; no additional product decision was chosen in this lane.
+
+- `packages/catalog/web/test/support/draftWorld.ts`
+- `packages/catalog/web/test/support/files.ts`
+- `packages/catalog/web/test/tableView.test.ts`
+- `packages/catalog/web/test/xlsxParity.test.ts`
+
+The strict ceiling decreases to the measured 148. The new state module is an actual owner, moved out of the
+screen to satisfy fast-refresh; its runtime import smoke passes. Package `check` passes at 148/148.
+
+Focused proofs against archived HEAD pass: saved writer/legacy reads, Patch encoded forms, Conversation V1/V2
+nulls and exact writer, shared empty identity, Notices omitted/false keys, 25 malformed/scalar/array reviewed-cell
+comparisons, and 14 terminal review bridge omission cases. Scratch: `.scratch/catalog-storage-proof.ts`.
+The actual reader worker module accepts encoded requests after Bun File structuredClone and emits decodable
+heads/chunks: messy CSV 200 rows with sheet None and workbook 6 rows with selected sheet Some(Items).
+Scratch: `.scratch/catalog-worker-proof.ts`. These are local synthetic/worker-module proofs, not browser Worker
+or on-screen proof. The independent app ImportsTwin test passes without retry, including 155 Ready / 24 Needs a
+decision / 21 Cannot import of 200 and Confirm storing 155. Receipt: `/tmp/catalog-web-source-final-twin.log`.
+
+Final catalog tests pass **401 tests in 38 files**, no retry. The final focused adapter/editor/upload run passes
+27 tests in 4 files, no retry (`/tmp/catalog-source-final-adapters.log`). Final workspace
+`bun run check --continue=always` exits 1: **102/105 tasks successful**, 75 cached, 2m42.067s. Only the assertions,
+readonly and promises ledger gates fail, each demanding the measured decreases below. All code checks, lint,
+tests, proofs and other workspace gates pass. Receipt: `/tmp/catalog-source-final-check-continue2.log`.
+Earlier attempts exposed the now-fixed fast-refresh module ownership and invalid dual(1) (runtime smoke catches
+it), the forced app signatures, and the review bridge reading its temporary stored-choice key after a decoder
+removed it. The lookup now reads the required region edits before that conversion; focused review parity and
+bridge encoded-shape proofs pass. Ledger decreases remain blocked by the authorized file scope. The exact
+unapplied assertion patch is `.scratch/catalog-assertions-lowering.patch`; the further readonly/Promise decreases
+are `.scratch/catalog-further-ledger-lowering.patch`. These tooling files are outside this lane's edit scope and
+require the person's narrow authorization before applying them. No casts were reintroduced and no ledger raises
+are proposed. The assertion changes remove cellDrafts and itemText (1 each) and lower ItemEditor.test 8 to 6.
+The readonly changes remove Upload.machine and reader.worker and lower cellDrafts 9 to 2; Promise
+changes lower Upload.controller 14 to 13 and reader.worker 3 to 2.
+
+Formatting all changed files plus the new state module, `git diff --check`, and `docs:check` pass; the latter
+retains pre-existing status warnings. All three tooling ledgers remain byte-unchanged pending scope approval.
+
+No browser was opened: Upload, Match, Review, Result and Items were **not seen on screen**. `check:full`, hosted
+behavior, an actual browser Worker, and dedicated performance proof were not run. PLAN, defaults baseline,
+exemptions, Verify lock, vendored code and .dev.vars are unchanged. No commit or push was made.
+
+Needs the person: the narrow debt-ledger scope extension is pending; unchanged undecided defaults remain
+listed in SPEC. The saved-progress hook's one owned unwrap needs its producer's later Option API migration;
+this lane does not declare row 11 fully cleared or propose an exemption for it.

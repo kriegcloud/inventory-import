@@ -63,12 +63,16 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
         const fileName = item.name
         const record = yield* Config.Boolean("XLSX_RECORD").pipe(Config.withDefault(false))
         if (record) {
-          const old = yield* readXlsx({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
+          const old = yield* readXlsx({ onProgress: () => {}, fileName, bytes, sheet: item.sheet, notes: [] }).pipe(
+            Effect.result
+          )
           const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
           writeFileSync(expectedUrl(item.name), `${text}\n`)
         }
         const expected = yield* S.decodeEffect(Json)(readFileSync(expectedUrl(item.name), "utf8"))
-        const next = yield* readXlsx({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
+        const next = yield* readXlsx({ onProgress: () => {}, fileName, bytes, sheet: item.sheet, notes: [] }).pipe(
+          Effect.result
+        )
         const nextText = yield* next.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
         const nextJson = yield* S.decodeEffect(Json)(nextText)
         expect(nextJson).toEqual(expected)
@@ -81,7 +85,7 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
   it.effect("and reads the rows a sheet's declared extent leaves out", () =>
     Effect.gen(function* () {
       const bytes = yield* lyingExtent
-      const table = yield* readXlsx({ fileName: "lying.xlsx", bytes, sheet: O.none(), notes: [] })
+      const table = yield* readXlsx({ onProgress: () => {}, fileName: "lying.xlsx", bytes, sheet: O.none(), notes: [] })
       expect(A.map(table.rows, (row) => row.rowNumber)).toEqual([2, 3, 4, 5])
     })
   )

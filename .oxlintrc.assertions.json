@@ -103,9 +103,7 @@
       "files": [
         "apps/inventory/vite.config.ts",
         "packages/access/web/src/People.screen.tsx",
-        "packages/catalog/web/src/internal/cellDrafts.ts",
         "packages/catalog/web/src/internal/CellForms.tsx",
-        "packages/catalog/web/src/internal/itemText.ts",
         "packages/catalog/web/src/ItemsPage.screen.tsx",
         "packages/catalog/web/src/TableAssistant.screen.tsx",
         "packages/catalog/web/test/ConfirmDraft.test.ts",

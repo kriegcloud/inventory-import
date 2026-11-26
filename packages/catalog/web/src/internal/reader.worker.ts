@@ -12,8 +12,8 @@ import * as S from "effect/Schema"
 import { StagedHead, StagedRow } from "@inventory/catalog-contract/Staged"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
-import { readSpreadsheet } from "./spreadsheet/read.ts"
-import { ReadMessage, type ReadRequest } from "./protocol.ts"
+import { readSpreadsheet, type ReadProgress } from "./spreadsheet/read.ts"
+import { ReadMessage, ReadRequest } from "./protocol.ts"
 import { stageTable, stagingProblem } from "@inventory/catalog-model/Staging"
 
 const post = (message: ReadMessage) => self.postMessage(message)
@@ -40,7 +40,7 @@ const refuse = (problem: FileProblem) =>
 /** At most one progress message every 50 ms: the page redraws on each. */
 const throttle = (send: (message: ReadMessage) => void) => {
   let last = -Infinity
-  return (progress: { rowsRead: number; rowsAbout: number | null; exact: boolean }) => {
+  return (progress: ReadProgress) => {
     const now = performance.now()
     if (now - last < 50 && !progress.exact) return
     last = now
@@ -49,9 +49,9 @@ const throttle = (send: (message: ReadMessage) => void) => {
 }
 
 const read = ({ file, sheet }: ReadRequest) =>
-  readSpreadsheet({ file, ...(sheet === null ? {} : { sheet }), onProgress: throttle(post) })
-    .pipe(Effect.result, Effect.runPromise)
-    .then((result) => {
+  readSpreadsheet({ file, sheet, onProgress: throttle(post) }).pipe(
+    Effect.result,
+    Effect.map((result) => {
       if (Result.isFailure(result)) return refuse(result.failure)
       const table = result.success
       const { rows, ...stagedHead } = stageTable({ table })
@@ -90,8 +90,11 @@ const read = ({ file, sheet }: ReadRequest) =>
       chunks.forEach((chunk, seq) => post(ReadMessage.Chunk({ seq, rows: chunk })))
       post(ReadMessage.Done())
     })
+  )
 
-self.onmessage = (event: MessageEvent<ReadRequest>) => {
+self.onmessage = (event: MessageEvent<typeof ReadRequest.Encoded>) => {
   // The reader itself broke (not the file): a sentence about the page, not a problem with the file.
-  read(event.data).catch(() => post(crashed(event.data.file)))
+  S.decodeEffect(ReadRequest)(event.data)
+    .pipe(Effect.flatMap(read), Effect.runPromise)
+    .catch(() => post(crashed(event.data.file)))
 }

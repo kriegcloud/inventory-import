@@ -1507,7 +1507,7 @@ const messy = (table: StagedTable) => {
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
     if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
-    return O.map(problem, toRegionProblem)
+    return O.map(problem, (problem) => toRegionProblem(problem, { withoutRivals: false }))
   }
   const rows = (decisions: Readonly<Record<string, ReviewDecision>>) => {
     const server = toServerDecisions(decisions)

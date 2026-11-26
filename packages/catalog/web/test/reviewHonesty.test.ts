@@ -53,7 +53,9 @@ const sample = (name: string): File =>
   new File([new Uint8Array(readFileSync(new URL(`./fixtures/samples/${name}`, import.meta.url)))], name)
 
 const stage = (file: File): Effect.Effect<StagedTable> =>
-  Effect.orDie(Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table })))
+  Effect.orDie(
+    Effect.map(readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file }), (table) => stageTable({ table }))
+  )
 
 // As the screen opens a file: the draft a new import starts with (the rules' own fixes held back as proposals).
 const sampleRows = (name: string, storedItems: ReadonlyArray<ItemFields>) =>

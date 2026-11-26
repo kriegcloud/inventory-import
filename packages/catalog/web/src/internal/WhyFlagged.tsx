@@ -12,11 +12,17 @@ import { problemKinds, type Proposal, type Review, rowPlace } from "@inventory/c
 /** How many rows the panel lists in full; past it, it says how many more and how to narrow the view. */
 const listed = 100
 
-const kindLabel = (id: string): string => problemKinds.find((kind) => kind.id === id)?.label ?? id
+const kindLabel = (id: string): string =>
+  O.match(
+    A.findFirst(problemKinds, (kind) => kind.id === id),
+    { onNone: () => id, onSome: (kind) => kind.label }
+  )
 
 const proposalWords = (proposal: Proposal): string => {
   const who = proposal.by === "model" ? "The model" : "A rule"
-  const values = [proposal.to, ...proposal.alternatives].map((value, at) => proposal.labels[at] ?? value)
+  const values = A.map(A.prepend(proposal.alternatives, proposal.to), (value, at) =>
+    O.match(A.get(proposal.labels, at), { onNone: () => value, onSome: (label) => label })
+  )
   return proposal.confidence === "low"
     ? `${who} asks: ${values.map((value) => (value === "" ? "empty" : value)).join(" or ")}?`
     : `${who} proposes ${values[0] === "" ? "empty" : values[0]} (${proposal.confidence} confidence).`
@@ -35,7 +41,8 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
               !O.exists(
                 problem.proposal,
                 (proposal) =>
-                  proposal.lossless && problem.field !== null && reviewed.values[problem.field] === proposal.to
+                  proposal.lossless &&
+                  O.exists(O.fromNullOr(problem.field), (field) => reviewed.values[field] === proposal.to)
               )
           )
           return open.length === 0 ? O.none() : O.some({ ...reviewed, problems: open })
@@ -76,7 +83,13 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
             </span>
             <ul className="flex flex-col gap-1.5 pl-4">
               {row.problems.map((problem, at) => (
-                <li key={`${problem.kind}:${problem.field ?? ""}:${at}`} className="list-disc">
+                <li
+                  key={O.match(O.fromNullOr(problem.field), {
+                    onNone: () => `${problem.kind}::${at}`,
+                    onSome: (field) => `${problem.kind}:${field}:${at}`
+                  })}
+                  className="list-disc"
+                >
                   <span className="text-muted-foreground">{kindLabel(problem.kind)}: </span>
                   {problem.message}
                   {O.match(problem.proposal, {

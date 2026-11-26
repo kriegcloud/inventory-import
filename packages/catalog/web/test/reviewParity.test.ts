@@ -48,7 +48,9 @@ const sample = (name: string): File =>
 
 /** Reads and stages a file exactly as the upload screen does. */
 const stage = (file: File): Effect.Effect<StagedTable> =>
-  Effect.orDie(Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table })))
+  Effect.orDie(
+    Effect.map(readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file }), (table) => stageTable({ table }))
+  )
 
 /** One screen: the decisions the server would be sent, and the region's own state, kept in step. */
 const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: ReadonlyArray<ItemFields>) => {
@@ -58,7 +60,7 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
     if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
-    return O.map(problem, toRegionProblem)
+    return O.map(problem, (problem) => toRegionProblem(problem, { withoutRivals: false }))
   }
   // As the review step holds them: the server's shape, and the region's state restored from the region's shape.
   let decisions: SavedDecisions = firstDecisions({ table, choices: [], mode, itemsOf: itemsOfRow })

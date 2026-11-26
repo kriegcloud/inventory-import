@@ -38,7 +38,11 @@ const rowNumbers = (table: SpreadsheetTable): ReadonlyArray<number> => A.map(tab
 describe("CSV", () => {
   it.effect("reads UTF-8 with a byte-order mark, dropping only the mark", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("utf8-bom.csv", "utf8-bom.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("utf8-bom.csv", "utf8-bom.csv")
+      })
       expect(table.format).toEqual(CsvFormat.make({ delimiter: ",", encoding: "utf-8" }))
       expect(table.columns[0]?.header).toBe("SKU")
       expect(texts(rowAt(table, 5))).toEqual(["RD-12", "Round bar Ø 12 mm", "m", "36", "4.80"])
@@ -47,7 +51,11 @@ describe("CSV", () => {
 
   it.effect("reads UTF-8 without a mark the same way", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: textFile("SKU,Item\nBRK-040,Steel bracket\n", "items.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: textFile("SKU,Item\nBRK-040,Steel bracket\n", "items.csv")
+      })
       expect(table.format).toEqual(CsvFormat.make({ delimiter: ",", encoding: "utf-8" }))
       expect(texts(rowAt(table, 2))).toEqual(["BRK-040", "Steel bracket"])
     })
@@ -55,7 +63,11 @@ describe("CSV", () => {
 
   it.effect("reads a non-UTF-8 file as Windows-1252 and says so, naming the rows to check", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("windows-1252.csv", "windows-1252.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("windows-1252.csv", "windows-1252.csv")
+      })
       expect(table.format).toEqual(CsvFormat.make({ delimiter: ",", encoding: "windows-1252" }))
       expect(texts(rowAt(table, 5))[1]).toBe("Round bar Ø 12 mm")
       expect(texts(rowAt(table, 6))[1]).toBe("Washer ½ inch")
@@ -66,7 +78,11 @@ describe("CSV", () => {
 
   it.effect("detects semicolons with CRLF line ends and keeps decimal commas as text", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("semicolon-crlf.csv", "semicolon-crlf.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("semicolon-crlf.csv", "semicolon-crlf.csv")
+      })
       expect(table.format).toEqual(CsvFormat.make({ delimiter: ";", encoding: "utf-8" }))
       expect(texts(rowAt(table, 2))).toEqual(["BRK-040", "Steel bracket 40 mm", "Each", "120", "2,35"])
       expect(O.isSome(noteOf(table, "delimiter"))).toBe(true)
@@ -75,7 +91,11 @@ describe("CSV", () => {
 
   it.effect("detects tabs", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("tab.csv", "tab.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("tab.csv", "tab.csv")
+      })
       expect(table.format).toEqual(CsvFormat.make({ delimiter: "\t", encoding: "utf-8" }))
       expect(table.columns.length).toBe(5)
     })
@@ -83,7 +103,11 @@ describe("CSV", () => {
 
   it.effect("keeps quoted commas, doubled quotes and line breaks, and counts rows as Excel shows them", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("quoted.csv", "quoted.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("quoted.csv", "quoted.csv")
+      })
       expect(texts(rowAt(table, 2))[1]).toBe("Angle iron 40 x 40 x 4, galvanised")
       expect(texts(rowAt(table, 3))[1]).toBe('Plate 6 mm "mild steel"')
       expect(texts(rowAt(table, 4))[4]).toBe("Two lines:\r\nkeep dry")
@@ -96,8 +120,16 @@ describe("CSV", () => {
 
   it.effect("reads LF and CRLF files to the same rows", () =>
     Effect.gen(function* () {
-      const lf = yield* readSpreadsheet({ file: textFile("SKU,Qty\nBRK-040,12\nFW-M8,3\n", "items.csv") })
-      const crlf = yield* readSpreadsheet({ file: textFile("SKU,Qty\r\nBRK-040,12\r\nFW-M8,3\r\n", "items.csv") })
+      const lf = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: textFile("SKU,Qty\nBRK-040,12\nFW-M8,3\n", "items.csv")
+      })
+      const crlf = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: textFile("SKU,Qty\r\nBRK-040,12\r\nFW-M8,3\r\n", "items.csv")
+      })
       expect(lf.rows).toEqual(crlf.rows)
       expect(lf.notes).toEqual([])
     })
@@ -105,7 +137,11 @@ describe("CSV", () => {
 
   it.effect("names duplicate and empty headers, keeps spaces, pads short rows and keeps extra cells apart", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("ragged.csv", "ragged.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("ragged.csv", "ragged.csv")
+      })
       expect(A.map(table.columns, (c) => c.label)).toEqual([
         "SKU",
         "Item",
@@ -138,7 +174,11 @@ describe("CSV", () => {
   it.effect("fails on a quote that never closes, naming the row", () =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(
-        readSpreadsheet({ file: textFile('SKU,Item\nBRK-040,"Steel bracket\nFW-M8,x\n', "items.csv") })
+        readSpreadsheet({
+          onProgress: () => {},
+          sheet: O.none(),
+          file: textFile('SKU,Item\nBRK-040,"Steel bracket\nFW-M8,x\n', "items.csv")
+        })
       )
       expect(error.kind).toBe("unreadable")
       expect(error.problem).toContain("row 2")
@@ -149,6 +189,8 @@ describe("CSV", () => {
   it.effect("keeps a quote in the middle of an unquoted field as it is", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
         file: textFile('SKU,Item\nBRK-040,Steel "bracket"\nFW-M8,x\n', "items.csv")
       })
       expect(texts(rowAt(table, 2))).toEqual(["BRK-040", 'Steel "bracket"'])
@@ -158,7 +200,11 @@ describe("CSV", () => {
 
   it.effect("cells are text or empty: a CSV has no types, and nothing is converted", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: textFile("SKU,Qty,Counted\n00123,12.50,03/04/2026\n", "items.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: textFile("SKU,Qty,Counted\n00123,12.50,03/04/2026\n", "items.csv")
+      })
       expect(rowAt(table, 2).cells).toEqual([
         { type: "text", text: "00123" },
         { type: "text", text: "12.50" },
@@ -171,7 +217,11 @@ describe("CSV", () => {
 describe("Workbook", () => {
   it.effect("picks the visible sheet with the most data, says why, and lists every sheet", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx", "sheets.xlsx") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("sheets.xlsx", "sheets.xlsx")
+      })
       if (!S.is(WorkbookFormat)(table.format)) throw new Error("expected a workbook")
       expect(A.map(table.format.sheets, (s) => [s.name, s.visibility, s.rowCount])).toEqual([
         ["Read me", "visible", 2],
@@ -193,7 +243,11 @@ describe("Workbook", () => {
 
   it.effect("reads the sheet the person chose, even a hidden one", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx", "sheets.xlsx"), sheet: "Lookup" })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        file: fixture("sheets.xlsx", "sheets.xlsx"),
+        sheet: O.some("Lookup")
+      })
       if (!S.is(WorkbookFormat)(table.format)) throw new Error("expected a workbook")
       expect(table.format.chosen).toMatchObject({ name: "Lookup", reason: "chosenByPerson" })
       expect(texts(rowAt(table, 2))).toEqual(["Each", "One piece"])
@@ -202,13 +256,15 @@ describe("Workbook", () => {
 
   it.effect("an empty sheet, if chosen, is an empty file naming the sheet", () =>
     Effect.gen(function* () {
-      const error = yield* Effect.flip(readSpreadsheet({ file: fixture("sheets.xlsx", "sheets.xlsx"), sheet: "Empty" }))
+      const error = yield* Effect.flip(
+        readSpreadsheet({ onProgress: () => {}, file: fixture("sheets.xlsx", "sheets.xlsx"), sheet: O.some("Empty") })
+      )
       expect(error.kind).toBe("empty")
       expect(error.problem).toContain('the sheet "Empty"')
     })
   )
 
-  const messy = readSpreadsheet({ file: fixture("messy.xlsx", "messy.xlsx") })
+  const messy = readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file: fixture("messy.xlsx", "messy.xlsx") })
 
   it.effect("finds the header under title rows and a merged title, and shows the title text", () =>
     Effect.gen(function* () {
@@ -238,7 +294,11 @@ describe("Workbook", () => {
 
   it.effect("reads 1904-based workbooks to the same dates", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("date-1904.xlsx", "date-1904.xlsx") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("date-1904.xlsx", "date-1904.xlsx")
+      })
       expect(rowAt(table, 2).cells[1]).toEqual({ type: "date", text: "2026-03-04" })
     })
   )
@@ -319,7 +379,11 @@ describe("Workbook", () => {
 
   it.effect("reads a workbook written by LibreOffice as well", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("libreoffice.xlsx", "libreoffice.xlsx") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("libreoffice.xlsx", "libreoffice.xlsx")
+      })
       expect(rowAt(table, 5).cells).toEqual([
         { type: "text", text: "RD-12" },
         { type: "text", text: "Round bar Ø 12 mm" },
@@ -333,7 +397,7 @@ describe("Workbook", () => {
 
 // Each failure is a FileProblem: data the screen shows, with its kind, what is wrong (naming the file) and what to do.
 describe("Failures a person can act on", () => {
-  const failure = (file: File) => Effect.flip(readSpreadsheet({ file }))
+  const failure = (file: File) => Effect.flip(readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file }))
 
   it.effect("wrong type: an old .xls says to save it as .xlsx or CSV", () =>
     Effect.gen(function* () {
@@ -350,7 +414,11 @@ describe("Failures a person can act on", () => {
       expect(error).toMatchObject({ kind: "wrongType", fileName: "letter.txt" })
       expect(error.problem).toContain("plain text")
       // A real table saved as .txt still reads.
-      const table = yield* readSpreadsheet({ file: textFile("sku,name\nBLT-0042,Bolt\nNUT-0001,Nut\n", "items.txt") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: textFile("sku,name\nBLT-0042,Bolt\nNUT-0001,Nut\n", "items.txt")
+      })
       expect(table.rows.length).toBe(2)
     })
   )
@@ -430,7 +498,11 @@ describe("Failures a person can act on", () => {
 describe("A file whose name lies about its content", () => {
   it.effect("a workbook named .csv is read as a workbook, with a note", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx", "items.csv") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("sheets.xlsx", "items.csv")
+      })
       expect(table.kind).toBe("xlsx")
       expect(O.map(noteOf(table, "wrongExtension"), (n) => n.message)).toEqual(
         O.some('The file is named ".csv" but holds an Excel workbook; it was read as .xlsx.')
@@ -440,7 +512,11 @@ describe("A file whose name lies about its content", () => {
 
   it.effect("CSV text named .xlsx is read as CSV, with a note", () =>
     Effect.gen(function* () {
-      const table = yield* readSpreadsheet({ file: fixture("utf8-bom.csv", "items.xlsx") })
+      const table = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
+        file: fixture("utf8-bom.csv", "items.xlsx")
+      })
       expect(table.kind).toBe("csv")
       expect(O.isSome(noteOf(table, "wrongExtension"))).toBe(true)
     })
@@ -451,9 +527,13 @@ describe("The sample files", () => {
   it.effect("the clean file is 25 items under the schema's own headings, the messy one 16 columns", () =>
     Effect.gen(function* () {
       const clean = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
         file: new File([bytesOf("fixtures/samples/items_clean.csv")], "items_clean.csv")
       })
       const messy = yield* readSpreadsheet({
+        onProgress: () => {},
+        sheet: O.none(),
         file: new File([bytesOf("fixtures/samples/items_messy.csv")], "items_messy.csv")
       })
       expect(clean.rows.length).toBe(25)

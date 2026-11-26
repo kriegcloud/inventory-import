@@ -2,6 +2,7 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
+import * as A from "effect/Array"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
@@ -90,8 +91,6 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
   const missing = view.mapping
     .filter((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
     .map((entry) => fieldLabels[entry.field])
-  const names =
-    missing.length < 2 ? (missing[0] ?? "") : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`
   // Not one column found by its heading or chosen: most likely another kind of file than the one this screen takes.
   const wrongFile = matched === 0 && view.mapping.length > 0
   return (
@@ -116,13 +115,22 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
           </>
         }
       />
-      {missing.length === 0 ? null : (
-        <p role="status" className="px-4 pb-2 text-sm text-destructive sm:px-9">
-          {wrongFile
-            ? `None of the columns of ${view.fileName} matches a field of an item: is this the right file? Match ${names} to review it.`
-            : `Match ${names} to a column to review: ${missing.length === 1 ? "it is" : "they are"} required.`}
-        </p>
-      )}
+      {A.match(missing, {
+        onEmpty: () => null,
+        onNonEmpty: (missing) => {
+          const names =
+            missing.length === 1
+              ? A.headNonEmpty(missing)
+              : `${A.join(A.take(missing, missing.length - 1), ", ")} and ${A.lastNonEmpty(missing)}`
+          return (
+            <p role="status" className="px-4 pb-2 text-sm text-destructive sm:px-9">
+              {wrongFile
+                ? `None of the columns of ${view.fileName} matches a field of an item: is this the right file? Match ${names} to review it.`
+                : `Match ${names} to a column to review: ${missing.length === 1 ? "it is" : "they are"} required.`}
+            </p>
+          )
+        }
+      })}
       {view.unusedColumns.length === 0 ? null : (
         <p className="px-4 pb-2 text-sm text-muted-foreground sm:px-9">
           {view.unusedColumns.map(notImportedColumn).join(" · ")}

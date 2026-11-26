@@ -19,6 +19,7 @@ describe("reading CSV text in pieces", () => {
           "\n"
         )}\n`
         const table = yield* readSpreadsheet({
+          sheet: O.none(),
           file: new File([big], "big.csv"),
           onProgress: (progress) => reports.push(progress)
         })
@@ -32,10 +33,10 @@ describe("reading CSV text in pieces", () => {
             state: UploadState.cases.Reading.make({
               fileName: "big.csv",
               rowsRead: report.rowsRead,
-              rows: rowsOf(report)
+              rows: rowsOf({ ...report, rowsAbout: O.fromNullOr(report.rowsAbout) })
             })
           })
-          O.match(O.fromNullOr(total), {
+          O.match(total, {
             onNone: () => expect(done).toBeLessThanOrEqual(Infinity),
             onSome: (total) => expect(done).toBeLessThanOrEqual(total)
           })

@@ -427,7 +427,15 @@ describe("rows that wait, kept in the browser", () => {
     // The picture the step finds goes straight to the server with the row: nothing is judged before it goes.
     const found = step(
       back.draft,
-      DraftEvent.ViewArrived({ revision: 9, decisions: { b: kept }, open: true, confirms: 0 })
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 9,
+        decisions: { b: kept },
+        open: true,
+        confirms: 0
+      })
     )
     expect(shown(found.draft)).toEqual({ a: out, b: kept })
     expect(A.filter(found.effects, DraftEffect.$is("Send"))).toEqual([
@@ -492,7 +500,15 @@ describe("a save that names what it was made on", () => {
   // The Review step is drawn, and holds revision 5.
   const held = step(
     step(emptyDraft, DraftEvent.Opened({ kept: O.none() })).draft,
-    DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: true, confirms: 0 })
+    DraftEvent.ViewArrived({
+      waiting: false,
+      matches: [],
+      takenBack: [],
+      revision: 5,
+      decisions: {},
+      open: true,
+      confirms: 0
+    })
   ).draft
 
   it("names the revision the earliest waiting row was decided on, whatever was read since", () => {
@@ -502,7 +518,18 @@ describe("a save that names what it was made on", () => {
     ])
     // The save fails; a newer picture arrives (somebody matched a column): the row is sent again as made on 5.
     const failed = step(first.draft, DraftEvent.SaveFailed({ id: first.draft.lastId })).draft
-    const newer = step(failed, DraftEvent.ViewArrived({ revision: 8, decisions: {}, open: true, confirms: 0 }))
+    const newer = step(
+      failed,
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 8,
+        decisions: {},
+        open: true,
+        confirms: 0
+      })
+    )
     expect(A.filter(newer.effects, DraftEffect.$is("Send"))).toEqual([
       DraftEffect.Send({
         id: 2,
@@ -515,7 +542,7 @@ describe("a save that names what it was made on", () => {
 
   it("takes out the accepts the server did not apply, keeps the rest of the row, and says which", () => {
     const sent = step(held, DraftEvent.Decided({ changes: { a: O.some(accept) } })).draft
-    const stale = [{ rowId: "a", field: "unitCost" }]
+    const stale = [{ rowId: "a", field: "unitCost", kind: "accept" as const }]
     const answered = step(
       sent,
       DraftEvent.SaveAnswered({ id: sent.lastId, revision: 6, changed: true, notApplied: stale, decidedSince: [] })
@@ -615,7 +642,18 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
       leftOver: O.none()
     })
     const back = step({ ...emptyDraft, onScreen: true }, DraftEvent.Opened({ kept }))
-    const arrived = step(back.draft, DraftEvent.ViewArrived({ revision: 9, decisions: {}, open: true, confirms: 1 }))
+    const arrived = step(
+      back.draft,
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 9,
+        decisions: {},
+        open: true,
+        confirms: 1
+      })
+    )
     expect(A.some(arrived.effects, DraftEffect.$is("Send"))).toBe(false)
     expect(A.filter(arrived.effects, DraftEffect.$is("Say"))).toEqual([
       DraftEffect.Say({ what: Said.Outlived({ rows: { a: O.some(out) }, beside: {}, theirs: {} }) })
@@ -625,13 +663,35 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
 })
 
 describe("what a save and a confirm name", () => {
-  const atFour = step(emptyDraft, DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 })).draft
+  const atFour = step(
+    emptyDraft,
+    DraftEvent.ViewArrived({
+      waiting: false,
+      matches: [],
+      takenBack: [],
+      revision: 4,
+      decisions: {},
+      open: true,
+      confirms: 0
+    })
+  ).draft
 
   it("names each row's own revision: a row waiting from long ago never dates a newer one", () => {
     const sent = step(atFour, DraftEvent.Decided({ changes: { a: O.some(out) } }))
     const failed = step(sent.draft, DraftEvent.SaveFailed({ id: sent.draft.lastId }))
     // A newer picture: the resend of row a goes, and fails again.
-    const resent = step(failed.draft, DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: true, confirms: 0 }))
+    const resent = step(
+      failed.draft,
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 5,
+        decisions: {},
+        open: true,
+        confirms: 0
+      })
+    )
     const again = step(resent.draft, DraftEvent.SaveFailed({ id: resent.draft.lastId }))
     // Row b goes with it, made on 5; row a keeps 4, and goes over what the server may hold of it (nothing, or the
     // leave-out sent twice).
@@ -668,7 +728,7 @@ describe("what a save and a confirm name", () => {
         id: behind.draft.lastId,
         revision: 5,
         changed: true,
-        notApplied: [{ rowId: "r", field: "unitCost" }],
+        notApplied: [{ rowId: "r", field: "unitCost", kind: "accept" as const }],
         decidedSince: []
       })
     )
@@ -684,7 +744,18 @@ describe("what a save and a confirm name", () => {
 })
 
 describe("a confirm held back (the line that says nothing was imported)", () => {
-  const atFour = step(emptyDraft, DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 })).draft
+  const atFour = step(
+    emptyDraft,
+    DraftEvent.ViewArrived({
+      waiting: false,
+      matches: [],
+      takenBack: [],
+      revision: 4,
+      decisions: {},
+      open: true,
+      confirms: 0
+    })
+  ).draft
 
   it("that waits for its save goes on the save's own picture, read before the save's answer", () => {
     const world = opened({})
@@ -706,7 +777,15 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
     // A match elsewhere (no decision changed) and then the person's row, read at 6.
     const later = step(
       waits.draft,
-      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: true, confirms: 0 })
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: { a: out },
+        open: true,
+        confirms: 0
+      })
     )
     expect(later.draft.confirm).toBe("waiting")
     const answered = step(
@@ -728,12 +807,15 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
     expect(pressed.draft.confirm).toBe("out")
     const stale = step(
       pressed.draft,
-      DraftEvent.ConfirmStale({ id: pressed.draft.lastId, accepts: [{ rowId: "r", field: "unitCost" }] })
+      DraftEvent.ConfirmStale({
+        id: pressed.draft.lastId,
+        accepts: [{ rowId: "r", field: "unitCost", kind: "accept" as const }]
+      })
     )
     // The server checked the revision before the accepts: the screen holds the picture the confirm named, so there is
     // nothing newer to read and the button is free at once (it stayed waiting for a picture nobody would bring).
     expect([stale.draft.heldBack, A.some(stale.effects, DraftEffect.$is("Ask"))]).toEqual([
-      O.some({ read: true, apart: 0, accepts: [{ rowId: "r", field: "unitCost" }] }),
+      O.some({ read: true, apart: 0, accepts: [{ rowId: "r", field: "unitCost", kind: "accept" as const }] }),
       true
     ])
     expect(step(stale.draft, DraftEvent.ConfirmPressed()).draft.confirm).not.toBe("idle")
@@ -755,7 +837,10 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
     const pressed = step(failed.draft, DraftEvent.ConfirmPressed())
     const stale = step(
       pressed.draft,
-      DraftEvent.ConfirmStale({ id: pressed.draft.lastId, accepts: [{ rowId: "r", field: "unitCost" }] })
+      DraftEvent.ConfirmStale({
+        id: pressed.draft.lastId,
+        accepts: [{ rowId: "r", field: "unitCost", kind: "accept" as const }]
+      })
     )
     // Sent again at once, without the accept.
     expect(O.map(stale.draft.flight, (flight) => R.map(flight.rows, (side) => side.decision))).toEqual(
@@ -1231,18 +1316,42 @@ describe("a save's answer that comes after its draft closed", () => {
   /** Row a left out on revision 4, its save failed and sent again (id 2), and the import closed at 6 while it was out. */
   const closedWithSaveOut = (closedHolds: SavedDecisions): ReadonlyArray<DraftEvent> => [
     DraftEvent.Opened({ kept: O.none() }),
-    DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+    DraftEvent.ViewArrived({
+      waiting: false,
+      matches: [],
+      takenBack: [],
+      revision: 4,
+      decisions: {},
+      open: true,
+      confirms: 0
+    }),
     DraftEvent.Decided({ changes: { a: O.some(out) } }),
     DraftEvent.SaveFailed({ id: 1 }),
     DraftEvent.SaveAgain(),
-    DraftEvent.ViewArrived({ revision: 6, decisions: closedHolds, open: false, confirms: 1 })
+    DraftEvent.ViewArrived({
+      waiting: false,
+      matches: [],
+      takenBack: [],
+      revision: 6,
+      decisions: closedHolds,
+      open: false,
+      confirms: 1
+    })
   ]
 
   it("does not bring her refused pick back against her own newer decision of the row, saved and answered since", () => {
     // The closed picture named row a (it held another decision): the late answer adds nothing.
     const named = played([
       ...closedWithSaveOut({ a: kept }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: {}, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: {},
+        open: true,
+        confirms: 1
+      }),
       DraftEvent.Decided({ changes: { a: O.some(acceptName) } }),
       DraftEvent.SaveAnswered({ id: 3, revision: 8, changed: true, notApplied: [], decidedSince: [] }),
       answer(2, 5, [{ rowId: "a", theirs: O.some(kept) }])
@@ -1252,7 +1361,15 @@ describe("a save's answer that comes after its draft closed", () => {
     // that is saved: what the late answer calls decided since is hers.
     const held = played([
       ...closedWithSaveOut({ a: out }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: out },
+        open: true,
+        confirms: 1
+      }),
       DraftEvent.Decided({ changes: { a: O.some(acceptName) } }),
       DraftEvent.SaveAnswered({ id: 3, revision: 8, changed: true, notApplied: [], decidedSince: [] }),
       answer(2, 8, [{ rowId: "a", theirs: O.some(acceptName) }])
@@ -1263,11 +1380,35 @@ describe("a save's answer that comes after its draft closed", () => {
   it("brings her refused pick back on the revision it was made on: a pick of it is sent with that revision", () => {
     const events = [
       DraftEvent.Opened({ kept: O.none() }),
-      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 4,
+        decisions: {},
+        open: true,
+        confirms: 0
+      }),
       DraftEvent.Decided({ changes: { a: O.some(accepted) } }),
       // Closed holding her decision, opened again, and somebody decides the row: then her save is judged.
-      DraftEvent.ViewArrived({ revision: 5, decisions: { a: accepted }, open: false, confirms: 1 }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: kept }, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 5,
+        decisions: { a: accepted },
+        open: false,
+        confirms: 1
+      }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: kept },
+        open: true,
+        confirms: 1
+      }),
       answer(1, 7, [{ rowId: "a", theirs: O.some(kept) }])
     ]
     const before = played(events)
@@ -1297,7 +1438,15 @@ describe("a save's answer that comes after its draft closed", () => {
     // Said as outlived when the import opened again, then the late answer: not offered to be sent.
     const reopened = played([
       ...closedWithSaveOut({ a: kept }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: kept }, open: true, confirms: 1 })
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: kept },
+        open: true,
+        confirms: 1
+      })
     ])
     expect(
       A.filter(reopened.effects, (effect) => DraftEffect.$is("Say")(effect) && Said.$is("Outlived")(effect.what))
@@ -1309,11 +1458,35 @@ describe("a save's answer that comes after its draft closed", () => {
   it("keeps the line of a pick refused in the reopened import while the picture the answer names is read", () => {
     const events = [
       DraftEvent.Opened({ kept: O.none() }),
-      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 4,
+        decisions: {},
+        open: true,
+        confirms: 0
+      }),
       DraftEvent.Decided({ changes: { a: O.some(out) } }),
       // Closed holding her decision, so nothing named it; opened again and held at 7.
-      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: { a: out },
+        open: false,
+        confirms: 1
+      }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: out },
+        open: true,
+        confirms: 1
+      }),
       // Her save was judged at 9: somebody had decided the row since.
       answer(1, 9, [{ rowId: "a", theirs: O.some(kept) }])
     ]
@@ -1333,7 +1506,15 @@ describe("a save's answer that comes after its draft closed", () => {
     // is older than the picture that held hers.
     const late = played([
       ...closedWithSaveOut({ a: out }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: out },
+        open: true,
+        confirms: 1
+      }),
       answer(2, 5, [{ rowId: "a", theirs: O.some(kept) }])
     ])
     expect([late.draft.lines, late.draft.unsent]).toEqual([{}, {}])
@@ -1346,11 +1527,36 @@ describe("a save's answer that comes after its draft closed", () => {
     // is on its way. The second, refused the same way, is the other side.
     const events = [
       DraftEvent.Opened({ kept: O.none() }),
-      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 4,
+        decisions: {},
+        open: true,
+        confirms: 0
+      }),
       DraftEvent.Decided({ changes: { a: O.some(out) } }),
-      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: { a: out },
+        open: false,
+        confirms: 1
+      }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: out },
+        open: true,
+        confirms: 1
+      }),
       DraftEvent.TakenUp({
+        here: false,
         kept: {
           rows: {
             a: {
@@ -1387,11 +1593,35 @@ describe("a save's answer that comes after its draft closed", () => {
     // closing. The late answer of the first adds neither a line nor a row to send.
     const waited = played([
       DraftEvent.Opened({ kept: O.none() }),
-      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 4,
+        decisions: {},
+        open: true,
+        confirms: 0
+      }),
       DraftEvent.Decided({ changes: { a: O.some(out) } }),
       DraftEvent.Decided({ changes: { a: O.some(kept) } }),
-      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
-      DraftEvent.ViewArrived({ revision: 7, decisions: { a: accepted }, open: true, confirms: 1 }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 6,
+        decisions: { a: out },
+        open: false,
+        confirms: 1
+      }),
+      DraftEvent.ViewArrived({
+        waiting: false,
+        matches: [],
+        takenBack: [],
+        revision: 7,
+        decisions: { a: accepted },
+        open: true,
+        confirms: 1
+      }),
       answer(1, 7, [{ rowId: "a", theirs: O.some(accepted) }])
     ])
     expect([waited.draft.lines, waited.draft.unsent]).toEqual([{}, {}])

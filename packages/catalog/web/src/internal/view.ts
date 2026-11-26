@@ -1,14 +1,17 @@
 // The pure part of applying an assistant's answer to a table: the view before, a change, the view after, and the patch
 // that takes back just that change. The table's own state is read and written by `useTableView`, so the sort and filter
 // menus show exactly what the assistant set: it is the same state, never a copy beside it.
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { ViewChange } from "@inventory/catalog-contract/TableView"
 import type { CatalogColumn, ColumnCatalog, ViewOperator } from "@inventory/catalog-contract/TableView"
 const Sort = S.Struct({ id: S.String, desc: S.Boolean })
 const FilterItem = S.Struct({
   id: S.String,
-  value: S.Union([S.String, S.Array(S.String)]),
-  variant: S.String,
+  value: S.Union([S.String, S.Array(S.String)]).pipe(S.withConstructorDefault(Effect.succeed(""))),
+  variant: S.String.pipe(S.withConstructorDefault(Effect.succeed("text"))),
   operator: S.String,
   filterId: S.String
 })
@@ -32,12 +35,12 @@ export type ViewState = {
 
 /** What takes one change back: each part it holds is put back as it was before the change. */
 export const Patch = S.Struct({
-  sorting: Sort.pipe(S.Array, S.optionalKey),
-  column: S.optionalKey(S.String),
-  columnFilters: FilterItem.pipe(S.Array, S.optionalKey),
-  filters: FilterItem.pipe(S.Array, S.optionalKey),
-  visibility: S.optionalKey(S.Record(S.String, S.Boolean)),
-  search: S.optionalKey(S.String)
+  sorting: Sort.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  column: S.String.pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  columnFilters: FilterItem.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  filters: FilterItem.pipe(S.Array, S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  visibility: S.Record(S.String, S.Boolean).pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
+  search: S.String.pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone))
 })
 /** The decoded value of `Patch`. */
 export type Patch = typeof Patch.Type
@@ -57,12 +60,16 @@ const operatorWords: Record<ViewOperator, string> = {
   isNotEmpty: "is set"
 }
 
-const labelOf = (columns: ColumnCatalog, id: string) => columns.find((column) => column.id === id)?.label ?? id
+const labelOf = (columns: ColumnCatalog, id: string) =>
+  O.match(
+    A.findFirst(columns, (column) => column.id === id),
+    { onNone: () => id, onSome: (column) => column.label }
+  )
 
-const valueWords = (column: CatalogColumn | undefined, values: ReadonlyArray<string>) => {
-  if (column?.type === "boolean") return values[0] === "true" ? "Yes" : "No"
-  if (values.length > 1) return `${values.slice(0, -1).join(", ")} or ${values[values.length - 1]}`
-  return values[0] ?? ""
+const valueWords = (column: O.Option<CatalogColumn>, values: ReadonlyArray<string>): O.Option<string> => {
+  if (O.exists(column, (column) => column.type === "boolean")) return O.some(values[0] === "true" ? "Yes" : "No")
+  if (values.length > 1) return O.some(`${values.slice(0, -1).join(", ")} or ${values[values.length - 1]}`)
+  return A.head(values)
 }
 
 /**
@@ -73,22 +80,24 @@ const valueWords = (column: CatalogColumn | undefined, values: ReadonlyArray<str
 export const describe = (columns: ColumnCatalog, change: ViewChange): string =>
   ViewChange.match(change, {
     sort: (change) => {
-      const column = columns.find((c) => c.id === change.column)
-      const words =
-        column?.type === "number"
-          ? change.direction === "desc"
-            ? "high to low"
-            : "low to high"
-          : change.direction === "desc"
-            ? "Z to A"
-            : "A to Z"
+      const column = A.findFirst(columns, (c) => c.id === change.column)
+      const words = O.exists(column, (column) => column.type === "number")
+        ? change.direction === "desc"
+          ? "high to low"
+          : "low to high"
+        : change.direction === "desc"
+          ? "Z to A"
+          : "A to Z"
       return `Sorted by ${labelOf(columns, change.column)}, ${words}`
     },
     filter: (change) => {
-      const column = columns.find((c) => c.id === change.column)
-      const values =
-        change.operator === "isEmpty" || change.operator === "isNotEmpty" ? "" : ` ${valueWords(column, change.values)}`
-      return `Filtered: ${labelOf(columns, change.column)} ${operatorWords[change.operator]}${values}`
+      const column = A.findFirst(columns, (c) => c.id === change.column)
+      const leading = `Filtered: ${labelOf(columns, change.column)} ${operatorWords[change.operator]}`
+      if (change.operator === "isEmpty" || change.operator === "isNotEmpty") return leading
+      return O.match(valueWords(column, change.values), {
+        onNone: () => `${leading} `,
+        onSome: (values) => `${leading} ${values}`
+      })
     },
     search: (change) => (change.text === "" ? "Stopped searching" : `Searched for “${change.text}”`),
     hide: (change) => `Hid ${labelOf(columns, change.column)}`,
@@ -115,30 +124,43 @@ export const applyChange = (input: {
   // Hiding and showing a column are one change to its visibility: the patch remembers how it stood.
   const visible = (column: string, shown: boolean): { readonly state: ViewState; readonly patch: Patch } => ({
     state: { ...state, visibility: { ...state.visibility, [column]: shown } },
-    patch: { visibility: { [column]: state.visibility[column] ?? true } }
+    patch: Patch.make({
+      visibility: O.some({
+        [column]: O.match(O.fromUndefinedOr(state.visibility[column]), { onNone: () => true, onSome: (shown) => shown })
+      })
+    })
   })
   return ViewChange.match(input.change, {
     sort: (change) => ({
       state: { ...state, sorting: [{ id: change.column, desc: change.direction === "desc" }] },
-      patch: { sorting: state.sorting }
+      patch: Patch.make({ sorting: O.some(state.sorting) })
     }),
     filter: (change) => {
-      const column = columns.find((c) => c.id === change.column)
-      const value = column?.type === "select" ? change.values : (change.values[0] ?? "")
-      const filter: ViewFilter = {
-        id: change.column,
-        value,
-        variant: column?.type ?? "text",
-        operator: change.operator,
-        filterId: `${change.column}-0`
-      }
-      const others = state.filters.filter((f) => f.id !== change.column)
+      const column = A.findFirst(columns, (c) => c.id === change.column)
+      const initial = FilterItem.make({ id: change.column, operator: change.operator, filterId: `${change.column}-0` })
+      const typed = O.match(column, {
+        onNone: () => initial,
+        onSome: (column) => FilterItem.make({ ...initial, variant: column.type })
+      })
+      const filter = O.exists(column, (column) => column.type === "select")
+        ? FilterItem.make({ ...typed, value: change.values })
+        : O.match(A.head(change.values), {
+            onNone: () => typed,
+            onSome: (value) => FilterItem.make({ ...typed, value })
+          })
+      const others = A.filter(state.filters, (f) => f.id !== change.column)
       return {
         state: { ...state, filters: [...others, filter] },
-        patch: { column: change.column, columnFilters: state.filters.filter((f) => f.id === change.column) }
+        patch: Patch.make({
+          column: O.some(change.column),
+          columnFilters: O.some(A.filter(state.filters, (f) => f.id === change.column))
+        })
       }
     },
-    search: (change) => ({ state: { ...state, search: change.text }, patch: { search: state.search } }),
+    search: (change) => ({
+      state: { ...state, search: change.text },
+      patch: Patch.make({ search: O.some(state.search) })
+    }),
     hide: (change) => visible(change.column, false),
     show: (change) => visible(change.column, true),
     clear: (change) => {
@@ -150,12 +172,12 @@ export const applyChange = (input: {
           search: all || change.what === "search" ? "" : state.search,
           visibility: all || change.what === "columns" ? opened.visibility : state.visibility
         },
-        patch: {
-          ...(all || change.what === "sorting" ? { sorting: state.sorting } : {}),
-          ...(all || change.what === "filters" ? { filters: state.filters } : {}),
-          ...(all || change.what === "search" ? { search: state.search } : {}),
-          ...(all || change.what === "columns" ? { visibility: state.visibility } : {})
-        }
+        patch: Patch.make({
+          sorting: O.liftPredicate(state.sorting, () => all || change.what === "sorting"),
+          filters: O.liftPredicate(state.filters, () => all || change.what === "filters"),
+          search: O.liftPredicate(state.search, () => all || change.what === "search"),
+          visibility: O.liftPredicate(state.visibility, () => all || change.what === "columns")
+        })
       }
     }
   })
@@ -163,14 +185,23 @@ export const applyChange = (input: {
 
 /** Puts back what one patch holds, leaving every other part of the view as it is now. */
 export const revert = (state: ViewState, patch: Patch): ViewState => ({
-  sorting: patch.sorting ?? state.sorting,
-  filters:
-    patch.filters ??
-    (patch.column === undefined
-      ? state.filters
-      : [...state.filters.filter((f) => f.id !== patch.column), ...(patch.columnFilters ?? [])]),
-  visibility: patch.visibility === undefined ? state.visibility : { ...state.visibility, ...patch.visibility },
-  search: patch.search ?? state.search
+  sorting: O.match(patch.sorting, { onNone: () => state.sorting, onSome: (sorting) => sorting }),
+  filters: O.match(patch.filters, {
+    onSome: (filters) => filters,
+    onNone: () =>
+      O.match(patch.column, {
+        onNone: () => state.filters,
+        onSome: (column) => [
+          ...A.filter(state.filters, (f) => f.id !== column),
+          ...O.match(patch.columnFilters, { onNone: A.empty, onSome: (filters) => filters })
+        ]
+      })
+  }),
+  visibility: O.match(patch.visibility, {
+    onNone: () => state.visibility,
+    onSome: (visibility) => ({ ...state.visibility, ...visibility })
+  }),
+  search: O.match(patch.search, { onNone: () => state.search, onSome: (search) => search })
 })
 
 /** Applies changes in order, returning the view after them and one patch per change. */
@@ -179,20 +210,26 @@ export const applyAll = (input: {
   readonly changes: ReadonlyArray<ViewChange>
   readonly columns: ColumnCatalog
   readonly opened: ViewState
-}): { readonly state: ViewState; readonly patches: ReadonlyArray<Patch> } => {
+}): {
+  readonly state: ViewState
+  readonly patches: ReadonlyArray<Patch>
+  readonly applied: ReadonlyArray<{ readonly change: ViewChange; readonly patch: Patch }>
+} => {
   let state = input.state
   const patches: Array<Patch> = []
+  const applied: Array<{ readonly change: ViewChange; readonly patch: Patch }> = []
   for (const change of input.changes) {
     const next = applyChange({ state, change, columns: input.columns, opened: input.opened })
     state = next.state
     patches.push(next.patch)
+    applied.push({ change, patch: next.patch })
   }
-  return { state, patches }
+  return { state, patches, applied }
 }
 
 /** Takes back several changes, the last one first, so the view ends as it was before the first. */
 export const revertAll = (state: ViewState, patches: ReadonlyArray<Patch>): ViewState =>
-  patches.reduceRight((view, patch) => revert(view, patch), state)
+  A.reduceRight(patches, state, (view, patch) => revert(view, patch))
 
 const targets: (change: ViewChange) => ReadonlyArray<string> = ViewChange.match({
   sort: () => ["sorting"],
@@ -224,7 +261,7 @@ const touches = (a: string, b: string) => {
  * @example overtaken({ kind: "sort", column: "name", direction: "asc" }, [{ kind: "sort", column: "sku", direction: "asc" }]) // true
  */
 export const overtaken = (change: ViewChange, later: ReadonlyArray<ViewChange>): boolean =>
-  later.some((next) => targets(change).some((a) => targets(next).some((b) => touches(a, b))))
+  A.some(later, (next) => A.some(targets(change), (a) => A.some(targets(next), (b) => touches(a, b))))
 
 /** A change as the conversation keeps it: what it was, what takes it back, and whether the person removed it. */
 export type Kept = { readonly change: ViewChange; readonly patch: Patch; readonly removed: boolean }
@@ -235,7 +272,7 @@ export type Kept = { readonly change: ViewChange; readonly patch: Patch; readonl
  */
 export const takeBack = (state: ViewState, kept: Kept, earlier: ReadonlyArray<Kept>): ViewState => {
   const patches: Array<Patch> = [kept.patch]
-  for (const before of [...earlier].reverse()) {
+  for (const before of A.reverse(earlier)) {
     if (!overtaken(kept.change, [before.change])) continue
     if (!before.removed) break
     patches.unshift(before.patch)

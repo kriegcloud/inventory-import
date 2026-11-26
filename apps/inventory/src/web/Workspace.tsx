@@ -187,7 +187,7 @@ function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSear
       fill
       title="Inventory import"
       sidebar={<AppSidebar current={current.path} />}
-      crumbs={<Crumbs page={current} importId={O.fromUndefinedOr(importInAddress(params).id)} />}
+      crumbs={<Crumbs page={current} importId={importInAddress(params).id} />}
     >
       <div className="flex h-full flex-col">
         {/* Whatever page is shown: what became of the person's unsaved decisions while this tab was away. */}

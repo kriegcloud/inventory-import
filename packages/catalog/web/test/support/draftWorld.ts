@@ -1227,7 +1227,7 @@ const runIn = (world: World, command: Command): void => {
           (mine) => sameDecision(mine.decision, one.value)
         )
       world.refused = A.filter(world.refused, (one) => !isOwn(one))
-      dispatchIn(world, DraftEvent.TakenUp({ kept: O.some(entry).pipe(keptForm, O.getOrThrow) }))
+      dispatchIn(world, DraftEvent.TakenUp({ here: false, kept: O.some(entry).pipe(keptForm, O.getOrThrow) }))
       // What it added to the row waited: it is sent over what it names, never as a live press.
       // (A refused one beside is a notice: this tab's own press is as it was.) Added only beside this tab's own, waiting
       // or on its way, as a side of the row's line, that press is as it was too: what waited is the side

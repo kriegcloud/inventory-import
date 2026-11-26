@@ -64,7 +64,7 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     cell: (row) =>
       row.outcome === "notImported" && row.decidedBy.kind === "person"
         ? `${row.reason} (${row.decidedBy.name})`
-        : O.getOrElse(outcomeReasonOf(row), () => "")
+        : O.match(outcomeReasonOf(row), { onNone: () => null, onSome: (reason) => reason })
   },
   {
     id: "sku",
@@ -85,7 +85,8 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     align: "right",
     // One of several items on its row says which ("8 · 2"); a row that is one item shows its number alone.
     cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: O.map(row.part, String) }),
-    sort: (row) => row.rowNumber * 1000 + O.getOrElse(row.part, () => 0)
+    sort: (row) =>
+      O.match(row.part, { onNone: () => row.rowNumber * 1000, onSome: (part) => row.rowNumber * 1000 + part })
   }
 ]
 
@@ -134,28 +135,33 @@ const filterOf = (input: {
   readonly result: ImportResult
   readonly chosen: O.Option<Filter>
 }): Filter =>
-  O.getOrElse(input.chosen, () =>
-    input.view.status === "takenBack" ? "takenBack" : input.result.notImported > 0 ? "notImported" : "all"
-  )
-
-const noResultRows: ImportResult["rows"] = []
+  O.match(input.chosen, {
+    onSome: (chosen) => chosen,
+    onNone: () =>
+      input.view.status === "takenBack" ? "takenBack" : input.result.notImported > 0 ? "notImported" : "all"
+  })
 
 /**
  * One import as the server last answered it, not the read itself: the read is a new object when it starts asking
  * again and another when it has answered (every return to the tab asks again), and the rows would be filtered, and
  * the table worked out, for each. From the answer they are worked out once per answer.
  */
-const viewAnswer = perKey((id: ImportId) => answerOf(importView(id)))
+const viewAnswer = perKey((id: ImportId) => Atom.map(answerOf(importView(id)), O.fromUndefinedOr))
 
 /** The rows the view on screen shows: the same rows while the result and the view are the same, so the table keeps its state. */
 export const shownRows = perKey((id: ImportId) =>
-  Atom.readable((get): ImportResult["rows"] => {
-    const view = get(viewAnswer(id))
-    if (view === undefined || O.isNone(view.result)) return noResultRows
-    const result = view.result.value
-    const filter = filterOf({ view, result, chosen: get(chosenFilter(id)) })
-    return A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
-  })
+  Atom.readable((get): ImportResult["rows"] =>
+    O.match(
+      O.flatMap(get(viewAnswer(id)), (view) => O.map(view.result, (result) => ({ view, result }))),
+      {
+        onNone: A.empty,
+        onSome: ({ view, result }) => {
+          const filter = filterOf({ view, result, chosen: get(chosenFilter(id)) })
+          return A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
+        }
+      }
+    )
+  )
 )
 
 /**
@@ -218,7 +224,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
 
   const { removable, restorable, changed, changedCount, kept, keptCount, confirms } = view.takeBack
   const takenBack = view.status === "takenBack"
-  const lastTakeBack = O.getOrUndefined(A.findLast(view.history, ImportEvent.guards.TakenBack))
+  const lastTakeBack = A.findLast(view.history, ImportEvent.guards.TakenBack)
   // A take-back is possible while a confirm is in force and one of its items is as it created or replaced it.
   const canTakeBack = props.canImport && !takenBack && confirms.length > 0 && (removable > 0 || restorable > 0)
   const noLonger = !takenBack && confirms.length > 0 && removable === 0 && restorable === 0 && changedCount > 0
@@ -229,11 +235,15 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
       ? []
       : [`puts back the ${items(restorable)} it replaced as ${restorable === 1 ? "it was" : "they were"} before`])
   ].join(" and ")
-  const replaced = result.updated
-  const putsBack =
-    takenBack || replaced === 0
-      ? null
-      : `A take-back puts back the ${items(replaced)} this import replaced as ${replaced === 1 ? "it was" : "they were"} before, unless changed since.`
+  const putsBack = O.map(
+    O.liftPredicate((replaced: number) => !takenBack && replaced > 0)(result.updated),
+    (replaced) =>
+      `A take-back puts back the ${items(replaced)} this import replaced as ${replaced === 1 ? "it was" : "they were"} before, unless changed since.`
+  )
+  const omitted = [
+    ...O.match(putsBack, { onNone: A.empty, onSome: (line) => [line] }),
+    ...A.map(view.unusedColumns, notImportedColumn)
+  ]
 
   const downloadButton =
     result.notImported === 0 ? null : (
@@ -300,12 +310,15 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
     <div className="flex h-full flex-col">
       <PageHeader
         title={takenBack ? `Took back ${view.fileName}` : `Imported ${view.fileName}`}
-        line={
-          takenBack && lastTakeBack !== undefined
-            ? `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack.removed)}${lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`
-            : // What the form-only rules changed without the person, counted from what the confirms stored.
+        line={O.match(
+          O.filter(lastTakeBack, () => takenBack),
+          {
+            onSome: (lastTakeBack) =>
+              `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack.removed)}${lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`,
+            onNone: () =>
               `${result.importedBy} · ${when(result.importedAt)}${result.fixed.cells === 0 ? "" : ` · ${result.fixed.cells} values fixed for you in ${result.fixed.rows} ${result.fixed.rows === 1 ? "row" : "rows"}`}`
-        }
+          }
+        )}
         actions={
           takenBack ? (
             <>
@@ -390,10 +403,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           </Alert>
         </div>
       ) : null}
-      {putsBack === null && view.unusedColumns.length === 0 ? null : (
-        <p className="px-4 pb-2 text-sm text-muted-foreground sm:px-9">
-          {[...(putsBack === null ? [] : [putsBack]), ...view.unusedColumns.map(notImportedColumn)].join(" · ")}
-        </p>
+      {omitted.length === 0 ? null : (
+        <p className="px-4 pb-2 text-sm text-muted-foreground sm:px-9">{A.join(omitted, " · ")}</p>
       )}
       {view.history.length > 1 ? (
         <ol

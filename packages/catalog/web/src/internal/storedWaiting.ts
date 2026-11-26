@@ -2,6 +2,7 @@
 // break: what a reload reads back is what the draft kept, every side of every line and what each may be written over
 // included; and what an older page of the app kept still reads, so nothing it kept is lost.
 import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
 import { dual, identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
@@ -9,7 +10,7 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { emptyWhenLeftOut } from "@inventory/kernel/Wire"
 import { RowDecision } from "@inventory/catalog-contract/Decision"
-import type { Line, Side, Waiting } from "../Draft.machine.ts"
+import { Named, Side, type Line, type Waiting } from "../Draft.machine.ts"
 
 const StoredDecision = S.OptionFromNullOr(RowDecision)
 
@@ -66,16 +67,16 @@ const OlderHeld = S.Struct({
  * for all of them or one each (`madeOn`), the values seen apart, and the rows on hold (`held`).
  */
 export const StoredWaiting = S.Struct({
-  waits: S.Record(S.String, StoredSide).pipe(S.optionalKey),
-  lines: S.Record(S.String, StoredLine).pipe(S.optionalKey),
-  confirms: S.Int.pipe(S.NullOr, S.optionalKey),
+  waits: S.Record(S.String, StoredSide).pipe(S.OptionFromOptionalKey),
+  lines: S.Record(S.String, StoredLine).pipe(S.OptionFromOptionalKey),
+  confirms: S.Int.pipe(S.OptionFromNullOr, S.OptionFromOptionalKey),
   leftOver: S.Boolean,
   rows: S.Record(S.String, StoredDecision),
-  beside: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
-  theirs: S.Record(S.String, StoredDecision).pipe(S.optionalKey),
+  beside: S.Record(S.String, StoredSeveral).pipe(S.OptionFromOptionalKey),
+  theirs: S.Record(S.String, StoredDecision).pipe(S.OptionFromOptionalKey),
   madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
-  seen: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
-  held: S.Record(S.String, OlderHeld).pipe(S.optionalKey),
+  seen: S.Record(S.String, StoredSeveral).pipe(S.OptionFromOptionalKey),
+  held: S.Record(S.String, OlderHeld).pipe(S.OptionFromOptionalKey),
   fileName: S.OptionFromOptionalKey(S.String)
 })
   .pipe(S.OptionFromNullOr)
@@ -99,24 +100,28 @@ const sideTo = ({ dates, decision, here, madeOn, overtaken, refused, seen }: Sid
   refused
 })
 
-/** A decision an older page kept; where it kept no values seen, the server may hold nothing of the row. */
+/** A side kept before every row carried a revision: the unchanged legacy revision zero lives here. */
+const LegacySide = S.Struct({
+  ...Side.fields,
+  madeOn: Side.fields.madeOn.pipe(S.withConstructorDefault(Effect.succeed(0)))
+}).annotate({ description: "A legacy side, whose missing row revision was read as zero" })
+
+/** A decision an older page kept, with its legacy starting values owned by the side's fields. */
 const olderSide = (parts: {
   readonly decision: Side["decision"]
-  readonly madeOn: number
+  readonly madeOn: O.Option<number>
   readonly seen: O.Option<Side["seen"]>
   readonly here: boolean
   readonly overtaken: boolean
   readonly refused: O.Option<string>
-}): Side => ({
-  decision: parts.decision,
-  madeOn: parts.madeOn,
-  dates: {},
-  seen: O.getOrElse(parts.seen, (): Side["seen"] => [O.none()]),
-  live: false,
-  here: parts.here,
-  overtaken: parts.overtaken,
-  refused: parts.refused
-})
+}): Side => {
+  const { madeOn, seen, ...rest } = parts
+  const initial = O.match(madeOn, {
+    onNone: () => LegacySide.make(rest),
+    onSome: (madeOn) => Side.make({ ...rest, madeOn })
+  })
+  return O.match(seen, { onNone: () => initial, onSome: (seen) => Side.make({ ...initial, seen }) })
+}
 
 /**
  * One row on hold as an older page kept it, as its line. A gone tab's decision held beside this tab's own is told by
@@ -131,14 +136,21 @@ const olderLine = (input: {
 }): Line => {
   const { held, seen, waits } = input
   const closed = A.map(O.match(held.closed, { onNone: A.empty, onSome: identity }), (one) =>
-    olderSide({ ...one, here: false, overtaken: false })
+    olderSide({ ...one, madeOn: O.some(one.madeOn), here: false, overtaken: false })
   )
   const own = (parts: { readonly overtaken: boolean; readonly refused: O.Option<string> }): ReadonlyArray<Side> => [
-    olderSide({ decision: held.mine, madeOn: held.madeOn, seen, here: true, ...parts }),
+    olderSide({ decision: held.mine, madeOn: O.some(held.madeOn), seen, here: true, ...parts }),
     ...closed
   ]
   const gone = (refused: O.Option<string>): ReadonlyArray<Side> => [
-    olderSide({ decision: held.mine, madeOn: held.madeOn, seen: O.none(), here: false, overtaken: false, refused }),
+    olderSide({
+      decision: held.mine,
+      madeOn: O.some(held.madeOn),
+      seen: O.none(),
+      here: false,
+      overtaken: false,
+      refused
+    }),
     ...closed
   ]
   return OlderHold.match(held.why, {
@@ -158,36 +170,49 @@ const olderLine = (input: {
 /** The draft's waiting rows from what this browser kept. */
 export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
   O.map(stored, (entry): Waiting => {
-    const confirms = O.fromNullishOr(entry.confirms)
+    const confirms = O.flatten(entry.confirms)
     if (entry.leftOver) {
-      const named = { rows: entry.rows, beside: entry.beside ?? {}, theirs: entry.theirs ?? {} }
-      return { rows: {}, lines: {}, confirms, leftOver: O.some(named) }
+      const named = O.match(entry.beside, {
+        onNone: () => Named.make({ rows: entry.rows }),
+        onSome: (beside) => Named.make({ rows: entry.rows, beside })
+      })
+      const all = O.match(entry.theirs, { onNone: () => named, onSome: (theirs) => ({ ...named, theirs }) })
+      return { rows: {}, lines: {}, confirms, leftOver: O.some(all) }
     }
     const made = entry.madeOn
-    const seenOf = (rowId: string): O.Option<Side["seen"]> => R.get(entry.seen ?? {}, rowId)
+    const seenOf = (rowId: string): O.Option<Side["seen"]> => O.flatMap(entry.seen, (seen) => R.get(seen, rowId))
     const older = R.map(entry.rows, (decision, rowId) =>
       olderSide({
         decision,
-        madeOn: P.isNumber(made) ? made : O.getOrElse(R.get(made, rowId), () => 0),
+        madeOn: P.isNumber(made) ? O.some(made) : R.get(made, rowId),
         seen: seenOf(rowId),
         here: true,
         overtaken: false,
         refused: O.none()
       })
     )
-    const olderLines = R.map(entry.held ?? {}, (held, rowId) =>
-      olderLine({ held, seen: seenOf(rowId), waits: R.has(older, rowId) })
-    )
-    const lines = R.map(entry.lines ?? {}, (line): Line => ({
-      sides: A.map(line.sides, sideFrom),
-      theirs: line.theirs
-    }))
-    return {
-      rows: { ...older, ...R.map(entry.waits ?? {}, sideFrom) },
-      lines: { ...olderLines, ...lines },
-      confirms,
-      leftOver: O.none()
-    }
+    const initial: Waiting = { rows: older, lines: {}, confirms, leftOver: O.none() }
+    const withHeld = O.match(entry.held, {
+      onNone: () => initial,
+      onSome: (held) => ({
+        ...initial,
+        lines: R.map(held, (held, rowId) => olderLine({ held, seen: seenOf(rowId), waits: R.has(older, rowId) }))
+      })
+    })
+    const withLines = O.match(entry.lines, {
+      onNone: () => withHeld,
+      onSome: (lines) => ({
+        ...withHeld,
+        lines: {
+          ...withHeld.lines,
+          ...R.map(lines, (line): Line => ({ sides: A.map(line.sides, sideFrom), theirs: line.theirs }))
+        }
+      })
+    })
+    return O.match(entry.waits, {
+      onNone: () => withLines,
+      onSome: (waits) => ({ ...withLines, rows: { ...withLines.rows, ...R.map(waits, sideFrom) } })
+    })
   })
 
 /** The name of the import's file, as it was kept with the rows: none where an older page kept them. */
@@ -200,18 +225,31 @@ export const toStored: {
 } = dual(2, (waits: O.Option<Waiting>, fileName: O.Option<string>): StoredWaiting =>
   O.map(waits, (entry) => ({
     fileName,
-    confirms: O.getOrNull(entry.confirms),
+    confirms: O.some(entry.confirms),
+    seen: O.none(),
+    held: O.none(),
     madeOn: {},
     ...O.match(entry.leftOver, {
-      onSome: (named) => ({ leftOver: true, ...named }),
+      onSome: (named) => ({
+        leftOver: true,
+        rows: named.rows,
+        beside: O.some(named.beside),
+        theirs: O.some(named.theirs),
+        waits: O.none(),
+        lines: O.none()
+      }),
       onNone: () => ({
         leftOver: false,
         rows: {},
-        waits: R.map(entry.rows, sideTo),
-        lines: R.map(entry.lines, (line) => ({
-          sides: A.map(line.sides, sideTo),
-          theirs: line.theirs
-        }))
+        beside: O.none(),
+        theirs: O.none(),
+        waits: O.some(R.map(entry.rows, sideTo)),
+        lines: O.some(
+          R.map(entry.lines, (line) => ({
+            sides: A.map(line.sides, sideTo),
+            theirs: line.theirs
+          }))
+        )
       })
     })
   }))

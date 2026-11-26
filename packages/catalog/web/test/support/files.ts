@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // The sample files as the browser would hold them after the person chose them, and staged as the upload stages
 // them. The files are this package's copies of the app's `public/samples`; a test in the app holds the copies to the
 // originals, byte for byte.
@@ -17,7 +18,7 @@ export const textFile = (text: string): File => new File([text], "items.csv")
 
 /** A file read and staged as the upload does it: what the server would hold. */
 export const stage = (file: File): Effect.Effect<StagedTable> =>
-  readSpreadsheet({ file }).pipe(
+  readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file }).pipe(
     Effect.map((table) => stageTable({ table })),
     Effect.orDie
   )

@@ -27,7 +27,8 @@ import {
   type Side
 } from "../Draft.machine.ts"
 
-const label = (field: string): string => O.getOrElse(R.get<string, string>(fieldLabels, field), () => field)
+const label = (field: string): string =>
+  O.match(R.get<string, string>(fieldLabels, field), { onNone: () => field, onSome: identity })
 
 /**
  * One decision as the person made it: "left out", "accepted the proposal for Unit cost", "typed Name: Steel Tube".
@@ -91,8 +92,11 @@ const sideWords = (side: Side): string =>
 /** A decision the server did not refuse: it can be sent. */
 const isGood = (side: Side): boolean => O.isNone(side.refused)
 
+type RefusedSide = Side & { readonly refused: O.Some<string> }
+const isRefused = (side: Side): side is RefusedSide => O.isSome(side.refused)
+
 /** The words of a line with nothing but refused decisions: there is nothing to pick between. */
-const refusedWords = (sides: ReadonlyArray<Side>): string =>
+const refusedWords = (sides: ReadonlyArray<RefusedSide>): string =>
   A.match(sides, {
     onEmpty: () => "",
     onNonEmpty: ([one, ...others]) =>
@@ -101,7 +105,7 @@ const refusedWords = (sides: ReadonlyArray<Side>): string =>
             A.map(sides, (side) => ` ${side.here ? "This tab" : "Your closed tab"}: ${sideWords(side)}.`),
             ""
           )
-        : ` ${one.here ? "you" : "in a closed tab you"} ${mineWords(one.decision)}. Not saved: ${O.getOrElse(one.refused, () => "")}`
+        : ` ${one.here ? "you" : "in a closed tab you"} ${mineWords(one.decision)}. Not saved: ${one.refused.value}`
   })
 
 /**
@@ -123,9 +127,10 @@ export const lineWords = (input: {
   const row = rowLabel(rowId)
   const { going, since, sides, theirs } = line
   const waits = O.isSome(going) ? " What to keep can be picked once this tab's decision of it is saved." : ""
-  if (!A.some(sides, isGood)) {
+  const refused = A.filter(sides, isRefused)
+  if (refused.length === sides.length) {
     return {
-      text: `${row}:${refusedWords(sides)}${waits}`,
+      text: `${row}:${refusedWords(refused)}${waits}`,
       actions: O.isSome(going) ? [] : [{ keep: Keep.Theirs(), label: "Dismiss" }]
     }
   }
@@ -344,14 +349,15 @@ export const takeBackWords = (taken: MatchTakeBack): string => {
   }
   const numbers = A.map(A.take(taken.rows, rowsNamedInLine), (id) => Str.replace(/^row-/, "")(id))
   const more = taken.count - numbers.length
-  const listed =
-    numbers.length === 0
-      ? ""
-      : more > 0
+  const listed = A.match(numbers, {
+    onEmpty: () => "",
+    onNonEmpty: (numbers) =>
+      more > 0
         ? `${A.join(numbers, ", ")} and ${more} more`
         : numbers.length === 1
           ? A.join(numbers, "")
-          : `${A.join(A.take(numbers, numbers.length - 1), ", ")} and ${numbers[numbers.length - 1] ?? ""}`
+          : `${A.join(A.take(numbers, numbers.length - 1), ", ")} and ${A.lastNonEmpty(numbers)}`
+  })
   const where = numbers.length === 0 ? "" : `, on ${one ? "row" : "rows"} ${listed}`
   return `${matchWords(taken)}: ${taken.count} ${kinds[taken.kind]} taken back${where}.`
 }

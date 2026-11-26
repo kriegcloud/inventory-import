@@ -1,5 +1,9 @@
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as Str from "effect/String"
+import * as R from "effect/Record"
+import * as Num from "effect/Number"
+import * as Order from "effect/Order"
 import { type Column, createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
 import { type ComponentType, lazy, Suspense } from "react"
@@ -88,22 +92,22 @@ const whole = new Intl.NumberFormat()
 // Pixels, in the order the columns stand. The last number is the column's place in the queue to step aside when the
 // page is short of room (lowest first); a column without one always shows.
 const widths = {
-  name: [200],
-  sku: [104],
-  category: [136],
-  uom: [84],
-  unitCost: [104],
-  quantityOnHand: [136],
-  reorderPoint: [116, 7],
-  isActive: [76, 8],
-  lotTracked: [100, 5],
-  tags: [150, 3],
-  firstReceivedOn: [124, 6],
-  discontinuedOn: [124, 4],
-  dimensions: [176, 2],
-  vendors: [232, 9],
-  createdAt: [180, 1]
-} as const satisfies Record<string, readonly [number, number?]>
+  name: [200, O.none()],
+  sku: [104, O.none()],
+  category: [136, O.none()],
+  uom: [84, O.none()],
+  unitCost: [104, O.none()],
+  quantityOnHand: [136, O.none()],
+  reorderPoint: [116, O.some(7)],
+  isActive: [76, O.some(8)],
+  lotTracked: [100, O.some(5)],
+  tags: [150, O.some(3)],
+  firstReceivedOn: [124, O.some(6)],
+  discontinuedOn: [124, O.some(4)],
+  dimensions: [176, O.some(2)],
+  vendors: [232, O.some(9)],
+  createdAt: [180, O.some(1)]
+} as const satisfies Record<string, readonly [number, O.Option<number>]>
 type ColumnId = keyof typeof widths
 const columnIds = Object.keys(widths) as ReadonlyArray<ColumnId>
 const editWidth = 48
@@ -115,11 +119,12 @@ const aroundTable = 74
  * one by one until the rest do, so the table opens without a sideways scroll. "View" brings any of them back.
  */
 const fitting = (room: number): Partial<Record<ColumnId, boolean>> => {
-  let needed = aroundTable + editWidth + columnIds.reduce((sum, id) => sum + widths[id][0], 0)
+  let needed = aroundTable + editWidth + A.reduce(columnIds, 0, (sum, id) => sum + widths[id][0])
   const shown: Partial<Record<ColumnId, boolean>> = {}
-  const queue = columnIds
-    .filter((id) => widths[id].length === 2)
-    .sort((a, b) => (widths[a][1] ?? 0) - (widths[b][1] ?? 0))
+  const queue = A.sort(
+    A.filter(columnIds, (id) => O.isSome(widths[id][1])),
+    Order.mapInput(O.makeOrder(Num.Order), (id: ColumnId) => widths[id][1])
+  )
   for (const id of queue) {
     shown[id] = needed <= room
     if (needed > room) needed -= widths[id][0]
@@ -173,35 +178,79 @@ const col = createColumnHelper<DataTableFeatures, StoredItem>()
 const catalogColumn = (
   id: string,
   label: string,
-  type: CatalogColumn["type"] | null,
-  options: { readonly sortable?: boolean; readonly hideable?: boolean; readonly values?: ReadonlyArray<string> } = {}
+  type: CatalogColumn["type"],
+  options: {
+    readonly sortable: boolean
+    readonly hideable: boolean
+    readonly filterable: boolean
+    readonly values: ReadonlyArray<string>
+  }
 ): CatalogColumn => ({
   id,
   label,
-  type: type ?? "text",
-  sortable: options.sortable ?? true,
-  hideable: options.hideable ?? true,
-  operators: type === null ? [] : operatorsFor[type],
-  values: options.values ?? []
+  type,
+  sortable: options.sortable,
+  hideable: options.hideable,
+  operators: options.filterable ? operatorsFor[type] : [],
+  values: options.values
 })
-type Listed = ReadonlyArray<{ readonly value: string }> | undefined
-const valuesOf = (listed: Listed) => (listed ?? []).map((entry) => entry.value).slice(0, 100)
-const itemsCatalog = (facets: { readonly category: Listed; readonly uom: Listed } | undefined): ColumnCatalog => [
-  catalogColumn("name", "Name", "text", { hideable: false }),
-  catalogColumn("sku", "SKU", "text"),
-  catalogColumn("category", "Category", "select", { values: valuesOf(facets?.category) }),
-  catalogColumn("uom", "UoM", "select", { values: valuesOf(facets?.uom) }),
-  catalogColumn("unitCost", "Unit cost", "number"),
-  catalogColumn("quantityOnHand", "Qty on hand", "number"),
-  catalogColumn("reorderPoint", "Reorder point", null),
-  catalogColumn("isActive", "Active", null, { sortable: false }),
-  catalogColumn("lotTracked", "Lot tracked", null, { sortable: false }),
-  catalogColumn("tags", "Tags", null, { sortable: false }),
-  catalogColumn("firstReceivedOn", "First received", null),
-  catalogColumn("discontinuedOn", "Discontinued", null, { sortable: false }),
-  catalogColumn("dimensions", "Dimensions", null, { sortable: false }),
-  catalogColumn("vendors", "Vendors", null, { sortable: false }),
-  catalogColumn("createdAt", "Added", null)
+type Listed = O.Option<ReadonlyArray<{ readonly value: string }>>
+const valuesOf = (listed: Listed) =>
+  A.take(
+    A.map(O.match(listed, { onNone: A.empty, onSome: (entries) => entries }), (entry) => entry.value),
+    100
+  )
+const itemsCatalog = (facets: Found): ColumnCatalog => [
+  catalogColumn("name", "Name", "text", { sortable: true, hideable: false, filterable: true, values: [] }),
+  catalogColumn("sku", "SKU", "text", { sortable: true, hideable: true, filterable: true, values: [] }),
+  catalogColumn("category", "Category", "select", {
+    sortable: true,
+    hideable: true,
+    filterable: true,
+    values: valuesOf(O.map(facets, (found) => found.category))
+  }),
+  catalogColumn("uom", "UoM", "select", {
+    sortable: true,
+    hideable: true,
+    filterable: true,
+    values: valuesOf(O.map(facets, (found) => found.uom))
+  }),
+  catalogColumn("unitCost", "Unit cost", "number", { sortable: true, hideable: true, filterable: true, values: [] }),
+  catalogColumn("quantityOnHand", "Qty on hand", "number", {
+    sortable: true,
+    hideable: true,
+    filterable: true,
+    values: []
+  }),
+  catalogColumn("reorderPoint", "Reorder point", "text", {
+    sortable: true,
+    hideable: true,
+    filterable: false,
+    values: []
+  }),
+  catalogColumn("isActive", "Active", "text", { sortable: false, hideable: true, filterable: false, values: [] }),
+  catalogColumn("lotTracked", "Lot tracked", "text", {
+    sortable: false,
+    hideable: true,
+    filterable: false,
+    values: []
+  }),
+  catalogColumn("tags", "Tags", "text", { sortable: false, hideable: true, filterable: false, values: [] }),
+  catalogColumn("firstReceivedOn", "First received", "text", {
+    sortable: true,
+    hideable: true,
+    filterable: false,
+    values: []
+  }),
+  catalogColumn("discontinuedOn", "Discontinued", "text", {
+    sortable: false,
+    hideable: true,
+    filterable: false,
+    values: []
+  }),
+  catalogColumn("dimensions", "Dimensions", "text", { sortable: false, hideable: true, filterable: false, values: [] }),
+  catalogColumn("vendors", "Vendors", "text", { sortable: false, hideable: true, filterable: false, values: [] }),
+  catalogColumn("createdAt", "Added", "text", { sortable: true, hideable: true, filterable: false, values: [] })
 ]
 
 const labels: Record<ColumnId, string> = {
@@ -223,22 +272,22 @@ const labels: Record<ColumnId, string> = {
 }
 
 const skeletonColumns = columnIds
-  .filter((id) => widths[id].length === 1 || id === "reorderPoint" || id === "isActive" || id === "vendors")
+  .filter((id) => O.isNone(widths[id][1]) || id === "reorderPoint" || id === "isActive" || id === "vendors")
   .map((id) => ({ id, label: labels[id], width: widths[id][0] }))
-
-const none: ReadonlyArray<StoredItem> = []
 
 const yesNo = (value: boolean) => (value ? "Yes" : "No")
 /** A number of a range filter's ends, from the lowest and highest value there is. */
 const range = (
-  found: { readonly min: O.Option<number>; readonly max: O.Option<number> } | undefined
-): { readonly min?: number; readonly max?: number } =>
-  found === undefined
-    ? {}
-    : O.match(found.min, {
-        onNone: () => ({}),
-        onSome: (min) => ({ min: Math.floor(min), max: Math.ceil(O.getOrElse(found.max, () => min)) })
-      })
+  found: O.Option<{ readonly min: O.Option<number>; readonly max: O.Option<number> }>
+): { readonly min?: number; readonly max?: number } => {
+  const bounds = O.flatMap(found, (range) =>
+    O.map(range.min, (min) => ({
+      min: Math.floor(min),
+      max: Math.ceil(O.match(range.max, { onNone: () => min, onSome: (max) => max }))
+    }))
+  )
+  return R.getSomes({ min: O.map(bounds, (bounds) => bounds.min), max: O.map(bounds, (bounds) => bounds.max) })
+}
 
 // Every cell and heading of the table is a component made once, here: the table hands each the row or the column it
 // draws, so an answer that changes what the filters offer gives React the very same components, and it keeps what they
@@ -413,9 +462,10 @@ const buildColumns = (canImport: boolean) => {
       meta: { label: labels.firstReceivedOn },
       size: widths.firstReceivedOn[0]
     }),
-    col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
+    col.accessor((item) => discontinuedOn(item.stocking), {
       id: "discontinuedOn",
       header: labels.discontinuedOn,
+      sortFn: (a, b, id) => O.makeOrder(Str.Order)(a.getValue<O.Option<string>>(id), b.getValue<O.Option<string>>(id)),
       cell: DiscontinuedCell,
       meta: { label: labels.discontinuedOn },
       size: widths.discontinuedOn[0]
@@ -458,7 +508,7 @@ const itemsQuestion = Atom.readable((get) => {
   const { path, params } = get(location)
   const held = get.self<ItemsQuestion>()
   if (path !== "/items" && O.isSome(held)) return held.value
-  const searching = (params.get(itemsTable.urlKeys.search) ?? "").trim() !== ""
+  const searching = O.exists(O.fromNullOr(params.get(itemsTable.urlKeys.search)), (search) => /\S/.test(search))
   const config = searching ? searchedTable : itemsTable
   return { searching, config, query: config.parse(params.toString()) }
 })
@@ -473,15 +523,18 @@ type ItemsQuestion = {
  * page past the last goes to the last, instead of "Page 999 of 8" over an empty table. Said in the address, so the
  * table and the question agree; done where the answer is read, never after a render.
  */
-const correctAddress = (asked: ItemsQuestion["query"], pageCount: number | undefined) => {
+const correctAddress = (asked: ItemsQuestion["query"], pageCount: O.Option<number>) => {
   if (window.location.pathname !== "/items") return
   const next = new URLSearchParams(window.location.search)
   const before = next.toString()
   if (!itemPageSizes.some((size) => size === asked.perPage)) next.delete("perPage")
-  if (pageCount !== undefined && asked.page > Math.max(1, pageCount)) {
-    if (pageCount <= 1) next.delete("page")
-    else next.set("page", `${pageCount}`)
-  }
+  O.map(
+    O.filter(pageCount, (pageCount) => asked.page > Math.max(1, pageCount)),
+    (pageCount) => {
+      if (pageCount <= 1) next.delete("page")
+      else next.set("page", `${pageCount}`)
+    }
+  )
   const after = next.toString()
   if (after !== before) navigate(`${window.location.pathname}${after === "" ? "" : `?${after}`}`, { replace: true })
 }
@@ -495,7 +548,7 @@ export const itemsPage = shown(
   catalogApi.query(
     (api, get) => {
       const asked = get(itemsQuestion).query
-      return Effect.sync(() => correctAddress(asked, undefined)).pipe(
+      return Effect.sync(() => correctAddress(asked, O.none())).pipe(
         Effect.andThen(
           api.items.page({
             query: {
@@ -508,7 +561,7 @@ export const itemsPage = shown(
             }
           })
         ),
-        Effect.tap((answer) => Effect.sync(() => correctAddress(asked, answer.pageCount)))
+        Effect.tap((answer) => Effect.sync(() => correctAddress(asked, O.some(answer.pageCount))))
       )
     },
     { keep: "unwatched", reactivityKeys: O.some(catalogKeys.items) }
@@ -521,20 +574,24 @@ export const itemFacets = catalogApi.query((api) => api.items.facets(), {
   reactivityKeys: O.some(catalogKeys.itemFacets)
 })
 
-type Found = Atom.Success<typeof itemFacets> | undefined
+type Found = O.Option<Atom.Success<typeof itemFacets>>
 
 /**
  * The filters' values alone: the same object while the server answers the same, however often it is asked. The
  * columns are built from this and not from the read, which changes twice every time it is asked again.
  */
-const itemFacetValues = answerOf(itemFacets)
+const itemFacetValues = Atom.map(answerOf(itemFacets), O.fromUndefinedOr)
 
-type Counted = ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined
+type Counted = O.Option<ReadonlyArray<{ readonly value: string; readonly count: number }>>
 const options = (listed: Counted) =>
-  (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
+  A.map(O.match(listed, { onNone: A.empty, onSome: (entries) => entries }), (entry) => ({
+    label: entry.value,
+    value: entry.value,
+    count: entry.count
+  }))
 // A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
 const flagOptions = (listed: Counted) =>
-  (listed ?? []).map((entry) => ({
+  A.map(O.match(listed, { onNone: A.empty, onSome: (entries) => entries }), (entry) => ({
     label: entry.value === "true" ? "Yes" : "No",
     value: entry.value,
     count: entry.count
@@ -547,18 +604,21 @@ const flagOptions = (listed: Counted) =>
  * is the column made once with another meta: its cell, its heading and its pencil are the same components.
  */
 const withFilterValues = (columns: typeof editorColumns, found: Found): typeof editorColumns => {
-  const values: Partial<Record<string, object>> = {
-    category: { options: options(found?.category) },
-    uom: { options: options(found?.uom) },
-    isActive: { options: flagOptions(found?.isActive) },
-    lotTracked: { options: flagOptions(found?.lotTracked) },
+  const values: Readonly<Record<string, object>> = {
+    category: { options: options(O.map(found, (facets) => facets.category)) },
+    uom: { options: options(O.map(found, (facets) => facets.uom)) },
+    isActive: { options: flagOptions(O.map(found, (facets) => facets.isActive)) },
+    lotTracked: { options: flagOptions(O.map(found, (facets) => facets.lotTracked)) },
     // A range in whole numbers, wide enough to hold the lowest and the highest value there is.
-    unitCost: range(found?.unitCost),
-    quantityOnHand: range(found?.quantityOnHand)
+    unitCost: range(O.map(found, (facets) => facets.unitCost)),
+    quantityOnHand: range(O.map(found, (facets) => facets.quantityOnHand))
   }
   return A.map(columns, (column) => {
-    const extra = column.id === undefined ? undefined : values[column.id]
-    return extra === undefined ? column : { ...column, meta: { ...column.meta, ...extra } }
+    const extra = O.flatMap(O.fromUndefinedOr(column.id), (id) => R.get<string, object>(values, id))
+    return O.match(extra, {
+      onNone: () => column,
+      onSome: (extra) => ({ ...column, meta: { ...column.meta, ...extra } })
+    })
   }) as typeof editorColumns
 }
 
@@ -573,7 +633,10 @@ export const itemColumns = perKey((canImport: boolean) =>
 /** What the two toolbar filters offer, Category and UoM: the organization's values with how many items have each. */
 export const quickFilterOptions = Atom.readable((get) => {
   const found = get(itemFacetValues)
-  return { category: options(found?.category), uom: options(found?.uom) }
+  return {
+    category: options(O.map(found, (facets) => facets.category)),
+    uom: options(O.map(found, (facets) => facets.uom))
+  }
 })
 
 /** The page's sorting and filtering as the table reads it, for a test to put the columns through as the table does. */
@@ -587,12 +650,14 @@ function QuickFilters(props: { readonly table: ReactTable<DataTableFeatures, Sto
   const offered = useAtomValue(quickFilterOptions)
   return (
     <>
-      {A.map(quickFilters, (id) => {
-        const column = props.table.getColumn(id)
-        return column === undefined ? null : (
-          <DataTableFacetedFilter key={id} column={column} title={labels[id]} options={offered[id]} multiple />
-        )
-      })}
+      {A.map(quickFilters, (id) =>
+        O.match(O.fromUndefinedOr(props.table.getColumn(id)), {
+          onNone: () => null,
+          onSome: (column) => (
+            <DataTableFacetedFilter key={id} column={column} title={labels[id]} options={offered[id]} multiple />
+          )
+        })
+      )}
     </>
   )
 }
@@ -604,10 +669,12 @@ const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(get(itemFacetValues
 const firstFits = Atom.readable((get) => (get.once(isNarrow) ? {} : fitting(get.once(contentWidth))))
 
 /** Columns the assistant hid or showed, kept for the person in this organization: read once per visit. */
-export const keptColumns = Atom.readable((get) => {
-  const who = O.getOrUndefined(get(member))
-  return keptVisibility("Items", who?.organizationId, who?.id)
-})
+export const keptColumns = Atom.readable((get) =>
+  keptVisibility(
+    "Items",
+    O.map(get(member), (who) => ({ organizationId: who.organizationId, memberId: who.id }))
+  )
+)
 
 /**
  * The items the organization has now, a page at a time. The server sorts and filters them (one question in the
@@ -617,8 +684,7 @@ export const keptColumns = Atom.readable((get) => {
 export function ItemsPage() {
   const narrow = useAtomValue(isNarrow)
   const signedIn = useAtomValue(member)
-  const actor = O.getOrUndefined(signedIn)
-  const canImport = actor !== undefined && hasRole(actor.role, "editor")
+  const canImport = O.exists(signedIn, (actor) => hasRole(actor.role, "editor"))
   // The table writes its state into the address and the question for the server is read from the same address,
   // so the two cannot disagree.
   const { searching, config, query } = useAtomValue(itemsQuestion)
@@ -631,7 +697,10 @@ export function ItemsPage() {
   const found = facets.data
   const columns = useAtomValue(itemColumns(canImport))
 
-  const rows = page.data?.data ?? none
+  const rows = O.match(
+    O.map(page.data, (data) => data.data),
+    { onNone: A.empty, onSome: (rows) => rows }
+  )
   // The columns shown at first are the ones the page has room for (`fitting`). On a phone the rows are cards, one
   // line a value: there is room for all of them.
   const fits = useAtomValue(firstFits)
@@ -642,30 +711,38 @@ export function ItemsPage() {
     data: rows as Array<StoredItem>,
     columns,
     config,
-    pageCount: page.data?.pageCount ?? 0,
+    pageCount: O.getOrElse(
+      O.map(page.data, (data) => data.pageCount),
+      () => 0
+    ),
     urlState: true,
-    initialState: { columnVisibility: { ...fits, ...kept } },
+    initialState: {
+      columnVisibility: O.match(kept, { onNone: () => ({ ...fits }), onSome: (kept) => ({ ...fits, ...kept }) })
+    },
     // Items are read here, never acted on in bulk: no row can be selected.
     enableRowSelection: false,
     getRowId: (item) => item.id
   })
 
-  const total = page.data?.total
-  const all = found?.total
+  const total = O.map(page.data, (data) => data.total)
+  const all = O.map(found, (data) => data.total)
   const searched = query.globalFilter
   const leftOut = wordsLeftOut(searched)
   // While searching with no order chosen, the line says how the rows are ordered: no heading shows it.
   const order = searching && query.sorting.length === 0 ? ", best matches first" : ""
-  const counted =
-    all !== undefined && total !== undefined && total !== all
-      ? `${whole.format(total)} of ${whole.format(all)} items`
-      : `${whole.format(total ?? 0)} ${total === 1 ? "item" : "items"}`
-  const line =
-    total === undefined
-      ? page.error === null
-        ? ("loading" as const)
-        : undefined
-      : `${counted}${total > 0 ? order : ""}${leftOut > 0 ? `; searched by the first ${maxSearchWords} words` : ""}`
+  const line = O.match(total, {
+    onNone: () => O.match(page.error, { onNone: () => "loading" as const, onSome: () => undefined }),
+    onSome: (total) => {
+      const counted = O.match(all, {
+        onNone: () => `${whole.format(total)} ${total === 1 ? "item" : "items"}`,
+        onSome: (all) =>
+          total !== all
+            ? `${whole.format(total)} of ${whole.format(all)} items`
+            : `${whole.format(total)} ${total === 1 ? "item" : "items"}`
+      })
+      return `${counted}${total > 0 ? order : ""}${leftOut > 0 ? `; searched by the first ${maxSearchWords} words` : ""}`
+    }
+  })
 
   const clearSearch = () => table.setGlobalFilter("")
   const filtered = query.filters.length > 0
@@ -725,21 +802,21 @@ export function ItemsPage() {
           ? { actions: <Button onClick={() => navigate("/", { replace: false })}>Import a file</Button> }
           : {})}
       />
-      {page.error !== null ? (
+      {O.isSome(page.error) ? (
         <div className="px-4 sm:px-9">
           <Alert variant="destructive">
             <AlertTitle>The items could not be loaded</AlertTitle>
             <AlertDescription>
-              {sayError(page.error, { fields: {} }).sentence}
+              {sayError(page.error.value, { fields: {} }).sentence}
               <Button variant="outline" size="sm" onClick={askPageAgain}>
                 Try again
               </Button>
             </AlertDescription>
           </Alert>
         </div>
-      ) : page.data === undefined ? (
+      ) : O.isNone(page.data) ? (
         <TableSkeleton caption="Items" columns={skeletonColumns} />
-      ) : all === 0 ? (
+      ) : O.contains(all, 0) ? (
         <p className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-9">
           {canImport ? "No items yet. Import a file to create them." : "No items yet. An editor imports them."}
         </p>

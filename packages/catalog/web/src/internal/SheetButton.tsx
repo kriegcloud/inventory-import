@@ -38,7 +38,7 @@ export function SheetButton(props: { importId: ImportId }) {
               sheets={workbook.sheets}
               chosen={workbook.chosen}
               onChoose={(sheet) => {
-                start({ file: workbook.file, sheet })
+                start({ file: workbook.file, sheet: O.some(sheet), onEnd: () => {} })
                 navigate(importAddress(props.importId, "upload"), { replace: false })
               }}
             />

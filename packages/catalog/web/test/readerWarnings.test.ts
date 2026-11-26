@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // Which of the reader's Notes the Review step shows above the table before the person imports: the warnings, from a
 // workbook and from a CSV alike, and never a Note that only says how the file was read.
 import { describe, expect, it } from "@effect/vitest"
@@ -13,7 +14,8 @@ const row = (r: number, cells: string) =>
 const sheetOf = (rows: string) =>
   `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows}</sheetData></worksheet>`
 const heading = row(1, `${text("C1")("Quantity")}${text("D1")("Bay")}`)
-const staged = (file: File) => Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table }))
+const staged = (file: File) =>
+  Effect.map(readSpreadsheet({ onProgress: () => {}, sheet: O.none(), file }), (table) => stageTable({ table }))
 const kinds = (notes: ReadonlyArray<{ readonly kind: string }>) => A.map(notes, (note) => note.kind)
 
 describe("the reader's warnings shown on the Review step", () => {

@@ -115,9 +115,9 @@ describe("an assistant's answer", () => {
     })
     // The Items table stays drawn through a switch of organization answered at once.
     t.registry.mount(keptColumns)
-    expect(t.registry.get(keptColumns)).toEqual(hidden)
+    expect(t.registry.get(keptColumns)).toEqual(O.some(hidden))
     t.registry.set(t.signedIn, memberOf("org_lakeside"))
-    expect(t.registry.get(keptColumns)).toEqual({})
+    expect(t.registry.get(keptColumns)).toEqual(O.some({}))
   })
 
   it("is not applied when it was asked with no assistant drawn", () => {

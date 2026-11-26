@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // An upload is one member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody
 // else. Another organization the person switches to waits for it: still sending, it is stopped, what reached the server
 // deleted and said; being prepared, its answer is waited for and said with its own reason. The chosen file is kept where
@@ -112,7 +113,7 @@ const world = () => {
   browser.asked.length = 0
   const ended: Array<UploadEnd> = []
   registry.mount(startUpload)
-  registry.set(startUpload, { file: new File(["a"], "items.csv"), onEnd: (end) => ended.push(end) })
+  registry.set(startUpload, { sheet: O.none(), file: new File(["a"], "items.csv"), onEnd: (end) => ended.push(end) })
   const reader = browser.readers[browser.readers.length - 1]!
   const says = (message: ReadMessage) => reader.onmessage?.({ data: message })
   /** The file's head is read: the upload begins. */
@@ -217,7 +218,7 @@ describe("an upload", () => {
       yield* t.switched
       expect(t.state()).toEqual(UploadState.cases.Idle.make({}))
       // Another file chosen here meanwhile is told to wait, not dropped without a word.
-      t.registry.set(startUpload, { file: new File(["b"], "more.csv") })
+      t.registry.set(startUpload, { sheet: O.none(), onEnd: () => {}, file: new File(["b"], "more.csv") })
       yield* settle
       expect(browser.said).toEqual(["items.csv is still being prepared for the organization you chose it in"])
       yield* Deferred.succeed(t.finished, Result.succeed(viewAt({ revision: 1, fileName: "items.csv", mapping: [] })))

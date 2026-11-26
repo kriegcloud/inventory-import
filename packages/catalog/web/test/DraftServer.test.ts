@@ -62,6 +62,7 @@ const out = decisionFromFlags({ out: true })
 /** A view of the import as the screen hands it to the draft. */
 const arrived = (view: ImportView): DraftEvent =>
   DraftEvent.ViewArrived({
+    waiting: false,
     revision: view.revision,
     decisions: view.decisions,
     open: view.status === "open",

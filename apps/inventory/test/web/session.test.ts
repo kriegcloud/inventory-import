@@ -381,7 +381,7 @@ describe("what is typed, chosen or open", () => {
         held(people.addEmail, "wen@example.com"),
         held(people.addRole, "viewer"),
         held(activity.chosenView, O.some("events" as const)),
-        held(upload.uploadProblem, "items.csv is no longer kept in this browser."),
+        held(upload.uploadProblem, O.some("items.csv is no longer kept in this browser.")),
         held(assistant.assistantOf("Items"), { open: true, prompt: "Only oak" }),
         held(
           uploading.uploadState,

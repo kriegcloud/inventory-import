@@ -62,7 +62,7 @@ export const heldBackSentence = (input: {
   readonly why: {
     readonly read: boolean
     readonly apart: number
-    readonly accepts: ReadonlyArray<{ readonly kind?: string }>
+    readonly accepts: ReadonlyArray<{ readonly kind: string }>
   }
   /** The accepts taken back, in words. */
   readonly accepts: string
@@ -81,7 +81,7 @@ export const heldBackSentence = (input: {
   const taken =
     why.accepts.length === 0
       ? ""
-      : A.every(why.accepts, (taken) => (taken.kind ?? "accept") === "accept")
+      : A.every(why.accepts, (taken) => taken.kind === "accept")
         ? ` A column was matched again after you accepted its proposal, so ${one ? "that accept was" : "those accepts were"} taken back: ${accepts}.`
         : ` A column was matched again after you decided, so ${one ? "that decision was" : "those decisions were"} taken back: ${accepts}.`
   return `Nothing was imported: ${rows}${taken} The review and its totals below show the import as it is now. Check them, then import again.`

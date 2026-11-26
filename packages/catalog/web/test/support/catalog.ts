@@ -63,6 +63,7 @@ export const importNo = (n: number): ImportId =>
 export const viewAt = (parts: Partial<ImportView> & { readonly revision: number }): ImportView => {
   const view: Record<string, unknown> = {
     id: importId,
+    fileName: "items.csv",
     status: "open",
     decisions: {},
     suggestions: [],

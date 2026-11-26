@@ -777,7 +777,7 @@ access.
   terms a must or should question needs. Decision 1 stands: the model of record is this repository's, and Sutton is
   still a mapping onto it. Decision 87's ranking of the questions stands. The records report 16 section 3 lists are
   in scope.
-- Not decided, and put to me when the first slice beyond the party terms is planned (no open row yet, because no
-  work waits on it): which slice takes which records, and whether "all" means every one of the 199 record types or the
+- Not decided ([report 17](research/17-sutton-whole-model-plan.md), question P20, which sizes every slice; no open
+  row yet): which slice takes which records, and whether "all" means every one of the 199 record types or the
   business records without the document layouts, settings and integrations.
 - Reverse: restore the brief's rule; terms already added for Sutton alone stay or go one by one.

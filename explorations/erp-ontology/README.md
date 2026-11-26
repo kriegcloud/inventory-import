@@ -51,6 +51,7 @@ organization scope remains enough for the thread (115). Gate 10 remains open (pe
 | [14 The thin thread](research/14-thin-thread.md) | The terms and records (sections 2 and 3), how the member's role answers the question (4 and 5), and how to check and package the result (6 to 8). |
 | [15 What the foundational audit of the thread found](research/15-audit-findings.md) | The auditor's two runs, what its adversary landed, why the audit is advisory (decision 107) and five design points still to rule on. |
 | [16 Sutton's API schema against the packet's Sutton rows](research/16-sutton-schema-check.md) | What the schema confirms and overturns in report 11's 28 Sutton rows, the records Sutton has that the packet lacks, and three questions (decisions 125 to 127). |
+| [17 A plan for modelling Sutton whole](research/17-sutton-whole-model-plan.md) | Sutton's 200 record types placed against the packet, eight slices with what each waits on and which pointers run forward, 45 findings where schema and design disagree, 24 new questions, and what a review disputed. The readers' output is `assets/sutton/readings.json`. |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).
@@ -93,3 +94,6 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-26: Sutton's API schema read with Benjamin's demo key ([report 16](research/16-sutton-schema-check.md));
   decision 123 allows its names here, decision 124 takes back the rule against modelling Sutton whole, and 125 to
   127 are open.
+- 2026-11-26: six readers placed every Sutton record type against the packet and
+  [report 17](research/17-sutton-whole-model-plan.md) plans the whole model in eight slices; four reviewers tried to refute it and their corrections are in it.
+  Nothing is built from it.

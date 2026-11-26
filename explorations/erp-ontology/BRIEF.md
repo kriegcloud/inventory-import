@@ -320,7 +320,7 @@ section 8). What each construct of the term model becomes is 12's section 3.1.
   of rank must or should needs it, never to complete a picture. That exclusion is this brief's rule. Decision 87 only
   ranks the questions and does not state it.
   Taken back on 2026-11-26 (decision 124): Benjamin has the schema through a demo key and chose to model it all.
-  [Report 16](research/16-sutton-schema-check.md) is the first reading; no slice for the rest is planned yet.
+  [Report 16](research/16-sutton-schema-check.md) is the first reading, and [report 17](research/17-sutton-whole-model-plan.md) plans the rest in eight slices.
 - **Turtle formatting.** Write one small writer; do not tune a library serializer to be stable.
 
 ## No-gos

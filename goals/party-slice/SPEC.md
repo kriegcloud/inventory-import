@@ -2,7 +2,7 @@
 type: Goal
 title: "party-slice"
 description: Slice 1 of the ERP vocabulary. The party and access terms join the vocabulary module, the projector and gates 1 to 9 grow to them, the access records that wait for them are enrolled, the party questions are answered on named test_ fixtures, and Sutton's party records are covered by name.
-status: active
+status: done
 from: explorations/erp-ontology
 ---
 
@@ -78,7 +78,7 @@ of its fields is placed in this slice, left for a later slice, or given no term.
   ROBOT v1.9.11 jar (decisions 112 and 113).
 - IRIs under `example.org` (decision 7); every fixture individual is named `test_`. Where a decision's fixture name
   has a space, such as "test_Ana Ruiz", the name stays as text and the IRI drops the space: the agent's choice (PLAN,
-  "Choices made"), put to Benjamin with the open rows.
+  "Choices made"), which no decision rules and Benjamin may reverse.
 - The expected rows are the lock on an answer (decision 118). A commit that changes a question's rows says so, and the
   release notes name the question with its old and new answer.
 - The version (decision 24): `0.y`, any change advances `y`, and a change after which data or an answer that held no

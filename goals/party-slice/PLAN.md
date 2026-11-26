@@ -34,11 +34,12 @@ names, and only under O2's recommendation; under its option (d) it stays out.
 | 12 | Contacts and addresses: `ContactAssignment`, `ContactPurposeScheme` and the contact point, stated by CQ-P03's fixtures (the person's `SourceRecord` giving the point by `hasContactPoint`), with CQ-P03 (O12) and its must-fail cases; under O2 (a), the address terms of O10 (`defaultFor` under no gist property, decision 174; `PostalAddress`'s criterion with decision 158's clause, decision 173), O11's links and `accountStatus` on the fixture `sutton-party.ttl`: one `test_` record of each Sutton type the coverage table places, stating each property it places that no question's fixture states, its contact and workspace records stating neither flag (168) and every contact point written by hand (175); `membershipWorkspace` (decision 154), `memberContactPoint` (162) under `gist:hasAddress` (174), `profileImage` and `profileText` (163), `givenName`, `middleName`, `familyName` and `jobTitle` (130), a `UserProfile`'s names and job title stated on the `Member` (172), and `membershipIn`'s text reworded (169), naming the accepting decision and added to the breaking release line; CQ-P06 and CQ-P07 gain the clause that leaves out a membership naming a workspace, with a must-fail membership each | Gates 1 to 8; `Questions.test.ts` for CQ-P03, and for CQ-P06 and CQ-P07 with their new must-fail memberships; `Coherence.test.ts`: the thread's terms name 111 for all but `Member` and `membershipIn` | 9 | done |
 | 13 | Gate 9 on the larger module: a run for each slice-1 fixture, `model-call.ttl` and `sutton-party.ttl` among them, and the refused fixture whose `SourceRecord` is also an organization | `bun run check:full` on a run that started the reasoner; `Reason.test.ts` | 10 to 12 | done |
 | 14 | The walk of each new planted mistake through the nine gates; SPEC's coverage table read against the module | Each new refusal fails its own gate and no other; a `Coherence.test.ts` assertion that each term the coverage table names exists | 13 | done |
-| 15 | Close: `/quality-review-fix-loop`, the documents the build made false (listed below), the closing note naming each part of report 05 left for a later slice | Reviewers' findings at zero required; `bun run beep laws boundaries`; no `package.json` added (SPEC's acceptance) | 14 | doing: the documents and the closing note are written; the quality review is not run |
+| 15 | Close: `/quality-review-fix-loop`, the documents the build made false (listed below), the closing note naming each part of report 05 left for a later slice | Reviewers' findings at zero required; `bun run beep laws boundaries`; no `package.json` added (SPEC's acceptance) | 14 | done |
 
 Steps 1 to 5 wait on no open row and on no data the repository lacks: each builds what an answered decision already
 fixes (12, 16 to 18, 27, 33, 36) or what every option of an open row needs (a literal lift), and C9 is checked on
-planted gist lists only. Five parts rest on choices of the agent that step 6 puts to Benjamin: step 4's tenant given
+planted gist lists only. Five parts rest on choices of the agent that step 6 put to Benjamin, and decisions 148 to 152 (2026-11-26) confirm
+each as built: step 4's tenant given
 beside the rows, whose reversal changes one parameter of the lift and its test; step 5's `cq/` folder, whose reversal
 moves its files and changes the `turbo.json` input and the `?raw` paths but no answer (both in Choices made); a gist
 property's own gist parent, left out of the metamodel though decision 16 copies it (Step 2, and the table below);
@@ -77,7 +78,8 @@ name `test_AcmeC` and `test_AcmeD` share stated in CQ-P04's fixture (179); each 
 Benjamin" says. Step 13 is done (2026-11-26): what it built and left out is under "Step 13" below. Step 14 is done (2026-11-26):
 the walk and the coverage read are under "Step 14" below. No decided point holds step 15 back. Step 15's first half
 is done (2026-11-26): the documents the build made false are corrected and the closing note is written ("Step 15"
-below); its quality review, `/quality-review-fix-loop`, is not run, and the goal is not done until it is.
+below). Its quality review is run (2026-11-26): the panel's findings are fixed or answered under "Step 15", and the
+last review found no required finding, so the goal is done.
 What the decisions add to each:
 
 - **Step 9**: nothing waits. It builds `Party` with `storesId: false` (170) and the two flags'
@@ -94,8 +96,9 @@ What the decisions add to each:
 
 ## Choices made
 
-Where the sources left a choice open while the goal was specified. Each is Benjamin's to reverse, and step 6 puts
-them to him with the open rows.
+Where the sources left a choice open while the goal was specified. Each is Benjamin's to reverse. Step 6 put
+the five readings to him, and decisions 148 to 152 (2026-11-26) confirm them as built; no decision rules the fixture
+name without its space.
 
 - **The fixtures' home is the packet**, `explorations/erp-ontology/assets/requirements/cq/`: decision 36 says "in the
   packet", the brief's Map names `explorations/erp-ontology/assets/requirements/` and leaves the home to the slice;
@@ -258,7 +261,7 @@ Choices the SPEC left open, each the agent's:
   copy's keys in the test file, since the kernel's helpers know no `Party` and rule 6 of gate 7 refuses a mark written
   by hand. No record of the kernel or the contracts is pointed at `Party`.
 
-Needs Benjamin:
+Needs Benjamin (answered on 2026-11-26: decision 152, as built):
 
 - **Does a scheme's retirement cover its live concepts?** P14 refuses a fixed concept only when the concept is
   retired itself; one that is live in a retired scheme passes, a reading of decision 33 and V14 that he has not ruled
@@ -1144,7 +1147,7 @@ What was corrected, and by which decision:
 ## Closing note
 
 Written on 2026-11-26, in step 15, before its quality review, and amended after the review's first panel (below). SPEC's
-20 acceptance lines are ticked; its status stays `active` until the review's loop closes with no required finding.
+20 acceptance lines are ticked; its status was `active` until the review's loop closed with no required finding (2026-11-26); it is now `done`.
 
 **What was built.** The module holds report 18's terms beside the thread's, as decision 176 accepted them: 17 classes,
 34 object and 28 datatype properties, 9 schemes and 28 concepts, on 12 gist classes with 4 disjoint pairs and 5 gist

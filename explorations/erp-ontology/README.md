@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Close goals/party-slice (step 15, its quality review); the slices after it are not specified.
+next: Specify the slice after the party slice; goals/party-slice is done, and its branch is not pushed.
 goals: [erp-vocabulary, party-slice]
 ---
 
@@ -127,3 +127,4 @@ first class list, a decision log and a product model read from public sources).
   properties, 9 schemes, 28 concepts), the access records enrolled, CQ-P01 to CQ-P05, CQ-P07 and CQ-P09's party half
   on `test_` fixtures, gate 9 on each fixture, and gate 4 reading report 18's coverage table against the module;
   decisions 177 to 179 answered what steps 9 to 12 set aside. Step 15 corrected the documents the build made false.
+- 2026-11-26: `goals/party-slice` is done: its closing review found no required finding. The branch is not pushed.

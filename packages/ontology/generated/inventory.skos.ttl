@@ -13,6 +13,10 @@ inv:GrantScopeKindScheme a skos:ConceptScheme ;
     skos:prefLabel "Grant scope kind"@en ;
     skos:definition "A controlled vocabulary of the extents a grant of access covers: a whole organization, one location, or one field."@en .
 
+inv:IdentityOutcomeScheme a skos:ConceptScheme ;
+    skos:prefLabel "Identity outcome"@en ;
+    skos:definition "A controlled vocabulary of what an identity decision finds about two source records a tenant holds that may be one party."@en .
+
 inv:MemberRoleScheme a skos:ConceptScheme ;
     skos:prefLabel "Member role"@en ;
     skos:definition "A controlled vocabulary of the access levels a member holds in an organization, ranked by what each may do."@en .
@@ -24,6 +28,22 @@ inv:GrantScopeKindScheme-organization a skos:Concept ;
     skos:notation "organization" ;
     skos:inScheme inv:GrantScopeKindScheme ;
     skos:topConceptOf inv:GrantScopeKindScheme .
+
+inv:IdentityOutcomeScheme-differentParties a skos:Concept ;
+    skos:prefLabel "Different parties"@en ;
+    skos:altLabel "Not a duplicate"@en ;
+    skos:definition "An identity outcome in which two source records a tenant holds are found to be records of two parties."@en ;
+    skos:notation "differentParties" ;
+    skos:inScheme inv:IdentityOutcomeScheme ;
+    skos:topConceptOf inv:IdentityOutcomeScheme .
+
+inv:IdentityOutcomeScheme-sameParty a skos:Concept ;
+    skos:prefLabel "Same party"@en ;
+    skos:altLabel "Merge"@en ;
+    skos:definition "An identity outcome in which two source records a tenant holds are found to be records of one party."@en ;
+    skos:notation "sameParty" ;
+    skos:inScheme inv:IdentityOutcomeScheme ;
+    skos:topConceptOf inv:IdentityOutcomeScheme .
 
 inv:MemberRoleScheme-admin a skos:Concept ;
     skos:prefLabel "Admin"@en ;

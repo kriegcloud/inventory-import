@@ -62,7 +62,7 @@ describe("gate 4, vocabulary coherence", () => {
   // Decision 129 with 176: each new term and Party's exception entry name the accepting decision, and the thread's 22
   // terms keep 111, Person, Organization and grantScope among them, whose new links change no text of theirs.
   it.effect(
-    "the thread's 22 terms name decision 111, step 9's nine name 176, and so does Party's exception entry",
+    "the thread's 22 terms name decision 111, steps 9 and 10's twenty name 176, and so does Party's exception entry",
     () =>
       Effect.gen(function* () {
         const decoded = yield* decodeVocabulary(vocabulary)
@@ -72,19 +72,30 @@ describe("gate 4, vocabulary coherence", () => {
         expect(A.map(named176, ([key]) => key)).toStrictEqual([
           "Party",
           "SourceRecord",
+          "IdentityDecision",
+          "IdentityEvidence",
           "recordOf",
+          "decidesOn",
+          "identityOutcome",
+          "decidedBy",
+          "citesEvidence",
           "sourceSystem",
           "sourceType",
           "sourceId",
           "capturedAt",
           "isCustomer",
-          "isVendor"
+          "isVendor",
+          "eventTime",
+          "evidenceText",
+          "IdentityOutcomeScheme",
+          "sameParty",
+          "differentParties"
         ])
         expect(named111).toHaveLength(22)
         expect(A.map(named111, ([key]) => key)).toEqual(
           expect.arrayContaining(["Person", "Organization", "grantScope"])
         )
-        expect(termRatifications(decoded)).toHaveLength(31)
+        expect(termRatifications(decoded)).toHaveLength(42)
         expect(A.map(exceptions, (entry) => [entry.class, entry.ratification.decision])).toEqual([
           ["Role", 97],
           ["Party", 176]
@@ -131,6 +142,26 @@ describe("gate 4, vocabulary coherence", () => {
       const exceptions = yield* decodeExceptions(exceptionFile)
       expect(named(coherenceFindings({ vocabulary: decoded, exceptions, decisions }))).toEqual([
         ["C12", "class", "Member"]
+      ])
+    })
+  )
+
+  // Report 18 section 4.2: eventTime passes C9 because gist:atDateTime declares no domain and the range xsd:dateTime,
+  // eventTime's datatype; the kernel's literal above is the near miss.
+  it.effect("reports exactly C9 on eventTime when atDateTime declares another range, or leaves the gist list", () =>
+    Effect.gen(function* () {
+      const exceptions = yield* decodeExceptions(exceptionFile)
+      const { atDateTime, ...others } = vocabulary.gist.properties
+      const ranged = yield* decodeVocabulary({
+        ...vocabulary,
+        gist: { ...vocabulary.gist, properties: { ...others, atDateTime: { ...atDateTime, range: "xsd:string" } } }
+      })
+      const unlisted = yield* decodeVocabulary({ ...vocabulary, gist: { ...vocabulary.gist, properties: others } })
+      expect(named(coherenceFindings({ vocabulary: ranged, exceptions, decisions }))).toEqual([
+        ["C9", "datatypeProperty", "eventTime"]
+      ])
+      expect(named(coherenceFindings({ vocabulary: unlisted, exceptions, decisions }))).toEqual([
+        ["C9", "datatypeProperty", "eventTime"]
       ])
     })
   )
@@ -208,7 +239,7 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
-  it.effect("reports exactly C9 on the two relations under a gist property that leaves the gist list", () =>
+  it.effect("reports exactly C9 on the three relations under a gist property that leaves the gist list", () =>
     Effect.gen(function* () {
       const planted = {
         ...constructsVocabulary,
@@ -216,14 +247,17 @@ describe("gate 4, vocabulary coherence", () => {
           ...constructsVocabulary.gist,
           properties: {
             isAbout: constructsVocabulary.gist.properties.isAbout,
+            atDateTime: constructsVocabulary.gist.properties.atDateTime,
             plantedAttribute: constructsVocabulary.gist.properties.plantedAttribute
           }
         }
       }
       const found = yield* findingsOfCopy(planted)
-      // The retired relation is held to its gist parent too: C9 reads every property, live or retired.
+      // The retired relation is held to its gist parent too: C9 reads every property, live or retired. The kernel's
+      // identityOutcome sits under isCategorizedBy too (decision 176), and eventTime keeps atDateTime on the list.
       expect(found).toEqual([
         ["C9", "objectProperty", "grantScope"],
+        ["C9", "objectProperty", "identityOutcome"],
         ["C9", "objectProperty", "workspaceMembership"]
       ])
     })

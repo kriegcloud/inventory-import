@@ -1,0 +1,6 @@
+# CQ-P05, the companion of CQ-P04: Does any party, item or record stand in owl:sameAs with another?
+# A constraint: identity is stated by an identity decision, never by owl:sameAs (decision 34), so the answer passes
+# when it is false. A thing the same as itself is no answer. It reads no type, so it has no step to walk.
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+ASK { ?x owl:sameAs ?y . FILTER (?x != ?y) }

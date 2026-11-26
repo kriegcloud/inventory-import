@@ -50,17 +50,21 @@ export const vocabulary = {
       PhysicalIdentifiableItem: {},
       Content: {},
       TemporalRelation: {},
-      Assignment: { parent: "TemporalRelation" }
+      Assignment: { parent: "TemporalRelation" },
+      Event: {},
+      Determination: { parent: "Event" }
     },
     disjointPairs: [
       ["Organization", "Content"],
       ["Organization", "PhysicalIdentifiableItem"],
       ["PhysicalIdentifiableItem", "Content"]
     ],
-    // Report 18 section 8, read from the pinned file: neither declares a range, and `isCategorizedBy` no domain.
+    // Report 18 section 8, read from the pinned file: `isCategorizedBy` declares no domain and no range, `isAbout` the
+    // domain `gist:Content` and no range, and `atDateTime` no domain and the range `xsd:dateTime`.
     properties: {
       isCategorizedBy: { kind: "object" },
-      isAbout: { kind: "object", domain: "Content" }
+      isAbout: { kind: "object", domain: "Content" },
+      atDateTime: { kind: "datatype", range: "xsd:dateTime" }
     }
   },
   classes: {
@@ -182,6 +186,33 @@ export const vocabulary = {
         restsOn: ["inTenant", "sourceSystem", "sourceType", "sourceId"]
       },
       ratification: partySlice
+    },
+    IdentityDecision: {
+      prefLabel: "Identity decision",
+      definition:
+        "A determination by a member that two source records the tenant holds describe the same party, or different parties, resting on the evidence it cites.",
+      tag: "event",
+      parent: { kind: "gist", name: "Determination" },
+      identity: {
+        kind: "stated",
+        criterion: "the tenant and the decision's own id.",
+        restsOn: ["inTenant"]
+      },
+      ratification: partySlice
+    },
+    IdentityEvidence: {
+      prefLabel: "Identity evidence",
+      definition:
+        "A statement of one observed likeness or difference between two source records the tenant holds, such as a shared tax number or names one letter apart, cited by an identity decision.",
+      tag: "information",
+      parent: { kind: "gist", name: "Content" },
+      identity: {
+        kind: "stated",
+        criterion:
+          "the tenant and the evidence's own id; one piece of evidence may be cited by more than one decision.",
+        restsOn: ["inTenant"]
+      },
+      ratification: partySlice
     }
   },
   objectProperties: {
@@ -241,6 +272,38 @@ export const vocabulary = {
       domain: "SourceRecord",
       range: { kind: "class", key: "Party" },
       subPropertyOf: { kind: "gist", name: "isAbout" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    decidesOn: {
+      prefLabel: "decides on",
+      definition: "Links an identity decision to one of the two source records it compares.",
+      domain: "IdentityDecision",
+      range: { kind: "class", key: "SourceRecord" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    identityOutcome: {
+      prefLabel: "identity outcome",
+      definition: "Links an identity decision to what it found: the two records denote one party, or two.",
+      domain: "IdentityDecision",
+      range: { kind: "scheme", key: "IdentityOutcomeScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    decidedBy: {
+      prefLabel: "decided by",
+      definition: "Links an identity decision to the member who made it.",
+      domain: "IdentityDecision",
+      range: { kind: "class", key: "Member" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    citesEvidence: {
+      prefLabel: "cites evidence",
+      definition: "Links a decision to a piece of evidence it rests on.",
+      range: { kind: "class", key: "IdentityEvidence" },
       evidence: "fixture",
       ratification: partySlice
     }
@@ -312,6 +375,22 @@ export const vocabulary = {
       datatype: "xsd:boolean",
       evidence: "fixture",
       ratification: partySlice
+    },
+    eventTime: {
+      prefLabel: "event time",
+      definition: "The instant at which an event occurred, as its record states it.",
+      datatype: "xsd:dateTime",
+      subPropertyOf: { kind: "gist", name: "atDateTime" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    evidenceText: {
+      prefLabel: "evidence text",
+      definition: "The evidence in a sentence a person reads, naming the two values compared.",
+      domain: "IdentityEvidence",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
     }
   },
   schemes: {
@@ -360,6 +439,29 @@ export const vocabulary = {
         }
       },
       ratification
+    },
+    IdentityOutcomeScheme: {
+      prefLabel: "Identity outcome",
+      definition:
+        "A controlled vocabulary of what an identity decision finds about two source records a tenant holds that may be one party.",
+      closed: true,
+      concepts: {
+        sameParty: {
+          prefLabel: "Same party",
+          altLabels: ["Merge"],
+          definition:
+            "An identity outcome in which two source records a tenant holds are found to be records of one party.",
+          ratification: partySlice
+        },
+        differentParties: {
+          prefLabel: "Different parties",
+          altLabels: ["Not a duplicate"],
+          definition:
+            "An identity outcome in which two source records a tenant holds are found to be records of two parties.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
     }
   }
 } as const satisfies typeof Vocabulary.Encoded

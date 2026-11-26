@@ -11,6 +11,10 @@ import rolelessFixture from "../../../../explorations/erp-ontology/assets/requir
 import rolelessQuery from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P02.rq?raw"
 import tenancyFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P09.fixture.ttl?raw"
 import tenancyQuery from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P09.rq?raw"
+import identityFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P04.fixture.ttl?raw"
+import identityQuery from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P04.rq?raw"
+import samenessFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P05.fixture.ttl?raw"
+import samenessQuery from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P05.rq?raw"
 import ontologyText from "../../generated/inventory.owl.ttl?raw"
 import { threadHandWritten } from "../../src/Thread.ts"
 
@@ -20,7 +24,9 @@ export const handWrittenFixtures: ReadonlyArray<readonly [name: string, text: st
   ["bare-type.fixture.ttl", bareTypeFixture],
   ["CQ-P01.fixture.ttl", tradingFixture],
   ["CQ-P02.fixture.ttl", rolelessFixture],
-  ["CQ-P09.fixture.ttl", tenancyFixture]
+  ["CQ-P09.fixture.ttl", tenancyFixture],
+  ["CQ-P04.fixture.ttl", identityFixture],
+  ["CQ-P05.fixture.ttl", samenessFixture]
 ]
 
 /** The fixture of the planted query: one node typed only `inv:Tenant`. */
@@ -37,6 +43,15 @@ export const roleless = { query: rolelessQuery, fixture: rolelessFixture } as co
 
 /** CQ-P09's party half, a source record held by no tenant or by two, and its fixture. */
 export const tenancy = { query: tenancyQuery, fixture: tenancyFixture } as const
+
+/** CQ-P04, the pairs of a tenant's source records decided to be one party, and its fixture. */
+export const identity = { query: identityQuery, fixture: identityFixture } as const
+
+/**
+ * CQ-P05, the ASK for a thing stated the same as another by the construct identity is never stated by, and its fixture:
+ * that one statement, read only beside CQ-P04's fixture.
+ */
+export const sameness = { query: samenessQuery, fixture: samenessFixture } as const
 
 /** The committed OWL file, as `bun run ontology:write` wrote it. */
 export const ontology: string = ontologyText

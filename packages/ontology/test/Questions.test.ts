@@ -1,6 +1,6 @@
 // Gate 8, the question suite (report 14 sections 5 and 6.8; decision 120): CQ-P06 and CQ-P11 asked of
-// `threadGraph()` in Oxigraph, with no reasoner, and the party slice's CQ-P01, CQ-P02 and CQ-P09 asked of their
-// hand-written fixtures, which no record holds (report 18 section 10). Every question walks `rdf:type/rdfs:subClassOf*`
+// `threadGraph()` in Oxigraph, with no reasoner, and the party slice's CQ-P01, CQ-P02, CQ-P09, CQ-P04 and the CQ-P05
+// ASK asked of their hand-written fixtures, which no record holds (report 18 section 10). Every question walks `rdf:type/rdfs:subClassOf*`
 // and is asked of its graph with the committed OWL file beside it (decision 27), so a node typed by a subclass is found.
 //
 // The expected rows below are the lock on each question's answer (decision 118): there is no lock file and no update
@@ -24,7 +24,7 @@ import mutantThroughPerson from "../fixtures/cq/CQ-P06.M5.rq?raw"
 import membersAndRoles from "../fixtures/cq/CQ-P06.rq?raw"
 import rolesAtScope from "../fixtures/cq/CQ-P11.rq?raw"
 import { overreach, unshown } from "../src/Fixture.rules.ts"
-import { byCodePoint, linesOf, link, ObjectNode, without, type Triple } from "../src/Graph.schema.ts"
+import { byCodePoint, linesOf, link, literal, ObjectNode, without, type Triple } from "../src/Graph.schema.ts"
 import { lift } from "../src/Lift.ts"
 import { graphOf, threadContext, threadGraph, threadHandWritten, threadRows } from "../src/Thread.ts"
 import { readTurtle } from "../src/Turtle.ts"
@@ -33,8 +33,10 @@ import {
   bareType,
   bareTypeQuery,
   handWrittenFixtures,
+  identity,
   ontology,
   roleless,
+  sameness,
   tenancy,
   trading
 } from "./support/fixtures.ts"
@@ -106,6 +108,7 @@ const memberWithRole = (mark: S.Annotations.Key<Role>) =>
 
 const tradingVariables = ["tenant", "organization"]
 const tenancyVariables = ["record", "tenants"]
+const identityVariables = ["tenant", "a", "b", "decider", "at", "evidence"]
 
 /** A party question's hand-written fixture as a graph: no record holds what it states, so nothing is lifted. */
 const fixtureGraph = (text: string) =>
@@ -120,7 +123,11 @@ const partyNames = Effect.gen(function* () {
     ...n,
     record: fixture("SourceRecord"),
     organization: fixture("Organization"),
-    individual: fixture("Person")
+    individual: fixture("Person"),
+    decision: fixture("IdentityDecision"),
+    member: fixture("Member"),
+    evidence: fixture("IdentityEvidence"),
+    instant: (value: string) => literal(n.inv("eventTime"), value, `${RdfVocab.xsd.iri}dateTime`)
   }
 })
 
@@ -168,12 +175,16 @@ describe("gate 8, the questions", () => {
         bareTypeQuery,
         trading.query,
         roleless.query,
-        tenancy.query
+        tenancy.query,
+        identity.query
       ]) {
         expect(query).toContain(`PREFIX inv: <${vocabulary.namespace}>`)
         expect(query).toContain(`PREFIX rdf: <${RdfVocab.rdf.iri}>`)
         expect(query).toContain(`PREFIX rdfs: <${RdfVocab.rdfs.iri}>`)
       }
+      // CQ-P05 reads no type, so it walks nothing: it names OWL's namespace alone.
+      expect(sameness.query).toContain(`PREFIX owl: <${RdfVocab.owl.iri}>`)
+      expect(sameness.query).not.toContain("rdf:type")
     })
   )
 })
@@ -236,13 +247,15 @@ ASK { ?organization ${walk} inv:Organization }`
       const tradingGraph = yield* fixtureGraph(trading.fixture)
       const rolelessGraph = yield* fixtureGraph(roleless.fixture)
       const tenancyGraph = yield* fixtureGraph(tenancy.fixture)
+      const identityGraph = yield* fixtureGraph(identity.fixture)
       const questions: ReadonlyArray<readonly [ReadonlyArray<Triple>, string, ReadonlyArray<string>]> = [
         [graph, membersAndRoles, membersVariables],
         [graph, mutantThroughPerson, membersVariables],
         [graph, rolesAtScope, scopeVariables],
         [tradingGraph, trading.query, tradingVariables],
         [rolelessGraph, roleless.query, tradingVariables],
-        [tenancyGraph, tenancy.query, tenancyVariables]
+        [tenancyGraph, tenancy.query, tenancyVariables],
+        [identityGraph, identity.query, identityVariables]
       ]
       for (const [given, query, variables] of questions) {
         const moved = movedDown(given)
@@ -709,6 +722,290 @@ SELECT ?record WHERE { ?record ${walk} inv:SourceRecord } ORDER BY ?record`,
   )
 })
 
+/** CQ-P04's clause that keeps a pair only while no later decision of the tenant about it exists. */
+const laterDecision = `  FILTER NOT EXISTS {
+    ?later rdf:type/rdfs:subClassOf* inv:IdentityDecision ;
+           inv:inTenant ?tenant ;
+           inv:decidesOn ?a , ?b ;
+           inv:eventTime ?laterAt .
+    FILTER (?laterAt > ?at)
+  }
+`
+
+/** CQ-P04 as committed, with no later decision read: every sameParty decision is in force. */
+const everyDecision = Str.replace(laterDecision, "")
+
+/** CQ-P04 as committed, with a later decision read whatever tenant holds it. */
+const laterOfAnyTenant = Str.replace(
+  `?later rdf:type/rdfs:subClassOf* inv:IdentityDecision ;
+           inv:inTenant ?tenant ;`,
+  "?later rdf:type/rdfs:subClassOf* inv:IdentityDecision ;"
+)
+
+/** CQ-P04 as committed, with the pair's records read whatever tenant holds them. */
+const recordsOfAnyTenant = Str.replaceAll(
+  `inv:SourceRecord ;
+     inv:inTenant ?tenant .`,
+  "inv:SourceRecord ."
+)
+
+/** CQ-P04's one row on its fixture: the pair test_Dana decided at 09:00, with the evidence it cites. */
+const pairInForce = Effect.map(partyNames, (n) => [
+  n.works,
+  n.record("test_AcmeA"),
+  n.record("test_AcmeB"),
+  n.member("test_Dana"),
+  "2026-11-01T09:00:00Z",
+  "same tax id"
+])
+
+/** `graph` less every triple whose subject is one of `subjects`. */
+const withoutSubjects = (graph: ReadonlyArray<Triple>, subjects: ReadonlyArray<string>) =>
+  A.filter(graph, (triple) => !A.contains(subjects, triple.subject))
+
+/** The triples of one identity decision, written in the test: never a fixture's, so a plant adds what it says. */
+const decisionTriples = Effect.fnUntraced(function* (given: {
+  readonly name: string
+  readonly tenant: string
+  readonly pair: readonly [string, string]
+  readonly outcome: string
+  readonly decider: string
+  readonly at: string
+}) {
+  const n = yield* partyNames
+  const decision = n.decision(given.name)
+  return [
+    link(decision, type, n.inv("IdentityDecision")),
+    link(decision, n.inv("inTenant"), given.tenant),
+    link(decision, n.inv("decidesOn"), n.record(given.pair[0])),
+    link(decision, n.inv("decidesOn"), n.record(given.pair[1])),
+    link(decision, n.inv("identityOutcome"), n.inv(`IdentityOutcomeScheme-${given.outcome}`)),
+    link(decision, n.inv("decidedBy"), n.member(given.decider)),
+    n.instant(given.at)(decision)
+  ]
+})
+
+describe("gate 8, CQ-P04: the pairs of a tenant's records decided to be one party", () => {
+  it.effect(
+    'test_AcmeA and test_AcmeB, by test_Dana at 09:00, on the evidence "same tax id"; the second tenant none',
+    () =>
+      Effect.gen(function* () {
+        const n = yield* partyNames
+        const graph = yield* fixtureGraph(identity.fixture)
+        const inForce = yield* pairInForce
+        const rows = yield* asked(graph, identity.query, identityVariables)
+        expect(rows).toStrictEqual([inForce])
+        expect(A.filter(rows, ([tenant]) => tenant === n.second)).toStrictEqual([])
+      })
+  )
+
+  it.effect("must-fail: a reversed decision gives no row, and the reversal alone hides test_AcmeE and test_AcmeF", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const reversed = [n.record("test_AcmeE"), n.record("test_AcmeF")]
+      const rows = yield* asked(graph, identity.query, identityVariables)
+      expect(A.filter(rows, ([, a, b]) => A.contains(reversed, a) || A.contains(reversed, b))).toStrictEqual([])
+      // Planted: with no later decision read, every sameParty decision is in force, reversed or not.
+      const mutant = everyDecision(identity.query)
+      expect(mutant).not.toBe(identity.query)
+      const wrong = yield* asked(graph, mutant, identityVariables)
+      expect(A.map(wrong, A.take(4))).toStrictEqual([
+        [n.works, n.record("test_AcmeA"), n.record("test_AcmeB"), n.member("test_Dana")],
+        [n.works, n.record("test_AcmeE"), n.record("test_AcmeF"), n.member("test_Dana")],
+        [n.second, n.record("test_SecondAcmeA"), n.record("test_SecondAcmeB"), n.member("test_Kim")]
+      ])
+      // Near miss: with test_Decision3 gone, nothing reverses test_Decision2 and the committed question lists E and F.
+      const inForce = yield* pairInForce
+      const unreversed = withoutSubjects(graph, [n.decision("test_Decision3")])
+      expect(unreversed).toHaveLength(graph.length - 7)
+      const restored = yield* asked(unreversed, identity.query, identityVariables)
+      expect(restored).toStrictEqual([
+        inForce,
+        [n.works, ...reversed, n.member("test_Dana"), "2026-11-01T10:00:00Z", ""]
+      ])
+    })
+  )
+
+  it.effect("must-fail: the second tenant's decisions add no row to the first's answer and hide none of it", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const rows = yield* asked(graph, identity.query, identityVariables)
+      const seconds = [
+        n.record("test_SecondAcmeA"),
+        n.record("test_SecondAcmeB"),
+        n.decision("test_Decision4"),
+        n.decision("test_Decision5"),
+        n.member("test_Kim")
+      ]
+      const alone = withoutSubjects(graph, seconds)
+      // Two records of five triples, two decisions of seven and the member's two.
+      expect(alone).toHaveLength(graph.length - 26)
+      const firstAlone = yield* asked(alone, identity.query, identityVariables)
+      expect(firstAlone).toStrictEqual(rows)
+      // Near miss: with test_Decision5 gone, test_Decision4 is in force, and the second tenant's answer is its own row.
+      const unreversed = withoutSubjects(graph, [n.decision("test_Decision5")])
+      const both = yield* asked(unreversed, identity.query, identityVariables)
+      expect(both).toStrictEqual([
+        ...rows,
+        [
+          n.second,
+          n.record("test_SecondAcmeA"),
+          n.record("test_SecondAcmeB"),
+          n.member("test_Kim"),
+          "2026-11-01T12:00:00Z",
+          ""
+        ]
+      ])
+    })
+  )
+
+  it.effect(
+    "must-fail: a decision the other tenant holds neither reverses this tenant's pair nor joins its records",
+    () =>
+      Effect.gen(function* () {
+        const n = yield* partyNames
+        const graph = yield* fixtureGraph(identity.fixture)
+        const rows = yield* asked(graph, identity.query, identityVariables)
+        // Planted: test_SecondOrg holds a later decision about the first tenant's A and B, and a sameParty decision
+        // about the first tenant's C and D. Neither is that tenant's to make about those records.
+        const reversal = yield* decisionTriples({
+          name: "test_ForeignReversal",
+          tenant: n.second,
+          pair: ["test_AcmeA", "test_AcmeB"],
+          outcome: "differentParties",
+          decider: "test_Kim",
+          at: "2026-11-01T14:00:00Z"
+        })
+        const joining = yield* decisionTriples({
+          name: "test_ForeignJoin",
+          tenant: n.second,
+          pair: ["test_AcmeC", "test_AcmeD"],
+          outcome: "sameParty",
+          decider: "test_Kim",
+          at: "2026-11-01T14:00:00Z"
+        })
+        const crossed = [...graph, ...reversal, ...joining]
+        const answer = yield* asked(crossed, identity.query, identityVariables)
+        expect(answer).toStrictEqual(rows)
+        // Without the later decision's tenant, the other tenant's reversal hides A and B.
+        const anyLater = laterOfAnyTenant(identity.query)
+        expect(anyLater).not.toBe(identity.query)
+        const hidden = yield* asked(crossed, anyLater, identityVariables)
+        expect(hidden).toStrictEqual([])
+        // Without the records' tenant, the other tenant's decision joins C and D for it.
+        const anyRecords = recordsOfAnyTenant(identity.query)
+        expect(anyRecords).not.toBe(identity.query)
+        const joined = yield* asked(crossed, anyRecords, identityVariables)
+        expect(joined).toContainEqual([
+          n.second,
+          n.record("test_AcmeC"),
+          n.record("test_AcmeD"),
+          n.member("test_Kim"),
+          "2026-11-01T14:00:00Z",
+          ""
+        ])
+      })
+  )
+
+  it.effect("must-fail: test_AcmeC and test_AcmeD, two records with no decision, give no pair", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const undecided = [n.record("test_AcmeC"), n.record("test_AcmeD")]
+      const rows = yield* asked(graph, identity.query, identityVariables)
+      expect(A.filter(rows, ([, a, b]) => A.contains(undecided, a) || A.contains(undecided, b))).toStrictEqual([])
+      // Planted: given a sameParty decision of the tenant's about them, they are a pair; the decision is the answer.
+      const decided = yield* decisionTriples({
+        name: "test_DecisionCD",
+        tenant: n.works,
+        pair: ["test_AcmeC", "test_AcmeD"],
+        outcome: "sameParty",
+        decider: "test_Dana",
+        at: "2026-11-01T14:00:00Z"
+      })
+      const inForce = yield* pairInForce
+      const joined = yield* asked([...graph, ...decided], identity.query, identityVariables)
+      expect(joined).toStrictEqual([
+        inForce,
+        [n.works, ...undecided, n.member("test_Dana"), "2026-11-01T14:00:00Z", ""]
+      ])
+    })
+  )
+
+  it.effect("must-fail: test_Decision1 finding different parties gives no row", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const decision = n.decision("test_Decision1")
+      const turned = [
+        ...dropped(graph, decision, n.inv("identityOutcome")),
+        link(decision, n.inv("identityOutcome"), n.inv("IdentityOutcomeScheme-differentParties"))
+      ]
+      expect(turned).toHaveLength(graph.length)
+      const rows = yield* asked(turned, identity.query, identityVariables)
+      expect(rows).toStrictEqual([])
+    })
+  )
+
+  it.effect("the evidence is read through citesEvidence and evidenceText; without the link the row has none", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(identity.fixture)
+      const evidence = n.evidence("test_SameTaxId")
+      const reworded = [
+        ...dropped(graph, evidence, n.inv("evidenceText")),
+        literal(evidence, n.inv("evidenceText"), "same bank account", `${RdfVocab.xsd.iri}string`)
+      ]
+      const rewordedRows = yield* asked(reworded, identity.query, identityVariables)
+      expect(A.map(rewordedRows, A.drop(5))).toStrictEqual([["same bank account"]])
+      const unlinked = dropped(graph, n.decision("test_Decision1"), n.inv("citesEvidence"))
+      expect(unlinked).toHaveLength(graph.length - 1)
+      const rows = yield* asked(unlinked, identity.query, identityVariables)
+      expect(rows).toStrictEqual([
+        [n.works, n.record("test_AcmeA"), n.record("test_AcmeB"), n.member("test_Dana"), "2026-11-01T09:00:00Z", ""]
+      ])
+    })
+  )
+})
+
+describe("gate 8, CQ-P05: no identity is stated by the construct CQ-P05 asks for", () => {
+  it.effect("on CQ-P04's fixture the ASK answers false: two records with no decision are two records", () =>
+    Effect.gen(function* () {
+      const graph = yield* fixtureGraph(identity.fixture)
+      const owl = yield* ontologyGraph
+      const answer = yield* askWhether([...graph, ...owl], sameness.query)
+      expect(answer).toBe(false)
+    })
+  )
+
+  it.effect(
+    "must-fail: CQ-P05's statement added and test_Decision1 removed, CQ-P04 has no row and the ASK is true",
+    () =>
+      Effect.gen(function* () {
+        const n = yield* partyNames
+        const graph = yield* fixtureGraph(identity.fixture)
+        const stated = yield* fixtureGraph(sameness.fixture)
+        const owl = yield* ontologyGraph
+        // The file holds one statement, from test_AcmeA to test_AcmeB, by a predicate CQ-P04's fixture never uses.
+        expect(A.map(stated, (triple) => [triple.subject, iriOf(triple)])).toStrictEqual([
+          [n.record("test_AcmeA"), n.record("test_AcmeB")]
+        ])
+        expect(A.some(graph, (triple) => A.some(stated, (given) => given.predicate === triple.predicate))).toBe(false)
+        const swapped = [...withoutSubjects(graph, [n.decision("test_Decision1")]), ...stated]
+        const rows = yield* asked(swapped, identity.query, identityVariables)
+        expect(rows).toStrictEqual([])
+        const answer = yield* askWhether([...swapped, ...owl], sameness.query)
+        expect(answer).toBe(true)
+        // Near miss: a record stated the same as itself says nothing, and the ASK answers false.
+        const reflexive = [...graph, ...A.map(stated, (given) => link(given.subject, given.predicate, given.subject))]
+        const itself = yield* askWhether([...reflexive, ...owl], sameness.query)
+        expect(itself).toBe(false)
+      })
+  )
+})
+
 describe("gate 8, the guards on the fixture's two parts", () => {
   it.effect("guard 1: the hand-written text states nothing the lift states", () =>
     Effect.gen(function* () {
@@ -756,8 +1053,9 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
-  // The forward plant of step 5 (PLAN, Step 9): the party fixtures state seven properties no other text states, so guard
-  // 3 fed CQ-P06's text alone, as before step 5, reports them.
+  // The forward plant of step 5 (PLAN, Steps 9 and 10): the party fixtures state thirteen properties no other text
+  // states, so guard 3 fed CQ-P06's text alone, as before step 5, reports them; and CQ-P04's fixture alone states the
+  // six of step 10, so with it left out guard 3 reports those six.
   it.effect(
     "guard 3 reads every hand-written fixture text: with CQ-P06's alone or left out, a property is unshown",
     () =>
@@ -768,7 +1066,9 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "bare-type.fixture.ttl",
           "CQ-P01.fixture.ttl",
           "CQ-P02.fixture.ttl",
-          "CQ-P09.fixture.ttl"
+          "CQ-P09.fixture.ttl",
+          "CQ-P04.fixture.ttl",
+          "CQ-P05.fixture.ttl"
         ])
         const texts = yield* Effect.forEach(
           handWrittenFixtures,
@@ -790,12 +1090,29 @@ describe("gate 8, the guards on the fixture's two parts", () => {
         expect(alone).not.toStrictEqual([])
         expect(unshown(context.vocabulary, alone)).toStrictEqual([
           "recordOf",
+          "decidesOn",
+          "identityOutcome",
+          "decidedBy",
+          "citesEvidence",
           "sourceSystem",
           "sourceType",
           "sourceId",
           "capturedAt",
           "isCustomer",
-          "isVendor"
+          "isVendor",
+          "eventTime",
+          "evidenceText"
+        ])
+        const notIdentity = A.filter(texts, ({ name }) => name !== "CQ-P04.fixture.ttl")
+        const withoutIdentity = A.flatMap(notIdentity, ({ graph }) => graph)
+        expect(withoutIdentity).not.toStrictEqual([])
+        expect(unshown(context.vocabulary, withoutIdentity)).toStrictEqual([
+          "decidesOn",
+          "identityOutcome",
+          "decidedBy",
+          "citesEvidence",
+          "eventTime",
+          "evidenceText"
         ])
       })
   )

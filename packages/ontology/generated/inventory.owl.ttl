@@ -29,6 +29,11 @@ gist:Content a owl:Class ;
     owl:disjointWith gist:Organization ,
         gist:PhysicalIdentifiableItem .
 
+gist:Determination a owl:Class ;
+    rdfs:subClassOf gist:Event .
+
+gist:Event a owl:Class .
+
 gist:LivingThing a owl:Class ;
     rdfs:subClassOf gist:PhysicalIdentifiableItem .
 
@@ -52,6 +57,16 @@ inv:Grant a owl:Class ;
     rdfs:subClassOf gist:Assignment ;
     skos:prefLabel "Grant"@en ;
     skos:definition "An assignment of one role to one member at one scope (the whole tenant, one site or one field), made by a member allowed to make it."@en .
+
+inv:IdentityDecision a owl:Class ;
+    rdfs:subClassOf gist:Determination ;
+    skos:prefLabel "Identity decision"@en ;
+    skos:definition "A determination by a member that two source records the tenant holds describe the same party, or different parties, resting on the evidence it cites."@en .
+
+inv:IdentityEvidence a owl:Class ;
+    rdfs:subClassOf gist:Content ;
+    skos:prefLabel "Identity evidence"@en ;
+    skos:definition "A statement of one observed likeness or difference between two source records the tenant holds, such as a shared tax number or names one letter apart, cited by an identity decision."@en .
 
 inv:Member a owl:Class ;
     rdfs:subClassOf gist:TemporalRelation ;
@@ -88,6 +103,23 @@ inv:Tenant a owl:Class ;
     skos:prefLabel "Tenant"@en ;
     skos:definition "An organization for which this application keeps a workspace, whose records are scoped to it and hidden from every other organization."@en .
 
+inv:citesEvidence a owl:ObjectProperty ;
+    rdfs:range inv:IdentityEvidence ;
+    skos:prefLabel "cites evidence"@en ;
+    skos:definition "Links a decision to a piece of evidence it rests on."@en .
+
+inv:decidedBy a owl:ObjectProperty ;
+    rdfs:domain inv:IdentityDecision ;
+    rdfs:range inv:Member ;
+    skos:prefLabel "decided by"@en ;
+    skos:definition "Links an identity decision to the member who made it."@en .
+
+inv:decidesOn a owl:ObjectProperty ;
+    rdfs:domain inv:IdentityDecision ;
+    rdfs:range inv:SourceRecord ;
+    skos:prefLabel "decides on"@en ;
+    skos:definition "Links an identity decision to one of the two source records it compares."@en .
+
 inv:grantScope a owl:ObjectProperty ;
     rdfs:subPropertyOf gist:isCategorizedBy ;
     rdfs:domain inv:Grant ;
@@ -105,6 +137,12 @@ inv:grantsRole a owl:ObjectProperty ;
     rdfs:range inv:Role ;
     skos:prefLabel "grants role"@en ;
     skos:definition "Links a grant to the role it gives."@en .
+
+inv:identityOutcome a owl:ObjectProperty ;
+    rdfs:subPropertyOf gist:isCategorizedBy ;
+    rdfs:domain inv:IdentityDecision ;
+    skos:prefLabel "identity outcome"@en ;
+    skos:definition "Links an identity decision to what it found: the two records denote one party, or two."@en .
 
 inv:inTenant a owl:ObjectProperty ;
     rdfs:range inv:Tenant ;
@@ -152,6 +190,18 @@ inv:capturedAt a owl:DatatypeProperty ;
     skos:prefLabel "captured at"@en ;
     skos:definition "The instant a source record was last read from its system: one value, which each later read of the same record replaces."@en .
 
+inv:eventTime a owl:DatatypeProperty ;
+    rdfs:subPropertyOf gist:atDateTime ;
+    rdfs:range xsd:dateTime ;
+    skos:prefLabel "event time"@en ;
+    skos:definition "The instant at which an event occurred, as its record states it."@en .
+
+inv:evidenceText a owl:DatatypeProperty ;
+    rdfs:domain inv:IdentityEvidence ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "evidence text"@en ;
+    skos:definition "The evidence in a sentence a person reads, naming the two values compared."@en .
+
 inv:isCustomer a owl:DatatypeProperty ;
     rdfs:domain inv:SourceRecord ;
     rdfs:range xsd:boolean ;
@@ -193,7 +243,13 @@ inv:sourceType a owl:DatatypeProperty ;
     skos:prefLabel "source type"@en ;
     skos:definition "The record type the external system gives a source record, as written."@en .
 
+gist:atDateTime a owl:DatatypeProperty .
+
 inv:GrantScopeKindScheme-organization a owl:NamedIndividual .
+
+inv:IdentityOutcomeScheme-differentParties a owl:NamedIndividual .
+
+inv:IdentityOutcomeScheme-sameParty a owl:NamedIndividual .
 
 inv:MemberRoleScheme-admin a owl:NamedIndividual ,
         inv:Role .

@@ -1,0 +1,6 @@
+id: "po:sha256:c8e8fdebd997dbac3d3e155859f2f36e0a483bd39803752034c82e0dc7ad5bfe"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 176, end_line: 176}
+quote: "Links an audit entry to the member it names as having made the change (decision 106)."
+epistemic_status: quoted_prose

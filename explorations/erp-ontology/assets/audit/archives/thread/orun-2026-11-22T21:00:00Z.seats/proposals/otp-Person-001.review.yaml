@@ -1,0 +1,53 @@
+target: "otp:Person:001"
+target_sha256: "233b30b3bbecd71f8caa981c88996e63222772806d3deb75e6618be035f213d8"
+chain_sha256: "ff641a91f746cb7187f44fed06290d5e61bf273d0de64ac6269bc4de9ba415ef"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Drop gist:Person until some ancestor, itself included, supplies an identity criterion that decides death and duplicate persons."
+  - "Replace the identity criterion so it returns same or different for a human who dies while the contact entry remains, and for two contact records of one human. Do not leave organism continuity and legal-person continuity both open inside one criterion."
+  - "Replace the null discriminator. The cited quotations stay true as comments on a Person DTO; cite a fact that would be false of that twin, or stop rejecting the implementation-only null."
+attacks:
+  - surface: taxonomy
+    rule: "sortal-without-identity-supplier"
+    counterexample: "Person is proposed as a rigid kind whose only parent is gist:Person, but supplies_identity is unresolved and no artifact shows the parent supplying identity. Ada is entered once as a workspace member and once as a supplier contact. Nothing in the is-a chain decides whether those are one individual of the parent or two."
+    outcome: landed
+  - surface: taxonomy
+    rule: "no-valid-subsumption"
+    counterexample: "The account-or-contact-record rival is still viable. The contact record 'Ada at Northwind' is then a candidate individual of the undecided Person symbol, and a contact record is not an individual of gist:Person. The edge is asserted while that rival remains open."
+    outcome: landed
+  - surface: taxonomy
+    rule: "anti-rigid-superclass"
+    counterexample: "Tried: a human the tenant stops dealing with would leave an anti-rigid parent while persisting. The artifacts never classify gist:Person as anti-rigid, and the child is the rigid side, so rigid-under-anti-rigid is not shown."
+    outcome: survived
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Ada dies on Monday and the tenant keeps her contact on Tuesday. Organism continuity ends the Person at death. Legal or contact continuity keeps the same individual as Tuesday's contact. The published criterion, 'continuity of that human', licenses both, so it identifies the ended organism with the Tuesday contact and separates them in the same text."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: account ids or display names are the criterion. The card says they cannot supply identity, and reidentification_key is empty. Two accounts of Ada are not two humans under the stated criterion."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P06 is enumerative and merely mentions Person. Its decision is whether a person may be shown an action in one organization and nowhere else, and the sample is one person, test_Ravi, with two members. That sameness is unanswerable from member ids alone."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a Person interface commented with po:sha256:8746f14a1bc5f08392dc18e902915c61f9f21e9403967eed57cc9c873aa67dc7 ('A human being that a tenant deals with...') and a holder field commented with po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c ('independently of any account'). Both quotations stay true and no human exists. The discriminator's fact is about the quotations, so it is not false of the twin."
+    outcome: landed
+rival_models_still_viable:
+  - "Subkind of a broader organism kind, inheriting its identity criterion."
+  - "Human in a tenant-contact role: anti-rigid and relationally dependent if tenant involvement is definitional."
+  - "Account or contact record (information_artifact)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:8746f14a1bc5f08392dc18e902915c61f9f21e9403967eed57cc9c873aa67dc7"
+  - "po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c"

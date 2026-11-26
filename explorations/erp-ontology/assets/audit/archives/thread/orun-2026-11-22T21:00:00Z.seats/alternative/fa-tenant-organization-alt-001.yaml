@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:tenant-organization-alt:001"
+hypothesis_ref: "dh:tenant-organization:001"
+identity_card_ref: "ic:tenant-organization-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+  - label: "Tenant as anti-rigid role of Organization, relational on a workspace/service relationship (this seat)"
+    still_viable: true
+  - label: "Tenant = workspace (isolation boundary) rather than organization"
+    still_viable: true
+  - label: "Tenant as subscription relator"
+    still_viable: true
+strongest_counterexample: "An organization closes its workspace and opens a new one: under the role model it is the same tenant-bearer playing the role twice; under the workspace model these are two tenants."
+verdict: analyzed
+needed_evidence: "Cardinality of organization-to-workspace and whether workspaces can be transferred between organizations."

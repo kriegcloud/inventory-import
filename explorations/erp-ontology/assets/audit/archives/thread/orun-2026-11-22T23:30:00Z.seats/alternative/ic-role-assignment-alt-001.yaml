@@ -1,0 +1,51 @@
+{
+  "id": "ic:role-assignment-alt:001",
+  "hypothesis_ref": "dh:role-assignment:001",
+  "identity": {
+    "supplies_identity": "unresolved",
+    "identity_criterion": "unresolved: the stated criterion (member + the record field 'role', po:a189eb95f95d / po:4ddf67948771) makes 'viewer→admin' the SAME Grant with a changed role relatum, while a relator reading makes it a new Grant. Which is intended is not stated; the source already announces a breaking change of criterion when grants get stored ids.",
+    "reidentification_key": [
+      "<member IRI>/role (derived node IRI)",
+      "future: a stored grant id"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": "unresolved",
+    "supplies_identity": "unresolved",
+    "unity": "unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "relator",
+    "alternatives": [
+      "mode/quality of the Membership (its role value): observationally equivalent today because there is exactly one grant per member and one scope concept",
+      "information_object (the role field) only"
+    ],
+    "existential_dependencies": [
+      "Membership/member holding it (grantedTo)",
+      "Role concept (grantsRole)",
+      "scope (grantScope)",
+      "granting member (stated 'made by a member allowed to make it', no property observed)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": [
+      "revoked/superseded on role change or removal (not observed)"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Role change under the stated criterion: ChangeRole rewrites member.role; the Grant node keeps IRI <member>/role, so the 'same' Grant now relates the member to admin instead of viewer. A relator whose mediated relatum changes is not the same relator — so either the criterion or the relator category is wrong."
+    },
+    {
+      "description": "Vacuous CQ: the CQ added to force Grant ('at which scope does each member hold which role', po:773104c28ed4) is answerable from member.role plus the single shipped scope concept 'organization' as a constant. No observation distinguishes Grant from a property of Membership."
+    },
+    {
+      "description": "Grantor: the definition says the assignment is 'made by a member allowed to make it', but no grantor link, time, or making event is observed."
+    }
+  ],
+  "status": "proposed"
+}

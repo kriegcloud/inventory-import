@@ -1,0 +1,44 @@
+{
+  "id": "so:sha256:fc503554c4e9499fc379e6aaa602e85fb4b5380e14473df631987661aa239d81",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 46,
+    "end_line": 53,
+    "content_sha256": "c5647918a4a29d014b698877d7a8484d8cc1d5077096a5c9020f8cba0633452f"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AddPerson",
+    "lexical_name": "AddPerson",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_field",
+      "object": "email"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "role"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "AddPerson"
+    },
+    {
+      "predicate": "references_type",
+      "object": "Role"
+    }
+  ],
+  "source_excerpt": "export class AddPerson extends S.Opaque<AddPerson, { readonly brand: unique symbol }>()(\n  S.Struct({\n    email: EmailToFind.pipe(\n      S.annotateKey({ description: emailDescription, messageMissingKey: \"Give the email the person signed up with.\" })\n    ),\n    role: Role.pipe(S.annotateKey({ messageMissingKey: \"Choose a role: viewer, editor or admin.\" }))\n  }).pipe($I.annoteSchema(\"AddPerson\", { description: \"Add the person who signed up with this email, with this role\" }))\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

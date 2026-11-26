@@ -1,0 +1,26 @@
+id: dh:source-hasrole:001
+observation_refs:
+- so:sha256:14609510049a10b95b58d02c5a03c3df4d62f3eb93b90fabfe36c554bbdb3c16
+cq_warrants: []
+proposed_referent:
+  label: role comparison helper
+  description: One comparison function definition; each evaluation is a separate computation.
+    The observed rank comparison does not establish a grant or a live authorization
+    decision.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Access-level ordering specification
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

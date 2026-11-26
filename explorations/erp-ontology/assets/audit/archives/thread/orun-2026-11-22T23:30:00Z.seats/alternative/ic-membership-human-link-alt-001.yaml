@@ -1,0 +1,38 @@
+{
+  "id": "ic:membership-human-link-alt:001",
+  "hypothesis_ref": "dh:membership-human-link:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "Not an individual: a mediation link has no identity of its own beyond its relata (Membership, Person).",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "mediation relation of the Membership relator to its Person relatum (an object property, not a class) — my positive reading",
+      "information-level link from a Member record to a Person record (a resolution assertion), which can be wrong and corrected"
+    ],
+    "existential_dependencies": [
+      "Membership",
+      "Person"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Duplicate-person merge: decision 409 says two records of one human are merged as data quality. After the merge, a Member that linked to Person record A now links to Person record B. In the world the mediated human never changed (mediation is rigid for the relator), but in the data the link did — so the observed link is a resolution assertion about the world mediation, not the mediation itself."
+    }
+  ],
+  "status": "proposed"
+}

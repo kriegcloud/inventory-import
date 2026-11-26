@@ -1,0 +1,30 @@
+id: dh:tenant-organization:001
+observation_refs:
+- po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001
+cq_warrants:
+- CQ-P06
+- CQ-P09
+proposed_referent:
+  label: Organization served by a workspace
+  description: An organization in the tenant role while the application keeps its
+    workspace. Individuation follows the served organization in that application context;
+    whether one organization may have several workspaces is unspecified.
+representation_status: domain_referent
+alternatives:
+- label: Workspace or data partition
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotation identifies the tenant as an organization for which
+    a workspace is kept and whose records are hidden from other organizations. Its
+    asserted bearer is the served organization, not merely the partition implementation;
+    actual isolation is unverified.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

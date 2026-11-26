@@ -1,0 +1,83 @@
+id: otp:Organization:001
+hypothesis_ref: dh:organization:001
+identity_card_ref: ic:organization:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Organization
+  local_name: Organization
+  proposed_iri: https://example.org/inventory-import/ontology/Organization
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: An organized body of people or other organizations formed for a purpose, including a company a
+    tenant buys from, sells to, ships with or has goods made by, or the tenant itself.
+  source:
+  - CQ-P06
+  - po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: unresolved
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: unresolved
+  dependence: unresolved
+parents:
+- parent: gist:Organization
+  justification: Provisional is-a placement supported by the supplied gist projection and thin-thread
+    section 2; unresolved identity and category choices remain explicit below.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Organization
+    compatibility: Broader parent candidate from the supplied gist 14.1.0 projection; the local definition
+      narrows its meaning. This is not an exact-reuse or equivalence claim.
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotation
+  explicitly describes a body of people or organizations formed for a purpose, including companies that
+  buy, sell, ship or manufacture; those participants and activities are referents outside a software declaration.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:organization:001): Identity and unity rules for mergers, succession, purpose change
+  and replacement of constituents; clarify whether legal entities and informal bodies share an identity
+  provider.'
+- 'Identity criterion from ic:organization:001: Unresolved: continuity of the organized social body is
+  proposed, but purpose, name, constituent members and a directory key are not individually sufficient.
+  The text supplies no criterion for legal succession, mergers, splits or complete replacement of constituents.'
+- 'Design disagreement: section 2.1 calls this a kind with stated identity. The joined card leaves category,
+  rigidity and identity unresolved; neither name, purpose, membership roster nor directory key establishes
+  continuity.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Social-agent kind with institutional
+  continuity supplying identity. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Identity and unity rules for mergers, succession, purpose
+  change and replacement of constituents; clarify whether legal entities and informal bodies share an
+  identity provider.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Collective whose unity follows an organization
+  of constituents. Choose the proposed shape or this rival explicitly; the current proposal does not decide
+  between them. Evidence required: Identity and unity rules for mergers, succession, purpose change and
+  replacement of constituents; clarify whether legal entities and informal bodies share an identity provider.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Category covering different social-body
+  kinds without a common supplied identity. Choose the proposed shape or this rival explicitly; the current
+  proposal does not decide between them. Evidence required: Identity and unity rules for mergers, succession,
+  purpose change and replacement of constituents; clarify whether legal entities and informal bodies share
+  an identity provider.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Organization directory record (information_artifact).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

@@ -1,0 +1,21 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:access-level-alt:001"
+hypothesis_ref: "dh:access-level:001"
+identity_card_ref: "ic:access-level-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+  - label: "Access level as an ordinal quality value of the grant relator (this seat's model)"
+    still_viable: true
+  - label: "Access level as a social role universal (Viewer/Editor/Admin) played by the member, constituted by the grant"
+    still_viable: true
+  - label: "Access level as a deontic mode (powers/permissions) inhering in the grant"
+    still_viable: true
+  - label: "Controlled-vocabulary entry only (no domain referent beyond the vocabulary)"
+    still_viable: true
+strongest_counterexample: "Member.role 'What this member may do in this organization' places the level on the member in one organization with no scope; a member holding editor org-wide and admin at one location cannot be expressed, so either the level belongs to a per-scope grant (quality model) or scope is not yet real in the implementation."
+verdict: analyzed
+needed_evidence: "Discriminating evidence: (1) whether a member can hold different levels at different scopes at the same time (favours quality-of-grant over role universal); (2) whether levels carry editable permission sets beyond rank (favours mode); (3) whether hasRole's rank comparison is the only semantic use (favours ordinal quality value)."

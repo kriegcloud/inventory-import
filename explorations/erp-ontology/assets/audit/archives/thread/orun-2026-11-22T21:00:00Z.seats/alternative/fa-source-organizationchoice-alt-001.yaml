@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-organizationchoice-alt:001"
+hypothesis_ref: "dh:source-organizationchoice:001"
+identity_card_ref: "ic:source-organizationchoice-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Display projection of a tenant organization (id + name)"
+    still_viable: true
+strongest_counterexample: "The choice adds nothing to Organization except availability to this account in this session, which is session context."
+verdict: analyzed
+needed_evidence: ""

@@ -1,0 +1,57 @@
+target: "otp:Tenant:001"
+target_sha256: "3360877b913170a74f0690def0598458cff23667bf1879adf32c27960725b94c"
+chain_sha256: "d59fd3f30da1a8eddc994a91794a0e1505dc46f634749c5b19aecba9a81100e6"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Remove Tenant is-a Organization until Organization supplies the identity Tenant claims to carry. A role with supplies_identity false under a parent that supplies none has no identity-supplying kind ancestor."
+  - "Decide legal succession before inheriting organization identity. State whether Northwind Ltd and its successor, under one workspace, are one Tenant."
+  - "Do not reject the implementation-only null on po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001 alone. That sentence can comment a partition, and the discriminator already admits isolation is unverified."
+attacks:
+  - surface: taxonomy
+    rule: "sortal-without-identity-supplier"
+    counterexample: "Tenant carries identity and supplies none. Its only parent, Organization, also supplies none. Northwind Ltd is succeeded by Northwind Logistics Ltd while one workspace remains. No ancestor can say which corporation is the Tenant individual."
+    outcome: landed
+  - surface: taxonomy
+    rule: "no-valid-subsumption"
+    counterexample: "The tenancy-record rival and the workspace-service relator rival are both still viable. A tenancy row, or the relator between ExampleWorks and the application, is a candidate individual of the undecided term and is not an Organization. The is-a edge classifies it as one."
+    outcome: landed
+  - surface: taxonomy
+    rule: "anti-rigid-superclass"
+    counterexample: "Tried: rigid subclass of an anti-rigid parent. Tenant is the anti-rigid child and Organization's rigidity is unresolved. An organization that closes its workspace leaves Tenant and remains an organization, which is allowed."
+    outcome: survived
+  - surface: taxonomy
+    rule: "role-without-dependence-rationale"
+    counterexample: "Tried: a role with no relational-dependence rationale. The card says the organization is a tenant only while the application keeps a workspace for it, and can exist before and after. The rationale is present."
+    outcome: survived
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "The criterion says sameness is the served organization's sameness, and that criterion has no succession rule. Northwind Ltd and Northwind Logistics Ltd under one workspace id are therefore both the same Tenant and not the same Tenant."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: OrganizationId is bearer identity. The proposal says it is a technical pointer, and reidentification_key is empty."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P06 and CQ-P09 merely mention Tenant. CQ-P09 is a constraint whose decision is whether a tenant's data is that tenant's alone. Without a served-organization bearer the decision has no subject, and CQ-P06's sample is keyed by tenant."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a partition commented with po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001 ('An organization for which this application keeps a workspace... hidden from every other organization'). The quotation stays true. The discriminator says actual isolation is unverified, so no observed fact would be false of the partition."
+    outcome: landed
+rival_models_still_viable:
+  - "Workspace-service relator mediating organization and application, distinct from its tenant bearer."
+  - "Information record of tenancy, distinct from the served organization."
+  - "Workspace or data partition (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "CQ-P09"
+  - "po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001"

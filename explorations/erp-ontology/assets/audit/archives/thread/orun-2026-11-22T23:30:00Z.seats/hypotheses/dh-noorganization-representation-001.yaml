@@ -1,0 +1,24 @@
+id: dh:noorganization-representation:001
+observation_refs:
+- so:sha256:a1cd7ef956abd7f2020494c480326eced3144a131138c624ea13ab25ea25a44a
+cq_warrants: []
+proposed_referent:
+  label: NoOrganization session branch
+  description: 'Candidate real/domain referents: none established. This branch represents a signed-in
+    account without a usable selected organization. Instances are session-state snapshots, dependent on
+    an account and selection context; no domain identity or persistent state transition is established.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A temporary lack of usable workspace membership
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

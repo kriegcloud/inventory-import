@@ -1,0 +1,37 @@
+{
+  "id": "ic:scope-vocabulary-alt:001",
+  "hypothesis_ref": "dh:scope-vocabulary:001",
+  "identity": {
+    "supplies_identity": "unresolved",
+    "identity_criterion": "unresolved: as for MemberRoleScheme — the scheme note states no identity criterion of its own while member concepts are identified by scheme + notation.",
+    "reidentification_key": [
+      "GrantScopeKindScheme"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": "unresolved",
+    "supplies_identity": "unresolved",
+    "unity": "unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "collective of scope-kind concepts",
+      "grouping device for serialized codes (null)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "The definition lists three extents (organization, location, field — po:b32d63c6c6ff) but only one ships (po:19ca3041dabc). Under a collective reading the scheme changes identity when 'location' is added; under an information-object reading it is the same scheme revised. Nothing observed decides this."
+    }
+  ],
+  "status": "proposed"
+}

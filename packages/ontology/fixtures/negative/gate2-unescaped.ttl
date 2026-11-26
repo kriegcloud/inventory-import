@@ -1,0 +1,3 @@
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+inv:Member skos:definition "A "relationship" between two things."@en .

@@ -1,0 +1,40 @@
+target: "otp:membershipIn:001"
+target_sha256: "fc065002ff6a97a1519ab59a5fcd53dc73e9a639272b5292a34d6e33218566da"
+chain_sha256: "f850943481167828e9b495bf0917a94be198c66dd497bf0128d9d8c4bc84a3dc"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "CQ-P06 asks for members of an organization. The range is Tenant. A supplier organization the tenant buys from (po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b, cited by Organization) is an organization in that question and not a Tenant. Do not claim membershipIn answers the CQ for those organizations."
+  - "State the transfer rule. Moving one episode from tenant A to tenant B is one context or two, and the criterion currently says both."
+  - "Replace the null discriminator. po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a can comment a tenantId foreign key."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Membership episode M starts in tenant A and is transferred to tenant B without removal and recreation. The criterion says the same relation is the same episode and the same tenant bearer. Transfer rules are absent on the membership card. Keeping one episode identifies a context that changed tenant; splitting by tenant separates one episode into two relations. The criterion does both."
+    outcome: landed
+  - surface: warrant
+    rule: "cq-mismatch"
+    counterexample: "CQ-P06 asks who the members of this organization are. membershipIn's range is Tenant, a workspace role. po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b includes a company the tenant buys from as an organization. That company's members are in the question and are not in any Tenant, so membershipIn returns no row for them. The property does not answer the CQ it cites. CQ-P09's belonging question is likewise about organizations, not only workspace roles."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a tenantId foreign key commented with po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a ('Links a membership to the tenant it lets its person act in') and po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c. The discriminator says this context has access significance beyond a syntactic link. The observations are those sentences, which the foreign key still has."
+    outcome: landed
+rival_models_still_viable:
+  - "Tenant role played by the organization, with organization identity."
+  - "Mediation aspect of the membership relator."
+  - "Storage link to a workspace identifier (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "CQ-P09"
+  - "po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a"
+  - "po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c"
+  - "po:sha256:f06f5414bdd1e4bb71616923bd5302bd87856d08eb6d6d3fe12eb852639d6b7b"

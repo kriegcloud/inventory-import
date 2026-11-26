@@ -1,0 +1,18 @@
+id: fa:grant-scope-content:001
+hypothesis_ref: dh:grant-scope-content:001
+identity_card_ref: ic:grant-scope-content:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Applicability situation joining assignment, tenant, scope kind, actual target and interval.
+  still_viable: true
+- label: Information assertion that a grant has a particular scope code.
+  still_viable: true
+strongest_counterexample: Two location grants cover different sites yet have the same extent-kind code.
+  Flattening kind into target makes the grants appear to cover the same records.
+verdict: explicitly_deferred
+needed_evidence: Supply actual-target selection and versioned scope semantics, and determine whether scope
+  changes replace the grant. Decision 96 explicitly names kind of scope, not a particular site.

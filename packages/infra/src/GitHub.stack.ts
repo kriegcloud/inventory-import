@@ -11,15 +11,16 @@
  * owner's own `env/op.env.local`, for that one run (`OpReferences.secrets.ts`). No workflow
  * deploys it: a job that could rewrite its own approval rule would have none.
  *
- * Must not break: a preview or staging job holds no model key, no sign-up list and no token for production's
- * account; the previews' password is written as a secret and never printed; only a run whose ref is `main` may use
+ * Must not break: a preview job holds no model key, no sign-up list and no token for production's account; a staging
+ * job holds no model key and no such token, and only the sign-up list Benjamin sets by hand as its environment's secret;
+ * the previews' password is written as a secret and never printed; only a run whose ref is `main` may use
  * the `production` environment, and nothing reaches production without its reviewer approving that run.
  *
  * Known, and Benjamin's choice of 2026-11-22 ("Keep sharing, say so"): staging shares the previews' Cloudflare
  * token and account. A token covers a whole account, and a pull request's run uses the pull request's own copy of
  * the workflow, so anyone who can push a branch to this repository can change or remove staging. The `staging`
  * environment's rule says which run may use that environment, not who can reach the stage. Staging holds test
- * accounts only and no model key.
+ * accounts and no model key, and, once someone invited signs up, that person's account: it is as reachable as staging.
  *
  * Known too, and his choice of 2026-11-22 ("Use my own token"): that shared token is not one this stack makes with
  * the five permissions a deploy needs. It is the account-owned token he made in the previews' account, so it allows
@@ -194,6 +195,8 @@ export default Alchemy.Stack(
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: productionAccount
     })
+    // Kept for the setup command, which reads it back as the list a run again keeps; the deploy job reads the
+    // production environment's secret `SIGN_UP` instead, set by hand, so the public log never prints an email.
     yield* GitHub.Variable("ProductionSignUp", {
       ...repository,
       environment: production,

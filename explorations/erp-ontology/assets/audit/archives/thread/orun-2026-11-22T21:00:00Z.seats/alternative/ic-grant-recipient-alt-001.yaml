@@ -1,0 +1,31 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:grant-recipient-alt:001"
+hypothesis_ref: "dh:grant-recipient:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No individual of its own: the link is the grant relator's mediation of its recipient; it is identified by (grant, recipient) and cannot outlive the grant."
+  reidentification_key:
+    - "grant -> MemberId"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+    - "role: Grantee, the anti-rigid role a member plays while mediated by a grant (the category-bearing referent on the bearer side)"
+    - "mediation object property holdsGrant/grantedTo, no class"
+  existential_dependencies:
+    - "the grant"
+    - "the recipient member"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+    - "ends with the grant"
+counterexamples:
+  - description: "If the recipient is a Membership (a relator), a relator would be playing a role; if it is the human qua member, the grant survives membership removal unless a further rule ends it. The link's bearer is unresolved between those two."
+  - description: "The hypothesis' 'instance follows the assignment episode' would make the link have its own temporal individuation, which a mediation does not have."
+status: proposed

@@ -1,0 +1,34 @@
+{
+  "id": "ic:noorganization-representation-alt:001",
+  "hypothesis_ref": "dh:noorganization-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'NoOrganization' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "phase of a sign-in session (signed in, no usable membership)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "'Or not in the chosen one' makes the phase depend on a choice, not on an intrinsic condition — so it is not a clean phase either."
+    }
+  ],
+  "status": "proposed"
+}

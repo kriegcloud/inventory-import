@@ -1,0 +1,6 @@
+id: "po:sha256:2c332e9298fcc6c7c51b57fa34c20af8a9e6d8906f610b7584ce170c17dd3733"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 393, end_line: 394}
+quote: "I chose a role class `Tenant` under `Organization`, keyed by `OrganizationId`; `membershipIn` ranges over it, and the thin thread ships it. The agent recommended the same."
+epistemic_status: quoted_prose

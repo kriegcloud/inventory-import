@@ -1,0 +1,15 @@
+# CQ-P06: Who are the members of this organization and which role does each hold?
+# The role is read through the grant and in no other way. "This organization" is a value of ?tenant.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+
+SELECT ?tenant ?person ?member ?role
+WHERE {
+  ?member a inv:Member ;
+          inv:membershipIn ?tenant ;
+          inv:membershipOf ?person .
+  ?grant a inv:Grant ;
+         inv:grantedTo ?member ;
+         inv:grantScope inv:GrantScopeKindScheme-organization ;
+         inv:grantsRole ?role .
+}
+ORDER BY ?tenant ?member

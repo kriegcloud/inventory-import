@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:organization-alt:001"
+hypothesis_ref: "dh:organization:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "unresolved: social/legal identity of an organized body (continuity of its organizing structure and purpose). Question for Benjamin: is identity legal-entity based (registration) or operational, and what do merger, split and rename do?"
+  reidentification_key:
+    - "OrganizationId (tenant-side); none observed for non-tenant organizations"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U): unified by organizational structure, not by its current members"
+  dependence: none
+ufo_analysis:
+  candidate_category: kind
+  alternatives:
+    - "collective (a group of people/organizations): rejected because members change without the organization ceasing"
+    - "role_mixin over legal entity and informal group, if both kinds are admitted"
+  existential_dependencies: []
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+    - "dissolved"
+    - "merged into another organization"
+counterexamples:
+  - description: "'A body of people or of other organizations' covers both firms and consortia; if a consortium's identity is fixed by its member set, it is a collective, not the same kind as a company."
+  - description: "Customer, vendor, carrier, contract manufacturer and the tenant itself are listed in the definition; they are roles of the organization relative to the tenant, not subkinds."
+status: proposed

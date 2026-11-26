@@ -1,0 +1,27 @@
+id: dh:source-addpersonproblemkind-unrepresented:001
+observation_refs:
+- so:sha256:51bc20c321f4bcacedd44c346d158fe25eeb43dadf3e9e1a41ee59fb4bd821c5
+- so:sha256:fb162a0dd7346f06ce23ea1a47230af2081659d92ea10a9ec5992296ea2989e7
+cq_warrants: []
+proposed_referent:
+  label: add-person problem code representation
+  description: One error code or its compile-time alias, describing noAccount or alreadyMember;
+    no observed database lookup establishes either condition in a real case.
+representation_status: unresolved
+alternatives:
+- label: Account absence or existing-membership condition
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

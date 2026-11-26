@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-sessionstate-alt:001"
+hypothesis_ref: "dh:source-sessionstate:001"
+identity_card_ref: "ic:source-sessionstate-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "SessionState as a phase-tagged snapshot of a Session referent (relator between account and application)"
+    still_viable: true
+strongest_counterexample: "A tagged union of response shapes is not a taxonomy: signed-out/no-organization/ready are phases of one session (if Session exists), not kinds."
+verdict: analyzed
+needed_evidence: "Whether a session is a domain referent with identity (session id, lifetime) or transport state only."

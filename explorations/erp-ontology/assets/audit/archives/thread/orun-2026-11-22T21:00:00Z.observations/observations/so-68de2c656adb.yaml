@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:68de2c656adba380bf27088384f3dbf0204150d43cdd55e26ea9c47f6433a8d4",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 180,
+    "end_line": 184,
+    "content_sha256": "6eb8c46be4e3ca543890fb0f0e83b4fc9a03f714ae5207edd043d36cb50dec52"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SignedOut",
+    "lexical_name": "SignedOut",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class SignedOut extends S.Opaque<SignedOut, { readonly brand: unique symbol }>()(\n  S.Struct({ status: S.tag(\"signed-out\"), features: SignInFeatures }).pipe(\n    $I.annoteSchema(\"SignedOut\", { description: \"Nobody is signed in.\" })\n  )\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

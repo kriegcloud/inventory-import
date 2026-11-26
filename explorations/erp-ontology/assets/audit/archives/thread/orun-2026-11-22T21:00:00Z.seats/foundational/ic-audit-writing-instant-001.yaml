@@ -1,0 +1,32 @@
+id: ic:audit-writing-instant:001
+hypothesis_ref: dh:audit-writing-instant:001
+identity:
+  supplies_identity: false
+  identity_criterion: 'Provisional: two instants are the same iff they occupy the same position in the
+    adopted temporal reference system, regardless of how many entries were written then. A timestamp value
+    encodes a position only under a timescale, zone/offset and precision contract; no such contract is
+    supplied.'
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: false
+  unity: unity
+  dependence: none
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Timestamp information value representing an instant or uncertainty interval.
+  - Temporal region/interval if writing time is only known at finite precision.
+  existential_dependencies:
+  - An instant is a temporal position, not existentially dependent on a particular entry or writing event.
+    The relation at which an entry was written depends on the writing occurrence.
+temporality:
+  exists_during_interval: false
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: Two entries have identical rounded timestamps but were written at different instants, or
+    two writings truly occur simultaneously. Value equality and entry identity both fail as temporal identity
+    criteria.
+status: proposed

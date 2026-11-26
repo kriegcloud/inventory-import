@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:7f71ea10b334f583a0205967b2099b4b9f550c88142ad10f11912a9b132b4d16",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/Activity/AuditTrail.read.ts"
+  },
+  "source_span": {
+    "start_line": 26,
+    "end_line": 26,
+    "content_sha256": "a0cb58ec5af0f23a6098d2eaf1b3aebd221d87ef4962b172a4d2624c1d0bb17b"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AuditTrail",
+    "lexical_name": "AuditTrail",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "AuditTrail"
+    }
+  ],
+  "source_excerpt": "export type AuditTrail = typeof AuditTrail.Type\n",
+  "epistemic_status": "parser_derived"
+}

@@ -241,7 +241,8 @@ flowchart LR
   assistant --> ai
 ```
 
-Dependencies point one way: the browser and the Worker both import the contract, the contract imports the domain, and
-the browser never imports the server. The review screen and the confirm run the same pure `review` on the same staged
-rows and decisions, so the server refuses what the preview refused. Every model call first takes one from the
-organization's daily allowance in `modelCall`; when it is used up, or there is no key, the feature's rules answer.
+Dependencies point one way: the browser, the Worker and the domain all import the contract; the domain never imports a
+driver, a host or the server; and the browser never imports the server. The review screen and the confirm run the same
+pure `review` on the same staged rows and decisions, so the server refuses what the preview refused. Every model call
+first takes one from the organization's daily allowance in `modelCall`; when it is used up, or there is no key, the
+feature's rules answer.

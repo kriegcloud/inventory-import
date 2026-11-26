@@ -1,0 +1,26 @@
+id: dh:source-addperson-unrepresented:001
+observation_refs:
+- so:sha256:538d2cc42036aa94c1f72eec954f3a6bf6d74adb681a63e5ed121597bb31145f
+cq_warrants: []
+proposed_referent:
+  label: add-person request representation
+  description: One email-and-role request value. Distinct requests may ask for the
+    same assignment; no execution or grant-making act is shown.
+representation_status: unresolved
+alternatives:
+- label: Request for workspace participation
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

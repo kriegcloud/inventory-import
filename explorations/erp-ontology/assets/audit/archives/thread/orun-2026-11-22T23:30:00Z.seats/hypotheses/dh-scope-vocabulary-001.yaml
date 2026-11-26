@@ -1,0 +1,29 @@
+id: dh:scope-vocabulary:001
+observation_refs:
+- po:sha256:b32d63c6c6ff8121657d1f6e1cbe10edb75ce2885e9ff6a458178ca1e5db1f1b
+- po:sha256:badeb1dc1a0680ab75832b2858d545aed1b7e203be21606c8b64935bfbac9227
+- po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45
+cq_warrants:
+- CQ-P11
+proposed_referent:
+  label: Grant extent vocabulary candidate
+  description: 'Candidate referent under evaluation: a controlled collection of access extents. Whole-organization,
+    location and field extents are described, but only organization is stated to ship. A collection instance
+    would require a scheme identity and maintenance boundary; the supplied scheme note explicitly provides
+    no identity criterion.'
+representation_status: unresolved
+alternatives:
+- label: A grouping device for serialized grant-scope codes
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The collection label, key convention and list of potential values can all describe representational
+    scaffolding. No independent scheme identity or use fact separates the vocabulary construct from that
+    null.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

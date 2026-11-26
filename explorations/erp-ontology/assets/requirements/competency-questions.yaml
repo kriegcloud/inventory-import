@@ -1,0 +1,93 @@
+# Competency questions for the thin thread (decision 8). Each is taken from report 04
+# (research/04-requirements.md) as report 14 (research/14-thin-thread.md) narrows it for the thread;
+# CQ-P10 is reworded by decision 106 and CQ-P11 is new by decision 102. Queries are drafted, not run: the vocabulary module, the generated Turtle and the
+# question suite are not built.
+cqs:
+  - id: CQ-P06
+    natural_language: "Who are the members of this organization and which role does each hold?"
+    decision: "Whether a person may be shown, offered or refused an action in one organization, from the role they hold there and nowhere else."
+    type: enumerative
+    priority: must_have
+    derivation_method: direct_lookup
+    source: "research/04-requirements.md CQ-P06; research/14-thin-thread.md section 5"
+    sample_answer:
+      - {tenant: "test_ExampleWorks", person: "test_Ravi", member: "test_RaviWorks", role: "admin"}
+      - {tenant: "test_SecondOrg", person: "test_Ravi", member: "test_RaviSecond", role: "viewer"}
+    sparql: |
+      PREFIX inv: <https://example.org/inventory-import/ontology/>
+      SELECT ?tenant ?person ?member ?role
+      WHERE {
+        ?member a inv:Member ;
+                inv:membershipIn ?tenant ;
+                inv:membershipOf ?person .
+        ?grant a inv:Grant ;
+               inv:grantedTo ?member ;
+               inv:grantScope inv:GrantScopeKindScheme-organization ;
+               inv:grantsRole ?role .
+      }
+      ORDER BY ?tenant ?member
+    must_fail: "The two grantsRole triples removed from the lifted part: zero rows (report 14, section 5.4, M2)."
+    test_status: "drafted; run: not built"
+    required_classes: [Organization, Tenant, Person, Member, Role, Grant]
+    required_properties: [membershipIn, membershipOf, grantedTo, grantsRole, grantScope]
+    required_schemes: [MemberRoleScheme, GrantScopeKindScheme]
+    out_of_scope:
+      - "Members who were removed: removedAt is the party slice's"
+      - "What a role permits"
+  - id: CQ-P09
+    natural_language: "Does any record belong to no organization, or to two, or point at a record of another organization?"
+    decision: "Whether a tenant's data can be trusted to be that tenant's alone before a record is shown or changed."
+    type: constraint
+    priority: must_have
+    derivation_method: direct_lookup
+    source: "research/04-requirements.md CQ-P09; research/14-thin-thread.md section 2.2"
+    sample_answer: []
+    closure_assumption: "A missing tenant link is read as a violation; this holds only for records the lift wrote whole. Put to Benjamin with the party slice."
+    test_status: "drafted in report 04 for the party slice; the thread does not run it"
+    required_classes: [Tenant, Member, AuditEntry]
+    required_properties: [membershipIn, inTenant]
+    out_of_scope:
+      - "Stock positions and items: the warehouse slice"
+  - id: CQ-P10
+    natural_language: "What does each audit entry say was done, which member does it name, and when was it written?"
+    decision: "Whether a person reading the audit trail can be shown, for each entry, the member it names, the action it states and the instant it was written; the entry is a record about a change and does not prove who made it (decision 106)."
+    type: enumerative
+    priority: should_have
+    derivation_method: direct_lookup
+    source: "research/04-requirements.md CQ-P10, the part decision 98 keeps for the thread; research/14-thin-thread.md section 3.5"
+    sample_answer:
+      - {entry: "test_Activity1", actor: "test_RaviWorks", action: "Imported items", recordedAt: "2026-01-01T00:00:00Z"}
+    test_status: "drafted in report 04 for the party slice; the thread does not run it"
+    required_classes: [AuditEntry, Member]
+    required_properties: [recordedActor, action, recordedAt, inTenant]
+    out_of_scope:
+      - "Whether an agent acted for the member: AgentRun is the party slice's (decision 98)"
+      - "Whether a removed member is still named"
+  - id: CQ-P11
+    natural_language: "At which scope does each member hold which role?"
+    decision: "Whether a role a member holds applies to every record of the organization or only to a narrower extent, before an action on one record is offered or refused."
+    type: relational
+    priority: must_have
+    derivation_method: direct_lookup
+    source: "DECISIONS.md decision 102; research/14-thin-thread.md sections 2.1 to 2.4 (Grant, grantScope, GrantScopeKindScheme)"
+    sample_answer:
+      - {member: "test_RaviWorks", role: "admin", scope: "GrantScopeKindScheme-organization"}
+      - {member: "test_RaviSecond", role: "viewer", scope: "GrantScopeKindScheme-organization"}
+    sparql: |
+      PREFIX inv: <https://example.org/inventory-import/ontology/>
+      SELECT ?member ?role ?scope
+      WHERE {
+        ?grant a inv:Grant ;
+               inv:grantedTo ?member ;
+               inv:grantsRole ?role ;
+               inv:grantScope ?scope .
+      }
+      ORDER BY ?member ?scope
+    must_fail: "The two grantScope triples removed from the lifted part: zero rows. A role written on the member with no grant cannot state a scope, so the question has no answer without Grant."
+    test_status: "drafted; run: not built"
+    required_classes: [Member, Role, Grant]
+    required_properties: [grantedTo, grantsRole, grantScope]
+    required_schemes: [MemberRoleScheme, GrantScopeKindScheme]
+    out_of_scope:
+      - "Scopes narrower than the whole organization: sites and fields come with the slice that needs them (decision 96)"
+      - "What a role permits"

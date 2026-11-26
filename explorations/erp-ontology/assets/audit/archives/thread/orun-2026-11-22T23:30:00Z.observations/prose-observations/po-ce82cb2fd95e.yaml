@@ -1,0 +1,6 @@
+id: "po:sha256:ce82cb2fd95e4131746a50f6f6a39395dac6eeabf4feff1a2414407dde92f924"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 178, end_line: 178}
+quote: "The instant at which an audit entry was written. (new)"
+epistemic_status: quoted_prose

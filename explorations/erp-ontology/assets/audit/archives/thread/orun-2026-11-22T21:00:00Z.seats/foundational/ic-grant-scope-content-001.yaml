@@ -1,0 +1,32 @@
+id: ic:grant-scope-content:001
+hypothesis_ref: dh:grant-scope-content:001
+identity:
+  supplies_identity: false
+  identity_criterion: The same scope-kind association concerns the same assignment and selected extent
+    kind under a vocabulary version. It does not individuate a target site/field or establish equality
+    of actual permission extents. This is a relation extension, not a new individual or identity-supplying
+    sortal. Its holding is temporally qualified; participant identity is inherited from the referenced
+    analyses.
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Applicability situation joining assignment, tenant, scope kind, actual target and interval.
+  - Information assertion that a grant has a particular scope code.
+  existential_dependencies:
+  - Requires the assignment and extent-kind meaning; applicability also needs tenant and, for restricted
+    access, a selected target whose representation is not supplied here.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: Two location grants cover different sites yet have the same extent-kind code. Flattening
+    kind into target makes the grants appear to cover the same records.
+status: proposed

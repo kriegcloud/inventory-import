@@ -1,0 +1,39 @@
+{
+  "id": "ic:audit-writing-time-alt:001",
+  "hypothesis_ref": "dh:audit-writing-time:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No identity of its own: a temporal value of one entry (or of its writing occurrence).",
+    "reidentification_key": [
+      "Activity.createdAt (presumed source of recordedAt)"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "intrinsic"
+  },
+  "ufo_analysis": {
+    "candidate_category": "quality",
+    "alternatives": [
+      "the instant itself as a time individual (time:Instant)",
+      "the timestamp as an information artifact"
+    ],
+    "existential_dependencies": [
+      "AuditEntry (or its writing occurrence)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Clock source: if createdAt is set by the application clock before the transaction commits, two entries written in one batch can carry different values while being written at one commit instant — the value is then a recorded claim, not the write instant."
+    }
+  ],
+  "status": "proposed"
+}

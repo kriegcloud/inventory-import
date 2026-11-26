@@ -1,0 +1,24 @@
+{
+  "id": "fa:role-assignment-alt:001",
+  "hypothesis_ref": "dh:role-assignment:001",
+  "identity_card_ref": "ic:role-assignment-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "merged",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Relator Grant (member × role × scope × grantor)",
+      "still_viable": true
+    },
+    {
+      "label": "Mode/attribute of Membership (role value at implicit organization scope)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Exactly one grant per member, one scope value, no grantor, no history: every observation is reproduced by a role attribute on Membership. The models are observationally equivalent on current evidence.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "Any one of: (a) a member holding two grants at different scopes (site/field scope shipped); (b) grant history where a role change ends one grant and starts another; (c) a recorded grantor or grant time. Each would separate a relator from a membership attribute; also a ruling on whether a role change preserves Grant identity."
+}

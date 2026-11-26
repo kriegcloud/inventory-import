@@ -1,0 +1,25 @@
+id: dh:source-role:001
+observation_refs:
+- so:sha256:eb096a1254163a33ac3a6d958da433eed1ff61f2721b487a4f9b8081cd4123a9
+cq_warrants: []
+proposed_referent:
+  label: role schema or static alias
+  description: One literal schema or compile-time role alias; distinguish its source
+    identity from the access meanings and the vocabulary described by the prose.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Granted level of access
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

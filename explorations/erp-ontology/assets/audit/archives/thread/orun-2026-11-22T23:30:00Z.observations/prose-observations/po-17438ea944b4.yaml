@@ -1,0 +1,6 @@
+id: "po:sha256:17438ea944b4c4d7360830228707f119a5ed9bdd1620fdaaff4443e1dce4d3b9"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 136, end_line: 136}
+quote: "A named level of access a grant gives a member, such as viewer, editor or admin."
+epistemic_status: quoted_prose

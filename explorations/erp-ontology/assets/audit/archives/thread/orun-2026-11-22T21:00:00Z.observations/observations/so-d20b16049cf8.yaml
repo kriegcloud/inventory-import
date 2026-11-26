@@ -1,0 +1,48 @@
+{
+  "id": "so:sha256:d20b16049cf886b70d0abe8fc4f2ed22932915427521021b4c034d8b46a9bff3",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 59,
+    "end_line": 71,
+    "content_sha256": "ed31f7c90d0dfdbadfb6d47e025b97f50d3cf3383b0ea25bada1dd973f7e5f3d"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "TestAccount",
+    "lexical_name": "TestAccount",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_field",
+      "object": "email"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "memberships"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "name"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "TestAccount"
+    },
+    {
+      "predicate": "references_type",
+      "object": "DisplayName"
+    }
+  ],
+  "source_excerpt": "export class TestAccount extends S.Opaque<TestAccount, { readonly brand: unique symbol }>()(\n  S.Struct({\n    email: AccountEmail.pipe(S.annotateKey({ description: \"The email the account signs in with\" })),\n    name: DisplayName.pipe(S.annotateKey({ description: \"The account's name, as the sign-in page shows it\" })),\n    memberships: S.Array(Membership)\n      .check(S.isMaxLength(20))\n      .pipe(S.annotateKey({ description: \"Where the account belongs, earliest first\" }))\n  }).pipe(\n    $I.annoteSchema(\"TestAccount\", {\n      description: \"A local test account: written by `bun run dev`, never in a deployed database.\"\n    })\n  )\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

@@ -1,0 +1,29 @@
+id: dh:emailtofind-parser-gap:001
+observation_refs:
+- so:sha256:4e34e72580014581a647eaf3f65990e3e14a49b2786adf09ec468af3b9479534
+- so:sha256:f25ec1a0d819cd8dd06f0e389a5435aaeed206f8efa0863088e5535a94dd3e99
+cq_warrants: []
+proposed_referent:
+  label: EmailToFind constructs not represented by the adapter
+  description: 'Candidate real/domain referents: none established by these observation chains. The adapter
+    marks CallExpression, TypeQuery as unrepresentable. These chains are grouped by the observed symbol
+    only, not asserted to instantiate a domain kind. An observed declaration occurrence is individuated
+    by its supplied observation; neither its repeated excerpt nor its spelling establishes a domain instance.
+    More complete syntactic observations and semantic evidence are needed before these chains can support
+    a referent.'
+representation_status: unresolved
+alternatives:
+- label: A partially observed encoding of a domain concept or information object
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The closed observation vocabulary did not represent these constructs. Reusing the excerpt
+    to silently upgrade the unsupported chain would bypass that limit; the implementation-only null is
+    not rejected.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

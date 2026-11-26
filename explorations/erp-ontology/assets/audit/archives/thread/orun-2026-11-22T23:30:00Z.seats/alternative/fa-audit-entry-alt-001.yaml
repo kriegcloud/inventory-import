@@ -1,0 +1,23 @@
+{
+  "id": "fa:audit-entry-alt:001",
+  "hypothesis_ref": "dh:audit-entry:001",
+  "identity_card_ref": "ic:audit-entry-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Information object about a change (my ruling, concurring independently with the decision-106 rewording)",
+      "still_viable": true
+    },
+    {
+      "label": "The change event itself",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "A rolled-back batch: if the change rolls back, does the entry exist? 'Same batch' implies no, tying entry existence to change existence even though the entry is not the change.",
+  "verdict": "analyzed"
+}

@@ -41,13 +41,13 @@ describe("the plan of a stage", () => {
     })
   })
 
-  it("staging, what main holds, is on workers.dev with the test accounts, no model key, and sign-up closed", () => {
+  it("staging, what main holds, is on workers.dev with the test accounts, no model key, and reads a sign-up list", () => {
     expect(plan("staging")).toMatchObject({
       kind: "staging",
       address: { at: "workersDev" },
       seeds: ["organizations", "accounts"],
       modelKey: { from: "nowhere" },
-      signUp: { from: "nowhere" },
+      signUp: { from: "environment", variable: "SIGN_UP" },
       deployed: true
     })
   })

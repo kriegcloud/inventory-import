@@ -1,0 +1,23 @@
+id: fa:workspace-membership:001
+hypothesis_ref: dh:workspace-membership:001
+identity_card_ref: ic:workspace-membership:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Membership relator with creation/removal episodes
+  still_viable: true
+- label: Anti-rigid member role of the human, with the continuing human supplying identity
+  still_viable: true
+- label: Retained membership information object documenting an ended relation
+  still_viable: true
+strongest_counterexample: Remove a member and later recreate access for the same human in the same tenant,
+  perhaps reusing a handle. Two different establishments and one suspended relation fit the same current
+  row projection; no supplied history distinguishes them.
+verdict: explicitly_deferred
+needed_evidence: Supply creation/removal/rejoining and duplicate-member examples with effective dates,
+  person resolution and key reuse rules; decide whether a removed membership ceases or persists inactive
+  and what separates two membership establishments. The proposed relator rigidity concerns being a membership
+  relator, not the human retaining a role.

@@ -1,0 +1,24 @@
+id: dh:actorofsession-representation:001
+observation_refs:
+- so:sha256:17c5631a636fd0c5a7770920d9de468378ffcdf910e53e44114e1ef68ef1fbe9
+cq_warrants: []
+proposed_referent:
+  label: actorOfSession selector
+  description: 'Candidate real/domain referents: none established for the function itself. It selects
+    an optional actor from the ready branch. A function invocation is an implementation execution, not
+    a new actor, membership or action in the business domain.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: An acting-membership selection operation
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

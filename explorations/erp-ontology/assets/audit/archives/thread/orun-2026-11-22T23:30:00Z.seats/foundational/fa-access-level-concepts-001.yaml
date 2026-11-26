@@ -1,0 +1,19 @@
+id: fa:access-level-concepts:001
+hypothesis_ref: dh:access-level-concepts:001
+identity_card_ref: ic:access-level-concepts:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Bearer role or anti-rigid human class named Admin rather than the repeatable concept
+  still_viable: false
+- label: Version-specific entitlement specification with finer identity than scheme and notation if future
+    content-version policy requires it
+  still_viable: true
+strongest_counterexample: The notation admin in two different schemes need not be one concept; two humans
+  holding admin are not identical and create no new admin concept. A changed permission description under
+  the same notation exposes versioning policy not specified here.
+verdict: analyzed
+needed_evidence: ''

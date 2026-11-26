@@ -1,0 +1,36 @@
+{
+  "id": "so:sha256:e529b03ff56e449261ee2219c6889a2029b560b3aa7c463c9c6ccd124d638362",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/People/People.rejection.ts"
+  },
+  "source_span": {
+    "start_line": 19,
+    "end_line": 28,
+    "content_sha256": "e0ac7288271c02a3af86c437fed8f7cee86bafc73a411a42c56cc3f98094004a"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "PersonNotFound",
+    "lexical_name": "PersonNotFound",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_field",
+      "object": "reason"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "PersonNotFound"
+    }
+  ],
+  "source_excerpt": "export class PersonNotFound extends S.TaggedError<PersonNotFound, { readonly brand: unique symbol }>(\n  $I`PersonNotFound`\n)(\n  \"PersonNotFound\",\n  { reason },\n  $I.annoteError<PersonNotFound>(\"PersonNotFound\", {\n    description: \"The member in the address is not in this organization\",\n    httpApiStatus: 404\n  })\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

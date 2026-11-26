@@ -1,0 +1,3 @@
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+inv:membershipOf a owl:InverseFunctionalProperty .

@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Gate 4 reads one file outside the package: the decision log, whose headings say which decisions are answered
+    // (rule C12; report 14 section 6.10). It is neither in the package nor a dependency's source, so it is named here,
+    // or an edit to it, or its removal, replays gate 4's last pass. The kernel's literal is covered by the dependency
+    // edge, and the exception list by `$TURBO_DEFAULT$`.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts",
+        "$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md"
+      ]
+    },
+    // Gate 9, the reasoner (report 14 sections 6.9 and 6.10). Never cached: its pass depends on the Java installed
+    // and on the jar kept outside the repository, which no input can stand for, so a replay would skip the script's
+    // own check of both. Every `bun run check:full` starts it. Not in `bun run check`, which needs no Java.
+    "reason": { "dependsOn": ["transit"], "cache": false }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:4e34e72580014581a647eaf3f65990e3e14a49b2786adf09ec468af3b9479534",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 27,
+    "end_line": 32,
+    "content_sha256": "b6ff1f999d78803d3c7e399f2771536af1d1f8b6de569bca80586cc0c753de00"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "EmailToFind",
+    "lexical_name": "EmailToFind",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export const EmailToFind = S.Trim.pipe(\n  S.decode(SchemaTransformation.toLowerCase()),\n  S.decodeTo(AccountEmail),\n  $I.annoteSchema(\"EmailToFind\", { description: emailDescription }),\n  S.annotateEncoded({ description: emailDescription, examples: [\"elena@sample-supply.test\"] })\n)\n",
+  "epistemic_status": "parser_derived"
+}

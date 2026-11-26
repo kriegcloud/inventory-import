@@ -1,0 +1,26 @@
+id: dh:source-addpersonproblem-unrepresented:001
+observation_refs:
+- so:sha256:b339a8850f9d3ff0ed78bd56a74cdcc4105c9c48ec6313437a3276cff4540bc6
+cq_warrants: []
+proposed_referent:
+  label: form problem payload
+  description: One tagged form-response value with a problem sentence and suggested
+    next action. It does not prove a failure occurrence or an account's absence.
+representation_status: unresolved
+alternatives:
+- label: Human-readable problem report
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

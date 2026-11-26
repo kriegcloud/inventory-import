@@ -1,0 +1,49 @@
+{
+  "id": "ic:workspace-membership-alt:001",
+  "hypothesis_ref": "dh:workspace-membership:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "unresolved: is a Membership individuated by its founding (one making = one membership, so re-adding after removal is a new one), or by the (Person, tenant) pair (so re-adding resumes the same one)? The stated criterion — MemberId within its tenant, kept after removal (po:d81d11ca9403) — is a technical key and answers neither case.",
+    "reidentification_key": [
+      "Member.organizationId",
+      "Member.id (MemberId), retained after removal"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "relator",
+    "alternatives": [
+      "role 'member' played by a Person in relation to a Tenant (the Member record would then be a role-instance / qua-individual, not a relator)",
+      "information_object only (the member row)"
+    ],
+    "existential_dependencies": [
+      "Person (the human who holds it — po:84869274c0b0)",
+      "Tenant / workspace it lets the person act in (po:737ff1456ab1)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": [
+      "removed"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Record outlives relator: the MemberId is 'kept after removal', and AuditEntries keep naming the member after removal. The relationship ends at removal but the information object persists — the hypothesis's 'tracked by tenant plus MemberId retained after removal' runs the continuant (relator, ends at removal) together with its record (persists)."
+    },
+    {
+      "description": "Member mixes relator and bearer content: the Member class carries the human's display name and is annotated 'people are told apart by this id', i.e. it is used as a person handle, contradicting decision 409 that a member id never identifies a person. A human with two memberships has two 'people ids' under the code's own reading."
+    },
+    {
+      "description": "Account binding: the session Membership summary is 'an organization the account belongs to' (SessionState.read.ts), and AddPerson adds 'the person who signed up with this email' — membership creation is mediated by an account even though po:84869274c0b0 says the human link is independent of any account."
+    }
+  ],
+  "status": "proposed"
+}

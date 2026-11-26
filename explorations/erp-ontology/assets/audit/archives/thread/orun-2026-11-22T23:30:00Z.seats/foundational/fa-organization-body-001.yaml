@@ -1,0 +1,23 @@
+id: fa:organization-body:001
+hypothesis_ref: dh:organization-body:001
+identity_card_ref: ic:organization-body:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Organizational collective with membership-based unity
+  still_viable: true
+- label: Institutional organized body with legally constituted continuity and varying members
+  still_viable: true
+- label: Workspace partition or imported SourceRecord as the body itself
+  still_viable: false
+strongest_counterexample: An unregistered body replaces every founder and changes its purpose, or a company
+  reorganizes without a legally new entity. Founding and the phrase same legal entity alone do not decide
+  all such cases; retaining the workspace never establishes identity.
+verdict: explicitly_deferred
+needed_evidence: A steward-approved continuity rule with merger, dissolution, reorganization and unregistered-body
+  examples must distinguish continuation from successor formation and say whether member/purpose replacement
+  preserves identity. Also identify the essential institutional dependencies. Kind is a candidate, not
+  a settled identity-supplying sortal.

@@ -1,0 +1,42 @@
+{
+  "id": "ic:organization-body-alt:001",
+  "hypothesis_ref": "dh:organization-body:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "Same legal entity (po:715824f4fc19); for a body with no registration, same founding. A successor company is a different Organization even when it keeps the workspace.",
+    "reidentification_key": [
+      "OrganizationId is observed only as a workspace/tenant handle (po:7b635e2155ff), not as a legal-entity key; no registration-number key is observed"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "kind",
+    "alternatives": [
+      "two subkinds with distinct criteria (registered legal entity vs unregistered founded body) under a non-sortal 'organized body' category",
+      "collective of people/organizations (po:a9f7e334db4f 'body of people or of other organizations') rather than a functional-complex kind"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": [
+      "dissolution / succession (a successor is a new individual)"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Disjunctive criterion: an unregistered body founded in 2020 registers as a company in 2024. If identity is 'same legal entity', the registered company is a new legal entity and therefore a new Organization; if identity for unregistered bodies is 'same founding', the 2024 company has the same founding and is the same Organization. The supplied decision does not say which wins, so one kind is carrying two incompatible criteria (the OntoClean 'two identity criteria' warning)."
+    },
+    {
+      "description": "Succession with a retained OrganizationId: if the successor keeps the workspace and its OrganizationId, then OrganizationId cannot identify the Organization at all — it re-identifies the workspace/tenancy. Every Tenant/Member 'organizationId' field then denotes the workspace, not the body."
+    }
+  ],
+  "status": "proposed"
+}

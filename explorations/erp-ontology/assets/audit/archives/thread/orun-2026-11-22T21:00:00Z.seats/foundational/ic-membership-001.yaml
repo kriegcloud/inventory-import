@@ -1,0 +1,33 @@
+id: ic:membership:001
+hypothesis_ref: dh:membership:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Provisional: one continuous constituting participation episode connecting this
+    human with this tenant, from establishment until removal. Same human and tenant alone do not establish
+    sameness across removal and recreation. Unresolved: correction, suspension, transfer and reinstatement
+    rules are absent.'
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: relator
+  alternatives:
+  - Temporally qualified participation relation without a separately reified relator.
+  - Participation situation holding over human and tenant.
+  existential_dependencies:
+  - Specifically dependent on its human holder and tenant context throughout the episode. Removing the
+    participation ends the relator while its participants can persist. Account existence is not constitutive.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - Removal ends the specified participation episode.
+counterexamples:
+- description: Remove and later recreate participation for the same human and tenant. Tuple equality merges
+    potentially different episodes; equating membership with human also merges simultaneous memberships
+    in two tenants.
+status: proposed

@@ -1,0 +1,6 @@
+id: "po:sha256:89e5463325c44a76a128c4dff85caed068911d4e9354c960107bc822d66f0304"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 138, end_line: 138}
+quote: "A record of one change to a tenant's data, written in the same batch as the change, naming who made it, the agent that acted for them if any, and what was done."
+epistemic_status: quoted_prose

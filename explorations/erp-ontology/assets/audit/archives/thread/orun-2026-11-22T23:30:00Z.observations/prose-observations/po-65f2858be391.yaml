@@ -1,0 +1,6 @@
+id: "po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 460, end_line: 464}
+quote: "A question the second review raised under decision 22: the `Activity` record's fields had no properties in the thread. I chose four: `recordedActor` (to the `Member`), `action`, `recordedAt` and `inTenant`. The copied actor name and the detail sentence are `noTerm`, reason screen. The agent field waits for `AgentRun` in the party slice and is marked `noTerm` with a sixth reason, deferred, which names the slice that will place it; this adds one value to decision 21's closed list. The agent recommended the same."
+epistemic_status: quoted_prose

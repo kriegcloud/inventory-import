@@ -1,0 +1,33 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:membership-alt:001"
+hypothesis_ref: "dh:membership:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "Proposed (unratified): one membership per continuous episode between one human and one tenant, from making to removal; re-adding after removal founds a new membership. Unresolved for Benjamin: does re-adding resume the old membership (same MemberId) or create a new one?"
+  reidentification_key:
+    - "MemberId"
+    - "(tenant, human) during an episode"
+    - "Person.joinedAt (start, may be null)"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U): one relator unifying human, tenant and episode"
+  dependence: relational
+ufo_analysis:
+  candidate_category: relator
+  alternatives:
+    - "role: Member, the anti-rigid role a human plays in a tenant (founded by this relator; both are needed, not rivals)"
+    - "account-to-organization relationship (source Membership: 'An organization the account belongs to')"
+  existential_dependencies:
+    - "the human holder"
+    - "the tenant organization"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+    - "removed"
+counterexamples:
+  - description: "The source Membership class says 'An organization the account belongs to', i.e. account-mediated, while the prose says the holder is the human 'independently of any account'. Person.email is null 'for a member with no account', which supports the prose and shows the account-mediated source projection cannot be the membership itself."
+  - description: "AddPerson requires 'the person who signed up with this email', i.e. adding requires an account, yet members with no account exist; the creation path for account-less memberships is unobserved."
+status: proposed

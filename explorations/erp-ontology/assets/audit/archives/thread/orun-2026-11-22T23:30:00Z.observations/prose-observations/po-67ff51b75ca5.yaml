@@ -1,0 +1,6 @@
+id: "po:sha256:67ff51b75ca5446a6aa75c17d6c7e116ca807760d45ef2d4246594215123c638"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 385, end_line: 386}
+quote: "I chose `AuditEntry`, with \"Activity\" as an alternative label; the page and the record keep their name. The agent recommended the same."
+epistemic_status: quoted_prose

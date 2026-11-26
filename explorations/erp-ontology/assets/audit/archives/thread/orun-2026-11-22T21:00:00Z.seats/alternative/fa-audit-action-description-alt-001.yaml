@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:audit-action-description-alt:001"
+hypothesis_ref: "dh:audit-action-description:001"
+identity_card_ref: "ic:audit-action-description-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Dependent textual part of the audit record (this seat)"
+    still_viable: true
+  - label: "Plain datatype property, no class"
+    still_viable: true
+  - label: "Classifier of the change event (action type)"
+    still_viable: false
+strongest_counterexample: "The source example 'Imported items' paired with detail 'Created 11 items from items.csv' shows the action text is a free label, not a closed action-type code; it cannot serve as an event-type classifier, so the 'action occurrence' alternative is not supported."
+verdict: analyzed
+needed_evidence: "Whether action text is free prose (stay a dependent text part / data property) or drawn from a closed set of action types (then an action-type vocabulary referent is needed)."

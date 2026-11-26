@@ -1,0 +1,31 @@
+id: ic:grant-recipient:001
+hypothesis_ref: dh:grant-recipient:001
+identity:
+  supplies_identity: false
+  identity_criterion: The same recipient relation concerns the same assignment episode and recipient membership;
+    the human alone is insufficient, especially across tenants. This is a relation extension, not a new
+    individual or identity-supplying sortal. Its holding is temporally qualified; participant identity
+    is inherited from the referenced analyses.
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Grant-holder role borne by the member/human, anti-rigid while access is held.
+  - Recipient participation in an assigning event, if grant denotes an act.
+  existential_dependencies:
+  - Requires a grant/assignment and recipient membership, including its human and tenant context. No evidence
+    makes the recipient relationship an independent social relator.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: One human has two tenant memberships and receives a grant in only one. Modeling the recipient
+    as the human without membership context transfers access to the other tenant.
+status: proposed

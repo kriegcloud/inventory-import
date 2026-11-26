@@ -1,0 +1,20 @@
+id: fa:human-person:001
+hypothesis_ref: dh:human-person:001
+identity_card_ref: ic:human-person:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Subkind of a broader organism kind, inheriting its identity criterion.
+  still_viable: true
+- label: 'Human in a tenant-contact role: anti-rigid and relationally dependent if tenant involvement
+    is made definitional.'
+  still_viable: true
+strongest_counterexample: One human has two accounts and memberships in two tenants, then loses all of
+  them. The human remains one individual; account or membership identity would multiply or extinguish
+  that human.
+verdict: explicitly_deferred
+needed_evidence: Steward must distinguish the human kind from the tenant-related selection and specify
+  organism/legal identity and duplicate-resolution criteria.

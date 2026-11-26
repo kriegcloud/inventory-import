@@ -1,0 +1,6 @@
+id: "po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 135, end_line: 135}
+quote: "Stated, one criterion: the `MemberId` within its tenant, kept after removal. It rests on `Member.id` and `Member.organizationId`."
+epistemic_status: quoted_prose

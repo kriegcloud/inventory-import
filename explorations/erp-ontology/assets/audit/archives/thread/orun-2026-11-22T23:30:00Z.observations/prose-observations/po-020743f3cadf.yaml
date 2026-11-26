@@ -1,0 +1,6 @@
+id: "po:sha256:020743f3cadf0467e6f94f024b74d06b24fc542c5381f072586777707b229f1a"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 132, end_line: 132}
+quote: "Stated: the organized body itself (decision 34). No thread record holds it."
+epistemic_status: quoted_prose

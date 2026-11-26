@@ -1,0 +1,35 @@
+id: ic:recorded-change:001
+hypothesis_ref: dh:recorded-change:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Provisional: one bounded occurrence that effects this tenant-data transition, distinguished
+    by its actual participants, causal history and temporal parts. Tenant, time, before/after values or
+    audit wording alone are insufficient. Unresolved: whether transaction, command, item mutation or import
+    batch supplies the intended event boundary.'
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: event
+  alternatives:
+  - 'Process: extended import activity composed of several change events.'
+  - 'Situation: resulting changed data state, distinguished from the transition.'
+  - Information assertion of a change where occurrence is unverified; not an actual event instance.
+  existential_dependencies:
+  - Requires affected tenant data and an occurrence of transition in context. A particular log record
+    is unnecessary for the change to occur; an actor assertion alone does not establish actual agency.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+  - Completion or abortion of the bounded occurrence; whether an aborted attempt counts as a change is
+    unresolved.
+counterexamples:
+- description: One import command changes eleven items and emits multiple entries, or two commands independently
+    make equivalent transitions at the same reported time. Counting entries or matching state transitions
+    does not decide how many change events occurred.
+status: proposed

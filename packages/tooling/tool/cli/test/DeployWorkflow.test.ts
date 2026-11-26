@@ -190,15 +190,16 @@ layer(here)("the deploy workflow", (it) => {
           staging: [
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.PREVIEW_TEST_ACCOUNT_PASSWORD",
+            "secrets.SIGN_UP",
             "vars.CLOUDFLARE_ACCOUNT_ID"
           ],
           "release-tag": [],
           production: [
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.OPENROUTER_API_KEY",
+            "secrets.SIGN_UP",
             "vars.CLOUDFLARE_ACCOUNT_ID",
-            "vars.DEPLOY_WITHOUT_MODEL_KEY",
-            "vars.SIGN_UP"
+            "vars.DEPLOY_WITHOUT_MODEL_KEY"
           ]
         })
         // No secret is read anywhere else in the file: not in a command, not in a step's `with`.
@@ -419,13 +420,13 @@ layer(here)("the deploy workflow", (it) => {
         expect(each(jobs, (job) => job.env ?? {})).toEqual({
           preview: { ...account, ...password, ...stage },
           cleanup: { ...account, ...stage },
-          staging: { ...account, ...password },
+          staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}" },
           "release-tag": {},
           production: {
             ...account,
             OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}",
             DEPLOY_WITHOUT_MODEL_KEY: "${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}",
-            SIGN_UP: "${{ vars.SIGN_UP }}"
+            SIGN_UP: "${{ secrets.SIGN_UP }}"
           }
         })
       })

@@ -1,0 +1,27 @@
+{
+  "id": "fa:human-person-alt:001",
+  "hypothesis_ref": "dh:human-person:001",
+  "identity_card_ref": "ic:human-person-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Kind: human being (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Role 'human of interest to a tenant' borne by a human kind outside the ontology",
+      "still_viable": true
+    },
+    {
+      "label": "Only records/accounts exist (null)",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "A human whose every membership is removed and who is no longer a contact of any tenant: under the kind reading they remain the same Person; under the definitional-role reading they stop being one. The identity decision ('for life and after death') favours the kind reading, but the thin-thread definition text favours the role reading.",
+  "verdict": "analyzed"
+}

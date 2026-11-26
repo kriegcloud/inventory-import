@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:319a2addc69c457189cf4429d9f89e762ac3a8f93f09bb0b6e8adf14123a1cde",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 156,
+    "end_line": 161,
+    "content_sha256": "0c199c93de0c9cfdb67f38f7ddc1a900c3751bbba0fc95109f5321da9fb6fe8f"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SessionStatus",
+    "lexical_name": "SessionStatus",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "exports_symbol",
+      "object": "SessionStatus"
+    }
+  ],
+  "source_excerpt": "export const SessionStatus = LiteralKit([\"signed-out\", \"no-organization\", \"ready\"]).pipe(\n  $I.annoteSchema(\"SessionStatus\", {\n    description:\n      \"signed-out: nobody. no-organization: signed in, in no organization yet (or not the chosen one). ready.\"\n  })\n)\n",
+  "epistemic_status": "parser_derived"
+}

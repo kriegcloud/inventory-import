@@ -1,0 +1,19 @@
+{
+  "id": "fa:addpersonoutcome-representation-alt:001",
+  "hypothesis_ref": "dh:addpersonoutcome-representation:001",
+  "identity_card_ref": "ic:addpersonoutcome-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Result union encoding (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "None beyond its members (Person projection, AddPersonProblem).",
+  "verdict": "analyzed"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "ic:audit-entry-alt:001",
+  "hypothesis_ref": "dh:audit-entry:001",
+  "identity": {
+    "supplies_identity": true,
+    "identity_criterion": "One entry is one act of recording: the entry is the record created by one write (po:89e5463325c4 'written in the same batch as the change'); copies or re-serializations are not new entries. unresolved whether a re-import of the same entry into another tenant is the same entry.",
+    "reidentification_key": [
+      "Activity.organizationId",
+      "Activity.id (ActivityId, UuidV4 on insert)"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": true,
+    "supplies_identity": true,
+    "unity": "unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "event: the recorded data change (explicitly parked by decision 106, po:160303617dee)",
+      "speech-act/claim (a social commitment by the system that the change occurred)"
+    ],
+    "existential_dependencies": [
+      "the tenant/workspace that holds it",
+      "the writing occurrence"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "actorName is 'the member's name as it was then' — the entry is a frozen snapshot, so it should never change; but nothing observed forbids an update to Activity rows, so immutability is assumed, not shown."
+    },
+    {
+      "description": "Agent field deferred to AgentRun (po:65f2858be391): an entry written by an agent acting for a member names the member, so the entry's 'actor' and the actual acting agent diverge by construction."
+    }
+  ],
+  "status": "proposed"
+}

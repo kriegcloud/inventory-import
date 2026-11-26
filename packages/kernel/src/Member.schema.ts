@@ -7,6 +7,7 @@ import * as S from "effect/Schema"
 import { MemberId, OrganizationId } from "./Ids.id.ts"
 import { $KernelId } from "./internal/identity.ts"
 import { hasRole, Role } from "./Role.schema.ts"
+import { aboutClass, aboutPath, aboutProperty, noTerm } from "./Terms.pointer.ts"
 import { DisplayName } from "./Text.schema.ts"
 
 const $I = $KernelId.create("Member")
@@ -14,6 +15,10 @@ const $I = $KernelId.create("Member")
 /**
  * A person acting inside one organization: who they are, their role, and their tenant. Everything they read or write
  * is scoped to `organizationId`.
+ *
+ * It points at `inv:Member` (report 14 section 3.3): `id` is the subject's id, `organizationId` fills `membershipIn`,
+ * `role` is lifted to one `Grant` at the organization's scope, and the two names are for the screen. A mark is an
+ * annotation and changes nothing a value decodes to.
  *
  * **Example** (May this member write?)
  *
@@ -27,18 +32,39 @@ const $I = $KernelId.create("Member")
  */
 export class Member extends S.Opaque<Member, { readonly brand: unique symbol }>()(
   S.Struct({
-    id: MemberId.pipe(S.annotateKey({ description: "Who this is: people are told apart by this id" })),
+    id: MemberId.pipe(
+      S.annotateKey({ description: "Who this is: people are told apart by this id", ...aboutClass("inv:Member") })
+    ),
     name: DisplayName.pipe(
       S.annotateKey({
-        description: "The name people read. Not unique and can change, so it never decides a permission."
+        description: "The name people read. Not unique and can change, so it never decides a permission.",
+        ...noTerm("screen")
       })
     ),
-    role: Role.pipe(S.annotateKey({ description: "What this member may do in this organization" })),
-    organizationId: OrganizationId.pipe(S.annotateKey({ description: "The organization the member acts in" })),
-    organizationName: DisplayName.pipe(S.annotateKey({ description: "The organization's name, for the screen." }))
+    role: Role.pipe(
+      S.annotateKey({
+        description: "What this member may do in this organization",
+        ...aboutPath([
+          {
+            property: "inv:grantedTo",
+            reverse: true,
+            node: "inv:Grant",
+            fixed: [{ property: "inv:grantScope", concept: "inv:GrantScopeKindScheme-organization" }]
+          },
+          { property: "inv:grantsRole" }
+        ])
+      })
+    ),
+    organizationId: OrganizationId.pipe(
+      S.annotateKey({ description: "The organization the member acts in", ...aboutProperty("inv:membershipIn") })
+    ),
+    organizationName: DisplayName.pipe(
+      S.annotateKey({ description: "The organization's name, for the screen.", ...noTerm("screen") })
+    )
   }).pipe(
     $I.annoteSchema("Member", {
-      description: "A person acting inside one organization: who they are, their role, and their tenant."
+      description: "A person acting inside one organization: who they are, their role, and their tenant.",
+      ...aboutClass("inv:Member")
     })
   )
 ) {

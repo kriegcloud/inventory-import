@@ -1,0 +1,30 @@
+id: ic:membership-context:001
+hypothesis_ref: dh:membership-context:001
+identity:
+  supplies_identity: false
+  identity_criterion: The same contextual relation concerns the same membership episode and tenant bearer;
+    sharing a human or a workspace label is insufficient. This is a relation extension, not a new individual
+    or identity-supplying sortal. Its holding is temporally qualified; participant identity is inherited
+    from the referenced analyses.
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Tenant role as played by the organization, with organization identity.
+  - Mediation aspect of the membership relator.
+  existential_dependencies:
+  - Requires the membership and the tenant context in which participation enables action.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: The same human participates in two organizations. Merging context by human identity makes
+    authorization in one organization appear valid in the other.
+status: proposed

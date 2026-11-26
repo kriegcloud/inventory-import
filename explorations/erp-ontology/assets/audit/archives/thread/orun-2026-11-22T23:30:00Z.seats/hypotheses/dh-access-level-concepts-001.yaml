@@ -1,0 +1,39 @@
+id: dh:access-level-concepts:001
+observation_refs:
+- so:sha256:9f27182cb6fa04b772602a4c652c17a0c00aac9798a67870470f4c01853e8b4b
+- so:sha256:b83c15c49f2ccbd3cce461e637392107250b8a310b82823472d4a8096a60e7f2
+- po:sha256:17438ea944b4c4d7360830228707f119a5ed9bdd1620fdaaff4443e1dce4d3b9
+- po:sha256:4153731270284017dd2f93816b22863dd78e69e1cc7b10fd3e13c940002dba8a
+- po:sha256:471a16ce6f740e347c1f3f38e5480a050530104d4e167e047ef69c00c1899d7e
+- po:sha256:53dc6c25de9b99130d5c7b2b8dae181251cb671d41edcc57d4a250ac3eb405d0
+- po:sha256:cf426b237ec8182ac1c1c7893b2e21fcdbe11f6c682e625af8517f5042bc694c
+- po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2
+cq_warrants:
+- CQ-P06
+- CQ-P11
+proposed_referent:
+  label: Named access-level concepts
+  description: 'Candidate referents: viewer, editor and admin access-level concepts; custom levels are
+    mentioned without asserting additional current instances. These chains instantiate one kind of controlled
+    concept, not kinds of human beings. Each concept is individuated by scheme and notation, and describes
+    a specified level of permitted workspace activity. Holding it is separately represented by a scoped
+    assignment.'
+representation_status: information_artifact
+alternatives:
+- label: String literals used solely as implementation branch keys
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The supplied permission meanings and explicit scheme-and-notation identity support controlled
+    information concepts. The source alias observations provide no extra behavioral proof, and no permission
+    entities are inferred.
+  discriminator: 'The prose assigns different normative contents to the concepts: viewer may read and
+    write none, editor may read and write but not manage people, admin may additionally manage people.
+    These are descriptions of access entitlements held through grants, not merely three opaque literal
+    spellings.'
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

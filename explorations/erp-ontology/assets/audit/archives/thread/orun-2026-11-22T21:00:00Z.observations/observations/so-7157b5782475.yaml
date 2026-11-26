@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:7157b5782475fde29670176da606c01096e8171515efaacc44cdbcb9f23fce1e",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 78,
+    "end_line": 87,
+    "content_sha256": "839faa82856c5248c7d44c9d8ebb4698125f44a386778f1834f139d2b7cbdf4d"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "TestAccountsOffer",
+    "lexical_name": "TestAccountsOffer",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class TestAccountsOffer extends S.Opaque<TestAccountsOffer, { readonly brand: unique symbol }>()(\n  S.Struct({\n    password: S.String.check(S.isMinLength(1), S.isMaxLength(128)).pipe(\n      S.annotateKey({ description: \"The one password every test account shares; it is in the README\" })\n    ),\n    accounts: S.Array(TestAccount)\n      .check(S.isMaxLength(50))\n      .pipe(S.annotateKey({ description: \"The test accounts this copy's database holds\" }))\n  }).pipe($I.annoteSchema(\"TestAccountsOffer\", { description: \"The test accounts to offer and their password.\" }))\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

@@ -1,0 +1,20 @@
+id: fa:organization:001
+hypothesis_ref: dh:organization:001
+identity_card_ref: ic:organization:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Social-agent kind with institutional continuity supplying identity.
+  still_viable: true
+- label: Collective whose unity follows an organization of constituents.
+  still_viable: true
+- label: Category covering different social-body kinds without a common supplied identity.
+  still_viable: true
+strongest_counterexample: A company replaces every employee and changes its purpose while remaining legally
+  continuous; conversely two newly formed bodies can have the same people, name and purpose.
+verdict: explicitly_deferred
+needed_evidence: Identity and unity rules for mergers, succession, purpose change and replacement of constituents;
+  clarify whether legal entities and informal bodies share an identity provider.

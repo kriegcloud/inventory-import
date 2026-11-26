@@ -1,0 +1,20 @@
+id: fa:record-tenant-scoping:001
+hypothesis_ref: dh:record-tenant-scoping:001
+identity_card_ref: ic:record-tenant-scoping:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Contextual record-containment predicate with no separately identified relator
+  still_viable: true
+- label: Reified placement episode if migration, custody or succession history becomes decision-bearing
+  still_viable: true
+- label: Ownership relation to the body described by the record
+  still_viable: false
+strongest_counterexample: The tenant imports a record of a counterparty, then a successor takes over the
+  workspace. Neither the counterparty nor the record must become identical to its holder, and unchanged
+  organizationId does not prove unchanged legal tenant bearer.
+verdict: analyzed
+needed_evidence: ''

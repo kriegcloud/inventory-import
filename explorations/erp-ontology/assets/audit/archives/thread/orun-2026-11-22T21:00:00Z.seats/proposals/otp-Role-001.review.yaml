@@ -1,0 +1,44 @@
+target: "otp:Role:001"
+target_sha256: "b565619e91b4a3f328fd62044f2887cd115894eef80d766fec1c866e0c1b1108"
+chain_sha256: "001bc21eeb00902990164b9c095afb8dd41a5b74866df753ab584cfeb7bcdaa5"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed; the proposal itself withholds a gist parent. There is no subsumption to compare."
+revision_requests:
+  - "Choose one identity criterion for Role: identical permission meaning under one policy version, or one historically maintained level despite revised permissions. The present text identifies policy-v1 editor with policy-v2 editor and separates them."
+  - "Do not reject the implementation-only null. so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563 is already a string enum whose description states the read, write, and manage-people differences. That fact is true of the enum."
+  - "Keep semantic_support_for empty only if Role stays a decision term for 'which role'. If the class is really the permission meaning, CQ-P06 lists that meaning as out of scope ('What a role permits'); warrant the permission reading with a CQ that asks it."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Under policy v1, editor means read and write. Under policy v2, editor also means export. The criterion allows 'identical permission meaning under one policy version' (two Role individuals) and 'the same historically maintained level' (one Role individual). The two editors are therefore both the same Role and not the same Role. Labels alone are correctly said not to settle it, but no replacement test is given."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: the literals viewer, editor, and admin are the criterion. The card says those labels and extensionally identical permission sets do not settle cross-policy identity. The enum key is not adopted as identity."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P06 merely mentions Role, and 'What a role permits' is out of scope. The question's second conjunct is which role each member holds, and the sample answer has a role field. A role designator is required for that listing even though the permission consequences are out of scope. The warrant survives for the designator, not for an enforcement claim."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "The pure-DTO twin is the observation itself. so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563 is LiteralKit(['viewer','editor','admin']) whose description says a viewer reads, an editor writes, and an admin manages people. po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8 and po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0 are prose labels of that enum. All three stay true if Role denotes only the enum. The discriminator says enforcement is not demonstrated, so no non-textual fact is doing the work."
+    outcome: landed
+rival_models_still_viable:
+  - "Information object: policy meaning or vocabulary-entry content reusable across assignments."
+  - "Mode: recipient-borne normative entitlement conferred by a grant."
+  - "Quality: position on an access scale, if a value space is supplied."
+  - "Controlled-vocabulary entry representing an access level (information_artifact)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8"
+  - "po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0"
+  - "so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563"

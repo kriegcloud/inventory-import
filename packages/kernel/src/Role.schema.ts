@@ -6,19 +6,21 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { dual } from "effect/Function"
 import { $KernelId } from "./internal/identity.ts"
+import { aboutScheme } from "./Terms.pointer.ts"
 
 const $I = $KernelId.create("Role")
 
 /**
  * What a member may do, from least to most access: a viewer reads, an editor also writes, an admin also manages
- * people.
+ * people. Each literal is the notation of a concept of `inv:MemberRoleScheme` (decision 23).
  *
  * @category schemas
  */
 export const Role = LiteralKit(["viewer", "editor", "admin"]).pipe(
   $I.annoteSchema("Role", {
     description: "What a member may do: a viewer reads, an editor also writes, an admin also manages people.",
-    examples: ["editor"]
+    examples: ["editor"],
+    ...aboutScheme("inv:MemberRoleScheme")
   })
 )
 

@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:audit-attribution-alt:001"
+hypothesis_ref: "dh:audit-attribution:001"
+identity_card_ref: "ic:audit-attribution-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+  - label: "Attribution as a claim-bearing part of the audit record with principal + optional delegate (this seat)"
+    still_viable: true
+  - label: "World-side agency relator (principal, delegate, change) that the record reports"
+    still_viable: true
+  - label: "Binary record-to-member link only"
+    still_viable: false
+strongest_counterexample: "An agent-performed change: actorId = member M, agent = 'Importer bot'. A binary 'record names the member who made the change' model says M made it; the prose and source both say M is the principal and the agent performed it. The binary model is falsified by its own source."
+verdict: analyzed
+needed_evidence: "Whether 'agent' denotes a software agent with its own identity (then a delegation relator and an Agent referent are needed) or only a display label; and whether actorId must survive membership removal (human-level vs membership-level attribution)."

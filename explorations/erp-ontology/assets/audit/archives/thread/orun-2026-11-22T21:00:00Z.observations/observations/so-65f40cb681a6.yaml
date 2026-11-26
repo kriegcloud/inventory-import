@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:65f40cb681a6ae0beda880706435b642918f57bde153dcc48428f298b91bfdbb",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 168,
+    "end_line": 168,
+    "content_sha256": "afe8ad7bd6fbac87e2bbf812892c54138bb8b4a2f3d7ae9d1d0b3e7ff9a065cc"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SessionStatus",
+    "lexical_name": "SessionStatus",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "TypeQuery"
+    }
+  ],
+  "source_excerpt": "export type SessionStatus = typeof SessionStatus.Type\n",
+  "epistemic_status": "parser_derived"
+}

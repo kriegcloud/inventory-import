@@ -1,0 +1,20 @@
+run_id: "orun-2026-11-22T21:00:00Z"
+ontology: {name: "thread"}
+engine:
+  validator_sha256_12: "7dc25c3b173f"
+  contracts_sha256_12: "0e6924be3750"
+repository: {commit: "7f7c2b3f23842437520ff77d89e79c7985e237d9", dirty: false, pin_waived: false, waiver_reason: ""}
+scope_doc: {path: "explorations/erp-ontology/assets/requirements/scope.md", sha256_12: "419efa650b72"}
+cq_suite: {path: "explorations/erp-ontology/assets/requirements/competency-questions.yaml", sha256_12: "bdc0bbba557a", cq_count: 3}
+adapters: [{id: "adapter-typescript", version: "1.0.0", script: "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt", script_sha256_12: "a61db2f99f52", golden_fixture: "explorations/erp-ontology/assets/audit/thread/adapters/golden"}]
+agents:
+  denotation: {model: "gpt-6.1-sol", effort: "medium", prompt: "prompts/denotation.md", prompt_sha256_12: "38820bf1c154"}
+  foundational: {model: "gpt-6.1-sol", effort: "medium", prompt: "prompts/ufo-analysis.md", prompt_sha256_12: "3d94feb0629c"}
+  synthesis: {model: "gpt-6.1-sol", effort: "medium", prompt: "prompts/synthesis.md", prompt_sha256_12: "6e3aad591268"}
+  adversary: {model: "grok-4.7", effort: "xhigh", prompt: "prompts/ontoclean-adversary.md", prompt_sha256_12: "3b1d2f7e1c25", independent_context: true}
+  alternative: {model: "claude-opus-5-5", effort: "medium", prompt: "prompts/alternative-model.md", prompt_sha256_12: "2c20ed4d80b8", blinded: true}
+first_run: true
+prior_index: ""
+prior_index_sha256_12: ""
+empty_corpus_reason: ""
+unresolved_fraction_waiver: ""

@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-noorganization-alt:001"
+hypothesis_ref: "dh:source-noorganization:001"
+identity_card_ref: "ic:source-noorganization-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: true
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Session phase/situation 'signed in, not acting in any organization'"
+    still_viable: true
+strongest_counterexample: "'In no organization yet (or not in the chosen one)' covers two situations: global non-membership and absence from a chosen organization; the value cannot support a negative claim about membership in general."
+verdict: analyzed
+needed_evidence: "Separation of the two situations if either is decision-bearing."

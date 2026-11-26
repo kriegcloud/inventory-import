@@ -1,0 +1,28 @@
+{
+  "id": "fa:party-identity-decision-alt:001",
+  "hypothesis_ref": "dh:party-identity-decision:001",
+  "identity_card_ref": "ic:party-identity-decision-alt:001",
+  "tests": {
+    "spec_vs_execution": "merged",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Information object recording an adjudication",
+      "still_viable": true
+    },
+    {
+      "label": "Event (adjudication act)",
+      "still_viable": true
+    },
+    {
+      "label": "Relator between records",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "No CQ in the bounded thread requires identity adjudication; category choice has no decision consequence yet.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "A competency question that requires identity adjudication, plus the decision's contract: who decides, when, outcome values, and whether a decision can be reversed."
+}

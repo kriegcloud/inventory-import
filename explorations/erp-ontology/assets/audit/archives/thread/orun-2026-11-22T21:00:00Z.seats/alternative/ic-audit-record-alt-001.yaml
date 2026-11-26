@@ -1,0 +1,33 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:audit-record-alt:001"
+hypothesis_ref: "dh:audit-record:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "Proposed (unratified): one audit record per written entry (inscription), individuated by the entry itself, not by the writing event and not by the change. Re-serializations of the same entry are the same record. Unresolved for Benjamin: is an entry immutable and never deleted (append-only)?"
+  reidentification_key:
+    - "Activity.id (ActivityId, UUIDv4 on insert)"
+    - "Activity.organizationId"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U): one entry unifying attribution, action, detail and writing instant"
+  dependence: relational
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+    - "event: the record-writing occurrence (rejected as the record itself; it is the record's creating event)"
+    - "the change occurrence recorded (rejected: prose separates the record from the change)"
+  existential_dependencies:
+    - "the writing event that creates it"
+    - "the tenant whose workspace holds it"
+    - "the recorded change, as subject matter"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+    - "deleted or expired under a retention policy (unobserved)"
+counterexamples:
+  - description: "The hypothesis individuates the record as 'a particular record-writing occurrence'; that merges the information object (a continuant that is read later) with the event that produced it. A record can be read a year later; an occurrence cannot."
+  - description: "'Written in the same batch as the change' is specified, not tested; a failed batch could produce a change without a record or vice versa, so no 1:1 change-record correspondence holds by definition."
+status: proposed

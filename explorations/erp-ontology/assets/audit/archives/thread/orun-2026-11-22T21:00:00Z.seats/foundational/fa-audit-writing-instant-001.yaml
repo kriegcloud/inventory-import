@@ -1,0 +1,20 @@
+id: fa:audit-writing-instant:001
+hypothesis_ref: dh:audit-writing-instant:001
+identity_card_ref: ic:audit-writing-instant:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+- label: Timestamp information value representing an instant or uncertainty interval.
+  still_viable: true
+- label: Temporal region/interval if writing time is only known at finite precision.
+  still_viable: true
+strongest_counterexample: Two entries have identical rounded timestamps but were written at different
+  instants, or two writings truly occur simultaneously. Value equality and entry identity both fail as
+  temporal identity criteria.
+verdict: analyzed
+needed_evidence: Supply temporal scale, precision and uncertainty, and define which point of the writing
+  event is intended. Category none means temporal instant is outside the offered entity categories; it
+  is neither an event nor a quality.

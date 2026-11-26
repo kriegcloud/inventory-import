@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:26bdcd8cd9be64afdf2efdde027cb50521e12483aef18b8059b6fd4f46b032a8",
+  "schema_version": 1,
+  "repository": {
+    "commit": "1111111111111111111111111111111111111111",
+    "path": "golden/input/schemas.ts"
+  },
+  "source_span": {
+    "start_line": 7,
+    "end_line": 10,
+    "content_sha256": "407011f8a0e981908e29b51e9158c2d974a409b60c4a8060a38479d178410d47"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "ExampleRow",
+    "lexical_name": "ExampleRow",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class ExampleRow extends Model.Class<ExampleRow>(\"ExampleRow\")({\n  id: MemberId,\n  name: DisplayName.pipe(S.annotateKey({ description: \"Visible name\" })),\n}) {}\n",
+  "epistemic_status": "parser_derived"
+}

@@ -1,0 +1,69 @@
+id: otp:grantedTo:001
+hypothesis_ref: dh:grant-recipient:001
+identity_card_ref: ic:grant-recipient:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: granted to
+  local_name: grantedTo
+  proposed_iri: https://example.org/inventory-import/ontology/grantedTo
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: 'A relation linking an access assignment to its recipient membership, preserving the recipient’s
+    tenant context. Proposed domain: Grant; proposed range: Member.'
+  source:
+  - CQ-P06
+  - po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd
+  - po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The linked
+  grant is explicitly an authorized assignment of a role to a member at a scope; holding the grant denotes
+  being the recipient of that scoped access assignment beyond a storage pointer.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:grant-recipient:001): Resolve grant act-versus-continuing-assignment identity and
+  whether recipient replacement is correction or a new grant; preserve recipient membership context.'
+- 'Identity criterion from ic:grant-recipient:001: The same recipient relation concerns the same assignment
+  episode and recipient membership; the human alone is insufficient, especially across tenants. This is
+  a relation extension, not a new individual or identity-supplying sortal. Its holding is temporally qualified;
+  participant identity is inherited from the referenced analyses.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Grant-holder role borne by the member/human,
+  anti-rigid while access is held. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Resolve grant act-versus-continuing-assignment identity
+  and whether recipient replacement is correction or a new grant; preserve recipient membership context.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Recipient participation in an assigning
+  event, if grant denotes an act. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Resolve grant act-versus-continuing-assignment identity
+  and whether recipient replacement is correction or a new grant; preserve recipient membership context.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Grant recipient foreign key (implementation_artifact_only).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

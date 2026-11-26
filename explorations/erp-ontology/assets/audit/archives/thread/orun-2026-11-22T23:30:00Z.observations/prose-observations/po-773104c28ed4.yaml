@@ -1,0 +1,6 @@
+id: "po:sha256:773104c28ed467a30f132e112bcb7ae328f88cde089c66e73c56e487d48b30f8"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 512, end_line: 515}
+quote: "The auditor's adversary failed Grant, `grantedTo`, `grantsRole`, `grantScope`, `GrantScopeKindScheme` and Organization because CQ-P06 can be answered with a role written on the member. I chose to add one competency question that cannot be answered without a grant: at which scope does each member hold which role. Decision 40 stands. The agent recommended the same."
+epistemic_status: quoted_prose

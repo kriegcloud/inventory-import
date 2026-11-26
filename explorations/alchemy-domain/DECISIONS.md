@@ -754,3 +754,21 @@ rejection is read as the instance `new X(fields)` builds, held by the mutant `ma
 the patches' test aggregates build with `.make`, no file of either holds a diagnostic comment, and the scratchpad's
 `verify` template and its check lost the exception with them. The five proofs pass with the path counts their tests
 state.
+
+### 2026-11-25 — a change number's 0 for "none" stays in the model's state
+
+Asked after the model's invariants were rewritten to say their claim (`746c6ab7`): the 0 in a group's `undoneAt`
+that says "not taken back" is absence written as a value, which SF-3 refuses elsewhere. It is one of a family in the
+same model: `under`, `topGroup`, `lastGroup`, `confirmedAt` and a row's `Level.change`.
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| What happens to the 0 in a group's `undoneAt`? | Keep 0, read through `inForce` in the model file; an `Option` on `undoneAt` only; an `Option` for all five, as a goal | "Keep 0, read via inForce" |
+
+I chose; the agent recommended the same. Reverse it: a new decision by him, for all five at once, with an experiment
+in the scratchpad first: the prover's library reads `Option.isSome`, `match` and `exists`, and no state of this model
+has held an `Option` yet.
+
+Built in `packages/catalog/model/src/Catalog.model.ts`: `inForce` is the one place the model's invariants read the 0.
+The rules of `Group` and of the two decisions that record on it still compare `undoneAt` with 0 as written: the
+prover reads their code, and a helper there was not tried.

@@ -1,0 +1,6 @@
+id: "po:sha256:471a16ce6f740e347c1f3f38e5480a050530104d4e167e047ef69c00c1899d7e"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 206, end_line: 206}
+quote: "A member role whose holder may read and write the organization's records and add, change and remove its people."
+epistemic_status: quoted_prose

@@ -1,0 +1,6 @@
+id: "po:sha256:6978a469f8c2d0ff495c6dad024e4ea8420d2032a4f4f22db396decff519d8bb"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 134, end_line: 134}
+quote: "A human being that a tenant deals with, as a member of its workspace or as a contact at another organization."
+epistemic_status: quoted_prose

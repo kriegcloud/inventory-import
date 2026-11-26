@@ -1,0 +1,26 @@
+id: dh:source-addpersonoutcome:001
+observation_refs:
+- so:sha256:ed5055e915afe25a9c0e6d8492fdd229f9b83b353ed46d0e38071559c4feb9c6
+- so:sha256:f5e7d433650a0a22e14ab38f0a77628bd75465f341847f210d8c88aad2aeeaca
+cq_warrants: []
+proposed_referent:
+  label: add-person result representation
+  description: One success-or-problem result value; distinguish each returned value
+    from a completed membership-creation occurrence, which is not shown.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Outcome report about a membership change
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

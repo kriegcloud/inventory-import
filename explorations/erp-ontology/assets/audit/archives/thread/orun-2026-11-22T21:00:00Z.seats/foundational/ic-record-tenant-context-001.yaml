@@ -1,0 +1,32 @@
+id: ic:record-tenant-context:001
+hypothesis_ref: dh:record-tenant-context:001
+identity:
+  supplies_identity: false
+  identity_criterion: The same workspace-scoping association concerns the same information record, served
+    tenant and holding-workspace context over an interval. Record subject organization and workspace tenant
+    need not coincide. This is a relation extension, not a new individual or identity-supplying sortal.
+    Its holding is temporally qualified; participant identity is inherited from the referenced analyses.
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Reified data-custody/scoping relator, if it has independently specified rights and lifecycle.
+  - Situation in which a workspace holds a record for a tenant.
+  existential_dependencies:
+  - Requires a record and workspace-service context with a tenant organization; dependency of the contextual
+    association does not prove the record is destroyed when tenancy ends.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+  - Association ends on removal from the workspace; copy/move policy is unspecified.
+counterexamples:
+- description: Two tenants retain separate records describing the same supplier. Subject-based identity
+    collapses workspace scoping; moving or copying a record also cannot silently preserve the same association.
+status: proposed

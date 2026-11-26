@@ -1,0 +1,23 @@
+{
+  "id": "fa:write-authorization-retry-rule-alt:001",
+  "hypothesis_ref": "dh:write-authorization-retry-rule:001",
+  "identity_card_ref": "ic:write-authorization-retry-rule-alt:001",
+  "tests": {
+    "spec_vs_execution": "merged",
+    "world_vs_information": "not_applicable",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Implementation control flow only (my ruling, concurs on evidence)",
+      "still_viable": true
+    },
+    {
+      "label": "Policy specification information object",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "If a CQ asks 'which actions require editor', the role-requirement half becomes a policy term; the retry half stays implementation.",
+  "verdict": "analyzed"
+}

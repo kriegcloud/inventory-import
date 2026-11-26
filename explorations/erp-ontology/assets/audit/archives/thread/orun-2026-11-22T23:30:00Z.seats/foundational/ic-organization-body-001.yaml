@@ -1,0 +1,35 @@
+id: ic:organization-body:001
+hypothesis_ref: dh:organization-body:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Proposed identity follows continuity of the organized legal body, not workspace
+    or source-record continuity. po:715824f4fc19 rules a successor a different body and individuates an
+    unregistered body by founding; unresolved: legal continuity through reorganization and continued identity
+    of unregistered bodies are not operationally specified.'
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unity
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: kind
+  alternatives:
+  - collective
+  - Institutional body interpretation remains viable; member aggregation alone is not established.
+  existential_dependencies:
+  - Formation for a purpose and organization of people or other bodies are constitutive features (po:a9f7e334db4f).
+    No particular workspace or tenant relation is necessary. Whether any particular constituent, purpose,
+    registration or institutional recognition is essential is unresolved; founding is an origin condition,
+    not dependence on a currently existing founder.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+  - Dissolution may end existence; supplied corpus does not establish its exact criterion.
+counterexamples:
+- description: An unregistered body replaces every founder and changes its purpose, or a company reorganizes
+    without a legally new entity. Founding and the phrase same legal entity alone do not decide all such
+    cases; retaining the workspace never establishes identity.
+status: proposed

@@ -1,0 +1,18 @@
+id: fa:membership-context:001
+hypothesis_ref: dh:membership-context:001
+identity_card_ref: ic:membership-context:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Tenant role as played by the organization, with organization identity.
+  still_viable: true
+- label: Mediation aspect of the membership relator.
+  still_viable: true
+strongest_counterexample: The same human participates in two organizations. Merging context by human identity
+  makes authorization in one organization appear valid in the other.
+verdict: analyzed
+needed_evidence: No separate relation individual is required by the supplied evidence. If relations are
+  reified later, specify occurrence boundaries and independent identity rather than inheriting tuple keys.

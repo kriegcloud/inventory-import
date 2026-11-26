@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:organization-alt:001"
+hypothesis_ref: "dh:organization:001"
+identity_card_ref: "ic:organization-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+  - label: "Organization as rigid social kind with tenant-relative roles (this seat)"
+    still_viable: true
+  - label: "Organization as collective of its members"
+    still_viable: false
+  - label: "Organization as directory record (information object)"
+    still_viable: true
+strongest_counterexample: "A vendor is acquired and renamed: the tenant still deals with the same operation under a new name and legal entity. Under legal identity it is a new organization; under operational identity the same. The definition does not decide."
+verdict: analyzed
+needed_evidence: "Merger/rename/split rules and whether a non-tenant organization record is shared across tenants or held per tenant."

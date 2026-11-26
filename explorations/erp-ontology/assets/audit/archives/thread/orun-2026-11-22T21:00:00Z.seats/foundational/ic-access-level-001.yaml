@@ -1,0 +1,31 @@
+id: ic:access-level:001
+hypothesis_ref: dh:access-level:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: same level could mean identical permission meaning under one policy/vocabulary
+    version, or the same historically maintained level despite revised permissions. Labels viewer/editor/admin
+    and extensionally identical permission sets alone do not settle cross-policy identity.'
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: unresolved
+  supplies_identity: unresolved
+  unity: unresolved
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: unresolved
+  alternatives:
+  - 'Information object: policy meaning or vocabulary-entry content reusable across assignments.'
+  - 'Mode: recipient-borne normative entitlement conferred by a grant.'
+  - 'Quality: position on an explicitly defined access scale, if a value-space interpretation is supplied.'
+  existential_dependencies:
+  - A permission meaning presupposes a policy or vocabulary context but no particular current holder.
+    An instantiated entitlement would instead depend on a member, grant and organizational context.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states: []
+counterexamples:
+- description: The label editor is retained while its allowed actions change, or two policy levels permit
+    the same actions today. Label equality and extensional equality yield incompatible identity results.
+status: proposed

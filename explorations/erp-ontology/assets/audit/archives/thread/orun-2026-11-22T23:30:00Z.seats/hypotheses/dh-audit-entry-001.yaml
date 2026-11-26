@@ -1,0 +1,38 @@
+id: dh:audit-entry:001
+observation_refs:
+- so:sha256:c94fc69a82421478564d8bad567599e059b61ec1d0009fdcf8619b839690c5c9
+- po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+- po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+- po:sha256:67ff51b75ca5446a6aa75c17d6c7e116ca807760d45ef2d4246594215123c638
+- po:sha256:89e5463325c44a76a128c4dff85caed068911d4e9354c960107bc822d66f0304
+- po:sha256:8e6b8e4428f59f50f4bfcc6b8100db1692104086505630db8c9dca418239430b
+- po:sha256:a2954515f0563e447882b597c9c9efb2f780016b31552fa2b41b3b21a3989ea1
+cq_warrants:
+- CQ-P10
+- CQ-P09
+proposed_referent:
+  label: Audit entry recording a stated change
+  description: 'Candidate referent: a written information record saying what was done, naming a member
+    and carrying its writing time in a tenant. Activity is a supplied alternative name for this information
+    object. An instance is one entry distinguished by tenant plus entry id; multiple entries may describe
+    a change, and entry identity does not establish change or actor identity. Copied name, detail and
+    agent strings do not establish separate domain entities.'
+representation_status: information_artifact
+alternatives:
+- label: The actual change event or proof of the named member acting
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: Creation as an audit record about another occurrence and explicit limits on its evidential
+    force support an information object. Same-batch writing is a quoted claim, not independently verified
+    transactional behavior.
+  discriminator: 'The quoted use case says data changes write Activity rows, and the explicit audit decision
+    distinguishes what an entry says from who actually made a change: the entry cannot prove that actor.
+    Thus the intended object is a persistent claim-bearing record read by people, not only a schema construct
+    or the event itself.'
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

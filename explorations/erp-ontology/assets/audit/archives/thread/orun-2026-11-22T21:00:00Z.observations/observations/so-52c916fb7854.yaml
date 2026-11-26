@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:52c916fb7854298d2a4bb9f3ce68e0c438a62dc0b4bab015811c3f9984dc690b",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 223,
+    "end_line": 228,
+    "content_sha256": "3a7cc88c6009f724ca5e86dd3c03574fb5d4f258542e080f3ee5f44084fa24e7"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SessionState",
+    "lexical_name": "SessionState",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export const SessionState = SessionStatus.mapMembers(() => Tuple.make(SignedOut, NoOrganization, Ready)).pipe(\n  S.toTaggedUnion(\"status\"),\n  $I.annoteSchema(\"SessionState\", {\n    description: \"Who is signed in and as whom they act, and what the sign-in page offers.\"\n  })\n)\n",
+  "epistemic_status": "parser_derived"
+}

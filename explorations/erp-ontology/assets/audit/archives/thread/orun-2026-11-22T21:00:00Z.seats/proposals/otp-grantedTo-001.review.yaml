@@ -1,0 +1,42 @@
+target: "otp:grantedTo:001"
+target_sha256: "0a42900035107003cb236547ab99814839d7958d18d6df0ff78209b07ca3e14c"
+chain_sha256: "ae9bd0ff5129531922747c66dfb9ee6cbf510570f5ca95c119d990a5e1017d6f"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "State whether repointing a grant from membership M1 to M2 is a correction of one conferral or a new grant. The criterion currently makes that one relation and two."
+  - "CQ-P06 does not require a grant-to-member property. A role on the membership answers who holds which role. Drop the decision-term citation or show why the listing is unanswerable without grantedTo."
+  - "Replace the null discriminator. po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd is the comment a foreign key would carry."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Grant G is stored against membership M1, then corrected to M2, the membership that was meant. The criterion says the same relation concerns the same assignment episode and the same recipient membership. If the correction is one conferral, M1 and M2 are one relation and the criterion separates them. If the correction is a new grant, one grant id identifies them and the criterion separates them. The card says which case it is is unresolved."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "Tried: the human's id is the recipient. The criterion says the human alone is insufficient across tenants, so two memberships of one human are not one grantedTo pair."
+    outcome: survived
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks which role each member holds. The SPARQL path uses inv:grantedTo because it first invented inv:Grant. The sample rows are member and role. A membership that carries a role answers the listing with no grant-recipient property."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a grant.memberId foreign key commented with po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd ('Links a grant to the member who holds it') and po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a. The discriminator says holding the grant denotes a recipient beyond a storage pointer. The only facts in the observations are those two sentences, which the foreign key's comments still have."
+    outcome: landed
+rival_models_still_viable:
+  - "Grant-holder role borne by the member, anti-rigid while access is held."
+  - "Recipient participation in an assigning event, if grant denotes an act."
+  - "Grant recipient foreign key (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd"
+  - "po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a"

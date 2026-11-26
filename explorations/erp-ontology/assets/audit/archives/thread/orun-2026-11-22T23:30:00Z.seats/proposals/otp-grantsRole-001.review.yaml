@@ -1,0 +1,41 @@
+target: "otp:grantsRole:001"
+target_sha256: "2c41ee72b9537e314ec4bca53099cebe19d4611c1d17a6aa2dba7ae1eebbf9de"
+chain_sha256: "7674ddc66c3b63f385dc2275078c7f84d63fbca2afec3ba58f366265dd9dd7c3"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed for this object property, so superclass rigidity, identity, unity, and dependence checks have no edge to apply to."
+revision_requests:
+  - "Do not warrant grantsRole only as semantic support for otp:Grant:001. CQ-P11 and CQ-P06 ask which role is held; M.role already states it (po:c4054ec5a4fd). A grant edge is not required."
+  - "Replace the shared discriminator. The normative reading of member.role is already the implementation field plus po:559ba5ec7c7d; it is not a fact that field lacks."
+attacks:
+  - surface: warrant
+    rule: supports-non-decision-term
+    counterexample: "semantic_support_for lists only otp:Grant:001. CQ-P06 asks which role each member holds and po:773104c28ed4 records that this is answerable from the role written on the member. CQ-P11 adds scope, which po:c4054ec5a4fd fixes as organization for that same field. po:11d1b53834c3 (\"links a grant to the role it gives\") describes the drafted edge; it does not show a decision term that is unanswerable without grantsRole. Supporting a non-required Grant class is not a warrant."
+    outcome: landed
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "M.role = admin, with no grant row (po:4ddf67948771). po:559ba5ec7c7d already calls that an authorized assignment of one role at one scope. The discriminator's joint member-role-extent fact is true of the field. An object property from a manufactured <M>/role node to a Role individual is not something the field lacks."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "The proposal mints no property individual and leaves the joined assignment criterion unresolved. <M>/role naming viewer, admin, and viewer in succession is conceded not to be identity. No separate false identity claim is added for the property."
+    outcome: survived
+rival_models_still_viable:
+  - "Continuing authorization relator whose level may change"
+  - "Distinct grant episodes each created by an assignment act"
+  - "Current contextual role assertion without separately persisting grant individual"
+evidence:
+  - "CQ-P06"
+  - "CQ-P11"
+  - "po:sha256:773104c28ed467a30f132e112bcb7ae328f88cde089c66e73c56e487d48b30f8"
+  - "po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5"
+  - "po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9"
+  - "po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8"
+  - "po:sha256:11d1b53834c38359f84295b255a9249cef0d3f03d3a302aab2b61de3b75c1871"

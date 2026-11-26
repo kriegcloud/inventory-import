@@ -1,0 +1,34 @@
+{
+  "id": "ic:emailtofind-representation-alt:001",
+  "hypothesis_ref": "dh:emailtofind-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'EmailToFind' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "normalisation rule encoding an account-identity assumption (case-insensitive emails)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Local parts are case-sensitive in principle; the normaliser decides account sameness by policy, not by fact."
+    }
+  ],
+  "status": "proposed"
+}

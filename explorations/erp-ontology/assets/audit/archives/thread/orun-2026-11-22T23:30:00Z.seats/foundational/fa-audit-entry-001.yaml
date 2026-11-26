@@ -1,0 +1,22 @@
+id: fa:audit-entry:001
+hypothesis_ref: dh:audit-entry:001
+identity_card_ref: ic:audit-entry:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Persistent audit record allowing amendments while retaining identity
+  still_viable: true
+- label: Immutable audit-entry version or writing occurrence content
+  still_viable: true
+- label: Actual change event or proof of actual agency
+  still_viable: false
+strongest_counterexample: A record falsely naming a member remains an audit entry; two entries may describe
+  the same change. Conversely, replacing action and actor under the same tenant/id leaves the technical
+  key unchanged while potentially replacing the record claim.
+verdict: explicitly_deferred
+needed_evidence: Provide audit immutability/versioning, correction, copying, deletion and id-reuse rules,
+  with examples deciding whether correction creates a new entry. Identify which persistent informational
+  unit tenant/id is intended to track; do not infer event identity from that handle.

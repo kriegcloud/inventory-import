@@ -127,6 +127,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       # Staging's test accounts take the password every preview's do. A secret: never echoed.
       PREVIEW_TEST_ACCOUNT_PASSWORD: ${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}
+      # The emails that may make a real account on staging, from the staging environment's secret; unset, none. A
+      # secret, not a variable: this repository's logs are public, and a variable's value is printed in them.
+      SIGN_UP: ${{ secrets.SIGN_UP }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -225,7 +228,9 @@ jobs:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       # true only when the repository's stack was deployed without a model key on purpose.
       DEPLOY_WITHOUT_MODEL_KEY: ${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}
-      SIGN_UP: ${{ vars.SIGN_UP }}
+      # The emails that may make an account, from the production environment's secret; unset, sign-up is closed. A
+      # secret, not a variable, as on staging: this repository's logs are public, and a variable's value is printed.
+      SIGN_UP: ${{ secrets.SIGN_UP }}
     steps:
       # The release commit: the one CI checked and the guard passed.
       - uses: actions/checkout@v4

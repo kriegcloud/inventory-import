@@ -1,0 +1,22 @@
+id: fa:grant:001
+hypothesis_ref: dh:grant:001
+identity_card_ref: ic:grant:001
+tests:
+  spec_vs_execution: unresolved
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: 'Relator: continuing normative access assignment mediating recipient and organizational authority
+    under a scope.'
+  still_viable: true
+- label: 'Event: authorized act of assigning access.'
+  still_viable: true
+- label: 'Information object: configuration or prescription specifying access without establishing conferred
+    permission.'
+  still_viable: true
+strongest_counterexample: An authorized member assigns access then leaves while access remains. The assigning
+  event is over although the grant continues; two identical later conferrals may also be distinct episodes.
+verdict: explicitly_deferred
+needed_evidence: Determine whether assignment means act, continuing normative relation or configuration;
+  supply lifecycle examples for revocation, regrant, role edits and assigner departure.

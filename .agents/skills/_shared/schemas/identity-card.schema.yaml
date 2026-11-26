@@ -1,0 +1,39 @@
+# IdentityCard — what makes a commitment ontologically coherent. Proposal authority
+# only. `unresolved` is a LEGAL, SUCCESSFUL value everywhere below — epistemic
+# deferral is distinct from the substantive ruling `none`.
+# File layout: one record per file, work/foundational/ic-<slug>-<nnn>.yaml.
+id: "ic:<slug>:<nnn>"
+hypothesis_ref: "dh:..."
+identity:
+  supplies_identity: true | false | unresolved
+  identity_criterion: ""          # what makes two individuals the SAME — or "unresolved: <missing evidence>"
+  reidentification_key: []        # technical keys are evidence, never the criterion
+                                  # Here: report 01's "tenant and a source id" goes in
+                                  # reidentification_key; identity_criterion stays
+                                  # "unresolved: <question to Benjamin>" (project-profile.md)
+ontoclean:
+  rigidity: rigid | anti_rigid | semi_rigid | unresolved
+  carries_identity: true | false | unresolved
+  supplies_identity: true | false | unresolved
+  unity: ""                       # unity | anti_unity | non_unity | unresolved (+U | ~U | -U),
+                                  # read by the unity rule in ontoclean-rules.yaml. The
+                                  # validator requires the key and a STRING only; "" is
+                                  # the template's draft value and leaves the unity rule
+                                  # without an answer
+  dependence: none | relational | intrinsic | unresolved
+ufo_analysis:
+  candidate_category: kind | subkind | role | phase | category | mixin | role_mixin | phase_mixin | collective | quantity | relator | quality | mode | event | process | situation | information_object | none | unresolved
+                                  # non-sortals (category, mixin, role_mixin, phase_mixin)
+                                  # supply no identity: a role whose bearers span two
+                                  # kinds (a customer that is a person or an
+                                  # organization) is a role_mixin, not a role.
+                                  # information_object is an IAO/BFO notion kept for
+                                  # records and documents, not a UFO category
+  alternatives: []
+  existential_dependencies: []
+temporality:
+  exists_during_interval: true | false | unresolved
+  may_change_state_without_losing_identity: true | false | unresolved
+  terminal_states: []
+counterexamples: [{description: ""}]   # at least one attempted
+status: proposed

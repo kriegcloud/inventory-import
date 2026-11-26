@@ -476,31 +476,31 @@
       },
       "Catalog.NoTwoRowsHoldTheSameChange": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Row, (a) =>\n          A.every(\n            all.Row,\n            (b) =>\n              a.id === b.id ||\n              !RowState.guards.Decided(a.state) ||\n              !RowState.guards.Decided(b.state) ||\n              a.state.importId !== b.state.importId ||\n              a.state.change !== b.state.change\n          )\n        )"
+        "source": "(all) => noTwoHold(all.Row, RowState.guards.Decided, sameChangeOfOneImport)"
       },
       "Catalog.NoRowAndGroupHoldTheSameChange": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Row, (row) =>\n          A.every(\n            all.Group,\n            (group) =>\n              !RowState.guards.Decided(row.state) ||\n              !GroupState.guards.Decided(group.state) ||\n              row.state.importId !== group.state.importId ||\n              (row.state.change !== group.state.change && row.state.change !== group.state.undoneAt)\n          )\n        )"
+        "source": "(all) =>\n        A.every(all.Row, (row) =>\n          everyDecidedGroup(\n            all.Group,\n            (group) =>\n              !RowState.guards.Decided(row.state) ||\n              row.state.importId !== group.importId ||\n              (row.state.change !== group.change && row.state.change !== group.undoneAt)\n          )\n        )"
       },
       "Catalog.NoTwoGroupsHoldTheSameChange": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Group, (a) =>\n          A.every(\n            all.Group,\n            (b) =>\n              a.id === b.id ||\n              !GroupState.guards.Decided(a.state) ||\n              !GroupState.guards.Decided(b.state) ||\n              a.state.importId !== b.state.importId ||\n              a.state.change !== b.state.change\n          )\n        )"
+        "source": "(all) => noTwoHold(all.Group, GroupState.guards.Decided, sameChangeOfOneImport)"
       },
       "Catalog.AGroupsChangeIsOneItsImportGave": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !GroupState.guards.Decided(group.state) ||\n              group.state.importId !== life.id ||\n              ImportState.guards.Removed(life.state) ||\n              (!ImportState.guards.Unstaged(life.state) &&\n                group.state.change >= 1 &&\n                group.state.change <= life.state.changes &&\n                group.state.undoneAt <= life.state.changes)\n          )\n        )"
+        "source": "(all) =>\n        everyGroupOfItsImport(\n          all,\n          (group, life) => group.change >= 1 && group.change <= life.changes && group.undoneAt <= life.changes\n        )"
       },
       "Catalog.AGroupsUndoComesAfterIt": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(\n          all.Group,\n          (group) =>\n            !GroupState.guards.Decided(group.state) ||\n            group.state.undoneAt === 0 ||\n            group.state.undoneAt > group.state.change\n        )"
+        "source": "(all) =>\n        everyDecidedGroup(all.Group, (group) => inForce(group) || group.undoneAt > group.change)"
       },
       "Catalog.TheLastGroupInForceIsInForce": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !GroupState.guards.Decided(group.state) ||\n              group.state.importId !== life.id ||\n              ImportState.guards.Removed(life.state) ||\n              ImportState.guards.Unstaged(life.state) ||\n              group.state.change !== life.state.topGroup ||\n              group.state.undoneAt === 0\n          )\n        )"
+        "source": "(all) =>\n        everyGroupOfItsImport(all, (group, life) => group.change !== life.topGroup || inForce(group))"
       },
       "Catalog.NoGroupActIsLaterThanTheImportsLast": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !GroupState.guards.Decided(group.state) ||\n              group.state.importId !== life.id ||\n              ImportState.guards.Removed(life.state) ||\n              ImportState.guards.Unstaged(life.state) ||\n              (group.state.change <= life.state.lastGroup && group.state.undoneAt <= life.state.lastGroup)\n          )\n        )"
+        "source": "(all) =>\n        everyGroupOfItsImport(all, (group, life) => group.change <= life.lastGroup && group.undoneAt <= life.lastGroup)"
       },
       "Catalog.AnImportCanBeStaged": {
         "kind": "sometimes",
@@ -604,7 +604,7 @@
       },
       "Catalog.NoGroupInForceIsLaterThanTheLastInForce": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !GroupState.guards.Decided(group.state) ||\n              group.state.importId !== life.id ||\n              ImportState.guards.Removed(life.state) ||\n              ImportState.guards.Unstaged(life.state) ||\n              group.state.undoneAt !== 0 ||\n              group.state.change <= life.state.topGroup\n          )\n        )"
+        "source": "(all) =>\n        everyGroupOfItsImport(all, (group, life) => !inForce(group) || group.change <= life.topGroup)"
       },
       "UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo": {
         "kind": "transition",

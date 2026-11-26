@@ -1,0 +1,26 @@
+id: dh:source-organizationchoice:001
+observation_refs:
+- so:sha256:03f7cfc73e58f44243817da57e55cd6aee0e42713b78172bd5e27b19c37fd5f5
+cq_warrants: []
+proposed_referent:
+  label: organization-switch response projection
+  description: One choice-shaped response value containing an organization identifier
+    and display name; an instance is one encoded choice occurrence. This does not
+    establish another organization kind.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Organization represented by the choice
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

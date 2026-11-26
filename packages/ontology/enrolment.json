@@ -1,0 +1,12 @@
+[
+  { "file": "packages/kernel/src/Member.schema.ts", "export": "Member", "as": "record" },
+  { "file": "packages/kernel/src/Role.schema.ts", "export": "Role", "as": "scheme" },
+  { "file": "packages/kernel/src/Activity.schema.ts", "export": "Activity", "as": "record" },
+  { "file": "packages/access/contract/src/People/Person.read.ts", "export": "Person", "as": "record" },
+  {
+    "file": "packages/access/contract/src/Activity/AuditTrail.read.ts",
+    "export": "AuditTrail",
+    "as": "collection",
+    "of": "packages/kernel/src/Activity.schema.ts#Activity.json"
+  }
+]

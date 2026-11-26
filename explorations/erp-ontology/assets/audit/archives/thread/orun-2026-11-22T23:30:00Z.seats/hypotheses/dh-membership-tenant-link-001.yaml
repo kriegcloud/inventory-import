@@ -1,0 +1,27 @@
+id: dh:membership-tenant-link:001
+observation_refs:
+- po:sha256:737ff1456ab1b977ef7fb4179c8c5d5b1b9ef1c5c65a2b69ec33c606b56daef4
+cq_warrants:
+- CQ-P06
+- CQ-P09
+proposed_referent:
+  label: Membership-to-tenant link candidate
+  description: 'Candidate referent under evaluation: the tenant participation in a membership. The quoted
+    construct describes a link rather than a separately individuated thing. A link instance would be the
+    ordered membership and tenant pair. Its existence as a proposed link does not establish another domain
+    entity beyond those participants.'
+representation_status: unresolved
+alternatives:
+- label: The tenant participation aspect of an actual workspace membership
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The quotation states a proposed link meaning. It supplies no independent fact separating
+    that link construct from representational navigation; the null stands for this construct.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

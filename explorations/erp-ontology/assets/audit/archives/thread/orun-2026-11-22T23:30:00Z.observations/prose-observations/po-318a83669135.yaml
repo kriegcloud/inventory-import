@@ -1,0 +1,6 @@
+id: "po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 136, end_line: 136}
+quote: "Stated, one criterion: the concept's scheme and notation (decision 41)."
+epistemic_status: quoted_prose

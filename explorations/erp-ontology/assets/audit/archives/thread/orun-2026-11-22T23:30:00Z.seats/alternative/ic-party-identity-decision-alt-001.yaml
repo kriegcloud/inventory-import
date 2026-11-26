@@ -1,0 +1,41 @@
+{
+  "id": "ic:party-identity-decision-alt:001",
+  "hypothesis_ref": "dh:party-identity-decision:001",
+  "identity": {
+    "supplies_identity": "unresolved",
+    "identity_criterion": "unresolved: no identity, maker, time or outcome contract is supplied; candidate criterion is 'one adjudication act over one record pair'.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": "unresolved",
+    "supplies_identity": "unresolved",
+    "unity": "unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "event (the adjudication act)",
+      "relator mediating two SourceRecords and an adjudicator",
+      "implementation match marker (null)"
+    ],
+    "existential_dependencies": [
+      "two SourceRecords",
+      "tenant"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": [
+      "retracted/overturned (not observed)"
+    ]
+  },
+  "counterexamples": [
+    {
+      "description": "Reversal: a decision that two records are one party is later overturned. As an information object, the record persists with a superseded status; as a relator it ends; as an event it is immutable and a second event reverses it. Nothing observed picks one."
+    }
+  ],
+  "status": "proposed"
+}

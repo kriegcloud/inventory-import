@@ -1,0 +1,44 @@
+{
+  "id": "ic:record-tenant-scoping-alt:001",
+  "hypothesis_ref": "dh:record-tenant-scoping:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "Not an individual: a containment link between a record and the workspace that holds it, individuated by its relata at a snapshot.",
+    "reidentification_key": [
+      "organizationId column on every customer-data table",
+      "(organizationId, id) composite child references"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "relation record → workspace (artifact containment), with Tenant derivative",
+      "relation record → Tenant/Organization as stated ('the tenant whose workspace holds this record')"
+    ],
+    "existential_dependencies": [
+      "record (information object)",
+      "workspace/tenant"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Succession: a successor organization inherits the workspace; every record's 'inTenant' organization changes although no record moved. Containment is therefore in the workspace; relating records to the Tenant role-bearer encodes the wrong relatum."
+    },
+    {
+      "description": "This is an information-management relation between artifacts, not a business-world fact; labelling it a domain referent overstates it — it is real, but its relata are information objects and a software workspace."
+    }
+  ],
+  "status": "proposed"
+}

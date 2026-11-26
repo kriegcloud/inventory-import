@@ -1,0 +1,37 @@
+id: dh:workspace-membership:001
+observation_refs:
+- so:sha256:ef1f0d4ea98af75f0019fc328e503ec770accca7ea67d715b3b5e8de9e062beb
+- po:sha256:8b535e25c8a2cc2dfb8d33ef90801cd51458c927d540c9ccbe11aff2918848c2
+- po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863
+- po:sha256:e2b5eec09f7b75d471242308ed66f9815f1217127ff0c27b2c6af0238da41321
+- po:sha256:2263348a61c74a8002ba7d66289dfa64deb20d97c9fa37f4c1d154a9dacc06de
+- po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62
+cq_warrants:
+- CQ-P06
+- CQ-P09
+- CQ-P11
+proposed_referent:
+  label: Person-to-tenant membership
+  description: 'Candidate referent: a relationship letting one human act in one tenant workspace until
+    removal. Grouped chains include the acting Member representation, removal and role-management use
+    case, and the distinction between one human and two memberships. An instance is an established membership
+    in one tenant, tracked by tenant plus MemberId retained after removal; re-creation and human resolution
+    beyond that handle remain unproved.'
+representation_status: domain_referent
+alternatives:
+- label: A member row or session actor snapshot alone
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The relationship semantics, finite authorization interval and independent human bearer supply
+    more than the presence of an id field. This does not prove production membership history.
+  discriminator: The prose explicitly describes a relation that permits workspace action only from creation
+    until removal, and the two-member/one-human example distinguishes membership identity from human identity.
+    A display or session record alone has neither that interpersonal relation nor its stated duration
+    of authorization.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

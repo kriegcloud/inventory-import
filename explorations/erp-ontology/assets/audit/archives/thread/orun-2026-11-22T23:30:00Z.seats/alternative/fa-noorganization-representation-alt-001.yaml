@@ -1,0 +1,23 @@
+{
+  "id": "fa:noorganization-representation-alt:001",
+  "hypothesis_ref": "dh:noorganization-representation:001",
+  "identity_card_ref": "ic:noorganization-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Session-union branch (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Phase of a Session artifact",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Session phases are software-system states; they matter only if a Session continuant is admitted.",
+  "verdict": "analyzed"
+}

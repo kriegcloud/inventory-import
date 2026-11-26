@@ -2,9 +2,10 @@
  * The plan of a stage, from its name. This is the one place that says what differs between stages, as Benjamin
  * decided it (decisions "infra I4", "I5" and "I8"): production alone answers at the real address and holds a model
  * key; it is never seeded; a preview and a test stage live on `workers.dev` with the test accounts and no sign-up, so
- * no real email is ever stored outside production; production takes the owner's list. Staging, main's head once its check passed
- * (decision "releases and deploys"), is a rehearsal the same way: the test accounts, sign-up closed, and no model key,
- * since decision I5 gives one to production only. A name that is none of the five kinds is refused, `live_<user>`
+ * no real email is ever stored on them; production takes the owner's list. Staging, main's head once its check passed
+ * (decision "releases and deploys"), is a rehearsal the same way: the test accounts and no model key, since decision
+ * I5 gives one to production only; it alone among the rehearsals reads the owner's sign-up list at deploy, closed
+ * when the list is unset (decision "staging, invited sign-up"). A name that is none of the five kinds is refused, `live_<user>`
  * among them, which is what a deploy without `--stage` would use.
  *
  * @packageDocumentation
@@ -101,7 +102,8 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           signUp: { from: "environment", variable: "SIGN_UP" }
         }),
       preview: () => PreviewPlan.make(rehearsal),
-      staging: () => StagingPlan.make({ ...rehearsal, stage: "staging" }),
+      staging: () =>
+        StagingPlan.make({ ...rehearsal, stage: "staging", signUp: { from: "environment", variable: "SIGN_UP" } }),
       test: () => TestPlan.make(rehearsal),
       personal: () => PersonalPlan.make(rehearsal)
     })

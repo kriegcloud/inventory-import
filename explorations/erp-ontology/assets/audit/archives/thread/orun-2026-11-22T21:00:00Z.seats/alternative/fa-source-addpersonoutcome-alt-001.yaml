@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-addpersonoutcome-alt:001"
+hypothesis_ref: "dh:source-addpersonoutcome:001"
+identity_card_ref: "ic:source-addpersonoutcome-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Outcome report as an information object about a membership-creation event"
+    still_viable: true
+strongest_counterexample: "A success value returned to the client does not show that the membership was persisted; outcome and occurrence can diverge."
+verdict: analyzed
+needed_evidence: "Whether outcomes are stored or only returned."

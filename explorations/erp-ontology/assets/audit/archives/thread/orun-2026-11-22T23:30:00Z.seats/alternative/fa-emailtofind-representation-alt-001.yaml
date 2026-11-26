@@ -1,0 +1,19 @@
+{
+  "id": "fa:emailtofind-representation-alt:001",
+  "hypothesis_ref": "dh:emailtofind-representation:001",
+  "identity_card_ref": "ic:emailtofind-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Decoding transformation (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Lower-casing asserts that two emails differing only in case are the same account key — an identifier-is-identity assumption at the account level.",
+  "verdict": "analyzed"
+}

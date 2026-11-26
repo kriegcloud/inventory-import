@@ -1,0 +1,27 @@
+{
+  "id": "fa:tenant-role-alt:001",
+  "hypothesis_ref": "dh:tenant-role:001",
+  "identity_card_ref": "ic:tenant-role-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Role of Organization relative to a hosting relation (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Tenancy relator / workspace artifact is the real relatum; 'Tenant' is a derived role at most",
+      "still_viable": true
+    },
+    {
+      "label": "Partition key only (null)",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "On succession the same OrganizationId, workspace, memberships and records continue while the role-bearer changes; the continuant that persists is the workspace/tenancy, which this model does not reify.",
+  "verdict": "analyzed"
+}

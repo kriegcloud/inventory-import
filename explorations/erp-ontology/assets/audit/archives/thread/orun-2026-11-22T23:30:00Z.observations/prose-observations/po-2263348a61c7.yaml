@@ -1,0 +1,6 @@
+id: "po:sha256:2263348a61c74a8002ba7d66289dfa64deb20d97c9fa37f4c1d154a9dacc06de"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "CLAUDE.md"}
+source_span: {start_line: 75, end_line: 76}
+quote: "an admin adds a person by the email they signed up with, changes a role or removes someone, and the organization always keeps an admin."
+epistemic_status: quoted_prose

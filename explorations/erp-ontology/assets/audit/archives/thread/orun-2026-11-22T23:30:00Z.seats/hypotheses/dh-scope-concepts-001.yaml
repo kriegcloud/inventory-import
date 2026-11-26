@@ -1,0 +1,30 @@
+id: dh:scope-concepts:001
+observation_refs:
+- po:sha256:cf88db38b0c877168ea7fc86a91d7ee12704ce01e2b9fe3321b841240c924551
+- po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45
+- po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2
+cq_warrants:
+- CQ-P11
+proposed_referent:
+  label: Grant scope extent concepts
+  description: 'Candidate referent: the controlled concept of organization-wide extent; other extents
+    are deferred rather than asserted as shipped instances. One concept is individuated by scheme and
+    notation. An application of that extent to a particular member assignment is separate from the repeatable
+    concept.'
+representation_status: information_artifact
+alternatives:
+- label: An implementation constant attached to every lifted grant
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The coverage meaning supplies informational denotation; this does not prove any narrower
+    scopes are implemented or populated.
+  discriminator: The scope description says organization extent covers every record of one organization,
+    and the decision distinguishes narrower extents that future slices may need. This specifies the meaning
+    of the access extent rather than merely naming a serialized constant.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

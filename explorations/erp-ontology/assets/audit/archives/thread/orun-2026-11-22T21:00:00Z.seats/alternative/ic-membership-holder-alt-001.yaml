@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:membership-holder-alt:001"
+hypothesis_ref: "dh:membership-holder:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No individual of its own: the membership relator's mediation of its human holder, identified by (membership, human)."
+  reidentification_key:
+    - "none observed; source Member/Person expose MemberId but no human id"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+    - "role: Member, played by the human while the membership holds (the category-bearing referent)"
+    - "mediation object property heldBy, no class"
+  existential_dependencies:
+    - "the membership"
+    - "the human"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+    - "ends with the membership"
+counterexamples:
+  - description: "No observed human identifier exists in the source; the holder side of this link is therefore unimplemented, and the only observable 'holder' is the MemberId, which identifies the membership, not the human."
+status: proposed

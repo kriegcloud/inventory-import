@@ -1,0 +1,40 @@
+{
+  "id": "ic:role-vocabulary-alt:001",
+  "hypothesis_ref": "dh:role-vocabulary:001",
+  "identity": {
+    "supplies_identity": "unresolved",
+    "identity_criterion": "unresolved: the source says the scheme has no identity criterion of its own (po:badeb1dc1a06), yet concept identity is 'scheme and notation', so concept identity is only as determinate as scheme identity. Needed: is the scheme one global vocabulary, or one per tenant (custom roles)?",
+    "reidentification_key": [
+      "key ending in 'Scheme' (MemberRoleScheme)"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": "unresolved",
+    "supplies_identity": "unresolved",
+    "unity": "unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "information_object",
+    "alternatives": [
+      "collective of concepts (membership-defined; adding a custom role makes a new collective)",
+      "representation scaffolding only (null)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": true,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Admission entailment: if access-level concepts are admitted with identity 'scheme + notation', the scheme is a semantic-support term required to state that criterion. The null 'implementation artifact only' cannot stand for the scheme while it stands rejected for its concepts."
+    },
+    {
+      "description": "Ranking: the vocabulary is 'ranked by what each may do' (po:de408e7eb4c4), but the rank lives only in hasRole code and is not skos:broader. The order is a derivable consequence of permissions (admin ⊇ editor ⊇ viewer), not a property of the scheme."
+    }
+  ],
+  "status": "proposed"
+}

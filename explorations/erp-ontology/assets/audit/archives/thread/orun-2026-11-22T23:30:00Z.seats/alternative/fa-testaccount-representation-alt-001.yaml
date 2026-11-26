@@ -1,0 +1,19 @@
+{
+  "id": "fa:testaccount-representation-alt:001",
+  "hypothesis_ref": "dh:testaccount-representation:001",
+  "identity_card_ref": "ic:testaccount-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Dev fixture only (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Explicitly 'never in a deployed database' — the strongest possible null.",
+  "verdict": "analyzed"
+}

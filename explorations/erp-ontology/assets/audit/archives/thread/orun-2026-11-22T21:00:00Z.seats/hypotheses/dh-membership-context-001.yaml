@@ -1,0 +1,30 @@
+id: dh:membership-context:001
+observation_refs:
+- po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a
+- po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+cq_warrants:
+- CQ-P06
+- CQ-P09
+proposed_referent:
+  label: Tenant context of a membership
+  description: The relationship between one membership episode and the tenant in which
+    its human may act. One instance follows the episode and tenant pair; sharing a
+    human across two tenants does not merge these relationships.
+representation_status: domain_referent
+alternatives:
+- label: Storage link to a workspace identifier
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotation links membership to the tenant it lets its person act
+    in; the separate membership quotation supplies the human-to-tenant access relationship.
+    This context has access significance beyond a syntactic link.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

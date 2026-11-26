@@ -1,0 +1,27 @@
+{
+  "id": "fa:audit-action-content-alt:001",
+  "hypothesis_ref": "dh:audit-action-content:001",
+  "identity_card_ref": "ic:audit-action-content-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Data value (quality) of the AuditEntry — the 'action' property (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Separate information-content individuals per entry",
+      "still_viable": true
+    },
+    {
+      "label": "Controlled action-type concepts",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "If action wording later becomes a closed code list ('Imported items' as a concept reused across entries), it becomes a concept, not a quality.",
+  "verdict": "analyzed"
+}

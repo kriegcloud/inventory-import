@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:recorded-change-alt:001"
+hypothesis_ref: "dh:recorded-change:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "unresolved: granularity of a change is unspecified. Question for Benjamin: is a change one user-intended action (e.g. one import creating 11 items) or each atomic data mutation; is the transaction ('batch') the boundary?"
+  reidentification_key:
+    - "no change id observed; reachable only through its audit entry"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U) if the batch/transaction bounds it; otherwise unresolved"
+  dependence: relational
+ufo_analysis:
+  candidate_category: event
+  alternatives:
+    - "process: a complex change made of many row mutations"
+    - "information_object: an asserted change description with no verified occurrence"
+  existential_dependencies:
+    - "the tenant's data (information objects) it alters"
+    - "the principal member (and optional delegate agent) who participate in it"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "The change is a change to a tenant's DATA: its participants are information objects, so it is an information-system event, not the business event (receiving goods). Merging the two is the artifact/referent merge."
+  - description: "'Imported items' / 'Created 11 items from items.csv' is one entry for at least 11 mutations: if changes are atomic, one record describes 11 changes."
+status: proposed

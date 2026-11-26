@@ -1,0 +1,19 @@
+id: fa:access-level-vocabulary:001
+hypothesis_ref: dh:access-level-vocabulary:001
+identity_card_ref: ic:access-level-vocabulary:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Issued vocabulary edition whose provenance individuates otherwise equal content.
+  still_viable: true
+- label: Implementation enumeration only; the quotation proposes content but does not prove separate maintenance.
+  still_viable: true
+strongest_counterexample: Two schema objects serialize the same ranked meanings, while an unchanged literal
+  list receives a new permission interpretation. Object identity and literal equality both misidentify
+  vocabulary-version content.
+verdict: analyzed
+needed_evidence: Specify vocabulary version boundaries and whether identity tracks content or a publishing
+  act. Rigidity concerns vocabulary-version content, not the contingent role of being currently deployed.

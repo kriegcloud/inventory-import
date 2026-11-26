@@ -1,0 +1,6 @@
+id: "po:sha256:a2954515f0563e447882b597c9c9efb2f780016b31552fa2b41b3b21a3989ea1"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 138, end_line: 138}
+quote: "Stated: the tenant and the entry's id. It rests on `Activity.organizationId` and `Activity.id`."
+epistemic_status: quoted_prose

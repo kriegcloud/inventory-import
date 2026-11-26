@@ -1,0 +1,27 @@
+id: dh:source-audittrail:001
+observation_refs:
+- so:sha256:4565b951504ae3b985bba1a71ef0a6e91ad1f7f43570532fb68ae58ce5d2b1f9
+- so:sha256:804033f441cdbfb34c2122fa90d4fc65f014c70072e51006757c397f60a2e02b
+cq_warrants: []
+proposed_referent:
+  label: audit-trail response collection
+  description: One bounded array response described as newest-first. An instance is
+    a response snapshot; the maximum length does not establish a complete historical
+    audit collection.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Collection of audit records
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

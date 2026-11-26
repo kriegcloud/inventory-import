@@ -1,0 +1,26 @@
+id: dh:source-addpersonproblemkind:001
+observation_refs:
+- so:sha256:6f54b80e294095d222eb7a51dd3d91bd39f64a878e4e0ea6eb8097c43996010b
+- so:sha256:a48cd96114639e0029acd7da6e58aaec1467d54baaf0ce7205332a0224499e02
+cq_warrants: []
+proposed_referent:
+  label: add-person problem code representation
+  description: One error code or its compile-time alias, describing noAccount or alreadyMember;
+    no observed database lookup establishes either condition in a real case.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Account absence or existing-membership condition
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

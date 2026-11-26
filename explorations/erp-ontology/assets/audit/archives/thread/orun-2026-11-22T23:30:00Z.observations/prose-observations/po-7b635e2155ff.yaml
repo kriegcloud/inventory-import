@@ -1,0 +1,6 @@
+id: "po:sha256:7b635e2155ffb47af78fa15060c100ae1b805f024646ccf60c805e91a1103b8f"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 133, end_line: 133}
+quote: "Inherited from `Organization`. In the repository it is told apart by `OrganizationId` (decision 38)."
+epistemic_status: quoted_prose

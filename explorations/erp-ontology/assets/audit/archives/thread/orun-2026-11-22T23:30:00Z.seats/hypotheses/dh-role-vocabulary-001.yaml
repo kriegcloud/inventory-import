@@ -1,0 +1,30 @@
+id: dh:role-vocabulary:001
+observation_refs:
+- po:sha256:de408e7eb4c4400b6371a6c0953e638fee6eac266149fcc5e73488616fa0ea1e
+- po:sha256:badeb1dc1a0680ab75832b2858d545aed1b7e203be21606c8b64935bfbac9227
+- po:sha256:cf426b237ec8182ac1c1c7893b2e21fcdbe11f6c682e625af8517f5042bc694c
+cq_warrants:
+- CQ-P06
+- CQ-P11
+proposed_referent:
+  label: Member access-level vocabulary candidate
+  description: 'Candidate referent under evaluation: a controlled collection of access-level concepts,
+    not an access assignment or rank hierarchy. A collection instance would be individuated by a scheme
+    authority and lifecycle, but the supplied prose states there is no scheme identity criterion of its
+    own. The key spelling and rank implementation do not settle collection identity.'
+representation_status: unresolved
+alternatives:
+- label: Representation scaffolding for grouping role codes
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: Individual role meanings are assessed separately. Grouping them under a key ending in Scheme
+    and stating a vocabulary does not supply an independent discriminator or identity for the scheme itself.
+    The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

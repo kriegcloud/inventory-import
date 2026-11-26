@@ -1,0 +1,75 @@
+id: otp:grantScope:001
+hypothesis_ref: dh:grant-scope-content:001
+identity_card_ref: ic:grant-scope-content:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: grant scope
+  local_name: grantScope
+  proposed_iri: https://example.org/inventory-import/ontology/grantScope
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: 'A relation linking an access assignment to the kind of extent to which it applies, rather than
+    to a particular site or field. Proposed domain: Grant; objects are concepts of GrantScopeKindScheme;
+    no OWL range class is proposed.'
+  source:
+  - CQ-P06
+  - po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+  - po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96
+  - po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotations
+  say an access grant covers an extent and explicitly distinguish a whole organization, a location and
+  a field. These are intended limits on applicability of access, not merely alternative code spellings.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:grant-scope-content:001): Supply actual-target selection and versioned scope semantics,
+  and determine whether scope changes replace the grant. Decision 96 explicitly names kind of scope, not
+  a particular site.'
+- 'Identity criterion from ic:grant-scope-content:001: The same scope-kind association concerns the same
+  assignment and selected extent kind under a vocabulary version. It does not individuate a target site/field
+  or establish equality of actual permission extents. This is a relation extension, not a new individual
+  or identity-supplying sortal. Its holding is temporally qualified; participant identity is inherited
+  from the referenced analyses.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Applicability situation joining assignment,
+  tenant, scope kind, actual target and interval. Choose the proposed shape or this rival explicitly;
+  the current proposal does not decide between them. Evidence required: Supply actual-target selection
+  and versioned scope semantics, and determine whether scope changes replace the grant. Decision 96 explicitly
+  names kind of scope, not a particular site.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Information assertion that a grant
+  has a particular scope code. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Supply actual-target selection and versioned scope
+  semantics, and determine whether scope changes replace the grant. Decision 96 explicitly names kind
+  of scope, not a particular site.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Scope code stored on a grant (information_artifact).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

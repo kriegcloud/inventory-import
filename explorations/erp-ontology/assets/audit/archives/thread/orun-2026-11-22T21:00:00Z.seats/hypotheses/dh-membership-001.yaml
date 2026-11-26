@@ -1,0 +1,32 @@
+id: dh:membership:001
+observation_refs:
+- po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+- po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c
+- po:sha256:b6cf8430342dae4086e8ead460bc512ca46497f17efdee0f46ac2e1d4ceb075a
+cq_warrants:
+- CQ-P06
+- CQ-P09
+proposed_referent:
+  label: Workspace participation relationship
+  description: A person-to-tenant relationship enabling that person to act in the
+    workspace from creation until removal. One instance is one continuous membership
+    episode of that person in that tenant; recreation identity is unresolved.
+representation_status: domain_referent
+alternatives:
+- label: Membership row recording the relationship
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotations describe a relationship enabling a human to act within
+    a particular tenant and persisting from its making until removal, with the human
+    holder independent of an account; this is a participant-dependent access relationship
+    rather than just a record shape.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

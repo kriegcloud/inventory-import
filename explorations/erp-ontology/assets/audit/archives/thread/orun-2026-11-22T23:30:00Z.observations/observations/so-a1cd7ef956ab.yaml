@@ -1,0 +1,48 @@
+{
+  "id": "so:sha256:a1cd7ef956abd7f2020494c480326eced3144a131138c624ea13ab25ea25a44a",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 191,
+    "end_line": 197,
+    "content_sha256": "11055facc57f3b0ab093f5fbf4845c72dd2ca62aa494bd65ed12e239b5d44622"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "NoOrganization",
+    "lexical_name": "NoOrganization",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_field",
+      "object": "email"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "features"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "organizations"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "status"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "NoOrganization"
+    }
+  ],
+  "source_excerpt": "export class NoOrganization extends S.Opaque<NoOrganization, { readonly brand: unique symbol }>()(\n  S.Struct({ status: S.tag(\"no-organization\"), email, organizations, features: SignInFeatures }).pipe(\n    $I.annoteSchema(\"NoOrganization\", {\n      description: \"Signed in, in no organization yet (or not in the chosen one).\"\n    })\n  )\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

@@ -1,0 +1,6 @@
+id: "po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 440, end_line: 442}
+quote: "A question the carried-through reports raised under decision 40. I chose yes: the thread's `Grant` carries `grantScope`, and `GrantScopeKindScheme` ships with the one concept organization; other scopes are added by the slice that needs them. The agent recommended the same."
+epistemic_status: quoted_prose

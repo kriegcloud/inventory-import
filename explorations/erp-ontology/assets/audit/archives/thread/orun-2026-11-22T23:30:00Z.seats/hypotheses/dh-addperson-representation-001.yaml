@@ -1,0 +1,25 @@
+id: dh:addperson-representation:001
+observation_refs:
+- so:sha256:fc503554c4e9499fc379e6aaa602e85fb4b5380e14473df631987661aa239d81
+cq_warrants: []
+proposed_referent:
+  label: AddPerson command representation
+  description: 'Candidate real/domain referents: none established for the command itself. Email and role
+    form a request payload. A payload occurrence is individuated by a submitted request, but no request
+    identity or execution evidence is supplied. The described addition is a possible effect, not the request
+    itself.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: An instruction to create a membership
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

@@ -1,0 +1,29 @@
+id: dh:member-parser-gap:001
+observation_refs:
+- so:sha256:8711fd30663c1360206935d0a7e71773b7838730daace56a17cb751c5198b594
+- so:sha256:a73c1ed7866b21a0ab576608020aeb820df7153522eb14cf1f07faa2f63b1ad0
+cq_warrants: []
+proposed_referent:
+  label: Member constructs not represented by the adapter
+  description: 'Candidate real/domain referents: none established by these observation chains. The adapter
+    marks CallExpression, PropertyDeclaration as unrepresentable. These chains are grouped by the observed
+    symbol only, not asserted to instantiate a domain kind. An observed declaration occurrence is individuated
+    by its supplied observation; neither its repeated excerpt nor its spelling establishes a domain instance.
+    More complete syntactic observations and semantic evidence are needed before these chains can support
+    a referent.'
+representation_status: unresolved
+alternatives:
+- label: A partially observed encoding of a domain concept or information object
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The closed observation vocabulary did not represent these constructs. Reusing the excerpt
+    to silently upgrade the unsupported chain would bypass that limit; the implementation-only null is
+    not rejected.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

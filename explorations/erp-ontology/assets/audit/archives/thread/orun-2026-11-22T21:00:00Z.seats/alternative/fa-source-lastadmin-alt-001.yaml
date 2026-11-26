@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-lastadmin-alt:001"
+hypothesis_ref: "dh:source-lastadmin:001"
+identity_card_ref: "ic:source-lastadmin-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: true
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Organizational invariant 'at least one admin' as a norm/constraint referent (semantic-support term), of which LastAdmin is the rejection signal"
+    still_viable: true
+strongest_counterexample: "The error class denotes nothing, but its description states a policy ('nobody could manage it afterwards'); that policy is an unhypothesized semantic-support referent. Policy-as-fact risk: the error existing does not show the invariant is enforced on every path (removal, role change, revocation)."
+verdict: analyzed
+needed_evidence: "Whether the at-least-one-admin invariant is a ratified rule and on which operations it is enforced."

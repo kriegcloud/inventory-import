@@ -1,0 +1,245 @@
+// TypeScript 7 has no legacy directory entry point; this is its root export target.
+import compiler from "/repo/node_modules/typescript/lib/version.cjs";
+import * as ts from "/repo/node_modules/typescript/dist/ast/index.js";
+import { API } from "/repo/node_modules/typescript/dist/api/async/api.js";
+import { createVirtualFileSystem } from "/repo/node_modules/typescript/dist/api/fs.js";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync, statSync } from "node:fs";
+import { resolve, join } from "node:path";
+
+// Fixed corpus: only direct .ts children, inventoried on 2026-11-22. Never glob at runtime.
+const FILES = [
+  "packages/kernel/src/Member.schema.ts",
+  "packages/kernel/src/Role.schema.ts",
+  "packages/kernel/src/Activity.schema.ts",
+  "packages/access/contract/src/People/Person.read.ts",
+  "packages/access/contract/src/People/People.command.ts",
+  "packages/access/contract/src/People/People.rejection.ts",
+  "packages/access/contract/src/Activity/AuditTrail.read.ts",
+  "packages/access/contract/src/Session/SessionState.read.ts",
+];
+const EXTRACTOR = {
+  id: "adapter-typescript", version: "1.0.0", parser: `typescript@${compiler.version}`,
+  // Provenance snapshot path relative to the eventual audit root's repository.
+  // No snapshot is installed or committed by this adapter.
+  script: "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt",
+};
+type Fact = { predicate: string; object: string };
+const sha = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
+const cp = (a: string, b: string): number => {
+  const x = [...a], y = [...b];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const d = x[i].codePointAt(0)! - y[i].codePointAt(0)!; if (d) return d;
+  }
+  return x.length - y.length;
+};
+const factOrder = (a: Fact, b: Fact) => cp(a.predicate, b.predicate) || cp(a.object, b.object);
+// Conservative subset of IDENT_OBJ: never encode prose or an expression as an identifier.
+const identifier = (s: string) => /^[$\p{ID_Start}_][$\p{ID_Continue}\u200c\u200d]*(?:\.[$\p{ID_Start}_][$\p{ID_Continue}\u200c\u200d]*)*$/u.test(s);
+const plain = (n: ts.Node): boolean => ts.isIdentifier(n) ||
+  (ts.isPropertyAccessExpression(n) && !n.questionDotToken && plain(n.expression));
+// Exact keepends implementation in validate_artifacts.ts: CRLF, CR, LF.
+const linesOf = (s: string) => (s.match(/[^\r\n]*(?:\r\n|\r|\n|$)/g) ?? []).filter(Boolean);
+
+export async function observeSource(path: string, text: string, commit: string) {
+  // TypeScript 7's compiler API parses through its bundled native service.
+  // The entire project is virtual; unresolved imports are never followed on disk.
+  const virtualPath = "/source/input.ts", configPath = "/source/tsconfig.json";
+  const fs = createVirtualFileSystem({
+    [virtualPath]: text,
+    [configPath]: JSON.stringify({ compilerOptions: { noLib: true, noResolve: true }, files: ["input.ts"] }),
+  });
+  const api = new API({ cwd: "/source", fs });
+  let sf: ts.SourceFile;
+  try {
+    const snapshot = await api.updateSnapshot({ openProjects: [configPath] });
+    const program = snapshot.getProject(configPath)?.program;
+    if (!program) throw new Error(`${path}: virtual project not available`);
+    const diagnostics = await program.getSyntacticDiagnostics(virtualPath);
+    if (diagnostics.length) throw new Error(`${path}: ${diagnostics.length} TypeScript parse diagnostics`);
+    const parsed = await program.getSourceFile(virtualPath);
+    if (!parsed) throw new Error(`${path}: compiler returned no AST`);
+    sf = parsed;
+  } finally { await api.close(); }
+  const lines = linesOf(text), starts: number[] = []; let offset = 0;
+  for (const line of lines) { starts.push(offset); offset += line.length; }
+  const lineAt = (pos: number) => { let i = 0; while (i + 1 < starts.length && starts[i + 1] <= pos) i++; return i + 1; };
+  const imported = new Set<string>();
+  for (const st of sf.statements) if (ts.isImportDeclaration(st)) {
+    const bindings = st.importClause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings)) for (const el of bindings.elements) imported.add(el.name.text);
+  }
+  const records: any[] = [];
+  function emit(node: ts.Node, name: string, kind: string, facts: Fact[]) {
+    const start = lineAt(node.getStart(sf)), end = lineAt(node.end - 1);
+    const excerpt = lines.slice(start - 1, end).join("");
+    const sorted = [...new Map(facts.map(f => [JSON.stringify([f.predicate, f.object]), f])).values()].sort(factOrder);
+    const digest = sha(JSON.stringify([commit, path, start, end, sorted.map(f => [f.predicate, f.object]), EXTRACTOR.id, EXTRACTOR.version]));
+    records.push({ id: `so:sha256:${digest}`, schema_version: 1,
+      repository: { commit, path }, source_span: { start_line: start, end_line: end, content_sha256: sha(excerpt) },
+      extractor: { ...EXTRACTOR }, symbol: { qualified_name: name, lexical_name: name, syntactic_kind: kind },
+      observed_facts: sorted, source_excerpt: excerpt, epistemic_status: "parser_derived" });
+  }
+  function declaration(node: ts.Node, span: ts.Node, name: string, kind: string, root?: ts.Node) {
+    const facts: Fact[] = [], gaps = new Set<string>();
+    const add = (predicate: string, object: string, n: ts.Node) => {
+      if (predicate === "declares_literal_member" ? object.length > 0 && n.getText(sf).includes(object) : identifier(object)) facts.push({ predicate, object });
+      else gaps.add(ts.SyntaxKind[n.kind]);
+    };
+    add("exports_symbol", name, node);
+    const reference = (n: ts.Node) => {
+      // Traverse schema operands, excluding annotation payloads and helper callees.
+      if (ts.isIdentifier(n)) { if (imported.has(n.text)) add("references_type", n.text, n); return; }
+      if (ts.isPropertyAccessExpression(n)) { reference(n.expression); return; }
+      if (ts.isCallExpression(n)) {
+        if (ts.isPropertyAccessExpression(n.expression)) {
+          if (/^(annotate|annote)/.test(n.expression.name.text)) return;
+          reference(n.expression.expression);
+        }
+        n.arguments.forEach(reference); return;
+      }
+      if (ts.isObjectLiteralExpression(n) || ts.isTypeNode(n)) return;
+      n.forEachChild(reference);
+    };
+    function fields(obj: ts.ObjectLiteralExpression) {
+      for (const p of obj.properties) {
+        if ((ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
+            (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) || ts.isNumericLiteral(p.name))) {
+          add("declares_field", p.name.text, p);
+          reference(ts.isPropertyAssignment(p) ? p.initializer : p.name);
+        } else gaps.add(ts.SyntaxKind[p.kind]);
+      }
+    }
+    let described = false;
+    function visit(n: ts.Node) {
+      if (ts.isCallExpression(n)) {
+        // Curried Class/TaggedError: follow call receivers back to their factory.
+        let base: ts.Expression = n.expression;
+        while (ts.isCallExpression(base)) base = base.expression;
+        const factory = ts.isPropertyAccessExpression(base) ? base.getText(sf) : "";
+        if (/^(S|Model)\.(Class|TaggedClass|Opaque|Struct|TaggedStruct|TaggedError)$/.test(factory)) {
+          for (const arg of n.arguments) if (ts.isObjectLiteralExpression(arg)) { fields(arg); described = true; break; }
+        }
+        if (n.expression.getText(sf) === "S.Literals") {
+          described = true;
+          const array = n.arguments.length === 1 && ts.isArrayLiteralExpression(n.arguments[0]) ? n.arguments[0] : undefined;
+          if (!array) gaps.add("CallExpression");
+          else for (const el of array.elements) {
+            if (ts.isStringLiteral(el)) add("declares_literal_member", el.text, el);
+            else gaps.add(ts.SyntaxKind[el.kind]);
+          }
+        }
+      }
+      if (ts.isUnionTypeNode(n)) {
+        described = true;
+        for (const t of n.types) {
+          if (ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal)) add("declares_literal_member", t.literal.text, t.literal);
+          else gaps.add(ts.SyntaxKind[t.kind]);
+        }
+        return;
+      }
+      // Do not mine annotation objects, method bodies or arbitrary function internals.
+      if (ts.isObjectLiteralExpression(n) || ts.isFunctionLikeDeclaration(n)) return;
+      n.forEachChild(visit);
+    }
+    if (root) visit(root);
+    if (ts.isClassDeclaration(node)) {
+      for (const h of node.heritageClauses ?? []) for (const t of h.types) {
+        if (plain(t.expression)) add(h.token === ts.SyntaxKind.ExtendsKeyword ? "extends_syntactically" : "implements_syntactically", t.expression.getText(sf), t);
+        else gaps.add(ts.SyntaxKind[t.expression.kind]);
+      }
+      for (const m of node.members) gaps.add(ts.SyntaxKind[m.kind]);
+    }
+    if (ts.isInterfaceDeclaration(node)) {
+      described = true;
+      for (const m of node.members) {
+        if (ts.isPropertySignatureDeclaration(m) && m.name && ts.isIdentifier(m.name)) add("declares_field", m.name.text, m);
+        else gaps.add(ts.SyntaxKind[m.kind]);
+      }
+    }
+    if (!described && root) gaps.add(ts.SyntaxKind[root.kind]);
+    emit(span, name, kind, facts);
+    // Escape hatches always have their own records, and never replace the export record.
+    for (const gap of [...gaps].sort(cp)) emit(span, name, kind, [{ predicate: "unrepresentable_construct", object: gap }]);
+  }
+  for (const st of sf.statements) {
+    if (!st.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
+    if (ts.isClassDeclaration(st) || ts.isTypeAliasDeclaration(st) || ts.isInterfaceDeclaration(st)) {
+      if (!st.name) throw new Error(`${path}: anonymous exported declaration cannot be renamed`);
+      declaration(st, st, st.name.text, ts.isClassDeclaration(st) ? "class" : ts.isTypeAliasDeclaration(st) ? "type_alias" : "interface",
+        ts.isClassDeclaration(st) ? st.heritageClauses?.find(h => h.token === ts.SyntaxKind.ExtendsKeyword) : ts.isTypeAliasDeclaration(st) ? st.type : undefined);
+    } else if (ts.isVariableStatement(st) && (st.declarationList.flags & ts.NodeFlags.Const)) {
+      for (const d of st.declarationList.declarations) {
+        if (!ts.isIdentifier(d.name)) throw new Error(`${path}: exported destructuring needs an explicit adapter extension`);
+        declaration(d, st, d.name.text, "const", d.initializer);
+      }
+    }
+  }
+  return records;
+}
+
+// JSON is the YAML 1.2 flow-style subset: quoted scalar values, stable insertion order.
+// No YAML library, aliases, timestamps, implicit scalar typing or emitter variability.
+export const yaml = (record: any) => JSON.stringify(record, null, 2) + "\n";
+export const filename = (record: any) => `so-${record.id.slice("so:sha256:".length, "so:sha256:".length + 12)}.yaml`;
+export async function fixtureRecords(golden: string) {
+  const config = JSON.parse(readFileSync(join(golden, "fixture.json"), "utf8"));
+  return observeSource(config.path, readFileSync(join(golden, "input", config.input), "utf8"), config.commit);
+}
+export async function selfCheck(golden: string) {
+  const actual = (await fixtureRecords(golden)).map(yaml).sort(cp);
+  const expected = readdirSync(golden).filter(f => f.endsWith(".expected.yaml")).sort(cp).map(f => readFileSync(join(golden, f), "utf8")).sort(cp);
+  if (!actual.length || JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`golden mismatch: ${actual.length} generated / ${expected.length} expected records (exact bytes)`);
+  console.log(`PASS: ${actual.length} golden records match exactly; ${EXTRACTOR.parser}`);
+}
+function readCommit(repo: string): string {
+  // The runner passes no commit environment variable. Resolve Git metadata with builtins.
+  let git = join(repo, ".git");
+  if (!statSync(git).isDirectory()) {
+    const pointer = readFileSync(git, "utf8").trim();
+    if (!pointer.startsWith("gitdir: ")) throw new Error("invalid .git pointer");
+    git = resolve(repo, pointer.slice(8));
+  }
+  let common = git;
+  if (existsSync(join(git, "commondir"))) common = resolve(git, readFileSync(join(git, "commondir"), "utf8").trim());
+  const head = readFileSync(join(git, "HEAD"), "utf8").trim();
+  let commit = head;
+  if (head.startsWith("ref: ")) {
+    const ref = head.slice(5);
+    if (!/^refs\/[A-Za-z0-9._/-]+$/.test(ref) || ref.split("/").includes("..")) throw new Error("invalid HEAD ref");
+    const loose = [join(git, ref), join(common, ref)].find(existsSync);
+    if (loose) commit = readFileSync(loose, "utf8").trim();
+    else {
+      const packed = readFileSync(join(common, "packed-refs"), "utf8").split(/\r?\n/).find(l => l.split(" ")[1] === ref);
+      if (!packed) throw new Error(`HEAD ref unavailable: ${ref}`);
+      commit = packed.split(" ")[0];
+    }
+  }
+  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("unavailable or unsupported Git commit");
+  return commit;
+}
+if (import.meta.main && typeof Bun !== "undefined") {
+  // TS 7's JSON-RPC native client hangs under Bun 1.4.5. The runner mounts
+  // /usr read-only, so use its Node runtime for the same single-file adapter.
+  const result = spawnSync("/usr/bin/node", ["--experimental-strip-types", fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: "inherit" });
+  if (result.error) console.error(String(result.error));
+  process.exitCode = result.status ?? 1;
+} else if (import.meta.main) {
+  try {
+    const args = process.argv.slice(2);
+    if (args.length === 2 && args[0] === "--self-check") await selfCheck(args[1]);
+    else if (args.length === 4 && args[0] === "--repo" && args[2] === "--out") {
+      const repo = resolve(args[1]), out = resolve(args[3]), commit = readCommit(repo);
+      const records = [];
+      for (const p of FILES) records.push(...await observeSource(p, readFileSync(join(repo, p), "utf8"), commit));
+      const names = records.map(filename);
+      if (new Set(names).size !== names.length) throw new Error("record filename collision");
+      mkdirSync(out, { recursive: true });
+      if (names.some(n => existsSync(join(out, n)))) throw new Error("refusing to overwrite existing observations");
+      records.forEach((r, i) => writeFileSync(join(out, names[i]), yaml(r), { flag: "wx" }));
+      console.log(`Wrote ${records.length} records from ${FILES.length} files; commit ${commit}`);
+    } else throw new Error("usage: --self-check /golden | --repo /repo --out /out");
+  } catch (error) { console.error(String(error)); process.exitCode = 1; }
+}

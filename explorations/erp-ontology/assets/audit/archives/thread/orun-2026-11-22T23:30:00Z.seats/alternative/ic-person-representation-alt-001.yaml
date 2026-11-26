@@ -1,0 +1,35 @@
+{
+  "id": "ic:person-representation-alt:001",
+  "hypothesis_ref": "dh:person-representation:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No domain identity: 'Person (People page)' is a schema/value declaration; its values are compared structurally, not re-identified.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "view of a Membership (keyed by memberId) joined with person display name and account email",
+      "role 'member' of the human (qua-individual)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "The name annotation 'never tells two people apart' plus memberId as address means two rows for one human are two Person values, contradicting decision 409 if read as the Person kind."
+    }
+  ],
+  "status": "proposed"
+}

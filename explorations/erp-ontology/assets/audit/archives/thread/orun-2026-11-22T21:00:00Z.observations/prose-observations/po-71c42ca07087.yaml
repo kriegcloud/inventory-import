@@ -1,0 +1,6 @@
+id: "po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001"
+schema_version: 1
+repository: {commit: "7f7c2b3f23842437520ff77d89e79c7985e237d9", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 133, end_line: 133}
+quote: "An organization for which this application keeps a workspace, whose records are scoped to it and hidden from every other organization."
+epistemic_status: quoted_prose

@@ -1,0 +1,27 @@
+id: dh:source-personnotfound-unrepresented:001
+observation_refs:
+- so:sha256:ec706aa8fdc7cdab6a59b96f1e5477fbf5da74e2f946db54131a98901517e9f2
+cq_warrants: []
+proposed_referent:
+  label: person-not-found rejection representation
+  description: One tagged HTTP error value described in terms of a member outside
+    the organization. It does not establish absence of a human, or even execution
+    of the lookup.
+representation_status: unresolved
+alternatives:
+- label: Organization-scoped lookup failure report
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

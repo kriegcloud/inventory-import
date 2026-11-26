@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:fb162a0dd7346f06ce23ea1a47230af2081659d92ea10a9ec5992296ea2989e7",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 82,
+    "end_line": 82,
+    "content_sha256": "00921e72f16ad7c5117f08954fbe547a4e7fcd49dd143096d1b6dc7e11d1c226"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "AddPersonProblemKind",
+    "lexical_name": "AddPersonProblemKind",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "TypeQuery"
+    }
+  ],
+  "source_excerpt": "export type AddPersonProblemKind = typeof AddPersonProblemKind.Type\n",
+  "epistemic_status": "parser_derived"
+}

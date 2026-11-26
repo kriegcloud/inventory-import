@@ -1,0 +1,27 @@
+id: dh:source-signupoffer-unrepresented:001
+observation_refs:
+- so:sha256:360ad08374b3a5bdbea5885520bdc67226db5f653cc7007d81deed5de02d519d
+- so:sha256:d33c08da91acdf765057bdb172d3ed56f1c01606b35421191abbadbaa9d63f62
+cq_warrants: []
+proposed_referent:
+  label: sign-up offer setting representation
+  description: One coded offer setting among open, invited and closed, or its compile-time
+    alias. A setting value is not evidence of actual admission policy enforcement.
+representation_status: unresolved
+alternatives:
+- label: Account-admission policy specification
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

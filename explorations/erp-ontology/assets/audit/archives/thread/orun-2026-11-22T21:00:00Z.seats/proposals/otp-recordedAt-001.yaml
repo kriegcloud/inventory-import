@@ -1,0 +1,75 @@
+id: otp:recordedAt:001
+hypothesis_ref: dh:audit-writing-instant:001
+identity_card_ref: ic:audit-writing-instant:001
+foundational_status: analyzed
+term:
+  preferred_label: recorded at
+  local_name: recordedAt
+  proposed_iri: https://example.org/inventory-import/ontology/recordedAt
+  owl_entity_kind: data_property
+  in_scheme: ''
+definition:
+  text: 'A data property relating an audit entry to a timestamp encoding when that entry was written,
+    rather than necessarily when its described change occurred. Proposed domain: AuditEntry; proposed
+    range: xsd:dateTime.'
+  source:
+  - CQ-P10
+  - po:sha256:50ddbe3ee62ac9bdcea8d9e597cb1145c3bcde88a7c204db80291da9e5d053ad
+  - po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: rigid
+  identity: carries
+  dependence: none
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P10
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotation
+  anchors the instant specifically to the entry being written, and another quotation distinguishes writing
+  from the recorded change. This temporal anchor concerns a writing occurrence, rather than merely the
+  format of a date field; precision and clock correctness are not established.'
+open_issues:
+- 'Needed evidence (fa:audit-writing-instant:001): Supply temporal scale, precision and uncertainty, and
+  define which point of the writing event is intended. Category none means temporal instant is outside
+  the offered entity categories; it is neither an event nor a quality.'
+- 'Identity criterion from ic:audit-writing-instant:001: Provisional: two instants are the same iff they
+  occupy the same position in the adopted temporal reference system, regardless of how many entries were
+  written then. A timestamp value encodes a position only under a timescale, zone/offset and precision
+  contract; no such contract is supplied.'
+- 'Design qualification: xsd:dateTime encodes a claimed temporal position; it does not resolve timescale,
+  precision, uncertainty or the choice of point within the writing event.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Timestamp information value representing
+  an instant or uncertainty interval. Choose the proposed shape or this rival explicitly; the current
+  proposal does not decide between them. Evidence required: Supply temporal scale, precision and uncertainty,
+  and define which point of the writing event is intended. Category none means temporal instant is outside
+  the offered entity categories; it is neither an event nor a quality.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Temporal region/interval if writing
+  time is only known at finite precision. Choose the proposed shape or this rival explicitly; the current
+  proposal does not decide between them. Evidence required: Supply temporal scale, precision and uncertainty,
+  and define which point of the writing event is intended. Category none means temporal instant is outside
+  the offered entity categories; it is neither an event nor a quality.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Timestamp value encoding that instant
+  (information_artifact). This alternative is not accepted, rejected or silently merged with the proposed
+  referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

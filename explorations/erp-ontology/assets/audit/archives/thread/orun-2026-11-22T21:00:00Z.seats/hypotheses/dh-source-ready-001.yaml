@@ -1,0 +1,26 @@
+id: dh:source-ready:001
+observation_refs:
+- so:sha256:3d7c9c0f6d71ea58b0d93fd76ecfd4fd0814eebbd794b1feb9039246ec78ec48
+cq_warrants: []
+proposed_referent:
+  label: ready session response
+  description: One ready-state response value carrying an actor and available organizations.
+    This does not establish a new kind of member or guarantee that a subsequent action
+    is permitted.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Session-specific acting-member context
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

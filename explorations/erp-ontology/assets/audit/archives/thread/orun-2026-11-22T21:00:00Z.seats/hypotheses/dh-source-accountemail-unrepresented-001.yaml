@@ -1,0 +1,28 @@
+id: dh:source-accountemail-unrepresented:001
+observation_refs:
+- so:sha256:bec411d37bdd3acb2a319442f4cb4235481e6486cd2be3f3fba837ac82ebf8e3
+- so:sha256:e83455245320c475e3ccecc303d49d365b3271d155aa4a4287be172d83f3ff3c
+cq_warrants: []
+proposed_referent:
+  label: account-email validation representation
+  description: One validation schema or its derived static type; a validated string
+    occurrence is distinct from a mailbox, account or human, whose identity is not
+    established.
+representation_status: unresolved
+alternatives:
+- label: Account login identifier
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

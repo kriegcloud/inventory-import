@@ -1,0 +1,25 @@
+id: dh:emailtofind-representation:001
+observation_refs:
+- so:sha256:a7cc303ddb9cbad069bff607b86251629c7296d4e2edc36e2a061f1a3ec7655d
+- so:sha256:a806262539ec1114c50332e082d08ad2f7126a23054b0f61d13f8ebb71350b3d
+cq_warrants: []
+proposed_referent:
+  label: EmailToFind normalization representation
+  description: 'Candidate real/domain referents: none established for the normalization schema or inferred
+    type. Trimming, lowercasing and decoding produce a lookup string; a representation instance is a resulting
+    string value. No new person, account or email entity follows from normalization.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A normalized email lookup value
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

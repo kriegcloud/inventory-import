@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { StagedRow } from "@inventory/catalog-contract/Staged"
+import { StagedHead, StagedRow } from "@inventory/catalog-contract/Staged"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
 import { readSpreadsheet } from "./spreadsheet/read.ts"
@@ -20,6 +20,8 @@ const post = (message: ReadMessage) => self.postMessage(message)
 
 // An Option loses its prototype in the copy between threads (protocol.ts), so a chunk crosses in the form the wire
 // carries, and the page decodes it with the same schema.
+// Keep head-bound validation at its existing staging/server boundaries and preserve their refusal words.
+const encodeHead = S.encodeOption(StagedHead, { disableChecks: true })
 const encodeChunk = S.encodeOption(S.Array(StagedRow))
 
 const crashed = (file: File) =>
@@ -52,15 +54,18 @@ const read = ({ file, sheet }: ReadRequest) =>
     .then((result) => {
       if (Result.isFailure(result)) return refuse(result.failure)
       const table = result.success
-      const { rows, sheet: sheetName, ...rest } = stageTable({ table })
-      // Plain fields for the copy between threads (protocol.ts): the page makes the Option again.
-      const head = { ...rest, sheet: O.getOrNull(sheetName) }
+      const { rows, ...stagedHead } = stageTable({ table })
       const problem = stagingProblem({
-        fileName: head.fileName,
+        fileName: stagedHead.fileName,
         rowCount: rows.length,
-        columnCount: head.columns.length
+        columnCount: stagedHead.columns.length
       })
       if (O.isSome(problem)) return refuse(problem.value)
+      // Keep the staging refusals above ahead of encoding, as for chunks below.
+      // The complete head crosses in its schema's encoded form, just as the chunks do.
+      const encodedHead = encodeHead(stagedHead)
+      if (O.isNone(encodedHead)) return post(crashed(file))
+      const head = encodedHead.value
       const encoded = O.all(A.map(uploadChunks({ rows }), (chunk) => encodeChunk(chunk)))
       // Rows the reader made always encode: a chunk that does not is the reader's own failure, not the file's.
       if (O.isNone(encoded)) return post(crashed(file))
@@ -75,7 +80,7 @@ const read = ({ file, sheet }: ReadRequest) =>
       post(
         ReadMessage.Head({
           head,
-          chunkSizes: chunks.map((chunk) => chunk.length),
+          chunkSizes: A.map(chunks, (chunk) => chunk.length),
           workbook: Match.valueTags(table.format, {
             xlsx: (format) => ({ sheets: format.sheets, chosen: format.chosen }),
             csv: () => null

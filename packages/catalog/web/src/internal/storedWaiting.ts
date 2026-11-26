@@ -2,11 +2,12 @@
 // break: what a reload reads back is what the draft kept, every side of every line and what each may be written over
 // included; and what an older page of the app kept still reads, so nothing it kept is lost.
 import * as A from "effect/Array"
-import { dual } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import { emptyWhenLeftOut } from "@inventory/kernel/Wire"
 import { RowDecision } from "@inventory/catalog-contract/Decision"
 import type { Line, Side, Waiting } from "../Draft.machine.ts"
 
@@ -19,7 +20,7 @@ const StoredSeveral = StoredDecision.pipe(S.Array)
 const StoredSide = S.Struct({
   decision: StoredDecision,
   madeOn: S.Int,
-  dates: S.Record(S.String, S.Int).pipe(S.optionalKey),
+  dates: emptyWhenLeftOut(S.Record(S.String, S.Int), { empty: {}, isEmpty: R.isEmptyReadonlyRecord }),
   seen: StoredSeveral,
   here: S.Boolean,
   overtaken: S.Boolean,
@@ -27,7 +28,10 @@ const StoredSide = S.Struct({
 }).annotate({ description: "One decision of a row of the person's the server has not taken, as this browser keeps it" })
 
 /** One row's line as this browser keeps it: `theirs` left out where nobody decided the row since. */
-const StoredLine = S.Struct({ sides: S.Array(StoredSide), theirs: StoredDecision.pipe(S.optionalKey) }).annotate({
+const StoredLine = S.Struct({
+  sides: S.Array(StoredSide),
+  theirs: StoredDecision.pipe(S.OptionFromOptionalKey)
+}).annotate({
   description: "One row's line above the review, as this browser keeps it"
 })
 
@@ -43,7 +47,7 @@ const OlderClosed = S.Struct({
 const OlderHold = S.Union([
   S.Struct({ kind: S.tag("refused"), reason: S.String }),
   S.Struct({ kind: S.tag("elsewhere"), theirs: StoredDecision }),
-  S.Struct({ kind: S.tag("othertab"), thisTab: StoredDecision.pipe(S.optionalKey) })
+  S.Struct({ kind: S.tag("othertab"), thisTab: StoredDecision.pipe(S.OptionFromOptionalKey) })
 ])
   .annotate({ description: "Why one of the person's rows was held, as an older page kept it" })
   .pipe(S.toTaggedUnion("kind"))
@@ -53,7 +57,7 @@ const OlderHeld = S.Struct({
   mine: StoredDecision,
   madeOn: S.Int,
   why: OlderHold,
-  closed: OlderClosed.pipe(S.Array, S.optionalKey)
+  closed: OlderClosed.pipe(S.Array, S.OptionFromOptionalKey)
 }).annotate({ description: "One of the person's rows on hold, as an older page kept it" })
 
 /**
@@ -72,7 +76,7 @@ export const StoredWaiting = S.Struct({
   madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
   seen: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
   held: S.Record(S.String, OlderHeld).pipe(S.optionalKey),
-  fileName: S.optionalKey(S.String)
+  fileName: S.OptionFromOptionalKey(S.String)
 })
   .pipe(S.OptionFromNullOr)
   .annotate({ description: "One import's waiting rows as this browser keeps them; none is no entry" })
@@ -81,7 +85,6 @@ export type StoredWaiting = typeof StoredWaiting.Type
 
 const sideFrom = (stored: typeof StoredSide.Type): Side => ({
   ...stored,
-  dates: stored.dates ?? {},
   // Kept between visits, it waited.
   live: false
 })
@@ -89,7 +92,7 @@ const sideFrom = (stored: typeof StoredSide.Type): Side => ({
 const sideTo = ({ dates, decision, here, madeOn, overtaken, refused, seen }: Side): typeof StoredSide.Type => ({
   decision,
   madeOn,
-  ...(R.isEmptyReadonlyRecord(dates) ? {} : { dates }),
+  dates,
   seen,
   here,
   overtaken,
@@ -102,8 +105,8 @@ const olderSide = (parts: {
   readonly madeOn: number
   readonly seen: O.Option<Side["seen"]>
   readonly here: boolean
-  readonly overtaken?: boolean
-  readonly refused?: O.Option<string>
+  readonly overtaken: boolean
+  readonly refused: O.Option<string>
 }): Side => ({
   decision: parts.decision,
   madeOn: parts.madeOn,
@@ -111,8 +114,8 @@ const olderSide = (parts: {
   seen: O.getOrElse(parts.seen, (): Side["seen"] => [O.none()]),
   live: false,
   here: parts.here,
-  overtaken: parts.overtaken ?? false,
-  refused: parts.refused ?? O.none()
+  overtaken: parts.overtaken,
+  refused: parts.refused
 })
 
 /**
@@ -127,24 +130,26 @@ const olderLine = (input: {
   readonly waits: boolean
 }): Line => {
   const { held, seen, waits } = input
-  const closed = A.map(held.closed ?? [], (one) => olderSide({ ...one, here: false }))
-  const own = (parts: { readonly overtaken?: boolean; readonly refused?: O.Option<string> }): ReadonlyArray<Side> => [
+  const closed = A.map(O.match(held.closed, { onNone: A.empty, onSome: identity }), (one) =>
+    olderSide({ ...one, here: false, overtaken: false })
+  )
+  const own = (parts: { readonly overtaken: boolean; readonly refused: O.Option<string> }): ReadonlyArray<Side> => [
     olderSide({ decision: held.mine, madeOn: held.madeOn, seen, here: true, ...parts }),
     ...closed
   ]
   const gone = (refused: O.Option<string>): ReadonlyArray<Side> => [
-    olderSide({ decision: held.mine, madeOn: held.madeOn, seen: O.none(), here: false, refused }),
+    olderSide({ decision: held.mine, madeOn: held.madeOn, seen: O.none(), here: false, overtaken: false, refused }),
     ...closed
   ]
   return OlderHold.match(held.why, {
     refused: ({ reason }): Line => ({
-      sides: waits ? gone(O.some(reason)) : own({ refused: O.some(reason) }),
+      sides: waits ? gone(O.some(reason)) : own({ overtaken: false, refused: O.some(reason) }),
       theirs: O.none()
     }),
-    elsewhere: ({ theirs }) => ({ sides: own({ overtaken: true }), theirs: O.some(theirs) }),
+    elsewhere: ({ theirs }) => ({ sides: own({ overtaken: true, refused: O.none() }), theirs: O.some(theirs) }),
     // This tab's own waits beside the line, or is saved: what is asked about is the others'.
     othertab: ({ thisTab }) => ({
-      sides: thisTab === undefined && A.isReadonlyArrayNonEmpty(closed) ? closed : gone(O.none()),
+      sides: O.isNone(thisTab) && A.isReadonlyArrayNonEmpty(closed) ? closed : gone(O.none()),
       theirs: O.none()
     })
   })
@@ -165,7 +170,9 @@ export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
         decision,
         madeOn: P.isNumber(made) ? made : O.getOrElse(R.get(made, rowId), () => 0),
         seen: seenOf(rowId),
-        here: true
+        here: true,
+        overtaken: false,
+        refused: O.none()
       })
     )
     const olderLines = R.map(entry.held ?? {}, (held, rowId) =>
@@ -173,7 +180,7 @@ export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
     )
     const lines = R.map(entry.lines ?? {}, (line): Line => ({
       sides: A.map(line.sides, sideFrom),
-      theirs: line.theirs === undefined ? O.none() : O.some(line.theirs)
+      theirs: line.theirs
     }))
     return {
       rows: { ...older, ...R.map(entry.waits ?? {}, sideFrom) },
@@ -184,8 +191,7 @@ export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
   })
 
 /** The name of the import's file, as it was kept with the rows: none where an older page kept them. */
-export const fileNameOf = (stored: StoredWaiting): O.Option<string> =>
-  O.flatMap(stored, (entry) => O.fromNullishOr(entry.fileName))
+export const fileNameOf = (stored: StoredWaiting): O.Option<string> => O.flatMap(stored, (entry) => entry.fileName)
 
 /** The draft's waiting rows as this browser keeps them, with the name of the import's file. */
 export const toStored: {
@@ -193,7 +199,7 @@ export const toStored: {
   (waits: O.Option<Waiting>, fileName: O.Option<string>): StoredWaiting
 } = dual(2, (waits: O.Option<Waiting>, fileName: O.Option<string>): StoredWaiting =>
   O.map(waits, (entry) => ({
-    ...O.match(fileName, { onNone: () => ({}), onSome: (name) => ({ fileName: name }) }),
+    fileName,
     confirms: O.getOrNull(entry.confirms),
     madeOn: {},
     ...O.match(entry.leftOver, {
@@ -204,7 +210,7 @@ export const toStored: {
         waits: R.map(entry.rows, sideTo),
         lines: R.map(entry.lines, (line) => ({
           sides: A.map(line.sides, sideTo),
-          ...O.match(line.theirs, { onNone: () => ({}), onSome: (theirs) => ({ theirs }) })
+          theirs: line.theirs
         }))
       })
     })

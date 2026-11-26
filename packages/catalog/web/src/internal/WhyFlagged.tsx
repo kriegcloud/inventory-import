@@ -4,6 +4,8 @@
 // (`Problem.message`, `Proposal.basis`); nothing is reworded or guessed.
 import { Code } from "@inventory/ui/Code"
 import type { ReviewRow } from "@inventory/review/ReviewTypes"
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import * as O from "effect/Option"
 import { problemKinds, type Proposal, type Review, rowPlace } from "@inventory/catalog-model/Review"
 
@@ -22,23 +24,33 @@ const proposalWords = (proposal: Proposal): string => {
 
 /** Every reason of each flagged row on screen, the rows named, counted by kind first. */
 export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Review }) {
-  const found = props.rows.flatMap((row) => {
-    const reviewed = props.current.rows.find((candidate) => candidate.id === row.id)
-    if (reviewed === undefined) return []
-    // A form-only fix already in force is not a reason the row waits: it is listed under the row's changes.
-    const open = reviewed.problems.filter(
-      (problem) =>
-        !O.exists(
-          problem.proposal,
-          (proposal) => proposal.lossless && problem.field !== null && reviewed.values[problem.field] === proposal.to
-        )
+  const found = A.getSomes(
+    A.map(props.rows, (row) =>
+      O.flatMap(
+        A.findFirst(props.current.rows, (candidate) => candidate.id === row.id),
+        (reviewed) => {
+          // A form-only fix already in force is not a reason the row waits: it is listed under the row's changes.
+          const open = reviewed.problems.filter(
+            (problem) =>
+              !O.exists(
+                problem.proposal,
+                (proposal) =>
+                  proposal.lossless && problem.field !== null && reviewed.values[problem.field] === proposal.to
+              )
+          )
+          return open.length === 0 ? O.none() : O.some({ ...reviewed, problems: open })
+        }
+      )
     )
-    return open.length === 0 ? [] : [{ ...reviewed, problems: open }]
-  })
+  )
   const byKind = new Intl.NumberFormat("en-US")
-  const counts = found
-    .flatMap((row) => row.problems.map((problem) => problem.kind))
-    .reduce<Record<string, number>>((tally, kind) => ({ ...tally, [kind]: (tally[kind] ?? 0) + 1 }), {})
+  const counts = R.map(
+    A.groupBy(
+      A.flatMap(found, (row) => A.map(row.problems, (problem) => problem.kind)),
+      (kind): string => kind
+    ),
+    (problems) => problems.length
+  )
   return (
     <div className="flex flex-col gap-4 text-sm">
       <p>

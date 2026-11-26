@@ -28,6 +28,8 @@ import {
   type SignInFeatures
 } from "@inventory/access-contract/SessionState"
 import type { Member } from "@inventory/kernel/Member"
+import * as A from "effect/Array"
+import { identity } from "effect/Function"
 import * as Cause from "effect/Cause"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
@@ -132,12 +134,13 @@ const takeEnded = (who: O.Option<Member>): O.Option<string> => {
   const kept = tabStorage.read(endedKey)
   // Where the browser refuses to forget it, it is not taken: nothing is said, and the first screen is the landing.
   if (O.isNone(tabStorage.remove(endedKey))) return O.none()
-  const [of = "", at = ""] = Str.split(
-    O.getOrElse(kept, () => ""),
-    "\n"
-  )
-  const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
-  return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
+  return O.flatMap(kept, (text) => {
+    const parts = Str.split(text, "\n")
+    return O.flatMap(O.all({ of: A.get(parts, 0), at: A.get(parts, 1) }), ({ of, at }) => {
+      const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
+      return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
+    })
+  })
 }
 
 /**
@@ -264,15 +267,15 @@ export const signedInAsked: Atom.Atom<boolean> = Atom.readable(
 export interface SessionView {
   /** loading, then signed-out, no-organization or ready (`actor` is set only when ready; once ready, it stays so). */
   readonly status: "loading" | SessionState["status"]
-  readonly actor: Member | undefined
-  readonly email: string | undefined
+  readonly actor: O.Option<Member>
+  readonly email: O.Option<string>
   readonly organizations: ReadonlyArray<OrganizationChoice>
   /** What sign-in offers (test accounts, sign-up), once the answer says: none while it is asked. */
   readonly features: O.Option<SignInFeatures>
   /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
   readonly probablySignedOut: boolean
   /** Why the session could not be read, while it is not being asked again; with a member known, they stay. */
-  readonly error: unknown
+  readonly error: O.Option<unknown>
 }
 
 /**
@@ -281,18 +284,22 @@ export interface SessionView {
  * drawn, with whatever is being typed in it.
  */
 export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): SessionView => {
-  const known = result.pipe(AsyncResult.value, O.getOrUndefined)
-  const state = result.waiting && known?.status !== "ready" ? undefined : known
   // The answer as the shell may show it: a new answer is waited for unless it is already a member's.
   const shown = O.filter(AsyncResult.value(result), (answer) => !result.waiting || answer.status === "ready")
   return {
-    status: state?.status ?? "loading",
-    actor: state?.status === "ready" ? state.actor : undefined,
-    email: state === undefined || state.status === "signed-out" ? undefined : state.email,
-    organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
+    status: O.match(shown, { onNone: () => "loading", onSome: (state) => state.status }),
+    actor: O.flatMap(shown, actorOfSession),
+    email: O.flatMap(shown, emailOf),
+    organizations: O.match(
+      O.map(
+        O.filter(shown, (state) => state.status !== "signed-out"),
+        (state) => state.organizations
+      ),
+      { onNone: A.empty, onSome: identity }
+    ),
     features: O.map(shown, (answer) => answer.features),
-    probablySignedOut: state === undefined && !wasSignedIn(),
-    error: AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
+    probablySignedOut: O.isNone(shown) && !wasSignedIn(),
+    error: AsyncResult.isFailure(result) && !result.waiting ? result.cause.pipe(Cause.squash, O.some) : O.none()
   }
 })
 

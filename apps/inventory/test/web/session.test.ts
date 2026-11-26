@@ -3,6 +3,7 @@
 // organization, nobody: the page is left with a full page load, never having been theirs. And what was typed, chosen or
 // open in it is one member's.
 import { describe, expect, it } from "@effect/vitest"
+import { assertSome } from "@effect/vitest/utils"
 import { RegistryContext } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -36,7 +37,7 @@ vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
       setActive: () =>
         MutableRef.get(auth.refuses)
           ? Promise.reject(new Error("Not a member."))
-          : O.getOrElse(MutableRef.get(auth.hold), () => Promise.resolve(undefined))
+          : O.match(MutableRef.get(auth.hold), { onNone: () => Promise.resolve(undefined), onSome: (held) => held })
     }
   },
   orThrow: (answer: unknown) => answer
@@ -47,7 +48,7 @@ vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
 const settle = Effect.sleep("30 millis")
 
 /** A page of the app: its modules loaded afresh, its root registry made, and the session asked for the first time. */
-const load = (options: Parameters<typeof openPage>[0] = {}) =>
+const load = (options: Parameters<typeof openPage>[0]) =>
   Effect.suspend(() => {
     const page = openPage(options)
     vi.resetModules()
@@ -81,7 +82,7 @@ const load = (options: Parameters<typeof openPage>[0] = {}) =>
   )
 
 /** The same page, with its first answer given. */
-const loadAs = Effect.fnUntraced(function* (answer: string, options: Parameters<typeof openPage>[0] = {}) {
+const loadAs = Effect.fnUntraced(function* (answer: string, options: Parameters<typeof openPage>[0]) {
   const t = yield* load(options)
   t.page.asked[0]?.answer(answer)
   yield* settle
@@ -94,7 +95,7 @@ const here = () => `${window.location.pathname}${window.location.search}`
 describe("the page's start", () => {
   it.live("holds this tab's lock with nobody signed in", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(nobody)
+      const t = yield* loadAs(nobody, {})
       expect(t.view().status).toBe("signed-out")
       expect(A.map(t.page.locks, (name) => A.headNonEmpty(Str.split(name, ":")))).toEqual([
         "inventory-tab",
@@ -105,7 +106,7 @@ describe("the page's start", () => {
 
   it.live("asks the session once, and again when who is signed in is asked", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       expect([t.page.asked.length, t.who(), t.asked()]).toEqual([1, "mem_dana/org_prairie", false])
       t.ask()
       yield* settle
@@ -117,7 +118,7 @@ describe("the page's start", () => {
 describe("who is signed in, asked again", () => {
   it.live("the same member: they stay signed in and drawn all along, and nothing is left", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       const drawn: Array<string> = []
       const members: Array<string> = []
       t.registry.subscribe(t.session.sessionView, (view) => drawn.push(view.status))
@@ -136,7 +137,7 @@ describe("who is signed in, asked again", () => {
   it.live("anybody else, another organization, nobody or no organization: the page is left, and never theirs", () =>
     Effect.gen(function* () {
       for (const answer of [signedInAs("marcus"), signedInAs("dana", "northline"), nobody, inNoOrganization]) {
-        const t = yield* loadAs(signedInAs("dana"))
+        const t = yield* loadAs(signedInAs("dana"), {})
         const members: Array<string> = []
         t.registry.subscribe(t.member.member, () => members.push(t.who()))
         t.ask()
@@ -153,7 +154,7 @@ describe("who is signed in, asked again", () => {
 
   it.live("a page the browser brings back after it was left is loaded again", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.ask()
       yield* settle
       t.page.asked[1]?.answer(nobody)
@@ -165,12 +166,12 @@ describe("who is signed in, asked again", () => {
 
   it.live("not answered: the member stays, nothing is certain, and it is asked again when the connection is back", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.ask()
       yield* settle
       t.page.asked[1]?.fail()
       yield* settle
-      expect([t.who(), t.view().status, t.asked(), t.view().error === null]).toEqual([
+      expect([t.who(), t.view().status, t.asked(), O.isNone(t.view().error)]).toEqual([
         "mem_dana/org_prairie",
         "ready",
         true,
@@ -180,13 +181,13 @@ describe("who is signed in, asked again", () => {
       yield* settle
       t.page.asked[2]?.answer(signedInAs("dana"))
       yield* settle
-      expect([t.page.asked.length, t.asked(), t.view().error, t.page.left]).toEqual([3, false, null, []])
+      expect([t.page.asked.length, t.asked(), O.isNone(t.view().error), t.page.left]).toEqual([3, false, true, []])
     })
   )
 
   it.live("asked by somebody signing in where nobody was: the page goes on, as theirs", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(nobody)
+      const t = yield* loadAs(nobody, {})
       t.registry.mount(t.session.refreshSession)
       t.registry.set(t.session.refreshSession, undefined)
       yield* settle
@@ -201,7 +202,7 @@ describe("who is signed in, asked again", () => {
 describe("the person's own switch of organization", () => {
   it.live("goes on without a page load, as the member there, and nothing is certain from the press until it has", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.pick("org_northline")
       expect([t.asked(), t.page.asked.length]).toEqual([true, 1])
       yield* settle
@@ -225,7 +226,7 @@ describe("the person's own switch of organization", () => {
   it.live("refused by the server: still the same member, and certain again", () =>
     Effect.gen(function* () {
       MutableRef.set(auth.refuses, true)
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.pick("org_northline")
       yield* settle
       expect([t.who(), t.asked(), t.page.asked.length]).toEqual(["mem_dana/org_prairie", false, 1])
@@ -235,7 +236,7 @@ describe("the person's own switch of organization", () => {
 
   it.live("answered by somebody else's session in that organization: the page is left", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.pick("org_northline")
       yield* settle
       t.page.asked[1]?.answer(signedInAs("marcus", "northline"))
@@ -347,7 +348,7 @@ describe("a write pressed on the page", () => {
 describe("what is typed, chosen or open", () => {
   it.live("is one member's: kept when the same member is asked again, and gone in another organization", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       const [people, activity, upload, uploading, assistant, machine] = yield* Effect.all(
         [
           Effect.promise(() => import("@inventory/access-web/People")),
@@ -414,7 +415,7 @@ describe("the workspace", () => {
 
   it.live("stays drawn, the same one, while who is signed in is asked again and when it could not be read", () =>
     Effect.gen(function* () {
-      const t = yield* load()
+      const t = yield* load({})
       const first = yield* gate(t)
       expect(first).toEqual(O.none())
       t.page.asked[0]?.answer(signedInAs("dana"))
@@ -432,7 +433,7 @@ describe("the workspace", () => {
 
   it.live("is another one, with nothing typed or open in it, in another organization", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.pick("org_northline")
       yield* settle
       t.page.asked[1]?.answer(signedInAs("dana", "northline"))
@@ -476,7 +477,9 @@ const browserWithServer = Effect.fnUntraced(function* () {
   const client = http.ofThisPage(
     HttpClient.make((request) =>
       Effect.sync(() => {
-        const named = O.getOrElse(Headers.get(request.headers, "x-page-member"), () => "")
+        const pageMember = Headers.get(request.headers, "x-page-member")
+        assertSome(pageMember, "mem_dana/org_prairie")
+        const named = pageMember.value
         server.named.push(`${request.method} for ${named}`)
         if (named !== "" && named !== server.cookie) {
           return HttpClientResponse.fromWeb(request, new Response(null, { status: 401 }))
@@ -504,7 +507,11 @@ const browserWithServer = Effect.fnUntraced(function* () {
   registry.mount(save)
   yield* settle
   /** What the page draws of the rows. */
-  const drawn = () => O.getOrElse(AsyncResult.value(registry.get(rows)), () => "nothing")
+  const drawn = () => {
+    const answer = AsyncResult.value(registry.get(rows))
+    assertSome(answer, "rows of mem_dana/org_prairie")
+    return answer.value
+  }
   /** Another tab of the browser signs in as Marcus: the cookie is his, and that tab says so. */
   const marcusSignsInElsewhere = (said: boolean) => {
     server.cookie = "mem_marcus/org_prairie"
@@ -571,7 +578,7 @@ describe("somebody else signed in in another tab of the browser", () => {
 
   it.live("is asked again when this tab is shown, or gains focus, after it was hidden", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       window.dispatchEvent(new Event("focus"))
       document.dispatchEvent(new Event("visibilitychange"))
       expect(t.page.asked.length).toBe(1)
@@ -592,7 +599,7 @@ describe("somebody else signed in in another tab of the browser", () => {
 
   it.live("is told by this tab at its own switch, and when it finds the session ended", () =>
     Effect.gen(function* () {
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       const said = () => t.page.kept[t.session.changedKey]
       expect(said()).toBeUndefined()
       t.pick("org_northline")
@@ -604,7 +611,8 @@ describe("somebody else signed in in another tab of the browser", () => {
       yield* settle
       t.page.asked[2]?.answer(nobody)
       yield* settle
-      expect([atSwitch === undefined, said() === atSwitch, t.page.left]).toEqual([false, false, ["/"]])
+      expect(atSwitch).toBeDefined()
+      expect([said() === atSwitch, t.page.left]).toEqual([false, ["/"]])
     })
   )
 })
@@ -614,7 +622,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
       MutableRef.set(auth.hold, O.some(held.promise))
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.ask()
       yield* settle
       t.pick("org_northline")
@@ -636,7 +644,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
     Effect.gen(function* () {
       const held = Promise.withResolvers<void>()
       MutableRef.set(auth.hold, O.some(held.promise))
-      const t = yield* loadAs(signedInAs("dana"))
+      const t = yield* loadAs(signedInAs("dana"), {})
       t.ask()
       yield* settle
       t.pick("org_northline")
@@ -726,7 +734,7 @@ describe("the screen that creates a first organization", () => {
   it.live("is one account's: another account, or nobody, leaves it, so nothing typed there is theirs", () =>
     Effect.gen(function* () {
       for (const answer of [otherAccount, nobody, signedInAs("marcus")]) {
-        const t = yield* loadAs(inNoOrganization)
+        const t = yield* loadAs(inNoOrganization, {})
         t.ask()
         yield* settle
         t.page.asked[1]?.answer(answer)
@@ -734,7 +742,7 @@ describe("the screen that creates a first organization", () => {
         expect(t.page.left).toEqual(["/"])
       }
       // The same account, once its organization is made: it goes on, as theirs.
-      const t = yield* loadAs(inNoOrganization)
+      const t = yield* loadAs(inNoOrganization, {})
       t.ask()
       yield* settle
       t.page.asked[1]?.answer(signedInAs("dana"))

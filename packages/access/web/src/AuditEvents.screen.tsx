@@ -1,3 +1,6 @@
+import * as A from "effect/Array"
+import { identity } from "effect/Function"
+import * as O from "effect/Option"
 import * as DateTime from "effect/DateTime"
 import * as Atom from "effect/reactivity/Atom"
 import { answerOf } from "@inventory/client/Api"
@@ -34,14 +37,15 @@ export const auditEventsCaption = "Uploads and imports"
  */
 export const auditEvents = accessApi.query((api) => api.activity.recent(), { reactivityKeys: accessKeys.activity })
 
-const noEvents: ReadonlyArray<AuditEvent> = []
 const auditEventAnswer = answerOf(auditEvents)
 /** The audit trail's rows and columns as the list follows them: empty until the trail has been read. */
-const auditEventRows = Atom.map(auditEventAnswer, (answer) => answer ?? noEvents)
+const auditEventRows = Atom.map(auditEventAnswer, (answer) =>
+  O.match(O.fromNullishOr(answer), { onNone: A.empty<AuditEvent>, onSome: identity })
+)
 const auditEventColumnsAtom = Atom.make(auditEventColumns)
 
 /** The audit trail as a list a person searches and filters: every upload, import, take-back and change of role. */
-export function AuditEvents(props: { updating?: boolean }) {
+export function AuditEvents({ updating = false }: { updating?: boolean }) {
   return (
     <ListTable
       key="events"
@@ -51,7 +55,7 @@ export function AuditEvents(props: { updating?: boolean }) {
       rows={auditEventRows}
       rowKey={(event) => event.id}
       empty="Nothing has happened yet."
-      updating={props.updating === true}
+      updating={updating}
     />
   )
 }

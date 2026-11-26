@@ -1,4 +1,7 @@
 import { useAtom, useAtomMount, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
+import { identity } from "effect/Function"
+import * as R from "effect/Record"
 import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -93,7 +96,7 @@ const setRole = optimisticWrite({
   send: sendRoleChange,
   changes: [
     optimisticChange(people, (list: ReadonlyArray<Person>, input: RoleChange) =>
-      list.map((entry) =>
+      A.map(list, (entry) =>
         entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.role }) : entry
       )
     )
@@ -107,7 +110,7 @@ const remove = optimisticWrite({
   send: (person: Person) => accessApi.send((api) => api.people.remove({ params: { memberId: person.memberId } })),
   changes: [
     optimisticChange(people, (list: ReadonlyArray<Person>, person: Person) =>
-      list.filter((entry) => entry.memberId !== person.memberId)
+      A.filter(list, (entry) => entry.memberId !== person.memberId)
     )
   ],
   failed: (person) => `${person.name} was not removed.`,
@@ -144,9 +147,11 @@ function AddPerson() {
   const add = useAtomSet(addPerson, { mode: "promiseExit" })
   const reset = useAtomSet(addPerson)
   const pending = result.waiting
-  const outcome = result.pipe(AsyncResult.value, O.getOrUndefined)
-  const problem = !pending && outcome !== undefined && Result.isFailure(outcome) ? outcome.failure : undefined
-  const failed = !pending && AsyncResult.isFailure(result) ? Cause.squash(result.cause) : null
+  const problem = O.flatMap(
+    O.filter(AsyncResult.value(result), () => !pending),
+    Result.getFailure
+  )
+  const failed = !pending && AsyncResult.isFailure(result) ? result.cause.pipe(Cause.squash, O.some) : O.none()
   return (
     <Dialog
       open={open}
@@ -189,28 +194,34 @@ function AddPerson() {
             <Field>
               <FieldLabel htmlFor={roleId}>Role</FieldLabel>
               <NativeSelect id={roleId} value={role} onChange={(event) => setRole(event.target.value as Role)}>
-                {roles.map((entry) => (
+                {A.map(roles, (entry) => (
                   <NativeSelectOption key={entry.value} value={entry.value}>
                     {entry.label}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
             </Field>
-            {problem === undefined ? null : (
-              <Alert variant="destructive">
-                <AlertTitle>Not added</AlertTitle>
-                <AlertDescription>
-                  <p>{problem.problem}</p>
-                  <p>{problem.todo}</p>
-                </AlertDescription>
-              </Alert>
-            )}
-            {failed === null ? null : (
-              <Alert variant="destructive">
-                <AlertTitle>Not added</AlertTitle>
-                <AlertDescription>{sayError(failed).sentence}</AlertDescription>
-              </Alert>
-            )}
+            {O.match(problem, {
+              onNone: () => null,
+              onSome: (problem) => (
+                <Alert variant="destructive">
+                  <AlertTitle>Not added</AlertTitle>
+                  <AlertDescription>
+                    <p>{problem.problem}</p>
+                    <p>{problem.todo}</p>
+                  </AlertDescription>
+                </Alert>
+              )
+            })}
+            {O.match(failed, {
+              onNone: () => null,
+              onSome: (failed) => (
+                <Alert variant="destructive">
+                  <AlertTitle>Not added</AlertTitle>
+                  <AlertDescription>{sayError(failed).sentence}</AlertDescription>
+                </Alert>
+              )
+            })}
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -223,8 +234,6 @@ function AddPerson() {
   )
 }
 
-const noPeople: ReadonlyArray<Person> = []
-
 /**
  * The list's rows: each says whether its role is on its way to the server. Carried in the row itself: the table
  * redraws a row when its data changes, and the list the server sends back after a change can be the very object shown
@@ -232,7 +241,7 @@ const noPeople: ReadonlyArray<Person> = []
  */
 const peopleRows = Atom.readable((get): ReadonlyArray<PersonRow> => {
   const saving = get(savingRoles)
-  return (get(people).pipe(AsyncResult.value, O.getOrUndefined) ?? noPeople).map((person) => ({
+  return A.map(O.match(AsyncResult.value(get(people)), { onNone: A.empty<Person>, onSome: identity }), (person) => ({
     ...person,
     saving: HashSet.has(saving, person.memberId)
   }))
@@ -243,8 +252,8 @@ const peopleRows = Atom.readable((get): ReadonlyArray<PersonRow> => {
  * write through the registry they are read in, so the columns are made again only when the person signed in changes.
  */
 const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> => {
-  const actor = O.getOrUndefined(get(signedIn))
-  const admin = actor !== undefined && hasRole(actor.role, "admin")
+  const actor = get(signedIn)
+  const admin = O.exists(actor, (member) => hasRole(member.role, "admin"))
   const registry = get.registry
   const changeRole = (change: { readonly person: Person; readonly role: Role }) => registry.set(setRole, change)
   const removePerson = (person: Person) => registry.set(remove, person)
@@ -256,7 +265,7 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
       value: (person) => person.name,
       // The signed-in person's own row says so: the role and Remove beside it act on themself.
       cell: (person) =>
-        person.memberId === actor?.id ? (
+        O.exists(actor, (member) => person.memberId === member.id) ? (
           <>
             {person.name} <span className="font-normal text-muted-foreground">(you)</span>
           </>
@@ -289,7 +298,7 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
             disabled={person.saving}
             onChange={(event) => changeRole({ person: personOf(person), role: event.target.value as Role })}
           >
-            {roles.map((entry) => (
+            {A.map(roles, (entry) => (
               <NativeSelectOption key={entry.value} value={entry.value}>
                 {entry.label}
               </NativeSelectOption>
@@ -328,7 +337,9 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
                   <AlertDialogHeader>
                     <AlertDialogTitle>Remove {person.name}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      They lose access to {actor?.organizationName} at once. Their account and what they imported stay.
+                      They lose access to{" "}
+                      {O.match(actor, { onNone: () => null, onSome: (member) => member.organizationName })} at once.
+                      Their account and what they imported stay.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -347,55 +358,61 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
 /** Who is in the organization and with what role. An admin adds people, changes roles and removes members here. */
 export function PeoplePage() {
   const who = useAtomValue(signedIn)
-  const actor = O.getOrUndefined(who)
-  const admin = actor !== undefined && hasRole(actor.role, "admin")
+  const admin = O.exists(who, (member) => hasRole(member.role, "admin"))
   const list = useAtomValue(people)
   const askAgain = useAtomRefresh(people)
   // The two writes the list's cells make are mounted while the page is, so one under way is not let go.
   useAtomMount(setRole)
   useAtomMount(remove)
   const columns = useAtomValue(peopleColumns)
-  const data = list.pipe(AsyncResult.value, O.getOrUndefined)
-  const error = AsyncResult.isFailure(list) && !list.waiting ? Cause.squash(list.cause) : null
-  const count = data?.length ?? 0
+  const data = AsyncResult.value(list)
+  const error = AsyncResult.isFailure(list) && !list.waiting ? list.cause.pipe(Cause.squash, O.some) : O.none()
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="People"
-        line={
-          actor !== undefined && data !== undefined
-            ? `${actor.organizationName} · ${count} ${count === 1 ? "person" : "people"}`
-            : error === null
-              ? "loading"
-              : undefined
-        }
+        {...R.getSomes({
+          line: O.orElse(
+            O.map(
+              O.all({ actor: who, data }),
+              ({ actor, data }) =>
+                `${actor.organizationName} · ${data.length} ${data.length === 1 ? "person" : "people"}`
+            ),
+            () => (O.isNone(error) ? O.some("loading") : O.none())
+          )
+        })}
         actions={admin ? <AddPerson /> : undefined}
       />
-      {error !== null ? (
-        <div className="px-4 sm:px-9">
-          <Alert variant="destructive">
-            <AlertTitle>The people could not be loaded</AlertTitle>
-            <AlertDescription>
-              {sayError(error).sentence}
-              <Button variant="outline" size="sm" onClick={askAgain}>
-                Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      ) : data === undefined ? (
-        <TableSkeleton caption="People in the organization" columns={columns} />
-      ) : (
-        <ListTable
-          caption="People in the organization"
-          searchLabel="Search people"
-          columns={peopleColumns}
-          rows={peopleRows}
-          rowKey={(person) => person.memberId}
-          empty="Nobody is here yet."
-          updating={list.waiting}
-        />
-      )}
+      {O.match(error, {
+        onSome: (error) => (
+          <div className="px-4 sm:px-9">
+            <Alert variant="destructive">
+              <AlertTitle>The people could not be loaded</AlertTitle>
+              <AlertDescription>
+                {sayError(error).sentence}
+                <Button variant="outline" size="sm" onClick={askAgain}>
+                  Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        ),
+        onNone: () =>
+          O.match(data, {
+            onNone: () => <TableSkeleton caption="People in the organization" columns={columns} />,
+            onSome: () => (
+              <ListTable
+                caption="People in the organization"
+                searchLabel="Search people"
+                columns={peopleColumns}
+                rows={peopleRows}
+                rowKey={(person) => person.memberId}
+                empty="Nobody is here yet."
+                updating={list.waiting}
+              />
+            )
+          })
+      })}
     </div>
   )
 }

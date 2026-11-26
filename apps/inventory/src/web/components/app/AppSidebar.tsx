@@ -144,10 +144,11 @@ const signOutSaid = Atom.fn(() =>
  * server changes the session's organization after checking membership, and everything on screen is asked for again.
  */
 function OrganizationPicker() {
-  const { actor, organizations } = useAtomValue(sessionView)
+  const { actor: member, organizations } = useAtomValue(sessionView)
   const switchTo = useAtomSet(switchSaid)
   const { isMobile } = useSidebar()
-  if (actor === undefined) return null
+  if (O.isNone(member)) return null
+  const actor = member.value
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -208,17 +209,18 @@ function OrganizationPicker() {
  * test accounts (TEST_ACCOUNTS, on in development only), signing in as another of them in one click.
  */
 function UserMenu() {
-  const { actor, email, features } = useAtomValue(sessionView)
+  const { actor: member, email, features } = useAtomValue(sessionView)
   const theme = useAtomValue(themeChoice)
   const setTheme = useAtomSet(themeChoice)
   const signInTo = useAtomSet(signInSaid)
   const leave = useAtomSet(signOutSaid)
   const { isMobile } = useSidebar()
-  if (actor === undefined) return null
+  if (O.isNone(member)) return null
+  const actor = member.value
   // The test accounts other than the signed-in one, with the password they share: only while the server offers them.
   const offered = O.flatMap(features, (known) =>
     O.flatMap(known.testAccounts, (accounts) => {
-      const others = A.filter(accounts.accounts, (account) => account.email !== email)
+      const others = A.filter(accounts.accounts, (account) => !O.contains(email, account.email))
       return others.length === 0 ? O.none() : O.some({ password: accounts.password, others })
     })
   )
@@ -229,7 +231,9 @@ function UserMenu() {
       </Avatar>
       <span className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{actor.name}</span>
-        <span className="truncate text-xs text-muted-foreground">{email}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {O.match(email, { onNone: () => null, onSome: (email) => email })}
+        </span>
       </span>
     </>
   )

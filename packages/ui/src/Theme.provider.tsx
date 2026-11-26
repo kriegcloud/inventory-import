@@ -22,11 +22,12 @@ const pageColour = { light: "#ffffff", dark: "#09090b" } as const
 const stored = O.liftThrowable((): string | null => window.localStorage.getItem(storageKey))
 const store = O.liftThrowable((next: Theme): void => window.localStorage.setItem(storageKey, next))
 
-const readStored = (): Theme => {
-  const value = O.getOrNull(stored())
-  // Light unless the person has chosen otherwise.
-  return value === "dark" || value === "system" ? value : "light"
-}
+const readStored = (): Theme =>
+  O.match(stored(), {
+    // Light unless the person has chosen otherwise, including when storage refused the read.
+    onNone: () => "light",
+    onSome: (value) => (value === "dark" || value === "system" ? value : "light")
+  })
 
 /**
  * What the person chose, kept in localStorage as the bare word. Not `Atom.kvs`: it stores JSON (`"dark"` in quotes),

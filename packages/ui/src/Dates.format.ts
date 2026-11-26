@@ -6,11 +6,11 @@ import * as O from "effect/Option"
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
 
 /** A moment from the server (an instant, or its ISO text) as the person's own date and time. */
-export const when = (at: string | DateTime.Utc): string => {
-  const parsed = DateTime.make(at)
-  const date = O.isSome(parsed) ? DateTime.toDateUtc(parsed.value) : undefined
-  return date === undefined ? String(at) : dateTime.format(date)
-}
+export const when = (at: string | DateTime.Utc): string =>
+  O.match(DateTime.make(at), {
+    onNone: () => String(at),
+    onSome: (date) => dateTime.format(DateTime.toDateUtc(date))
+  })
 
 const dayTime = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -20,24 +20,28 @@ const dayTime = new Intl.DateTimeFormat(undefined, {
 })
 
 /** A date and time for a table column: the year is left out while it is this year ("Nov 14, 5:28 AM"). */
-export const whenShort = (at: string | DateTime.Utc): string => {
-  const parsed = DateTime.make(at)
-  const date = O.isSome(parsed) ? DateTime.toDateUtc(parsed.value) : undefined
-  if (date === undefined) return String(at)
-  return (date.getFullYear() === DateTime.toDateUtc(DateTime.nowUnsafe()).getFullYear() ? dayTime : dateTime).format(
-    date
-  )
-}
+export const whenShort = (at: string | DateTime.Utc): string =>
+  O.match(DateTime.make(at), {
+    onNone: () => String(at),
+    onSome: (parsed) => {
+      const date = DateTime.toDateUtc(parsed)
+      return (
+        date.getFullYear() === DateTime.toDateUtc(DateTime.nowUnsafe()).getFullYear() ? dayTime : dateTime
+      ).format(date)
+    }
+  })
 
 const dayOnly = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" })
 const dayAndYear = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" })
 
 /** A moment as the person's own date, for a column too narrow for the time. The year shows once it is not this one. */
-export const day = (at: string | DateTime.Utc): string => {
-  const parsed = DateTime.make(at)
-  const date = O.isSome(parsed) ? DateTime.toDateUtc(parsed.value) : undefined
-  if (date === undefined) return String(at)
-  return (date.getFullYear() === DateTime.toDateUtc(DateTime.nowUnsafe()).getFullYear() ? dayOnly : dayAndYear).format(
-    date
-  )
-}
+export const day = (at: string | DateTime.Utc): string =>
+  O.match(DateTime.make(at), {
+    onNone: () => String(at),
+    onSome: (parsed) => {
+      const date = DateTime.toDateUtc(parsed)
+      return (
+        date.getFullYear() === DateTime.toDateUtc(DateTime.nowUnsafe()).getFullYear() ? dayOnly : dayAndYear
+      ).format(date)
+    }
+  })

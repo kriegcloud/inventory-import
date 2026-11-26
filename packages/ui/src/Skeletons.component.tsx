@@ -1,3 +1,4 @@
+import * as A from "effect/Array"
 import { LineSkeleton } from "@inventory/ui/PageHeader"
 import { DataTableFrameSkeleton } from "@inventory/ui/components/data-table/data-table-frame-skeleton"
 import { Skeleton } from "@inventory/ui/components/skeleton"
@@ -101,20 +102,27 @@ export function TableSkeleton(props: { caption: string; columns: ReadonlyArray<S
  * The review's grid while its rows are on their way: the review region's own frame (the sticky table it draws, with
  * its pinned first column), so the review does not move when it arrives.
  */
-function GridSkeleton(props: { caption: string; columns: ReadonlyArray<SkeletonColumn>; rows?: number }) {
-  const rows = props.rows ?? 24
-  const minWidth = props.columns.reduce((total, column) => total + (column.width ?? 240), 0)
+function GridSkeleton({
+  caption,
+  columns,
+  rows = 24
+}: {
+  caption: string
+  columns: ReadonlyArray<SkeletonColumn>
+  rows?: number
+}) {
+  const minWidth = A.reduce(columns, 0, (total, column) => total + (column.width ?? 240))
   return (
-    <StickyTableFrame label={`${props.caption}, loading`} aria-busy="true">
+    <StickyTableFrame label={`${caption}, loading`} aria-busy="true">
       <StickyTable
-        caption={props.caption}
-        widths={props.columns.map((column) => column.width)}
+        caption={caption}
+        widths={A.map(columns, (column) => column.width)}
         minWidth={minWidth}
         rowCount={rows + 1}
       >
         <StickyTableHeader>
           <StickyTableRow>
-            {props.columns.map((column, index) => (
+            {A.map(columns, (column, index) => (
               <StickyTableColumn key={index} pin={index === 0 ? "start" : undefined} align={column.align}>
                 {column.label ?? <Skeleton className={column.align === "right" ? "ml-auto h-3 w-16" : "h-3 w-16"} />}
               </StickyTableColumn>
@@ -124,7 +132,7 @@ function GridSkeleton(props: { caption: string; columns: ReadonlyArray<SkeletonC
         <StickyTableBody>
           {Array.from({ length: rows }, (_, row) => (
             <StickyTableRow key={row} aria-hidden>
-              {props.columns.map((column, index) =>
+              {A.map(columns, (column, index) =>
                 index === 0 ? (
                   <StickyTableRowHeader key={index}>
                     <Bar seed={row + index} />

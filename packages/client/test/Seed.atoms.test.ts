@@ -1,3 +1,5 @@
+import { assertDefined } from "@effect/vitest/utils"
+import { assertedValue } from "./support"
 // A read can be given its answer by the screen (a staged file's view, a draft's new revision): the answer shows with
 // no request, and the next refresh asks the server. A read kept for the page (a staged file's rows, which never
 // change) is not asked again when a screen comes back to it. An answer given while a request is out never ends that
@@ -21,7 +23,12 @@ interface Rows {
 }
 class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/test/Seed.atoms.test/RowServer") {}
 
-const world = (takes: Duration.Input | Effect.Effect<void> = "10 millis", idle = 50) => {
+const worldStart: { readonly takes: Duration.Input | Effect.Effect<void>; readonly idle: number } = {
+  takes: "10 millis",
+  idle: 50
+}
+const world = (overrides: Partial<typeof worldStart>) => {
+  const { takes, idle } = { ...worldStart, ...overrides }
   let reads = 0
   let starts = 0
   const layer = Layer.succeed(RowServer, {
@@ -33,17 +40,17 @@ const world = (takes: Duration.Input | Effect.Effect<void> = "10 millis", idle =
     )
   })
   const api = makeApiAtoms(RowServer)
-  const rows = api.query((server) => server.rows)
+  const rows = api.query((server) => server.rows, { keep: "unwatched" })
   const forever = api.query((server) => server.rows, { keep: "page" })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: idle })
-  const seen = (atom: typeof rows) => registry.get(atom).pipe(AsyncResult.value, O.getOrUndefined)
+  const seen = (atom: typeof rows) => registry.get(atom).pipe(AsyncResult.value, assertedValue)
   return { registry, layer, rows, forever, seen, reads: () => reads, starts: () => starts }
 }
 
 describe("a read the screen gives its answer", () => {
   it.live("shows the given answer with no request, and asks the server on the next refresh", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       t.registry.set(t.rows, "the staged view")
       t.registry.mount(t.rows)
       yield* Effect.sleep("50 millis")
@@ -57,7 +64,7 @@ describe("a read the screen gives its answer", () => {
 
   it.live("kept for the page: a return shows it and does not ask again", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       const leave = t.registry.mount(t.forever)
       yield* Effect.sleep("50 millis")
       expect(t.seen(t.forever)).toBe("server's rows 1")
@@ -72,7 +79,7 @@ describe("a read the screen gives its answer", () => {
 
   it.live("given a while before it is first shown: shown at once, and asked again behind it", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       // An upload lands while the person is on another page; they open it later.
       t.registry.set(t.rows, "the staged view")
       yield* Effect.sleep("1100 millis")
@@ -87,7 +94,7 @@ describe("a read the screen gives its answer", () => {
 
   it.live("let go: the answer it held and the answer it was given are gone, and the next look asks the server", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       const leave = t.registry.mount(t.forever)
       yield* Effect.sleep("50 millis")
       expect(t.seen(t.forever)).toBe("server's rows 1")
@@ -106,7 +113,7 @@ describe("a read the screen gives its answer", () => {
 describe("an answer given while the read is being asked again", () => {
   it.live("shows at once, and the request that was out lands: it is not ended, and the server is asked once more", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       t.registry.mount(t.rows)
       yield* Effect.sleep("50 millis")
       expect(t.seen(t.rows)).toBe("server's rows 1")
@@ -128,8 +135,12 @@ describe("an answer given while the read is being asked again", () => {
     Effect.gen(function* () {
       // The server answers a read when the test says, so nothing here rests on how long anything takes.
       const waiting: Array<() => void> = []
-      const t = world(Effect.callback<void>((resume) => void waiting.push(() => resume(Effect.void))))
-      const answer = Effect.sync(() => waiting.shift()?.()).pipe(Effect.andThen(Effect.sleep("20 millis")))
+      const t = world({ takes: Effect.callback<void>((resume) => void waiting.push(() => resume(Effect.void))) })
+      const answer = Effect.sync(() => {
+        const next = waiting.shift()
+        assertDefined(next)
+        next()
+      }).pipe(Effect.andThen(Effect.sleep("20 millis")))
       t.registry.mount(t.rows)
       yield* Effect.sleep("20 millis")
       yield* answer
@@ -157,7 +168,7 @@ describe("an answer given while the read is being asked again", () => {
 
   it.live("an answer given after the request has landed stays, and nothing more is asked", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       t.registry.mount(t.rows)
       yield* Effect.sleep("50 millis")
       t.registry.set(t.rows, "a save's own answer")
@@ -168,7 +179,7 @@ describe("an answer given while the read is being asked again", () => {
 
   it.live("a look without asking: what is held, an answer given and not yet taken, or nothing, and no request", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       expect(O.isNone(t.rows.peek(t.registry))).toBe(true)
       t.registry.set(t.rows, "the staged view")
       expect(t.rows.peek(t.registry)).toEqual(O.some("the staged view"))
@@ -185,7 +196,7 @@ describe("an answer given while the read is being asked again", () => {
 describe("a read let go while a screen still shows it", () => {
   it.live("asks the server at once, and is asked again by a later refresh: it is not cut off", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       t.registry.mount(t.rows)
       yield* Effect.sleep("50 millis")
       expect(t.seen(t.rows)).toBe("server's rows 1")
@@ -210,7 +221,7 @@ describe("what a read shows besides the answer a screen gave", () => {
     Effect.gen(function* () {
       let asked = 0
       const api = makeApiAtoms(GoneServer)
-      const rows = api.query((server) => server.rows)
+      const rows = api.query((server) => server.rows, { keep: "unwatched" })
       const layer = Layer.succeed(GoneServer, {
         rows: Effect.suspend(() => (++asked === 1 ? Effect.succeed("server's rows 1") : Effect.fail(Gone.make({}))))
       })
@@ -218,7 +229,7 @@ describe("what a read shows besides the answer a screen gave", () => {
       registry.mount(rows)
       yield* Effect.sleep("30 millis")
       registry.set(rows, "a save's own answer")
-      expect(registry.get(rows).pipe(AsyncResult.value, O.getOrUndefined)).toBe("a save's own answer")
+      expect(registry.get(rows).pipe(AsyncResult.value, assertedValue)).toBe("a save's own answer")
       // The import was removed elsewhere: the next look is refused, and the screen is told so.
       registry.refresh(rows)
       yield* Effect.sleep("30 millis")
@@ -229,7 +240,7 @@ describe("what a read shows besides the answer a screen gave", () => {
 
   it.live("a request of a read let go that lands late leaves the answer given to the read made since", () =>
     Effect.gen(function* () {
-      const t = world("200 millis", 400)
+      const t = world({ takes: "200 millis", idle: 400 })
       const leave = t.registry.mount(t.rows)
       yield* Effect.sleep("250 millis")
       t.registry.set(t.rows, "given to the first")
@@ -246,7 +257,7 @@ describe("what a read shows besides the answer a screen gave", () => {
 
   it.live("an ask after a request lands and before its once more is not ended by it", () =>
     Effect.gen(function* () {
-      const t = world("20 millis")
+      const t = world({ takes: "20 millis" })
       t.registry.mount(t.rows)
       yield* Effect.sleep("40 millis")
       t.registry.refresh(t.rows)
@@ -269,7 +280,7 @@ describe("what a read shows besides the answer a screen gave", () => {
 describe("a read let go after the screen left it", () => {
   it.live("is not kept again: nothing of it stays in this tab but what lives for the page", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       const leave = t.registry.mount(t.rows)
       yield* Effect.sleep("40 millis")
       expect(t.seen(t.rows)).toBe("server's rows 1")
@@ -291,7 +302,7 @@ describe("a read let go after the screen left it", () => {
 describe("asking again for an answer no older than a write", () => {
   it.live("with no request out, the server is asked now", () =>
     Effect.gen(function* () {
-      const t = world("30 millis")
+      const t = world({ takes: "30 millis" })
       t.registry.mount(t.rows)
       yield* Effect.sleep("60 millis")
       t.rows.askAgain(t.registry, DateTime.nowUnsafe())
@@ -304,7 +315,7 @@ describe("asking again for an answer no older than a write", () => {
 
   it.live("a request that started after the write was sent is the answer wanted: nothing more is asked", () =>
     Effect.gen(function* () {
-      const t = world("30 millis")
+      const t = world({ takes: "30 millis" })
       t.registry.mount(t.rows)
       yield* Effect.sleep("60 millis")
       const sent = DateTime.nowUnsafe()
@@ -320,7 +331,7 @@ describe("asking again for an answer no older than a write", () => {
   it.live("a request that started before the write was sent is left to land, then asked once more", () =>
     Effect.gen(function* () {
       // A read slow enough that what happens while it is out stays inside it on a busy machine.
-      const t = world("200 millis")
+      const t = world({ takes: "200 millis" })
       t.registry.mount(t.rows)
       yield* Effect.sleep("300 millis")
       t.registry.refresh(t.rows)
@@ -343,7 +354,7 @@ describe("asking again for an answer no older than a write", () => {
 describe("an answer given on two pages at once", () => {
   it.live("is held by each page's own registry: one page giving its answer never lets the other's go", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       // Another page of the same app, beside the first (a test's second registry, or a second root).
       const other = AtomRegistry.make({ initialValues: [provideApi(t.layer)], defaultIdleTTL: 50 })
       t.registry.set(t.rows, "page one's view")
@@ -353,7 +364,7 @@ describe("an answer given on two pages at once", () => {
       other.mount(t.rows)
       t.registry.mount(t.rows)
       yield* Effect.sleep("5 millis")
-      expect([other.get(t.rows).pipe(AsyncResult.value, O.getOrUndefined), t.seen(t.rows), t.reads()]).toEqual([
+      expect([other.get(t.rows).pipe(AsyncResult.value, assertedValue), t.seen(t.rows), t.reads()]).toEqual([
         "page two's view",
         "page one's view",
         0

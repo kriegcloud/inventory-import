@@ -511,12 +511,15 @@ export const itemsPage = shown(
         Effect.tap((answer) => Effect.sync(() => correctAddress(asked, answer.pageCount)))
       )
     },
-    { reactivityKeys: catalogKeys.items }
+    { keep: "unwatched", reactivityKeys: catalogKeys.items }
   )
 )
 
 /** What the filters offer (each column's values, the range of numbers) and how many items there are in all. */
-export const itemFacets = catalogApi.query((api) => api.items.facets(), { reactivityKeys: catalogKeys.itemFacets })
+export const itemFacets = catalogApi.query((api) => api.items.facets(), {
+  keep: "unwatched",
+  reactivityKeys: catalogKeys.itemFacets
+})
 
 type Found = Atom.Success<typeof itemFacets> | undefined
 
@@ -718,14 +721,16 @@ export function ItemsPage() {
         title="Items"
         line={line}
         // A viewer cannot import: the button would lead to a screen that says so.
-        {...(canImport ? { actions: <Button onClick={() => navigate("/")}>Import a file</Button> } : {})}
+        {...(canImport
+          ? { actions: <Button onClick={() => navigate("/", { replace: false })}>Import a file</Button> }
+          : {})}
       />
       {page.error !== null ? (
         <div className="px-4 sm:px-9">
           <Alert variant="destructive">
             <AlertTitle>The items could not be loaded</AlertTitle>
             <AlertDescription>
-              {sayError(page.error).sentence}
+              {sayError(page.error, { fields: {} }).sentence}
               <Button variant="outline" size="sm" onClick={askPageAgain}>
                 Try again
               </Button>

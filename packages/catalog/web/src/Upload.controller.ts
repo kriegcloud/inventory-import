@@ -336,8 +336,11 @@ const arrive = (input: {
   // Straight to the review when every required field found its column by heading; to Match when one did not.
   const unmatched = view.mapping.some((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
   const next = importAddress(view.id, unmatched ? "match" : "review")
-  if (window.location.pathname === "/") navigate(next)
-  else toast(`${view.fileName} is ready to review`, { action: { label: "Open", onClick: () => navigate(next) } })
+  if (window.location.pathname === "/") navigate(next, { replace: false })
+  else
+    toast(`${view.fileName} is ready to review`, {
+      action: { label: "Open", onClick: () => navigate(next, { replace: false }) }
+    })
 }
 
 /** Starts reading and sending `file`; `onEnd` is told how it ended. Ignored while another upload is under way. */
@@ -479,7 +482,7 @@ const start = (input: {
     // Its own reason, said where the person is next when they are leaving its organization: what the screen holds of
     // it is that organization's, and is let go with it.
     if (leaving || registry.get(memberKey) !== startedAs) {
-      void toast.error(`${file.name} was not uploaded`, { description: sayError(error).sentence })
+      void toast.error(`${file.name} was not uploaded`, { description: sayError(error, { fields: {} }).sentence })
     }
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
@@ -494,7 +497,7 @@ const start = (input: {
       UploadState.cases.Failed.make({
         fileName: file.name,
         step: read ? "read" : "save",
-        message: read ? error.message : sayError(error).sentence
+        message: read ? error.message : sayError(error, { fields: {} }).sentence
       })
     )
   })

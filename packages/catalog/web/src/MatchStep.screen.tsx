@@ -36,7 +36,7 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
   const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
   const match = (input: { field: Field; column: number | null }) =>
     void matchOne({ id: view.id, field: input.field, column: O.fromNullOr(input.column) }).then((exit) => {
-      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash))
+      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), {})
     })
 
   const rows: ReadonlyArray<Row> = view.mapping.map((entry) => ({ match: entry }))
@@ -102,14 +102,14 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
         actions={
           <>
             {wrongFile ? (
-              <Button variant="outline" onClick={() => navigate(importAddress(view.id, "upload"))}>
+              <Button variant="outline" onClick={() => navigate(importAddress(view.id, "upload"), { replace: false })}>
                 Choose another file
               </Button>
             ) : null}
             <Button
               variant={wrongFile ? "outline" : "default"}
               disabled={missing.length > 0}
-              onClick={() => navigate(importAddress(view.id, "review"))}
+              onClick={() => navigate(importAddress(view.id, "review"), { replace: false })}
             >
               Review {view.progress.rows} rows
             </Button>

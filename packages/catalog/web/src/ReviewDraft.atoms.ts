@@ -256,7 +256,7 @@ const perform = (input: {
                 ? DraftEvent.SaveSignedOut({ id: sent })
                 : isTransient(error) || S.is(DraftBusy)(error)
                   ? DraftEvent.SaveFailed({ id: sent })
-                  : DraftEvent.SaveRefused({ id: sent, reason: sayError(error).sentence })
+                  : DraftEvent.SaveRefused({ id: sent, reason: sayError(error, { fields: {} }).sentence })
             )
           }
         )
@@ -382,7 +382,7 @@ const perform = (input: {
             // The picture the confirm answered with: rows decided while it was out are named on the result.
             happened(DraftEvent.ConfirmDone({ id: sent, revision: view.revision, decisions: view.decisions }))
             forget(registry, id)
-            if (onScreen) navigate(importAddress(view.id, "result"))
+            if (onScreen) navigate(importAddress(view.id, "result"), { replace: false })
           },
           (error: unknown) => {
             answered(registry, id)
@@ -392,7 +392,7 @@ const perform = (input: {
             }
             // Closed already, or the answer was lost: the machine sends nothing and asks for the import, whose picture
             // says what was written.
-            toastError(error)
+            toastError(error, {})
             happened(DraftEvent.ConfirmFailed({ id: sent }))
           }
         )

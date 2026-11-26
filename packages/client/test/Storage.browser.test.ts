@@ -13,7 +13,8 @@ const storageThat = (refuse: { readonly reads?: boolean; readonly writes?: boole
     throw new DOMException("The quota has been exceeded.", "QuotaExceededError")
   }
   return {
-    getItem: (key: string) => (refuse.reads === true ? refused() : (kept[key] ?? null)),
+    getItem: (key: string) =>
+      refuse.reads === true ? refused() : O.match(R.get(kept, key), { onNone: () => null, onSome: (value) => value }),
     setItem: (key: string, value: string) => {
       if (refuse.writes === true) refused()
       kept[key] = value
@@ -22,7 +23,10 @@ const storageThat = (refuse: { readonly reads?: boolean; readonly writes?: boole
       if (refuse.writes === true) refused()
       delete kept[key]
     },
-    key: (index: number) => (refuse.reads === true ? refused() : O.getOrNull(A.get(R.keys(kept), index))),
+    key: (index: number) =>
+      refuse.reads === true
+        ? refused()
+        : O.match(A.get(R.keys(kept), index), { onNone: () => null, onSome: (key) => key }),
     get length() {
       return refuse.reads === true ? refused() : R.size(kept)
     },

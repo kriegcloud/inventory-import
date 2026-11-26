@@ -14,15 +14,22 @@ const runtime = ManagedRuntime.make(FetchHttpClient.layer)
 /** Browser HTTP at Promise boundaries, retaining native response bodies and fetch options. */
 export const request: typeof globalThis.fetch = (input, init) => {
   const native = new Request(typeof input === "string" ? new URL(input, globalThis.location.href) : input, init)
+  const sent = HttpClient.execute(HttpClientRequest.fromWeb(native)).pipe(
+    Effect.tap((response) => Effect.sync(() => serverAnswered(response.status))),
+    Effect.flatMap((response) =>
+      O.match(HttpClientResponse.toWeb(response), {
+        onNone: () => Effect.die("The fetch client returned a response without its native body"),
+        onSome: Effect.succeed
+      })
+    ),
+    Effect.provideService(HttpClient.TracerDisabledWhen, () => true)
+  )
   return runtime
     .runPromiseExit(
-      HttpClient.execute(HttpClientRequest.fromWeb(native)).pipe(
-        Effect.tap((response) => Effect.sync(() => serverAnswered(response.status))),
-        Effect.map((response) => response.pipe(HttpClientResponse.toWeb, O.getOrThrow)),
-        Effect.provideService(FetchHttpClient.RequestInit, init ?? {}),
-        // These requests previously used plain fetch and did not send trace context.
-        Effect.provideService(HttpClient.TracerDisabledWhen, () => true)
-      ),
+      O.match(O.fromUndefinedOr(init), {
+        onNone: () => sent,
+        onSome: (init) => sent.pipe(Effect.provideService(FetchHttpClient.RequestInit, init))
+      }),
       { signal: native.signal }
     )
     .then((exit) => {

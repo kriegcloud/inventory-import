@@ -1,10 +1,10 @@
+import { assertedValue } from "./support"
 // Coming back to a screen shows what was there at once, marked waiting, and swaps in the fresh answer: no skeleton on
 // a return (Benjamin: "Old rows at once, refreshed behind").
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { makeApiAtoms, provideApi } from "@inventory/client/Api"
@@ -22,12 +22,12 @@ describe("a return to a screen", () => {
         // Answers after a moment, as a server does.
         rows: Effect.sleep("20 millis").pipe(Effect.andThen(Effect.sync(() => `rows of read ${++reads}`)))
       })
-      const rows = makeApiAtoms(RowServer).query((server) => server.rows)
+      const rows = makeApiAtoms(RowServer).query((server) => server.rows, { keep: "unwatched" })
       // The app's registry lets an unread screen's atoms go 400 ms later; shorter here.
       const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: 50 })
       const seen = () => {
         const result = registry.get(rows)
-        return { rows: result.pipe(AsyncResult.value, O.getOrUndefined), waiting: result.waiting }
+        return { rows: result.pipe(AsyncResult.value, assertedValue), waiting: result.waiting }
       }
       const leave = registry.mount(rows)
       yield* Effect.sleep("100 millis")

@@ -72,7 +72,7 @@ export function ActivityPage() {
           <Alert variant="destructive">
             <AlertTitle>The activity could not be loaded</AlertTitle>
             <AlertDescription>
-              {sayError(failed).sentence}
+              {sayError(failed, { fields: {} }).sentence}
               <Button variant="outline" size="sm" onClick={() => shown.refetch()}>
                 Try again
               </Button>

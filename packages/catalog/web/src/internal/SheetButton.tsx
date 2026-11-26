@@ -36,7 +36,7 @@ export function SheetButton(props: { importId: ImportId }) {
           chosen={workbook.chosen}
           onChoose={(sheet) => {
             start({ file: workbook.file, sheet })
-            navigate(importAddress(props.importId, "upload"))
+            navigate(importAddress(props.importId, "upload"), { replace: false })
           }}
         />
       </PopoverContent>

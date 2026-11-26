@@ -79,12 +79,20 @@ const makeBox = (
   const shown = Atom.readable((get): Shown => {
     const now = get(box)
     const value = get(held)
-    const ours = O.filter(now.typed, (typed) => O.getOrElse(now.asked, () => typed.over) === value)
-    return {
-      draft: O.match(ours, { onNone: () => value, onSome: (typed) => typed.text }),
-      asked: O.isSome(ours) ? O.getOrElse(now.asked, () => value) : value,
-      waiting: now.waiting && O.isSome(ours)
-    }
+    return O.match(now.typed, {
+      onNone: () => ({ draft: value, asked: value, waiting: false }),
+      onSome: (typed) =>
+        O.match(now.asked, {
+          onNone: () =>
+            typed.over === value
+              ? { draft: typed.text, asked: value, waiting: now.waiting }
+              : { draft: value, asked: value, waiting: false },
+          onSome: (asked) =>
+            asked === value
+              ? { draft: typed.text, asked, waiting: now.waiting }
+              : { draft: value, asked: value, waiting: false }
+        })
+    })
   })
   const ask = (text: string) => {
     registry.update(box, (now) => ({ ...now, asked: O.some(text), waiting: false }))

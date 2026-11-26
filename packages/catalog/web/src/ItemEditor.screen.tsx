@@ -234,7 +234,7 @@ const editAgain = (input: {
       notice
     })
     const drawn = document.querySelector(`[data-edit-item="${CSS.escape(base.id)}"]`) !== null
-    if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`)
+    if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`, { replace: false })
   }
 }
 
@@ -289,7 +289,7 @@ export const editItem = Atom.family((id: StoredItem["id"]) =>
         description: `${now.name} was changed by someone else just before you saved, so your change was not saved. Their values are showing.`,
         action: {
           label: "Edit again",
-          onClick: editAgain({ registry, save, base: now, notice: sayError(error).sentence })
+          onClick: editAgain({ registry, save, base: now, notice: sayError(error, { fields: {} }).sentence })
         }
       })
       return true
@@ -546,7 +546,7 @@ export function ItemEditor(props: {
             {saveError === null || notice !== null ? null : (
               <Alert variant="destructive">
                 <AlertTitle>Not saved</AlertTitle>
-                <AlertDescription>{sayError(saveError).sentence}</AlertDescription>
+                <AlertDescription>{sayError(saveError, { fields: {} }).sentence}</AlertDescription>
               </Alert>
             )}
           </FieldGroup>

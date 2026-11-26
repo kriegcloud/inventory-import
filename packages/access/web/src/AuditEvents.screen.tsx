@@ -35,7 +35,10 @@ export const auditEventsCaption = "Uploads and imports"
  * The audit trail of the signed-in member's organization, newest first, fetched once and shared. Anything that writes
  * an audit line says `accessKeys.activity` changed, and it is asked again.
  */
-export const auditEvents = accessApi.query((api) => api.activity.recent(), { reactivityKeys: accessKeys.activity })
+export const auditEvents = accessApi.query((api) => api.activity.recent(), {
+  keep: "unwatched",
+  reactivityKeys: accessKeys.activity
+})
 
 const auditEventAnswer = answerOf(auditEvents)
 /** The audit trail's rows and columns as the list follows them: empty until the trail has been read. */

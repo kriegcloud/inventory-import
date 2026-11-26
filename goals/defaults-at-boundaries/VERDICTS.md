@@ -496,3 +496,180 @@ Row 8 remains incomplete with the 123 named places above.
 
 Needs the person: nothing to approve for these edits. Row 8 still needs work on the 123 named sites; any
 exemptions proposed later require Benjamin's explicit decision. No new product behavior was chosen in this lane.
+
+## Client and owned UI (PLAN row 10)
+
+Written on 2026-11-26 before changing code. API retries, member isolation, optimistic rollback, sign-in states,
+error sentences, stored browser bytes and rendered outcomes retain their existing behavior.
+
+| Schema or boundary | Field | Verdict | Reason |
+| --- | --- | --- | --- |
+| Client query/write configuration | keeping policy and options argument | Required choices | Callers state the former keeping policy; optional reactivity keys and comparison time remain unresolved below |
+| Client read/write state | held answer, given answer, pending request, optimistic entries | State / Absent | Retain actual absence and object identity through atoms; no invented answer |
+| Signed-in member | session, organization, identity | State / Absent | Nobody signed in and no chosen organization remain distinct from an authenticated member |
+| Client HTTP URL and header boundary | origin, page address | Required / platform edge | Preserve same-origin requests and header behavior; an unavailable platform capability is named rather than disguised |
+| Client storage | missing or refused read | Absent | Existing encoded bytes stay unchanged; absence remains an Option until its consumer chooses behavior |
+| Client error input | typed refusal, transport failure, cause | State / Required | Preserve every existing sentence and transient retry classification |
+| Client test builders and result assertions | inputs / expected branch | Required / asserted branch | Builders receive explicit overrides over named starting objects; unexpected branches fail assertions |
+| UI React component props | optional presentation choices | Optional props with destructuring defaults | React callers may omit presentation props; defaults belong at destructuring, not body fallbacks |
+| UI route and measurement helpers | navigation flags, callback, font choices | Required choices / Absent | Our helpers require callers to state choices; DOM nulls remain boundary candidates |
+| UI date presentation | invalid date | State | A whole match draws the original input or the formatted date |
+| UI search | typed text, asked text, table search | State / Normalised at entry | Keep debounce, external search changes and keyboard behavior; decode clean text at its entry |
+| UI proposal attribution | source, confidence | Absent / existing presentation policy | Never invent attribution; existing confidence wording is preserved and any undecided fallback is named |
+| UI theme storage | chosen word, refused read, device setting | State / existing light policy | Bare localStorage words and pre-paint compatibility stay unchanged |
+| UI JSON codec | arbitrary JSON input/output | Third-party synchronous edge candidate | Do not replace synchronous schema operations with a renamed escape or change invalid-input behavior |
+| UI DOM and vendored component boundaries | missing elements, optional third-party props | Edge candidates | Leave genuinely nullable platform APIs and vendored contracts intact and inventory remaining places |
+
+Final counts, remaining examples and validation are recorded below after implementation.
+
+### Retained places after the row 10 sweep
+
+The scoped scanner fell from **127 to 68**: client **64 to 16**, owned UI **63 to 52**.
+Client tests have **zero** places across all 13 test/support files. These are retained places, not approved
+exemptions. No baseline or exemption was changed. The broader zero-place objective remains open.
+
+| File | Kind | Count | Example | Reason held |
+| --- | --- | --- | --- | --- |
+| packages/client/src/Api.atoms.ts | unwrap | 1 | answerOf: O.getOrUndefined | Changing the public derived atom requires broad dependent drawing changes; held rather than rename the unwrap |
+| packages/client/src/Api.atoms.ts | absence | 3 | options.reactivityKeys === undefined; since !== undefined; keys === undefined | Own optional config not yet modeled as required Options; original checks restored rather than merely wrapping undefined at use |
+| packages/client/src/Optimistic.atoms.ts | absence | 1 | spec.settled !== undefined | Own optional settled config remains; original check retained |
+| packages/client/src/SayError.controller.ts | absence | 2 | options.lead === undefined; error === null | Own optional lead config remains; original logOnce object/null guard retained |
+| packages/client/src/Connection.atoms.ts | absence | 2 | typeof window === "undefined" | Browser platform capability gates for server rendering/tests; unchanged |
+| packages/client/src/SayError.controller.ts | fallback | 1 | troubleSentence: dictionary choice ?? fixed model sentence | Existing unknown/missing installed wording policy; retained exactly instead of moving literal to a renamed starting object or fallback-only decode |
+| packages/client/src/SayError.controller.ts | normalise | 2 | fieldWords: last.replace(...).toLowerCase(); requestProblems: label.charAt(0).toUpperCase() | Existing synchronous human-readable path rendering; original capitalisation restored rather than hide normalization behind Str.capitalize |
+| packages/client/src/Tab.atoms.ts | absence | 4 | typeof navigator; navigator.locks === undefined; locks === undefined; lock === null | Actual browser lock capability and ifAvailable lock-acquisition boundary; unchanged |
+
+
+| File under packages/ui/src | Kind | Count | Example | Classification and reason retained |
+| --- | --- | --- | --- | --- |
+| AgentRun.component.tsx | absence | 5 | `step.input !== undefined` | Owned run-step presentation absence; conditional detail/tag drawing. Rendering candidates, not approved exemptions. Optional RunStep data not yet schema modeled. |
+| Json.codec.ts | absence | 1 | `value === undefined` | Synchronous JSON boundary candidate. Undefined retains stringify's existing undefined output. |
+| ListTable.component.tsx | fallback | 6 | `counts[text] ?? 0`, `column.width ?? room` | Unresolved owned defaults: two facet count fallbacks, fixed width 0, flexible width room, default cell renderer, hover text. No schema policy invented. |
+| ListTable.component.tsx | absence | 6 | `value === undefined`, `first === undefined` | Unresolved owned column representation and final rendering; toolbar null check draws optional wrapping. These are not all third-party edges. |
+| ListTable.component.tsx | normalise | 2 | filter text `.toLowerCase()` | Owned case-insensitive search comparison; existing behavior retained, boundary normalization not yet modeled. |
+| PageHeader.component.tsx | absence | 2 | `props.line === undefined` | Optional React line/actions final drawing. Explicit null currently differs from omitted props (wrapper exists); a null default would change DOM behavior. Rendering candidates. |
+| ProposalSource.words.ts | absence | 2 | `fix.confidence === undefined` | Unresolved owned proposal attribution absence; helper signatures/callers not migrated. |
+| ProposalSource.words.ts | fallback | 1 | `fix.confidence ?? "medium"` | Unresolved owned medium-confidence presentation policy; no new schema solely to hide fallback. Existing wording preserved. |
+| ProposedValue.component.tsx | absence | 4 | `props.source === undefined` | Optional React source/state final drawing; omitted state and each provided state have distinct markup. Rendering candidates. |
+| Route.atoms.ts | fallback | 2 | `[path = "/", query = ""]` | Unresolved owned route-splitting defaults; preserved original split semantics. |
+| Skeletons.component.tsx | absence | 7 | `props.title === undefined`, `props.rows === undefined` | React loading presentation and outgoing optional property bags, including one vendored DataTableFrameSkeleton rows boundary. Mixed rendering and vendor optional-prop candidates. |
+| Skeletons.component.tsx | fallback | 2 | `column.width ?? 240`, `column.label ?? <Skeleton ... />` | Unresolved owned skeleton-column data defaults; retained rather than moving into noncomponent destructuring. |
+| TableSearch.component.tsx | absence | 1 | `event.target.closest("[role=dialog]") !== null` | Real nullable DOM query candidate: preserve dialog keyboard ownership. |
+| TableSearch.component.tsx | normalise | 6 | `after.value.text.trim()`, `event.key.toLowerCase()` | Five owned trim sites for search comparison/submission and one browser keyboard spelling normalization. Existing debounce, submission and shortcut behavior retained; normalization schema not introduced. |
+| TextWidth.measure.ts | absence | 3 | `context === null`, `families === undefined` | One real nullable canvas API result; two owned lazy initialization states remain unresolved. |
+| TextWidth.measure.ts | fallback | 2 | CSS property `|| "sans-serif"` | CSS/browser font boundary with owned fallback policy (sans-serif/monospace), unresolved rather than silently schema-wrapped. |
+
+
+The five unchanged synchronous escapes beyond this checkout's scanner are `Api.atoms.ts`
+`Effect.runSync(Reactivity.make)` (1), `SayError.controller.ts` synchronous `Effect.logError` (2), and
+`ui/src/Json.codec.ts` synchronous encode/decode (2). They remain named candidates, not cleared sites.
+`Http.runtime.ts` now consumes the native response Option with an Effect match; a missing native response dies
+with the invariant. Present fetch options are provided unchanged, and absent options leave the optional
+RequestInit service unprovided (FetchHttpClient supplies its existing empty options).
+
+Uncounted own optional configuration is also still unresolved: query/write reactivity keys, `askAgain`
+comparison time, optimistic retry/settled/onAnswer/onRefused/readAgainAfterRefusal callbacks and options, and
+local subscription lifecycle. None is claimed schema-complete. Optional DOM chaining remains at the actual
+platform edge, including search field focus and the theme-color meta element.
+
+### Changes and forced callers
+
+The lane requires callers to state query keeping/options, write options, error field mappings/toast options,
+connection retry predicates, navigation history choice, link callbacks and text-measurement flags. Early GET
+consumption returns an Option through its API consumer. Cache and display-state folds preserve complete cases.
+Nonblank error reasons preserve their original bytes and continue accepting array/function carriers. React
+maxWidth and skeleton rows defaults sit in component destructuring. Stored schemas, files and wire shapes did
+not change, and no worker/postMessage boundary changed. No undecided fallback was moved to a new schema.
+
+Changed files (outside client/UI, every code change is a forced caller of these signatures):
+
+- `apps/inventory/src/web/Workspace.tsx`
+- `apps/inventory/src/web/components/app/AppSidebar.tsx`
+- `apps/inventory/src/web/components/app/SignedIn.tsx`
+- `apps/inventory/src/web/lib/api.ts`
+- `apps/inventory/src/web/pages/ActivityPage.tsx`
+- `apps/inventory/test/web/session.test.ts`
+- `goals/defaults-at-boundaries/PLAN.md`
+- `goals/defaults-at-boundaries/VERDICTS.md`
+- `packages/access/web/src/AuditEvents.screen.tsx`
+- `packages/access/web/src/People.screen.tsx`
+- `packages/catalog/web/src/ImportDecisions.screen.tsx`
+- `packages/catalog/web/src/ImportPage.screen.tsx`
+- `packages/catalog/web/src/Imports.atoms.ts`
+- `packages/catalog/web/src/ItemEditor.screen.tsx`
+- `packages/catalog/web/src/ItemsPage.screen.tsx`
+- `packages/catalog/web/src/MatchStep.screen.tsx`
+- `packages/catalog/web/src/ResultStep.screen.tsx`
+- `packages/catalog/web/src/ReviewDraft.atoms.ts`
+- `packages/catalog/web/src/ReviewStep.screen.tsx`
+- `packages/catalog/web/src/TableAssistant.screen.tsx`
+- `packages/catalog/web/src/Upload.controller.ts`
+- `packages/catalog/web/src/UploadStep.screen.tsx`
+- `packages/catalog/web/src/internal/SheetButton.tsx`
+- `packages/catalog/web/test/readSpreadsheet.test.ts`
+- `packages/client/src/Api.atoms.ts`
+- `packages/client/src/Connection.atoms.ts`
+- `packages/client/src/Early.runtime.ts`
+- `packages/client/src/Http.runtime.ts`
+- `packages/client/src/Member.atoms.ts`
+- `packages/client/src/Optimistic.atoms.ts`
+- `packages/client/src/SayError.controller.ts`
+- `packages/client/src/Tab.atoms.ts`
+- `packages/client/strict-ceiling.json`
+- `packages/client/test/Answer.atoms.test.ts`
+- `packages/client/test/Connection.atoms.test.ts`
+- `packages/client/test/Freshness.atoms.test.ts`
+- `packages/client/test/Member.atoms.test.ts`
+- `packages/client/test/Optimistic.atoms.test.ts`
+- `packages/client/test/Paging.atoms.test.ts`
+- `packages/client/test/SayError.test.ts`
+- `packages/client/test/Seed.atoms.test.ts`
+- `packages/client/test/SignOut.atoms.test.ts`
+- `packages/client/test/SignedIn.atoms.test.ts`
+- `packages/client/test/Storage.browser.test.ts`
+- `packages/client/test/support.ts`
+- `packages/review/src/internal/ReviewGrid.tsx`
+- `packages/ui/src/Dates.format.ts`
+- `packages/ui/src/ListTable.component.tsx`
+- `packages/ui/src/ProposalSource.words.ts`
+- `packages/ui/src/Route.atoms.ts`
+- `packages/ui/src/Skeletons.component.tsx`
+- `packages/ui/src/TableSearch.component.tsx`
+- `packages/ui/src/TextWidth.measure.ts`
+- `packages/ui/src/Theme.provider.tsx`
+- `packages/ui/strict-ceiling.json`
+
+
+### Validation and proof limits
+
+Final `bun run check --env-mode=loose` passed **105/105 tasks**, 56 cached, in **2m59.917s**
+(`/tmp/defaults-client-ui-check.log`). Temporary Bun cache, XDG cache, Turbo cache and Wrangler registry paths
+under `/tmp/defaults-client-ui-*` were supplied for the sandbox. Earlier integration attempts stopped on caller
+formatting, the unchanged readonly ledger after extra readonly modifiers, and one missed People query keeping
+argument. Each was corrected in owned code or a forced caller; no tooling ledger was edited.
+
+The final scoped defaults command over 41 owned source/test files passed with **14 fallback, 43 absence,
+1 unwrap, 10 normalise** (68). A separate command over all 13 client test/support files passed with all four
+counts **zero**. The defaults baseline was not lowered. Client tests passed **58 tests in 12 files**; catalog web
+passed **401 tests in 38 files**. No test needed a second try. All changed code/ceiling files were formatted;
+Markdown is excluded by the formatter, and `bun run docs:check` passed for the goal packet.
+
+UI and client strict ceilings fell from their original values **50 to 40** and **20 to 15** respectively,
+matching measured diagnostics; none was raised. UI export checks passed all 136 entries. Review checks passed
+251/251 for the measurement callers. A synthetic equivalence check covered 432 old/new search shown-state
+combinations; this proves the derived state fold, not browser debounce timing.
+
+HTTP proof checks credentials, cache, redirect, integrity, a forwarded non-aborted signal, and native Response
+identity/body. Actual abort timing and request-body round-trip were not asserted. Error tests preserve empty-key
+field labels for numeric paths and reasons carried by arrays/functions. Existing atom tests cover member
+isolation, sign-out cleanup, stale answers, concurrent optimistic edits, rollback and retries.
+
+Not run: `check:full`, slow database tests, a real browser import, hosted deployment, or on-screen verification.
+**Not seen on screen.** The orchestrator still owns the sample import and its 155-item acceptance check.
+No commit or push was made. No baseline, exemption, vendored file, stored snapshot or Verify lock was changed,
+and `.dev.vars` was not read. Final protected hashes remain:
+
+- `defaults-baseline.json`: `f0f425222d9a71cfab28ff687c3a1212a1c0336d2df15a43fb649da168107cb0`
+- `packages/catalog/model/test/Catalog.lock.json`: `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`
+
+Needs the person: nothing

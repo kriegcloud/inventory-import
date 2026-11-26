@@ -173,15 +173,15 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
   const reopenNow = useAtomSet(reopenImport, { mode: "promiseExit" })
   const reopen = () =>
     void reopenNow(view.id).then((exit) => {
-      if (Exit.isSuccess(exit)) navigate(importAddress(exit.value.id, "review"))
-      else toastError(exit.cause.pipe(Cause.squash))
+      if (Exit.isSuccess(exit)) navigate(importAddress(exit.value.id, "review"), { replace: false })
+      else toastError(exit.cause.pipe(Cause.squash), {})
     })
   const takingBack = useAtomValue(takeBackImport).waiting
   const takeBackNow = useAtomSet(takeBackImport, { mode: "promiseExit" })
   const takeBack = () =>
     void takeBackNow(view).then((exit) => {
       if (Exit.isFailure(exit)) {
-        toastError(exit.cause.pipe(Cause.squash))
+        toastError(exit.cause.pipe(Cause.squash), {})
         invalidate(catalogKeys.import(view.id))
         return
       }
@@ -309,7 +309,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         actions={
           takenBack ? (
             <>
-              <Button variant="outline" onClick={() => navigate("/items")}>
+              <Button variant="outline" onClick={() => navigate("/items", { replace: false })}>
                 View items
               </Button>
               {props.canImport ? (
@@ -327,7 +327,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
                 </Button>
               )}
               {takeBackButton}
-              <Button onClick={() => navigate("/items")}>View items</Button>
+              <Button onClick={() => navigate("/items", { replace: false })}>View items</Button>
             </>
           )
         }

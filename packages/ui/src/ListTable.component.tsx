@@ -1,3 +1,4 @@
+import * as A from "effect/Array"
 import { createColumnHelper, type ColumnDef, type FilterFn, type RowData } from "@tanstack/react-table"
 import * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
@@ -98,7 +99,7 @@ const optionsOf = <Row,>(rows: ReadonlyArray<Row>, value: (row: Row) => string |
 type ListInput<Row extends RowData> = {
   readonly columns: Atom.Atom<ReadonlyArray<ListColumn<Row>>>
   readonly rows: Atom.Atom<ReadonlyArray<Row>>
-  readonly maxWidth: number | undefined
+  readonly maxWidth: number
 }
 
 /**
@@ -110,8 +111,8 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
   // The column without a width takes the room the others leave, never less than `leastFlexible`: only then does
   // the table scroll sideways inside its frame.
   const flexible = Atom.readable((get) => {
-    const room = Math.min(get(contentWidth), input.maxWidth ?? Number.POSITIVE_INFINITY)
-    const fixed = get(input.columns).reduce((total, column) => total + (column.width ?? 0), 0)
+    const room = Math.min(get(contentWidth), input.maxWidth)
+    const fixed = A.reduce(get(input.columns), 0, (total, column) => total + (column.width ?? 0))
     return Math.max(leastFlexible, room - chrome - fixed)
   })
   // The config follows the columns' ids and what each does, not the array itself: columns made anew (their cells
@@ -146,7 +147,7 @@ const makeList = <Row extends RowData>(input: ListInput<Row>) => {
     const room = get(flexible)
     const col = createColumnHelper<DataTableFeatures, Row>()
     const first = columns[0]?.id
-    return columns.map((column): ColumnDef<DataTableFeatures, Row, unknown> => {
+    return A.map(columns, (column): ColumnDef<DataTableFeatures, Row, unknown> => {
       const size = column.width ?? room
       const show = column.cell ?? ((row: Row) => (column.value === undefined ? null : String(column.value(row))))
       const value = column.value
@@ -223,10 +224,10 @@ type ListTableProps<Row extends RowData> = {
  * A list the page already holds, as a data table the person sorts from its headings, searches, filters by the
  * values a column has, and narrows to the columns they want; on a page as narrow as a phone, the same rows as cards.
  */
-export function ListTable<Row extends RowData>(props: ListTableProps<Row>) {
+export function ListTable<Row extends RowData>({ maxWidth = Number.POSITIVE_INFINITY, ...props }: ListTableProps<Row>) {
   return (
     // One scope serves every kind of row: inside it a row is whatever the columns read.
-    <ListScope.Provider value={{ columns: props.columns, rows: props.rows, maxWidth: props.maxWidth } as never}>
+    <ListScope.Provider value={{ columns: props.columns, rows: props.rows, maxWidth } as never}>
       <ListBody {...props} />
     </ListScope.Provider>
   )

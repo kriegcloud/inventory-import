@@ -316,7 +316,7 @@ describe("a write pressed on the page", () => {
           .execute(HttpClientRequest.post("http://localhost/api/v1/items"))
           .pipe(Effect.as("saved"), Effect.orDie)
       })
-      const save = api.makeApiAtoms(SaveServer).write<void>()((one) => one.save)
+      const save = api.makeApiAtoms(SaveServer).write<void>()((one) => one.save, {})
       const registry = root.rootRegistry({ api: layer })
       yield* settle
       page.asked[0]?.answer(signedInAs("dana"))
@@ -497,8 +497,8 @@ const browserWithServer = Effect.fnUntraced(function* () {
     save: client.execute(HttpClientRequest.post("http://localhost/api/v1/items")).pipe(Effect.as("saved"), Effect.orDie)
   })
   const atoms = api.makeApiAtoms(RowServer)
-  const rows = atoms.query((one) => one.rows)
-  const save = atoms.write<void>()((one) => one.save)
+  const rows = atoms.query((one) => one.rows, { keep: "unwatched" })
+  const save = atoms.write<void>()((one) => one.save, {})
   const registry = root.rootRegistry({ api: layer })
   yield* settle
   page.asked[0]?.answer(signedInAs("dana"))
@@ -679,7 +679,7 @@ describe("the person's own switch, pressed while who is signed in is already ask
       yield* settle
       const result = t.registry.get(t.save)
       expect(t.server.done).toEqual([])
-      expect(AsyncResult.isFailure(result) ? sayError(Cause.squash(result.cause)) : "sent").toEqual({
+      expect(AsyncResult.isFailure(result) ? sayError(Cause.squash(result.cause), { fields: {} }) : "sent").toEqual({
         title: "That did not work",
         sentence:
           "You opened another organization before it was sent, so it was not sent and nothing was changed. Switch back to do it there.",

@@ -8,7 +8,7 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; they are under Answered. They are what is left
+Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 167 answer the questions report 18 and step 7 raised. They are under Answered. They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
@@ -1163,3 +1163,115 @@ I chose no: the note is a hint; the agent recommended the same.
 - Rationale: gist 14.1.0's `gistCore.ttl` (sha256 as the project profile pins it, read 2026-11-26) gives `gist:isCategorizedBy` no `rdfs:domain` and no `rdfs:range`, only `gist:rangeIncludes gist:Category`, an annotation with no logical force; `gist:name` has neither a domain nor a range. Decision 16's test compares declared domains and ranges, and there are none.
 - What changes: `grantScope` and the other classification properties go under `gist:isCategorizedBy` (decision 17) and `inv:name` under `gist:name` (decision 132); rule C9 reads both gist properties as declaring no domain and no range. Concepts stay SKOS only.
 - Reverse: have C9 read `gist:rangeIncludes` as a range, which refuses a property over a SKOS scheme under `gist:isCategorizedBy`.
+
+### 154. How a Sutton membership is told from one of this app's (2026-11-26)
+
+I chose that `Member` names the workspace it lets its person act in; the agent recommended the same (report 18, question 11).
+
+- Rationale: placed as a `Member` whose `membershipIn` is our tenant and nothing more, an active Sutton member reads as able to act in this app's workspace, which nobody granted, and CQ-P06 would list Sutton's members as ours.
+- What changes: one object property from `Member` to the Sutton `Organization`'s `SourceRecord`, stated on every Sutton membership and on none of this app's. `Member`'s definition reads "lets the person act in the tenant's workspace or, where it names one, in that source's workspace". CQ-P06 and CQ-P07 leave out a membership that names a workspace. P1, P2 and decision 133 stand.
+- Reverse: reword `Member` to cover both with no link, or hold a Sutton membership as a source record until a person decides it.
+
+### 155. What the lift writes for a path that ends in an attribute (2026-11-26)
+
+I chose nothing, with the record still lifted; the agent recommended the same (report 18, question 2).
+
+- Rationale: minting a node per record makes a person per membership, a run per audit entry and an account per membership, against decisions 94, 133 and 135; refusing the record stops `Member`, `Person` and `Activity` from lifting.
+- What changes: for a field whose path ends in an attribute the lift states nothing, an absent value included; the rule reads the last step's property kind only. The values (a member's name, the sign-in email, an agent's name) are written on fixtures by hand. `Grant`'s path, which ends in a relation, is lifted as today. No account node is written until a record holds the account's id.
+- Reverse: have the lift write the literal on a minted node.
+
+### 156. What a source record holds when it is read again (2026-11-26)
+
+I chose the latest read; the agent recommended the same (report 18, question 16).
+
+- Rationale: decision 34 makes a second read the same `SourceRecord`, so it must say which read it states; the record should say what its source says now.
+- What changes: `capturedAt` holds one value, the latest read's. A flag that differs from what is stored is a change the person confirms before it is written; nothing is replaced silently.
+- Reverse: keep the first read, or one `capturedAt` per read.
+
+### 157. Whether a name is the record's or the party's (2026-11-26)
+
+I chose the record's wherever a tenant's record states it; the agent recommended the same (report 18, question 14).
+
+- Rationale: on the party, two tenants' spellings of one body merge on the shared node (decision 138's reason); decisions 93 and 133 already place this app's own names.
+- What changes: a Sutton company's, contact's and workspace's names sit on the tenant's `SourceRecord`; this app's member and tenant names, which no source record holds, go through the person and the tenant. A question that asks a name reads both routes.
+- Reverse: move every name to the party, or every name to the record (amending 93 and 133).
+
+### 158. How the accepted criteria handle a source's ids (2026-11-26)
+
+I chose that the criteria accepted now hold this app's ids only; the agent recommended the same (report 18, question 12).
+
+- Rationale: no Sutton record is lifted in this slice, and reading an absent issuing system as "ours" is a default the metamodel does not state.
+- What changes: `Member`'s criterion is a `MemberId` within its tenant, `SignInAccount`'s a `UserId`, `ContactAssignment`'s its id within its tenant. The Sutton halves are unbuilt until Sutton records are lifted and their IRIs decided; `Member`'s is the workspace link of decision 154.
+- Reverse: add the issuing system to each basis, or put it in every record's IRI.
+
+### 159. What identifies a contact point (2026-11-26)
+
+I chose the record that gives it and the field it is read from; the agent recommended the same (report 18, question 13).
+
+- Rationale: no slice-1 source gives a contact point an id of its own, and by its value two parties with one email would share a point, which report 06 rejects and rule C16 refuses.
+- What changes: `ContactPoint` stores an id made from that record and field, as the lift makes a `Grant`'s node; a contact's email is one point and its phone another.
+- Reverse: mark it as storing no id and state each point by hand.
+
+### 160. Whether a criterion must state its basis (2026-11-26)
+
+I chose optional for this slice; the agent recommended the same (report 18, question 5).
+
+- Rationale: every criterion of report 18 says its own id in the sentence, and a basis entry for a class's own stored id does not exist yet.
+- What changes: `restsOn` may be left empty, and rule C16 then has nothing to refuse: a criterion written on a name with no basis stated passes. `AgentRun`'s criterion is restated as "the request it runs in; never the agent's name, which many runs share". The question is put again when a record first stores a criterion's whole basis.
+- Reverse: make the basis required, with an own-id entry or an empty basis with a reason, the thread's seven terms gaining one.
+
+### 161. Person stores no id, and the tenant's name is lifted (2026-11-26)
+
+I chose both; the agent recommended the same (report 18, questions 3 and 10).
+
+- Rationale: decision 133 has the lift write no person node, and the member's record already names its tenant through `organizationId`, so the organization's name has a node the record identifies (decision 93).
+- What changes: `Person` takes `storesId: false` and keeps decision 111; the accepting decision lists it with the category parent. A path whose node step's property is one another marked field of the same record fills takes that field's object as its node, and the lift writes the literal there; gate 5 accepts the reuse.
+- Reverse: leave `Person` at the default; write the organization's name by hand.
+
+### 162. Where a member's own contact points hang (2026-11-26)
+
+I chose a property of its own from `Member` to `ContactPoint`; the agent recommended the same (report 18, question 7).
+
+- Rationale: decision 138 hangs contact points from the tenant's record of a party and a member has none; on the person, one tenant's number would show for another.
+- What changes: one object property, stated on `sutton-party.ttl`, for `UserProfile.personalEmail`, `phoneNumber`, `phoneNumberExt` and `personalPhoneNumber`. Decision 138 stands.
+- Reverse: let `hasContactPoint` declare no domain.
+
+### 163. UserProfile.image and about (2026-11-26)
+
+I chose a property each; the agent recommended the same (report 18, question 8).
+
+- Rationale: decision 130 gives a term to each field that points at no later slice and is no setting, and decision 142's list does not name these two.
+- What changes: two datatype properties on the `Member`, stated on `sutton-party.ttl`.
+- Reverse: no term, as `logo` and `notes`.
+
+### 164. UserProfile.id and UserProfile.email wait (2026-11-26)
+
+I chose that both wait; the agent recommended the same (report 18, questions 9 and 15).
+
+- Rationale: whether `UserProfile.id` equals `OrganizationMember.id` was seen on one empty trial workspace only, and one account with two memberships may hold two different `UserProfile.email` values, so it may not be the sign-in email.
+- What changes: neither field is placed; report 18 lists both as unplaced with the reason. `accountEmail` is given by `CurrentUser.email` meanwhile. Each is placed once a person has checked it on Sutton records.
+- Reverse: place the id as the `Member`'s and the email as the account's.
+
+### 165. Whether V18 refuses a criterion that rests on a SKU (2026-11-26)
+
+I chose not in this slice: it comes with the catalog slice; the agent recommended the same.
+
+- Rationale: decision 146 names a name and an email, and no party term has a SKU; a word match over criterion sentences wrongly lists `Person` and `Role` today.
+- What changes: nothing now. The SKU case of CQ-I08 and the review list of V18's sentence part are named in the goal's closing note for the catalog slice.
+- Reverse: add a third designation and its planted tests now.
+
+### 166. Which gist super-properties the party slice's properties take (2026-11-26)
+
+I chose all four; the agent recommended the same (report 18, question 6).
+
+- Rationale: read from the pinned `gistCore.ttl` on 2026-11-26, `gist:isAbout` has domain `gist:Content` and no range, `gist:hasAddress` range `gist:Address` and no domain, `gist:atDateTime` range `xsd:dateTime` and no domain; each of our properties falls under them, which is decision 16's test.
+- What changes: `recordOf` goes under `gist:isAbout`, `hasPostalAddress` and `hasContactPoint` under `gist:hasAddress`, `eventTime` under `gist:atDateTime`; the module's gist list copies those domains and ranges and rule C9 checks each. gist defines `isAbout` as the subject matter of a document, a looser fit for a record of a party, which I accept.
+- Reverse: drop a link; the property stands without it.
+
+### 167. Three readings step 7 built (2026-11-26)
+
+I confirmed all three as built; the agent recommended the same.
+
+- Rationale: none is spelled out by decisions 135 or 146, and each is the stricter reading.
+- What changes: nothing. A record of a class that stores no id must name the class on the record alone, so an id field naming it is a P4 finding. Rule C16 also refuses a basis key that is no property of the vocabulary. The metamodel's three new fields are `restsOn`, `designation` and `storesId`.
+- Reverse: let such a record carry an id field and have the lift refuse it.

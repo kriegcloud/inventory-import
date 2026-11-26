@@ -95,7 +95,7 @@ export const ceilings = Effect.fn("Ceilings.ceilings")(function* () {
     found,
     (file) =>
       readCeiling(file).pipe(
-        Effect.map((ceiling) => ({ where: repo.relative(repo.root, repo.dirname(file)), ceiling: ceiling.ceiling }))
+        Effect.map((ceiling) => ({ where: repo.relative(repo.dirname(file), repo.root), ceiling: ceiling.ceiling }))
       ),
     { concurrency: 1 }
   )

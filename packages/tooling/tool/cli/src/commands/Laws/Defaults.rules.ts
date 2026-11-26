@@ -635,7 +635,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (
   if (write && A.isReadonlyArrayNonEmpty(only)) return A.of<DefaultsFinding>(DefaultsFinding.cases.NoWrite.make({}))
   const inScope = scopeOf(Str.split("\0")(listed.stdout), Str.split("\0")(vendored.stdout))
   // A named file is read as the caller wrote it: from the root, from the folder the command runs in, or in full.
-  const asked = A.map(only, (file) => repo.relative(repo.root, repo.resolve(repo.cwd, file)))
+  const asked = A.map(only, (file) => repo.relative(repo.resolve(repo.cwd, file), repo.root))
   const present = yield* Effect.filter(inScope, (file) => repo.exists(repo.join(repo.root, file)), { concurrency: 1 })
   const files = A.isReadonlyArrayNonEmpty(asked) ? A.filter(present, (file) => A.contains(asked, file)) : present
   const baselinePath = repo.join(repo.root, baselineFile)

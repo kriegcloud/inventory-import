@@ -1,6 +1,6 @@
 import { TotalCells } from "@inventory/review/ReviewDraft"
 import { query } from "./browser.ts"
-import { identity } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import { CellMark, ColumnMatch, Entry } from "@inventory/review/ReviewTypes"
 import { OtherAnswer } from "@inventory/review/ReviewDraft"
 import {
@@ -1522,7 +1522,10 @@ const canLeadLine = (line: Line): line is Extract<Line, { readonly type: "group"
  * Makes one grid's atoms and its virtual list, in the atom that holds the grid (`ctx`): the list is given the number
  * of lines by a subscription that lives as long as that atom.
  */
-const makeGrid = (input: { readonly region: Region; readonly table: RegionTable }, ctx: Atom.AtomContext): Grid => {
+const makeGrid: {
+  (ctx: Atom.AtomContext): (input: { readonly region: Region; readonly table: RegionTable }) => Grid
+  (input: { readonly region: Region; readonly table: RegionTable }, ctx: Atom.AtomContext): Grid
+} = dual(2, (input: { readonly region: Region; readonly table: RegionTable }, ctx: Atom.AtomContext): Grid => {
   const { region, table } = input
   const registry = ctx.registry
   const readOnly = region.input.readOnly
@@ -1838,7 +1841,7 @@ const makeGrid = (input: { readonly region: Region; readonly table: RegionTable 
       if (O.isSome(index)) list.scrollToIndex(index.value, { align: "auto" })
     }
   }
-}
+})
 
 /** One grid's atoms and its virtual list, as an atom made in the registry that first reads it. */
 export const gridAtom = (input: { readonly region: Region; readonly table: RegionTable }) =>

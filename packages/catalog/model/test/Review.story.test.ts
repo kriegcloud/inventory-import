@@ -1,5 +1,6 @@
 // The orderings that decide whether the review's model holds Benjamin's answers, as stories on the model in memory:
 // who may act, an import that is not open, the confirm, the take-back, a match, an opening, and every depth of an
+import { dual } from "effect/Function"
 // undo. Acts on groups of rows are in `Group.story.test.ts`. No rule of the model holds that a valid act is taken (a
 // `sometimes` rule only finds one sequence that takes it); these stories do (Benjamin, 2026-11-22: "Yes, one per
 // command"). So every command has at least one story in which it is taken and every event it records is stated:
@@ -236,16 +237,44 @@ const level = (input: {
     labelSize: "Decide".length
   })
 // One recorded act, as the events it leaves on the row and on the import.
-const recorded = (
-  ref: typeof row3,
-  row: string,
-  input: {
-    readonly change: number
-    readonly by: string
-    readonly step: string
-    readonly flags: string
-  } & Partial<typeof madeOnStart>
-) => [Story.then(ref, decided(input)), Story.then(life, counted({ row, ...input }))] as const
+const recorded: {
+  (
+    ref: typeof row3,
+    row: string
+  ): (
+    input: {
+      readonly change: number
+      readonly by: string
+      readonly step: string
+      readonly flags: string
+    } & Partial<typeof madeOnStart>
+  ) => readonly [ReturnType<typeof Story.then>, ReturnType<typeof Story.then>]
+  (
+    input: {
+      readonly change: number
+      readonly by: string
+      readonly step: string
+      readonly flags: string
+    } & Partial<typeof madeOnStart>,
+    ref: typeof row3,
+    row: string
+  ): readonly [ReturnType<typeof Story.then>, ReturnType<typeof Story.then>]
+} = dual(
+  3,
+  (
+    input: {
+      readonly change: number
+      readonly by: string
+      readonly step: string
+      readonly flags: string
+    } & Partial<typeof madeOnStart>,
+    ref: typeof row3,
+    row: string
+  ): readonly [ReturnType<typeof Story.then>, ReturnType<typeof Story.then>] => [
+    Story.then(ref, decided(input)),
+    Story.then(life, counted({ row, ...input }))
+  ]
+)
 // A group act opened at revision 0 unless a story says otherwise.
 const openingStart = { opening: 0 }
 const group = (input: { readonly step: string; readonly seen: number } & Partial<typeof openingStart>) =>
@@ -574,11 +603,11 @@ it.effect("another person's act lands before the screen's own waiting act: the c
     Story.given(life, staged),
     Story.provide(CurrentActor, dana),
     Story.when(act({ row: "row-7", step: "d1", saw: 0, flags: kept })),
-    ...recorded(row7, "row-7", { change: 1, by: "dana", step: "d1", flags: kept }),
+    ...recorded({ change: 1, by: "dana", step: "d1", flags: kept }, row7, "row-7"),
     // Ana's screen has not received change 1. Her own act is change 2: she has 2 and not 1, so every change up to 0.
     Story.provide(CurrentActor, ana),
     Story.when(act({ row: "row-3", step: "a1", saw: 0, flags: leftOut })),
-    ...recorded(row3, "row-3", { change: 2, by: "ana", step: "a1", flags: leftOut }),
+    ...recorded({ change: 2, by: "ana", step: "a1", flags: leftOut }, row3, "row-3"),
     Story.when(confirm({ seen: 0, planAt: 2 })),
     Story.rejected(ReviewMovedOn.make({ last: 2 })),
     Story.when(confirm({ seen: 2, planAt: 2 })),
@@ -765,7 +794,7 @@ it.effect("an act made on an older matching is refused, whatever it decides", ()
     Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: '{"stored":"replace"}', madeOn: 0 })),
     Story.rejected(MatchedSince.make({ matching: 1 })),
     Story.when(act({ row: "row-12", step: "a2", saw: 0, flags: '{"stored":"replace"}', madeOn: 1 })),
-    ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a2", flags: '{"stored":"replace"}', madeOn: 1 }),
+    ...recorded({ change: 2, by: "ana", step: "a2", flags: '{"stored":"replace"}', madeOn: 1 }, row12, "row-12"),
     // Nor is one that decides nothing on a row that holds nothing.
     Story.when(act({ row: "row-3", step: "a3", saw: 0, flags: "{}", madeOn: 0 })),
     Story.rejected(MatchedSince.make({ matching: 1 }))
@@ -778,7 +807,7 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: kept, madeOn: 0 })),
-      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: kept }),
+      ...recorded({ change: 1, by: "ana", step: "a1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
       Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
       Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "tags: none", by: "dana" })),
@@ -798,7 +827,7 @@ it.effect(
       // now. It is recorded, and the row's decision is on that matching.
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a2", saw: 1, flags: kept, madeOn: 1 })),
-      ...recorded(row12, "row-12", { change: 3, by: "ana", step: "a2", flags: kept, madeOn: 1 }),
+      ...recorded({ change: 3, by: "ana", step: "a2", flags: kept, madeOn: 1 }, row12, "row-12"),
       // And once more, on the same matching: no change.
       Story.when(act({ row: "row-12", step: "a3", saw: 3, flags: kept, madeOn: 1 })),
       Story.then(row12),
@@ -812,7 +841,7 @@ it.effect("an act made before a confirm is not taken after the import is opened 
     Story.when(act({ row: "row-3", step: "a1", saw: 0, flags: leftOut, opening: 0 })),
     Story.rejected(ConfirmedSince.make({})),
     Story.when(act({ row: "row-3", step: "a2", saw: 0, flags: leftOut, opening: 1 })),
-    ...recorded(row3, "row-3", { change: 3, by: "ana", step: "a2", flags: leftOut })
+    ...recorded({ change: 3, by: "ana", step: "a2", flags: leftOut }, row3, "row-3")
   )
 )
 it.effect(
@@ -914,10 +943,10 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
-      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      ...recorded({ change: 1, by: "ana", step: "a1", flags: leftOut }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
       Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
-      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      ...recorded({ change: 2, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
@@ -956,7 +985,7 @@ it.effect("a decision its sender saw that was taken back since is no longer ther
     Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
     Story.rejected(NoLongerThere.make({})),
     Story.when(act({ row: "row-12", step: "d2", saw: 0, sawUndone: 1, flags: kept })),
-    ...recorded(row12, "row-12", { change: 3, by: "dana", step: "d2", flags: kept })
+    ...recorded({ change: 3, by: "dana", step: "d2", flags: kept }, row12, "row-12")
   )
 )
 it.effect("a save that leaves the row as it is records nothing, seen or not: the answer says no change", () =>
@@ -1077,10 +1106,10 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
-      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      ...recorded({ change: 1, by: "ana", step: "a1", flags: leftOut }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
       Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
-      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      ...recorded({ change: 2, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
@@ -1105,7 +1134,7 @@ it.effect(
       // The admin types a name there, having received the undo. Dana's same undo, sent once more, is still known.
       Story.provide(CurrentActor, admin),
       Story.when(act({ row: "row-12", step: "x1", saw: 1, sawUndone: 2, flags: typed })),
-      ...recorded(row12, "row-12", { change: 4, by: "ada", step: "x1", flags: typed }),
+      ...recorded({ change: 4, by: "ada", step: "x1", flags: typed }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.then(row12),
@@ -1130,10 +1159,10 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
-      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      ...recorded({ change: 1, by: "ana", step: "a1", flags: leftOut }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
       Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
-      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      ...recorded({ change: 2, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
@@ -1163,7 +1192,7 @@ it.effect(
       Story.rejected(UndoneSince.make({ by: "dana", change: 2 })),
       // With the undo received, the same press is taken.
       Story.when(act({ row: "row-12", step: "x1", saw: 1, sawUndone: 2, flags: typed })),
-      ...recorded(row12, "row-12", { change: 4, by: "ada", step: "x1", flags: typed })
+      ...recorded({ change: 4, by: "ada", step: "x1", flags: typed }, row12, "row-12")
     )
 )
 it.effect(
@@ -1173,7 +1202,7 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, dana),
       Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
-      ...recorded(row12, "row-12", { change: 1, by: "dana", step: "d1", flags: kept }),
+      ...recorded({ change: 1, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, admin),
       Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
       Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "tags: none", by: "ada" })),
@@ -1233,10 +1262,10 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
-      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      ...recorded({ change: 1, by: "ana", step: "a1", flags: leftOut }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
       Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
-      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      ...recorded({ change: 2, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, admin),
       Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
       Story.then(life, ColumnMatched.make({ change: 3, matching: 1, columns: "tags: none", by: "ada" })),
@@ -1288,10 +1317,10 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, dana),
       Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
-      ...recorded(row12, "row-12", { change: 1, by: "dana", step: "d1", flags: kept }),
+      ...recorded({ change: 1, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, ana),
       Story.when(act({ row: "row-12", step: "a1", saw: 1, flags: leftOut })),
-      ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a1", flags: leftOut }),
+      ...recorded({ change: 2, by: "ana", step: "a1", flags: leftOut }, row12, "row-12"),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "ana" })),
       Story.then(life, undone({ change: 3, row: "row-12", step: "u1", holds: 1, by: "dana", flags: kept })),
@@ -1324,7 +1353,7 @@ it.effect(
       Story.provide(CurrentActor, ana),
       // What is kept below is past the most a row keeps: the act is taken all the same, and the rest is let go.
       Story.when(act({ row: "row-12", step: "a6", saw: 5, flags: "6" })),
-      ...recorded(row12, "row-12", { change: 6, by: "ana", step: "a6", flags: "6" }),
+      ...recorded({ change: 6, by: "ana", step: "a6", flags: "6" }, row12, "row-12"),
       Story.when(undo({ row: "row-12", undo: 6, step: "u1" })),
       Story.then(row12, StepUndone.make({ next: letGo, below: "", undo: 6, step: "u1", by: "ana" })),
       Story.then(life, undone({ change: 7, row: "row-12", step: "u1", holds: 5, by: "ana", flags: "5" })),
@@ -1345,6 +1374,6 @@ it.effect("a row whose older decisions were let go still takes a decision", () =
     ),
     Story.provide(CurrentActor, ana),
     Story.when(act({ row: "row-12", step: "a7", saw: 6, flags: "7" })),
-    ...recorded(row12, "row-12", { change: 7, by: "ana", step: "a7", flags: "7" })
+    ...recorded({ change: 7, by: "ana", step: "a7", flags: "7" }, row12, "row-12")
   )
 )

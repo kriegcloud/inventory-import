@@ -1,4 +1,5 @@
 import * as SchemaTransformation from "effect/SchemaTransformation"
+import { dual } from "effect/Function"
 // The one place a failure becomes words for the person: what went wrong and what to do next. The rule this file
 // protects: the screen never shows a status code, a stack, a URL or a provider's own text. Those go to the console,
 // once per failure, for whoever is debugging; the person reads a sentence. Every screen calls `sayError`, so a new
@@ -93,7 +94,10 @@ const fieldWords = (path: ReadonlyArray<string | number>): O.Option<string> =>
  * Every problem of a refused request, one sentence each, all at once. `fields` names the screen's fields in its own
  * words (`{ action: "Action" }`); a field it does not name is said from its key.
  */
-const requestProblems = (error: unknown, fields: Readonly<Record<string, string>>): ReadonlyArray<string> => {
+const requestProblems: {
+  (fields: Readonly<Record<string, string>>): (error: unknown) => ReadonlyArray<string>
+  (error: unknown, fields: Readonly<Record<string, string>>): ReadonlyArray<string>
+} = dual(2, (error: unknown, fields: Readonly<Record<string, string>>): ReadonlyArray<string> => {
   if (!P.hasProperty(error, "errors") || !Array.isArray(error.errors)) return []
   const seen: Array<string> = []
   for (const issue of error.errors) {
@@ -110,7 +114,7 @@ const requestProblems = (error: unknown, fields: Readonly<Record<string, string>
     if (!seen.includes(sentence)) seen.push(sentence)
   }
   return seen
-}
+})
 
 // Weak, so a failure already logged is let go with it; Effect has no weak collection to use instead.
 const logged = new WeakSet<object>()
@@ -131,7 +135,10 @@ const logOnce = (error: unknown) => {
  *
  * @example sayError(networkFailure).sentence // "The server could not be reached. Check the connection and try again."
  */
-export const sayError = (error: unknown, options: { readonly fields: Readonly<Record<string, string>> }): Said => {
+export const sayError: {
+  (options: { readonly fields: Readonly<Record<string, string>> }): (error: unknown) => Said
+  (error: unknown, options: { readonly fields: Readonly<Record<string, string>> }): Said
+} = dual(2, (error: unknown, options: { readonly fields: Readonly<Record<string, string>> }): Said => {
   Effect.runFork(logOnce(error))
   const said = (title: string, sentence: string): Said => ({ title, sentence, problems: [] })
   const known = Match.value(error).pipe(
@@ -213,25 +220,40 @@ export const sayError = (error: unknown, options: { readonly fields: Readonly<Re
     onSome: (reason) => said("That did not work", reason),
     onNone: () => said("Something went wrong", "Try again, and reload the page if it keeps happening.")
   })
-}
+})
 
 /**
  * Shows a failure as a toast: its title, the sentence under it, and `lead` before the sentence when the screen has
  * more to say ("Your line was not recorded."). `action` adds one button, such as "Edit again".
  */
-export const toastError = (
-  error: unknown,
-  options: {
+export const toastError: {
+  (options: {
     readonly lead: O.Option<string>
     readonly action?: { readonly label: string; readonly onClick: () => void }
+  }): (error: unknown) => void
+  (
+    error: unknown,
+    options: {
+      readonly lead: O.Option<string>
+      readonly action?: { readonly label: string; readonly onClick: () => void }
+    }
+  ): void
+} = dual(
+  2,
+  (
+    error: unknown,
+    options: {
+      readonly lead: O.Option<string>
+      readonly action?: { readonly label: string; readonly onClick: () => void }
+    }
+  ): void => {
+    const said = sayError(error, { fields: {} })
+    toast.error(said.title, {
+      description: O.match(options.lead, { onNone: () => said.sentence, onSome: (lead) => `${lead} ${said.sentence}` }),
+      ...R.getSomes({ action: O.fromUndefinedOr(options.action) })
+    })
   }
-): void => {
-  const said = sayError(error, { fields: {} })
-  toast.error(said.title, {
-    description: O.match(options.lead, { onNone: () => said.sentence, onSome: (lead) => `${lead} ${said.sentence}` }),
-    ...R.getSomes({ action: O.fromUndefinedOr(options.action) })
-  })
-}
+)
 
 /** True when the request never got an answer: the server could not be reached. */
 const unreachable = (error: HttpClientError.HttpClientError): boolean =>

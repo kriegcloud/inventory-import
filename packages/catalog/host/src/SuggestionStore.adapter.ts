@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // Where an import's suggestions are stored: the `importSuggestion` table, read and written through the two mappers
 // of the contract, so the stored rows keep their shape. A write is one batch with its audit line.
 import * as O from "effect/Option"
@@ -107,6 +108,9 @@ export const SuggestionStoreD1 = Layer.effect(
       return A.filter(write.suggestions, (suggestion) => A.contains(written, suggestion.id))
     }, Effect.orDie)
 
-    return SuggestionStore.of({ list, store })
+    return SuggestionStore.of({
+      list: dual(2, (self: ImportId, organizationId: OrganizationId) => list(organizationId, self)),
+      store
+    })
   })
 )

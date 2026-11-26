@@ -37,7 +37,10 @@ export class ItemStore extends Context.Service<
      * and items they make in all. With a search and no order chosen, the items with the most words in their name
      * come first, then in their SKU, then by SKU.
      */
-    page(organizationId: OrganizationId, query: ItemQuery): Effect.Effect<ItemPage>
+    readonly page: {
+      (organizationId: OrganizationId): (self: ItemQuery) => Effect.Effect<ItemPage>
+      (self: ItemQuery, organizationId: OrganizationId): Effect.Effect<ItemPage>
+    }
     /** Each category and unit in use with its count, and the lowest and highest quantity on hand and unit cost. */
     facets(organizationId: OrganizationId): Effect.Effect<ItemFacets>
     /**
@@ -45,6 +48,9 @@ export class ItemStore extends Context.Service<
      * one batch. The revision goes up, so the import that created the item can no longer take it back. Sending the
      * same edit again writes nothing.
      */
-    edit(actor: Member, id: string, edit: ItemEdit): Effect.Effect<EditOutcome>
+    readonly edit: {
+      (actor: Member, edit: ItemEdit): (self: string) => Effect.Effect<EditOutcome>
+      (self: string, actor: Member, edit: ItemEdit): Effect.Effect<EditOutcome>
+    }
   }
 >()("@inventory/catalog-model/Item/ItemStore.store/ItemStore") {}

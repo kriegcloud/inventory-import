@@ -1,3 +1,4 @@
+import { dual, pipe } from "effect/Function"
 import { assertTrue } from "@effect/vitest/utils"
 // The catalog's endpoints over its in-memory twins: what the screens rely on, with no SQL and no HTTP. The same
 // scenarios run on D1 through HTTP in the app's Imports, TakeBack, Suggestions and Assistant slow tests.
@@ -84,6 +85,13 @@ describe("an import, over the twins", () => {
             0,
             2
           ])
+          const store = yield* ImportStore
+          const directHistory = yield* store.history(id, marcus.organizationId)
+          const pipedHistory = yield* pipe(id, store.history(marcus.organizationId))
+          expect(pipedHistory).toEqual(directHistory)
+          expect(directHistory.length).toBe(1)
+          const otherHistory = yield* pipe(id, store.history(elena.organizationId))
+          expect(otherHistory).toEqual([])
           const stored = yield* items.list().pipe(as(priya))
           expect(
             A.map(stored, (item) => [item.sku, item.name, BigDecimal.format(item.unitCost), item.revision])
@@ -316,15 +324,19 @@ const Counting = Layer.succeed(
   Answerer,
   Answerer.of({
     status: "on",
-    ask: Effect.fnUntraced(function* <Sc extends AnswerSchema>(_question: ModelQuestion, schema: Sc) {
-      yield* Ref.update(asked, (n) => n + 1)
-      const value: Sc["Type"] = yield* S.decodeUnknownEffect(schema)(sortByName).pipe(Effect.orDie)
-      const answered: ModelAnswered<Sc["Type"]> = {
-        value,
-        answeredBy: AnsweredBy.cases.Model.make({ provider: "openrouter", model: "twin/model", fallback: false })
-      }
-      return answered
-    })
+    ask: dual(
+      2,
+      Effect.fnUntraced(function* <Sc extends AnswerSchema>(self: ModelQuestion, schema: Sc) {
+        yield* Ref.update(asked, (n) => n + 1)
+        yield* Effect.annotateCurrentSpan("ai.question", self.name)
+        const value: Sc["Type"] = yield* S.decodeUnknownEffect(schema)(sortByName).pipe(Effect.orDie)
+        const answered: ModelAnswered<Sc["Type"]> = {
+          value,
+          answeredBy: AnsweredBy.cases.Model.make({ provider: "openrouter", model: "twin/model", fallback: false })
+        }
+        return answered
+      })
+    )
   })
 )
 
@@ -368,10 +380,10 @@ const danaSavesDuringTheConfirm = Layer.effect(
       commit: Effect.fnUntraced(function* (write: ConfirmWrite) {
         const first = !(yield* Ref.getAndSet(raced, true))
         if (first) {
-          const found = yield* inner.find(write.audit.organizationId, write.draft)
+          const found = yield* inner.find(write.draft, write.audit.organizationId)
           yield* inner.decide(
-            dana,
             O.getOrThrow(found),
+            dana,
             { set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] },
             noItemsRead,
             O.none()

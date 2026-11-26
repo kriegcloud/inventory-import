@@ -6,6 +6,7 @@
  * @packageDocumentation
  */
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
 import * as MutableHashMap from "effect/MutableHashMap"
@@ -190,8 +191,14 @@ const readOf = (found: { readonly workbook: XlsxWorkbook; readonly warnings: Rea
 
 const parseError = (fatal: XlsxFatal): XlsxParseError => XlsxParseError.make({ fatal })
 
-const issue = (error: { readonly message: string }, actual: unknown): SchemaIssue.Issue =>
-  new SchemaIssue.InvalidValue({ message: error.message }, actual)
+const issue: {
+  (actual: unknown): (error: { readonly message: string }) => SchemaIssue.Issue
+  (error: { readonly message: string }, actual: unknown): SchemaIssue.Issue
+} = dual(
+  2,
+  (error: { readonly message: string }, actual: unknown): SchemaIssue.Issue =>
+    new SchemaIssue.InvalidValue({ message: error.message }, actual)
+)
 
 const write = (
   workbook: Pick<XlsxWorkbook, "dateSystem" | "sheets">,

@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 import { assertTrue } from "@effect/vitest/utils"
 // A match and another person's write that fall into each other, on the real handlers and SQL, a fresh D1. Benjamin's
 // answer "Server refuses, screen says so" holds only if nothing can land between a match's read and its write, or
@@ -144,10 +145,22 @@ const Around = Layer.effect(
       )
     return ImportStore.of({
       ...inner,
-      decide: Effect.fn("Around.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
-        yield* first("decide")
-        return yield* inner.decide(...args)
-      })
+      decide: dual(
+        5,
+        (
+          self: Parameters<ImportStore["Service"]["decide"]>[0],
+          actor: Parameters<ImportStore["Service"]["decide"]>[1],
+          delta: Parameters<ImportStore["Service"]["decide"]>[2],
+          read: Parameters<ImportStore["Service"]["decide"]>[3],
+          expected: Parameters<ImportStore["Service"]["decide"]>[4]
+        ) => {
+          const perform = Effect.fn("Around.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
+            yield* first("decide")
+            return yield* inner.decide(...args)
+          })
+          return perform(self, actor, delta, read, expected)
+        }
+      )
     })
   })
 ).pipe(Layer.provide(Layer.fresh(ImportStoreD1).pipe(Layer.provide(SteppedD1))))
@@ -174,11 +187,11 @@ const marcusSaves = (
   id: string,
   set: Readonly<Record<string, RowDecisionFlags.Encoded>>
 ) =>
-  Effect.flatMap(store.find(prairie, id), (draft) => {
+  Effect.flatMap(store.find(id, prairie), (draft) => {
     const valueOption = draft
     assertTrue(O.isSome(valueOption), "expected value to be present")
     const value = valueOption.value
-    return store.decide(marcusAsMember, value, { set: flags(set), clear: [] }, noItemsRead, O.none())
+    return store.decide(value, marcusAsMember, { set: flags(set), clear: [] }, noItemsRead, O.none())
   })
 
 /** The messy sample staged by Marcus, and the column Dana's matches give the unit cost: the reorder point's. */
@@ -362,13 +375,13 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const { client, view, params, other } = yield* staged
         // Dana's match lands once Marcus's save has been checked against the choices and is about to be written.
         yield* putBetween("decide", (inner) =>
-          Effect.flatMap(inner.find(prairie, view.id), (draft) => {
+          Effect.flatMap(inner.find(view.id, prairie), (draft) => {
             const valueOption = draft
             assertTrue(O.isSome(valueOption), "expected value to be present")
             const value = valueOption.value
             return inner.matchColumn(
-              danaAsMember,
               value,
+              danaAsMember,
               { field: "unitCost", column: O.some(other.index) },
               "unit cost",
               noComparison

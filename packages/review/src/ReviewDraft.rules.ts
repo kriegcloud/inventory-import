@@ -794,7 +794,10 @@ type ActInput = {
  * One decision taken: `write` sets the rows it changes and returns the label; the rows' old decisions become the undo
  * step, focused on `focus` or else the first row changed.
  */
-const decide = (input: ActInput, focus: O.Option<string>, write: (deciding: Deciding) => string): Outcome => {
+const decide: {
+  (focus: O.Option<string>, write: (deciding: Deciding) => string): (input: ActInput) => Outcome
+  (input: ActInput, focus: O.Option<string>, write: (deciding: Deciding) => string): Outcome
+} = dual(3, (input: ActInput, focus: O.Option<string>, write: (deciding: Deciding) => string): Outcome => {
   const { state } = input
   const views = viewRows({
     columns: input.columns,
@@ -848,7 +851,7 @@ const decide = (input: ActInput, focus: O.Option<string>, write: (deciding: Deci
     changed: changes.map(([rowId]) => rowId),
     focus: O.none()
   }
-}
+})
 
 /** A fix's column taken out of force on one decision: no longer accepted, and undone. */
 const reverting = (decision: RowDecision, column: string): RowDecision =>

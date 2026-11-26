@@ -149,7 +149,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
   const posixDir = (file: string) => repo.dirname(file)
 
   const relativeTo = (testFile: string, target: string): string => {
-    const relative = repo.relative(posixDir(testFile), target)
+    const relative = repo.relative(target, posixDir(testFile))
     return Str.startsWith(".")(relative) ? relative : `./${relative}`
   }
   const header = (pkgDir: string, file: string, patched: boolean): string =>
@@ -324,7 +324,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
       devDependencies: asking(devDependencies)
     }).pipe(Effect.orDie)
     yield* repo.write(repo.join(target, "package.json"), `${packageJson}\n`)
-    const base = repo.relative(pkg.dir, "tsconfig.base.json")
+    const base = repo.relative("tsconfig.base.json", pkg.dir)
     const tsconfig = (include: ReadonlyArray<string>) =>
       pretty({ extends: base, include, compilerOptions: { types: ["node"] } }).pipe(
         Effect.orDie,
@@ -336,7 +336,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     yield* repo.write(repo.join(target, "tsconfig.test.json"), testConfig)
     // The repository's test limits (vitest.shared.ts), as every package of its own has them: a kit package's
     // property tests are what timed out on CI's runner under vitest's 5 s.
-    const shared = repo.relative(pkg.dir, "vitest.shared.ts")
+    const shared = repo.relative("vitest.shared.ts", pkg.dir)
     yield* repo.write(
       repo.join(target, "vitest.config.ts"),
       `import { defineConfig } from "vitest/config"\nimport { limits } from "${shared}"\n\nexport default defineConfig({ test: { include: ["test/**/*.test.ts"], ...limits } })\n`

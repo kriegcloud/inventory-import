@@ -827,7 +827,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
         problem(
           `${scratchpad}/tsconfig.json`,
           `the type-checker's list of the files it reads lacks ${A.join(
-            A.map(unlisted, (file) => repo.relative(repo.root, file)),
+            A.map(unlisted, (file) => repo.relative(file, repo.root)),
             " and "
           )}, which it always reads. So the list is not whole, and a line that turns a check off may stand in a file nobody read: run \`bun run types --listFilesOnly\` in ${scratchpad} and see what it prints (its \`types\` script is \`tsrs -p tsconfig.json\`)`
         )
@@ -873,7 +873,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     { concurrency: 1 }
   )
   const code = A.sort(
-    A.map(ours, (file) => repo.relative(repo.root, file)),
+    A.map(ours, (file) => repo.relative(file, repo.root)),
     Order.String
   )
   const turnedOff = yield* Effect.forEach(
@@ -1115,7 +1115,7 @@ export const scratchEnd = Effect.fn("Scratch.scratchEnd")(function* (
   if (learned === "") {
     return yield* refuse(where, "say what was learned, in one line (--learned): it is all that stays of the experiment")
   }
-  const to = O.map(options.to, (path) => repo.relative(repo.root, repo.resolve(path)))
+  const to = O.map(options.to, (path) => repo.relative(repo.resolve(path), repo.root))
   if (O.isSome(to)) {
     const target = repo.join(repo.root, to.value)
     const inside =

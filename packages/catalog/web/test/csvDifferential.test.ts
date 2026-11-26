@@ -1,13 +1,11 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // The definition of done for moving CSV reading onto @beep/csv: the reader gives exactly the table (cells, row
 // numbers, Notes, format) or exactly the problem the papaparse reader gave, for every CSV fixture, both samples and
 // generated text with stray quotes, quoted line breaks and an unclosed quote, read whole and in pieces of any size.
-// The papaparse reader's results were recorded in test/fixtures/csv-expected/ while it was still installed (run with
-// CSV_RECORD=true to write them); the comparison now reads those.
-import { writeFileSync } from "node:fs"
+// The papaparse reader's results were recorded in test/fixtures/csv-expected/ while it was still installed;
+// `bun apps/inventory/scripts/record-csv-parity.mjs` writes current-reader snapshots for an intentional wire-shape change.
+// The comparison only reads the recorded snapshots.
 import { readBytes, readText } from "./support/fixture.ts"
 import { describe, expect, it } from "@effect/vitest"
-import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
@@ -24,7 +22,7 @@ const plain = (result: Result.Result<SpreadsheetTable, unknown>) =>
   result.pipe(
     Result.match({
       onSuccess: (table) => Effect.map(S.encodeEffect(SpreadsheetTable)(table), (table) => ({ table })),
-      onFailure: (problem) => Effect.succeed({ problem: { ...(problem as object) } })
+      onFailure: (problem) => Effect.succeed({ problem: problem })
     })
   )
 
@@ -32,18 +30,6 @@ describe("@beep/csv reads every CSV as the papaparse reader did", () => {
   for (const { name, bytes } of csvCorpus(readBytes)) {
     it.effect(name, () =>
       Effect.gen(function* () {
-        const record = yield* Config.Boolean("CSV_RECORD").pipe(Config.withDefault(false))
-        if (record) {
-          const old = yield* readCsv({
-            fileName: name,
-            bytes,
-            notes: [],
-            pieceChars: 256 * 1024,
-            onProgress: () => {}
-          }).pipe(Effect.result)
-          const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
-          writeFileSync(expectedUrl(name), `${text}\n`)
-        }
         const expected = yield* S.decodeEffect(Json)(readText(expectedUrl(name)))
         for (const pieceChars of pieces) {
           const next = yield* readCsv({ fileName: name, bytes, notes: [], pieceChars, onProgress: () => {} }).pipe(

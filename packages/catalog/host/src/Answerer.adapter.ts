@@ -7,6 +7,7 @@ import { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { AiUnavailable, aiUnavailable } from "@inventory/catalog-contract/AiUnavailable"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import { dual } from "effect/Function"
 import * as R from "effect/Record"
 import type * as S from "effect/Schema"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
@@ -65,15 +66,18 @@ export const AnswererOpenRouter = Layer.effect(
     const openRouter = yield* OpenRouter
     return Answerer.of({
       status: availabilityOf(openRouter.status),
-      ask: Effect.fnUntraced(function* <Sc extends AnswerSchema>(question: ModelQuestion, schema: Sc) {
-        return yield* askModel(openRouter, {
-          name: question.name,
-          prompt: question.prompt,
-          schema,
-          ...R.getSomes({ system: question.system }),
-          ...R.getSomes({ maxOutputTokens: question.maxOutputTokens })
+      ask: dual(
+        2,
+        Effect.fnUntraced(function* <Sc extends AnswerSchema>(self: ModelQuestion, schema: Sc) {
+          return yield* askModel(openRouter, {
+            name: self.name,
+            prompt: self.prompt,
+            schema,
+            ...R.getSomes({ system: self.system }),
+            ...R.getSomes({ maxOutputTokens: self.maxOutputTokens })
+          })
         })
-      })
+      )
     })
   })
 )

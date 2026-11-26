@@ -17,6 +17,7 @@ import * as OpenRouterLanguageModel from "@effect/ai-openrouter/OpenRouterLangua
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import { dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import type * as HttpClient from "effect/http/HttpClient"
@@ -48,10 +49,12 @@ export class OpenRouter extends Context.Service<
     /** What will answer, for a status screen. */
     readonly status: ModelStatus
     /** One structured answer. Pass an `S.Struct`: models answer with a JSON object. */
-    readonly generateObject: <Sc extends AnswerSchema>(
-      prompt: ModelPrompt,
-      schema: Sc
-    ) => Effect.Effect<ModelAnswer<Sc["Type"]>, ModelUnavailable>
+    readonly generateObject: {
+      <Sc extends AnswerSchema>(
+        schema: Sc
+      ): (self: ModelPrompt) => Effect.Effect<ModelAnswer<Sc["Type"]>, ModelUnavailable>
+      <Sc extends AnswerSchema>(self: ModelPrompt, schema: Sc): Effect.Effect<ModelAnswer<Sc["Type"]>, ModelUnavailable>
+    }
   }
 >()($I`OpenRouter`) {
   /**
@@ -70,9 +73,15 @@ export class OpenRouter extends Context.Service<
         if (ModelAccess.guards.off(access)) {
           return OpenRouter.of({
             status,
-            generateObject: Effect.fn("OpenRouter.generateObject")(function* () {
-              return yield* ModelUnavailable.make({ trouble: "noKey", retryable: false })
-            })
+            generateObject: dual<
+              OpenRouter["Service"]["generateObject"],
+              (self: ModelPrompt, schema: AnswerSchema) => Effect.Effect<never, ModelUnavailable>
+            >(
+              2,
+              Effect.fn("OpenRouter.generateObject")(function* () {
+                return yield* ModelUnavailable.make({ trouble: "noKey", retryable: false })
+              })
+            )
           })
         }
         const models = yield* Layer.build(
@@ -85,21 +94,21 @@ export class OpenRouter extends Context.Service<
         )
         return OpenRouter.of({
           status,
-          generateObject: Effect.fn("OpenRouter.generateObject")(function* <Sc extends AnswerSchema>(
-            prompt: ModelPrompt,
-            schema: Sc
-          ) {
-            yield* Effect.annotateCurrentSpan("ai.model", access.model)
-            return yield* ask({
-              models,
-              model: access.model,
-              fallbackModels: access.fallbackModels,
-              policy,
-              prompt,
-              schema,
-              withConfig: withMaxTokens
+          generateObject: dual(
+            2,
+            Effect.fn("OpenRouter.generateObject")(function* <Sc extends AnswerSchema>(self: ModelPrompt, schema: Sc) {
+              yield* Effect.annotateCurrentSpan("ai.model", access.model)
+              return yield* ask({
+                models,
+                model: access.model,
+                fallbackModels: access.fallbackModels,
+                policy,
+                prompt: self,
+                schema,
+                withConfig: withMaxTokens
+              })
             })
-          })
+          )
         })
       })
     )

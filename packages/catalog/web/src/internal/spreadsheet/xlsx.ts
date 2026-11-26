@@ -3,6 +3,7 @@
 // the chosen sheet's rows are built. The package keeps each cell as the file holds it; here a cell becomes the
 // app's `Cell`: its type, its text without coercion and the text Excel would display.
 import { Xlsx } from "@beep/xlsx/Xlsx"
+import { dual } from "effect/Function"
 import { columnLetters } from "@beep/xlsx/XlsxAddress"
 import { XlsxCell, XlsxNumberFormat, XlsxValue } from "@beep/xlsx/XlsxCell"
 import type { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
@@ -72,7 +73,10 @@ const toCell = (cell: XlsxRow["cells"][number], system: XlsxDateSystem): Cell =>
 }
 
 /** Why the package stopped, as the problem the person is told. */
-const problemOf = (fileName: string, bytes: number, error: XlsxParseError): FileProblem => {
+const problemOf: {
+  (fileName: string, bytes: number): (error: XlsxParseError) => FileProblem
+  (error: XlsxParseError, fileName: string, bytes: number): FileProblem
+} = dual(3, (error: XlsxParseError, fileName: string, bytes: number): FileProblem => {
   const finding = error.fatal.finding
   if (finding.kind === "LimitExceeded" && finding.limit === "inputBytes") {
     return fileProblem.tooManyBytes({ fileName, bytes, limitBytes: maxFileBytes.xlsx, what: "workbooks" })
@@ -85,7 +89,7 @@ const problemOf = (fileName: string, bytes: number, error: XlsxParseError): File
     })
   }
   return fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" })
-}
+})
 
 /**
  * What an archive is, from its first bytes and the names inside: a workbook this reader takes, or which other kind of
@@ -109,7 +113,7 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
   readonly onProgress: (progress: ReadProgress) => void
 }) {
   const { fileName, bytes } = input
-  const failed = (error: XlsxParseError): FileProblem => problemOf(fileName, bytes.length, error)
+  const failed = (error: XlsxParseError): FileProblem => problemOf(error, fileName, bytes.length)
   const outline = yield* Effect.mapError(Xlsx.outline(bytes, options), failed)
   const system = outline.dateSystem
   return yield* describeSheets({

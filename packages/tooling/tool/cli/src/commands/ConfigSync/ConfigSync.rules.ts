@@ -168,7 +168,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
   const repo = yield* Repo
   const read = Effect.fn("ConfigSync.read")(function* (absolute: string) {
     const text = yield* repo.text(absolute)
-    return { file: repo.relative(repo.root, absolute), absolute, text } satisfies Text
+    return { file: repo.relative(absolute, repo.root), absolute, text } satisfies Text
   })
   const readIfThere = Effect.fn("ConfigSync.readIfThere")(function* (absolute: string) {
     if (!(yield* repo.exists(absolute))) return O.none<Text>()
@@ -176,7 +176,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     return O.some(at)
   })
   const fromHere = (dir: string, target: string) => {
-    const relative = repo.relative(dir, target)
+    const relative = repo.relative(target, dir)
     return Str.startsWith(".")(relative) ? relative : `./${relative}`
   }
 
@@ -186,7 +186,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
   const byFolder = Order.mapInput(Order.String, (workspace: Workspace) => workspace.dir)
   const unsorted = yield* repo.workspaces
   const workspaces = A.sort(unsorted, byFolder)
-  const folderOf = (workspace: Workspace) => repo.relative(repo.root, workspace.dir)
+  const folderOf = (workspace: Workspace) => repo.relative(workspace.dir, repo.root)
 
   // sources: what syncpack reads is the root and one pattern for each workspace pattern.
   const sourcesPlan = Effect.fn("ConfigSync.sources")(function* () {

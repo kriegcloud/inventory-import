@@ -1,3 +1,5 @@
+import * as P from "effect/Predicate"
+import { dual } from "effect/Function"
 import { describe, it } from "@effect/vitest"
 import { assertNone, deepStrictEqual, strictEqual } from "@effect/vitest/utils"
 import * as A from "effect/Array"
@@ -937,11 +939,25 @@ describe("main's baseline written for a reader that counted less", () => {
           // git answers a code other than 0 when it could not list them: a list it could not give, never an empty one.
           const failing = Repo.of({
             ...repo,
-            run: Effect.fn("failingGrep")(function* (command, args, options) {
-              if (A.contains(args, "--no-renames"))
-                return { bytes: new Uint8Array(), stdout: "", stderr: "diff broke\n", code: 2 }
-              return yield* repo.run(command, args, options)
-            })
+            run: dual(
+              (args) => P.isString(args[0]),
+              (
+                self: Parameters<Repo["Service"]["run"]>[0],
+                args: Parameters<Repo["Service"]["run"]>[1],
+                options?: Parameters<Repo["Service"]["run"]>[2]
+              ) => {
+                const perform = Effect.fn("failingGrep")(function* (
+                  command: Parameters<Repo["Service"]["run"]>[0],
+                  args: Parameters<Repo["Service"]["run"]>[1],
+                  options: Parameters<Repo["Service"]["run"]>[2]
+                ) {
+                  if (A.contains(args, "--no-renames"))
+                    return { bytes: new Uint8Array(), stdout: "", stderr: "diff broke\n", code: 2 }
+                  return yield* repo.run(command, args, options)
+                })
+                return perform(self, args, options)
+              }
+            )
           })
           const found = yield* Effect.provideService(defaults(false, [], []), Repo, failing)
           return printed(render(defaultsSentence)(found))
@@ -1125,11 +1141,25 @@ describe("what git says of a move, and when it cannot say", () => {
           yield* repo.write(repo.join(repo.root, baselineFile), baseline({ [held]: [2, 0, 0, 0] }))
           const failing = Repo.of({
             ...repo,
-            run: Effect.fn("failingHash")(function* (command, args, options) {
-              if (A.contains(args, "hash-object"))
-                return { bytes: new Uint8Array(), stdout: "", stderr: "hash broke\n", code: 128 }
-              return yield* repo.run(command, args, options)
-            })
+            run: dual(
+              (args) => P.isString(args[0]),
+              (
+                self: Parameters<Repo["Service"]["run"]>[0],
+                args: Parameters<Repo["Service"]["run"]>[1],
+                options?: Parameters<Repo["Service"]["run"]>[2]
+              ) => {
+                const perform = Effect.fn("failingHash")(function* (
+                  command: Parameters<Repo["Service"]["run"]>[0],
+                  args: Parameters<Repo["Service"]["run"]>[1],
+                  options: Parameters<Repo["Service"]["run"]>[2]
+                ) {
+                  if (A.contains(args, "hash-object"))
+                    return { bytes: new Uint8Array(), stdout: "", stderr: "hash broke\n", code: 128 }
+                  return yield* repo.run(command, args, options)
+                })
+                return perform(self, args, options)
+              }
+            )
           })
           const found = yield* Effect.provideService(defaults(false, [], []), Repo, failing)
           return printed(render(defaultsSentence)(found))
@@ -1156,11 +1186,25 @@ describe("when git cannot list today's files", () => {
           yield* onMain()
           const failing = Repo.of({
             ...repo,
-            run: Effect.fn("failingList")(function* (command, args, options) {
-              if (A.contains(args, "ls-files"))
-                return { bytes: new Uint8Array(), stdout: "", stderr: "ls broke\n", code: 128 }
-              return yield* repo.run(command, args, options)
-            })
+            run: dual(
+              (args) => P.isString(args[0]),
+              (
+                self: Parameters<Repo["Service"]["run"]>[0],
+                args: Parameters<Repo["Service"]["run"]>[1],
+                options?: Parameters<Repo["Service"]["run"]>[2]
+              ) => {
+                const perform = Effect.fn("failingList")(function* (
+                  command: Parameters<Repo["Service"]["run"]>[0],
+                  args: Parameters<Repo["Service"]["run"]>[1],
+                  options: Parameters<Repo["Service"]["run"]>[2]
+                ) {
+                  if (A.contains(args, "ls-files"))
+                    return { bytes: new Uint8Array(), stdout: "", stderr: "ls broke\n", code: 128 }
+                  return yield* repo.run(command, args, options)
+                })
+                return perform(self, args, options)
+              }
+            )
           })
           const found = yield* Effect.provideService(defaults(false, [], []), Repo, failing)
           return printed(render(defaultsSentence)(found))

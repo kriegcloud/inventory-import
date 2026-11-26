@@ -2119,3 +2119,26 @@ Next: 3 and 4 are work for now, schema and contract of the driver's client first
 Reverse: 1, the brief's move 2 names the driver for the session lookup instead; 2, the host imports Alchemy's package
 and the driver is deleted; 3 and 4, the screens and `authOptions.ts` call Better Auth as before and the ledger's
 counts for them stay.
+
+### 2026-11-26 — Alchemy uptake: the goal's edges
+
+After the sweep in [research 05](research/05-alchemy-unused.md) I asked for a goal that makes use of all of it:
+`goals/alchemy-uptake`. Four questions decided what it holds.
+
+1. **Is the Worker as an Alchemy Effect part of it?** I chose; the agent recommended the same. No: infra I1 stands,
+   and the host change stays with move 2 of `explorations/alchemy-domain`. Rejected: as the goal's last step; a
+   proof only.
+2. **`alchemy dev`, against the infra brief's no-go?** I chose; the agent recommended the same. A trial beside
+   `bun run dev` (`bun run dev:alchemy`), compared and written up; `bun run dev` stays until I decide from the
+   result. Rejected: replacing `bun run dev`; leaving it out.
+3. **An Access gate on previews?** I chose; the agent recommended the same. Yes, on `pr-<number>` stages only, with a
+   service token for the deploy workflow's smoke check. I8's rejection of Access was for public sign-up and stands.
+   Rejected: previews and `test_<user>` stages; no gate.
+4. **Where may the stack tests run?** I chose; the agent recommended the same. On Alchemy's local providers only, in
+   `bun run check:full`; no agent deploys anything. Rejected: local and live in CI; deciding after a trial.
+
+Open, each blocking one step of the goal: the limiter's rule, who may open a preview, where telemetry goes, and
+where a database dump is kept.
+
+Reverse: 1, the goal gains a last step and I1 is reversed; 2, the trial is dropped or `bun run dev` replaced; 3,
+the policy is taken off the preview plan; 4, a workflow job runs the suite against a throwaway stage.

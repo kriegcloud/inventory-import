@@ -20,7 +20,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | todo |
 | 5 | Bring the vendored kit into the hash of prove, verify, mutants and mutants:sample; then take `@beep/repo-cli` out of the root's devDependencies, and bring the CLI's source to the tasks that run it through its own `transit`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | done ("Step 5, the experiment" below) |
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | todo |
-| 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | todo |
+| 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | todo |
 | 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
 | 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | todo |
@@ -101,6 +101,28 @@ install from nothing).
 
 Found on the way, and not this goal's: a new file git does not yet track in a kit package changed no proof's hash
 before this change, since the root's dependency hashed tracked files only. It does now.
+
+## Step 7, what the build stores and which Node runs
+
+`turbo run build --filter=@inventory/app --force` into an empty cache folder, with a file `apps/inventory/.dev.vars`
+holding one marker line (made for the experiment in a checkout that had none; no real one was read). Run on
+2026-11-26.
+
+| | Files in the stored result | `.dev.vars` or `.env` among them | On disk in `dist` after the build |
+| --- | --- | --- | --- |
+| Before | 115 | `apps/inventory/dist/inventory/.dev.vars` | `dist/inventory/.dev.vars` |
+| After | 114 | none | `dist/inventory/.dev.vars`, so `vite preview` still has it |
+| After, with a `.env.local` and a `.dev.vars.staging` beside it too | 114 | none | `dist/inventory/.dev.vars` |
+
+`build`'s outputs leave out `.dev.vars`, `.dev.vars.*`, `.env` and `.env.*` anywhere under `dist`, and
+`packages/tooling/tool/cli/test/TurboCache.test.ts` fails when a task that stores files under `dist` does not. The
+same file holds that the root depends on no workspace (step 5) and that the pinned Node is in every hash.
+
+Node is `22.23.4`, in `.tool-versions`: every workflow sets it up from that file (`node-version-file`), turbo hashes
+the file into every task, and `version-sync` holds its major to `engines.node`. On the workstation mise reads the
+same file, so inside this repository `node` is 22.23.4 where it was 24.22.1: that is the point of the pin, and it is
+the one thing here that changes what his machine runs. Not checked at run time: a machine with no version manager
+runs whatever Node it has under the pin's hash.
 
 ## Choices made along the way
 

@@ -6,7 +6,9 @@
     // The files bun applies to dependencies at an install are among them (docs/patches.md): bun.lock holds a patch's
     // path and never its content, so without them a changed patch would replay a result made with the old one, a
     // proof of the review's model included.
-    "inputs": [".bun-version", "bunfig.toml", "packages/patches/*.patch"],
+    // And the one Node that runs every task (`.tool-versions`: the workflows set it up from this file, and a version
+    // manager runs it on a workstation), so a result made under one Node is never replayed under another.
+    "inputs": [".bun-version", ".tool-versions", "bunfig.toml", "packages/patches/*.patch"],
     // Tasks see the whole environment (the slow tests start workerd and wrangler, which read many variables); none
     // of it changes a cached result, so none of it is hashed.
     "envMode": "loose"
@@ -66,8 +68,13 @@
     },
     // The slow tests: workerd, a real D1 database and sign-in. One suite calls a live service, so never cached.
     "test:slow": { "dependsOn": ["transit"], "cache": false },
-    // The production build and its identity check.
-    "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
+    // The production build and its identity check. Cloudflare's Vite plugin copies a `.dev.vars` (and a `.env`) it
+    // finds beside the app into `dist`, for `vite preview`; that file holds the workstation's secrets, so it is
+    // never part of the result turbo stores and may share. `test/TurboCache.test.ts` of the CLI holds these lines.
+    "build": {
+      "dependsOn": ["transit"],
+      "outputs": ["dist/**", "!dist/**/.dev.vars", "!dist/**/.dev.vars.*", "!dist/**/.env", "!dist/**/.env.*"]
+    },
     "dev": { "dependsOn": ["//#patches:installed"], "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
     // Every file but the scratchpad's: the formatter leaves it alone (.oxfmtrc.json), and an experiment that is not
@@ -440,11 +447,15 @@
     // Its tests run that law with the root's own profile and the installed packages, whose deprecation notes they
     // expect word for word: the same installed manifests are inputs here. One of its tests reads the workflows GitHub
     // runs (test/DeployWorkflow.test.ts), so a change to a workflow alone runs the tests again and is never replayed.
+    // Another reads every turbo.json (test/TurboCache.test.ts), and the Node pinned in `.tool-versions`, a global input.
     "@beep/repo-cli#test": {
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.github/workflows/**",
+        "$TURBO_ROOT$/turbo.json",
+        "$TURBO_ROOT$/apps/*/turbo.json",
+        "$TURBO_ROOT$/packages/**/turbo.json",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
         "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",

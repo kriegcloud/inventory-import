@@ -66,7 +66,7 @@ export const lineColumns: ReadonlyArray<ReviewColumn> = [
   ReviewColumn.make({ display: identity, id: "unit", label: "Unit", core: true })
 ]
 
-type Material = { name: string; sku: string; unit: "m" | "pcs" | "kg" | "L" }
+type Material = { readonly name: string; readonly sku: string; readonly unit: "m" | "pcs" | "kg" | "L" }
 
 const materials: A.NonEmptyReadonlyArray<Material> = [
   { name: "Flat bar 40 × 5", sku: "FB-40-5", unit: "m" },
@@ -111,7 +111,12 @@ const making = [
   "Barrow frame"
 ] as const
 
-export type Job = { code: string; making: string; due: string; lines: ReadonlyArray<Line> }
+export type Job = {
+  readonly code: string
+  readonly making: string
+  readonly due: string
+  readonly lines: ReadonlyArray<Line>
+}
 
 /** One line of the file: a material a job needs. `problem` when the person has to answer for it. */
 const Line = S.Struct({
@@ -293,7 +298,7 @@ export const questionRows = (jobs: ReadonlyArray<Job>, leftOut: ReadonlyArray<st
     )
 
 /** The page's own check of a line after the person typed or picked a value: the same rule the server would run. */
-export function recheckLine(input: { cells: Readonly<Record<string, string>> }): O.Option<Problem> {
+export function recheckLine(input: { readonly cells: Readonly<Record<string, string>> }): O.Option<Problem> {
   const { cells } = input
   if (!O.exists(R.get(cells, "sku"), (sku) => knownSkus.includes(sku)))
     return Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
@@ -334,22 +339,22 @@ const answerOf = (entry: Line, decision: O.Option<RowDecision>): "open" | "answe
   })
 
 export type JobReview = {
-  job: Job
-  status: "ready" | "waiting" | "out"
+  readonly job: Job
+  readonly status: "ready" | "waiting" | "out"
   /** One sentence: what the job waits on, or why it is ready. */
-  reason: string
+  readonly reason: string
   /** Lines that will be imported with it. */
-  importing: number
-  waiting: number
+  readonly importing: number
+  readonly waiting: number
 }
 
 const lines = (n: number) => `${n} ${n === 1 ? "line" : "lines"}`
 
 /** The page's pure review of the jobs: what each becomes, from the person's answers on its lines. */
 export function reviewJobs(input: {
-  jobs: ReadonlyArray<Job>
-  decisions: SavedDecisions
-  leftOut: ReadonlyArray<string>
+  readonly jobs: ReadonlyArray<Job>
+  readonly decisions: SavedDecisions
+  readonly leftOut: ReadonlyArray<string>
 }): ReadonlyArray<JobReview> {
   return input.jobs.map((job) => {
     if (input.leftOut.includes(job.code)) {

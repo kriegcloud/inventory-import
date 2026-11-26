@@ -223,7 +223,10 @@ export const fromDraft = (draft: ReviewDraft): ReviewState => ({
   redo: draft.redo.map(fromDraftStep)
 })
 
-type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => O.Option<Problem>
+type Recheck = (input: {
+  readonly row: ReviewRow
+  readonly cells: Readonly<Record<string, string>>
+}) => O.Option<Problem>
 
 /** Whether a problem kind can be settled on this screen, from the caller's kinds (`ProblemKind.fixable`). */
 type Fixable = (kind: string) => boolean
@@ -242,7 +245,7 @@ export const fixableBy = (kinds: ReadonlyArray<ProblemKind>): Fixable => {
 
 const untouched = new WeakMap<
   ReviewRow,
-  { readonly columns: ReadonlyArray<ReviewColumn>; fixable: Fixable; view: RowView }
+  { readonly columns: ReadonlyArray<ReviewColumn>; readonly fixable: Fixable; readonly view: RowView }
 >()
 
 /** A row nobody has decided on: the rules' applied fixes are in force and its problem, if any, is open. */
@@ -424,16 +427,16 @@ function build(
 /** Every row as it stands now, in file order. Rows without a decision reuse one cached answer. */
 export function viewRows(input: {
   readonly columns: ReadonlyArray<ReviewColumn>
-  rows: ReadonlyArray<ReviewRow>
-  state: ReviewState
-  recheck: O.Option<Recheck>
+  readonly rows: ReadonlyArray<ReviewRow>
+  readonly state: ReviewState
+  readonly recheck: O.Option<Recheck>
   /** The caller's kinds: a row whose problem is of a kind marked `fixable: false` is `cannot`, not `needs`. */
-  fixable: Fixable
+  readonly fixable: Fixable
   /**
    * A fix whose column is in `RowDecision.reverted` is rejected, not offered again: the file's value stands and the
    * row waits for the person. Without it (rule fixes held back as proposals) a reverted fix is a proposal to take.
    */
-  rejects: boolean
+  readonly rejects: boolean
 }): ReadonlyArray<RowView> {
   const fixable = input.fixable
   const decisions = input.state.decisions
@@ -514,9 +517,9 @@ export const kindCount = (counts: Counts, kind: string): number => O.getOrElse(H
 
 /** The rows a filter shows, in file order. A problem kind narrows the needs view only. */
 export function visible(input: {
-  views: ReadonlyArray<RowView>
-  filter: FilterId
-  kind: O.Option<string>
+  readonly views: ReadonlyArray<RowView>
+  readonly filter: FilterId
+  readonly kind: O.Option<string>
 }): ReadonlyArray<RowView> {
   if (input.filter === "all") return input.views
   if (input.filter === "auto") return input.views.filter((view) => O.contains(view.decided, "auto"))
@@ -533,20 +536,38 @@ export function visible(input: {
 }
 
 /** A group being gathered: its fix, its rows and the file's spelling on each. */
-type Gathered = { fix: Fix; rowIds: Array<string>; froms: Array<string>; mixed: boolean }
+type Gathered = {
+  readonly fix: Fix
+  readonly rowIds: ReadonlyArray<string>
+  readonly froms: ReadonlyArray<string>
+  readonly mixed: boolean
+  readonly add: (rowId: string, from: string, fix: Fix) => void
+}
 
-/** Adds a row's fix to its group, noting when it ends in another value than the group's first. */
-const gather = (group: Gathered, rowId: string, from: string, fix: Fix): Gathered => {
-  group.rowIds.push(rowId)
-  group.froms.push(from)
-  if (fix.to !== group.fix.to) group.mixed = true
-  return group
+/** Collects a group's rows locally, without copying the accumulated rows for each fix. */
+const gathered = (fix: Fix): Gathered => {
+  const rowIds: Array<string> = []
+  const froms: Array<string> = []
+  let mixed = false
+  return {
+    fix,
+    rowIds,
+    froms,
+    get mixed() {
+      return mixed
+    },
+    add: (rowId, from, next) => {
+      rowIds.push(rowId)
+      froms.push(from)
+      if (next.to !== fix.to) mixed = true
+    }
+  }
 }
 
 /** One value named for rows that get different ones would be false: such a group says so, unless it has a label. */
-const mixedOf = (group: Gathered): { mixed: boolean } => ({ mixed: group.mixed && O.isNone(group.fix.label) })
+const mixedOf = (group: Gathered): { readonly mixed: boolean } => ({ mixed: group.mixed && O.isNone(group.fix.label) })
 
-const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ from: string; count: number }> => {
+const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ readonly from: string; readonly count: number }> => {
   const tally = MutableHashMap.empty<string, number>()
   for (const from of froms) MutableHashMap.set(tally, from, O.getOrElse(MutableHashMap.get(tally, from), () => 0) + 1)
   return [...tally].map(([from, n]) => ({ from, count: n })).sort((a, b) => b.count - a.count)
@@ -557,8 +578,8 @@ const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ from: string;
  * in a group, so accepting one can never touch a row the person already decided.
  */
 export function waitingGroups(input: {
-  views: ReadonlyArray<RowView>
-  kind: O.Option<string>
+  readonly views: ReadonlyArray<RowView>
+  readonly kind: O.Option<string>
 }): ReadonlyArray<FixGroup> {
   const found = MutableHashMap.empty<string, Gathered>()
   for (const view of input.views) {
@@ -569,13 +590,9 @@ export function waitingGroups(input: {
     if (O.isSome(input.kind) && !O.exists(view.problem, (problem) => O.contains(input.kind, problem.kind))) continue
     const fix = proposed.value
     const groupId = proposed.value.group.value
-    const group = O.getOrElse(MutableHashMap.get(found, groupId), (): Gathered => ({
-      fix,
-      rowIds: [],
-      froms: [],
-      mixed: false
-    }))
-    MutableHashMap.set(found, groupId, gather(group, view.row.id, TotalCells.text(view.original, fix.column), fix))
+    const group = O.getOrElse(MutableHashMap.get(found, groupId), () => gathered(fix))
+    group.add(view.row.id, TotalCells.text(view.original, fix.column), fix)
+    MutableHashMap.set(found, groupId, group)
   }
   return [...found]
     .map(([id, group]) => ({
@@ -602,13 +619,9 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
       const mark = view.marks[fix.column]
       if (mark === undefined || !isCellMarkApplied(mark) || mark.by === "you") continue
       const id = O.match(fix.group, { onNone: () => `${fix.column}:${fix.to}`, onSome: (group) => group })
-      const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({
-        fix,
-        rowIds: [],
-        froms: [],
-        mixed: false
-      }))
-      MutableHashMap.set(found, id, gather(group, view.row.id, mark.from, fix))
+      const group = O.getOrElse(MutableHashMap.get(found, id), () => gathered(fix))
+      group.add(view.row.id, mark.from, fix)
+      MutableHashMap.set(found, id, group)
     }
   }
   return [...found].map(([id, group]) => ({
@@ -714,7 +727,7 @@ const unchanged = (state: ReviewState): Outcome => ({ state, label: "", changed:
 const swap = (
   decisions: HashMap.HashMap<string, RowDecision>,
   step: UndoStep
-): { decisions: HashMap.HashMap<string, RowDecision>; mirror: UndoStep } => {
+): { readonly decisions: HashMap.HashMap<string, RowDecision>; readonly mirror: UndoStep } => {
   const mirror: UndoStep = {
     label: step.label,
     before: HashMap.map(step.before, (_, rowId) => HashMap.get(decisions, rowId)),
@@ -769,12 +782,12 @@ interface Deciding {
 
 type ActInput = {
   readonly columns: ReadonlyArray<ReviewColumn>
-  rows: ReadonlyArray<ReviewRow>
-  state: ReviewState
-  action: Action
-  recheck: O.Option<Recheck>
-  fixable: Fixable
-  rejects: boolean
+  readonly rows: ReadonlyArray<ReviewRow>
+  readonly state: ReviewState
+  readonly action: Action
+  readonly recheck: O.Option<Recheck>
+  readonly fixable: Fixable
+  readonly rejects: boolean
 }
 
 /**
@@ -989,13 +1002,13 @@ export function act(input: ActInput): Outcome {
 /** What the footer's one button is, by what pressing it would do. */
 export type Primary = Data.TaggedEnum<{
   /** Pressing it imports (or, reopened with nothing to add, closes the import). */
-  Import: { readonly label: string }
+  readonly Import: { readonly label: string }
   /** The label names what stands in the way; pressing the button goes there instead of importing. */
-  Blocked: { readonly label: string; readonly columnId: string }
+  readonly Blocked: { readonly label: string; readonly columnId: string }
   /** Decisions are open and nothing is ready yet: the button says so and cannot be pressed. */
-  Idle: { readonly label: string }
+  readonly Idle: { readonly label: string }
   /** Nothing in the file can be imported, and nothing is left to decide: words stand where the button was. */
-  Done: { readonly label: string }
+  readonly Done: { readonly label: string }
 }>
 export const Primary = Data.taggedEnum<Primary>()
 
@@ -1005,12 +1018,12 @@ export const Primary = Data.taggedEnum<Primary>()
  * import and nothing to decide it gives way to words saying so (`nothingNew` when every row is already there).
  */
 export function primary(input: {
-  columns: ReadonlyArray<ReviewColumn>
-  counts: Counts
-  noun: readonly [string, string]
+  readonly columns: ReadonlyArray<ReviewColumn>
+  readonly counts: Counts
+  readonly noun: readonly [string, string]
   /** What the button says when nothing is ready and nothing waits for a decision, if that may be confirmed. */
-  closing: O.Option<string>
-  words: ReviewWords
+  readonly closing: O.Option<string>
+  readonly words: ReviewWords
 }): Primary {
   const words = input.words
   return O.match(
@@ -1055,14 +1068,20 @@ export function heldLine(counts: Counts, words: ReviewWords): string {
 }
 
 /** The sentence in the confirm step: what will not be written, and why. 25 words at most. */
-export function confirmLine(input: { counts: Counts; noun: readonly [string, string]; words: ReviewWords }): string {
+export function confirmLine(input: {
+  readonly counts: Counts
+  readonly noun: readonly [string, string]
+  readonly words: ReviewWords
+}): string {
   const { counts } = input
   const held = counts.needs + counts.cannot + counts.out + counts.stored
   return `${plural(held, input.noun[0], input.noun[1])} won't be imported (${tabTally(counts, input.words)}). Your file is not changed.`
 }
 
 /** What the import will carry, by how each row got ready: the lines of the confirm step. */
-export function importSummary(views: ReadonlyArray<RowView>): ReadonlyArray<{ label: string; count: number }> {
+export function importSummary(
+  views: ReadonlyArray<RowView>
+): ReadonlyArray<{ readonly label: string; readonly count: number }> {
   const tally = { accepted: 0, kept: 0, edited: 0, auto: 0, plain: 0 }
   for (const view of views)
     if (view.status === "ready")
@@ -1093,9 +1112,9 @@ export const kindsOf = (kinds: ReadonlyArray<ProblemKind>): HashMap.HashMap<stri
  * a row left out or already there; nothing for a ready row.
  */
 export const reasonOf = (input: {
-  view: RowView
-  kinds: HashMap.HashMap<string, ProblemKind>
-  words: ReviewWords
+  readonly view: RowView
+  readonly kinds: HashMap.HashMap<string, ProblemKind>
+  readonly words: ReviewWords
 }): string => {
   const { view } = input
   const words = input.words
@@ -1119,10 +1138,10 @@ const csvField = (text: string): string => (/[",\n]/.test(text) ? `"${text.repla
 
 /** The rows that will not be imported, as CSV with the reason for each, for the person to fix elsewhere. */
 export function heldCsv(input: {
-  views: ReadonlyArray<RowView>
-  columns: ReadonlyArray<ReviewColumn>
-  problemKinds: ReadonlyArray<ProblemKind>
-  words: ReviewWords
+  readonly views: ReadonlyArray<RowView>
+  readonly columns: ReadonlyArray<ReviewColumn>
+  readonly problemKinds: ReadonlyArray<ProblemKind>
+  readonly words: ReviewWords
 }): string {
   const kinds = kindsOf(input.problemKinds)
   const lines = [["Row", "Reason", ...input.columns.map((column) => column.label)]]
@@ -1139,9 +1158,9 @@ export function heldCsv(input: {
  * as a heading with its rows under it, then the rows that belong to no group.
  */
 export function entries(input: {
-  list: ReadonlyArray<RowView>
-  groups: ReadonlyArray<FixGroup>
-  applied: boolean
+  readonly list: ReadonlyArray<RowView>
+  readonly groups: ReadonlyArray<FixGroup>
+  readonly applied: boolean
 }): ReadonlyArray<Entry> {
   const rows = (views: ReadonlyArray<RowView>): ReadonlyArray<Entry> =>
     views.map((view) => ({ type: "row" as const, view }))
@@ -1164,10 +1183,10 @@ export function entries(input: {
  * heading and count and hides its rows.
  */
 export function sections(input: {
-  list: ReadonlyArray<RowView>
-  groups: ReadonlyArray<FixGroup>
-  problemKinds: ReadonlyArray<ProblemKind>
-  collapsed: (kind: ProblemKind, hasGroups: boolean) => boolean
+  readonly list: ReadonlyArray<RowView>
+  readonly groups: ReadonlyArray<FixGroup>
+  readonly problemKinds: ReadonlyArray<ProblemKind>
+  readonly collapsed: (kind: ProblemKind, hasGroups: boolean) => boolean
 }): ReadonlyArray<Entry> {
   const out: Array<Entry> = []
   for (const kind of input.problemKinds) {
@@ -1201,10 +1220,10 @@ export function sections(input: {
  * person chose to go through that group row by row (`split`). Then every other row that needs them, in file order.
  */
 export function queue(input: {
-  views: ReadonlyArray<RowView>
-  split: Iterable<string>
+  readonly views: ReadonlyArray<RowView>
+  readonly split: Iterable<string>
   /** The rows that cannot be imported as written (`RowView.blocked`) instead of the decisions: each one by itself. */
-  blocked: boolean
+  readonly blocked: boolean
 }): ReadonlyArray<QueueEntry> {
   if (input.blocked === true) {
     return input.views
@@ -1227,14 +1246,14 @@ export function queue(input: {
  * with words its description lacks). It is never a row's one-press answer: the row asks the person to type the
  * value, and the guess is offered beside the box with its evidence.
  */
-export const weakGuess = (fix: { by: O.Option<string>; confidence: O.Option<string> }): boolean =>
+export const weakGuess = (fix: { readonly by: O.Option<string>; readonly confidence: O.Option<string> }): boolean =>
   O.contains(fix.by, "model") && O.contains(fix.confidence, "low")
 
 /** A `low` fix is a question for the person, not something to accept. Its choices are `to` and the alternatives. */
 export const choicesOf = (fix: {
-  to: string
-  confidence: O.Option<string>
-  why: { alternatives: ReadonlyArray<string> }
+  readonly to: string
+  readonly confidence: O.Option<string>
+  readonly why: { readonly alternatives: ReadonlyArray<string> }
 }): O.Option<ReadonlyArray<string>> =>
   O.map(
     O.filter(fix.confidence, (confidence) => confidence === "low"),
@@ -1243,9 +1262,9 @@ export const choicesOf = (fix: {
 
 /** What the caller writes, and what it holds with a reason for each row. */
 export function result(input: {
-  views: ReadonlyArray<RowView>
-  problemKinds: ReadonlyArray<ProblemKind>
-  words: ReviewWords
+  readonly views: ReadonlyArray<RowView>
+  readonly problemKinds: ReadonlyArray<ProblemKind>
+  readonly words: ReviewWords
 }): ImportResult {
   const kinds = kindsOf(input.problemKinds)
   const ready: Array<ReadyRow> = []
@@ -1295,9 +1314,9 @@ export function result(input: {
 
 /** The next undecided row after `afterId` in `list`, wrapping round; undefined when none is left. */
 export function nextProblem(input: {
-  list: ReadonlyArray<RowView>
-  afterId: O.Option<string>
-  back: boolean
+  readonly list: ReadonlyArray<RowView>
+  readonly afterId: O.Option<string>
+  readonly back: boolean
 }): O.Option<string> {
   const list = input.list
   const start = O.match(
@@ -1315,7 +1334,10 @@ export function nextProblem(input: {
 
 /** What a button that takes `value` says for it: the fix's own words for the value (`why.labels`), else the value. */
 export const valueWords = (
-  fix: { to: string; why: { alternatives: ReadonlyArray<string>; labels: ReadonlyArray<string> } },
+  fix: {
+    readonly to: string
+    readonly why: { readonly alternatives: ReadonlyArray<string>; readonly labels: ReadonlyArray<string> }
+  },
   value: string
 ): string => {
   const at = A.findFirstIndex([fix.to, ...fix.why.alternatives], (candidate) => candidate === value)
@@ -1331,7 +1353,11 @@ export const valueWords = (
  * @example columnFor({ column: "isActive", to: "false", why: { alternatives: [""], targets: ["isActive", "discontinuedOn"] } }, "") // "discontinuedOn"
  */
 export const columnFor = (
-  fix: { column: string; to: string; why: { alternatives: ReadonlyArray<string>; targets: ReadonlyArray<string> } },
+  fix: {
+    readonly column: string
+    readonly to: string
+    readonly why: { readonly alternatives: ReadonlyArray<string>; readonly targets: ReadonlyArray<string> }
+  },
   value: string
 ): string => {
   const at = A.findFirstIndex([fix.to, ...fix.why.alternatives], (candidate) => candidate === value)
@@ -1348,7 +1374,7 @@ export const columnFor = (
  * @example shownWith({ id: "quantityOnHand", label: "On hand", unitFrom: "uom" }, "120", { uom: "EA" }) // "120 EA"
  */
 export const shownWith = (
-  column: { display: ReviewColumn["display"]; unitFrom: ReviewColumn["unitFrom"] },
+  column: { readonly display: ReviewColumn["display"]; readonly unitFrom: ReviewColumn["unitFrom"] },
   text: string,
   cells: TotalCells
 ): string => {
@@ -1364,7 +1390,7 @@ export const shownWith = (
 }
 
 /** Words in a "Why?" answer, heading excluded. The region's budget is 25. */
-export const whyWords = (why: { basis: Why["basis"]; detail: Why["detail"] }): number => {
+export const whyWords = (why: { readonly basis: Why["basis"]; readonly detail: Why["detail"] }): number => {
   const count = (text: string) => A.length(A.filter(text.split(/\s+/), (word) => word !== ""))
   return count(why.basis) + O.match(why.detail, { onNone: () => 0, onSome: count })
 }
@@ -1396,16 +1422,16 @@ export const pickedChoice = (view: RowView): O.Option<Choice> => {
  * A group heading's button: the change by its `label` (rows that end in different values) or by its value, for the
  * rows ticked under it or, where each row keeps its own answers (`rowAction`) and has no tick, for all of them.
  */
-export const groupUse = (input: { group: FixGroup; n: number; ticks: boolean }): string =>
+export const groupUse = (input: { readonly group: FixGroup; readonly n: number; readonly ticks: boolean }): string =>
   `${input.group.mixed === true ? "Accept" : `Use ${O.match(input.group.label, { onNone: () => valueWords(input.group, input.group.to), onSome: (label) => label })}`} ${input.ticks ? `for the ${input.n} ticked` : `for all ${input.n}`}`
 
 /** One entry of "Other answers": typing a value, leaving the row out, or the caller's own answer. */
 export type OtherAnswer = Data.TaggedEnum<{
   /** Type a value instead of taking the proposal. */
-  Type: {}
-  LeaveOut: { readonly label: string }
+  readonly Type: {}
+  readonly LeaveOut: { readonly label: string }
   /** The caller's own answer for the row (`rowAction`). */
-  Extra: { readonly label: string }
+  readonly Extra: { readonly label: string }
 }>
 /** Builds and tells apart the entries of "Other answers". */
 export const OtherAnswer = Data.taggedEnum<OtherAnswer>()
@@ -1417,8 +1443,8 @@ export const OtherAnswer = Data.taggedEnum<OtherAnswer>()
  * has none for this row: the row then shows "Leave out" as any row does.
  */
 export function otherAnswers(input: {
-  view: RowView
-  extra: O.Option<RowAction>
+  readonly view: RowView
+  readonly extra: O.Option<RowAction>
 }): O.Option<ReadonlyArray<OtherAnswer>> {
   const { view, extra } = input
   const problem = view.status === "needs" ? view.problem : O.none()
@@ -1452,7 +1478,7 @@ export const inSentence = (label: string): string =>
 export const askFor = (label: string): string => `Set ${inSentence(label.trim())}`
 
 /** One line of the work list: a problem kind, how many of its rows still need the person, and whether it is done. */
-export type WorkItem = { kind: ProblemKind; left: number; done: boolean }
+export type WorkItem = { readonly kind: ProblemKind; readonly left: number; readonly done: boolean }
 
 /**
  * The work list beside the table: every problem kind that has rows waiting, or had some since the review opened
@@ -1460,9 +1486,9 @@ export type WorkItem = { kind: ProblemKind; left: number; done: boolean }
  * sees the list go down instead of lines disappearing. The `left` counts add up to `counts.needs`.
  */
 export function workList(input: {
-  counts: Counts
-  problemKinds: ReadonlyArray<ProblemKind>
-  seen: HashSet.HashSet<string>
+  readonly counts: Counts
+  readonly problemKinds: ReadonlyArray<ProblemKind>
+  readonly seen: HashSet.HashSet<string>
 }): ReadonlyArray<WorkItem> {
   return input.problemKinds.flatMap((kind) => {
     const left = kindCount(input.counts, kind.id)
@@ -1474,7 +1500,10 @@ export function workList(input: {
  * The kind "Next problem" goes to once `from` has no row left: the next kind down the list with rows waiting, then
  * from the top. Undefined when nothing is left anywhere.
  */
-export function nextKind(input: { list: ReadonlyArray<WorkItem>; from: O.Option<string> }): O.Option<string> {
+export function nextKind(input: {
+  readonly list: ReadonlyArray<WorkItem>
+  readonly from: O.Option<string>
+}): O.Option<string> {
   const at = input.list.findIndex((item) => O.contains(input.from, item.kind.id))
   const order = [...input.list.slice(at + 1), ...input.list.slice(0, at + 1)]
   return O.map(

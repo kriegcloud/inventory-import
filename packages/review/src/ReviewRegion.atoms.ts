@@ -71,7 +71,10 @@ const isActionUndo = Action.guards.undo
 const isActionRedo = Action.guards.redo
 
 /** The caller's rule for a row whose value the person typed: what is still wrong with it, or nothing. */
-export type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => O.Option<Problem>
+export type Recheck = (input: {
+  readonly row: ReviewRow
+  readonly cells: Readonly<Record<string, string>>
+}) => O.Option<Problem>
 
 /** The caller's own answer on a row that needs the person, or nothing for a row it does not fit. */
 export type RowActionFor = (row: ReviewRow) => O.Option<RowAction>
@@ -102,9 +105,9 @@ export interface RegionInput {
 
 /** A place "Next problem" stops at: a row that needs the person, or a folded kind standing for its rows. */
 export type Stop = Data.TaggedEnum<{
-  Row: { readonly rowId: string }
+  readonly Row: { readonly rowId: string }
   /** The kind to unfold, its first row, and its rows to choose among once they are drawn. */
-  Folded: { readonly rowId: string; readonly kindId: string; readonly among: ReadonlyArray<string> }
+  readonly Folded: { readonly rowId: string; readonly kindId: string; readonly among: ReadonlyArray<string> }
 }>
 export const Stop = Data.taggedEnum<Stop>()
 const isStopRow = Stop.$is("Row")
@@ -115,13 +118,13 @@ export type Wanted = Data.TaggedEnum<{
    * A row (none: the one action left on the screen). `toGroup`: after a decision, a row under a group's heading hands
    * the focus to the heading's accept. `waited`: frames waited for the row to come into the list.
    */
-  Row: { readonly rowId: O.Option<string>; readonly toGroup: boolean; readonly waited: number }
+  readonly Row: { readonly rowId: O.Option<string>; readonly toGroup: boolean; readonly waited: number }
   /** A kind was just unfolded to step into it: its first row as drawn among these (its last, stepping backwards). */
-  Among: { readonly rowId: O.Option<string>; readonly ids: ReadonlyArray<string>; readonly last: boolean }
+  readonly Among: { readonly rowId: O.Option<string>; readonly ids: ReadonlyArray<string>; readonly last: boolean }
   /** The kind that was on screen has nothing left: on down the work list from it, to the next kind with rows. */
-  Advance: { readonly from: O.Option<string> }
+  readonly Advance: { readonly from: O.Option<string> }
   /** A new kind was just put on screen: its first row that needs the person. */
-  First: {}
+  readonly First: {}
 }>
 export const Wanted = Data.taggedEnum<Wanted>()
 
@@ -215,7 +218,7 @@ export interface Region {
   /** `list` with the facets the person ticked applied: a row shows when each ticked facet lists its value. */
   readonly shown: Atom.Atom<ReadonlyArray<RowView>>
   /** `shown` as the array the table holds, the same array while the rows shown are. */
-  readonly tableData: Atom.Atom<Array<RowView>>
+  readonly tableData: Atom.Atom<ReadonlyArray<RowView>>
   readonly columnDefs: Atom.Atom<ReturnType<typeof defsOf>>
   readonly hiddenAtFirst: Atom.Atom<{ readonly columnVisibility: Record<string, boolean> }>
   readonly kinds: Atom.Atom<HashMap.HashMap<string, ProblemKind>>
@@ -261,7 +264,11 @@ const facetsOf = (
     // same: one choice that holds both, named by the spelling most rows have.
     const found = MutableHashMap.empty<
       string,
-      { values: MutableHashSet.MutableHashSet<string>; n: number; spellings: Record<string, number> }
+      {
+        readonly values: MutableHashSet.MutableHashSet<string>
+        readonly n: number
+        readonly spellings: Record<string, number>
+      }
     >()
     const keyOf = (value: string): string => value.trim().toLowerCase()
     for (const view of views) {
@@ -279,8 +286,9 @@ const facetsOf = (
       MutableHashMap.set(found, key, entry)
     }
     for (const view of list) {
-      O.map(MutableHashMap.get(found, keyOf(TotalCells.text(view.cells, column.id))), (entry) => {
-        entry.n += 1
+      const key = keyOf(TotalCells.text(view.cells, column.id))
+      O.map(MutableHashMap.get(found, key), (entry) => {
+        MutableHashMap.set(found, key, { ...entry, n: entry.n + 1 })
       })
     }
     const options = [...found]
@@ -536,31 +544,31 @@ export const RegionScope = ScopedAtom.make(regionAtom)
 
 /** What a row can ask the region to do. The same functions for the life of the region, so rows keep their memo. */
 export type RowActions = {
-  accept: (rowId: string) => void
-  keep: (rowId: string) => void
-  leaveOut: (rowId: string) => void
-  putBack: (rowId: string) => void
-  edit: (rowId: string, column: string, value: string) => void
+  readonly accept: (rowId: string) => void
+  readonly keep: (rowId: string) => void
+  readonly leaveOut: (rowId: string) => void
+  readonly putBack: (rowId: string) => void
+  readonly edit: (rowId: string, column: string, value: string) => void
   /** Takes a fix that is in force on one cell out again ("Undo this fix"). */
-  undoFix: (rowId: string, column: string) => void
+  readonly undoFix: (rowId: string, column: string) => void
   /** Turns a proposal down: the file's value stands and the row waits. Absent where a turned-down fix is offered again. */
-  reject: O.Option<(rowId: string, column: string) => void>
+  readonly reject: O.Option<(rowId: string, column: string) => void>
   /** The row as it stands now, for comparing two rows that cannot both be imported. */
-  peek: (rowId: string) => O.Option<RowView>
+  readonly peek: (rowId: string) => O.Option<RowView>
 }
 
 /** What a group heading can ask for. Each is one undo step. */
 export type GroupActions = {
-  accept: (groupId: string) => void
-  choose: (groupId: string, value: string) => void
+  readonly accept: (groupId: string) => void
+  readonly choose: (groupId: string, value: string) => void
   /** Take a row out of its group's action, or put it back. */
-  toggle: (rowId: string) => void
+  readonly toggle: (rowId: string) => void
   /** Take the rules' lossless fixes for these rows in one step. */
-  acceptRows: (rowIds: ReadonlyArray<string>) => void
+  readonly acceptRows: (rowIds: ReadonlyArray<string>) => void
   /** Show or hide the rows under a problem kind's heading. */
-  fold: (kindId: string) => void
-  leaveOut: (rowIds: ReadonlyArray<string>) => void
-  revert: (groupId: string) => void
+  readonly fold: (kindId: string) => void
+  readonly leaveOut: (rowIds: ReadonlyArray<string>) => void
+  readonly revert: (groupId: string) => void
 }
 
 /** The region's table: what follows from the order it shows the rows in, and what the person can do there. */

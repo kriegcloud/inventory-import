@@ -64,7 +64,7 @@ const personOf = ({ saving: _saving, ...person }: PersonRow): Person => Person.m
 /** A role as one word, as the Role column's filter and the rows of people who cannot change it show it. */
 const roleWords: Record<Role, string> = { viewer: "Viewer", editor: "Editor", admin: "Admin" }
 
-const roles: ReadonlyArray<{ value: Role; label: string }> = [
+const roles: ReadonlyArray<{ readonly value: Role; readonly label: string }> = [
   { value: "viewer", label: "Viewer: can look" },
   { value: "editor", label: "Editor: can import" },
   { value: "admin", label: "Admin: can manage people" }

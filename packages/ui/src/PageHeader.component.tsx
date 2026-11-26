@@ -16,7 +16,11 @@ export function LineSkeleton() {
  * title asks for 15rem before the actions may sit beside it: on a phone the actions go under it instead of cutting
  * it short.
  */
-export function PageHeader(props: { title: string; line?: ReactNode | "loading"; actions?: ReactNode }) {
+export function PageHeader(props: {
+  readonly title: string
+  readonly line?: ReactNode | "loading"
+  readonly actions?: ReactNode
+}) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 px-4 pt-5 pb-3 sm:px-9">
       <div className="min-w-0 flex-1 basis-60">
@@ -33,7 +37,7 @@ export function PageHeader(props: { title: string; line?: ReactNode | "loading";
 }
 
 /** A row of saved views ("All 178", "Ready 137"): each a ghost button that says whether it is the one showing. */
-export function Views(props: { label: string; children: ReactNode }) {
+export function Views(props: { readonly label: string; readonly children: ReactNode }) {
   return (
     <div role="group" aria-label={props.label} className="flex flex-wrap gap-1 px-4 pb-2 sm:px-8">
       {props.children}

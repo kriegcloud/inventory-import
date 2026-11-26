@@ -47,7 +47,7 @@ const peoplePath = "/people"
  * What shows for the moment a page's code is on its way: a skeleton of that page, in its own boxes, so nothing moves
  * when the page arrives. The import page's depends on its step.
  */
-function PageSkeleton(props: { path: string; params: URLSearchParams }) {
+function PageSkeleton(props: { readonly path: string; readonly params: URLSearchParams }) {
   const { path, params } = props
   if (path === "/items") {
     return <TablePageSkeleton title="Items" line action caption="Items" columns={someColumns(7)} />
@@ -86,7 +86,7 @@ const noImport = Atom.make(AsyncResult.initial<never, never>())
  * Where the person is, in the bar beside the sidebar's button: the organization, the page, and the file when an
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
-function Crumbs(props: { page: AppPage; importId: O.Option<ImportId> }) {
+function Crumbs(props: { readonly page: AppPage; readonly importId: O.Option<ImportId> }) {
   const { actor } = useAtomValue(sessionView)
   // The same read the import page shows: no second request.
   const opened = useAtomValue(O.match(props.importId, { onNone: () => noImport, onSome: importViewShown }))
@@ -185,7 +185,7 @@ function SessionNotice() {
   )
 }
 
-function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSearchParams }) {
+function WorkspaceFrame(props: { readonly current: AppPage; readonly path: string; readonly params: URLSearchParams }) {
   const { current, path, params } = props
   return (
     <AppShell

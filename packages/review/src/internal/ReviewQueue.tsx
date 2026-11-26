@@ -121,7 +121,10 @@ const QueueScope = ScopedAtom.make((region: Region) => Atom.make(makeQueue(regio
  * the total grows with them, so nothing runs below empty. `done + left = all`, so the card's "Decision 2 of 60" and
  * the footer's "59 decisions left" agree.
  */
-export const decided = (progress: { total: number; left: number }): { done: number; all: number } => {
+export const decided = (progress: {
+  readonly total: number
+  readonly left: number
+}): { readonly done: number; readonly all: number } => {
   const done = Math.max(0, progress.total - progress.left)
   return { done, all: done + progress.left }
 }
@@ -147,7 +150,7 @@ const contextOf = (view: RowView, columns: ReadonlyArray<ReviewColumn>, skip: st
 const first = { "data-first-action": "" }
 
 /** "Why?" on a card: who made the proposal, how sure it is and its evidence, in a sheet that rises from the bottom. */
-function WhySheet(props: { title: string; about: string; children: ReactNode }) {
+function WhySheet(props: { readonly title: string; readonly about: string; readonly children: ReactNode }) {
   return (
     <span>
       <Overlay
@@ -166,19 +169,19 @@ function WhySheet(props: { title: string; about: string; children: ReactNode }) 
 }
 
 type CardProps = {
-  columns: ReadonlyArray<ReviewColumn>
-  labels: HashMap.HashMap<string, string>
-  kinds: HashMap.HashMap<string, ProblemKind>
-  actions: RowActions
-  groupActions: GroupActions
-  onSplit: (groupId: string) => void
-  excluded: HashSet.HashSet<string>
-  rowAction: O.Option<RowActionFor>
-  cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
+  readonly columns: ReadonlyArray<ReviewColumn>
+  readonly labels: HashMap.HashMap<string, string>
+  readonly kinds: HashMap.HashMap<string, ProblemKind>
+  readonly actions: RowActions
+  readonly groupActions: GroupActions
+  readonly onSplit: (groupId: string) => void
+  readonly excluded: HashSet.HashSet<string>
+  readonly rowAction: O.Option<RowActionFor>
+  readonly cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
 }
 
 /** The one decision on screen: a group of identical fixes, or a row. Everything needed to decide is on the card. */
-function Decision(props: CardProps & { entry: QueueEntry }) {
+function Decision(props: CardProps & { readonly entry: QueueEntry }) {
   const { entry, ...card } = props
   return Entry.match(entry, {
     group: ({ group }) => <GroupCard {...card} group={group} />,
@@ -197,7 +200,7 @@ const cardKey = Entry.match({
   rest: () => ""
 })
 
-function GroupCard(props: CardProps & { group: FixGroup }) {
+function GroupCard(props: CardProps & { readonly group: FixGroup }) {
   const { group, actions, groupActions } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
   const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
@@ -311,7 +314,7 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
   )
 }
 
-function RowCard(props: CardProps & { view: RowView }) {
+function RowCard(props: CardProps & { readonly view: RowView }) {
   const { view, actions, labels } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
   const nameColumn = props.columns[0]
@@ -581,18 +584,18 @@ function RowCard(props: CardProps & { view: RowView }) {
 }
 
 type QueueProps = {
-  deciding: boolean
+  readonly deciding: boolean
   /** The cards are the rows that cannot be imported as written, one by one, instead of the decisions. */
-  blocked?: boolean
+  readonly blocked?: boolean
   /** Decisions there were when the review opened, and how many are left (`decisionsLeft`). */
-  progress: { total: number; left: number }
+  readonly progress: { readonly total: number; readonly left: number }
   /** A group to go through row by row. Kept by the region, so its count of decisions agrees. */
-  onSplit: (groupId: string) => void
-  undo: ReactNode
-  loading: boolean
-  caption: string
-  empty: ReactNode
-  cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
+  readonly onSplit: (groupId: string) => void
+  readonly undo: ReactNode
+  readonly loading: boolean
+  readonly caption: string
+  readonly empty: ReactNode
+  readonly cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
 }
 
 /**
@@ -609,7 +612,7 @@ export function ReviewQueue(props: QueueProps) {
   )
 }
 
-function QueueBody(props: QueueProps & { region: Region }) {
+function QueueBody(props: QueueProps & { readonly region: Region }) {
   const { region } = props
   const table = useAtomValue(TableScope.use())
   const queueOf = useAtomValue(QueueScope.use())

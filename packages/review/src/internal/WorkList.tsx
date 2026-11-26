@@ -17,11 +17,11 @@ const whole = new Intl.NumberFormat("en-US")
  * row of toggle chips above the table where there is not. The arrow keys move along it (a toggle group).
  */
 export function WorkList(props: {
-  items: ReadonlyArray<WorkItem>
+  readonly items: ReadonlyArray<WorkItem>
   /** The kind the table is showing; undefined while it shows another view (Ready, All). */
-  active: O.Option<string>
-  onPick: (kindId: string) => void
-  mode: "rail" | "chips"
+  readonly active: O.Option<string>
+  readonly onPick: (kindId: string) => void
+  readonly mode: "rail" | "chips"
 }) {
   const items = props.items.map((item) => (
     <ToggleGroupItem
@@ -126,7 +126,7 @@ const StripScope = ScopedAtom.make(() =>
  * One line of chips that scrolls sideways with no bar drawn: by wheel, by touch, by the arrow keys (focus brings a
  * chip into view), and by a round button over a fade at each edge that has more behind it.
  */
-function Strip(props: { children: React.ReactNode }) {
+function Strip(props: { readonly children: React.ReactNode }) {
   return (
     <StripScope.Provider>
       <StripBody>{props.children}</StripBody>
@@ -134,7 +134,7 @@ function Strip(props: { children: React.ReactNode }) {
   )
 }
 
-function StripBody(props: { children: React.ReactNode }) {
+function StripBody(props: { readonly children: React.ReactNode }) {
   const strip = useAtomValue(StripScope.use())
   const more = useAtomValue(strip.more)
   const move = (target: HTMLElement, by: number) => {

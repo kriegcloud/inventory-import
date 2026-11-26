@@ -81,7 +81,7 @@ const Ended = () => (
  * stay drawn while the session is asked again, and are drawn anew, with nothing typed or open in them, for another
  * organization the person switches to.
  */
-export function SignedIn(props: { title: string; children: ReactNode }) {
+export function SignedIn(props: { readonly title: string; readonly children: ReactNode }) {
   const { status, error, features, probablySignedOut } = useAtomValue(sessionView)
   const retry = useAtomRefresh(session)
   const refresh = useAtomSet(refreshSession)

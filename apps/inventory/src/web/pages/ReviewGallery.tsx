@@ -211,7 +211,7 @@ const galleryLooking = Atom.map(galleryState, (state) => state === "readonly")
 const monthColumnsAtom = Atom.make(monthColumns)
 const monthRowsAtom = Atom.make(monthRows)
 const monthRecheck = Atom.make(
-  O.some((asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) =>
+  O.some((asked: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) =>
     belowZero(asked.cells.month ?? "", asked.cells.onHand ?? asked.row.cells.onHand ?? "")
   )
 )

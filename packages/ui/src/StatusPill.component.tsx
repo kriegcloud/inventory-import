@@ -14,7 +14,12 @@ const tones = {
 export type Tone = keyof typeof tones
 
 /** A small status label. Colour is never the only signal: always pass words, and an icon where it helps. */
-export function StatusPill(props: { tone: Tone; icon?: ReactNode; children: ReactNode; className?: string }) {
+export function StatusPill(props: {
+  readonly tone: Tone
+  readonly icon?: ReactNode
+  readonly children: ReactNode
+  readonly className?: string
+}) {
   return (
     <span
       className={cn(

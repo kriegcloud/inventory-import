@@ -86,11 +86,11 @@ const redoKeys = onMac ? "\u21e7\u2318Z" : "Ctrl+Shift+Z"
 const stepTag = { read: "Read", rule: "Rule", model: "Model" } as const
 /** What the run did, behind one button: steps tagged Read, Rule or Model, what it was allowed to do, and what it cost. */
 function ActivityPanel(props: {
-  activity: Activity
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  narrow: boolean
-  returnFocus: React.RefObject<HTMLButtonElement | null>
+  readonly activity: Activity
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly narrow: boolean
+  readonly returnFocus: React.RefObject<HTMLButtonElement | null>
 }) {
   const body = (
     <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-6 text-sm">
@@ -175,11 +175,11 @@ function ToolButton({
   children,
   ...rest
 }: Omit<React.ComponentProps<typeof Button>, "variant" | "size"> & {
-  label: string
+  readonly label: string
   /** The tooltip, when it says more than the label (a shortcut, the step it would undo). */
-  tip?: string
-  narrow: boolean
-  variant?: "ghost" | "attention"
+  readonly tip?: string
+  readonly narrow: boolean
+  readonly variant?: "ghost" | "attention"
 }) {
   return (
     <Tooltip>
@@ -273,7 +273,10 @@ function RegionWithTable(props: ReviewRegionProps) {
   )
 }
 
-type WithTable = ReviewRegionProps & { region: Region; table: ReturnType<typeof useDataTable<RowView>>["table"] }
+type WithTable = ReviewRegionProps & {
+  readonly region: Region
+  readonly table: ReturnType<typeof useDataTable<RowView>>["table"]
+}
 
 /** The grid's atoms are made here, above the region's body: its footer reads from them which group's accept leads. */
 function RegionWithGrid(props: WithTable) {
@@ -285,7 +288,7 @@ function RegionWithGrid(props: WithTable) {
   )
 }
 
-function RegionBody(props: WithTable & { regionTable: RegionTable }) {
+function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
   const {
     region,
     table,
@@ -404,7 +407,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
     onNone: () => `${statusCaption}, ${countCaption}`,
     onSome: (label) => `${statusCaption}, ${label}, ${countCaption}`
   })
-  const filters: ReadonlyArray<{ id: FilterId; label: string; n: number }> = [
+  const filters: ReadonlyArray<{ readonly id: FilterId; readonly label: string; readonly n: number }> = [
     { id: "needs", label: words.needs, n: counts.needs },
     // Rows nothing here can fix are not decisions: they have their own tab, shown while there are any.
     ...(counts.cannot > 0 || filter === "cannot"

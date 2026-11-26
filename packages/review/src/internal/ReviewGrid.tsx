@@ -137,7 +137,10 @@ const nameOf = (view: RowView, first: ReviewColumn | undefined): string => {
 }
 
 /** A column that could not be found in the file: the choice sits in its own header, where the values will appear. */
-function MatchSelect(props: { column: ReviewColumn; onMatch: (columnId: string, source: string) => void }) {
+function MatchSelect(props: {
+  readonly column: ReviewColumn
+  readonly onMatch: (columnId: string, source: string) => void
+}) {
   return O.match(O.filter(props.column.match, isColumnMatchUnmatched), {
     onNone: () => null,
     onSome: (match) => (
@@ -166,11 +169,11 @@ function MatchSelect(props: { column: ReviewColumn; onMatch: (columnId: string, 
 
 /** Two rows that cannot both be imported, side by side: the cells where they differ, and which one to keep. */
 function Compare(props: {
-  view: RowView
-  other: RowView
-  columns: ReadonlyArray<ReviewColumn>
+  readonly view: RowView
+  readonly other: RowView
+  readonly columns: ReadonlyArray<ReviewColumn>
   /** Left out for someone who may only look. */
-  onKeep: ((rowId: string) => void) | undefined
+  readonly onKeep: ((rowId: string) => void) | undefined
 }) {
   const { view, other } = props
   const differing = props.columns.filter(
@@ -228,9 +231,9 @@ const headerChrome = 16 + 6 + 16 + 2
  * the row) and, beside a tag, the link to a row it clashes with.
  */
 const statusFit = (input: {
-  views: ReadonlyArray<RowView>
-  kinds: HashMap.HashMap<string, ProblemKind>
-  words: ReviewWords
+  readonly views: ReadonlyArray<RowView>
+  readonly kinds: HashMap.HashMap<string, ProblemKind>
+  readonly words: ReviewWords
 }): number => {
   // 12 px medium text in a pill: its padding and icon; "Auto-fixed" and the person's tags carry an icon too.
   const pill = (words: string, icon: boolean) =>
@@ -280,12 +283,12 @@ const longest = (values: ReadonlyArray<string>, n: number): ReadonlyArray<string
  * least width. Measured on a canvas (`@/lib/text-width`), never on an element.
  */
 const measureNeeds = (input: {
-  columns: ReadonlyArray<ReviewColumn>
-  views: ReadonlyArray<RowView>
+  readonly columns: ReadonlyArray<ReviewColumn>
+  readonly views: ReadonlyArray<RowView>
   /** Group headings are drawn: a row under one is ticked into it and has no "Why?" of its own. */
-  banding: boolean
+  readonly banding: boolean
   /** The rows have an expand button before their number. */
-  expandable: boolean
+  readonly expandable: boolean
 }): ReadonlyArray<number> => {
   const { columns, views } = input
   return columns.map((column, index) => {
@@ -354,10 +357,10 @@ const actionsChrome = 6 + 32 + 1 + 6
  * its own answer's words with an ellipsis; the button after it never moves under it.
  */
 export const actionsFit = (input: {
-  entries: ReadonlyArray<Entry>
-  columns: ReadonlyArray<ReviewColumn>
-  readOnly: boolean
-  rowAction: O.Option<RowActionFor>
+  readonly entries: ReadonlyArray<Entry>
+  readonly columns: ReadonlyArray<ReviewColumn>
+  readonly readOnly: boolean
+  readonly rowAction: O.Option<RowActionFor>
 }): number => {
   if (input.readOnly) return actionsQuiet
   if (!input.entries.some((entry) => !isEntryRow(entry) || entry.view.status === "needs")) return actionsQuiet
@@ -420,38 +423,38 @@ export const actionsFit = (input: {
 }
 
 const Row = memo(function Row(props: {
-  view: RowView
-  index: number
+  readonly view: RowView
+  readonly index: number
   /** Measures the drawn row: a reason in full can take more than one line. */
-  measure: (element: Element | null) => void
-  columns: ReadonlyArray<ReviewColumn>
-  allColumns: ReadonlyArray<ReviewColumn>
+  readonly measure: (element: Element | null) => void
+  readonly columns: ReadonlyArray<ReviewColumn>
+  readonly allColumns: ReadonlyArray<ReviewColumn>
   /** Columns whose value sits under the name at this width. */
-  under: ReadonlyArray<ReviewColumn>
+  readonly under: ReadonlyArray<ReviewColumn>
   /** The value under the name shares a 36px row with it (a desk short of room), not a 44px one (a tablet). */
-  dense: boolean
-  showStatus: boolean
+  readonly dense: boolean
+  readonly showStatus: boolean
   /** Columns with no room in the table at this width: they are in the row's detail, opened by the row's button. */
-  folded: ReadonlyArray<ReviewColumn>
-  expanded: boolean
-  onExpand: (rowId: string) => void
-  words: ReviewWords
+  readonly folded: ReadonlyArray<ReviewColumn>
+  readonly expanded: boolean
+  readonly onExpand: (rowId: string) => void
+  readonly words: ReviewWords
   /** The group heading this row sits under. Its own accept is then the quieter one. */
-  group: O.Option<FixGroup>
+  readonly group: O.Option<FixGroup>
   /** The row sits under its group's heading: the heading is the decision, the row only opts out. */
-  banded: boolean
-  included: boolean
+  readonly banded: boolean
+  readonly included: boolean
   /** The row sits under its problem kind's heading, so it does not repeat the kind as a tag. */
-  sectioned: boolean
-  labels: HashMap.HashMap<string, string>
-  kinds: HashMap.HashMap<string, ProblemKind>
-  actions: RowActions
-  groupActions: GroupActions
-  readOnly: boolean
+  readonly sectioned: boolean
+  readonly labels: HashMap.HashMap<string, string>
+  readonly kinds: HashMap.HashMap<string, ProblemKind>
+  readonly actions: RowActions
+  readonly groupActions: GroupActions
+  readonly readOnly: boolean
   /** The caller's own answer on a row that needs the person (`rowAction` on the region). */
-  rowAction: O.Option<RowActionFor>
+  readonly rowAction: O.Option<RowActionFor>
   /** The caller's own form for a value the person has to give (`cellEditor` on the region). */
-  cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
+  readonly cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
 }) {
   const { view, columns, actions } = props
   const first = columns[0]
@@ -1092,7 +1095,7 @@ const Row = memo(function Row(props: {
 
 /** A line of the table: one of the region's entries, or the detail opened under a row. */
 /** A row's detail, drawn under it when the row is opened. */
-type Opened = Data.TaggedEnum<{ Detail: { readonly view: RowView } }>
+type Opened = Data.TaggedEnum<{ readonly Detail: { readonly view: RowView } }>
 const Opened = Data.taggedEnum<Opened>()
 const isOpenedDetail = Opened.$is("Detail")
 
@@ -1115,7 +1118,7 @@ const lineMatch = <R,>(
 
 /** The columns with no room in the table at this width, under their row: each label and its value, change and all. */
 /** An empty cell that takes a default when imported: the default, quieter, and said to be one ("0 EA, default"). */
-function DefaultValue(props: { column: ReviewColumn; readonly value: string; cells: TotalCells }) {
+function DefaultValue(props: { readonly column: ReviewColumn; readonly value: string; readonly cells: TotalCells }) {
   return (
     <span className="text-muted-foreground">
       {shownWith(props.column, props.value, props.cells)}
@@ -1124,7 +1127,7 @@ function DefaultValue(props: { column: ReviewColumn; readonly value: string; cel
   )
 }
 
-function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) {
+function Detail(props: { readonly view: RowView; readonly columns: ReadonlyArray<ReviewColumn> }) {
   const { view } = props
   return (
     // Lined up with the row's name: past the expand button and the row number.
@@ -1158,11 +1161,11 @@ function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) 
  * The work list beside the table picks the kind, so the heading no longer folds.
  */
 function KindRow(props: {
-  entry: Extract<Entry, { readonly type: "kind" }>
-  span: number
-  index: number
-  actions: GroupActions
-  readOnly: boolean
+  readonly entry: Extract<Entry, { readonly type: "kind" }>
+  readonly span: number
+  readonly index: number
+  readonly actions: GroupActions
+  readonly readOnly: boolean
 }) {
   const { kind, rowIds, safe } = props.entry
   return (
@@ -1197,25 +1200,25 @@ function KindRow(props: {
  * accept, then the quieter ones, behind one "More" when the column has no room for them side by side.
  */
 function GroupRow(props: {
-  group: FixGroup
-  applied: boolean
+  readonly group: FixGroup
+  readonly applied: boolean
   /** This group's accept is the screen's one filled button: the next thing to do. */
-  lead: boolean
-  span: number
-  index: number
-  excluded: HashSet.HashSet<string>
+  readonly lead: boolean
+  readonly span: number
+  readonly index: number
+  readonly excluded: HashSet.HashSet<string>
   /** Its rows are ticked into it; without ticks (rows keep their own answers) it acts on all of them. */
-  ticks: boolean
-  labels: HashMap.HashMap<string, string>
-  actions: GroupActions
-  readOnly: boolean
+  readonly ticks: boolean
+  readonly labels: HashMap.HashMap<string, string>
+  readonly actions: GroupActions
+  readonly readOnly: boolean
   /** The rows below have an expand button before their number: the heading's text starts where their names do. */
-  indent: boolean
+  readonly indent: boolean
   /** The actions column's width, to tell whether the quiet answers fit beside each other. */
-  actionsWidth: number
-  measure: (element: Element | null) => void
+  readonly actionsWidth: number
+  readonly measure: (element: Element | null) => void
   /** How the group's column shows a value (`ReviewColumn.display`). */
-  display?: ((value: string) => string) | undefined
+  readonly display?: ((value: string) => string) | undefined
 }) {
   const { group } = props
   const rowIds = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId))
@@ -1846,16 +1849,16 @@ export const GridScope = ScopedAtom.make(gridAtom)
 
 type GridProps = {
   /** The one table instance: its column headers carry the sort and hide menu. */
-  table: TanstackTable<DataTableFeatures, RowView>
-  loading: boolean
-  caption: string
+  readonly table: TanstackTable<DataTableFeatures, RowView>
+  readonly loading: boolean
+  readonly caption: string
   /** One row across the table when the filter has nothing to show. */
-  empty: ReactNode
-  onMatch: ((columnId: string, source: string) => void) | undefined
+  readonly empty: ReactNode
+  readonly onMatch: ((columnId: string, source: string) => void) | undefined
   /** The caller's own form for a value the person has to give: read when a row is drawn. */
-  cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
+  readonly cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
   /** Inside a card: the card's edge is the gutter, and the frame draws no rules of its own above and below. */
-  framed?: boolean
+  readonly framed?: boolean
 }
 
 /**

@@ -22,20 +22,20 @@ const skipLink = (
  * with the mark, over one centred column.
  */
 export function AppShell(props: {
-  title: string
+  readonly title: string
   /** The app's sidebar. Left out, the frame is a plain header: nobody is signed in yet. */
-  sidebar?: ReactNode
+  readonly sidebar?: ReactNode
   /** Where the person is, beside the sidebar's button: a breadcrumb. */
-  crumbs?: ReactNode
-  actions?: ReactNode
+  readonly crumbs?: ReactNode
+  readonly actions?: ReactNode
   /** Full width with a gutter, for a page that is mostly a table. Default is a centred reading column. */
-  wide?: boolean
+  readonly wide?: boolean
   /**
    * The page fills the screen below the header and never scrolls; what is inside scrolls in its own frame (a review
    * table). The page brings its own gutters. Implies `wide`.
    */
-  fill?: boolean
-  children: ReactNode
+  readonly fill?: boolean
+  readonly children: ReactNode
 }) {
   const frame =
     props.wide === true || props.fill === true ? "w-full px-4 sm:px-9" : "mx-auto w-full max-w-5xl px-4 sm:px-6"

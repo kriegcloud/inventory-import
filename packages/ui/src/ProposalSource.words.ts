@@ -12,11 +12,11 @@ export type ProposalSource = "rule" | "model" | "person"
 /** The words for one source: a short tag, the hidden words beside a mark, and the tooltip on it. */
 export type SourceWords = {
   /** One word after a value or on a badge ("Rule", "Model"). */
-  tag: string
+  readonly tag: string
   /** Read by a screen reader after the value ("suggested by the model"). */
-  hidden: string
+  readonly hidden: string
   /** The tooltip on the mark beside a value. */
-  tip: string
+  readonly tip: string
 }
 
 const known: Readonly<Record<ProposalSource, SourceWords>> = {

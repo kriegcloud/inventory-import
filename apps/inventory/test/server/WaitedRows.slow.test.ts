@@ -529,7 +529,11 @@ const sacksStocked = Effect.gen(function* () {
     })
   const credit = Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const rows = yield* sql<{ decidedById: string; savedRevision: number; lastSavedById: string | null }>`
+    const rows = yield* sql<{
+      readonly decidedById: string
+      readonly savedRevision: number
+      readonly lastSavedById: string | null
+    }>`
       SELECT decidedById, savedRevision, lastSavedById FROM importDecision
       WHERE importId = ${params.id} AND rowId = 'row-2'`
     return rows

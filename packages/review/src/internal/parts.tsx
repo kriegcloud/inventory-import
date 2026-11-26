@@ -93,28 +93,28 @@ const OverlayScope = ScopedAtom.make(() =>
 )
 
 type OverlayProps = {
-  trigger: ReactNode
-  title: string
+  readonly trigger: ReactNode
+  readonly title: string
   /** For the bottom sheet's hidden description. */
-  about: string
+  readonly about: string
   /** Width only (`w-80`): the popover's look is the design system's. */
-  children: ReactNode | ((close: () => void) => ReactNode)
-  align?: "start" | "center" | "end"
-  side?: "top" | "bottom" | "left" | "right"
-  className?: string
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  readonly children: ReactNode | ((close: () => void) => ReactNode)
+  readonly align?: "start" | "center" | "end"
+  readonly side?: "top" | "bottom" | "left" | "right"
+  readonly className?: string
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean) => void
   /**
    * Also opens when a mouse rests on the trigger (after a short delay) and closes when it leaves both. It stays a
    * popover: a click, Enter or a tap opens it as before and keeps it open, and a screen reader meets it as a dialog.
    * Opened by hover it does not take the focus.
    */
-  hover?: boolean
+  readonly hover?: boolean
   /**
    * Drawn as the hover card is: the bordered card alone, with no arrow and no close button (Escape, a click outside
    * or the pointer leaving closes it). For a card that explains; a panel that holds a form keeps its close button.
    */
-  card?: boolean
+  readonly card?: boolean
 }
 
 /** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
@@ -266,7 +266,7 @@ export const codeFace = (column: ReviewColumn | undefined): string | undefined =
  * A value inside a line of text: a code in its face, anything else as plain text with no element of its own, so a
  * truncated line holds nothing that reaches past its edge.
  */
-export function ColumnText(props: { column: ReviewColumn | undefined; children: ReactNode }) {
+export function ColumnText(props: { readonly column: ReviewColumn | undefined; readonly children: ReactNode }) {
   return props.column?.code === true ? <span className="font-mono">{props.children}</span> : props.children
 }
 
@@ -274,16 +274,16 @@ export function ColumnText(props: { column: ReviewColumn | undefined; children: 
 const markSource = (by: MarkSource): "rule" | "model" | undefined => (by === "unknown" ? undefined : by)
 
 /** The mark beside a value someone other than the person proposed: who it was, as the caller said. */
-export function FixMark(props: { by: MarkSource }) {
+export function FixMark(props: { readonly by: MarkSource }) {
   return <SourceMark source={markSource(props.by)} />
 }
 
 /** The reason a row needs the person: an icon and three words at most. Never colour alone. */
 export function ReasonTag(props: {
-  kind: O.Option<ProblemKind>
+  readonly kind: O.Option<ProblemKind>
   /** The problem's own tone, over its kind's (`Problem.tone`). */
-  tone: O.Option<ProblemKind["tone"]>
-  fallback: string
+  readonly tone: O.Option<ProblemKind["tone"]>
+  readonly fallback: string
 }) {
   const blocker = O.contains(
     O.orElse(props.tone, () => O.map(props.kind, (kind) => kind.tone)),
@@ -304,7 +304,7 @@ export function ReasonTag(props: {
  * What happened to a row that no longer needs the person. The person's own decisions carry a person and an outline;
  * what a rule did carries a wand and a grey fill; an untouched row says Ready.
  */
-export function DecisionTag(props: { view: RowView; words?: ReviewWords }) {
+export function DecisionTag(props: { readonly view: RowView; readonly words?: ReviewWords }) {
   const { words = defaultReviewWords } = props
   if (props.view.status === "stored") {
     return (
@@ -344,14 +344,14 @@ export const longValue = 8
 
 /** A value with its change, or the plain value. A `low` reading is shown as a question, not as a change. */
 export function CellValue(props: {
-  value: string
-  mark: O.Option<CellMark>
+  readonly value: string
+  readonly mark: O.Option<CellMark>
   /** How the column shows a value (`ReviewColumn.display`): money as the app shows it. */
-  display?: ((value: string) => string) | undefined
-  accepted?: boolean
-  empty?: ReactNode
+  readonly display?: ((value: string) => string) | undefined
+  readonly accepted?: boolean
+  readonly empty?: ReactNode
   /** The row sits under a group heading that already says what its empty cell becomes ("empty → Foot"). */
-  stated?: boolean
+  readonly stated?: boolean
 }) {
   const { empty = null, display = identity } = props
   const shown = (text: string): string => (text === "" ? text : display(text))
@@ -477,12 +477,12 @@ const CutScope = ScopedAtom.make(() =>
 
 type CutTextProps = {
   /** The whole text, for the card. */
-  text: string
+  readonly text: string
   /** What is drawn, when it is more than the text (a code in its face, hidden words for a screen reader). */
-  children?: ReactNode
+  readonly children?: ReactNode
   /** What the card shows, when it is more than the text (an old and a new value). */
-  card?: ReactNode
-  className?: string
+  readonly card?: ReactNode
+  readonly className?: string
 }
 
 /**
@@ -527,12 +527,12 @@ function CutBody(props: CutTextProps) {
 
 /** A group of identical fixes in one line: the file's spellings with their counts, and what they become. */
 export function GroupChange(props: {
-  group: FixGroup
-  applied?: boolean
+  readonly group: FixGroup
+  readonly applied?: boolean
   /** In a table heading of one fixed height: short of room, the file's spellings end in an ellipsis. */
-  oneLine?: boolean
+  readonly oneLine?: boolean
   /** How the column shows a value (`ReviewColumn.display`): vendors as "2 · Acme preferred", not the file's JSON. */
-  display?: ((value: string) => string) | undefined
+  readonly display?: ((value: string) => string) | undefined
 }) {
   const { group, display = identity } = props
   const choices = choicesOf(group)
@@ -579,9 +579,9 @@ export function GroupChange(props: {
  * `brief` keeps it to one line: who is behind it and the reason, without the evidence.
  */
 export function Reason(props: {
-  fix: { by: Fix["by"]; confidence: Fix["confidence"]; why: Fix["why"] }
-  brief?: boolean
-  className?: string
+  readonly fix: { readonly by: Fix["by"]; readonly confidence: Fix["confidence"]; readonly why: Fix["why"] }
+  readonly brief?: boolean
+  readonly className?: string
 }) {
   const { why } = props.fix
   return (
@@ -602,16 +602,16 @@ export function Reason(props: {
 
 /** The answer to "Why?": the reason, then what accepting applies to: this row, or every row with the same fix. */
 export function WhyBody(props: {
-  fix: Fix
-  size: "sm" | "touch"
-  onAccept?: (() => void) | undefined
+  readonly fix: Fix
+  readonly size: "sm" | "touch"
+  readonly onAccept?: (() => void) | undefined
   /** Present when other rows wait on the same fix. */
-  all?: { count: number; onAccept: () => void } | undefined
-  onPick?: ((value: string) => void) | undefined
+  readonly all?: { readonly count: number; readonly onAccept: () => void } | undefined
+  readonly onPick?: ((value: string) => void) | undefined
   /** The proposal is turned down: the file's value stands and the row waits for the person. One undo step. */
-  onReject?: (() => void) | undefined
+  readonly onReject?: (() => void) | undefined
   /** The fix is in force: this takes it out again. One undo step. */
-  onUndoFix?: (() => void) | undefined
+  readonly onUndoFix?: (() => void) | undefined
 }) {
   const { fix } = props
   const choices = choicesOf(fix)
@@ -689,10 +689,10 @@ const EditScope = ScopedAtom.make((opened: string) =>
 )
 
 type EditFormProps = {
-  label: string
-  value: string
-  size: "sm" | "touch"
-  onSave: (value: string) => void
+  readonly label: string
+  readonly value: string
+  readonly size: "sm" | "touch"
+  readonly onSave: (value: string) => void
 }
 
 /** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */

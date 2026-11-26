@@ -131,10 +131,12 @@ layer(TestDatabase)("tenancy in the database", (it) => {
       yield* item("rec_p", "org_prairie", "mem_dana")
       const twice = yield* refused(item("rec_p2", "org_prairie", "mem_dana"))
       expect(twice).toContain("UNIQUE constraint failed")
-      const found = yield* sql<{ n: number }>`SELECT COUNT(*) AS n FROM item WHERE organizationId = 'org_northline'`
+      const found = yield* sql<{
+        readonly n: number
+      }>`SELECT COUNT(*) AS n FROM item WHERE organizationId = 'org_northline'`
       expect(found[0]?.n).toBe(0)
       // The search index names each row's organization, and is queried with it.
-      const indexed = yield* sql<{ n: number }>`SELECT COUNT(*) AS n FROM itemSearch
+      const indexed = yield* sql<{ readonly n: number }>`SELECT COUNT(*) AS n FROM itemSearch
         WHERE itemSearch MATCH 'bracket' AND organizationId = 'org_northline'`
       expect(indexed[0]?.n).toBe(0)
     })

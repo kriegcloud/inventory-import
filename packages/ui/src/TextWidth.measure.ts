@@ -6,7 +6,7 @@
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 
-type FontFamilies = { sans: string; mono: string }
+type FontFamilies = { readonly sans: string; readonly mono: string }
 
 // The outer Option distinguishes not initialized from a browser that has no 2D context.
 let context: O.Option<O.Option<CanvasRenderingContext2D>> = O.none()
@@ -56,7 +56,7 @@ const tableTextSize = 13
  * The width of `text` in the table's face: the text face, or the mono face a SKU is set in; `medium` is the weight
  * a proposed value's chip uses. The same text is measured once.
  */
-export const textWidth = (text: string, options: { medium: boolean; mono: boolean }): number => {
+export const textWidth = (text: string, options: { readonly medium: boolean; readonly mono: boolean }): number => {
   const medium = options.medium
   const mono = options.mono
   const key = `${medium ? "m" : "r"}${mono ? "c" : "t"}${text}`

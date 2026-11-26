@@ -154,13 +154,13 @@ export const columnsUnmatched: ReadonlyArray<ReviewColumn> = columns.map((column
 )
 
 type Family = {
-  name: string
-  code: string
-  category: string
-  unit: (typeof units)[number]
-  supplier: string
-  sizes: A.NonEmptyReadonlyArray<readonly [label: string, code: string]>
-  cost: number
+  readonly name: string
+  readonly code: string
+  readonly category: string
+  readonly unit: (typeof units)[number]
+  readonly supplier: string
+  readonly sizes: A.NonEmptyReadonlyArray<readonly [label: string, code: string]>
+  readonly cost: number
 }
 
 const pairs = (list: A.NonEmptyReadonlyArray<string>): A.NonEmptyReadonlyArray<readonly [string, string]> =>
@@ -505,7 +505,11 @@ type StockCells = Record<
 >
 
 /** The file as the review reads it: `size` rows, the same mix in every block of 178. `clean` removes every problem. */
-export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: boolean }): ReadonlyArray<ReviewRow> {
+export function makeRows(input: {
+  readonly size: number
+  readonly clean?: boolean
+  readonly withoutUnit?: boolean
+}): ReadonlyArray<ReviewRow> {
   const rows: Array<ReviewRow & { readonly cells: StockCells }> = []
   const cycling = A.map(families, (family) => {
     const turn = MutableRef.make(0)
@@ -677,7 +681,10 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
 }
 
 /** The gallery's pure check of one row after the person typed a value. Copies need the whole file, so not here. */
-export function recheck(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }): O.Option<Problem> {
+export function recheck(input: {
+  readonly row: ReviewRow
+  readonly cells: Readonly<Record<string, string>>
+}): O.Option<Problem> {
   const { cells } = input
   if (O.match(R.get(cells, "name"), { onNone: () => true, onSome: (name) => name.trim() === "" }))
     return Problem.makeOption({ kind: "name", column: O.some("name") })

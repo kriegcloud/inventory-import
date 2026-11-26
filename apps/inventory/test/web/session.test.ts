@@ -409,14 +409,14 @@ describe("the workspace", () => {
   /** What the sign-in gate draws: the workspace, with the key it is drawn under (if any), or none for anything else. */
   const gate = Effect.fnUntraced(function* (t: { readonly registry: AtomRegistry.AtomRegistry }) {
     const { SignedIn } = yield* Effect.promise(() => import("../../src/web/components/app/SignedIn.tsx"))
-    const seen: { drawn: ReactNode } = { drawn: undefined }
+    const seen = MutableRef.make<ReactNode>(undefined)
     // The gate's own element, read where its hooks run; it is drawn only when it is not the workspace's.
     const Probe = (): ReactNode => {
-      seen.drawn = SignedIn({ title: "Inventory import", children: "WORKSPACE" })
+      MutableRef.set(seen, SignedIn({ title: "Inventory import", children: "WORKSPACE" }))
       return null
     }
     renderToStaticMarkup(createElement(RegistryContext, { value: t.registry }, createElement(Probe)))
-    const { drawn } = seen
+    const drawn = MutableRef.get(seen)
     return isValidElement<{ readonly children?: ReactNode }>(drawn) && drawn.props.children === "WORKSPACE"
       ? O.some(O.fromNullOr(drawn.key))
       : O.none()

@@ -795,47 +795,65 @@ const comeBack = (world: World): void => {
  */
 const settles = (world: World, picks: ReadonlyArray<LinePick>): void => {
   // Lines are drawn over a picture: before one is held, the machine takes no pick.
-  if (O.isNone(world.draft.held)) return dispatchIn(world, DraftEvent.Settled({ picks }))
-  for (const { keep, rowId } of picks) {
-    const line = world.draft.lines[rowId]
-    if (line === undefined) continue
-    // This tab's decision of the row is on its way: the machine takes no pick of the row until it is answered.
-    if (O.exists(world.draft.flight, (flight) => R.has(flight.rows, rowId))) continue
-    const on = (value: Value): boolean => A.some(line.sides, (side) => isPartOf(value, side.decision))
-    Keep.$match(keep, {
-      Theirs: () => {
-        world.facts = A.filter(world.facts, (fact) => !(fact.row === rowId && on(fact.value)))
-        // Picked over a decision of hers that could be sent, what is saved stays; a refused one dismissed promises
-        // nothing of what else of hers waits.
-        if (A.some(line.sides, (side) => O.isNone(side.refused))) {
-          world.promised[rowId] = { stays: true, value: R.get(shownOfServer(world), rowId) }
-        } else delete world.promised[rowId]
-      },
-      Side: ({ decision }) => {
-        const side = A.findFirst(line.sides, (one) => sameDecision(one.decision, decision))
-        if (O.isNone(side)) return
-        // The one picked is hers from this tab now, whichever tab made it; the others on the line are let go.
-        world.facts = A.map(
-          A.filter(world.facts, (fact) => fact.row !== rowId || !on(fact.value) || isPartOf(fact.value, decision)),
-          (fact) => (fact.row === rowId && isPartOf(fact.value, decision) ? { ...fact, here: true } : fact)
-        )
-        // What the line shows the server to hold is what the pick stands over.
-        const theirs = [R.get(shownOfServer(world), rowId), ...O.match(line.theirs, { onNone: A.empty, onSome: A.of })]
-        // A refused decision is never sent by a pick: nothing of hers waits for it.
-        if (O.isNone(side.value.refused)) {
-          presses(world, rowId, decision, theirs)
-          world.waited[rowId] = true
-          // Picked as a decision that can be sent (another tab had it, not refused there): no refusal of it stands.
-          world.refused = A.filter(world.refused, (one) => !(one.row === rowId && sameDecision(one.value, decision)))
-          // Picked as what the screen knows the server holds, it is a pick of what is saved: that stays.
-          const isSaved = sameDecision(decision, R.get(shownOfServer(world), rowId))
-          world.promised[rowId] = { stays: isSaved, value: decision }
-        } else delete world.promised[rowId]
-      }
-    })
-    delete world.confirmed[rowId]
-    forget(world, rowId)
-  }
+  O.map(world.draft.held, () => {
+    for (const { keep, rowId } of picks) {
+      O.map(R.get(world.draft.lines, rowId), (line) => {
+        // This tab's decision of the row is on its way: the machine takes no pick of the row until it is answered.
+        if (O.exists(world.draft.flight, (flight) => R.has(flight.rows, rowId))) return
+        const on = (value: Value): boolean => A.some(line.sides, (side) => isPartOf(value, side.decision))
+        Keep.$match(keep, {
+          Theirs: () => {
+            world.facts = A.filter(world.facts, (fact) => !(fact.row === rowId && on(fact.value)))
+            // Picked over a decision of hers that could be sent, what is saved stays; a refused one dismissed promises
+            // nothing of what else of hers waits.
+            if (A.some(line.sides, (side) => O.isNone(side.refused))) {
+              world.promised[rowId] = { stays: true, value: R.get(shownOfServer(world), rowId) }
+            } else delete world.promised[rowId]
+          },
+          Side: ({ decision }) => {
+            O.map(
+              A.findFirst(line.sides, (one) => sameDecision(one.decision, decision)),
+              (side) => {
+                // The one picked is hers from this tab now, whichever tab made it; the others on the line are let go.
+                world.facts = A.map(
+                  A.filter(
+                    world.facts,
+                    (fact) => fact.row !== rowId || !on(fact.value) || isPartOf(fact.value, decision)
+                  ),
+                  (fact) => (fact.row === rowId && isPartOf(fact.value, decision) ? { ...fact, here: true } : fact)
+                )
+                // What the line shows the server to hold is what the pick stands over.
+                const theirs = [
+                  R.get(shownOfServer(world), rowId),
+                  ...O.match(line.theirs, { onNone: A.empty, onSome: A.of })
+                ]
+                // A refused decision is never sent by a pick: nothing of hers waits for it.
+                O.match(side.refused, {
+                  onNone: () => {
+                    presses(world, rowId, decision, theirs)
+                    world.waited[rowId] = true
+                    // Picked as a decision that can be sent (another tab had it, not refused there): no refusal of it stands.
+                    world.refused = A.filter(
+                      world.refused,
+                      (one) => !(one.row === rowId && sameDecision(one.value, decision))
+                    )
+                    // Picked as what the screen knows the server holds, it is a pick of what is saved: that stays.
+                    const isSaved = sameDecision(decision, R.get(shownOfServer(world), rowId))
+                    world.promised[rowId] = { stays: isSaved, value: decision }
+                  },
+                  onSome: () => {
+                    delete world.promised[rowId]
+                  }
+                })
+              }
+            )
+          }
+        })
+        delete world.confirmed[rowId]
+        forget(world, rowId)
+      })
+    }
+  })
   dispatchIn(world, DraftEvent.Settled({ picks }))
 }
 
@@ -876,76 +894,84 @@ const runIn = (world: World, command: Command): void => {
   if (world.removed) return
   Command.match(command, {
     PressConfirm: () => {
-      if (world.draft.onScreen && O.isSome(world.draft.held)) dispatchIn(world, DraftEvent.ConfirmPressed())
+      if (world.draft.onScreen) O.map(world.draft.held, () => dispatchIn(world, DraftEvent.ConfirmPressed()))
     },
     ServerTakesConfirm: () =>
       void O.map(world.confirm, (confirm) => {
-        if (O.isSome(confirm.answer) || !world.server.open) return
-        // Made on another revision than the draft is at: the server writes nothing.
-        if (confirm.revision !== world.server.revision) {
-          world.confirm = O.some({ ...confirm, answer: O.some("moved") })
-          return
-        }
-        const rows = rowsOf(confirm.delta)
-        if (
-          R.some(
-            rows,
-            (value, row) =>
-              hasAccept(value) &&
-              O.match(R.get(confirm.madeOn, row), {
-                onNone: () => world.server.matchedAt > 0,
-                onSome: (revision) => revision < world.server.matchedAt
-              })
-          )
-        ) {
-          world.confirm = O.some({ ...confirm, answer: O.some("stale") })
-          return
-        }
-        for (const [row, value] of R.toEntries(rows)) {
-          replaces(world, { row, value, named: O.none(), isLive: A.contains(confirm.live, row) })
-          keeps(world, row, value)
-          if (!Eq.equals(R.get(world.server.decisions, row), value)) stores(world, row, value, "this tab")
-        }
-        const written = over(world.server.decisions, rows)
-        // The rule: what a confirm writes is what its screen showed. No decision it had not shown, none missing.
-        expect(written, "a confirm wrote another thing than its screen showed").toEqual(confirm.shown)
-        moves(world, { decisions: written, open: false, confirms: world.server.confirms + 1 })
-        world.confirm = O.some({ ...confirm, answer: O.some("made") })
+        O.match(confirm.answer, {
+          onSome: () => {},
+          onNone: () => {
+            if (!world.server.open) return
+            // Made on another revision than the draft is at: the server writes nothing.
+            if (confirm.revision !== world.server.revision) {
+              world.confirm = O.some({ ...confirm, answer: O.some("moved") })
+              return
+            }
+            const rows = rowsOf(confirm.delta)
+            if (
+              R.some(
+                rows,
+                (value, row) =>
+                  hasAccept(value) &&
+                  O.match(R.get(confirm.madeOn, row), {
+                    onNone: () => world.server.matchedAt > 0,
+                    onSome: (revision) => revision < world.server.matchedAt
+                  })
+              )
+            ) {
+              world.confirm = O.some({ ...confirm, answer: O.some("stale") })
+              return
+            }
+            for (const [row, value] of R.toEntries(rows)) {
+              replaces(world, { row, value, named: O.none(), isLive: A.contains(confirm.live, row) })
+              keeps(world, row, value)
+              if (!Eq.equals(R.get(world.server.decisions, row), value)) stores(world, row, value, "this tab")
+            }
+            const written = over(world.server.decisions, rows)
+            // The rule: what a confirm writes is what its screen showed. No decision it had not shown, none missing.
+            expect(written, "a confirm wrote another thing than its screen showed").toEqual(confirm.shown)
+            moves(world, { decisions: written, open: false, confirms: world.server.confirms + 1 })
+            world.confirm = O.some({ ...confirm, answer: O.some("made") })
+          }
+        })
       }),
     ConfirmAnswers: () =>
       void O.map(world.confirm, (confirm) => {
-        if (O.isNone(confirm.answer)) return
-        world.confirm = O.none()
-        const { id } = confirm
-        if (confirm.answer.value === "made") {
-          // The answer is the closed import, put into the tab's view first, as the runner does (`putConfirmed`).
-          world.confirmed = {}
-          world.region = O.none()
-          for (const row of R.keys(world.unanswered)) forget(world, row)
-          const made = world.history[confirm.revision + 1]!
-          if (!O.exists(world.view, (view) => view.revision > made.revision)) world.view = O.some(made)
-          world.told = Math.max(world.told, made.revision)
-          dispatchIn(world, DraftEvent.ConfirmDone({ id, revision: made.revision, decisions: made.decisions }))
-          return
-        }
-        const accepts = A.map(
-          A.filter(
-            R.toEntries(rowsOf(confirm.delta)),
-            ([row, value]) =>
-              hasAccept(value) &&
-              O.match(R.get(confirm.madeOn, row), {
-                onNone: () => world.server.matchedAt > 0,
-                onSome: (revision) => revision < world.server.matchedAt
-              })
-          ),
-          ([row]) => ({ rowId: row, field: "unitCost", kind: "accept" as const })
-        )
-        // Nothing was written: the rows wait.
-        allWaited(world)
-        dispatchIn(
-          world,
-          confirm.answer.value === "moved" ? DraftEvent.ConfirmMoved({ id }) : DraftEvent.ConfirmStale({ id, accepts })
-        )
+        O.map(confirm.answer, (received) => {
+          world.confirm = O.none()
+          const { id } = confirm
+          if (received === "made") {
+            // The answer is the closed import, put into the tab's view first, as the runner does (`putConfirmed`).
+            world.confirmed = {}
+            world.region = O.none()
+            for (const row of R.keys(world.unanswered)) forget(world, row)
+            const madeAt = A.get(world.history, confirm.revision + 1)
+            assertTrue(O.isSome(madeAt), "a completed confirm has its written revision in history")
+            const made = madeAt.value
+            if (!O.exists(world.view, (view) => view.revision > made.revision)) world.view = O.some(made)
+            world.told = Math.max(world.told, made.revision)
+            dispatchIn(world, DraftEvent.ConfirmDone({ id, revision: made.revision, decisions: made.decisions }))
+            return
+          }
+          const accepts = A.map(
+            A.filter(
+              R.toEntries(rowsOf(confirm.delta)),
+              ([row, value]) =>
+                hasAccept(value) &&
+                O.match(R.get(confirm.madeOn, row), {
+                  onNone: () => world.server.matchedAt > 0,
+                  onSome: (revision) => revision < world.server.matchedAt
+                })
+            ),
+            ([row]) => ({ rowId: row, field: "unitCost", kind: "accept" as const })
+          )
+          // Nothing was written: the rows wait.
+          allWaited(world)
+          dispatchIn(
+            world,
+            received === "moved" ? DraftEvent.ConfirmMoved({ id }) : DraftEvent.ConfirmStale({ id, accepts })
+          )
+        })
       }),
     // Lost on its way to the server (nothing was written), or its answer lost on the way back (made, or refused):
     // either way the screen does not know what was written.
@@ -956,63 +982,65 @@ const runIn = (world: World, command: Command): void => {
         dispatchIn(world, DraftEvent.ConfirmFailed({ id }))
       }),
     Decide: ({ row, to }) => {
-      if (!world.draft.onScreen || O.isNone(world.draft.held)) return
-      // The person acts on what the region shows, and what is sent is what that action changed there.
-      const before = regionShows(world)
-      const after = over(before, change(row, to))
-      if (Eq.equals(after, before)) return
-      const value = valueOf(to)
-      const showed = R.get(before, row)
-      const wasPending = A.contains(pending(world.draft), row)
-      const own = A.filter(
-        O.match(O.fromUndefinedOr(world.draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }),
-        (side) => side.here
-      )
-      // Their earlier decision of the row, shown on the screen or this tab's on its line, is replaced by this one.
-      world.facts = A.filter(
-        world.facts,
-        (fact) =>
-          fact.row !== row ||
-          !(
-            (wasPending && isPartOf(fact.value, showed)) ||
-            // A closed tab's decision equal to this tab's is one with it (read once, sent once): replaced with it.
-            A.some(own, (side) => isPartOf(fact.value, side.decision)) ||
-            (fact.here && wasPending)
-          )
-      )
-      // A closed tab's decision the server refused is settled by deciding the row again (Benjamin, 2026-11-21: "until
-      // the person decides the row again or dismisses the line").
-      world.facts = A.filter(
-        world.facts,
-        (fact) =>
-          fact.row !== row ||
-          fact.here ||
-          !A.some(world.refused, (one) => one.row === row && sameDecision(one.value, fact.value))
-      )
-      world.facts = [...world.facts, { row, value, here: true }]
-      world.refused = A.filter(world.refused, (one) => !(one.row === row && isPartOf(value, one.value)))
-      delete world.confirmed[row]
-      delete world.promised[row]
-      forget(world, row)
-      // The decision it rests on counts as seen.
-      presses(world, row, value, [showed])
-      // What the screen knows is behind (an answer said so) makes it no live press.
-      if (!wasPending) world.waited[row] = O.isSome(world.draft.landed)
-      // Decided again with no closed tab's decision standing on the line (a refused one is settled by this one, and one
-      // not refused stays a side beside it): what goes of the row is this tab's own, as it was.
-      const theirsStands = O.exists(R.get(world.draft.lines, row), (line) =>
-        A.some(line.sides, (side) => !side.here && O.isNone(side.refused))
-      )
-      if (!theirsStands) delete world.besideWaited[row]
-      world.region = O.some(after)
-      dispatchIn(world, DraftEvent.Decided({ changes: change(row, to) }))
-      // Decided back to what the screen knew before anything of it was sent: an undo, not a decision of its own.
-      const is = (fact: { readonly row: string; readonly value: Value }) =>
-        fact.row === row && sameDecision(fact.value, value)
-      if (!A.some(placed(world.draft), is) && Eq.equals(R.get(shownOfServer(world), row), value)) {
-        world.facts = A.filter(world.facts, (fact) => !(is(fact) && fact.here))
-        world.waited[row] = false
-      }
+      if (!world.draft.onScreen) return
+      O.map(world.draft.held, () => {
+        // The person acts on what the region shows, and what is sent is what that action changed there.
+        const before = regionShows(world)
+        const after = over(before, change(row, to))
+        if (Eq.equals(after, before)) return
+        const value = valueOf(to)
+        const showed = R.get(before, row)
+        const wasPending = A.contains(pending(world.draft), row)
+        const own = A.filter(
+          O.match(O.fromUndefinedOr(world.draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }),
+          (side) => side.here
+        )
+        // Their earlier decision of the row, shown on the screen or this tab's on its line, is replaced by this one.
+        world.facts = A.filter(
+          world.facts,
+          (fact) =>
+            fact.row !== row ||
+            !(
+              (wasPending && isPartOf(fact.value, showed)) ||
+              // A closed tab's decision equal to this tab's is one with it (read once, sent once): replaced with it.
+              A.some(own, (side) => isPartOf(fact.value, side.decision)) ||
+              (fact.here && wasPending)
+            )
+        )
+        // A closed tab's decision the server refused is settled by deciding the row again (Benjamin, 2026-11-21: "until
+        // the person decides the row again or dismisses the line").
+        world.facts = A.filter(
+          world.facts,
+          (fact) =>
+            fact.row !== row ||
+            fact.here ||
+            !A.some(world.refused, (one) => one.row === row && sameDecision(one.value, fact.value))
+        )
+        world.facts = [...world.facts, { row, value, here: true }]
+        world.refused = A.filter(world.refused, (one) => !(one.row === row && isPartOf(value, one.value)))
+        delete world.confirmed[row]
+        delete world.promised[row]
+        forget(world, row)
+        // The decision it rests on counts as seen.
+        presses(world, row, value, [showed])
+        // What the screen knows is behind (an answer said so) makes it no live press.
+        if (!wasPending) world.waited[row] = O.isSome(world.draft.landed)
+        // Decided again with no closed tab's decision standing on the line (a refused one is settled by this one, and one
+        // not refused stays a side beside it): what goes of the row is this tab's own, as it was.
+        const theirsStands = O.exists(R.get(world.draft.lines, row), (line) =>
+          A.some(line.sides, (side) => !side.here && O.isNone(side.refused))
+        )
+        if (!theirsStands) delete world.besideWaited[row]
+        world.region = O.some(after)
+        dispatchIn(world, DraftEvent.Decided({ changes: change(row, to) }))
+        // Decided back to what the screen knew before anything of it was sent: an undo, not a decision of its own.
+        const is = (fact: { readonly row: string; readonly value: Value }) =>
+          fact.row === row && sameDecision(fact.value, value)
+        if (!A.some(placed(world.draft), is) && Eq.equals(R.get(shownOfServer(world), row), value)) {
+          world.facts = A.filter(world.facts, (fact) => !(is(fact) && fact.here))
+          world.waited[row] = false
+        }
+      })
     },
     SomeoneElse: ({ row, to }) => {
       if (!world.server.open) return
@@ -1083,38 +1111,44 @@ const runIn = (world: World, command: Command): void => {
     ServerTakesSave: ({ which }) =>
       void O.map(saveOf(world, which), (save) => {
         // A closed import takes no save: it refuses it (`SaveRefused`).
-        if (O.isSome(save.answer) || !world.server.open) return
-        replaceSave(world, { ...save, answer: takes(world, save) })
+        O.match(save.answer, {
+          onSome: () => {},
+          onNone: () => {
+            if (!world.server.open) return
+            replaceSave(world, { ...save, answer: takes(world, save) })
+          }
+        })
       }),
     SaveAnswers: ({ which }) =>
       void O.map(saveOf(world, which), (save) => {
-        if (O.isNone(save.answer)) return
-        const answer = save.answer.value
-        const current = isCurrent(world, save)
-        dropSave(world, save)
-        for (const row of R.keys(rowsOf(save.delta))) forget(world, row)
-        world.told = Math.max(world.told, current ? answer.revision : 0)
-        if (current) {
-          const since = A.map(answer.decidedSince, (one) => one.rowId)
-          // Somebody saved in between: what waits behind it is no live press any more.
-          if (
-            !answer.changed ||
-            !O.exists(world.draft.held, (held) => held.revision + 1 === answer.revision) ||
-            O.isSome(world.draft.landed)
-          ) {
-            if (!O.exists(world.draft.held, (held) => answer.revision <= held.revision)) allWaited(world)
-          }
-          for (const row of since) world.waited[row] = true
-          for (const [row, value] of R.toEntries(rowsOf(save.delta))) {
-            const taken = A.some(answer.notApplied, (one) => one.rowId === row)
-            const stored = taken ? withoutAccept(value) : value
-            const same = sameDecision(R.get(world.server.decisions, row), stored)
-            if (!A.contains(since, row) && latestIs(world, row, value) && same && world.byElse[row] !== true) {
-              world.confirmed[row] = R.get(world.server.decisions, row)
+        O.map(save.answer, (received) => {
+          const answer = received
+          const current = isCurrent(world, save)
+          dropSave(world, save)
+          for (const row of R.keys(rowsOf(save.delta))) forget(world, row)
+          world.told = Math.max(world.told, current ? answer.revision : 0)
+          if (current) {
+            const since = A.map(answer.decidedSince, (one) => one.rowId)
+            // Somebody saved in between: what waits behind it is no live press any more.
+            if (
+              !answer.changed ||
+              !O.exists(world.draft.held, (held) => held.revision + 1 === answer.revision) ||
+              O.isSome(world.draft.landed)
+            ) {
+              if (!O.exists(world.draft.held, (held) => answer.revision <= held.revision)) allWaited(world)
+            }
+            for (const row of since) world.waited[row] = true
+            for (const [row, value] of R.toEntries(rowsOf(save.delta))) {
+              const taken = A.some(answer.notApplied, (one) => one.rowId === row)
+              const stored = taken ? withoutAccept(value) : value
+              const same = sameDecision(R.get(world.server.decisions, row), stored)
+              if (!A.contains(since, row) && latestIs(world, row, value) && same && world.byElse[row] !== true) {
+                world.confirmed[row] = R.get(world.server.decisions, row)
+              }
             }
           }
-        }
-        dispatchIn(world, DraftEvent.SaveAnswered({ id: save.id, ...answer }))
+          dispatchIn(world, DraftEvent.SaveAnswered({ id: save.id, ...answer }))
+        })
       }),
     SaveFails: ({ which }) =>
       void O.map(saveOf(world, which), (save) => {
@@ -1124,26 +1158,34 @@ const runIn = (world: World, command: Command): void => {
       }),
     SaveSignedOut: ({ which }) =>
       void O.map(saveOf(world, which), (save) => {
-        if (O.isSome(save.answer)) return
-        if (isCurrent(world, save)) allWaited(world)
-        lost(world, save)
-        dropSave(world, save)
-        dispatchIn(world, DraftEvent.SaveSignedOut({ id: save.id }))
+        O.match(save.answer, {
+          onSome: () => {},
+          onNone: () => {
+            if (isCurrent(world, save)) allWaited(world)
+            lost(world, save)
+            dropSave(world, save)
+            dispatchIn(world, DraftEvent.SaveSignedOut({ id: save.id }))
+          }
+        })
       }),
     SaveRefused: ({ which }) =>
       void O.map(saveOf(world, which), (save) => {
-        if (O.isSome(save.answer)) return
-        // Refused: what it carried is no unanswered send of this tab's any more.
-        const carried = rowsOf(save.delta)
-        for (const row of R.keys(carried)) forget(world, row)
-        if (isCurrent(world, save)) {
-          allWaited(world)
-          for (const [row, value] of R.toEntries(carried)) {
-            if (latestHere(world, row, value)) world.refused = [...world.refused, { row, value }]
+        O.match(save.answer, {
+          onSome: () => {},
+          onNone: () => {
+            // Refused: what it carried is no unanswered send of this tab's any more.
+            const carried = rowsOf(save.delta)
+            for (const row of R.keys(carried)) forget(world, row)
+            if (isCurrent(world, save)) {
+              allWaited(world)
+              for (const [row, value] of R.toEntries(carried)) {
+                if (latestHere(world, row, value)) world.refused = [...world.refused, { row, value }]
+              }
+            }
+            dropSave(world, save)
+            dispatchIn(world, DraftEvent.SaveRefused({ id: save.id, reason: "The import was already imported." }))
           }
-        }
-        dropSave(world, save)
-        dispatchIn(world, DraftEvent.SaveRefused({ id: save.id, reason: "The import was already imported." }))
+        })
       }),
     SaveAgain: () => dispatchIn(world, DraftEvent.SaveAgain()),
     // The tab asks for the import again, and gives the view it holds again meanwhile, as waiting.
@@ -1183,7 +1225,9 @@ const runIn = (world: World, command: Command): void => {
       if (!world.draft.onScreen) return
       // The closed tab decided the row on a state the server was in, over what it held then.
       const madeOn = Math.max(1, world.server.revision - 1)
-      const then = world.history[madeOn]!
+      const previous = A.get(world.history, madeOn)
+      assertTrue(O.isSome(previous), "the take-up revision is already in server history")
+      const then = previous.value
       const base = R.get(then.decisions, row)
       const value = valueOf(to)
       const side = (decision: Value, parts: Partial<Side>): Side => ({
@@ -1227,9 +1271,10 @@ const runIn = (world: World, command: Command): void => {
       for (const one of sides) add(one.decision)
       for (const one of [own, ...sides]) {
         // Made again in that tab and not refused there, it is no refused decision any more.
-        world.refused = O.isSome(one.refused)
-          ? [...world.refused, { row, value: one.decision }]
-          : A.filter(world.refused, (was) => !(was.row === row && sameDecision(was.value, one.decision)))
+        world.refused = O.match(one.refused, {
+          onSome: () => [...world.refused, { row, value: one.decision }],
+          onNone: () => A.filter(world.refused, (was) => !(was.row === row && sameDecision(was.value, one.decision)))
+        })
       }
       const onLine = as === "refused" ? [own, ...sides] : beside === "another" ? [own, ...sides] : sides
       const entry: Waiting = {

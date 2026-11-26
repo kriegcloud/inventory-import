@@ -1,3 +1,4 @@
+import * as R from "effect/Record"
 // The pure part of applying an assistant's answer to a table: the view before, a change, the view after, and the patch
 // that takes back just that change. The table's own state is read and written by `useTableView`, so the sort and filter
 // menus show exactly what the assistant set: it is the same state, never a copy beside it.
@@ -126,7 +127,7 @@ export const applyChange = (input: {
     state: { ...state, visibility: { ...state.visibility, [column]: shown } },
     patch: Patch.make({
       visibility: O.some({
-        [column]: O.match(O.fromUndefinedOr(state.visibility[column]), { onNone: () => true, onSome: (shown) => shown })
+        [column]: O.match(R.get(state.visibility, column), { onNone: () => true, onSome: (shown) => shown })
       })
     })
   })

@@ -1,3 +1,4 @@
+import { RowId } from "@inventory/catalog-contract/Ids"
 import { assertTrue } from "@effect/vitest/utils"
 // What a line offers and what a pick does: nothing a pick could be undone by this tab's own save on its way, and the
 // line then follows what the server holds; a closed tab's refused decision lets the confirm go once the row is decided
@@ -8,7 +9,6 @@ import * as A from "effect/Array"
 import * as Formatter from "effect/Formatter"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as S from "effect/Schema"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import {
@@ -203,14 +203,16 @@ describe("the confirm and a row that waits", () => {
 })
 
 describe("the line that names what a match took back", () => {
-  // @effect-diagnostics-next-line schemaSync:off
-  const taken = S.decodeSync(MatchTakeBack)({
+  const taken = MatchTakeBack.make({
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none(),
     revision: 7,
     by: "Marcus Oyelaran",
     field: "unitCost",
     kind: "accept",
     count: 3,
-    rows: ["row-4", "row-9", "row-12"]
+    rows: [RowId.make("row-4"), RowId.make("row-9"), RowId.make("row-12")]
   })
 
   it("names the rows not decided again, and tells only somebody who can decide to decide again", () => {

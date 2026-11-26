@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 import * as O from "effect/Option"
 // An upload is one member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody
 // else. Another organization the person switches to waits for it: still sending, it is stopped, what reached the server
@@ -119,7 +120,9 @@ const world = () => {
   const ended: Array<UploadEnd> = []
   registry.mount(startUpload)
   registry.set(startUpload, { sheet: O.none(), file: new File(["a"], "items.csv"), onEnd: (end) => ended.push(end) })
-  const reader = browser.readers[browser.readers.length - 1]!
+  const requiredEntry1 = A.get(browser.readers, browser.readers.length - 1)
+  assertTrue(O.isSome(requiredEntry1), "expected browser.readers[browser.readers.length - 1]")
+  const reader = requiredEntry1.value
   const says = (message: ReadMessage) => reader.onmessage?.({ data: message })
   /** The file's head is read: the upload begins. */
   const begin = () => says(ReadMessage.Head({ head: head as never, chunkSizes: [1, 1], workbook: null }))

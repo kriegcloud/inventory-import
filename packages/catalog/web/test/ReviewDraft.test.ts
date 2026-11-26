@@ -123,14 +123,31 @@ const world = (id: ImportId) => {
       }
     },
     give: (view: ImportView) => registry.set(importView(id), view),
-    answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
+    answerGet: (n: number, view: ImportView) => {
+      const requiredEntry1 = A.get(gets, n)
+      assertTrue(O.isSome(requiredEntry1), "expected gets[n]")
+      return Deferred.succeed(requiredEntry1.value, view)
+    },
     /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
-    answerSave: (n: number, revision: number, changed: boolean) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [], decidedSince: [] }),
-    refuseSave: (n: number) =>
-      Deferred.fail(saves[n]!.answer, AlreadyImported.make({ reason: "This import was confirmed already." })),
+    answerSave: (n: number, revision: number, changed: boolean) => {
+      const requiredEntry2 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry2), "expected saves[n]")
+      return Deferred.succeed(requiredEntry2.value.answer, { revision, changed, notApplied: [], decidedSince: [] })
+    },
+    refuseSave: (n: number) => {
+      const requiredEntry3 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry3), "expected saves[n]")
+      return Deferred.fail(
+        requiredEntry3.value.answer,
+        AlreadyImported.make({ reason: "This import was confirmed already." })
+      )
+    },
     /** The server fails the save itself: the client sends it again, later. */
-    failSave: (n: number) => Deferred.fail(saves[n]!.answer, HttpApiError.InternalServerErrorProblem.make({})),
+    failSave: (n: number) => {
+      const requiredEntry4 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry4), "expected saves[n]")
+      return Deferred.fail(requiredEntry4.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
+    },
     gets: () => gets.length,
     held: () => {
       const expectedSome1 = registry.get(importView(id)).pipe(AsyncResult.value)

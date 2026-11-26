@@ -1,3 +1,4 @@
+import { parameter } from "./internal/browser.ts"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
@@ -508,7 +509,7 @@ const itemsQuestion = Atom.readable((get) => {
   const { path, params } = get(location)
   const held = get.self<ItemsQuestion>()
   if (path !== "/items" && O.isSome(held)) return held.value
-  const searching = O.exists(O.fromNullOr(params.get(itemsTable.urlKeys.search)), (search) => /\S/.test(search))
+  const searching = O.exists(parameter(itemsTable.urlKeys.search)(params), (search) => /\S/.test(search))
   const config = searching ? searchedTable : itemsTable
   return { searching, config, query: config.parse(params.toString()) }
 })
@@ -731,7 +732,7 @@ export function ItemsPage() {
   // While searching with no order chosen, the line says how the rows are ordered: no heading shows it.
   const order = searching && query.sorting.length === 0 ? ", best matches first" : ""
   const line = O.match(total, {
-    onNone: () => O.match(page.error, { onNone: () => "loading" as const, onSome: () => undefined }),
+    onNone: () => O.match(page.error, { onNone: () => O.some<"loading">("loading"), onSome: () => O.none() }),
     onSome: (total) => {
       const counted = O.match(all, {
         onNone: () => `${whole.format(total)} ${total === 1 ? "item" : "items"}`,
@@ -740,7 +741,9 @@ export function ItemsPage() {
             ? `${whole.format(total)} of ${whole.format(all)} items`
             : `${whole.format(total)} ${total === 1 ? "item" : "items"}`
       })
-      return `${counted}${total > 0 ? order : ""}${leftOut > 0 ? `; searched by the first ${maxSearchWords} words` : ""}`
+      return O.some(
+        `${counted}${total > 0 ? order : ""}${leftOut > 0 ? `; searched by the first ${maxSearchWords} words` : ""}`
+      )
     }
   })
 
@@ -796,7 +799,7 @@ export function ItemsPage() {
     <div className="flex h-full flex-col">
       <PageHeader
         title="Items"
-        line={line}
+        {...O.match(line, { onNone: () => ({}), onSome: (line) => ({ line }) })}
         // A viewer cannot import: the button would lead to a screen that says so.
         {...(canImport
           ? { actions: <Button onClick={() => navigate("/", { replace: false })}>Import a file</Button> }

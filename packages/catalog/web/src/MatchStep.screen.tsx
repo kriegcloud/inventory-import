@@ -35,8 +35,8 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
   const { view, table } = props
   const matching = useAtomValue(matchColumn).waiting
   const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
-  const match = (input: { field: Field; column: number | null }) =>
-    void matchOne({ id: view.id, field: input.field, column: O.fromNullOr(input.column) }).then((exit) => {
+  const match = (input: { field: Field; column: O.Option<number> }) =>
+    void matchOne({ id: view.id, field: input.field, column: input.column }).then((exit) => {
       if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
     })
 
@@ -64,7 +64,10 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
           value={O.match(matchedColumn(entry), { onNone: () => "", onSome: (column) => `${column.index}` })}
           disabled={!props.canImport || matching}
           onChange={(event) =>
-            match({ field: entry.field, column: event.target.value === "" ? null : Number(event.target.value) })
+            match({
+              field: entry.field,
+              column: event.target.value === "" ? O.none() : O.some(Number(event.target.value))
+            })
           }
         >
           <NativeSelectOption value="">None</NativeSelectOption>

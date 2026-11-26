@@ -1,3 +1,4 @@
+import * as A from "effect/Array"
 import { assertTrue } from "@effect/vitest/utils"
 // An answer put into the import's view (suggestions, a match) must change only its own part of what the view holds
 // when the answer arrives. Built from the view as it was at the press, it took back the decisions saved, or the match
@@ -59,9 +60,13 @@ describe("an answer put into the import's view", () => {
       registry.set(matchColumn, { id: importId, field: "sku", column: O.some(2) })
       yield* settle
       // The second match answers first, with the later revision; the first lands after it.
-      yield* Deferred.succeed(answers[1]!, viewAt({ revision: 12 }))
+      const requiredEntry1 = A.get(answers, 1)
+      assertTrue(O.isSome(requiredEntry1), "expected answers[1]")
+      yield* Deferred.succeed(requiredEntry1.value, viewAt({ revision: 12 }))
       yield* settle
-      yield* Deferred.succeed(answers[0]!, viewAt({ revision: 11 }))
+      const requiredEntry2 = A.get(answers, 0)
+      assertTrue(O.isSome(requiredEntry2), "expected answers[0]")
+      yield* Deferred.succeed(requiredEntry2.value, viewAt({ revision: 11 }))
       yield* settle
       const expectedSome2 = registry.get(read).pipe(AsyncResult.value)
       assertTrue(O.isSome(expectedSome2), "expected registry.get(read).pipe(AsyncResult.value)")

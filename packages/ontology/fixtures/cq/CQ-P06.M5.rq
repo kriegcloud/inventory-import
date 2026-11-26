@@ -1,14 +1,17 @@
 # Must-fail case M5, a mutant of CQ-P06 and never the question: it reaches the grant through the person, not the
 # member, so it forgets the tenant and reports a role held in one organization as held in the other.
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
 PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?tenant ?person ?member ?role
 WHERE {
-  ?member a inv:Member ;
+  ?member rdf:type/rdfs:subClassOf* inv:Member ;
           inv:membershipIn ?tenant ;
           inv:membershipOf ?person .
   ?other inv:membershipOf ?person .
-  ?grant a inv:Grant ;
+  ?grant rdf:type/rdfs:subClassOf* inv:Grant ;
          inv:grantedTo ?other ;
          inv:grantScope inv:GrantScopeKindScheme-organization ;
          inv:grantsRole ?role .

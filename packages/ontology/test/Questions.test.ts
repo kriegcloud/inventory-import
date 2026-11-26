@@ -1,5 +1,6 @@
 // Gate 8, the question suite (report 14 sections 5 and 6.8; decision 120): CQ-P06 and CQ-P11 asked of
-// `threadGraph()` in Oxigraph, with no reasoner.
+// `threadGraph()` in Oxigraph, with no reasoner. Every question walks `rdf:type/rdfs:subClassOf*` and is asked of its
+// graph with the committed OWL file beside it (decision 27), so a node typed by a subclass is found.
 //
 // The expected rows below are the lock on each question's answer (decision 118): there is no lock file and no update
 // flag. A commit that changes them says so, and the release notes name the question with its old and its new answer.
@@ -17,6 +18,7 @@ import { aboutClass, aboutPath, noTerm } from "@inventory/kernel/TermsPointer"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import mutantThroughPerson from "../fixtures/cq/CQ-P06.M5.rq?raw"
 import membersAndRoles from "../fixtures/cq/CQ-P06.rq?raw"
 import rolesAtScope from "../fixtures/cq/CQ-P11.rq?raw"
@@ -25,9 +27,11 @@ import { byCodePoint, linesOf, link, ObjectNode, without, type Triple } from "..
 import { lift } from "../src/Lift.ts"
 import { graphOf, threadContext, threadGraph, threadHandWritten, threadRows } from "../src/Thread.ts"
 import { readTurtle } from "../src/Turtle.ts"
-import { ask } from "./support/ask.ts"
+import { ask, askWhether } from "./support/ask.ts"
+import { bareType, bareTypeQuery, handWrittenFixtures, ontology } from "./support/fixtures.ts"
 
 const type = `${RdfVocab.rdf.iri}type`
+const subClassOf = `${RdfVocab.rdfs.iri}subClassOf`
 
 const membersVariables = ["tenant", "person", "member", "role"]
 const scopeVariables = ["member", "role", "scope"]
@@ -74,6 +78,19 @@ const withPredicate = (predicate: string) => (triple: Triple) => triple.predicat
 
 const iriOf = (triple: Triple): string => (ObjectNode.guards.iri(triple.object) ? triple.object.iri : "")
 
+/** The committed OWL file as a graph: what a question's walk down `rdfs:subClassOf*` reads. */
+const ontologyGraph = Effect.flatMap(threadContext, ({ vocabulary }) => readTurtle(vocabulary.base, ontology))
+
+/** A SELECT asked of `graph` with the OWL file beside it, as every question is (decision 27). */
+const asked = Effect.fnUntraced(function* (
+  graph: ReadonlyArray<Triple>,
+  query: string,
+  variables: ReadonlyArray<string>
+) {
+  const owl = yield* ontologyGraph
+  return yield* ask([...graph, ...owl], query, variables)
+})
+
 /** `Member`'s fields with `role` built afresh from `Role`, pointed at `inv:Member`: never enrolled. */
 const memberWithRole = (mark: S.Annotations.Key<Role>) =>
   S.Struct({ ...Member.fields, role: Role.pipe(S.annotateKey(mark)) }).pipe(S.annotate(aboutClass("inv:Member")))
@@ -83,7 +100,7 @@ describe("gate 8, the questions", () => {
     Effect.gen(function* () {
       const graph = yield* threadGraph()
       const expected = yield* expectedMembers
-      const rows = yield* ask(graph, membersAndRoles, membersVariables)
+      const rows = yield* asked(graph, membersAndRoles, membersVariables)
       expect(rows).toStrictEqual(expected)
     })
   )
@@ -92,7 +109,7 @@ describe("gate 8, the questions", () => {
     Effect.gen(function* () {
       const graph = yield* threadGraph()
       const n = yield* names
-      const rows = yield* ask(graph, membersAndRoles, membersVariables)
+      const rows = yield* asked(graph, membersAndRoles, membersVariables)
       expect(A.filter(rows, ([tenant]) => tenant === n.second)).toStrictEqual([
         [n.second, n.person, n.raviSecond, n.viewer]
       ])
@@ -103,16 +120,97 @@ describe("gate 8, the questions", () => {
     Effect.gen(function* () {
       const graph = yield* threadGraph()
       const expected = yield* expectedScopes
-      const rows = yield* ask(graph, rolesAtScope, scopeVariables)
+      const rows = yield* asked(graph, rolesAtScope, scopeVariables)
       expect(rows).toStrictEqual(expected)
     })
   )
 
-  it.effect("the committed query files are the questions: each names the vocabulary's namespace as its prefix", () =>
+  it.effect("the committed query files name the vocabulary's namespace, and RDF's and RDFS's for the walk", () =>
     Effect.gen(function* () {
       const { vocabulary } = yield* threadContext
-      for (const query of [membersAndRoles, mutantThroughPerson, rolesAtScope]) {
+      for (const query of [membersAndRoles, mutantThroughPerson, rolesAtScope, bareTypeQuery]) {
         expect(query).toContain(`PREFIX inv: <${vocabulary.namespace}>`)
+        expect(query).toContain(`PREFIX rdf: <${RdfVocab.rdf.iri}>`)
+        expect(query).toContain(`PREFIX rdfs: <${RdfVocab.rdfs.iri}>`)
+      }
+    })
+  )
+})
+
+/** The walk every question makes from a node to its class, and the bare step it replaces. */
+const walk = "rdf:type/rdfs:subClassOf*"
+const bareStep = (query: string) => Str.replaceAll(walk, "a")(query)
+
+/**
+ * `graph` with each typed node moved one subclass down: every `rdf:type` to a class becomes a type to a class made
+ * here, stated a subclass of it. A question that walks the subclasses gives the same rows over the result.
+ */
+const movedDown = (graph: ReadonlyArray<Triple>): ReadonlyArray<Triple> => {
+  const isTyping = (triple: Triple) => triple.predicate === type && ObjectNode.guards.iri(triple.object)
+  const typed = A.filter(graph, isTyping)
+  const classes = A.dedupe(A.map(typed, iriOf))
+  return [
+    ...A.filter(graph, (triple) => !isTyping(triple)),
+    ...A.map(typed, (triple) => link(triple.subject, type, `${iriOf(triple)}-below`)),
+    ...A.map(classes, (given) => link(`${given}-below`, subClassOf, given))
+  ]
+}
+
+describe("gate 8, every question walks the subclasses (decision 27)", () => {
+  it.effect("planted: the query written `a inv:Organization` misses the node typed only a Tenant", () =>
+    Effect.gen(function* () {
+      const { vocabulary } = yield* threadContext
+      const fixture = yield* readTurtle(vocabulary.base, bareType)
+      const node = `${vocabulary.base}/fixture/Tenant/test_TenantOnly`
+      expect(linesOf(fixture)).toStrictEqual(linesOf([link(node, type, `${vocabulary.namespace}Tenant`)]))
+      const bare = yield* asked(fixture, bareTypeQuery, ["organization"])
+      expect(bare).toStrictEqual([])
+      // The near miss: the same query with its one type step walked finds the tenant through the OWL file.
+      const walked = Str.replace("?organization a inv:", `?organization ${walk} inv:`)(bareTypeQuery)
+      expect(bareStep(walked)).toBe(bareTypeQuery)
+      const found = yield* asked(fixture, walked, ["organization"])
+      expect(found).toStrictEqual([[node]])
+    })
+  )
+
+  it.effect("the walk reads the OWL file: without it no organization is found, with it the tenant is", () =>
+    Effect.gen(function* () {
+      const { vocabulary } = yield* threadContext
+      const fixture = yield* readTurtle(vocabulary.base, bareType)
+      const owl = yield* ontologyGraph
+      const query = `PREFIX inv: <${vocabulary.namespace}>
+PREFIX rdf: <${RdfVocab.rdf.iri}>
+PREFIX rdfs: <${RdfVocab.rdfs.iri}>
+ASK { ?organization ${walk} inv:Organization }`
+      const alone = yield* askWhether(fixture, query)
+      const beside = yield* askWhether([...fixture, ...owl], query)
+      expect([alone, beside]).toStrictEqual([false, true])
+    })
+  )
+
+  it.effect("each question gives the same rows with every typed node one subclass down, its bare twin none", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const moved = movedDown(graph)
+      expect(moved).toHaveLength(graph.length + 4)
+      const questions: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
+        [membersAndRoles, membersVariables],
+        [mutantThroughPerson, membersVariables],
+        [rolesAtScope, scopeVariables]
+      ]
+      for (const [query, variables] of questions) {
+        expect(query).toContain(walk)
+        const rows = yield* asked(graph, query, variables)
+        const below = yield* asked(moved, query, variables)
+        expect(rows).not.toStrictEqual([])
+        expect(below).toStrictEqual(rows)
+        // Planted: the same question with bare type steps answers the graph as typed, and nothing one class down.
+        const bare = bareStep(query)
+        expect(bare).not.toContain(walk)
+        const bareRows = yield* asked(graph, bare, variables)
+        const bareBelow = yield* asked(moved, bare, variables)
+        expect(bareRows).toStrictEqual(rows)
+        expect(bareBelow).toStrictEqual([])
       }
     })
   )
@@ -123,7 +221,7 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
     Effect.gen(function* () {
       const { written } = yield* parts
       expect(written).toHaveLength(5)
-      const rows = yield* ask(written, membersAndRoles, membersVariables)
+      const rows = yield* asked(written, membersAndRoles, membersVariables)
       expect(rows).toStrictEqual([])
     })
   )
@@ -134,7 +232,7 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       const n = yield* names
       const less = A.filter(graph, (triple) => !withPredicate(n.inv("grantsRole"))(triple))
       expect(less).toHaveLength(graph.length - 2)
-      const rows = yield* ask(less, membersAndRoles, membersVariables)
+      const rows = yield* asked(less, membersAndRoles, membersVariables)
       expect(rows).toStrictEqual([])
     })
   )
@@ -161,8 +259,8 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       expect(grants).toHaveLength(2)
       expect(direct).toHaveLength(2)
       expect(ungranted).toHaveLength(graph.length - 8 + 2)
-      const rows = yield* ask(ungranted, membersAndRoles, membersVariables)
-      const scoped = yield* ask(ungranted, rolesAtScope, scopeVariables)
+      const rows = yield* asked(ungranted, membersAndRoles, membersVariables)
+      const scoped = yield* asked(ungranted, rolesAtScope, scopeVariables)
       expect(rows).toStrictEqual([])
       expect(scoped).toStrictEqual([])
     })
@@ -176,7 +274,7 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       const changed = A.map(rows, (row) => (row["id"] === "test_RaviWorks" ? { ...row, role: "editor" } : row))
       expect(changed).not.toStrictEqual(rows)
       const graph = yield* graphOf(context, Member, changed, threadHandWritten)
-      const answer = yield* ask(graph, membersAndRoles, membersVariables)
+      const answer = yield* asked(graph, membersAndRoles, membersVariables)
       expect(answer).toStrictEqual([
         [n.works, n.person, n.raviWorks, n.editor],
         [n.second, n.person, n.raviSecond, n.viewer]
@@ -188,8 +286,8 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
     Effect.gen(function* () {
       const graph = yield* threadGraph()
       const n = yield* names
-      const rows = yield* ask(graph, mutantThroughPerson, membersVariables)
-      const asked = yield* ask(graph, membersAndRoles, membersVariables)
+      const rows = yield* asked(graph, mutantThroughPerson, membersVariables)
+      const asWritten = yield* asked(graph, membersAndRoles, membersVariables)
       const wrong = [n.second, n.person, n.raviSecond, n.admin]
       // The mutant differs from the question by its join alone, so its four rows are compared whatever their order.
       const sorted = A.sort(A.map(rows, A.join(" ")), byCodePoint)
@@ -209,7 +307,7 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       )
       // It reports Ravi as admin of the second organization; the question as written, asked of the same graph, does not.
       expect(rows).toContainEqual(wrong)
-      expect(asked).not.toContainEqual(wrong)
+      expect(asWritten).not.toContainEqual(wrong)
     })
   )
 
@@ -219,7 +317,7 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
       const n = yield* names
       const copy = memberWithRole(noTerm("screen"))
       const graph = yield* graphOf(context, copy, threadRows, threadHandWritten)
-      const rows = yield* ask(graph, membersAndRoles, membersVariables)
+      const rows = yield* asked(graph, membersAndRoles, membersVariables)
       expect(rows).toStrictEqual([])
       const membersOnly = [
         link(n.raviWorks, type, n.inv("Member")),
@@ -245,8 +343,8 @@ describe("gate 8, the must-fail cases of CQ-P06", () => {
         ])
       )
       const graph = yield* graphOf(context, copy, threadRows, threadHandWritten)
-      const rows = yield* ask(graph, membersAndRoles, membersVariables)
-      const scoped = yield* ask(graph, rolesAtScope, scopeVariables)
+      const rows = yield* asked(graph, membersAndRoles, membersVariables)
+      const scoped = yield* asked(graph, rolesAtScope, scopeVariables)
       expect(rows).toStrictEqual([])
       expect(scoped).toStrictEqual([])
       const unscoped = A.filter(lifted, (triple) => !withPredicate(n.inv("grantScope"))(triple))
@@ -273,12 +371,12 @@ describe("gate 8, what CQ-P06 asks of a node's type", () => {
       const noMember = untyped(n.raviWorks, n.inv("Member"))
       const noGrant = untyped(`${n.raviSecond}/role`, n.inv("Grant"))
       expect([noMember.length, noGrant.length]).toStrictEqual([graph.length - 1, graph.length - 1])
-      const withoutMember = yield* ask(noMember, membersAndRoles, membersVariables)
-      const withoutGrant = yield* ask(noGrant, membersAndRoles, membersVariables)
+      const withoutMember = yield* asked(noMember, membersAndRoles, membersVariables)
+      const withoutGrant = yield* asked(noGrant, membersAndRoles, membersVariables)
       expect(withoutMember).toStrictEqual(A.drop(expected, 1))
       expect(withoutGrant).toStrictEqual(A.take(expected, 1))
       // CQ-P11 asks for the grant's type too.
-      const scoped = yield* ask(noGrant, rolesAtScope, scopeVariables)
+      const scoped = yield* asked(noGrant, rolesAtScope, scopeVariables)
       expect(scoped).toStrictEqual([[n.raviWorks, n.admin, n.organizationScope]])
     })
   )
@@ -291,7 +389,7 @@ describe("gate 8, the must-fail case of CQ-P11", () => {
       const n = yield* names
       const less = A.filter(graph, (triple) => !withPredicate(n.inv("grantScope"))(triple))
       expect(less).toHaveLength(graph.length - 2)
-      const rows = yield* ask(less, rolesAtScope, scopeVariables)
+      const rows = yield* asked(less, rolesAtScope, scopeVariables)
       expect(rows).toStrictEqual([])
     })
   )
@@ -344,6 +442,31 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
+  it.effect("guard 3 reads every hand-written fixture text: with CQ-P06's left out, its property is unshown", () =>
+    Effect.gen(function* () {
+      const { context } = yield* parts
+      expect(A.map(handWrittenFixtures, ([name]) => name)).toStrictEqual([
+        "CQ-P06.fixture.ttl",
+        "bare-type.fixture.ttl"
+      ])
+      const texts = yield* Effect.forEach(
+        handWrittenFixtures,
+        ([name, text]) => Effect.map(readTurtle(context.vocabulary.base, text), (graph) => ({ name, graph })),
+        { concurrency: 1 }
+      )
+      expect(
+        unshown(
+          context.vocabulary,
+          A.flatMap(texts, ({ graph }) => graph)
+        )
+      ).toStrictEqual([])
+      const kept = A.filter(texts, ({ name }) => name !== "CQ-P06.fixture.ttl")
+      const others = A.flatMap(kept, ({ graph }) => graph)
+      expect(others).not.toStrictEqual([])
+      expect(unshown(context.vocabulary, others)).toStrictEqual(["membershipOf"])
+    })
+  )
+
   it.effect("guard 3: every property whose evidence is the fixture is stated by the hand-written text", () =>
     Effect.gen(function* () {
       const { context, written } = yield* parts
@@ -371,6 +494,38 @@ describe("the question runner", () => {
       const graph = yield* threadGraph()
       const rows = yield* ask(graph, "SELECT ?member WHERE { ?member <https://example.org/none> ?nothing }", ["member"])
       expect(rows).toStrictEqual([])
+    })
+  )
+
+  it.effect("refuses an ASK as a table, so a yes is never read as rows", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const refusal = yield* Effect.flip(ask(graph, "ASK { ?member ?p ?o }", ["member"]))
+      expect(refusal.reason).toBe("the query returned no table of solutions")
+    })
+  )
+})
+
+describe("the boolean runner", () => {
+  const holds = "ASK { ?member ?p ?o }"
+  const fails = "ASK { ?member <https://example.org/none> ?nothing }"
+
+  it.effect("answers an ASK with its boolean: true when the pattern has a solution, false when it has none", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const yes = yield* askWhether(graph, holds)
+      const no = yield* askWhether(graph, fails)
+      expect([yes, no]).toStrictEqual([true, false])
+    })
+  )
+
+  it.effect("refuses a SELECT, whose rows are no yes or no, and a query that does not parse, as values", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const select = yield* Effect.flip(askWhether(graph, "SELECT ?member WHERE { ?member ?p ?o }"))
+      expect(select.reason).toBe("the query returned no boolean: it is not an ASK")
+      const unparsed = yield* Effect.flip(askWhether(graph, "ASK {"))
+      expect(unparsed.reason).toContain("error at 1:6")
     })
   )
 })

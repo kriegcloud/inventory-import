@@ -1,13 +1,16 @@
 # CQ-P06: Who are the members of this organization and which role does each hold?
 # The role is read through the grant and in no other way. "This organization" is a value of ?tenant.
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
 PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?tenant ?person ?member ?role
 WHERE {
-  ?member a inv:Member ;
+  ?member rdf:type/rdfs:subClassOf* inv:Member ;
           inv:membershipIn ?tenant ;
           inv:membershipOf ?person .
-  ?grant a inv:Grant ;
+  ?grant rdf:type/rdfs:subClassOf* inv:Grant ;
          inv:grantedTo ?member ;
          inv:grantScope inv:GrantScopeKindScheme-organization ;
          inv:grantsRole ?role .

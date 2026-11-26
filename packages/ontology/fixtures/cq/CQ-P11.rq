@@ -1,10 +1,13 @@
 # CQ-P11: At which scope does each member hold which role? (decision 102)
 # It has no answer without a grant: a role written on the member cannot state a scope.
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
 PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?member ?role ?scope
 WHERE {
-  ?grant a inv:Grant ;
+  ?grant rdf:type/rdfs:subClassOf* inv:Grant ;
          inv:grantedTo ?member ;
          inv:grantsRole ?role ;
          inv:grantScope ?scope .

@@ -467,6 +467,9 @@ const absentAsFalse = Str.replace(
   FILTER NOT EXISTS { ?record inv:isVendor true }`
 )
 
+/** CQ-P02 as committed, asking only that the record states isVendor false. */
+const vendorFlagOnly = Str.replace("          inv:isCustomer false ;\n", "")
+
 describe("gate 8, CQ-P01: the organizations a tenant both buys from and sells to", () => {
   it.effect("each tenant's co-packer, read on its own record; for one tenant, its rows alone", () =>
     Effect.gen(function* () {
@@ -545,6 +548,20 @@ describe("gate 8, CQ-P01: the organizations a tenant both buys from and sells to
         )
         expect(counts).toStrictEqual([1, 1, 1, 1])
       }
+      // SourceRecord's criterion: an id is kept as written, leading zeros included, and the same id in two tenants
+      // is two records.
+      const idOf = (record: string) =>
+        A.map(
+          A.filter(graph, (triple) => triple.subject === record && triple.predicate === n.inv("sourceId")),
+          (triple) => triple.object
+        )
+      const works = n.record("test_WorksCoPacker")
+      const second = n.record("test_SecondOtherCoPacker")
+      expect(records).toContain(works)
+      expect(records).toContain(second)
+      expect(works).not.toBe(second)
+      expect(idOf(works)).toMatchObject([{ kind: "literal", value: "0001" }])
+      expect(idOf(second)).toStrictEqual(idOf(works))
     })
   )
 })
@@ -597,6 +614,44 @@ describe("gate 8, CQ-P02: the organizations a tenant's record says hold no tradi
         const rows = yield* asked(less, roleless.query, tradingVariables)
         expect(rows).toStrictEqual([[n.second, n.organization("test_OpenCo")]])
       })
+  )
+
+  it.effect("must-fail: the record of a person, both flags false, is never listed as an organization", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(roleless.fixture)
+      const retiree = n.individual("test_Retiree")
+      const rows = yield* asked(graph, roleless.query, tradingVariables)
+      expect(A.filter(rows, ([, organization]) => organization === retiree)).toStrictEqual([])
+      // Planted: without the organization type step, the retired person is listed beside the dormant company.
+      const mutant = untypedOrganization(roleless.query)
+      expect(mutant).not.toBe(roleless.query)
+      const wrong = yield* asked(graph, mutant, tradingVariables)
+      expect(wrong).toStrictEqual([
+        [n.works, n.organization("test_DormantCo")],
+        [n.works, retiree],
+        [n.second, n.organization("test_OpenCo")]
+      ])
+    })
+  )
+
+  it.effect("must-fail: the buyer, isCustomer true and isVendor false, holds a trading role and is not listed", () =>
+    Effect.gen(function* () {
+      const n = yield* partyNames
+      const graph = yield* fixtureGraph(roleless.fixture)
+      const buyer = n.organization("test_BuyerCo")
+      const rows = yield* asked(graph, roleless.query, tradingVariables)
+      expect(A.filter(rows, ([, organization]) => organization === buyer)).toStrictEqual([])
+      // Planted: a question that asks only for isVendor false lists the buyer.
+      const mutant = vendorFlagOnly(roleless.query)
+      expect(mutant).not.toBe(roleless.query)
+      const wrong = yield* asked(graph, mutant, tradingVariables)
+      expect(wrong).toStrictEqual([
+        [n.works, buyer],
+        [n.works, n.organization("test_DormantCo")],
+        [n.second, n.organization("test_OpenCo")]
+      ])
+    })
   )
 })
 

@@ -12,7 +12,9 @@
 //
 // The party slice's constructs (PLAN, step 2) are tried on an in-memory copy of the kernel's literal that holds each
 // of them (`support/constructs.ts`): what the projector writes for each, that the writer's text reads back, and what
-// gate 3 refuses. The committed files do not change, since the kernel's module holds none of them yet.
+// gate 3 refuses. Since step 9 the kernel's module holds the constructs that step brings (category parents, the two
+// gist properties and their subPropertyOf links, boolean ranges), and the committed files carry them; the copy still
+// tries the ones the kernel lacks, such as the retirements and the planted attribute.
 import { describe, expect, it } from "@effect/vitest"
 import { ClassTerm, IdentityCriterion, Vocabulary } from "@beep/vocabulary/Model"
 import { RdfVocab } from "@beep/vocabulary/Rdf"

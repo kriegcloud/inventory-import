@@ -479,7 +479,10 @@ Choices the sources left open, each the agent's:
   count; its fixture holds one record of each case report 18 section 10 names (one tenant, none, two).
 - **The planted queries are text made in the test**, as step 5's walked twin is, never files: CQ-P01 reading each flag
   from any record of the organization (lists `test_SharedCo`), CQ-P01 without its organization type step (lists the
-  individual's record) and CQ-P02 reading an absent flag as false (lists the open reading).
+  individual's record), CQ-P02 reading an absent flag as false (lists the open reading), CQ-P02 without its
+  organization type step (lists the retired person) and CQ-P02 asking only for `isVendor false` (lists the buyer), so
+  each of CQ-P02's near misses has a plant that needs it. The CQ-P01 source-keys test also reads that the two
+  co-packers' records, one in each tenant, are two records with the same `sourceId` "0001", kept as written.
 - **Earlier steps' tests on the kernel.** Step 3's planted `Person` records in `Pointers.test.ts` drop their id field,
   since `Person` now stores no id (decision 161) and P4 refuses a field naming it; the `Tenant` and `Member` records
   keep theirs. Step 2's gate 3 plant of an unlisted gist property uses the copy's `plantedAttribute` against the

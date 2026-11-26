@@ -2254,3 +2254,98 @@ a real browser Worker, hosted behavior or deployment. The fold test file and its
 No claim of zero test debt, approved edge exemptions, changed screen words or changed stored data is made.
 
 Needs the person: nothing. The retained places are named follow-up work; no exemption or new product rule was chosen.
+
+## Inventory app final non-gallery lane, PLAN row 13, 2026-11-26
+
+These field verdicts precede implementation. Scope is the eleven files named in the last row-13 lane; gallery
+pages, the baseline, exemptions and all other packages remain outside it.
+
+| Fields / owner | Verdict | Intended form / boundary |
+| --- | --- | --- |
+| SameOrigin fetch-site and origin headers | Optional HTTP input | Read Options with effect/http Headers.get; retain exactly the existing RequestSource policy. Refusal log attributes carry only present headers via Record.getSomes. |
+| OpenAPI operations, response references, parameters and request body | Generated JSON read boundary | Decode the read shape through module-level schemas where consumed. Keep the mutable generated document as the write target; decoding must not rewrite its wire form or discard unrelated document keys. If a synchronous invariant cannot be expressed honestly, retain and name it. |
+| Workspace and preload import/step query parameters | Optional browser address input | Read through effect/http UrlParams, whose reader supplies Options without introducing browser nulls. Whole cases select existing screen/code paths; screen fallback wording stays unchanged. |
+| AppShell sidebar | Component-owned optional React prop | Keep the optional prop and its counted presence check, as Benjamin decided. |
+| AppSidebar initials | Display transformation | Model the existing initial-letter and uppercase transformation in a module-level schema; consume its Option at the last rendering step. No changed visible words. |
+| Public settings bootstrap | Synchronous runtime edge | Inspect dependencies before changing the synchronous initialization. Retain and name runSync if removing it requires a different initialization/lifecycle contract. |
+| Twin search and slow-test column selection | Known fixture prerequisites | Assert the literal fixture column and compare literal known item names instead of normalizing test data. Run edited slow tests through the full app slow project. |
+| Browser test storage getItem | Browser Storage stand-in contract | Preserve null on missing exactly. Retain and name if clearing requires a fallback-only codec or Option-to-null conversion; no new exemption. |
+
+No product decision, stored representation, screen wording or exemption is added. Final retained sites and validation
+will follow in this section. PLAN is owned by the orchestrator and is not edited here.
+
+### Final non-gallery lane: changes and remaining places
+
+The eleven-file reader now holds **3 places: 2 fallback, 1 absence, 0 unwrap, 0 normalise**, down from **16**
+(5 fallback, 7 absence, 0 unwrap, 4 normalise). Eight files reached zero. No baseline or exemption was edited.
+
+- `src/api/v1/Document.ts` (3 → 0): module-level operation and response-reference schemas decode read views of
+  generated JSON, with optional fields represented by Options. The original generated objects remain the mutation
+  targets, so unknown document fields are not stripped from the output. No schema encodes a fallback or converts
+  an Option into undefined. The transform still operates on generated OpenAPI operations; malformed operation
+  shapes that do not decode are not selected. Generated output parity is checked below.
+- `src/server/SameOrigin.ts` (2 → 0): `Headers.get` supplies the header Options; `Record.getSomes` supplies the
+  present refusal-log attributes. An absent header now leaves its log attribute absent instead of manufacturing
+  an empty string. The request policy, refusal status and refusal words are unchanged; the HTTP security test
+  below proves the write is refused before identity.
+- `src/web/Workspace.tsx` (2 → 0) and `src/web/preload.ts` (2 → 0): `UrlParams.fromInput` and `getFirst` read
+  browser address parameters as Options. First-value precedence, an empty import id, the 64-character preload
+  limit, missing-step screen selection and code loading keep their existing cases. These reads use Effect's
+  Option-returning HTTP reader directly; no new nullable browser adapter or exemption was needed.
+- `src/web/components/app/AppSidebar.tsx` (1 → 0): the existing first-letter/two-character/uppercase display
+  transformation is a module-level schema. The rendering consumes the decoded Option at its last step. This is
+  a display-only decoder; it is never used to write a name or stored value.
+- `test/server/ImportsTwin.test.ts` (1 → 0): the fixed sample's already-capitalized `Oak` is compared literally.
+  `test/server/MatchAtomic.slow.test.ts` and `StaleAccepts.slow.test.ts` (1 → 0 each) select the fixture's literal
+  `Reorder Pt` label and retain the assertion that the column exists. No expectation is skipped or removed.
+
+All paths in the following table are relative to `apps/inventory`. This is the complete retained-site inventory
+for the eleven-file lane, including the three files that were read and deliberately left unchanged.
+
+| File | Line | Count / kind | Example | Why left / work still needed |
+| --- | ---: | --- | --- | --- |
+| `src/web/components/app/AppShell.tsx` | 44 | 1 absence | `props.sidebar !== undefined` | This component owns its optional React prop. Benjamin explicitly requires such a prop and its presence check to stay counted. It is not an exemption request. |
+| `src/web/lib/settings.ts` | 21 | 1 fallback | `Effect.runSync(PublicSettings.parse(...))` | Synchronous public-settings initialization is consumed immediately by `devtools.ts` to choose a Layer and by `traceContext.ts` to choose synchronous tracing behavior. Removing the runner honestly requires moving that initialization to an asynchronous boundary and carrying the settings through both consumers. No initialization/lifecycle change was built; no replacement synchronous unwrap or fallback-only schema was introduced. |
+| `test/web/support/page.ts` | 22 | 1 fallback | `of[key] ?? null` | This stand-in implements Storage.getItem's actual missing-key result. A renamed null, Option-to-null fold or fallback-only codec would hide the same question. It stays visible; tests in this lane have not all reached zero. No exemption was added or requested. |
+
+### Final non-gallery lane: verification and limits
+
+- `bun run check` passed **105/105 tasks**, 81 cached, **11.768s**. The app's fast suite passed **70 tests in
+  19 files**, with no retry. Receipt: `/tmp/defaults-app-check-final.log`. No ledger decrease blocks the check.
+- `XDG_CONFIG_HOME=/tmp/defaults-app-xdg XDG_CACHE_HOME=/tmp/defaults-app-cache
+  WRANGLER_LOG_PATH=/tmp/defaults-app-wrangler-logs bun run --cwd apps/inventory test:slow` passed **133 tests
+  in 24 files**, **66.16s**, no retry, including both edited slow files and the 50,000-row tests.
+  Receipt: `/tmp/defaults-app-slow-final.log`. The initial run without temporary paths failed in setup because
+  Wrangler could not write its registry/logs under the read-only home configuration; no test was waived.
+- Focused Security, Document property and ImportsTwin tests passed **7 tests in 3 files**, no retry. The final
+  full check reran these after the last schema edit. The cross-site proof is `test/server/Security.test.ts:112`,
+  **"refuses a write another site asked for before it acts as anyone, and takes the app's own"**. It checks 403
+  for cross-site, same-site and foreign-Origin writes, decodes CrossSiteRequest, checks same-origin writes still
+  succeed, and checks cross-site reads remain allowed. Receipt: `/tmp/defaults-app-fast.log`.
+- A temporary read-only parity harness generated the complete OpenAPI document twice from the same Api, overriding
+  OpenApi.Transform with HEAD's original transform and this lane's transform. Serialized JSON is byte-identical,
+  **169,175 characters**. Receipt: `/tmp/defaults-app-document-parity.log`.
+- A temporary parity harness extracted HEAD's original initials helper and this lane's schema and compared their
+  outputs for **1,000 schema-generated names plus 8 explicit cases**, including empty/whitespace, punctuation,
+  Unicode and emoji. Every decoded result was Some and matched. Receipt: `/tmp/defaults-app-initials-parity.log`.
+  These are temporary proof artifacts, not new production code or checked-in fixture data.
+- The required eleven-file `bun run beep laws defaults <files>` passed at **2 fallback, 1 absence**, with eight
+  baseline decreases, each listed above. Receipt: `/tmp/defaults-app-law.log`. No write mode was used.
+- `bun run format -- <changed files>` and `git diff --check` passed. Full check includes docs validation. New
+  Effect calls were checked against 4.1.5 source: Headers.get, UrlParams.fromInput/getFirst, Record.get/getSomes/has,
+  Option map/flatMap/filter/contains/exists/match, Schema Struct/Record/OptionFromOptionalKey/
+  OptionFromOptionalNullOr/decodeUnknownOption/decodeOption/decodeTo/annotateKey, SchemaGetter transform/
+  passthrough/toUpperCase, and Arbitrary.sampleEffect for the temporary parity harness.
+
+Only the eight code files above and this appended verdict section changed. No caller outside the lane changed.
+AppShell, settings and browser test support are unchanged. PLAN, SPEC, defaults-baseline.json, all ledgers,
+exemptions, the Verify lock, stored data, samples, vendored code and bun.lock are unchanged. No .dev.vars was read,
+UPDATE_VERIFY_LOCK was not set, and no commit or push was made; the tree remains dirty for the orchestrator.
+
+Not run: `check:full`, a browser/on-screen import, a production build, hosted behavior or deployment. The initials
+and skeletons were **not seen on screen**. The existing generated-OpenAPI behavior is covered by parity and tests;
+there is no claim of compatibility for arbitrary malformed documents. No new product default was chosen or moved
+onto a schema, so SPEC's "Defaults nobody decided" has no new entry from this lane.
+
+Needs the person: nothing. The three retained sites are follow-up work under the stated lane rules, not exemptions
+or silently cleared debt.

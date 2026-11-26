@@ -22,6 +22,7 @@ import { KeptNotices } from "@inventory/catalog-web/KeptNotices"
 import { askBeforeLeaving, importViewShown } from "@inventory/catalog-web/Imports"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as UrlParams from "effect/http/UrlParams"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { contentBelow } from "@inventory/ui/ContentWidth"
@@ -57,7 +58,11 @@ function PageSkeleton(props: { path: string; params: URLSearchParams }) {
   if (path === peoplePath) {
     return <TablePageSkeleton title="People" line caption="People in the organization" columns={someColumns(4)} />
   }
-  const step = params.get("import") === null ? "upload" : (params.get("step") ?? "review")
+  const address = UrlParams.fromInput(params)
+  const step = O.match(UrlParams.getFirst(address, "import"), {
+    onNone: () => "upload",
+    onSome: () => O.match(UrlParams.getFirst(address, "step"), { onNone: () => "review", onSome: (step) => step })
+  })
   return (
     <div className="flex h-full flex-col">
       <StepsSkeleton />

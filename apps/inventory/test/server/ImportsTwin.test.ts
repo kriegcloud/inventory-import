@@ -101,12 +101,9 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           }
         })
         expect(page.total).toBeGreaterThan(0)
-        expect(
-          A.every(
-            page.data,
-            (item) => item.category === "finished-goods" && Str.includes("oak")(Str.toLowerCase(item.name))
-          )
-        ).toBe(true)
+        expect(A.every(page.data, (item) => item.category === "finished-goods" && Str.includes("Oak")(item.name))).toBe(
+          true
+        )
 
         // The same file again: all 155 already there, row 55 (stored after its accept) among them, and row 18 is the
         // one new item.

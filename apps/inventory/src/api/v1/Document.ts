@@ -31,14 +31,45 @@ type Json = Record<string, any>
 
 const methods = ["get", "put", "post", "delete", "patch", "head", "options"]
 
-/** Every operation of the document, with its method. */
-const operationsOf = (spec: Json): Array<{ readonly method: string; readonly operation: Json }> => {
-  const found: Array<{ readonly method: string; readonly operation: Json }> = []
+/** The generated operation fields this document transform reads; other fields stay on the original object. */
+const Operation = S.Struct({
+  responses: S.Record(S.String, S.Unknown).pipe(
+    S.annotateKey({ description: "Responses the generated operation can send" }),
+    S.OptionFromOptionalKey
+  ),
+  parameters: S.Array(S.Unknown).pipe(
+    S.annotateKey({ description: "Path and query parameters" }),
+    S.OptionFromOptionalKey
+  ),
+  requestBody: S.Unknown.pipe(
+    S.annotateKey({ description: "Request body, when the operation accepts one" }),
+    S.OptionFromOptionalKey
+  )
+}).annotate({ description: "The read view of a generated OpenAPI operation" })
+
+/** The response reference used to recognize the cross-site refusal; inline schemas carry no reference. */
+const ResponseReference = S.Struct({
+  content: S.Record(
+    S.String,
+    S.Struct({
+      schema: S.Struct({
+        $ref: S.String.pipe(S.annotateKey({ description: "Component reference" }), S.OptionFromOptionalKey)
+      }).pipe(S.annotateKey({ description: "Response schema" }), S.OptionFromOptionalNullOr)
+    })
+  ).pipe(S.annotateKey({ description: "Response media types" }), S.OptionFromOptionalNullOr)
+}).annotate({ description: "Reference fields of an OpenAPI response" })
+
+/** Every operation of the document, decoded where read, beside its original mutable write target. */
+const operationsOf = (
+  spec: Json
+): Array<{ readonly method: string; readonly operation: Json; readonly read: typeof Operation.Type }> => {
+  const found: Array<{ readonly method: string; readonly operation: Json; readonly read: typeof Operation.Type }> = []
   const paths = O.map(O.fromNullishOr(spec["paths"]), (paths) => R.values<string, Json>(paths))
   for (const item of O.match(paths, { onNone: A.empty, onSome: identity })) {
     for (const method of methods) {
-      const operation = item[method]
-      if (operation !== undefined) found.push({ method, operation })
+      O.map(S.decodeUnknownOption(Operation)(item[method]), (read) => {
+        found.push({ method, operation: item[method], read })
+      })
     }
   }
   return found
@@ -133,15 +164,21 @@ const nameComponents = (spec: Json): void => {
  * also covers `Forbidden` (a role too low) is shared by both errors and is left as it is.
  */
 const dropImpossibleResponses = (spec: Json): void => {
-  for (const { method, operation } of operationsOf(spec)) {
-    O.map(O.fromNullishOr(operation["responses"]), (responses: Json) => {
-      const refused = responses["403"]?.["content"]?.["application/json"]?.["schema"]?.["$ref"]
-      if (method === "get" && refused === `${refPrefix}CrossSiteRequest`) delete responses["403"]
-      const noParameters = O.match(O.fromNullishOr(operation["parameters"]), {
+  for (const { method, operation, read } of operationsOf(spec)) {
+    O.map(read.responses, (responses) => {
+      const refused = O.flatMap(
+        O.flatMap(R.get(responses, "403"), S.decodeUnknownOption(ResponseReference)),
+        (response) =>
+          O.flatMap(response.content, (content) =>
+            O.flatMap(R.get(content, "application/json"), (media) => O.flatMap(media.schema, (schema) => schema.$ref))
+          )
+      )
+      if (method === "get" && O.contains(refused, `${refPrefix}CrossSiteRequest`)) delete operation["responses"]["403"]
+      const noParameters = O.match(read.parameters, {
         onNone: () => true,
-        onSome: (parameters: ReadonlyArray<unknown>) => parameters.length === 0
+        onSome: (parameters) => parameters.length === 0
       })
-      if (noParameters && operation["requestBody"] === undefined) delete responses["400"]
+      if (noParameters && O.isNone(read.requestBody)) delete operation["responses"]["400"]
     })
   }
 }
@@ -156,8 +193,9 @@ const declareSessionCookie = (spec: Json): void => {
     ...spec["components"]["securitySchemes"],
     [sessionCookieScheme]: sessionCookie
   }
-  for (const { operation } of operationsOf(spec)) {
-    if (operation["responses"]?.["401"] !== undefined) operation["security"] = [{ [sessionCookieScheme]: [] }]
+  for (const { operation, read } of operationsOf(spec)) {
+    if (O.exists(read.responses, (responses) => R.has(responses, "401")))
+      operation["security"] = [{ [sessionCookieScheme]: [] }]
   }
 }
 

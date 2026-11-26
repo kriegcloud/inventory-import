@@ -1,12 +1,14 @@
 /**
  * Gate 5, record pointers on the AST (report 14 section 6.5): rules P1 to P13 over the enrolled schemas, read through
- * `@beep/vocabulary/Pointer`'s reader and compared with the decoded vocabulary. Each broken rule is one `PointerFinding`,
- * data that names the rule, the enrolment entry and the field; nothing here fails or throws.
+ * `@beep/vocabulary/Pointer`'s reader and compared with the decoded vocabulary, and P14, report 05's V14: no pointer
+ * names a retired term (decision 33). Each broken rule is one `PointerFinding`, data that names the rule, the enrolment
+ * entry and the field; nothing here fails or throws.
  *
  * Do not break: the rules read only their arguments. The marks are read from the schemas' ASTs, never from source
  * text, and a field's mark only from its key annotations (section 3.1), so a field whose schema is itself an enrolled
  * record is not taken for pointed. P13 is the one rule that says a mark is the right one; P1 to P12 say it is well
- * formed.
+ * formed. A class falls under its local parent and its category parents alike (decision 12), and a retired notation of a
+ * live scheme is no pointer: a stored code still reads (V12), so P8 passes it and P14 does not look at literals.
  *
  * @packageDocumentation
  */
@@ -101,7 +103,7 @@ export const entryKey = (entry: EnrolmentEntry): string => `${entry.file}#${entr
 // The finding
 // ---------------------------------------------------------------------------------------------------------------
 
-/** The rules gate 5 runs, by their names in report 14 section 6.5. */
+/** The rules gate 5 runs, by their names in report 14 section 6.5, and P14 for report 05's V14 (party slice, step 3). */
 export const PointerRule = LiteralKit([
   "P1",
   "P2",
@@ -115,7 +117,8 @@ export const PointerRule = LiteralKit([
   "P10",
   "P11",
   "P12",
-  "P13"
+  "P13",
+  "P14"
 ]).pipe($I.annoteSchema("PointerRule", { description: "A rule of gate 5" }))
 /** Runtime type of {@link PointerRule}. */
 export type PointerRule = typeof PointerRule.Type
@@ -164,15 +167,23 @@ const sameMark = S.toEquivalence(MarkReading)
 // Reading the vocabulary
 // ---------------------------------------------------------------------------------------------------------------
 
-/** A class and its local ancestors, nearest first; a cycle stops at the class seen twice. */
+/**
+ * A class and every class of the vocabulary it falls under, the class first: its local parent and its category parents
+ * (decision 12), and theirs in turn. A cycle stops at the class seen twice.
+ */
 const lineage = (vocabulary: Vocabulary, key: string, seen: ReadonlyArray<string>): ReadonlyArray<string> => {
   if (A.contains(seen, key)) {
     return seen
   }
-  const next = [...seen, key]
+  const next: ReadonlyArray<string> = [...seen, key]
   return O.match(R.get(vocabulary.classes, key), {
     onNone: () => next,
-    onSome: (term) => (ParentLink.guards.local(term.parent) ? lineage(vocabulary, term.parent.key, next) : next)
+    onSome: (term) =>
+      A.reduce(
+        [...(ParentLink.guards.local(term.parent) ? [term.parent.key] : []), ...term.categoryParents],
+        next,
+        (walked, above) => lineage(vocabulary, above, walked)
+      )
   })
 }
 
@@ -193,6 +204,24 @@ const conceptOf = (
         )
       )
     )
+  )
+
+/** Whether the class of that key is retired (decision 33). */
+const retiredClass = (vocabulary: Vocabulary, key: string): boolean =>
+  O.exists(R.get(vocabulary.classes, key), (term) => O.isSome(term.deprecation))
+
+/** Whether the property of that key, a relation or an attribute, is retired. */
+const retiredProperty = (vocabulary: Vocabulary, key: string): boolean =>
+  O.exists(R.get(vocabulary.objectProperties, key), (term) => O.isSome(term.deprecation)) ||
+  O.exists(R.get(vocabulary.datatypeProperties, key), (term) => O.isSome(term.deprecation))
+
+/** Whether the concept a concept CURIE's local name names is itself retired. */
+const retiredConcept = (vocabulary: Vocabulary, local: string): boolean =>
+  O.exists(
+    O.flatMap(conceptOf(vocabulary, local), ({ scheme, notation }) =>
+      O.flatMap(R.get(vocabulary.schemes, scheme), (term) => R.get(term.concepts, notation))
+    ),
+    (concept) => O.isSome(concept.deprecation)
   )
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -241,7 +270,10 @@ const MarkKeyRule: Readonly<Record<"term" | "path" | "noTerm", PointerRule>> = {
 
 type Context = PointerInput & { readonly local: (curie: string) => O.Option<string> }
 
-/** P8 on one node: a node pointing at a scheme allows only notations of it. */
+/**
+ * P8 and P14 on one node: a node pointing at a scheme allows only notations of it, and the scheme is live. A retired
+ * notation of a live scheme is still one of its notations, so a stored code keeps decoding (V12, decision 33).
+ */
 const notationFindings = (
   context: Context,
   entry: string,
@@ -253,8 +285,9 @@ const notationFindings = (
     onSome: (local) =>
       O.match(R.get(context.vocabulary.schemes, local), {
         onNone: () => [],
-        onSome: (scheme) =>
-          O.match(literalsOf(ast), {
+        onSome: (scheme) => [
+          ...(O.isSome(scheme.deprecation) ? [finding("P14", entry, field, `${local} is a retired scheme`)] : []),
+          ...O.match(literalsOf(ast), {
             onNone: () => [
               finding("P8", entry, field, `${local} is pointed at by a schema that is no union of literals`)
             ],
@@ -264,6 +297,7 @@ const notationFindings = (
                 (literal) => finding("P8", entry, field, `"${literal}" is no notation of ${local}`)
               )
           })
+        ]
       })
   })
 
@@ -379,7 +413,31 @@ const pathFindings = (
   return found
 }
 
-/** P2 to P9 on one record entry. */
+/** P14 on one path: no class, property or concept a step names is retired. */
+const retiredInPath = (
+  context: Context,
+  entry: string,
+  field: string,
+  path: LiftPathRead
+): ReadonlyArray<PointerFinding> => {
+  const { vocabulary } = context
+  const named = A.flatMap(path, (step) => [
+    ...("node" in step ? [{ curie: step.node, retired: (local: string) => retiredClass(vocabulary, local) }] : []),
+    { curie: step.property, retired: (local: string) => retiredProperty(vocabulary, local) },
+    ...("fixed" in step
+      ? A.flatMap(step.fixed, (fix) => [
+          { curie: fix.property, retired: (local: string) => retiredProperty(vocabulary, local) },
+          { curie: fix.concept, retired: (local: string) => retiredConcept(vocabulary, local) }
+        ])
+      : [])
+  ])
+  return A.map(
+    A.filter(named, ({ curie, retired }) => O.exists(context.local(curie), retired)),
+    ({ curie }) => finding("P14", entry, O.some(field), `the path names ${curie}, a retired term`)
+  )
+}
+
+/** P2 to P9, and P14 on the record's class and its fields' terms, on one record entry. */
 const recordFindings = (context: Context, entry: string, schema: S.Top): ReadonlyArray<PointerFinding> => {
   const { vocabulary } = context
   const none = O.none<string>()
@@ -392,7 +450,10 @@ const recordFindings = (context: Context, entry: string, schema: S.Top): Readonl
   if (nodes.length === 0) {
     return [finding("P2", entry, none, "the record has no fields: it is no struct and no class over one")]
   }
-  const found: Array<PointerFinding> = []
+  // The subject's id field names the same class as the record's annotation, so a retired class is one finding.
+  const found: Array<PointerFinding> = retiredClass(vocabulary, record)
+    ? [finding("P14", entry, none, `the record points at ${record}, a retired class`)]
+    : []
   const subjects: Array<string> = []
   const tenants: Array<string> = []
   for (const field of nodes) {
@@ -417,6 +478,7 @@ const recordFindings = (context: Context, entry: string, schema: S.Top): Readonl
       },
       path: (path) => {
         found.push(...pathFindings(context, entry, record, field, path.path))
+        found.push(...retiredInPath(context, entry, field.name, path.path))
       },
       term: (term) => {
         const local = context.local(term.term)
@@ -431,6 +493,9 @@ const recordFindings = (context: Context, entry: string, schema: S.Top): Readonl
         }
         if (!domainFits(vocabulary, property.value.domain, record)) {
           found.push(finding("P5", entry, at, `${term.term}'s domain does not fit ${record}`))
+        }
+        if (retiredProperty(vocabulary, property.value.key)) {
+          found.push(finding("P14", entry, at, `${term.term} is a retired property`))
         }
         const named = property.value
         if (named.kind === "object" && RangeTarget.guards.class(named.range) && named.range.key === context.tenant) {
@@ -610,7 +675,7 @@ const collectionFindings = (context: Context, entry: CollectionEntry, schema: S.
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
- * Runs P1 to P13 and returns every finding: none when every enrolled schema is marked as section 3 says.
+ * Runs P1 to P14 and returns every finding: none when every enrolled schema is marked as section 3 says.
  *
  * @example pointerFindings({ vocabulary, prefix: "inv", tenant: "Tenant", slices: ["party"], ... }) // []
  */
@@ -658,10 +723,14 @@ export const pointerFindings = (input: PointerInput): ReadonlyArray<PointerFindi
     A.map(A.filter(input.enrolment, EnrolmentEntry.guards.record), (entry) => R.get(input.enrolled, entryKey(entry)))
   )
   const used = A.flatMap(records, (schema) => propertiesNamed(context, schema))
-  const properties = [
-    ...A.map(R.toEntries(input.vocabulary.objectProperties), ([key, term]) => [key, term.evidence] as const),
-    ...A.map(R.toEntries(input.vocabulary.datatypeProperties), ([key, term]) => [key, term.evidence] as const)
-  ]
+  // A retired property is left out of P11: P14 refuses every mark that would name it (V14).
+  const properties = A.filter(
+    [
+      ...A.map(R.toEntries(input.vocabulary.objectProperties), ([key, term]) => [key, term.evidence] as const),
+      ...A.map(R.toEntries(input.vocabulary.datatypeProperties), ([key, term]) => [key, term.evidence] as const)
+    ],
+    ([key]) => !retiredProperty(input.vocabulary, key)
+  )
   const p11 = A.map(
     A.filter(properties, ([key, evidence]) => !A.contains(used, key) && O.isNone(evidence)),
     ([key]) =>

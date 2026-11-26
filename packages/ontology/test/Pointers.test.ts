@@ -8,9 +8,15 @@
 // Each negative hands the gate one planted input in place of a real one, and the table's rows for a planted field are
 // the plant's own marks, so the negative names its rule alone. The two the report specifies (the unmarked `name`,
 // and the swapped `Activity` properties) are kept as it writes them.
+//
+// The party slice's step 3 runs the gate on step 2's in-memory copy (`support/constructs.ts`) and on copies of it:
+// a category walk through `Party` (decision 12), and P14, a pointer at a retired term (report 05's V14, decision 33),
+// with a retired notation of a live scheme still passing P8 (V12). Its planted records point at the copy's terms
+// through helpers bound to the copy's own keys, so a misspelt name is a type error here too.
 import { describe, expect, it } from "@effect/vitest"
+import type { Curie } from "@beep/identity/Vocab"
 import { Vocabulary } from "@beep/vocabulary/Model"
-import { noTermFor, readKeyMark } from "@beep/vocabulary/Pointer"
+import { noTermFor, pathFor, pointerFor, readKeyMark } from "@beep/vocabulary/Pointer"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
@@ -20,12 +26,14 @@ import * as Model from "effect/schema/Model"
 import { Activity } from "@inventory/kernel/Activity"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
+import { Role } from "@inventory/kernel/Role"
 import { vocabulary } from "@inventory/kernel/Terms"
 import { aboutClass, aboutPath, aboutProperty, aboutScheme, noTerm } from "@inventory/kernel/TermsPointer"
 import { DisplayName } from "@inventory/kernel/Text"
 import enrolmentFile from "../enrolment.json" with { type: "json" }
 import { enrolled, variants } from "../src/Enrolled.ts"
 import { Enrolment, Placement, pointerFindings, type PointerFinding, type PointerInput } from "../src/Pointers.rules.ts"
+import { constructsVocabulary } from "./support/constructs.ts"
 
 const strict = { onExcessProperty: "error", errors: "all" } as const
 const decodeVocabulary = S.decodeUnknownEffect(Vocabulary, strict)
@@ -395,6 +403,242 @@ describe("gate 5's negatives, one rule each", () => {
       const stray = Placement.make({ entry: role, field: "viewer", mark: reading(noTerm("screen")) })
       const found = yield* gate({ placements: [...placements, stray] })
       expect(found).toEqual([["P13", role, "viewer"]])
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// The party slice's constructs (PLAN, step 3)
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Step 2's copy with Activity's `action` live again, so the real records find nothing in it and a plant one rule. */
+const live = {
+  ...constructsVocabulary,
+  datatypeProperties: { ...constructsVocabulary.datatypeProperties, action: vocabulary.datatypeProperties.action }
+} as const satisfies typeof Vocabulary.Encoded
+
+/** That copy with two properties of this test's own whose domain is the category `Party`, each shown on a fixture. */
+const partied = {
+  ...live,
+  objectProperties: {
+    ...live.objectProperties,
+    partyGrant: {
+      prefLabel: "party grant",
+      definition: "Links a party to a grant it holds, a relation of this test's own.",
+      domain: "Party",
+      range: { kind: "class", key: "Grant" },
+      evidence: "fixture",
+      ratification: { decision: 12 }
+    }
+  },
+  datatypeProperties: {
+    ...live.datatypeProperties,
+    knownAs: {
+      prefLabel: "known as",
+      definition: "The name a party is known by, an attribute of this test's own.",
+      domain: "Party",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: { decision: 12 }
+    }
+  }
+} as const satisfies typeof Vocabulary.Encoded
+
+type Planted = typeof partied
+type PlantedRegistry<K extends string> = {
+  readonly inv: { readonly iri: Planted["namespace"]; readonly terms: ReadonlyArray<K> }
+}
+type PlantedClasses = PlantedRegistry<keyof Planted["classes"] & string>
+type PlantedProperties = PlantedRegistry<
+  (keyof Planted["objectProperties"] | keyof Planted["datatypeProperties"]) & string
+>
+type PlantedSchemes = Planted["schemes"]
+type PlantedConcept = {
+  readonly [K in keyof PlantedSchemes & string]: `inv:${K}-${keyof PlantedSchemes[K]["concepts"] & string}`
+}[keyof PlantedSchemes & string]
+
+/** The kernel's helpers, bound to the copy's keys: a class, a property, a scheme, a path. */
+const plantedClass = pointerFor<PlantedClasses>()
+const plantedProperty = pointerFor<PlantedProperties>()
+const plantedScheme = pointerFor<PlantedRegistry<keyof PlantedSchemes & string>>()
+const plantedPath = pathFor<Curie<PlantedClasses>, Curie<PlantedProperties>, PlantedConcept>()
+
+const plantedFile = "packages/ontology/test/Pointers.test.ts"
+
+/**
+ * A planted record enrolled beside the real ones: the enrolment list with its entry, the schemas with it, and P13's
+ * table holding the plant's own marks, so a finding names the rule the plant breaks and no other.
+ */
+const withRecord = Effect.fn("withRecord")(function* (
+  name: string,
+  schema: S.Top,
+  marks: ReadonlyArray<readonly [string, S.Annotations.Key<string>]>
+) {
+  const key = `${plantedFile}#${name}`
+  const enrolment = yield* decodeEnrolment([...enrolmentFile, { file: plantedFile, export: name, as: "record" }])
+  const rows = A.map(marks, ([field, mark]) => Placement.make({ entry: key, field, mark: reading(mark) }))
+  return { enrolment, enrolled: { ...enrolled, [key]: schema }, placements: [...placements, ...rows] }
+})
+
+/** A record of `cls` whose `knownAs` fills the property whose domain is `Party`. */
+const knownAsRecord = (cls: "inv:Person" | "inv:Tenant" | "inv:Member") => {
+  const marks = [
+    ["id", plantedClass(cls)],
+    ["knownAs", plantedProperty("inv:knownAs")]
+  ] as const
+  const schema = S.Struct({
+    id: S.String.pipe(S.annotateKey(marks[0][1])),
+    knownAs: S.String.pipe(S.annotateKey(marks[1][1]))
+  }).pipe(S.annotate(plantedClass(cls)))
+  return withRecord("KnownAs", schema, marks)
+}
+
+/** A record of `cls` whose role is reached through `partyGrant`, a relation from a `Party` to its grant. */
+const partyGrantRecord = (cls: "inv:Person" | "inv:Member") => {
+  const path = plantedPath([{ property: "inv:partyGrant", node: "inv:Grant" }, { property: "inv:grantsRole" }])
+  const marks = [
+    ["id", plantedClass(cls)],
+    ["role", path]
+  ] as const
+  const schema = S.Struct({
+    id: S.String.pipe(S.annotateKey(marks[0][1])),
+    role: Role.pipe(S.annotateKey(path))
+  }).pipe(S.annotate(plantedClass(cls)))
+  return withRecord("PartyGrant", schema, marks)
+}
+
+const knownAs = `${plantedFile}#KnownAs`
+const partyGrant = `${plantedFile}#PartyGrant`
+
+describe("gate 5 on the party slice's constructs", () => {
+  it.effect("the real records on step 2's copy: only Activity's action, an attribute the copy withdraws (P14)", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(constructsVocabulary)
+      const found = yield* gate({ vocabulary: decoded })
+      expect(found).toEqual([["P14", activity, "action"]])
+    })
+  )
+
+  it.effect("the real records on the copy with action live: nothing, the two retired properties no P11 finding", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(live)
+      const found = yield* gate({ vocabulary: decoded })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("a Person record fills a property whose domain is Party, through its category parent", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* knownAsRecord("inv:Person")
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("a Tenant record fills it too: Tenant is an Organization, and Organization falls under Party", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* knownAsRecord("inv:Tenant")
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P5: a Member record, which falls under no Party, fills the same property", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* knownAsRecord("inv:Member")
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P5", knownAs, "knownAs"]])
+    })
+  )
+
+  it.effect("a Person record's path leaves it along a relation whose domain is Party", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* partyGrantRecord("inv:Person")
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P7: a Member record's path leaves it along the same relation", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* partyGrantRecord("inv:Member")
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P7", partyGrant, "role"]])
+    })
+  )
+
+  it.effect("P14: a record pointed at Workspace, a retired class, once though its id field names it too", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(live)
+      const mark = plantedClass("inv:Workspace")
+      const schema = S.Struct({ id: S.String.pipe(S.annotateKey(mark)) }).pipe(S.annotate(mark))
+      const planted = yield* withRecord("Retired", schema, [["id", mark]])
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P14", `${plantedFile}#Retired`, ""]])
+    })
+  )
+
+  it.effect("P14: a membership record's organizationId fills workspaceMembership, a retired relation", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(live)
+      const marks = [
+        ["id", plantedClass("inv:Member")],
+        ["organizationId", plantedProperty("inv:workspaceMembership")]
+      ] as const
+      const schema = S.Struct({
+        id: S.String.pipe(S.annotateKey(marks[0][1])),
+        organizationId: S.String.pipe(S.annotateKey(marks[1][1]))
+      }).pipe(S.annotate(plantedClass("inv:Member")))
+      const planted = yield* withRecord("Membership", schema, marks)
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P14", `${plantedFile}#Membership`, "organizationId"]])
+    })
+  )
+
+  it.effect("P14: a union in Role's place points at AccessLevelScheme, a retired scheme", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(live)
+      const retired = S.Literals(["full"]).pipe(S.annotate(plantedScheme("inv:AccessLevelScheme")))
+      const found = yield* gate({ vocabulary: decoded, enrolled: { ...enrolled, [role]: retired } })
+      expect(found).toEqual([["P14", role, ""]])
+    })
+  )
+
+  it.effect("P8 passes owner, a retired notation of the live MemberRoleScheme kept in Role's literals (V12)", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(live)
+      const kept = S.Literals(["viewer", "editor", "admin", "owner"]).pipe(
+        S.annotate(plantedScheme("inv:MemberRoleScheme"))
+      )
+      const found = yield* gate({ vocabulary: decoded, enrolled: { ...enrolled, [role]: kept } })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P14: Member's role path fixes the grant's scope to whole, a retired concept", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(live)
+      const mark = plantedPath([
+        {
+          property: "inv:grantedTo",
+          reverse: true,
+          node: "inv:Grant",
+          fixed: [{ property: "inv:grantScope", concept: "inv:GrantScopeKindScheme-whole" }]
+        },
+        { property: "inv:grantsRole" }
+      ])
+      const planted = memberWith({ role: Member.fields.role.annotateKey(mark) })
+      const found = yield* gate({
+        vocabulary: decoded,
+        enrolled: { ...enrolled, [member]: planted },
+        placements: placedAs(member, "role", mark)
+      })
+      expect(found).toEqual([["P14", member, "role"]])
     })
   )
 })

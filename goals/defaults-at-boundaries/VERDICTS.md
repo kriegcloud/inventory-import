@@ -303,3 +303,72 @@ resource declarations, variable names, reference precedence and secret bytes mus
 No stored encoding changes, new deployment defaults or exemption requests are intended. Literal failure branches
 in the stack secret-name callbacks are held as written unless they can be removed without changing behavior for
 an invalid stage. The scoped law now reports zero; PLAN.md records validation and the two unchanged, uncounted failure branches.
+
+## Access web (PLAN row 12)
+
+Written on 2026-11-26 before code changes. Sign-in, organization switching, adding people, roles and removal retain their behavior and wording.
+
+| Boundary or field | Verdict | Reason |
+| --- | --- | --- |
+| Saved ended-session text | Absent when missing or malformed | Read the two required positions as Options; no invented empty member or address |
+| Session view actor, email, failure | Absent as Option | Keep absence until the final screen; loading and existing member retention remain unchanged |
+| Session view organizations | Derived list | Empty while no session/organization is known, retaining the existing shell behavior |
+| Sign-in refusal and pending email | Absent as Option | A waiting or successful attempt has no refusal; only a matching attempt shows its spinner |
+| People add outcome and failed request | Absent as Option | A domain refusal and a failed request remain separate, with the same sentences |
+| People rows and audit rows | Derived list | Fold unavailable reads with `onNone: A.empty`, `onSome: identity` |
+| Signed-in member in People | Absent as Option | Admin checks and own-row labels use the member without manufacturing a record |
+| AuditEvents updating prop | React optional prop, destructured default false | The caller can omit a display flag |
+| Better Auth optional message/error | Third-party boundary retained pending honest schema route | Preserve Better Auth error ownership and messages |
+| Organization slug | Own unresolved fallback and normalization, retained | Preserve existing lowercase, punctuation removal, truncation and empty-name fallback |
+| People ListColumn email/joinedAt value/title | UI boundary retained | ListTable requires text for search/sort/title; preserve empty-sort and "Not set" title semantics |
+| DOM availability | DOM edge retained | Server imports do not subscribe to browser events |
+
+Uncleared places will be named by file, kind, count and example in the hand-back. No baseline or exemption changes are authorized.
+
+
+Access web implementation and evidence:
+
+- `SessionView.actor`, `email` and `error` now carry Options; its organization list folds the unavailable answer with
+  `onNone: A.empty`, `onSome: identity`. Waiting retains a ready member and hides an initial/no-organization answer as before.
+- Ended-session text uses the first two positions as Options. Missing/malformed text still does not navigate; a real
+  member/address pair is consumed once, retaining the same checks against another member and an unsafe address.
+- People add-result refusal, failed request, member and loaded-list absence remain Options until rendering. Lists
+  use Effect arrays; role/removal and optimistic behavior are unchanged. SignIn refusal/pending email use Options.
+- The audit table folds its unavailable answer to an empty list, and its optional display prop defaults in the React
+  destructure. No new schemas or undecided defaults were introduced.
+- Forced callers outside the package: `apps/inventory/src/web/Workspace.tsx`, `components/app/AppSidebar.tsx`,
+  `components/app/SignedIn.tsx`, and `apps/inventory/test/web/session.test.ts`. They consume the Option fields;
+  the test's builders now require explicit options and its known values narrow with `assertSome` from `@effect/vitest/utils`.
+- `packages/access/web/strict-ceiling.json` fell from 14 to 6 after replacing native array methods. No baseline,
+  exemption, lockfile, Verify lock, vendor file or secret file was edited.
+
+The scoped defaults command read all nine package TypeScript files and the forced session test. It holds **4 fallback,
+3 absence, 0 unwrap, 1 normalise** (8 total, down from the package's 37); the forced test has zero. Remaining places:
+
+| File | Kind and count | Example and reason |
+| --- | --- | --- |
+| `People.screen.tsx` | fallback 2 | `O.getOrElse(person.email, () => "")` supplies ListTable's required search/sort text; title uses "Not set". UI boundary candidates, held unchanged |
+| `Session.atoms.ts` | absence 2 | `typeof window === "undefined"`, likewise document: DOM subscription guard, candidate only |
+| `SignIn.screen.tsx` | fallback 1, normalise 1 | Slug lowercases and uses "organization" when generated text is empty. Own unresolved normalization/default, retained unchanged, not an exemption candidate |
+| `internal/authClient.ts` | fallback 1, absence 1 | Better Auth optional `message` uses the existing general sentence; nullable `result.error` chooses error/data. Third-party boundary candidates, held unchanged |
+
+Uncounted folds are also explicit: People joinedAt value/title retain empty sort text and "Not set"; they predate this
+change. New literal `onNone` cases are final screen output (hidden message/menu/breadcrumb, loading status, "closed"
+sign-up offer), and the existing sign-in refusal's general sentence remains. Organization and list absence use
+`A.empty`/`identity`, not renamed literal defaults. The JSX password `minLength` and header actions retain vendor prop
+omission; DOM/vendor props are not changed into owned nullable data. No postMessage boundary exists in this package.
+
+Validation: focused session/workspace tests pass, 31 tests in 2 files with no retry. Full `bun run check` passed
+105 tasks (15.751 seconds) before the final test tightening. The final rerun after `assertSome` passed all 105 tasks
+(20.532 seconds, 71 cached); app fast tests passed 70 tests in 19 files with no retry. Package source type-check
+passed. Formatting touched only the changed code files and own strict ceiling. No browser was opened: signing in,
+switching organization, adding a person, changing a role and removal were **not seen on screen**. `check:full`, the
+155-item messy-sample path and production behavior were not checked; this lane is doing, not done.
+
+Needs the person: nothing for this refactor; the existing slug default remains unresolved work for the sweep.
+
+Final receipts: `/tmp/access-web-check-final.log`, `/tmp/access-web-tests.log`, and `/tmp/access-web-defaults.log`.
+No cache overrides were needed; the existing app Vitest cache location was used. The explicit all-package scoped
+law was rerun after the final edits, and `git diff --check` passed. A first full check failed only because the
+strict ceiling had fallen; a later intermediate check caught the test narrowing's pipe diagnostic; both were
+corrected before the successful final full check. No browser layout or view arrangement was changed.

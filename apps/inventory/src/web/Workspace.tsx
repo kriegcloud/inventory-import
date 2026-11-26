@@ -92,13 +92,19 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
   return (
     <Breadcrumb>
       <BreadcrumbList className="flex-nowrap">
-        {actor === undefined || short ? null : (
-          <>
-            <BreadcrumbItem className="min-w-0">
-              <span className="block truncate">{actor.organizationName}</span>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-          </>
+        {O.match(
+          O.filter(actor, () => !short),
+          {
+            onNone: () => null,
+            onSome: (actor) => (
+              <>
+                <BreadcrumbItem className="min-w-0">
+                  <span className="block truncate">{actor.organizationName}</span>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            )
+          }
         )}
         <BreadcrumbItem>
           {inImport ? (
@@ -149,15 +155,15 @@ function SessionNotice() {
   const { error } = useAtomValue(sessionView)
   const ask = useAtomRefresh(session)
   const narrow = useAtomValue(isNarrow)
-  if (error === null) return null
+  if (O.isNone(error)) return null
   return (
     <Alert className={narrow ? "mx-4 my-3 w-auto flex-none" : "mx-6 my-4 w-auto flex-none"}>
       <AlertTitle>We could not check that you are still signed in</AlertTitle>
       <AlertDescription>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="min-w-0">
-            {sayError(error).sentence} Nothing you decide or save is sent until we can. It is checked again by itself
-            every half minute, and at once when the connection comes back.
+            {sayError(error.value).sentence} Nothing you decide or save is sent until we can. It is checked again by
+            itself every half minute, and at once when the connection comes back.
           </p>
           <Button variant="outline" size="xs" onClick={ask}>
             Check now

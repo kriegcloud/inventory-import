@@ -8,7 +8,7 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 175 answer the questions report 18 and step 7 raised. Decision 176 accepts report 18 as the text of the party slice's terms. They are under Answered. They are what is left
+Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 175 answer the questions report 18 and step 7 raised. Decision 176 accepts report 18 as the text of the party slice's terms, and 177 to 179 answer what steps 9 to 12 set aside. They are under Answered. They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
@@ -1347,3 +1347,27 @@ I accepted report 18 (`research/18-party-slice-terms.md`, as committed at `8363b
 - Rationale: decision 129 has one report and one accepting decision; a number of its own names the text accepted and not the method chosen before it was written.
 - What changes: each new term's label, definition, tag, parents, identity criterion, basis and gist names are the report's, and each names 176: 10 classes, 27 object and 26 datatype properties, 7 schemes with 24 concepts. `Member` and `membershipIn`, whose text changed, name 176, as does `Party`'s entry in the no-gist-parent exceptions. `Person`, `Organization` and `grantScope` keep 111; their new links are `Party` as category parent of `Person` and `Organization`, `storesId: false` on `Person`, and `grantScope` under `gist:isCategorizedBy`. The choices the report lists in its section 11 are accepted with it. Terms enter the module in steps 9 to 12 of `goals/party-slice`.
 - Reverse: a term is changed or retired by a decision of its own (decisions 24 and 33).
+
+### 177. Whether CQ-P06 lists a member whose person has no stated name (2026-11-26)
+
+I chose that the member stays listed; the agent recommended the same.
+
+- Rationale: the question asks who is in the organization, and a missing name should not lose a member.
+- What changes: the person's name is optional in CQ-P06, as the sign-in email is; a member with no stated name is listed with no name. One query and its test.
+- Reverse: require the name and say in the release line that a member without one is not listed.
+
+### 178. The lift's two edge cases under decision 161 (2026-11-26)
+
+I chose that the lift states nothing for the field and the record still lifts; the agent recommended the same.
+
+- Rationale: decision 155 has the record still lift, and one ambiguous field should not stop what the rest of the record says. No record reaches either case today.
+- What changes: where two fields of one record fill the node step's relation, or the reused step fixes a concept, the lift writes nothing for that field instead of refusing the record. The planted tests keep both cases.
+- Reverse: refuse the record, naming the field.
+
+### 179. CQ-P04's shared-name case states the name (2026-11-26)
+
+I chose to add the name; the agent recommended the same.
+
+- Rationale: the case "two records that share only a name are not thereby the same party" held only because neither record stated one; `name` did not exist when step 10 was built.
+- What changes: `test_AcmeC` and `test_AcmeD` state `inv:name "Acme Industrial"` in CQ-P04's fixture; the test reads that they share it and give no pair, and CQ-P05's ASK stays false.
+- Reverse: take the two lines out and reword the goal's acceptance line.

@@ -17,7 +17,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 1 | Upload `.turbo/runs/*.json` from both jobs; record ten runs as the baseline | nothing; turns every estimate into a number | nothing | built; the ten runs wait on a push |
 | 2 | Start the proofs' three long tasks at once: jobs for prove, verify, and fold with mutants:sample; "Proofs and search of the model" stays as the job that waits for them | 1 to 2 min on a full miss alone; about 4 min with step 3 | nothing | built |
 | 3 | Split the check: `catalog-web:test`; `app:test:slow` with the grid test; everything else; "Check, test and build" stays as the job that waits for them | 3 to 5 min | nothing | built |
-| 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | todo |
+| 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | built; the split waits on CI's timing ("Step 4" below) |
 | 5 | Bring the vendored kit into the hash of prove, verify, mutants and mutants:sample; then take `@beep/repo-cli` out of the root's devDependencies, and bring the CLI's source to the tasks that run it through its own `transit`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | done ("Step 5, the experiment" below) |
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | built; CI's run waits on a push ("Step 6" below) |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
@@ -76,6 +76,49 @@ Before any change, from GitHub Actions on 2026-11-26. Step 1 replaces it with tu
 | Proofs job, all replayed | 15 to 24 s |
 | `catalog-web:test` | 190 to 449 s |
 | `app:test:slow` | 191 to 311 s |
+
+## Step 4, the seeds' orderings
+
+There were ten seeds, not the eight the audit counted: 9b6ac36d added two after it. Each was played at 1,000 runs
+against the code before its fix, in a scratch worktree (removed after): at the fix commit with its `src` taken from
+the commit before where the fix was in the machine, with its world taken from the commit before where the fix was
+in the property world, and at the commit itself where the seed failed an older machine. Each failed, and printed
+its shortest ordering. Run on 2026-11-26:
+
+| Seed | Played against | Falsified after | What did not hold | Pinned |
+| --- | --- | --- | --- | --- |
+| -876652368938065 | 9b6ac36d, `src` before | 92 runs | row c: the line says it was decided since by someone else, and only this tab wrote it | already, word for word |
+| -5255366521312007 | 9b6ac36d, `src` before | 870 runs | row b: the same | already |
+| 369148268449177 | 5ae91943, before the rewrite (518babdb) | 651 runs | after everything landed, a row of the person's still waits | new, below |
+| -2416120108841983 | 5ae91943 | 762 runs | the same | new, below |
+| 5903557278919753 | 518babdb | 526 runs | row a's value is not on the server, waiting, on a line or named | already |
+| -7675454253259129 | b7d94590, `src` before | 499 runs | row b: she picked one value, and the server holds another with no line | already |
+| 7065129212828743 | b7d94590, `src` before | 374 runs | row c: the line says it was decided since by someone else, and only this tab wrote it | already |
+| -5469710740912195 | b7d94590, `src` before | 6 runs | row a is sent as the server refused it | already |
+| 1376949052012291 | 1a8ecfc1, world before | 237 runs | row a waited and goes as a live press | already |
+| 22 | 4ee66ba0, world before | 907 runs | row a is sent as the server refused it | already, the test at "her own decision on its way, its answer lost with a reload" |
+
+"Already" means the ordering the seed printed is a run of commands in "orderings the properties met, pinned",
+command for command: each fix commit had pinned its shortest ordering beside its seed. The two from before the
+rewrite were written in that day's commands, when the world kept one save out at a time; they are pinned as one new
+test with each save as the one the draft waits for (`which: "last"`), and both hold on today's code. They cannot
+be played against the old machine in today's world, whose commands changed with the rewrite; the table's line is
+the old world's own failure. The seed loop is gone. The four unseeded properties keep 1,000 runs.
+
+`Draft.machine.test.ts` alone, one worker: 75 tests in 50.6 s. `catalog-web:test` alone on four pinned cores
+(`taskset -c 0-3`, the runner's stand-in), two rounds, on a workstation busy with other work (load 9 to 22):
+
+| Workers | Round 1 | Round 2 |
+| --- | --- | --- |
+| 1 | 81 s | 87 s |
+| 2 | 57 s | 47 s |
+| 3 | 87 s | 53 s |
+| 4 | 66 s | 48 s |
+
+Past two workers nothing is gained: the draft file, about 50 s in one worker, is the floor. Not done yet: the web
+job still gives one worker, and the file is not split. Both wait on the job timed on CI over several runs at one
+and at two workers, as the standard asks before a job is given more; if two holds, splitting the file by group is
+what lets a third or fourth worker help.
 
 ## Step 5, the experiment
 

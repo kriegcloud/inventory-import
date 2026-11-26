@@ -24,9 +24,11 @@ import { aboutClass, aboutPath, aboutProperty, noTerm } from "@inventory/kernel/
 import { Instant } from "@inventory/kernel/Text"
 import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
 import * as A from "effect/Array"
+import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import { IriNode, linesOf, link, literal, without, type Triple } from "../src/Graph.schema.ts"
 import { lift, type LiftContext } from "../src/Lift.ts"
 import { graphOf, threadContext, threadGraph, threadHandWritten, threadRows } from "../src/Thread.ts"
@@ -317,6 +319,33 @@ describe("the lift's literals", () => {
       const refusal = yield* Effect.flip(lift(context, wordedMember, worded))
       expect(refusal.field).toStrictEqual(O.some("onHold"))
       expect(refusal.reason).toBe("the field's value is no xsd:boolean the lift writes")
+    })
+  )
+
+  it.effect("refuses a record its own schema cannot encode, naming no field, and lifts one it can", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const { head } = yield* entryNames
+      // A field that stands for no term: the record is encoded whole, before any mark is read.
+      const record = S.Struct({
+        id: ActivityId.pipe(S.annotateKey(aboutClass("inv:AuditEntry"))),
+        organizationId: OrganizationId.pipe(S.annotateKey(aboutProperty("inv:inTenant"))),
+        elapsed: S.BigInt.pipe(
+          S.decodeTo(S.Duration, SchemaTransformation.durationFromNanos),
+          S.annotateKey(noTerm("screen"))
+        )
+      }).pipe(S.annotate(aboutClass("inv:AuditEntry")))
+      const timed = yield* S.decodeEffect(record)({
+        id: entryId,
+        organizationId: "test_ExampleWorks",
+        elapsed: 5_000_000_000n
+      })
+      const encodable = yield* lift(context, record, timed)
+      expect(linesOf(encodable)).toStrictEqual(linesOf(head))
+      // Built in code, not decoded: an endless duration has no count of nanoseconds to encode to.
+      const endless = yield* Effect.flip(lift(context, record, { ...timed, elapsed: Duration.infinity }))
+      expect(endless.field).toStrictEqual(O.none())
+      expect(endless.reason).toBe("the value does not encode through the record's schema")
     })
   )
 })

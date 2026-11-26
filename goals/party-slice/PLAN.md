@@ -258,12 +258,16 @@ Choices the SPEC left open, each the agent's:
 - **Where the tenant beside the rows goes**: `organization`, an `Option` on `LiftContext`, none in `threadContext`. A
   record that names its tenant in a field and is given one too is refused, not compared, since two sources of the
   organization could disagree; a record that names none and is given none is refused as before, and a given tenant is
-  held to the same segment rule as a field's. `graphOf` needs no change.
+  held to the same segment rule as a field's. `graphOf` takes no organization parameter; it and `lift` now take only
+  a schema with no encoding services (`EncodingServices: never`), since the lift encodes the record once.
 - **What `Person` states**: five triples, `Member`'s six less `membershipIn`, since no field of the People page's record
   names the tenant and the lift writes only what a mark says. The given tenant is in the IRIs and nowhere else.
 - **A literal's text is the record as its own schema encodes it**: the record is encoded once, and each attribute's
   text read from it, so `Activity.createdAt` decoded from `2026-11-01T09:00:00Z` is written `2026-11-01T09:00:00.000Z`,
-  the text `DateTimeUtcFromString` writes. An encoding that fails is a `LiftRefused` naming no field.
+  the text `DateTimeUtcFromString` writes. An encoding that fails is a `LiftRefused` naming no field, asked of every
+  record, one with no attribute included. A decoded value encodes, so its plant is a value built in code that its
+  schema cannot encode: an endless `Duration` under `durationFromNanos`, with a finite one as the near miss.
+  The writer's NFC check is not the lift's: a lifted literal that is not NFC is refused when it is written.
 - **Which encoded values make a literal**: a JavaScript boolean for `xsd:boolean`, written `true` or `false`, and a
   string for `xsd:string` and `xsd:dateTime`; anything else is refused, a number for a string included, rather than
   turned into text. The text is then held to the writer's own check, `misread`, exported from `Write.ts` (as a dual,

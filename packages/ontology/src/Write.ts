@@ -108,7 +108,8 @@ const dayFits = (value: string): boolean =>
 
 /**
  * Why a literal's text is not one its datatype writes, or none when it is. The writer refuses such a literal, and the
- * lift asks the same before it states one, so a value the lift writes is one the files can hold.
+ * lift asks the same before it states one, so the two refuse the same misreadings of a datatype. Whether the text is
+ * NFC is the writer's check alone: a lifted literal that is not NFC is refused only when it is written.
  *
  * @example misread("2026-02-30T00:00:00Z", term("xsd", "dateTime")) // Some('is no xsd:dateTime: "2026-02-30T00:00:00Z"')
  */

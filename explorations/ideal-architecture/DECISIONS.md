@@ -1982,3 +1982,24 @@ Answer: I chose each; the agent recommended the same each time.
 
 Reverse: widening the literal list or taking the file off `exemptions` counts those places again, and they are
 cleared in the same commit.
+
+### 2026-11-26 — the defaults sweep's first edges: the byte readers, Better Auth's API and the browser's
+
+Question: row 8 cleared 74 of 197 places in our csv and xlsx packages and stopped at the readers of bytes and markup:
+92 places in 11 files under `csv/src/internal` and `xlsx/src/internal` (`bytes[i] ?? 0` in the UTF-8 scan of
+`csv/src/internal/encoding.ts`). And three files hold places that are another library's API or the browser's.
+Answer: I chose each; the agent recommended the same each time.
+
+- The 11 reader files go on `exemptions` for the kinds each holds, with one reason: an Option for each byte, capture
+  or position would cost the loop that reads every cell. Rejected: a rewrite with a benchmark (the pilot took a
+  review from 1.2 s to 70 s with one fold); leaving them in the baseline. The other 31 places of those packages (the
+  codec and schema files, two test supports) go back to a lane.
+- `access/host/src/internal/authOptions.ts` (2, absence: Better Auth's session hook passes a null context and wants
+  `undefined` back), `access/web/src/internal/authClient.ts` (2, a fallback and an absence: its answer's error is
+  null or holds a message that may be left out) and `access/web/src/Session.atoms.ts` (2, absence:
+  `typeof window === "undefined"`) go on `exemptions`. Rejected: only the Better Auth two; ruling on every edge at
+  the end.
+- A second dev server runs on port 5174 from the sweep's worktree, with its own local database, while the browser
+  lanes merge; the messy sample is imported on it after each one.
+
+Reverse: taking a file off `exemptions` counts its places again, and they are cleared in the same commit.

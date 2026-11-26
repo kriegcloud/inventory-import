@@ -79,6 +79,76 @@ export interface DefaultsExemption {
  */
 export const exemptions: ReadonlyArray<DefaultsExemption> = [
   {
+    file: "packages/access/host/src/internal/authOptions.ts",
+    kinds: ["absence"],
+    why: "Better Auth's own API: its session hook passes a null context and wants undefined back when there is nothing to change (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/access/web/src/Session.atoms.ts",
+    kinds: ["absence"],
+    why: "the browser's own API: window and document are undefined where no page is (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/access/web/src/internal/authClient.ts",
+    kinds: ["fallback", "absence"],
+    why: "Better Auth's own API: an answer's error is null or holds a message that may be left out (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/encoding.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/header.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/machine.ts",
+    kinds: ["absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/sniff.ts",
+    kinds: ["absence"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/container.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/formula.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/numberFormat.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/ooxml.ts",
+    kinds: ["fallback", "absence"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/sheet.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/workbookPart.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/writer.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
     file: "packages/catalog/model/src/Reading/Spreadsheet.rules.ts",
     kinds: ["absence"],
     why: "Cell.shown and Cell.formula stay keys left out because the table crosses the worker by postMessage, where an Option loses its prototype; shownOf and formulaOf read them as Options (Benjamin, 2026-11-25)"

@@ -107,14 +107,21 @@ not to lower a strict ceiling puts good moves back: seven were, until the ruling
 
 Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs), and again on pull request 25's branch at `89da8db6`, `main` at `64885a89` with 22's review fix, 114 of 114 with none replayed; SF-3's, SF-4's and SF-5's `rg` lines over every swept
 package find only schema definitions and files on `exemptions`; the messy sample on screen on the branch of each
-pull request that changed what the browser sends (above). Not checked: "Use items_messy.csv" reading "Stopped before
-it was saved" on a dev server just started (below) was not pressed on a production build.
+pull request that changed what the browser sends (above). "Stopped before it was saved" on a dev server just
+started was the dev server reloading the page, and is fixed in this pull request (below).
 
 ## Choices made along the way
 
 - 2026-11-26. "Use items_messy.csv" on a dev server just started read "Stopped before it was saved" on both looks,
-  and Continue went on. Not diagnosed: it may be the dev server's first build of the reader, or a defect in the
-  sample's first press. Somebody should press it on a production build before this is called nothing.
+  and Continue went on. Diagnosed on this pull request's branch, each run on a fresh database with Vite's cache
+  cleared. A production build (`bun run preview`, signed in as Dana Whitfield): one press read "200 rows read · 20
+  values fixed for you", Needs a decision 24, Cannot import 21, Ready 155, All 200, and no "Stopped". A dev server on
+  port 5174: the press logged `dependency optimized: effect/MutableList` and `optimized dependencies changed.
+  reloading`, and the page read "Stopped before it was saved". The readers took `effect/MutableList` and
+  `effect/MutableRef` in `436478d2` (every property readonly), and the list of the worker's modules in
+  `vite.config.ts` did not name them. The list is gone: the worker is now one of Vite's scan entries, so whatever it
+  imports is ready at start. Pressed again on a cold dev server: no reload, and Review read Needs a decision 24,
+  Cannot import 21, Ready 155, All 200.
 
 - 2026-11-26. The stored change's `confidence` and a left-out row's `name` became optional on the wire, so absence
   is carried as absence. Stored columns are unchanged.

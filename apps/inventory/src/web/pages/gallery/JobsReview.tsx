@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
 import { restored, saved } from "@inventory/review/ReviewDraft"
-import type { ReviewRow } from "@inventory/review/ReviewTypes"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@inventory/ui/components/item"
@@ -54,23 +54,30 @@ const jobReviews = Atom.readable((get) => reviewJobs({ jobs, decisions: get(jobD
 /** The questions on the lines of the jobs still in. */
 const jobQuestionRows = Atom.map(jobsLeftOut, (leftOut) => questionRows(jobs, leftOut))
 
+/** A job question keeps the fixture's complete row and requires the parent job named by its cells. */
+const JobQuestion = ReviewRow.mapFields((fields) => ({
+  ...fields,
+  cells: S.StructWithRest(
+    S.Struct({ job: S.String.annotateKey({ description: "Parent job whose lines are left out together" }) }),
+    [S.Record(S.String, S.String)]
+  ).annotateKey({ description: "Reviewed cells with the parent job required; other columns remain open" })
+})).annotate({ description: "A review question belonging to one parent job" })
+const readJobQuestion = S.decodeUnknownOption(S.toType(JobQuestion))
+
 /** "Leave job … out" on every question's row, as the atom the region takes its rows' own answer from. */
 const leaveJobAction = Atom.readable((get) =>
-  O.some((row: ReviewRow) => {
-    const code = row.cells.job
-    return code === undefined
-      ? O.none()
-      : O.some({
-          label: `Leave job ${code} out`,
-          onSelect: () =>
-            get.registry.update(jobsLeftOut, (before) =>
-              A.append(
-                A.filter(before, (at) => at !== code),
-                code
-              )
-            )
-        })
-  })
+  O.some((row: ReviewRow) =>
+    O.map(readJobQuestion(row), (question) => ({
+      label: `Leave job ${question.cells.job} out`,
+      onSelect: () =>
+        get.registry.update(jobsLeftOut, (before) =>
+          A.append(
+            A.filter(before, (at) => at !== question.cells.job),
+            question.cells.job
+          )
+        )
+    }))
+  )
 )
 const jobLineKinds = Atom.make(lineKinds)
 // A line's own "ready" is an answered question: the job it belongs to is what is Ready.

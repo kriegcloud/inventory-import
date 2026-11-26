@@ -37,7 +37,7 @@ Places by package on 2026-11-23, from the baseline:
 | 11 | `packages/catalog/web` | 572 | Codex lane | todo |
 | 12 | `packages/access/web` | 37 | Codex lane | todo |
 | 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | todo |
-| 14 | `packages/infra` | 7 | Codex lane | todo |
+| 14 | `packages/infra` | 7 | Codex lane | done: 15 places under the new reader, all cleared; the stage plan is unchanged and no alchemy command was run. Two `onFailure: () => []` branches stay, which the law does not count |
 | 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | todo |
 
 ## Where the pilot stands

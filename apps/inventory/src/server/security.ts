@@ -103,7 +103,11 @@ export const withSecurityHeaders: {
     })
     const hashes = yield* Effect.forEach(
       A.fromIterable(Str.matchAll(inlineScripts)(html)),
-      (match) => sha256Base64(match[1] ?? ""),
+      (match) =>
+        O.match(A.get(match, 1), {
+          onNone: () => Effect.die("A matched inline script must have its content capture"),
+          onSome: sha256Base64
+        }),
       { concurrency: "unbounded" }
     )
     const page = new Response(html, secured)

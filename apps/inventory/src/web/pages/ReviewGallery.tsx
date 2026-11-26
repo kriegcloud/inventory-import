@@ -2,6 +2,7 @@ import { LayoutGridIcon } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Atom from "effect/reactivity/Atom"
 import * as Str from "effect/String"
 import { toast } from "sonner"
@@ -92,24 +93,25 @@ const newSupplier: ProblemKind = ProblemKind.make({
 })
 const elsewhereKinds: ReadonlyArray<ProblemKind> = [...problemKinds, newSupplier]
 
+/** Every supplier example supplies its name, SKU and supplier. */
+const elsewhereItems: ReadonlyArray<readonly [string, string, string]> = [
+  ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
+  ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
+  ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
+]
+
 /** Rows whose supplier is not in the list yet, each with its own reason. */
-const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(
-  [
-    ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
-    ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
-    ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
-  ],
-  ([name = "", sku = "", supplier = ""], index) =>
-    ReviewRow.make({
-      id: `elsewhere-${index + 1}`,
-      line: 183 + index,
-      cells: { name, sku, unit: "pcs", onHand: "10", supplier },
-      problem: {
-        kind: newSupplier.id,
-        column: "supplier",
-        reason: `Supplier ${supplier} is not in your supplier list yet.`
-      }
-    })
+const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(elsewhereItems, ([name, sku, supplier], index) =>
+  ReviewRow.make({
+    id: `elsewhere-${index + 1}`,
+    line: 183 + index,
+    cells: { name, sku, unit: "pcs", onHand: "10", supplier },
+    problem: {
+      kind: newSupplier.id,
+      column: "supplier",
+      reason: `Supplier ${supplier} is not in your supplier list yet.`
+    }
+  })
 )
 
 /**
@@ -154,7 +156,10 @@ const monthRows: ReadonlyArray<ReviewRow> = A.flatMap(monthItems, (item, index) 
 /** The item's own answer on each of its months: every record of its line goes. An atom, as the region takes it. */
 const leaveItemOut = Atom.make(
   O.some((row: ReviewRow) => ({
-    label: `Leave ${row.cells.name ?? "the item"} out, every month`,
+    label: O.match(R.get(row.cells, "name"), {
+      onNone: () => "Leave the item out, every month",
+      onSome: (name) => `Leave ${name} out, every month`
+    }),
     onSelect: () => toast(`Would leave every month of line ${row.line} out`)
   }))
 )

@@ -1009,3 +1009,96 @@ locations through Turbo. No repository configuration was changed for the sandbox
 No browser, hosted deployment or check:full was run; not seen on screen.
 
 Needs the person: nothing.
+
+## App source lane, row 13, 2026-11-26
+
+Scope: `apps/inventory/src` only, with this verdict section. Settings continue to enter through Config; public
+Vite flags keep their existing browser boundary. No stored shape, screen sentence, baseline or exemption changes.
+
+| Fields / owner | Verdict | Boundary and reason |
+| --- | --- | --- |
+| Generated OpenAPI document | Third-party document edge | Effect's generated paths, methods, parameters, response and reference properties really may be absent. Preserve in-place transforms and document contents; inventory retained syntax explicitly. |
+| Same-origin log annotations | Unresolved compatibility values | Keep the existing empty log fields: omitting keys would change emitted telemetry. No fallback-only codec is introduced to conceal them. |
+| Settings API key | Schema-owned blank test | Config still reads a Redacted key; blank detection belongs to the setting's schema, without trimming the secret used in requests. |
+| Telemetry route path | Nonempty split invariant | Splitting text always produces at least one segment; use the nonempty return type instead of fabricating empty text. Header absence remains an HTTP edge. |
+| Security script capture | Required capture invariant | Every matched inline script has capture 1, including empty scripts. A missing capture is a defect, never an empty script. |
+| Development gallery modules | Option capability | Production has None, development Some lazy component. Match only into the screen. |
+| Breadcrumb import and filename | Option through rendering | Retain the route's Option and the async read's Option until the breadcrumb draws. DOM query nulls remain actual browser edges. |
+| Shell optional React props | Component edge | Optional props remain optional, with destructuring defaults where needed. An omitted sidebar still chooses the plain frame. |
+| Activity reads and view | Option through rendering | Retain AsyncResult values and failure causes as Options. Choose the same initial list by whole predicates; draw counts and skeletons at the last step. |
+| Request member and sent header | Option capability | No registry or no member header means the request/answer passes through. No empty string is invented to represent either absence. |
+| Browser public settings startup | Existing synchronous runtime boundary | Preserve startup timing and invalid-flag warning/default behavior; no alternate synchronous runner or throwing decoder. Name any retained place honestly. |
+| Gallery rows and callbacks | Existing review-region contract | Tighten fixture tuples that always have all fields. Review callbacks still follow the other lane's contract; unresolved data fallbacks stay visible and are inventoried, not hidden by codecs. |
+
+Final occurrence counts, exact residuals and validation follow below after implementation.
+
+### App source residual inventory
+
+The scoped source law now holds **19 places: 8 fallback, 9 absence, 0 unwrap, 2 normalise**, down from
+51 places in 15 files (26 fallback, 20 absence, 2 unwrap, 3 normalise). This clears 32 counted places.
+No baseline rewrite was run.
+This lane is **not complete**: eight places are API-edge candidates and eleven are unresolved source work,
+not approved exemptions. Every retained occurrence is listed below; paths are relative to `apps/inventory/src/`.
+
+| File | Kind | Count | Lines | Example | Why retained |
+| --- | --- | --- | --- | --- | --- |
+| `api/v1/Document.ts` | absence | 3 | 41, 144, 160 | `operation["requestBody"] === undefined` | Effect's generated OpenAPI document may omit a method, request body or 401 response. Third-party API-edge candidates. |
+| `web/Workspace.tsx` | absence, fallback | 2 | 60 | `params.get("step") ?? "review"` | DOM URLSearchParams.get returns null. The existing skeleton chooses upload when no import is named and review when its step is absent. Browser-edge candidates. |
+| `web/preload.ts` | absence | 2 | 34, 37 | `opened !== null` | DOM URLSearchParams.get returns null; preload fetches import data only for a present id within the existing bound. Browser-edge candidates. |
+| `web/components/app/AppShell.tsx` | absence | 1 | 44 | `props.sidebar !== undefined` | React's optional sidebar prop chooses the plain or signed-in frame. Optional-component-prop edge candidate. |
+| `server/SameOrigin.ts` | fallback | 2 | 37, 38 | `O.getOrElse(source.origin, () => "")` | Existing emitted log attributes contain empty strings for absent headers. Omitting attributes changes telemetry; a fallback-only schema would conceal the issue. Unresolved, not an exemption candidate. |
+| `web/lib/settings.ts` | fallback | 1 | 21 | `Effect.runSync(PublicSettings.parse(...))` | Existing synchronous module startup provides public flags before the runtime imports them, with its original invalid-flag warning/default behavior. No renamed runner or throwing decoder was substituted. Unresolved startup/API work, not an approved edge. |
+| `web/pages/ReviewGallery.tsx` | fallback | 1 | 52 | `O.getOrElse` in `readState` | The absent or unknown query state selects `default`; it still needs a coherent state-entry boundary. Unresolved; no fallback-only decoder. |
+| `web/pages/ReviewGallery.tsx` | fallback | 3 | 201 | `asked.cells.onHand ?? asked.row.cells.onHand ?? ""` | The recheck's partial edited cells choose edited, original, then empty text; month chooses empty text. Requires an honest input shape coordinated with the review API lane. Unresolved, not a platform edge. |
+| `web/pages/ReviewGallery.tsx` | absence | 1 | 153 | `problem === undefined` | The existing own recheck contract returns Problem or undefined; row construction follows that contract. Unresolved pending that contract's Option form. |
+| `web/pages/ReviewGallery.tsx` | normalise | 1 | 139 | `Str.trim(onHand)` | The gallery's cell-reading rule recognizes a negative typed count, retaining the original text in its sentence. No normalization of reviewed cells was introduced. Unresolved; no exemption requested here. |
+| `web/components/app/AppSidebar.tsx` | normalise | 1 | 75 | `Str.toUpperCase` | Avatar initials are formatted for display. No runtime decoder was inserted into this pure formatter to hide the operation. Unresolved display-formatting placement, not a platform edge. |
+| `web/pages/gallery/JobsReview.tsx` | absence | 1 | 61 | `code === undefined` | The own review row-action callback currently returns undefined when no job cell exists. Requires the review API's Option callback contract; no Option-to-undefined codec was added. Unresolved. |
+
+The two gallery strings moved only at their last display step: complete row-action labels and the complete jobs
+caption are matched, with the exact same words in each case. Supplier examples now have required three-element
+tuples, removing three uncounted destructuring defaults. The breadcrumb still shows a filename only for a successful
+read (not an older success attached to a failed read). Activity retains the prior rule for selecting Events, the
+same counts, skeletons and error sentence, and the null-cause behavior of its previous shape adapter.
+
+No stored or wire schema was changed, no worker/postMessage crossing was touched, and no stored data or exported
+file is rewritten by these edits. No test, caller outside this lane, PLAN, SPEC, baseline, exemption, Verify lock or
+vendored source was edited. No new undecided data fallback was moved onto a schema; the unresolved values above
+remain visible in their original places. No .dev.vars was read. No commit or push was made.
+
+Focused compatibility receipts (synthetic local proof, not browser acceptance):
+
+- `.scratch/defaults-app-source/settings-proof.ts` compares HEAD's Settings to this lane across 35 synthetic keys,
+  including all ECMAScript trim whitespace code points. Presence and every accepted key's exact bytes agree;
+  the same model/fallback-model Config reads are compared. Output: `/tmp/defaults-app-source/settings-proof.log`.
+- `.scratch/defaults-app-source/document-proof.ts` compares HEAD's document transform across 22 cases, including
+  absent, undefined and null paths, responses and parameters, component naming/folding and security declarations.
+  Output: `/tmp/defaults-app-source/document-proof.log`.
+- Effect 4.1.5 source was checked for Array's nonempty head/get/getSomes, String.split's nonempty return,
+  Option conversion/match/map/filter/flatMap/exists, Record.get, Schema.is/isPattern and the used Effect calls.
+  The first typecheck rejected Effect 3's Option-returning Array.filterMap assumption; the final code uses
+  Array.map plus Array.getSomes, matching the installed Effect 4 API.
+
+The scoped defaults law passes for all 38 owned source files; `/tmp/defaults-app-source/defaults.log`.
+The formatter ran on all eleven changed source files (Markdown is excluded by the formatter).
+Full validation results follow below. No browser was opened: **not seen on screen**. Fresh import/Confirm storing
+155 rows and stored/result/Items agreement, hosted behavior, check:full and performance benchmarks were not run.
+
+### App source validation
+
+- `bun run check --env-mode=loose`: **105/105 tasks passed**, 83 cached, 12.066s on the final source/test pass.
+  `/tmp/defaults-app-source/check-final.log`. App fast tests: **70 in 19 files**, no retry. The earlier full uncached
+  run also passed 105/105 in 2m51.739s, including catalog web's 401 tests and the five Verify proofs.
+- `bun run --cwd apps/inventory test:slow`: **133 tests in 24 files passed**, 69.40s, no retry.
+  `/tmp/defaults-app-source/slow.log`. This includes the 50,000-row match/confirm cases, but is not a dedicated
+  performance comparison or on-screen import proof.
+- All eleven changed source files were formatted; all 38 source files pass the scoped defaults law with
+  **8 / 9 / 0 / 2** retained. `bun run docs:check` and `git diff --check` pass; docs keeps the existing status warnings.
+- Sandbox cache/temp paths were passed under `/tmp/defaults-app-source/` using BUN_TMPDIR,
+  BUN_INSTALL_CACHE_DIR, XDG_CACHE_HOME, XDG_CONFIG_HOME, WRANGLER_REGISTRY_PATH, TURBO_CACHE_DIR and
+  MINIFLARE_CACHE_DIR. Loose environment mode passes these to Turbo; repository configuration was not changed.
+- Frozen scope check: PLAN, baseline, Verify lock, review source, catalog web and app tests have no diff.
+
+Needs the person: the eight listed API-edge candidates need an exemption decision; eleven unresolved source places
+remain work. No screen words or stored-data decisions are requested. Not seen on screen; the orchestrator still
+owns the real import acceptance.

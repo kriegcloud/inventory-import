@@ -81,12 +81,12 @@ const noImport = Atom.make(AsyncResult.initial<never, never>())
  * Where the person is, in the bar beside the sidebar's button: the organization, the page, and the file when an
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
-function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
+function Crumbs(props: { page: AppPage; importId: O.Option<ImportId> }) {
   const { actor } = useAtomValue(sessionView)
   // The same read the import page shows: no second request.
-  const opened = useAtomValue(props.importId === undefined ? noImport : importViewShown(props.importId))
-  const fileName = AsyncResult.isSuccess(opened) ? opened.value.fileName : undefined
-  const inImport = props.page.path === "/" && props.importId !== undefined
+  const opened = useAtomValue(O.match(props.importId, { onNone: () => noImport, onSome: importViewShown }))
+  const fileName = AsyncResult.isSuccess(opened) ? O.some(opened.value.fileName) : O.none()
+  const inImport = props.page.path === "/" && O.isSome(props.importId)
   // The organization is already named at the top of the sidebar: beside a narrow page the bar keeps its room.
   const short = useAtomValue(contentBelow(1024))
   return (
@@ -115,16 +115,22 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
             <BreadcrumbPage>{props.page.label}</BreadcrumbPage>
           )}
         </BreadcrumbItem>
-        {inImport && fileName !== undefined ? (
-          <>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage>
-                <span className="block truncate">{fileName}</span>
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </>
-        ) : null}
+        {O.match(
+          O.filter(fileName, () => inImport),
+          {
+            onNone: () => null,
+            onSome: (fileName) => (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem className="min-w-0">
+                  <BreadcrumbPage>
+                    <span className="block truncate">{fileName}</span>
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </>
+            )
+          }
+        )}
       </BreadcrumbList>
     </Breadcrumb>
   )
@@ -181,7 +187,7 @@ function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSear
       fill
       title="Inventory import"
       sidebar={<AppSidebar current={current.path} />}
-      crumbs={<Crumbs page={current} importId={importInAddress(params).id} />}
+      crumbs={<Crumbs page={current} importId={O.fromUndefinedOr(importInAddress(params).id)} />}
     >
       <div className="flex h-full flex-col">
         {/* Whatever page is shown: what became of the person's unsaved decisions while this tab was away. */}

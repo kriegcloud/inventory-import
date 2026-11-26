@@ -22,13 +22,15 @@ import {
 
 /** The request named for the member this page is for, when it has one. */
 const named = (request: HttpClientRequest.HttpClientRequest) =>
-  Effect.map(Effect.serviceOption(AtomRegistry.AtomRegistry), (registry) => {
-    const key = O.getOrElse(
-      O.map(registry, (one) => one.get(memberKey)),
-      () => ""
-    )
-    return key === "" ? request : HttpClientRequest.setHeader(request, pageMemberHeader, key)
-  })
+  Effect.map(Effect.serviceOption(AtomRegistry.AtomRegistry), (registry) =>
+    O.match(registry, {
+      onNone: () => request,
+      onSome: (one) => {
+        const key = one.get(memberKey)
+        return key === "" ? request : HttpClientRequest.setHeader(request, pageMemberHeader, key)
+      }
+    })
+  )
 
 /**
  * What every request of the API's client does for the page it is made on. It names the member the page is for, and a
@@ -80,21 +82,24 @@ const answeredFor = <E>(input: {
   const { registry, answer, request } = input
   if (answer.status !== 401) return Effect.succeed(answer)
   if (!registry.get(whoIsSignedInAsked)) askWhoIsSignedIn(registry)
-  const sentFor = O.getOrElse(Headers.get(request.headers, pageMemberHeader), () => "")
+  const sentFor = O.filter(Headers.get(request.headers, pageMemberHeader), (key) => key !== "")
   // Sent for nobody (the sign-in page): its answer is the page's to say.
-  if (sentFor === "") return Effect.succeed(answer)
-  // After what is running now: an ask made while the registry is between two states is taken up first.
-  return Effect.yieldNow.pipe(
-    Effect.andThen(onceSignedInKnown(registry)),
-    Effect.andThen(() => {
-      // Still that member (the cookie changed back meanwhile): nothing was done, and it is sent once more.
-      if (registry.get(memberKey) === sentFor) return input.send
-      // The person switched organization: a read for the one they left is not taken here, and is sent again once the
-      // page is that member's again (never, if it is left); a write was refused before it did anything, and is said
-      // as not sent.
-      return request.method === "GET"
-        ? Effect.andThen(onceBackAs(registry, sentFor), input.send)
-        : Effect.die(notSentElsewhere())
-    })
-  )
+  return O.match(sentFor, {
+    onNone: () => Effect.succeed(answer),
+    onSome: (sentFor) =>
+      // After what is running now: an ask made while the registry is between two states is taken up first.
+      Effect.yieldNow.pipe(
+        Effect.andThen(onceSignedInKnown(registry)),
+        Effect.andThen(() => {
+          // Still that member (the cookie changed back meanwhile): nothing was done, and it is sent once more.
+          if (registry.get(memberKey) === sentFor) return input.send
+          // The person switched organization: a read for the one they left is not taken here, and is sent again once the
+          // page is that member's again (never, if it is left); a write was refused before it did anything, and is said
+          // as not sent.
+          return request.method === "GET"
+            ? Effect.andThen(onceBackAs(registry, sentFor), input.send)
+            : Effect.die(notSentElsewhere())
+        })
+      )
+  })
 }

@@ -190,13 +190,13 @@ export function JobsReview() {
       ) : view === "jobs" ? (
         <RecordsTable
           key={filter}
-          caption={`Jobs in jobs.csv: ${O.getOrElse(
-            O.map(
-              A.findFirst(filters, (entry) => entry.id === filter),
-              (entry) => entry.label
-            ),
-            () => "All"
-          )}`}
+          caption={O.match(
+            A.findFirst(filters, (entry) => entry.id === filter),
+            {
+              onNone: () => "Jobs in jobs.csv: All",
+              onSome: (entry) => `Jobs in jobs.csv: ${entry.label}`
+            }
+          )}
           columns={jobColumns({
             onAnswer: () => setView("questions"),
             onLeaveOut: (code) =>

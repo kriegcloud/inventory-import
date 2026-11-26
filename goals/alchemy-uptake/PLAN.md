@@ -18,7 +18,7 @@ closes the step with what was seen; it does not get worked around.
 | 1 | CLI inspection: `docs/operations.md` with plan, drift, logs and state for a stage; the plan and its guard before each deploy in `deploy.yml` | nothing | done |
 | 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | waits for his measurement ("What Benjamin does by hand"); nothing declared |
 | 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | built; the dump and the restore seen on a local database, never on a deployed one. A real run is his |
-| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | his re-pin adding `@alchemy.run/test` | waits for his re-pin ("What Benjamin does by hand"); nothing built |
+| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | npm's `@alchemy.run/test` 2.0.0-beta.87 in `scratchpad/` (the registry never builds it) | in progress: the trial in `scratchpad/` |
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
 | 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
 | 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
@@ -29,8 +29,9 @@ The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 
 
 ## Current blocker
 
-Nothing an agent can do is left. Steps 2 and 4 wait for Benjamin, and steps 6, 7, 8 and 3 are built and unseen on
-a real account: each is under "What Benjamin does by hand" and "What waits for a real account".
+Step 4 is in progress: the trial of npm's harness in `scratchpad/`. Step 2 waits for Benjamin, and steps 6, 7, 8
+and 3 are built and unseen on a real account: each is under "What Benjamin does by hand" and "What waits for a real
+account".
 
 ## What each proof must show
 
@@ -140,16 +141,13 @@ Nothing is declared until this is measured: a guessed CPU limit cuts a confirm o
 
 ### To test the stack itself (step 4)
 
-`@alchemy.run/test` is not among the packages kept in `vendor/alchemy`. Ask for the re-pin in these words, or do
-it: add `"@alchemy.run/test"` to `ROOTS` in `vendor/alchemy/repin.py`, then
-
-```bash
-bun run alchemy:repin -- e1c3e6d
-```
-
-(the commit already pinned: only the package list changes). It ends with `check:full` and commits nothing. Step 4
-then starts with its proof in `scratchpad/`: whether the harness deploys this stack on the local providers with the
-state store given, and whether any file it writes holds the sign-in secret.
+Done differently, 2026-11-26. The re-pin with `"@alchemy.run/test"` in `ROOTS` stopped: "the registry has no
+build of commit e1c3e6d". The registry never builds that package: the library's `.github/workflows/pkg.yml` packs a
+fixed list of folders, and `packages/alchemy-test` is not in it, at e1c3e6d or since. npm has `2.0.0-beta.87`,
+published 2026-11-12 from the tag `v2.0.0-beta.87` (771d058), 194 commits behind the pin; one commit has touched the
+harness since (126d8ca, "fail a plain test whose body returns an Effect"). Benjamin chose npm's build, tried in
+`scratchpad/` first; how it is kept for `check:full` is asked once the trial has shown whether it works. `ROOTS`
+is back to the five packages, so a re-pin runs again.
 
 ## What was proved on this machine
 
@@ -371,3 +369,7 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
 - **`node node_modules/alchemy/bin/cli.js`, not `bunx alchemy`, in the script** (step 5): the repository runs its
   dev server on Node. The CLI still starts its own supervisor on Bun when one is on the path; Vite and workerd run
   as they do under `bun run dev`.
+- **The harness comes from npm, tried in `scratchpad/` first** (step 4; Benjamin, 2026-11-26, the recommended
+  answer). Against it: packing `packages/alchemy-test` from the library's source at the pin (its types are in a
+  `lib/` only the library's build makes), waiting for the library to add it to `pkg.yml`, and a stack test with no
+  harness. npm's `2.0.0-beta.87` goes in the scratchpad's own `package.json`, never a workspace's.

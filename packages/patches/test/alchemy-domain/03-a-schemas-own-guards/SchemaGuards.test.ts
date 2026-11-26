@@ -1,5 +1,7 @@
-// The test of `alchemy-domain/03-a-schemas-own-guards.patch`. Without the patch the prover reads none of it: every
-// rule of the ticket comes back "not read", at the first guard a `decide` asks.
+// The test of `alchemy-domain/03-a-schemas-own-guards.patch`. Without the patch the prover has no model of
+// `Schema.is`: each command that asks it comes back "not supported" ("calls a schema, which the prover does not
+// model"). A union told by a number is read wrongly: its `matchOrElse` finds no case where the library finds one under
+// the number's text. And a union's guard answers yes of a case whose check the prover does not read.
 import * as Prove from "@alchemy.run/domain/Prove"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
@@ -16,7 +18,7 @@ const proved = (rule: string): RegExp =>
 const kept = (rule: string): RegExp =>
   new RegExp(`✓ ${rule}\\n\\s+✓ holds on the initial state\\n\\s+✓ proved for AskName, AskWhole, AskPair, AskVoid\\n`)
 
-const unread = (command: string, why: string): RegExp => new RegExp(`✗ ${command}: not read\\n.*\\n\\s+${why}\\n`)
+const unread = (command: string, why: string): RegExp => new RegExp(`✗ ${command}: not supported\\n.*\\n\\s+${why}\\n`)
 
 const broken = (rule: string, others: string, by: string, command: string, after: string): RegExp =>
   new RegExp(
@@ -31,7 +33,7 @@ layer(NodeServices.layer)("a schema's own guards", (it) => {
       const report = yield* Prove.report(Ticket, { source: new URL("./Ticket.aggregate.ts", import.meta.url) })
       const said = Prove.render(report)
       // Nothing was left unread, and the real code did what the prover read on every path it took.
-      expect(said).not.toMatch(/not read|read wrongly|not decided|not proved/)
+      expect(said).not.toMatch(/not supported|read wrongly|not decided|not proved/)
       expect(said).toMatch(/Agreed with the real code: inputs picked for each of 9 paths/)
       expect(A.map(report.commands, (command) => [command.command, command.accepted])).toEqual([
         ["Open", true],
@@ -98,7 +100,7 @@ layer(NodeServices.layer)("a schema's own guards", (it) => {
       const report = yield* Prove.report(Code, { source: new URL("./Code.aggregate.ts", import.meta.url) })
       const said = Prove.render(report)
       expect(said).toMatch(
-        /✗ ACodeIsNeverLowerCaseA\n\s+✓ holds on the initial state\n\s+✗ Keep: not read\n.*\n\s+asks Schema\.is\(Capitals\) of a value, where the prover does not read the schema or the value exactly/
+        /✗ ACodeIsNeverLowerCaseA\n\s+✓ holds on the initial state\n\s+✗ Keep: not supported\n.*\n\s+asks Schema\.is\(Capitals\) of a value, where the prover does not read the schema or the value exactly/
       )
       expect(said).not.toMatch(/proved for Keep|violated/)
     }),
@@ -110,7 +112,7 @@ layer(NodeServices.layer)("a schema's own guards", (it) => {
     Effect.fnUntraced(function* () {
       const report = yield* Prove.report(Exact, { source: new URL("./Exact.aggregate.ts", import.meta.url) })
       const said = Prove.render(report)
-      expect(said).not.toMatch(/not read|read wrongly|not decided|not proved/)
+      expect(said).not.toMatch(/not supported|read wrongly|not decided|not proved/)
       expect(said).toMatch(/Agreed with the real code: inputs picked for each of 5 paths/)
       // The guard of the event `Copied` says yes to a rejection named "Copied", so the mark is made.
       expect(said).toMatch(

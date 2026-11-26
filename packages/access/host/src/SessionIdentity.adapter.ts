@@ -27,6 +27,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import { signUpOfferOf } from "@inventory/access-model/SignUp"
 import { authSettings } from "./Config.ts"
@@ -34,6 +35,13 @@ import { $AccessHostId } from "./internal/identity.ts"
 import { seededAccounts, testAccountPassword } from "./internal/TestAccounts.ts"
 
 const $I = $AccessHostId.create("SessionIdentity")
+
+const PageIdentity = S.Struct({
+  page: S.String.pipe(
+    S.annotateKey({ description: "The page’s member and organization claim when supplied" }),
+    S.OptionFromOptional
+  )
+}).annotate({ description: "The optional page identity header at the request boundary" })
 
 /** What Better Auth's session says, in the access context's own ids: the two share their text and their rules. */
 const signedIn = (session: AuthSession): SignedInUser =>
@@ -63,8 +71,10 @@ export const SessionIdentityLive: Layer.Layer<Identity, never, BetterAuth | Memb
           .pipe(Effect.provideService(MemberDirectory, directory))
         // The page that sent it is another member's (somebody signed in, out or switched in another tab of the same
         // browser): refused before the handler runs, so nothing is done as, or read for, whoever the cookie is now.
-        const forPage = request.headers[pageMemberHeader]
-        if (forPage !== undefined && forPage !== `${member.id}/${member.organizationId}`) {
+        const forPage = yield* S.decodeEffect(PageIdentity)({ page: request.headers[pageMemberHeader] }).pipe(
+          Effect.orDie
+        )
+        if (O.exists(forPage.page, (page) => page !== `${member.id}/${member.organizationId}`)) {
           return yield* NotSignedIn.make({
             reason: "This page was opened for somebody else than is signed in now. Load the page again."
           })

@@ -102,9 +102,9 @@ const fieldsSaid = (named: ReadonlyArray<string>): string => {
     A.filter(fields, (field) => A.contains(named, field)),
     (field) => fieldLabels[field]
   )
-  return O.match(A.last(labels), {
-    onNone: () => "A column",
-    onSome: (last) => (labels.length === 1 ? last : `${A.join(A.dropRight(labels, 1), ", ")} and ${last}`)
+  return A.matchRight(labels, {
+    onEmpty: () => "A column",
+    onNonEmpty: (init, last) => (init.length === 0 ? last : `${A.join(init, ", ")} and ${last}`)
   })
 }
 
@@ -167,8 +167,9 @@ const withUnsaved = (
   stored: StoredDecisions,
   unsaved: { readonly delta: DecisionDelta; readonly author: string; readonly authorId: string }
 ): StoredDecisions => {
-  const changed = R.filter(unsaved.delta.set, (decision, id) =>
-    O.match(R.get(stored.decisions, id), { onNone: () => true, onSome: (old) => !sameDecision(old, decision) })
+  const changed = R.filter(
+    unsaved.delta.set,
+    (decision, id) => !O.exists(R.get(stored.decisions, id), (old) => sameDecision(old, decision))
   )
   const cleared = (_: unknown, id: string): boolean => !A.contains(unsaved.delta.clear, id)
   return {
@@ -228,7 +229,7 @@ export const importsEndpoints = Effect.gen(function* () {
         (key) => key !== ""
       )
     )
-    const found = yield* imports.storedAmong(actor.organizationId, keys)
+    const found = yield* imports.storedAmong(keys, actor.organizationId)
     return { keys, found }
   })
 
@@ -260,8 +261,8 @@ export const importsEndpoints = Effect.gen(function* () {
   ) {
     const typed = A.map(asked.questions, (question) => question.then)
     const { keys, found } = yield* storedAmongFile(actor, table, asked.choices, typed)
-    const created = yield* imports.createdRows(actor.organizationId, draft.id)
-    const suggestions = yield* suggestionStore.list(actor.organizationId, draft.id)
+    const created = yield* imports.createdRows(draft.id, actor.organizationId)
+    const suggestions = yield* suggestionStore.list(draft.id, actor.organizationId)
     const changed = comparisonsChanged({
       table,
       choices: asked.choices,
@@ -336,7 +337,7 @@ export const importsEndpoints = Effect.gen(function* () {
     const { madeOn, set } = request
     const questions = comparisonQuestions({ choices, moves, madeOn, set })
     const answer = A.isReadonlyArrayNonEmpty(questions)
-      ? yield* Effect.flatMap(imports.table(actor.organizationId, draft), (table) =>
+      ? yield* Effect.flatMap(imports.table(draft, actor.organizationId), (table) =>
           compared(actor, draft, { choices, moves, questions }, table)
         )
       : { changed: [], read: noItemsRead }
@@ -382,19 +383,19 @@ export const importsEndpoints = Effect.gen(function* () {
     unsaved: O.Option<DecisionDelta>
   ) {
     const choices = yield* imports.choices(draft)
-    const held = yield* imports.decisions(actor.organizationId, draft.id)
+    const held = yield* imports.decisions(draft.id, actor.organizationId)
     const stored = O.match(unsaved, {
       onNone: () => held,
       onSome: (delta) => withUnsaved(held, { delta, author: actor.name, authorId: actor.id })
     })
     const storedItems = yield* storedFor(actor, table, choices, stored.decisions)
-    const created = yield* imports.createdRows(actor.organizationId, draft.id)
+    const created = yield* imports.createdRows(draft.id, actor.organizationId)
     const createdIds = A.map(created, (row) => rowId({ rowNumber: row.rowNumber, part: O.some(row.part) }))
     // The rows behind them, as the view has always said them: one number per row, however many items it holds.
     const createdRows = A.dedupe(A.map(created, (item) => item.rowNumber))
     const decisions = carryDecisions({ table, choices, decisions: stored.decisions, mode: ruleFixes, itemsOf })
     // The stored suggestions: the review turns each into a proposal that waits, here exactly as on the screen.
-    const suggestions = yield* suggestionStore.list(actor.organizationId, draft.id)
+    const suggestions = yield* suggestionStore.list(draft.id, actor.organizationId)
     return {
       table,
       suggestions,
@@ -411,7 +412,7 @@ export const importsEndpoints = Effect.gen(function* () {
   })
 
   const viewOf = (actor: Member, draft: Draft) =>
-    Effect.flatMap(imports.table(actor.organizationId, draft), (table) => viewWith(actor, draft, table))
+    Effect.flatMap(imports.table(draft, actor.organizationId), (table) => viewWith(actor, draft, table))
 
   const viewWith = Effect.fn("imports.viewWith")(function* (actor: Member, draft: Draft, table: StagedTable) {
     const { storedItems, decisions, current, choices, createdRows, createdIds, suggestions } = yield* reviewOf(
@@ -421,13 +422,13 @@ export const importsEndpoints = Effect.gen(function* () {
       O.none()
     )
     const confirmed = !DraftStatus.is.open(draft.status)
-    const outcomes = confirmed ? yield* imports.outcomes(actor.organizationId, draft.id) : []
+    const outcomes = confirmed ? yield* imports.outcomes(draft.id, actor.organizationId) : []
     const tally = (outcome: string): number => A.filter(outcomes, (row) => row.outcome === outcome).length
-    const history = yield* imports.history(actor.organizationId, draft.id)
-    const takeBack = yield* imports.takeBackState(actor.organizationId, draft.id)
+    const history = yield* imports.history(draft.id, actor.organizationId)
+    const takeBack = yield* imports.takeBackState(draft.id, actor.organizationId)
     // What matches took back is named only while the import is open: once confirmed there is nothing left to decide.
     const takenBack = confirmed ? [] : yield* imports.takenBack(draft)
-    const fixed = confirmed ? yield* imports.fixed(actor.organizationId, draft.id) : { rows: 0, cells: 0 }
+    const fixed = confirmed ? yield* imports.fixed(draft.id, actor.organizationId) : { rows: 0, cells: 0 }
     return ImportView.make({
       id: draft.id,
       fileName: draft.fileName,
@@ -476,7 +477,7 @@ export const importsEndpoints = Effect.gen(function* () {
   })
 
   const find = Effect.fn("imports.find")(function* (actor: Member, id: string) {
-    const draft = yield* imports.find(actor.organizationId, id)
+    const draft = yield* imports.find(id, actor.organizationId)
     if (O.isNone(draft)) {
       return yield* ImportNotFound.make({
         reason: "No import with that id in your organization.",
@@ -516,7 +517,7 @@ export const importsEndpoints = Effect.gen(function* () {
     const waiting = !R.isEmptyRecord(payload.over)
     // With who decided each row, who last saved it and the revisions: a row that waited is judged by whose it is.
     const stored: StoredDecisions = waiting
-      ? yield* imports.decisions(actor.organizationId, draft.id)
+      ? yield* imports.decisions(draft.id, actor.organizationId)
       : noStoredDecisions
     // What the matches recorded they took back, as stored with the draft read: the rows that waited are judged by it.
     const takenBack = waiting ? yield* imports.takenBack(draft) : []
@@ -530,14 +531,13 @@ export const importsEndpoints = Effect.gen(function* () {
     // A row decided otherwise since is not written at all: nothing of it was taken back by this save either.
     const notWritten = HashSet.fromIterable(A.map(decidedSince, (row) => row.rowId))
     const done = yield* imports.decide(
-      actor,
       draft,
+      actor,
       {
         set: R.filter(applied, (_decision, row) => !HashSet.has(notWritten, row)),
         clear: A.filter(payload.clear, (row) => !HashSet.has(notWritten, row))
       },
       read,
-      // Written only while no save has come since what was compared, even one that moved no revision.
       waiting ? O.some({ revision: draft.revision, saves: stored.saves }) : O.none()
     )
     const again = (overtaken: Overtaken) =>
@@ -598,9 +598,9 @@ export const importsEndpoints = Effect.gen(function* () {
     // Decisions made a moment before the confirm, not saved yet, are the person's own: the review counts them, and
     // the store saves them in the confirm's own write.
     const unsaved: DecisionDelta = { set: payload.set, clear: payload.clear }
-    const table = yield* imports.table(actor.organizationId, draft)
+    const table = yield* imports.table(draft, actor.organizationId)
     const { current, authors } = yield* reviewOf(actor, draft, table, O.some(unsaved))
-    const plan = confirmPlan({ draft: draft.id, review: current, authors, actor })
+    const plan = confirmPlan({ draft: draft.id, review: current, authors })
     // The ids of the confirm and of each item it creates are made here, so the store only writes.
     const confirm = yield* random.uuidV4()
     const itemIds = yield* Effect.forEach(
@@ -641,7 +641,7 @@ export const importsEndpoints = Effect.gen(function* () {
 
   // The caller's own unfinished upload, or the error that says it is gone.
   const findUpload = Effect.fn("imports.findUpload")(function* (actor: Member, id: string) {
-    const upload = yield* imports.findUpload(actor, id)
+    const upload = yield* imports.findUpload(id, actor)
     if (O.isNone(upload)) return yield* gone()
     return upload.value
   })
@@ -690,7 +690,7 @@ export const importsEndpoints = Effect.gen(function* () {
       const problem = stagingProblem({ fileName: head.fileName, rowCount, columnCount: head.columns.length })
       if (O.isSome(problem)) return Result.fail(problem.value)
       // Pieces that cannot carry the rows never reach here: `UploadStart` refuses that start when it is decoded.
-      const begun = yield* imports.beginUpload(actor, key, head, { rowCount, chunkCount })
+      const begun = yield* imports.beginUpload(head, actor, key, { rowCount, chunkCount })
       return Result.map(begun, (id) => ({ id }))
     }),
     putChunk: Effect.fn("imports.putChunk")(function* ({
@@ -705,7 +705,7 @@ export const importsEndpoints = Effect.gen(function* () {
       if (payload.seq >= upload.chunkCount) {
         return Result.fail(fileProblem.incomplete({ fileName: upload.fileName, how: "unsent" }))
       }
-      const stored = yield* imports.putChunk(actor, upload, payload.seq, payload.rows)
+      const stored = yield* imports.putChunk(upload, actor, payload.seq, payload.rows)
       return Result.map(stored, () => ({ seq: payload.seq, rows: payload.rows.length }))
     }),
     finishUpload: Effect.fn("imports.finishUpload")(function* ({
@@ -715,11 +715,11 @@ export const importsEndpoints = Effect.gen(function* () {
     }) {
       const actor = yield* requireRole("editor")
       // Finished already (a retry whose first answer was lost): the import has the upload's id.
-      const finished = yield* imports.find(actor.organizationId, params.id)
+      const finished = yield* imports.find(params.id, actor.organizationId)
       if (O.isSome(finished)) return yield* Effect.map(viewOf(actor, finished.value), Result.succeed)
       const upload = yield* findUpload(actor, params.id)
       const head = yield* S.decodeEffect(StagedHeadJson)(upload.headJson).pipe(Effect.orDie)
-      const chunks = yield* imports.uploadChunks(actor, upload)
+      const chunks = yield* imports.uploadChunks(upload, actor)
       const table: StagedTable = { ...head, rows: A.flatMap(chunks, (chunk) => chunk.rows) }
       const problem = O.orElse(
         chunkProblem({
@@ -740,10 +740,10 @@ export const importsEndpoints = Effect.gen(function* () {
         suggestions: [],
         itemsOf
       })
-      yield* imports.finishUpload(actor, upload, start.counts.needs)
+      yield* imports.finishUpload(upload, actor, start.counts.needs)
       // Another request finished it in between (a double send): either way the import now exists, or the upload
       // was cancelled meanwhile and there is nothing.
-      const draft = yield* imports.find(actor.organizationId, upload.id)
+      const draft = yield* imports.find(upload.id, actor.organizationId)
       if (O.isNone(draft)) return yield* gone()
       return yield* Effect.map(viewWith(actor, draft.value, table), Result.succeed)
     }),
@@ -753,7 +753,7 @@ export const importsEndpoints = Effect.gen(function* () {
       readonly params: { readonly id: ImportId }
     }) {
       const actor = yield* requireRole("editor")
-      const deleted = yield* imports.discardUpload(actor, params.id)
+      const deleted = yield* imports.discardUpload(params.id, actor)
       return uploadDiscard(deleted)
     }),
     match: Effect.fn("imports.match")(function* ({
@@ -766,7 +766,7 @@ export const importsEndpoints = Effect.gen(function* () {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
       if (!DraftStatus.is.open(draft.status)) return yield* closed(draft)
-      const table = yield* imports.table(actor.organizationId, draft)
+      const table = yield* imports.table(draft, actor.organizationId)
       const asked = payload.column
       const column = O.flatMap(asked, (index) => A.findFirst(table.columns, (candidate) => candidate.index === index))
       if (O.isSome(payload.column) && O.isNone(column)) {
@@ -787,8 +787,8 @@ export const importsEndpoints = Effect.gen(function* () {
       const label = fieldLabels[payload.field]
       const compare = yield* heldAcrossTries(table, compareFor(actor, draft, table))
       const saved = yield* imports.matchColumn(
-        actor,
         draft,
+        actor,
         { field: payload.field, column: asked },
         O.match(column, {
           onNone: () => `${label}: no column, in ${draft.fileName}`,
@@ -810,19 +810,25 @@ export const importsEndpoints = Effect.gen(function* () {
     table: Effect.fn("imports.table")(function* ({ params }: { readonly params: { readonly id: ImportId } }) {
       const actor = yield* CurrentActor
       const draft = yield* find(actor, params.id)
-      return yield* imports.table(actor.organizationId, draft)
+      return yield* imports.table(draft, actor.organizationId)
     }),
     // Any member may read the list. Each view runs the full review of its file, which is why only the newest
     // `openImportsShown` are sent and the rest are counted.
     open: Effect.fn("imports.open")(function* () {
       const actor = yield* CurrentActor
-      const { drafts, total } = yield* imports.listOpen(actor.organizationId, openImportsShown)
+      const { drafts, total } = yield* imports.listOpen({
+        organizationId: actor.organizationId,
+        limit: openImportsShown
+      })
       const views = yield* Effect.forEach(drafts, (draft) => viewOf(actor, draft), { concurrency: 1 })
       return { views, older: Math.max(0, total - views.length) }
     }),
     past: Effect.fn("imports.past")(function* () {
       const actor = yield* CurrentActor
-      const { imports: listed, total } = yield* imports.listPast(actor.organizationId, pastImportsShown)
+      const { imports: listed, total } = yield* imports.listPast({
+        organizationId: actor.organizationId,
+        limit: pastImportsShown
+      })
       return { imports: listed, older: Math.max(0, total - listed.length) }
     }),
     changes: Effect.fn("imports.changes")(function* () {
@@ -835,7 +841,7 @@ export const importsEndpoints = Effect.gen(function* () {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
       if (!DraftStatus.is.open(draft.status)) return yield* closed(draft)
-      const table = yield* imports.table(actor.organizationId, draft)
+      const table = yield* imports.table(draft, actor.organizationId)
       const { current, suggestions } = yield* reviewOf(actor, draft, table, O.none())
       const done = yield* suggest({
         importId: draft.id,
@@ -844,7 +850,7 @@ export const importsEndpoints = Effect.gen(function* () {
       }).pipe(Effect.provideContext(asking))
       return {
         made: done.made,
-        suggestions: yield* suggestionStore.list(actor.organizationId, draft.id),
+        suggestions: yield* suggestionStore.list(draft.id, actor.organizationId),
         answeredBy: done.answeredBy,
         lines: done.lines
       }
@@ -900,7 +906,7 @@ export const importsEndpoints = Effect.gen(function* () {
     reopen: Effect.fn("imports.reopen")(function* ({ params }: { readonly params: { readonly id: ImportId } }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      if (!DraftStatus.is.open(draft.status)) yield* imports.reopen(actor, draft)
+      if (!DraftStatus.is.open(draft.status)) yield* imports.reopen(draft, actor)
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),
@@ -910,7 +916,7 @@ export const importsEndpoints = Effect.gen(function* () {
       if (!DraftStatus.is.open(draft.status)) return yield* kept(draft)
       // An open import that still has items (reopened, or taken back with one kept) is refused by the batch,
       // as is one a confirm closed after the read above.
-      if (yield* imports.remove(actor, draft)) return
+      if (yield* imports.remove(draft, actor)) return
       // Nothing was removed. Either another request removed it first (a double click), which answers as a second
       // remove does, or it has created items and stays.
       yield* find(actor, draft.id)

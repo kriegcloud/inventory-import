@@ -35,13 +35,10 @@ const draw = <T>(schema: S.Codec<T, unknown>) =>
  */
 const onTheCalendar = (day: string): boolean => {
   const parts = A.map(Str.split("-")(day), Number)
-  return O.match(O.all([A.get(parts, 0), A.get(parts, 1), A.get(parts, 2)]), {
-    onNone: () => false,
-    onSome: ([year, month, date]) => {
-      const landed = DateTime.toPartsUtc(DateTime.makeUnsafe({ year, month, day: date }))
-      const written = `${year}-${twoDigits(`${month}`)}-${twoDigits(`${date}`)}`
-      return written === day && year >= 1000 && year <= 9999 && landed.month === month && landed.day === date
-    }
+  return O.exists(O.all([A.get(parts, 0), A.get(parts, 1), A.get(parts, 2)]), ([year, month, date]) => {
+    const landed = DateTime.toPartsUtc(DateTime.makeUnsafe({ year, month, day: date }))
+    const written = `${year}-${twoDigits(`${month}`)}-${twoDigits(`${date}`)}`
+    return written === day && year >= 1000 && year <= 9999 && landed.month === month && landed.day === date
   })
 }
 

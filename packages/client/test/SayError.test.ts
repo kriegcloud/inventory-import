@@ -47,7 +47,7 @@ describe("saying a failure", () => {
   it("never shows a status code, a URL, a stack or provider text", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
     for (const [what, error] of failures) {
-      const said = sayError(error)
+      const said = sayError(error, { fields: {} })
       const words = A.join([said.title, said.sentence, ...said.problems], " ")
       expect(words, what).not.toMatch(/\b(4\d\d|5\d\d)\b|https?:|\/api|Error|\{|\bat \w+\.tsx?/)
       expect(said.sentence.length, what).toBeGreaterThan(10)
@@ -62,15 +62,17 @@ describe("saying a failure", () => {
         errors: [
           { path: ["payload", "action"], message: "Expected a value with a length of at most 200, got 201" },
           { path: ["payload", "detail"], message: "Expected a string, got null" },
-          { path: ["payload", "unitCost"], message: "Expected a finite number, got NaN" }
+          { path: ["payload", "unitCost"], message: "Expected a finite number, got NaN" },
+          { path: [0], message: "Not accepted" }
         ]
       }),
-      { fields: { action: "Action", detail: "Detail" } }
+      { fields: { action: "Action", detail: "Detail", "": "Line" } }
     )
     expect(said.problems).toEqual([
       "Action was not accepted. Check it and try again.",
       "Detail was not accepted. Check it and try again.",
-      "Unit cost was not accepted. Check it and try again."
+      "Unit cost was not accepted. Check it and try again.",
+      "Line was not accepted. Check it and try again."
     ])
   })
 
@@ -86,7 +88,9 @@ describe("saying a failure", () => {
     } as const
     installTroubleSentences(modelSentences)
     for (const kind of ["noKey", "refused", "busy", "badAnswer", "down"] as const) {
-      expect(sayError(AiUnavailable.make({ kind, reason: "provider said 503 {}" })).sentence).toBe(modelSentences[kind])
+      expect(sayError(AiUnavailable.make({ kind, reason: "provider said 503 {}" }), { fields: {} }).sentence).toBe(
+        modelSentences[kind]
+      )
     }
   })
 })
@@ -106,7 +110,7 @@ describe("a request whose every try was overtaken", () => {
   it("is said under a title true of each, with the server's reason: what kept changing, and to try again", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
     for (const reason of reasons) {
-      const said = sayError(DraftBusy.make({ reason }))
+      const said = sayError(DraftBusy.make({ reason }), { fields: {} })
       expect(said).toEqual({ title: "Nothing was written", sentence: reason, problems: [] })
       // The title names neither the import nor the items: one of the sentences says the import did not change.
       expect(said.title).not.toMatch(/import|item/i)
@@ -131,20 +135,33 @@ class FileNotKept extends S.TaggedError<FileNotKept, { readonly brand: unique sy
 describe("a file that was not read or kept", () => {
   it("says the file's problem and what to do, the reader's sentence, and that progress is not kept", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
-    expect(sayError(FileProblem.make({ problem: "items.csv is empty.", todo: "Choose another file." }))).toEqual({
+    expect(
+      sayError(FileProblem.make({ problem: "items.csv is empty.", todo: "Choose another file." }), { fields: {} })
+    ).toEqual({
       title: "The file was not read",
       sentence: "items.csv is empty. Choose another file.",
       problems: []
     })
-    expect(sayError(ReadFailed.make({ message: "The file could not be opened. Try again." })).sentence).toBe(
-      "The file could not be opened. Try again."
+    expect(
+      sayError(ReadFailed.make({ message: "The file could not be opened. Try again." }), { fields: {} }).sentence
+    ).toBe("The file could not be opened. Try again.")
+    expect(sayError(FileNotKept.make({}), { fields: {} }).title).toBe("This browser would not keep your progress")
+    expect(sayError(HalfFileProblem.make({ problem: "items.csv is empty." }), { fields: {} }).title).toBe(
+      "Something went wrong"
     )
-    expect(sayError(FileNotKept.make({})).title).toBe("This browser would not keep your progress")
-    expect(sayError(HalfFileProblem.make({ problem: "items.csv is empty." })).title).toBe("Something went wrong")
   })
 
   it("asks again after the server's own problem document, never after a refused request", () => {
     expect(isTransient(HttpApiError.InternalServerErrorProblem.make({}))).toBe(true)
     expect(isTransient(HttpApiError.BadRequestProblem.make({ detail: "Request validation failed" }))).toBe(false)
   })
+})
+
+it("keeps nonblank reasons on arrays and callable failures without trimming their sentence", () => {
+  const reason = "  Your change was refused.  "
+  const array = Object.assign([], { reason })
+  const callable = Object.assign(() => undefined, { reason })
+  expect(sayError(array, { fields: {} }).sentence).toBe(reason)
+  expect(sayError(callable, { fields: {} }).sentence).toBe(reason)
+  expect(sayError({ reason: " \t\n" }, { fields: {} }).title).toBe("Something went wrong")
 })

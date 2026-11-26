@@ -4,9 +4,10 @@
 // the state lives in local variables, for speed; a `MachineState` value is built only at the chunk's end. Engine code
 // never imports the `Csv` facade: it returns findings as schema values and the facade decides what fails.
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
+import * as MutableList from "effect/MutableList"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -204,98 +205,98 @@ export interface Step {
 
 type Mode = typeof Mode.Type
 
-/** The mutable working copy of a state, for one chunk. */
+/** The working references and append-only buffers for one chunk. */
 class Run {
-  mode: Mode
-  spaces: number
-  cells: Array<string>
-  quoted: Array<boolean>
-  field: string
-  fieldQuoted: boolean
-  content: boolean
-  held: boolean
-  crInQuotes: boolean
-  offset: number
-  line: number
-  character: number
-  recordOffset: number
-  recordLine: number
-  recordCharacter: number
-  quoteOffset: number
-  quoteLine: number
-  quoteCharacter: number
-  record: number
-  emitted: number
-  width: O.Option<number>
-  firstEnd: O.Option<CsvRecordEnd>
-  mixedReported: boolean
-  stopped: boolean
-  readonly records: Array<RawRecord> = []
-  readonly diagnostics: Array<CsvDiagnostic> = []
+  readonly mode: MutableRef.MutableRef<Mode>
+  readonly spaces: MutableRef.MutableRef<number>
+  readonly field: MutableRef.MutableRef<string>
+  readonly fieldQuoted: MutableRef.MutableRef<boolean>
+  readonly content: MutableRef.MutableRef<boolean>
+  readonly held: MutableRef.MutableRef<boolean>
+  readonly crInQuotes: MutableRef.MutableRef<boolean>
+  readonly offset: MutableRef.MutableRef<number>
+  readonly line: MutableRef.MutableRef<number>
+  readonly character: MutableRef.MutableRef<number>
+  readonly recordOffset: MutableRef.MutableRef<number>
+  readonly recordLine: MutableRef.MutableRef<number>
+  readonly recordCharacter: MutableRef.MutableRef<number>
+  readonly quoteOffset: MutableRef.MutableRef<number>
+  readonly quoteLine: MutableRef.MutableRef<number>
+  readonly quoteCharacter: MutableRef.MutableRef<number>
+  readonly record: MutableRef.MutableRef<number>
+  readonly emitted: MutableRef.MutableRef<number>
+  readonly width: MutableRef.MutableRef<O.Option<number>>
+  readonly firstEnd: MutableRef.MutableRef<O.Option<CsvRecordEnd>>
+  readonly mixedReported: MutableRef.MutableRef<boolean>
+  readonly stopped: MutableRef.MutableRef<boolean>
+  readonly cells = MutableList.make<string>()
+  readonly quoted = MutableList.make<boolean>()
+  readonly records = MutableList.make<RawRecord>()
+  readonly diagnostics = MutableList.make<CsvDiagnostic>()
 
   readonly config: MachineConfig
 
   constructor(state: MachineState, config: MachineConfig) {
     this.config = config
-    this.mode = state.mode.mode
-    this.spaces = state.mode.mode === "afterQuoteSpaces" ? state.mode.spaces : 0
-    this.cells = A.copy(state.cells)
-    this.quoted = A.copy(state.quoted)
-    this.field = state.field
-    this.fieldQuoted = state.fieldQuoted
-    this.content = state.content
-    this.held = state.held
-    this.crInQuotes = state.crInQuotes
-    this.offset = state.offset
-    this.line = state.line
-    this.character = state.character
-    this.recordOffset = state.recordOffset
-    this.recordLine = state.recordLine
-    this.recordCharacter = state.recordCharacter
-    this.quoteOffset = state.quoteOffset
-    this.quoteLine = state.quoteLine
-    this.quoteCharacter = state.quoteCharacter
-    this.record = state.record
-    this.emitted = state.emitted
-    this.width = state.width
-    this.firstEnd = state.firstEnd
-    this.mixedReported = state.mixedReported
-    this.stopped = state.stopped
+    this.mode = MutableRef.make<Mode>(state.mode.mode)
+    this.spaces = MutableRef.make<number>(state.mode.mode === "afterQuoteSpaces" ? state.mode.spaces : 0)
+    MutableList.appendAll(this.cells, state.cells)
+    MutableList.appendAll(this.quoted, state.quoted)
+    this.field = MutableRef.make<string>(state.field)
+    this.fieldQuoted = MutableRef.make<boolean>(state.fieldQuoted)
+    this.content = MutableRef.make<boolean>(state.content)
+    this.held = MutableRef.make<boolean>(state.held)
+    this.crInQuotes = MutableRef.make<boolean>(state.crInQuotes)
+    this.offset = MutableRef.make<number>(state.offset)
+    this.line = MutableRef.make<number>(state.line)
+    this.character = MutableRef.make<number>(state.character)
+    this.recordOffset = MutableRef.make<number>(state.recordOffset)
+    this.recordLine = MutableRef.make<number>(state.recordLine)
+    this.recordCharacter = MutableRef.make<number>(state.recordCharacter)
+    this.quoteOffset = MutableRef.make<number>(state.quoteOffset)
+    this.quoteLine = MutableRef.make<number>(state.quoteLine)
+    this.quoteCharacter = MutableRef.make<number>(state.quoteCharacter)
+    this.record = MutableRef.make<number>(state.record)
+    this.emitted = MutableRef.make<number>(state.emitted)
+    this.width = MutableRef.make<O.Option<number>>(state.width)
+    this.firstEnd = MutableRef.make<O.Option<CsvRecordEnd>>(state.firstEnd)
+    this.mixedReported = MutableRef.make<boolean>(state.mixedReported)
+    this.stopped = MutableRef.make<boolean>(state.stopped)
   }
 
   snapshot(): Step {
     const mode: MachineMode =
-      this.mode === "afterQuoteSpaces"
-        ? AfterQuoteSpaces.make({ spaces: this.spaces })
-        : MachineMode.cases[this.mode].make({})
+      this.mode.current === "afterQuoteSpaces"
+        ? AfterQuoteSpaces.make({ spaces: this.spaces.current })
+        : MachineMode.cases[this.mode.current].make({})
     return {
       state: MachineState.make({
         mode,
-        cells: this.cells,
-        quoted: this.quoted,
-        field: this.field,
-        fieldQuoted: this.fieldQuoted,
-        content: this.content,
-        held: this.held,
-        crInQuotes: this.crInQuotes,
-        offset: this.offset,
-        line: this.line,
-        character: this.character,
-        recordOffset: this.recordOffset,
-        recordLine: this.recordLine,
-        recordCharacter: this.recordCharacter,
-        quoteOffset: this.quoteOffset,
-        quoteLine: this.quoteLine,
-        quoteCharacter: this.quoteCharacter,
-        record: this.record,
-        emitted: this.emitted,
-        width: this.width,
-        firstEnd: this.firstEnd,
-        mixedReported: this.mixedReported,
-        stopped: this.stopped
+        cells: MutableList.toArray(this.cells),
+        quoted: MutableList.toArray(this.quoted),
+        field: this.field.current,
+        fieldQuoted: this.fieldQuoted.current,
+        content: this.content.current,
+        held: this.held.current,
+        crInQuotes: this.crInQuotes.current,
+        offset: this.offset.current,
+        line: this.line.current,
+        character: this.character.current,
+        recordOffset: this.recordOffset.current,
+        recordLine: this.recordLine.current,
+        recordCharacter: this.recordCharacter.current,
+        quoteOffset: this.quoteOffset.current,
+        quoteLine: this.quoteLine.current,
+        quoteCharacter: this.quoteCharacter.current,
+        record: this.record.current,
+        emitted: this.emitted.current,
+        width: this.width.current,
+        firstEnd: this.firstEnd.current,
+        mixedReported: this.mixedReported.current,
+        stopped: this.stopped.current
       }),
-      records: this.records,
-      diagnostics: this.diagnostics
+      records: MutableList.toArray(this.records),
+      diagnostics: MutableList.toArray(this.diagnostics)
     }
   }
 
@@ -304,12 +305,12 @@ class Run {
   }
 
   here(length: number): CsvTextSpan {
-    return this.span(this.offset, length, this.line, this.character)
+    return this.span(this.offset.current, length, this.line.current, this.character.current)
   }
 
   report(diagnostic: CsvDiagnostic): void {
-    this.diagnostics.push(diagnostic)
-    if (diagnostic.severity === "fatal") this.stopped = true
+    MutableList.append(this.diagnostics, diagnostic)
+    if (diagnostic.severity === "fatal") this.stopped.current = true
   }
 
   limit(limit: CsvTextLimit, maximum: number, at: CsvTextSpan): void {
@@ -318,32 +319,32 @@ class Run {
 
   /** Moves past one consumed unit that is not a line break. */
   advance(units: number): void {
-    this.offset += units
-    this.character += units
+    this.offset.current += units
+    this.character.current += units
   }
 
   /** Moves past a line break of `units` units. */
   breakLine(units: number): void {
-    this.offset += units
-    this.line += 1
-    this.character = 0
+    this.offset.current += units
+    this.line.current += 1
+    this.character.current = 0
   }
 
   checkField(): void {
     const { maxFieldLength, maxRecordLength } = this.config.limits
-    if (this.field.length > maxFieldLength) this.limit("fieldLength", maxFieldLength, this.here(0))
-    else if (this.offset - this.recordOffset > maxRecordLength)
+    if (this.field.current.length > maxFieldLength) this.limit("fieldLength", maxFieldLength, this.here(0))
+    else if (this.offset.current - this.recordOffset.current > maxRecordLength)
       this.limit("recordLength", maxRecordLength, this.here(0))
   }
 
   endField(): void {
-    const cell = applyTrim(this.config.trim, this.field, this.fieldQuoted)
-    this.cells.push(cell)
-    this.quoted.push(this.fieldQuoted)
-    this.field = ""
-    this.fieldQuoted = false
-    this.mode = "fieldStart"
-    this.spaces = 0
+    const cell = applyTrim(this.config.trim, this.field.current, this.fieldQuoted.current)
+    MutableList.append(this.cells, cell)
+    MutableList.append(this.quoted, this.fieldQuoted.current)
+    this.field.current = ""
+    this.fieldQuoted.current = false
+    this.mode.current = "fieldStart"
+    this.spaces.current = 0
     const { maxFieldsPerRecord } = this.config.limits
     if (this.cells.length > maxFieldsPerRecord) this.limit("fieldsPerRecord", maxFieldsPerRecord, this.here(0))
     else this.checkField()
@@ -351,24 +352,27 @@ class Run {
 
   /** Finishes the current record's last field and emits the record with how it ended. */
   endRecord(end: CsvRecordEnd): void {
-    if (this.mode !== "fieldStart" || this.cells.length === 0 || this.content) this.endField()
-    if (this.stopped) return
-    const cells = this.cells
-    const quoted = this.quoted
-    const recordIndex = this.record
-    const span = this.span(this.recordOffset, this.offset - this.recordOffset, this.recordLine, this.recordCharacter)
-    this.cells = []
-    this.quoted = []
-    this.content = false
-    this.record += 1
+    if (this.mode.current !== "fieldStart" || this.cells.length === 0 || this.content.current) this.endField()
+    if (this.stopped.current) return
+    const cells = MutableList.takeAll(this.cells)
+    const quoted = MutableList.takeAll(this.quoted)
+    const recordIndex = this.record.current
+    const span = this.span(
+      this.recordOffset.current,
+      this.offset.current - this.recordOffset.current,
+      this.recordLine.current,
+      this.recordCharacter.current
+    )
+    this.content.current = false
+    this.record.current += 1
     if (end !== "EndOfInput") {
-      O.match(this.firstEnd, {
+      O.match(this.firstEnd.current, {
         onNone: () => {
-          this.firstEnd = O.some(end)
+          this.firstEnd.current = O.some(end)
         },
         onSome: (first) => {
-          if (first !== end && !this.mixedReported) {
-            this.mixedReported = true
+          if (first !== end && !this.mixedReported.current) {
+            this.mixedReported.current = true
             this.report(
               CsvDiagnostic.cases.warning.make({
                 finding: MixedTerminators.make({ at: span, first, other: end })
@@ -385,9 +389,9 @@ class Run {
     if (head === undefined || quotedHead === undefined) return
     const record: [string, ...Array<string>] = [head, ...rest]
     const flags: [boolean, ...Array<boolean>] = [quotedHead, ...quotedRest]
-    O.match(this.width, {
+    O.match(this.width.current, {
       onNone: () => {
-        this.width = O.some(record.length)
+        this.width.current = O.some(record.length)
       },
       onSome: (width) => {
         if (record.length !== width) {
@@ -406,22 +410,22 @@ class Run {
         }
       }
     })
-    if (this.stopped) return
-    this.emitted += 1
+    if (this.stopped.current) return
+    this.emitted.current += 1
     const { maxRecords } = this.config.limits
-    if (this.emitted > maxRecords) {
+    if (this.emitted.current > maxRecords) {
       this.limit("records", maxRecords, span)
       return
     }
-    this.records.push(RawRecord.make({ cells: record, quoted: flags, record: recordIndex, span, end }))
+    MutableList.append(this.records, RawRecord.make({ cells: record, quoted: flags, record: recordIndex, span, end }))
   }
 
   startRecordIfNeeded(): void {
-    if (!this.content) {
-      this.content = true
-      this.recordOffset = this.offset
-      this.recordLine = this.line
-      this.recordCharacter = this.character
+    if (!this.content.current) {
+      this.content.current = true
+      this.recordOffset.current = this.offset.current
+      this.recordLine.current = this.line.current
+      this.recordCharacter.current = this.character.current
     }
   }
 
@@ -430,18 +434,18 @@ class Run {
     const field = this.cells.length
     const finding =
       kind === "stray"
-        ? StrayQuote.make({ at, record: this.record, field })
-        : TextAfterClosingQuote.make({ at, record: this.record, field })
+        ? StrayQuote.make({ at, record: this.record.current, field })
+        : TextAfterClosingQuote.make({ at, record: this.record.current, field })
     this.report(judgeQuote(this.config.quotes, finding))
   }
 
   /** Releases a record held at a carriage return, now that the next unit is known not to be a line feed. */
   releaseHeld(lineFeedFollows: boolean): void {
-    if (!this.held) return
-    this.held = false
+    if (!this.held.current) return
+    this.held.current = false
     if (lineFeedFollows) {
       // The CR was already counted as a line break; the LF joins it.
-      this.offset += 1
+      this.offset.current += 1
       this.endRecord("CRLF")
     } else {
       this.endRecord("CR")
@@ -451,17 +455,17 @@ class Run {
   push(text: string): void {
     const length = text.length
     let i = 0
-    while (i < length && !this.stopped) {
-      if (this.held) {
+    while (i < length && !this.stopped.current) {
+      if (this.held.current) {
         if (text[i] === "\n") {
           this.releaseHeld(true)
           i += 1
           continue
         }
         this.releaseHeld(false)
-        if (this.stopped) break
+        if (this.stopped.current) break
       }
-      i = this.step(this.mode)(text, i)
+      i = this.step(this.mode.current)(text, i)
     }
   }
 
@@ -483,13 +487,13 @@ class Run {
     const length = text.length
     const c = text[i]
     if (c === "\r" || c === "\n") {
-      if (this.mode === "fieldStart" && !this.content) {
+      if (this.mode.current === "fieldStart" && !this.content.current) {
         // A blank line: a record of one empty cell.
         this.startRecordIfNeeded()
       }
       if (c === "\r") {
         this.breakLine(1)
-        this.held = true
+        this.held.current = true
       } else {
         this.breakLine(1)
         this.endRecord("LF")
@@ -502,31 +506,31 @@ class Run {
       this.advance(1)
       return i + 1
     }
-    if (c === '"' && this.mode === "fieldStart") {
-      this.mode = "quoted"
-      this.fieldQuoted = true
-      this.quoteOffset = this.offset
-      this.quoteLine = this.line
-      this.quoteCharacter = this.character
+    if (c === '"' && this.mode.current === "fieldStart") {
+      this.mode.current = "quoted"
+      this.fieldQuoted.current = true
+      this.quoteOffset.current = this.offset.current
+      this.quoteLine.current = this.line.current
+      this.quoteCharacter.current = this.character.current
       this.advance(1)
       return i + 1
     }
     if (c === '"') {
       this.quoteFinding("stray")
-      if (this.stopped) return i
-      this.field += '"'
+      if (this.stopped.current) return i
+      this.field.current += '"'
       this.advance(1)
       return i + 1
     }
     // A run of ordinary characters.
-    this.mode = "unquoted"
+    this.mode.current = "unquoted"
     let j = i + 1
     while (j < length) {
       const d = text[j]
       if (d === delimiter || d === '"' || d === "\r" || d === "\n") break
       j += 1
     }
-    this.field += Str.slice(i, j)(text)
+    this.field.current += Str.slice(i, j)(text)
     this.advance(j - i)
     this.checkField()
     return j
@@ -536,7 +540,7 @@ class Run {
   private readonly quotedStep = (text: string, i: number): number => {
     const length = text.length
     if (text[i] === '"') {
-      this.mode = "quoteInQuoted"
+      this.mode.current = "quoteInQuoted"
       this.advance(1)
       return i + 1
     }
@@ -545,24 +549,24 @@ class Run {
       const d = text[j]
       if (d === '"') break
       if (d === "\r") {
-        this.line += 1
-        this.character = 0
-        this.offset += 1
-        this.crInQuotes = true
+        this.line.current += 1
+        this.character.current = 0
+        this.offset.current += 1
+        this.crInQuotes.current = true
       } else if (d === "\n") {
-        if (!this.crInQuotes) {
-          this.line += 1
+        if (!this.crInQuotes.current) {
+          this.line.current += 1
         }
-        this.character = 0
-        this.offset += 1
-        this.crInQuotes = false
+        this.character.current = 0
+        this.offset.current += 1
+        this.crInQuotes.current = false
       } else {
-        this.crInQuotes = false
+        this.crInQuotes.current = false
         this.advance(1)
       }
       j += 1
     }
-    this.field += Str.slice(i, j)(text)
+    this.field.current += Str.slice(i, j)(text)
     this.checkField()
     return j
   }
@@ -570,10 +574,10 @@ class Run {
   /** Just after a quote inside quotes: a second quote is a quote in the text, anything else closes the field. */
   private readonly closingQuoteStep = (text: string, i: number): number => {
     const c = text[i]
-    this.crInQuotes = false
+    this.crInQuotes.current = false
     if (c === '"') {
-      this.field += '"'
-      this.mode = "quoted"
+      this.field.current += '"'
+      this.mode.current = "quoted"
       this.advance(1)
       return i + 1
     }
@@ -583,19 +587,19 @@ class Run {
       return i + 1
     }
     if (c === "\r" || c === "\n") {
-      this.mode = "unquoted"
+      this.mode.current = "unquoted"
       return i
     }
     if (c === " ") {
-      this.mode = "afterQuoteSpaces"
-      this.spaces = 1
+      this.mode.current = "afterQuoteSpaces"
+      this.spaces.current = 1
       this.advance(1)
       return i + 1
     }
     this.quoteFinding("after")
-    if (this.stopped) return i
-    this.field += '"'
-    this.mode = "quoted"
+    if (this.stopped.current) return i
+    this.field.current += '"'
+    this.mode.current = "quoted"
     return i
   }
 
@@ -604,7 +608,7 @@ class Run {
     const delimiter = this.config.delimiter
     const c = text[i]
     if (c === " ") {
-      this.spaces += 1
+      this.spaces.current += 1
       this.advance(1)
       return i + 1
     }
@@ -618,42 +622,42 @@ class Run {
         this.advance(1)
         return i + 1
       }
-      this.mode = "unquoted"
+      this.mode.current = "unquoted"
       return i
     }
     this.quoteFinding("after")
-    if (this.stopped) return i
-    this.field += `"${Str.repeat(this.spaces)(" ")}`
-    this.spaces = 0
+    if (this.stopped.current) return i
+    this.field.current += `"${Str.repeat(this.spaces.current)(" ")}`
+    this.spaces.current = 0
     if (c !== '"') {
-      this.mode = "quoted"
+      this.mode.current = "quoted"
       return i
     }
-    this.mode = "quoteInQuoted"
+    this.mode.current = "quoteInQuoted"
     this.advance(1)
     return i + 1
   }
 
   end(): void {
-    if (this.stopped) return
-    if (this.held) {
+    if (this.stopped.current) return
+    if (this.held.current) {
       this.releaseHeld(false)
       return
     }
-    if (this.mode === "quoted") {
-      const at = this.span(this.quoteOffset, 1, this.quoteLine, this.quoteCharacter)
+    if (this.mode.current === "quoted") {
+      const at = this.span(this.quoteOffset.current, 1, this.quoteLine.current, this.quoteCharacter.current)
       this.report(
         CsvDiagnostic.cases.fatal.make({
-          finding: UnterminatedQuote.make({ at, record: this.record, field: this.cells.length })
+          finding: UnterminatedQuote.make({ at, record: this.record.current, field: this.cells.length })
         })
       )
       return
     }
-    if (this.mode === "afterQuoteSpaces" && this.config.quotes === "strict") {
+    if (this.mode.current === "afterQuoteSpaces" && this.config.quotes === "strict") {
       this.quoteFinding("after")
       return
     }
-    if (this.content) this.endRecord("EndOfInput")
+    if (this.content.current) this.endRecord("EndOfInput")
   }
 }
 

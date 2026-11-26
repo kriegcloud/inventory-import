@@ -1,3 +1,5 @@
+import * as O from "effect/Option"
+import { assertTrue } from "@effect/vitest/utils"
 // A take-back of an import confirmed twice (155 items, then one more after an answer): its result and its audit
 // line count every item it removed across both confirms, read from what was stored. And a row with two problems
 // names both in its reason. And a take-back of an import that replaced a stored item puts it back as it was, unless
@@ -6,7 +8,6 @@ import { expect, layer } from "@effect/vitest"
 import { digits } from "../support/cost.ts"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import clean from "../../public/samples/items_clean.csv?raw"
@@ -30,7 +31,10 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const first = yield* client.imports
         .commit({ params, payload: { revision: staged.revision, madeOn: {}, set: {}, clear: [] } })
         .pipe(marcus)
-      expect(O.getOrUndefined(first.result)?.created).toBe(155)
+      const firstResultOption = first.result
+      assertTrue(O.isSome(firstResultOption), "expected firstResult to be present")
+      const firstResult = firstResultOption.value
+      expect(firstResult.created).toBe(155)
       // Listed among the past imports at once, its items counted from what is stored.
       const listed = yield* client.imports.past().pipe(marcus)
       expect(A.map(listed.imports, (past) => [past.id, past.status, past.items, past.notImported])).toEqual([
@@ -62,7 +66,9 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const after = yield* client.imports.past().pipe(marcus)
       expect(A.map(after.imports, (past) => [past.status, past.items])).toEqual([["takenBack", 0]])
       const trail = yield* client.activity.recent().pipe(marcus)
-      const line = O.getOrThrow(A.findFirst(trail, (entry) => entry.action === "Took back an import"))
+      const lineOption = A.findFirst(trail, (entry) => entry.action === "Took back an import")
+      assertTrue(O.isSome(lineOption), "expected line to be present")
+      const line = lineOption.value
       expect(Str.includes("removed 156 items")(line.detail)).toBe(true)
     })
   )
@@ -73,7 +79,10 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       Effect.gen(function* () {
         const table = yield* stage(new File([messy], "items_messy.csv"))
         const rows = review({ ...noHistory, table, choices: [], decisions: {}, storedItems: [] }).rows
-        const reason = A.join(O.getOrThrow(A.findFirst(rows, (row) => row.rowNumber === 56)).reasons, " ")
+        const leftOutOption = A.findFirst(rows, (row) => row.rowNumber === 56)
+        assertTrue(O.isSome(leftOutOption), "expected leftOut to be present")
+        const leftOut = leftOutOption.value
+        const reason = A.join(leftOut.reasons, " ")
         expect([
           Str.includes("vendors are marked preferred")(reason),
           Str.includes("is also on row 151")(reason)
@@ -110,9 +119,14 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
       }
     })
     .pipe(marcus)
-  expect([O.getOrUndefined(replaced.result)?.updated, O.getOrUndefined(replaced.result)?.created]).toEqual([1, 0])
+  const replacedResultOption = replaced.result
+  assertTrue(O.isSome(replacedResultOption), "expected replacedResult to be present")
+  const replacedResult = replacedResultOption.value
+  expect([replacedResult.updated, replacedResult.created]).toEqual([1, 0])
   const stored = yield* client.items.list().pipe(marcus)
-  const insert = O.getOrThrow(A.findFirst(stored, (item) => item.sku === "SHH-9574"))
+  const insertOption = A.findFirst(stored, (item) => item.sku === "SHH-9574")
+  assertTrue(O.isSome(insertOption), "expected insert to be present")
+  const insert = insertOption.value
   expect([insert.name, digits(insert.unitCost), insert.revision]).toEqual(["Oak Foam Insert XL", "14.1", 2])
   return { client, marcus, first, second, replaced, insert }
 })
@@ -127,15 +141,18 @@ layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => 
       const back = yield* client.imports
         .takeBack({ params: { id: second.id }, payload: { confirms: replaced.takeBack.confirms } })
         .pipe(marcus)
-      const event = O.getOrThrow(A.findFirst(back.history, ImportEvent.guards.TakenBack))
+      const eventOption = A.findFirst(back.history, ImportEvent.guards.TakenBack)
+      assertTrue(O.isSome(eventOption), "expected event to be present")
+      const event = eventOption.value
       expect([event.removed, event.restored, event.kept]).toEqual([0, 1, 0])
-      expect([back.status, O.getOrUndefined(back.result)?.updated, O.getOrUndefined(back.result)?.takenBack]).toEqual([
-        "takenBack",
-        0,
-        1
-      ])
+      const backResultOption = back.result
+      assertTrue(O.isSome(backResultOption), "expected backResult to be present")
+      const backResult = backResultOption.value
+      expect([back.status, backResult.updated, backResult.takenBack]).toEqual(["takenBack", 0, 1])
       const after = yield* client.items.list().pipe(marcus)
-      const insert = O.getOrThrow(A.findFirst(after, (item) => item.sku === "SHH-9574"))
+      const insertOption = A.findFirst(after, (item) => item.sku === "SHH-9574")
+      assertTrue(O.isSome(insertOption), "expected insert to be present")
+      const insert = insertOption.value
       expect([insert.name, digits(insert.unitCost), insert.revision, after.length]).toEqual([
         "Oak Foam Insert",
         "12.33",
@@ -143,7 +160,9 @@ layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => 
         25
       ])
       const trail = yield* client.activity.recent().pipe(marcus)
-      const line = O.getOrThrow(A.findFirst(trail, (entry) => entry.action === "Took back an import"))
+      const lineOption = A.findFirst(trail, (entry) => entry.action === "Took back an import")
+      assertTrue(O.isSome(lineOption), "expected line to be present")
+      const line = lineOption.value
       expect(line.detail).toBe("items_changed.csv: removed 0 items, restored 1 item it had replaced")
       // Back as the first import created it, so that import can take it back again with the others.
       const original = yield* client.imports.get({ params: { id: first.id } }).pipe(marcus)
@@ -186,15 +205,24 @@ layer(TypedApp)("a take-back of an import whose replaced item was edited since",
       const back = yield* client.imports
         .takeBack({ params: { id: second.id }, payload: { confirms: before.takeBack.confirms } })
         .pipe(marcus)
-      const event = O.getOrThrow(A.findFirst(back.history, ImportEvent.guards.TakenBack))
+      const eventOption = A.findFirst(back.history, ImportEvent.guards.TakenBack)
+      assertTrue(O.isSome(eventOption), "expected event to be present")
+      const event = eventOption.value
       expect([event.removed, event.restored, event.kept]).toEqual([0, 0, 1])
-      expect([O.getOrUndefined(back.result)?.updated, O.getOrUndefined(back.result)?.takenBack]).toEqual([1, 0])
+      const backResultOption = back.result
+      assertTrue(O.isSome(backResultOption), "expected backResult to be present")
+      const backResult = backResultOption.value
+      expect([backResult.updated, backResult.takenBack]).toEqual([1, 0])
       expect([back.takeBack.keptCount, A.map(back.takeBack.kept, (item) => item.sku)]).toEqual([1, ["SHH-9574"]])
       const stored = yield* client.items.list().pipe(marcus)
-      const after = O.getOrThrow(A.findFirst(stored, (item) => item.sku === "SHH-9574"))
+      const afterOption = A.findFirst(stored, (item) => item.sku === "SHH-9574")
+      assertTrue(O.isSome(afterOption), "expected after to be present")
+      const after = afterOption.value
       expect([after.name, digits(after.unitCost), after.revision]).toEqual(["Oak Foam Insert, edited", "14.1", 3])
       const trail = yield* client.activity.recent().pipe(marcus)
-      const line = O.getOrThrow(A.findFirst(trail, (entry) => entry.action === "Took back an import"))
+      const lineOption = A.findFirst(trail, (entry) => entry.action === "Took back an import")
+      assertTrue(O.isSome(lineOption), "expected line to be present")
+      const line = lineOption.value
       expect(line.detail).toBe("items_changed.csv: removed 0 items, kept 1 that had changed since")
     })
   )

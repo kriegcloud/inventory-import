@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The Items table's columns against the filters' answer. A save that changes a category, a unit or a count changes
 // the answer, and the filters must offer the new values; but every cell, heading and pencil must stay the very same
 // component, or React would draw each anew and an open row editor would close under the person. The columns are read
@@ -30,6 +31,7 @@ const nothing = { min: O.none<number>(), max: O.none<number>() }
 
 /** A filters' answer with these categories; the rest is what an empty organization has. */
 const facets = (categories: ReadonlyArray<readonly [string, number]>, cost: readonly [number, number]) => ({
+  total: A.reduce(categories, 0, (sum, [, count]) => sum + count),
   category: listed(categories),
   uom: listed([["EA", 3]]),
   isActive: listed([["true", 3]]),
@@ -53,8 +55,11 @@ describe("the Items table's columns", () => {
         return A.map(columns, (column) => applyColumnConfig(column, itemsTableConfig.columns))
       }
       const before = taken()
-      const column = (id: string) => (columns: typeof before) =>
-        O.getOrThrow(A.findFirst(columns, (candidate) => candidate.id === id))
+      const column = (id: string) => (columns: typeof before) => {
+        const expectedSome1 = A.findFirst(columns, (candidate) => candidate.id === id)
+        assertTrue(O.isSome(expectedSome1), "expected A.findFirst(columns, (candidate) => candidate.id === id)")
+        return expectedSome1.value
+      }
       expect(registry.get(quickFilterOptions)).toEqual({
         category: [{ label: "components", value: "components", count: 2 }],
         uom: [{ label: "EA", value: "EA", count: 3 }]

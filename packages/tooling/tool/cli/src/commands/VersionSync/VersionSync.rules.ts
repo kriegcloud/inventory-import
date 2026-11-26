@@ -230,7 +230,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   const repo = yield* Repo
   const read = Effect.fn("VersionSync.read")(function* (absolute: string) {
     const text = yield* repo.text(absolute)
-    return { file: repo.relative(repo.root, absolute), absolute, text } satisfies Text
+    return { file: repo.relative(absolute, repo.root), absolute, text } satisfies Text
   })
   const readIfThere = Effect.fn("VersionSync.readIfThere")(function* (absolute: string) {
     if (!(yield* repo.exists(absolute))) return O.none<Text>()
@@ -268,7 +268,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   const underDocs = yield* repo.files(docsDir)
   const docsDocuments = yield* Effect.forEach(
     A.filter(underDocs, (file) => {
-      const within = repo.relative(docsDir, file)
+      const within = repo.relative(file, docsDir)
       return Str.endsWith(".md")(file) && !Str.startsWith("qa/")(within) && !Str.startsWith("session/")(within)
     }),
     read,
@@ -662,7 +662,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     )
     return mergePlans(
       A.map(A.flatten<ReadonlyArray<ReadonlyArray<Text>>>(perDir), (at) => {
-        const relative = repo.relative(repo.dirname(at.absolute), installed)
+        const relative = repo.relative(installed, repo.dirname(at.absolute))
         const local = Str.startsWith(".")(relative) ? relative : `./${relative}`
         return places({
           at: at,

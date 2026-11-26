@@ -1,3 +1,4 @@
+import { unsafeAssert } from "@beep/unsafe-assert"
 // Build configuration, run by Node. Its settings come from the environment through Vite's own `loadEnv`, only the
 // names below; it reads no file and imports no Node module.
 import { cloudflare } from "@cloudflare/vite-plugin"
@@ -49,7 +50,12 @@ const compressPreview = (settings: BuildSettings): Plugin => ({
   configurePreviewServer(server) {
     // Typed for Express, which hands it the same Node request and response as Vite's server does.
     if (settings.previewCompression) {
-      server.middlewares.use(compression() as unknown as Connect.NextHandleFunction)
+      server.middlewares.use(
+        unsafeAssert<Connect.NextHandleFunction>(
+          compression(),
+          "Compression only uses the Node request and response operations supplied by Vite Connect; its declarations unnecessarily require Express request extensions."
+        )
+      )
     }
   }
 })

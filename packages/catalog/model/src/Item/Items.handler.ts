@@ -22,14 +22,17 @@ export const itemsEndpoints = Effect.gen(function* () {
     }),
     page: Effect.fn("items.page")(function* ({ query }: { readonly query: ItemQueryParams }) {
       const actor = yield* CurrentActor
-      return yield* items.page(actor.organizationId, {
-        page: query.page,
-        perPage: query.perPage,
-        sorting: query.sort,
-        filters: query.filters,
-        joinOperator: query.joinOperator,
-        search: query.search
-      })
+      return yield* items.page(
+        {
+          page: query.page,
+          perPage: query.perPage,
+          sorting: query.sort,
+          filters: query.filters,
+          joinOperator: query.joinOperator,
+          search: query.search
+        },
+        actor.organizationId
+      )
     }),
     facets: Effect.fn("items.facets")(function* () {
       const actor = yield* CurrentActor
@@ -44,7 +47,7 @@ export const itemsEndpoints = Effect.gen(function* () {
       readonly payload: ItemEdit
     }) {
       const actor = yield* requireRole("editor")
-      const done = yield* items.edit(actor, params.id, payload)
+      const done = yield* items.edit(params.id, actor, payload)
       return yield* EditOutcome.match(done, {
         Edited: ({ item }) => Effect.succeed(item),
         Same: ({ item }) => Effect.succeed(item),

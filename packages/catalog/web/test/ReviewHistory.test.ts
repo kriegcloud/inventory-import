@@ -1,3 +1,6 @@
+import type { SaveAnswer } from "./support/catalog.ts"
+import * as MutableRef from "effect/MutableRef"
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 // The undo history behind a review's decisions, kept in this browser per person and import. The rule: it is written
 // with every decision, and used when the review is opened again only while it ends at the decisions the server
 // holds. A change made on another screen since starts a new history from the server's: "Undo last step" must never
@@ -17,17 +20,15 @@ import { DisplayName } from "@inventory/kernel/Text"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
-import {
-  decisionFromFlags,
-  type SavedDecisions,
-  type SaveRequest,
-  type DecidedSince
-} from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import { followDraft, reviewLocal, reviewState } from "../src/ReviewDraft.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // The browser's storage, which outlives a refresh: looked up once when the saved progress is first read. And the tab's
 // own storage, which a refresh of the tab keeps: every visit here is a refresh of one tab.
@@ -61,12 +62,7 @@ const browser = vi.hoisted(() => {
 })
 
 /** What the server answers a save with. */
-type Saved = {
-  readonly revision: number
-  readonly changed: boolean
-  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
-  readonly decidedSince: ReadonlyArray<DecidedSince>
-}
+type Saved = SaveAnswer
 
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
@@ -83,38 +79,39 @@ const memberOf = (member: string) =>
   )
 
 /** The Review step of one import opened in a page of its own: a refresh is another page on the same storage. */
-const visit = (
-  id: ImportId,
-  options: { readonly member?: string; readonly saves?: "taken" | "lost"; readonly reads?: "answered" } = {}
-) => {
-  const server: { revision: number; decisions: SavedDecisions } = { revision: 0, decisions: {} }
+const visitStart: { readonly member: string; readonly saves: "taken" | "lost"; readonly reads: "answered" | "silent" } =
+  { member: "mem_dana", saves: "taken", reads: "silent" }
+const visit = (id: ImportId, options: typeof visitStart) => {
+  const server: MutableRef.MutableRef<{ readonly revision: number; readonly decisions: SavedDecisions }> =
+    MutableRef.make<{ readonly revision: number; readonly decisions: SavedDecisions }>({ revision: 0, decisions: {} })
   const sent: Array<SaveRequest> = []
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         // A read of the import never answers, unless the test says the server answers it with what it holds.
         get: () =>
           options.reads === "answered"
-            ? Effect.sync(() => viewAt({ id, revision: server.revision, decisions: server.decisions }))
+            ? Effect.sync(() => viewAt({ id, revision: server.current.revision, decisions: server.current.decisions }))
             : Deferred.await(Deferred.makeUnsafe<ImportView>()),
         // The server takes every save, unless the test says the network loses them: those never answer.
         decide: (request: { readonly payload: SaveRequest }) => {
           sent.push(request.payload)
           if (options.saves === "lost") return Deferred.await(Deferred.makeUnsafe<Saved>())
-          server.revision += 1
-          return Effect.succeed({ revision: server.revision, changed: true, notApplied: [], decidedSince: [] })
+          server.current = { ...server.current, revision: server.current.revision + 1 }
+          return Effect.succeed({ revision: server.current.revision, changed: true, notApplied: [], decidedSince: [] })
         }
       }
     },
-    signedIn: Atom.make(memberOf(options.member ?? "mem_dana"))
+    signedIn: memberOf(options.member).pipe((who) => Atom.make(who), O.some)
   })
   return {
     registry,
     sent,
     /** The server's view is in the tab and the step is drawn. */
     open: (revision: number, decisions: SavedDecisions) => {
-      server.revision = revision
-      server.decisions = decisions
+      server.current = { ...server.current, revision: revision }
+      server.current = { ...server.current, decisions: decisions }
       registry.set(importView(id), viewAt({ id, revision, decisions }))
       registry.mount(importViewShown(id))
       registry.mount(reviewLocal(id))
@@ -125,10 +122,11 @@ const visit = (
     /** The person takes a step on the region. */
     run: (action: Action) => {
       const next = act({
+        columns: reviewColumns,
         rows: A.map(["row-2", "row-3"], (rowId, index) => ReviewRow.make({ id: rowId, line: index + 2, cells: {} })),
         state: registry.get(reviewState(id)),
         action,
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       }).state
@@ -146,7 +144,7 @@ describe("the undo history kept in the browser", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(60)
-        const first = visit(id)
+        const first = visit(id, { ...visitStart })
         first.open(10, {})
         yield* settle
         expect(labels(first.state())).toEqual([])
@@ -158,7 +156,7 @@ describe("the undo history kept in the browser", () => {
         expect(R.keys(browser.kept)).toHaveLength(1)
 
         // A refresh: another page, the same browser. The server holds the two decisions the person made.
-        const again = visit(id)
+        const again = visit(id, { ...visitStart })
         again.open(12, { "row-2": out, "row-3": out })
         yield* settle
         expect(labels(again.state())).toEqual(labels(left))
@@ -173,14 +171,14 @@ describe("the undo history kept in the browser", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(61)
-        const first = visit(id)
+        const first = visit(id, { ...visitStart })
         first.open(10, {})
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
 
         // Somebody else has since put row 2 back and left row 3 out: the kept history ends somewhere else.
-        const again = visit(id)
+        const again = visit(id, { ...visitStart })
         again.open(13, { "row-3": out })
         yield* settle
         expect(labels(again.state())).toEqual([])
@@ -194,7 +192,7 @@ describe("the undo history kept in the browser", () => {
       Effect.gen(function* () {
         const id = importNo(63)
         // The network loses the save: row 2 is on the screen, kept in this browser, and not on the server.
-        const first = visit(id, { saves: "lost" })
+        const first = visit(id, { ...visitStart, saves: "lost" })
         first.open(10, {})
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
@@ -202,7 +200,7 @@ describe("the undo history kept in the browser", () => {
         expect(first.sent).toEqual([{ madeOn: { "row-2": 10 }, over: {}, set: { "row-2": out }, clear: [] }])
 
         // A refresh. Somebody else has left row 3 out meanwhile: the server holds that, and not row 2.
-        const again = visit(id, { reads: "answered" })
+        const again = visit(id, { ...visitStart, reads: "answered" })
         again.open(13, { "row-3": out })
         yield* settle
         // Both are on the screen: what the server holds, with the person's waiting row over it.
@@ -224,13 +222,13 @@ describe("the undo history kept in the browser", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(62)
-        const first = visit(id)
+        const first = visit(id, { ...visitStart })
         first.open(10, {})
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
 
-        const other = visit(id, { member: "mem_lee" })
+        const other = visit(id, { ...visitStart, member: "mem_lee" })
         other.open(11, { "row-2": out })
         yield* settle
         expect(labels(other.state())).toEqual([])

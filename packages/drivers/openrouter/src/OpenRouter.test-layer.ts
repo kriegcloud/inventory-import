@@ -13,11 +13,12 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
+import { dual, identity } from "effect/Function"
 import * as Stream from "effect/Stream"
 import * as HttpClient from "effect/http/HttpClient"
 import type * as HttpClientRequest from "effect/http/HttpClientRequest"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
-import { ModelPolicy, type OpenRouterSettings } from "./OpenRouter.config.ts"
+import type { ModelPolicy, OpenRouterSettings } from "./OpenRouter.config.ts"
 import { ModelUnavailable } from "./OpenRouter.errors.ts"
 import { type ModelId, type ModelStatus, ModelStatus as Status, type OffReason } from "./OpenRouter.schema.ts"
 import { OpenRouter } from "./OpenRouter.service.ts"
@@ -30,7 +31,7 @@ import { type AnswerSchema, ask } from "./internal/plan.ts"
  * @category models
  */
 export type ScriptedReply =
-  | { readonly text: string; readonly modelId?: string }
+  | { readonly text: string; readonly modelId: O.Option<string> }
   | { readonly hang: true }
   | AiError.AiError
 
@@ -48,9 +49,18 @@ export class OpenRouterTest {
       OpenRouter,
       OpenRouter.of({
         status: Status.cases.off.make({ kind: "off", why, model }),
-        generateObject: Effect.fn("OpenRouter.generateObject")(function* () {
-          return yield* ModelUnavailable.make({ trouble: "noKey", retryable: false })
-        })
+        generateObject: dual<
+          OpenRouter["Service"]["generateObject"],
+          (
+            self: Parameters<OpenRouter["Service"]["generateObject"]>[0],
+            schema: AnswerSchema
+          ) => Effect.Effect<never, ModelUnavailable>
+        >(
+          2,
+          Effect.fn("OpenRouter.generateObject")(function* () {
+            return yield* ModelUnavailable.make({ trouble: "noKey", retryable: false })
+          })
+        )
       })
     )
 
@@ -62,16 +72,16 @@ export class OpenRouterTest {
     replies: ReadonlyArray<ScriptedReply>,
     options: {
       readonly model: ModelId
-      readonly fallbackModels?: ReadonlyArray<ModelId>
-      readonly policy?: ModelPolicy
+      readonly fallbackModels: ReadonlyArray<ModelId>
+      readonly policy: ModelPolicy
     }
   ): { readonly layer: Layer.Layer<OpenRouter>; readonly calls: () => number } => {
     const count = MutableRef.make(0)
-    const fallbackModels = options.fallbackModels ?? []
-    const status: ModelStatus = Status.cases.on.make({ kind: "on", model: options.model, fallbackModels })
     const layer = Layer.effect(
       OpenRouter,
       Effect.gen(function* () {
+        const { fallbackModels, policy } = options
+        const status: ModelStatus = Status.cases.on.make({ kind: "on", model: options.model, fallbackModels })
         const languageModel = yield* LanguageModel.make({
           generateText: Effect.fnUntraced(function* () {
             const index = MutableRef.getAndIncrement(count)
@@ -81,7 +91,10 @@ export class OpenRouterTest {
             if ("hang" in reply.value) return yield* Effect.never
             if ("text" in reply.value) {
               return [
-                { type: "response-metadata" as const, modelId: reply.value.modelId ?? options.model },
+                {
+                  type: "response-metadata" as const,
+                  modelId: O.match(reply.value.modelId, { onNone: () => options.model, onSome: identity })
+                },
                 { type: "text" as const, text: reply.value.text }
               ]
             }
@@ -92,20 +105,23 @@ export class OpenRouterTest {
         const models = Context.make(LanguageModel.LanguageModel, languageModel)
         return OpenRouter.of({
           status,
-          generateObject: Effect.fn("OpenRouter.generateObject")(function* <Sc extends AnswerSchema>(
-            prompt: Parameters<OpenRouter["Service"]["generateObject"]>[0],
-            schema: Sc
-          ) {
-            return yield* ask({
-              models,
-              model: options.model,
-              fallbackModels,
-              policy: options.policy ?? ModelPolicy.default,
-              prompt,
-              schema,
-              withConfig: (effect) => effect
+          generateObject: dual(
+            2,
+            Effect.fn("OpenRouter.generateObject")(function* <Sc extends AnswerSchema>(
+              self: Parameters<OpenRouter["Service"]["generateObject"]>[0],
+              schema: Sc
+            ) {
+              return yield* ask({
+                models,
+                model: options.model,
+                fallbackModels,
+                policy,
+                prompt: self,
+                schema,
+                withConfig: (effect) => effect
+              })
             })
-          })
+          )
         })
       })
     )
@@ -118,7 +134,7 @@ export class OpenRouterTest {
   static readonly overHttp = (
     settings: OpenRouterSettings,
     respond: (request: HttpClientRequest.HttpClientRequest) => Response,
-    policy: ModelPolicy = ModelPolicy.default
+    policy: ModelPolicy
   ): Layer.Layer<OpenRouter> =>
     OpenRouter.layer(settings, policy).pipe(
       Layer.provide(

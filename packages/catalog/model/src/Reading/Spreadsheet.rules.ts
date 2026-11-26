@@ -3,6 +3,8 @@
 // The rule this file protects: nothing in a file is coerced on the way in. A cell keeps its own text and says what
 // type it was in the file; anything the reader skipped or noticed is a Note the screen can show, never a console line.
 
+import { emptyWhenLeftOut } from "@inventory/kernel/Wire"
+import * as A from "effect/Array"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -94,10 +96,15 @@ export const Row = S.Struct({
       "CSV it counts items: a line break inside quotes stays in its row, as Excel shows it."
   }),
   cells: S.Array(Cell).annotateKey({ description: "One cell per column, in column order." }),
-  extra: ExtraCell.pipe(S.Array, S.optionalKey).annotateKey({
-    description: "Non-empty cells beyond the named columns, when the row has any."
-  }),
-  hidden: S.optionalKey(S.Boolean).annotateKey({ description: "True when the row is hidden in Excel." })
+  extra: ExtraCell.pipe(
+    S.Array,
+    S.annotateKey({ description: "Non-empty cells beyond the named columns, when the row has any." }),
+    emptyWhenLeftOut({ empty: A.empty<ExtraCell>(), isEmpty: A.isReadonlyArrayEmpty })
+  ),
+  hidden: S.Boolean.pipe(
+    S.annotateKey({ description: "True when the row is hidden in Excel." }),
+    emptyWhenLeftOut({ empty: false, isEmpty: (hidden) => !hidden })
+  )
 }).annotate({ description: "One data row, numbered as the person sees it in Excel, with one cell per column." })
 /** A decoded `Row`. Cite `rowNumber` in every message about it, so the person can find it in their file. */
 export type Row = typeof Row.Type

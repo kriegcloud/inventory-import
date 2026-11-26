@@ -138,8 +138,8 @@ which is not checked from main.
   rule, a group counted by a number instead of cleared by a branch, and no rule weaker, trial 13's `Deciding` had 332
   paths and `Undoing` 2,652; `review15`'s four decisions have 284, 298, 42 and 84 (a row's act 152 on `review14`, before
   the no-change answer). On `dbfd0dd` the prover also cannot write a text's length into a text, nor read a loop, so it
-  reads no hash. On this repository's pin the length half is patched (`02-text-length-in-a-template`,
-  [docs/patches.md](../../docs/patches.md)): a length-prefixed text is read and proved there. The loop half stands.
+  reads no hash. The length half was patched here (`02-text-length-in-a-template`) until the pin moved to `e1c3e6d`,
+  whose prover reads a length-prefixed text itself ([docs/patches.md](../../docs/patches.md)). The loop half stands.
 - **The group as one unit, before the last-group rule** (trials 15 to 17, for decision 7, on `review12`): 123 rules
   proved, the four decisions with 42 to 292 paths; one act for 6,000 rows a median of 214 ms in local workerd, each time
   the first group act on a fresh import; and the reading of a row's decision through its groups equals today's `act` for

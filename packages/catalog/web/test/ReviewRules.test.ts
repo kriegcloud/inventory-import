@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // Rules of the review where a wrong result hides a row or stores a wrong value: a stored SKU on a row that does not
 // read yet, an item named "Total", a year written with two digits, a tags cell of separators only, a vendor cost in
 // quotes, and what an edit of one item may not say.
@@ -23,55 +24,60 @@ const head =
   "sku,name,description,category,uom,unit_cost,quantity_on_hand,reorder_point,is_active,lot_tracked,tags,first_received_on,discontinued_on,dimensions,vendors"
 
 /** One row under the schema's own headings; the values given replace the plain ones. */
-const line = (values: {
-  readonly sku?: string
-  readonly name?: string
-  readonly cost?: string
-  readonly tags?: string
-  readonly received?: string
-  readonly vendors?: string
-}): string =>
+const lineStart = { sku: "ABC-0001", name: "Steel Tube", cost: "9.5", tags: "", received: "", vendors: "" }
+const line = (values: typeof lineStart): string =>
   A.join(
     [
-      values.sku ?? "ABC-0001",
-      values.name ?? "Steel Tube",
+      values.sku,
+      values.name,
       "",
       "components",
       "EA",
-      values.cost ?? "9.5",
+      values.cost,
       "4",
       "",
       "true",
       "false",
-      values.tags ?? "",
-      values.received ?? "",
+      values.tags,
+      values.received,
       "",
       "",
-      values.vendors ?? ""
+      values.vendors
     ],
     ","
   )
 
-const reviewed = (rows: ReadonlyArray<string>, storedItems: ReadonlyArray<ItemFields> = []) =>
+const reviewed = (rows: ReadonlyArray<string>, storedItems: ReadonlyArray<ItemFields>) =>
   Effect.map(stage(textFile(A.join([head, ...rows], "\n"))), (table) =>
     review({ ...noHistory, table, choices: [], decisions: {}, storedItems })
   )
 
-const rowOf = (result: Review, rowNumber: number) =>
-  O.getOrThrow(A.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
+const rowOf = (result: Review, rowNumber: number) => {
+  const expectedSome1 = A.findFirst(result.rows, (row) => row.rowNumber === rowNumber)
+  assertTrue(O.isSome(expectedSome1), "expected A.findFirst(result.rows, (row) => row.rowNumber === rowNumber)")
+  return expectedSome1.value
+}
 
 describe("a second import", () => {
   it.effect(
     "counts a row whose SKU reads and is stored as Already there though another cell does not read, and keeps a SKU that does not read yet waiting",
     () =>
       Effect.gen(function* () {
-        const first = yield* reviewed([line({ sku: "AWP-1853" }), line({ sku: "TBD-0002" })])
+        const first = yield* reviewed(
+          [line({ ...lineStart, sku: "AWP-1853" }), line({ ...lineStart, sku: "TBD-0002" })],
+          []
+        )
         const stored = A.getSomes(A.map(first.rows, (row) => row.item))
         expect(stored.length).toBe(2)
         // The same two SKUs again: one in lower case (its own proposal is open), one with a cost nobody can read.
-        const again = yield* reviewed([line({ sku: "awp-1853" }), line({ sku: "TBD-0002", cost: "TBD" })], stored)
+        const again = yield* reviewed(
+          [line({ ...lineStart, sku: "awp-1853" }), line({ ...lineStart, sku: "TBD-0002", cost: "TBD" })],
+          stored
+        )
         expect([again.counts.already, again.counts.decision, again.counts.cannot]).toEqual([1, 1, 0])
-        expect(O.getOrThrow(rowOf(again, 2).reason)).toContain("awp-1853")
+        const expectedSome2 = rowOf(again, 2).reason
+        assertTrue(O.isSome(expectedSome2), "expected rowOf(again, 2).reason")
+        expect(expectedSome2.value).toContain("awp-1853")
         // The item is stored: the row adds nothing, and its unread cost is not asked for.
         expect([rowOf(again, 3).status, rowOf(again, 3).reason, rowOf(again, 3).item]).toEqual([
           "already",
@@ -85,9 +91,14 @@ describe("a second import", () => {
 describe("a total row", () => {
   it.effect('is a row that says "Total" and has no SKU; an item named Total is an item, and counted', () =>
     Effect.gen(function* () {
-      const result = yield* reviewed([line({ name: "Total" }), line({ sku: "", name: "Total" })])
+      const result = yield* reviewed(
+        [line({ ...lineStart, name: "Total" }), line({ ...lineStart, sku: "", name: "Total" })],
+        []
+      )
       expect([result.counts.rows, result.counts.ready, result.totalRows]).toEqual([1, 1, [3]])
-      expect(O.getOrThrow(rowOf(result, 2).item).name).toBe("Total")
+      const expectedSome3 = rowOf(result, 2).item
+      assertTrue(O.isSome(expectedSome3), "expected rowOf(result, 2).item")
+      expect(expectedSome3.value.name).toBe("Total")
     })
   )
 })
@@ -95,13 +106,13 @@ describe("a total row", () => {
 describe("a date whose year has two digits", () => {
   it.effect("gets no proposal: the row cannot be imported until the person types the date", () =>
     Effect.gen(function* () {
-      const result = yield* reviewed([line({ received: "13/04/98" })])
+      const result = yield* reviewed([line({ ...lineStart, received: "13/04/98" })], [])
       const row = rowOf(result, 2)
       expect([row.outcome, row.values.firstReceivedOn, row.changes]).toEqual(["cannot", "13/04/98", []])
       expect([row.problems[0]?.proposal, row.proposals]).toEqual([O.none(), []])
-      expect(O.getOrThrow(row.reason)).toBe(
-        "First received “13/04/98” has a two-digit year; type it as year-month-day."
-      )
+      const expectedSome4 = row.reason
+      assertTrue(O.isSome(expectedSome4), "expected row.reason")
+      expect(expectedSome4.value).toBe("First received “13/04/98” has a two-digit year; type it as year-month-day.")
     })
   )
 })
@@ -110,12 +121,18 @@ describe("reasons", () => {
   it.effect('reads a tags cell of separators only as empty, and a vendor cost in quotes ("7.50") from its digits', () =>
     Effect.gen(function* () {
       const vendors = '"[{""vendor_name"":""Acme Industrial"",""unit_cost"":""7.50"",""is_preferred"":false}]"'
-      const result = yield* reviewed([line({ tags: "|" }), line({ sku: "ABC-0002", vendors })])
-      expect([rowOf(result, 2).status, O.getOrThrow(rowOf(result, 2).item).tags]).toEqual(["ready", []])
-      expect([rowOf(result, 3).status, digits(O.getOrThrow(rowOf(result, 3).item).vendors[0]?.unitCost)]).toEqual([
-        "ready",
-        "7.5"
-      ])
+      const result = yield* reviewed(
+        [line({ ...lineStart, tags: "|" }), line({ ...lineStart, sku: "ABC-0002", vendors })],
+        []
+      )
+      const expectedSome5 = rowOf(result, 2).item
+      assertTrue(O.isSome(expectedSome5), "expected rowOf(result, 2).item")
+      expect([rowOf(result, 2).status, expectedSome5.value.tags]).toEqual(["ready", []])
+      const expectedSome6 = rowOf(result, 3).item
+      assertTrue(O.isSome(expectedSome6), "expected rowOf(result, 3).item")
+      const vendor = A.head(expectedSome6.value.vendors)
+      assertTrue(O.isSome(vendor), "the reviewed row has its expected vendor")
+      expect([rowOf(result, 3).status, digits(vendor.value.unitCost)]).toEqual(["ready", "7.5"])
     })
   )
 })

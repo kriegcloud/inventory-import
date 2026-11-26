@@ -1,3 +1,5 @@
+import { RowId } from "@inventory/catalog-contract/Ids"
+import { assertTrue } from "@effect/vitest/utils"
 // A Replace or a Keep-stored the server took back on an import matched before moves were kept (Benjamin, 2026-11-21,
 // "Take it back, say so"): the screen names it with the field that was matched again, which is not the SKU, in each place
 // it can learn of it: a save's answer, a confirm's refusal, and the import's view. The words are read here as the person
@@ -7,7 +9,6 @@ import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as S from "effect/Schema"
 import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
 import {
@@ -16,7 +17,7 @@ import {
   type SaveRequest,
   type DecidedSince
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -43,11 +44,16 @@ const page = vi.hoisted(() => {
       location: { pathname: "/", search: "" }
     }
   })
-  return { said: [] as Array<string> }
+  return { said: Array<string>() }
 })
 vi.mock("sonner", () => {
   const say = (title: string, more?: { readonly description?: string }) =>
-    page.said.push(`${title}: ${more?.description ?? ""}`)
+    page.said.push(
+      O.match(O.fromUndefinedOr(more?.description), {
+        onNone: () => `${title}: `,
+        onSome: (description) => `${title}: ${description}`
+      })
+    )
   return { toast: Object.assign(say, { dismiss: () => undefined, success: () => 0, loading: () => 0, error: say }) }
 })
 
@@ -69,7 +75,7 @@ const taken = [
 ] as const
 
 /** The Review step on one import at revision 10: each save and confirm answers only when the test says. */
-const world = (id: ImportId, parts: Partial<ImportView> = {}) => {
+const world = (id: ImportId, parts: Partial<ImportView>) => {
   const saves: Array<Deferred.Deferred<Saved, HttpApiError.InternalServerErrorProblem>> = []
   const confirms: Array<Deferred.Deferred<ImportView, AcceptsTakenBack>> = []
   const registry = registryWith({
@@ -92,27 +98,47 @@ const world = (id: ImportId, parts: Partial<ImportView> = {}) => {
   registry.mount(reviewLocal(id))
   registry.mount(followDraft(id))
   const happened = (event: DraftEvent) => registry.set(draftEvents(id), event)
-  const shownHere = (): SavedDecisions => O.getOrThrow(registry.get(shownDecisions(id)))
+  const shownHere = (): SavedDecisions => {
+    const expectedSome1 = registry.get(shownDecisions(id))
+    assertTrue(O.isSome(expectedSome1), "expected registry.get(shownDecisions(id))")
+    return expectedSome1.value
+  }
   return { registry, saves, confirms, happened, shownHere }
 }
 
 /** One match's take-backs as the view carries them, read through the contract's schema. */
-// @effect-diagnostics-next-line schemaSync:off
-const takenBack = S.decodeSync(S.Array(MatchTakeBack))([
-  { revision: 10, by: "Marcus", field: "unitCost", kind: "stored", count: 2, rows: ["row-7", "row-9"] }
-])
+const takenBack = [
+  MatchTakeBack.make({
+    matched: O.none(),
+    reads: O.none(),
+    saved: O.none(),
+    revision: 10,
+    by: "Marcus",
+    field: "unitCost",
+    kind: "stored",
+    count: 2,
+    rows: [RowId.make("row-7"), RowId.make("row-9")]
+  })
+]
 
 const decides = DraftEvent.Decided({ changes: { "row-7": O.some(replaced), "row-9": O.some(keepStored) } })
 
 describe("a Replace and a Keep-stored taken back because another column than the SKU was matched again", () => {
   it.live("are named by a save's answer, with the field and the rows, and each row is undecided again", () =>
     Effect.gen(function* () {
-      const t = world(importNo(91))
+      const t = world(importNo(91), {})
       yield* settle
       page.said.length = 0
       t.happened(decides)
       yield* settle
-      yield* Deferred.succeed(t.saves[0]!, { revision: 11, changed: true, notApplied: taken, decidedSince: [] })
+      const requiredEntry1 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry1), "expected t.saves[0]")
+      yield* Deferred.succeed(requiredEntry1.value, {
+        revision: 11,
+        changed: true,
+        notApplied: taken,
+        decidedSince: []
+      })
       yield* settle
       expect(page.said).toEqual([
         "2 decisions were taken back: A column was matched again after you decided: the keep-or-replace on row 7 (Unit cost matched again); the keep-or-replace on row 9 (Unit cost matched again). Each row shows what it reads now, to decide again."
@@ -125,25 +151,31 @@ describe("a Replace and a Keep-stored taken back because another column than the
   it.live("are named by a confirm's refusal, in the toast and above the review, where nothing was imported", () =>
     Effect.gen(function* () {
       const id = importNo(92)
-      const t = world(id)
+      const t = world(id, {})
       yield* settle
       t.happened(decides)
       yield* settle
       // The save fails: the rows wait, and ride with the confirm.
-      yield* Deferred.fail(t.saves[0]!, HttpApiError.InternalServerErrorProblem.make({}))
+      const requiredEntry2 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry2), "expected t.saves[0]")
+      yield* Deferred.fail(requiredEntry2.value, HttpApiError.InternalServerErrorProblem.make({}))
       yield* settle
       page.said.length = 0
       t.happened(DraftEvent.ConfirmPressed())
       yield* settle
+      const requiredEntry3 = A.get(t.confirms, 0)
+      assertTrue(O.isSome(requiredEntry3), "expected t.confirms[0]")
       yield* Deferred.fail(
-        t.confirms[0]!,
+        requiredEntry3.value,
         AcceptsTakenBack.make({ reason: "A column was matched again.", accepts: taken })
       )
       yield* settle
       expect(page.said).toEqual([
         "2 decisions were taken back: A column was matched again after you decided: the keep-or-replace on row 7 (Unit cost matched again); the keep-or-replace on row 9 (Unit cost matched again). Each row shows what it reads now, to decide again."
       ])
-      const why = O.getOrThrow(t.registry.get(confirmHeldBack(id)))
+      const expectedSome2 = t.registry.get(confirmHeldBack(id))
+      assertTrue(O.isSome(expectedSome2), "expected t.registry.get(confirmHeldBack(id))")
+      const why = expectedSome2.value
       expect(heldBackSentence({ why, accepts: acceptsWords(why.accepts) })).toBe(
         "Nothing was imported: the import changed while you were reviewing. A column was matched again after you decided, so those decisions were taken back: the keep-or-replace on row 7 (Unit cost matched again); the keep-or-replace on row 9 (Unit cost matched again). The review and its totals below show the import as it is now. Check them, then import again."
       )

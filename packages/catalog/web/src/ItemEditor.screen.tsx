@@ -1,5 +1,8 @@
+import { query } from "./internal/browser.ts"
 import * as Match from "effect/Match"
+import { EditorState, formOf, type OpenEditor } from "./ItemEditor.state.ts"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { PencilIcon } from "lucide-react"
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
@@ -36,35 +39,13 @@ import { keptOfMember, memberKey } from "@inventory/client/MemberAtoms"
 import { optimisticChange, optimisticWrite } from "@inventory/client/OptimisticAtoms"
 import { catalogApi } from "./Catalog.runtime.ts"
 import { itemsPage } from "./ItemsPage.screen.tsx"
-import {
-  categories,
-  discontinuedOn,
-  isActive,
-  type ItemEdit,
-  type StoredItem,
-  uoms,
-  costDigits
-} from "@inventory/catalog-contract/Item"
+import { categories, Category, Uom, type ItemEdit, type StoredItem, uoms } from "@inventory/catalog-contract/Item"
 import type { ItemPage } from "@inventory/catalog-contract/ItemQuery"
 import { ItemChanged } from "@inventory/catalog-contract/Catalog"
 import { sayError } from "@inventory/client/SayError"
 import { catalogKeys } from "./Catalog.keys.ts"
 import { costOf, dimensionsText } from "./internal/itemText.ts"
 import { type ItemForm, type ItemFormProblems, readItemForm } from "@inventory/catalog-model/ItemEdit"
-
-const formOf = (item: StoredItem): ItemForm => ({
-  name: item.name,
-  description: O.getOrElse(item.description, () => ""),
-  category: item.category,
-  uom: item.uom,
-  unitCost: costDigits(item.unitCost),
-  quantityOnHand: `${item.quantityOnHand}`,
-  reorderPoint: O.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
-  isActive: isActive(item.stocking),
-  lotTracked: item.lotTracked,
-  firstReceivedOn: O.getOrElse(item.firstReceivedOn, () => ""),
-  discontinuedOn: O.getOrElse(discontinuedOn(item.stocking), () => "")
-})
 
 /** The item with an edit's values in it: what the table shows the moment the person saves. */
 const withEdit = (item: StoredItem, edit: ItemEdit): StoredItem => {
@@ -81,10 +62,11 @@ const putItem = (page: ItemPage, item: StoredItem): ItemPage => ({
 const isItemChanged = S.is(ItemChanged)
 
 /** `ItemChanged`: someone saved this item between the person opening it and saving it. */
-const changedMeanwhile = (error: unknown): StoredItem | undefined => (isItemChanged(error) ? error.item : undefined)
+const changedMeanwhile = (error: unknown): O.Option<StoredItem> =>
+  O.map(O.liftPredicate(isItemChanged)(error), (changed) => changed.item)
 
 /** What only an import writes, shown and not changed here: the tags, the dimensions and every vendor. */
-function FromTheFile(props: { item: StoredItem }) {
+function FromTheFile(props: { readonly item: StoredItem }) {
   const { item } = props
   return (
     <dl className="flex flex-col gap-2 text-sm">
@@ -133,16 +115,7 @@ function FromTheFile(props: { item: StoredItem }) {
 }
 
 /** One item's editor: open or not, the item as it was when opened, what is typed, its problems and a notice. */
-interface EditorState {
-  readonly open: boolean
-  readonly base: O.Option<StoredItem>
-  readonly form: O.Option<ItemForm>
-  readonly problems: ItemFormProblems
-  readonly notice: string | null
-}
-
-/** An editor nobody has opened. */
-const closedEditor: EditorState = { open: false, base: O.none(), form: O.none(), problems: {}, notice: null }
+const closedEditor = EditorState.cases.Closed.make({})
 
 /**
  * The editors that are open, by item. Kept for the page's life, and small: an editor is in it only while its dialog
@@ -150,7 +123,7 @@ const closedEditor: EditorState = { open: false, base: O.none(), form: O.none(),
  * on a save that failed must find its editor whether or not the row is drawn; held with the row, it was gone. What is
  * typed in one is one member's: another member, or another organization, has none open.
  */
-const openEditors = keptOfMember(() => HashMap.empty<string, EditorState>())
+const openEditors = keptOfMember(() => HashMap.empty<string, OpenEditor>())
 
 /**
  * What the server answered to the last save of each item: the item as stored, at its new revision. Kept while the same
@@ -173,14 +146,18 @@ const newerOf = (base: StoredItem, saved: O.Option<StoredItem>): StoredItem =>
 export const itemEditor = Atom.family((id: string) =>
   Atom.writable(
     (get) => {
-      const editor = O.getOrElse(HashMap.get(get(openEditors), id), () => closedEditor)
       const saved = HashMap.get(get(savedItems), id)
-      return { ...editor, base: O.map(editor.base, (base) => newerOf(base, saved)) }
+      return O.match(HashMap.get(get(openEditors), id), {
+        onNone: () => closedEditor,
+        onSome: (editor) => ({ ...editor, base: newerOf(editor.base, saved) })
+      })
     },
     (ctx, next: EditorState) =>
       ctx.set(
         openEditors,
-        next.open ? HashMap.set(ctx.get(openEditors), id, next) : HashMap.remove(ctx.get(openEditors), id)
+        EditorState.guards.Open(next)
+          ? HashMap.set(ctx.get(openEditors), id, next)
+          : HashMap.remove(ctx.get(openEditors), id)
       )
   )
 )
@@ -215,7 +192,7 @@ const editAgain = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly save: ItemSave
   readonly base: StoredItem
-  readonly notice: string | null
+  readonly notice: O.Option<string>
 }): (() => void) => {
   const { base, notice, registry, save } = input
   const savedAs = registry.get(memberKey)
@@ -226,15 +203,17 @@ const editAgain = (input: {
       })
       return
     }
-    registry.set(itemEditor(base.id), {
-      open: true,
-      base: O.some(base),
-      form: O.some(save.form),
-      problems: {},
-      notice
-    })
-    const drawn = document.querySelector(`[data-edit-item="${CSS.escape(base.id)}"]`) !== null
-    if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`)
+    registry.set(
+      itemEditor(base.id),
+      EditorState.cases.Open.make({
+        base,
+        form: save.form,
+        problems: {},
+        notice
+      })
+    )
+    const drawn = O.isSome(query({ selector: `[data-edit-item="${CSS.escape(base.id)}"]`, root: document }))
+    if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`, { replace: false })
   }
 }
 
@@ -244,7 +223,7 @@ const sendEdit = (id: StoredItem["id"]) =>
     const registry = yield* AtomRegistry.AtomRegistry
     const count = (by: number) =>
       registry.update(savesOut, (out) => {
-        const next = O.getOrElse(HashMap.get(out, id), () => 0) + by
+        const next = O.match(HashMap.get(out, id), { onNone: () => by, onSome: (count) => count + by })
         return next > 0 ? HashMap.set(out, id, next) : HashMap.remove(out, id)
       })
     count(1)
@@ -272,28 +251,35 @@ export const editItem = Atom.family((id: StoredItem["id"]) =>
     // The press carries what the person typed: the editor opens on it again rather than make them type it again.
     retry: (save, registry) => ({
       label: "Edit again",
-      onClick: editAgain({ registry, save, base: save.base, notice: null })
+      onClick: editAgain({ registry, save, base: save.base, notice: O.none() })
     }),
-    settled: [...catalogKeys.imports, ...catalogKeys.itemFacets, ...catalogKeys.activity],
+    settled: O.some([...catalogKeys.imports, ...catalogKeys.itemFacets, ...catalogKeys.activity]),
     onAnswer: (saved, _save, registry) => {
       // An editor open on this item now, or opened before the row is read again, is on the saved revision.
       registry.update(savedItems, (held) => HashMap.set(held, id, saved))
       toast.success(`Saved ${saved.sku}`)
     },
-    onRefused: (error, save, registry) => {
-      const now = changedMeanwhile(error)
-      if (now === undefined) return false
-      // Their values in the table; the person's in the form, on their revision.
-      invalidate(catalogKeys.items)
-      toast.error("Changed by someone else", {
-        description: `${now.name} was changed by someone else just before you saved, so your change was not saved. Their values are showing.`,
-        action: {
-          label: "Edit again",
-          onClick: editAgain({ registry, save, base: now, notice: sayError(error).sentence })
+    onRefused: (error, save, registry) =>
+      O.match(changedMeanwhile(error), {
+        onNone: () => false,
+        onSome: (now) => {
+          // Their values in the table; the person's in the form, on their revision.
+          invalidate(catalogKeys.items)
+          toast.error("Changed by someone else", {
+            description: `${now.name} was changed by someone else just before you saved, so your change was not saved. Their values are showing.`,
+            action: {
+              label: "Edit again",
+              onClick: editAgain({
+                registry,
+                save,
+                base: now,
+                notice: O.some(sayError(error, { fields: {} }).sentence)
+              })
+            }
+          })
+          return true
         }
       })
-      return true
-    }
   })
 )
 
@@ -305,9 +291,9 @@ export const editItem = Atom.family((id: StoredItem["id"]) =>
  * than overwritten. An item that has been changed is kept if the import that created it is taken back.
  */
 export function ItemEditor(props: {
-  item: StoredItem
+  readonly item: StoredItem
   /** What opens it: a small pencil in a table's row, or a full-size "Edit" button on a phone's card. */
-  trigger: "icon" | "button"
+  readonly trigger: "icon" | "button"
 }) {
   const ids = {
     name: useId(),
@@ -324,65 +310,43 @@ export function ItemEditor(props: {
   }
   const itemId = props.item.id
   const [editor, setEditor] = useAtom(itemEditor(itemId))
-  const { open, problems, notice } = editor
-  const base = O.getOrElse(editor.base, () => props.item)
-  const form = O.getOrElse(editor.form, () => formOf(props.item))
-  const set = <K extends keyof ItemForm>(key: K, value: ItemForm[K]) =>
-    setEditor((now) => ({ ...now, form: O.some({ ...O.getOrElse(now.form, () => formOf(props.item)), [key]: value }) }))
   const saveResult = useAtomValue(editItem(itemId))
   // Read from what outlives the row: a save pressed before the row left and came back is still out.
   const saving = useAtomValue(saveOut(itemId))
-  const saveError = AsyncResult.isFailure(saveResult) && !saving ? saveResult.cause.pipe(Cause.squash) : null
+  const saveError =
+    AsyncResult.isFailure(saveResult) && !saving ? O.some(saveResult.cause.pipe(Cause.squash)) : O.none()
   const save = useAtomSet(editItem(itemId))
 
-  const submit = () => {
-    Match.valueTags(readItemForm({ form, revision: base.revision }), {
-      Problems: (read) => setEditor((now) => ({ ...now, notice: null, problems: read.problems })),
-      Edit: (read) => {
-        // Optimistic: the row shows the new values now; the dialog closes without waiting for the server.
-        setEditor((now) => ({ ...now, notice: null, problems: {}, open: false }))
-        save({ base, edit: read.edit, form })
-      }
-    })
-  }
+  const draw = (editor: OpenEditor) => {
+    const { base, form, problems, notice } = editor
+    const set = <K extends keyof ItemForm>(key: K, value: ItemForm[K]) =>
+      setEditor((now) =>
+        EditorState.match(now, {
+          Closed: () => now,
+          Open: (current) => EditorState.cases.Open.make({ ...current, form: { ...current.form, [key]: value } })
+        })
+      )
+    const submit = () => {
+      Match.valueTags(readItemForm({ form, revision: base.revision }), {
+        Problems: (read) =>
+          setEditor((now) =>
+            EditorState.match(now, {
+              Closed: () => now,
+              Open: (current) => EditorState.cases.Open.make({ ...current, notice: O.none(), problems: read.problems })
+            })
+          ),
+        Edit: (read) => {
+          // Optimistic: the row shows the new values now; the dialog closes without waiting for the server.
+          setEditor(closedEditor)
+          save({ base, edit: read.edit, form })
+        }
+      })
+    }
 
-  const invalid = (key: keyof ItemFormProblems) => (problems[key] === undefined ? {} : { "aria-invalid": true })
+    const invalid = (key: keyof ItemFormProblems) =>
+      R.getSomes({ "aria-invalid": O.map(R.get<string, string>(problems, key), () => true as const) })
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) {
-          setEditor({
-            open: true,
-            base: O.some(props.item),
-            form: O.some(formOf(props.item)),
-            problems: {},
-            notice: null
-          })
-          save(Atom.Reset)
-        } else setEditor((now) => ({ ...now, open: false }))
-      }}
-    >
-      {/* While a save is on its way the row already shows it; the next edit waits for the server's answer. */}
-      <DialogTrigger asChild>
-        {props.trigger === "button" ? (
-          <Button variant="outline" size="touch" disabled={saving} data-edit-item={itemId}>
-            Edit<span className="sr-only"> {props.item.name}</span>
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            title={`Edit ${props.item.name}`}
-            disabled={saving}
-            data-edit-item={itemId}
-          >
-            <PencilIcon aria-hidden />
-            <span className="sr-only">Edit {props.item.name}</span>
-          </Button>
-        )}
-      </DialogTrigger>
+    return (
       <DialogContent className="max-h-screen overflow-y-auto">
         <form
           noValidate
@@ -398,12 +362,15 @@ export function ItemEditor(props: {
             </DialogDescription>
           </DialogHeader>
           <FieldGroup className="my-4">
-            {notice === null ? null : (
-              <Alert>
-                <AlertTitle>Changed by someone else</AlertTitle>
-                <AlertDescription>{notice}</AlertDescription>
-              </Alert>
-            )}
+            {O.match(notice, {
+              onNone: () => null,
+              onSome: (notice) => (
+                <Alert>
+                  <AlertTitle>Changed by someone else</AlertTitle>
+                  <AlertDescription>{notice}</AlertDescription>
+                </Alert>
+              )
+            })}
             <Field>
               <FieldLabel htmlFor={ids.name}>Name</FieldLabel>
               <Input
@@ -421,8 +388,7 @@ export function ItemEditor(props: {
                   id={ids.category}
                   value={form.category}
                   onChange={(event) => {
-                    const category = categories.find((entry) => entry === event.target.value)
-                    if (category !== undefined) set("category", category)
+                    O.map(S.decodeUnknownOption(Category)(event.target.value), (category) => set("category", category))
                   }}
                 >
                   {categories.map((category) => (
@@ -438,8 +404,7 @@ export function ItemEditor(props: {
                   id={ids.uom}
                   value={form.uom}
                   onChange={(event) => {
-                    const uom = uoms.find((entry) => entry === event.target.value)
-                    if (uom !== undefined) set("uom", uom)
+                    O.map(S.decodeUnknownOption(Uom)(event.target.value), (uom) => set("uom", uom))
                   }}
                 >
                   {uoms.map((uom) => (
@@ -543,11 +508,17 @@ export function ItemEditor(props: {
               <FieldError>{problems.description}</FieldError>
             </Field>
             <FromTheFile item={base} />
-            {saveError === null || notice !== null ? null : (
-              <Alert variant="destructive">
-                <AlertTitle>Not saved</AlertTitle>
-                <AlertDescription>{sayError(saveError).sentence}</AlertDescription>
-              </Alert>
+            {O.match(
+              O.filter(saveError, () => O.isNone(notice)),
+              {
+                onNone: () => null,
+                onSome: (saveError) => (
+                  <Alert variant="destructive">
+                    <AlertTitle>Not saved</AlertTitle>
+                    <AlertDescription>{sayError(saveError, { fields: {} }).sentence}</AlertDescription>
+                  </Alert>
+                )
+              }
             )}
           </FieldGroup>
           <DialogFooter>
@@ -557,6 +528,46 @@ export function ItemEditor(props: {
           </DialogFooter>
         </form>
       </DialogContent>
+    )
+  }
+
+  return (
+    <Dialog
+      open={EditorState.guards.Open(editor)}
+      onOpenChange={(next) => {
+        if (next) {
+          setEditor(
+            EditorState.cases.Open.make({
+              base: props.item,
+              form: formOf(props.item),
+              problems: {},
+              notice: O.none()
+            })
+          )
+          save(Atom.Reset)
+        } else setEditor(closedEditor)
+      }}
+    >
+      {/* While a save is on its way the row already shows it; the next edit waits for the server's answer. */}
+      <DialogTrigger asChild>
+        {props.trigger === "button" ? (
+          <Button variant="outline" size="touch" disabled={saving} data-edit-item={itemId}>
+            Edit<span className="sr-only"> {props.item.name}</span>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            title={`Edit ${props.item.name}`}
+            disabled={saving}
+            data-edit-item={itemId}
+          >
+            <PencilIcon aria-hidden />
+            <span className="sr-only">Edit {props.item.name}</span>
+          </Button>
+        )}
+      </DialogTrigger>
+      {EditorState.match(editor, { Closed: () => null, Open: draw })}
     </Dialog>
   )
 }

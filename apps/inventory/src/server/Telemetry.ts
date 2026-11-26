@@ -63,10 +63,7 @@ export const httpDuration = Metric.histogram("http_duration_ms", {
  * routeOf("/api/v1/activity/batches") // "/api/v1/activity"
  */
 export const routeOf = (path: string): string => {
-  const parts = Str.split(
-    O.getOrElse(A.head(Str.split(path, "?")), () => ""),
-    "/"
-  )
+  const parts = Str.split(A.headNonEmpty(Str.split(path, "?")), "/")
   return A.join(A.take(parts, parts[2] === "v1" ? 4 : 3), "/")
 }
 
@@ -195,13 +192,15 @@ export const OtlpProxyRoute = withRouter(
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
           const own = O.toArray(O.map(HttpServerRequest.toURL(request), (url) => url.origin))
+          const fetchSite = O.fromUndefinedOr(request.headers["sec-fetch-site"])
+          const origin = O.fromUndefinedOr(request.headers["origin"])
           const fromOurPage =
-            request.headers["sec-fetch-site"] !== undefined || request.headers["origin"] !== undefined
+            O.isSome(fetchSite) || O.isSome(origin)
               ? RequestSource.allows(
                   RequestSource.make({
                     method: request.method,
-                    fetchSite: O.fromUndefinedOr(request.headers["sec-fetch-site"]),
-                    origin: O.fromUndefinedOr(request.headers["origin"]),
+                    fetchSite,
+                    origin,
                     own
                   })
                 )

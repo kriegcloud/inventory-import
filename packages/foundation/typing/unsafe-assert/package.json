@@ -1,0 +1,21 @@
+{
+  "name": "@beep/unsafe-assert",
+  "version": "0.0.0",
+  "private": true,
+  "description": "One explicit compiler claim for a documented library typing gap",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    ".": "./src/unsafeAssert.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json",
+    "lint": "oxlint --quiet src"
+  },
+  "beep": {
+    "family": "foundation",
+    "kind": "typing"
+  }
+}

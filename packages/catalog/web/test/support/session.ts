@@ -1,8 +1,11 @@
+import * as MutableRef from "effect/MutableRef"
+import { assertTrue } from "@effect/vitest/utils"
 // Who is signed in, as a test's page has it: one session atom that everything derives from, by the app's own rules
 // (`@inventory/client/MemberAtoms`), so a test is never on a page the app cannot be on. Asked again, the member stays
 // and nobody is certain until the test answers; the same member goes on; anybody else, another organization or nobody
 // leaves the page, which never becomes theirs (`left`); another organization the person chose (`choose`), answered for
 // the same account, is the one change a page lives through, and the choice is over with the next answer, as in the app. And what is drawn while there is a member, as the app's sign-in gate draws it.
+import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
@@ -27,16 +30,17 @@ class Unread extends S.TaggedError<Unread, { readonly brand: unique symbol }>()(
  * says otherwise): one account is one person, a member of each of their organizations. The account is the member's
  * name here, as the app tells it by the session's email.
  */
+export const memberStart = { organization: "org_prairie" }
 export const memberOf = (who: {
   readonly id: string
-  readonly organization?: string
-  readonly account?: string
+  readonly organization: string
+  readonly account: string
 }): Who => {
-  const organization = who.organization ?? "org_prairie"
+  const organization = who.organization
   return O.some(
     Member.make({
       id: MemberId.make(who.id),
-      name: DisplayName.make(who.account ?? who.id),
+      name: DisplayName.make(who.account),
       role: "admin",
       organizationId: OrganizationId.make(organization),
       organizationName: DisplayName.make(organization)
@@ -48,41 +52,53 @@ export const memberOf = (who: {
  * A page's session: `first` is who it is for. Its `signedIn` and `asked` are what `registryFor` takes. Each time it is
  * asked again is counted (`times`) and stays out until `answer` or `fail`.
  *
- * @example const s = sessionStandIn(memberOf({ id: "mem_dana" }))
+ * @example const s = sessionStandIn(memberOf({ ...memberStart, id: "mem_dana", account: "mem_dana" }))
  *          const registry = registryFor({ endpoints, signedIn: s.signedIn, asked: s.asked })
  */
 export const sessionStandIn = (first: Who) => {
   const out: Array<Deferred.Deferred<Who, Unread>> = []
   const left = { times: 0 }
-  const chosen: { organization: string | undefined } = { organization: undefined }
+  const chosen: MutableRef.MutableRef<{ readonly organization: string | undefined }> = MutableRef.make<{
+    readonly organization: string | undefined
+  }>({ organization: undefined })
   const session: Atom.Atom<AsyncResult.AsyncResult<Who, Unread>> = Atom.make((get): Effect.Effect<Who, Unread> => {
     const before = get.self<AsyncResult.AsyncResult<Who, Unread>>()
-    if (O.isNone(before)) return Effect.succeed(first)
-    return Effect.suspend(() => {
-      const question = Deferred.makeUnsafe<Who, Unread>()
-      out.push(question)
-      return Deferred.await(question)
-    }).pipe(
-      Effect.flatMap((answer) => {
-        const had = O.flatten(O.flatMap(before, AsyncResult.value))
-        const to = chosen.organization
-        // Over with this answer, whatever it is: as the app's own switch is.
-        chosen.organization = undefined
-        return answeredFor({
-          answer,
-          before: had,
-          after: answer,
-          // The organization chosen, for the same account.
-          chosen: O.exists(answer, (one) => one.organizationId === to && O.exists(had, (was) => was.name === one.name)),
-          leave: () => {
-            left.times += 1
-          }
-        })
-      })
-    )
+    return O.match(before, {
+      onNone: () => Effect.succeed(first),
+      onSome: () =>
+        Effect.suspend(() => {
+          const question = Deferred.makeUnsafe<Who, Unread>()
+          out.push(question)
+          return Deferred.await(question)
+        }).pipe(
+          Effect.flatMap((answer) => {
+            const had = O.flatten(O.flatMap(before, AsyncResult.value))
+            const to = chosen.current.organization
+            // Over with this answer, whatever it is: as the app's own switch is.
+            chosen.current = { ...chosen.current, organization: undefined }
+            return answeredFor({
+              answer,
+              before: had,
+              after: answer,
+              // The organization chosen, for the same account.
+              chosen: O.exists(
+                answer,
+                (one) => one.organizationId === to && O.exists(had, (was) => was.name === one.name)
+              ),
+              leave: () => {
+                left.times += 1
+              }
+            })
+          })
+        )
+    })
   }).pipe(Atom.keepAlive)
   /** The question that is out: the last one asked. */
-  const question = () => O.getOrThrow(O.fromUndefinedOr(out[out.length - 1]))
+  const question = () => {
+    const expectedSome1 = A.last(out)
+    assertTrue(O.isSome(expectedSome1), "expected A.last(out)")
+    return expectedSome1.value
+  }
   return {
     signedIn: Atom.readable(
       (get) => memberOfAnswer({ session: get(session), memberOf: identity<Who> }),
@@ -101,21 +117,25 @@ export const sessionStandIn = (first: Who) => {
      * their own switch. Any answer ends the choice.
      */
     choose: (organization: string) => {
-      chosen.organization = organization
+      chosen.current = { ...chosen.current, organization: organization }
     },
     /**
      * Draws `what` while the page has a member, as the sign-in gate does: let go with nobody, and drawn anew for
      * another organization.
      */
     drawn: (registry: AtomRegistry.AtomRegistry, what: (registry: AtomRegistry.AtomRegistry) => () => void) => {
-      const on: { for: string; stop: (() => void) | undefined } = { for: keyOfMember(O.none()), stop: undefined }
+      const on: MutableRef.MutableRef<{ readonly for: string; readonly stop: (() => void) | undefined }> =
+        MutableRef.make<{ readonly for: string; readonly stop: (() => void) | undefined }>({
+          for: keyOfMember(O.none()),
+          stop: undefined
+        })
       return registry.subscribe(
         memberKey,
         (now) => {
-          if (now === on.for) return
-          on.stop?.()
-          on.for = now
-          on.stop = now === "" ? undefined : what(registry)
+          if (now === on.current.for) return
+          on.current.stop?.()
+          on.current = { ...on.current, for: now }
+          on.current = { ...on.current, stop: now === "" ? undefined : what(registry) }
         },
         { immediate: true }
       )

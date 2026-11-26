@@ -1,3 +1,6 @@
+import * as DateTime from "effect/DateTime"
+import { ImportResult, RowOutcome } from "@inventory/catalog-contract/Import"
+import { assertTrue } from "@effect/vitest/utils"
 // A confirm, wired to the import's read and to the server, without the screen. The machine (`Draft.machine.ts`) says
 // when a confirm goes and what it carries; what is held here is that the request is that and nothing more (the
 // revision the screen holds, the person's rows not saved yet), that a refusal because the draft moved on writes
@@ -18,7 +21,7 @@ import {
   type SaveRequest,
   type DecidedSince
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack, AlreadyImported, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -36,7 +39,7 @@ import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
 // The page: where the person is taken, and what is said to them.
 const page = vi.hoisted(() => {
-  const state = { went: [] as Array<string>, said: [] as Array<string> }
+  const state = { went: Array<string>(), said: Array<string>() }
   Object.assign(globalThis, {
     window: {
       addEventListener: () => undefined,
@@ -122,8 +125,16 @@ const world = (id: ImportId) => {
     press: () => happened(DraftEvent.ConfirmPressed()),
     confirming: () => registry.get(confirmingImport(id)),
     heldBack: () => registry.get(confirmHeldBack(id)),
-    shown: () => O.getOrThrow(registry.get(shownDecisions(id))),
-    held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
+    shown: () => {
+      const expectedSome1 = registry.get(shownDecisions(id))
+      assertTrue(O.isSome(expectedSome1), "expected registry.get(shownDecisions(id))")
+      return expectedSome1.value
+    },
+    held: () => {
+      const expectedSome2 = registry.get(importView(id)).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome2), "expected registry.get(importView(id)).pipe(AsyncResult.value)")
+      return expectedSome2.value
+    },
     draft: () => registry.get(draftOf(id))
   }
 }
@@ -139,7 +150,14 @@ describe("a confirm", () => {
       t.press()
       yield* settle
       expect([t.sent(), t.confirming()]).toEqual([[], true])
-      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [], decidedSince: [] })
+      const requiredEntry1 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry1), "expected t.saves[0]")
+      yield* Deferred.succeed(requiredEntry1.value.answer, {
+        revision: 11,
+        changed: true,
+        notApplied: [],
+        decidedSince: []
+      })
       yield* settle
       // Row 1 is saved; the confirm carries no row at all, only the revision the screen now holds.
       expect(t.sent()).toEqual([{ revision: 11, madeOn: {}, set: {}, clear: [] }])
@@ -160,8 +178,10 @@ describe("a confirm", () => {
         yield* settle
         expect(t.sent()).toEqual([{ revision: 10, madeOn: {}, set: {}, clear: [] }])
         const asked = t.gets.length
+        const requiredEntry2 = A.get(t.confirms, 0)
+        assertTrue(O.isSome(requiredEntry2), "expected t.confirms[0]")
         yield* Deferred.fail(
-          t.confirms[0]!.answer,
+          requiredEntry2.value.answer,
           DraftMoved.make({ reason: "Someone else changed this import.", revision: 11 })
         )
         yield* settle
@@ -175,10 +195,9 @@ describe("a confirm", () => {
         ])
         expect([t.gets.length, t.confirms.length]).toEqual([asked + 1, 1])
         // The newer picture: somebody else left row 5 out.
-        yield* Deferred.succeed(
-          O.getOrThrow(A.last(t.gets)),
-          t.at({ revision: 11, decisions: { "row-7": kept, "row-5": out } })
-        )
+        const expectedSome3 = A.last(t.gets)
+        assertTrue(O.isSome(expectedSome3), "expected A.last(t.gets)")
+        yield* Deferred.succeed(expectedSome3.value, t.at({ revision: 11, decisions: { "row-7": kept, "row-5": out } }))
         yield* settle
         expect([t.shown(), t.heldBack(), t.confirming()]).toEqual([
           { "row-7": kept, "row-5": out },
@@ -190,8 +209,24 @@ describe("a confirm", () => {
         t.press()
         yield* settle
         expect([O.map(A.last(t.sent()), (sent) => sent.revision), t.heldBack()]).toEqual([O.some(11), O.none()])
-        const result = { created: 3 } as unknown as ImportView["result"]
-        yield* Deferred.succeed(t.confirms[1]!.answer, t.at({ revision: 12, status: "imported", result }))
+        const result = O.some(
+          ImportResult.make({
+            importedBy: "Dana Whitfield",
+            importedAt: DateTime.makeUnsafe("2026-11-19T05:06:15.445Z"),
+            created: 3,
+            updated: 0,
+            already: 0,
+            notImported: 0,
+            takenBack: 0,
+            fixed: { rows: 0, cells: 0 },
+            rows: A.map([1, 2, 3], (rowNumber) =>
+              RowOutcome.cases.created.make({ rowNumber, part: O.none(), sku: `SKU-${rowNumber}`, name: "Bolt" })
+            )
+          })
+        )
+        const requiredEntry3 = A.get(t.confirms, 1)
+        assertTrue(O.isSome(requiredEntry3), "expected t.confirms[1]")
+        yield* Deferred.succeed(requiredEntry3.value.answer, t.at({ revision: 12, status: "imported", result }))
         yield* settle
         expect([t.held().revision, t.held().status]).toEqual([12, "imported"])
         // The draft ends on the confirmed picture: nothing held, nothing left over (every row was in the confirm).
@@ -212,15 +247,24 @@ describe("a confirm", () => {
       yield* settle
       t.decide("row-1")
       yield* settle
-      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [], decidedSince: [] })
+      const requiredEntry4 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry4), "expected t.saves[0]")
+      yield* Deferred.succeed(requiredEntry4.value.answer, {
+        revision: 11,
+        changed: true,
+        notApplied: [],
+        decidedSince: []
+      })
       yield* settle
       page.said.length = 0
       page.went.length = 0
       t.press()
       yield* settle
       const asked = t.gets.length
+      const requiredEntry5 = A.get(t.confirms, 0)
+      assertTrue(O.isSome(requiredEntry5), "expected t.confirms[0]")
       yield* Deferred.fail(
-        t.confirms[0]!.answer,
+        requiredEntry5.value.answer,
         AlreadyImported.make({ reason: "This import was confirmed already." })
       )
       yield* settle
@@ -239,7 +283,9 @@ describe("a confirm", () => {
       t.registry.set(draftEvents(id), DraftEvent.Decided({ changes: { "row-55": O.some(accepted) } }))
       yield* settle
       expect(t.saves[0]?.madeOn).toEqual({ "row-55": 10 })
-      yield* Deferred.succeed(t.saves[0]!.answer, {
+      const requiredEntry6 = A.get(t.saves, 0)
+      assertTrue(O.isSome(requiredEntry6), "expected t.saves[0]")
+      yield* Deferred.succeed(requiredEntry6.value.answer, {
         revision: 11,
         changed: true,
         notApplied: [{ rowId: "row-55", field: "unitCost", kind: "accept" }],
@@ -263,14 +309,18 @@ describe("a confirm", () => {
         t.registry.set(draftEvents(id), DraftEvent.Decided({ changes: { "row-55": O.some(accepted) } }))
         yield* settle
         // The save fails: the row waits, and rides with the confirm.
-        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        const requiredEntry7 = A.get(t.saves, 0)
+        assertTrue(O.isSome(requiredEntry7), "expected t.saves[0]")
+        yield* Deferred.fail(requiredEntry7.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         t.press()
         yield* settle
         expect(t.sent()).toEqual([{ revision: 10, madeOn: { "row-55": 10 }, set: { "row-55": accepted }, clear: [] }])
         const asked = t.gets.length
+        const requiredEntry8 = A.get(t.confirms, 0)
+        assertTrue(O.isSome(requiredEntry8), "expected t.confirms[0]")
         yield* Deferred.fail(
-          t.confirms[0]!.answer,
+          requiredEntry8.value.answer,
           AcceptsTakenBack.make({
             reason: "A column was matched again.",
             accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
@@ -286,7 +336,9 @@ describe("a confirm", () => {
           asked + 1
         ])
         expect(page.said).toEqual(["Not saved yet", "An accept was taken back"])
-        yield* Deferred.succeed(O.getOrThrow(A.last(t.gets)), t.at({ revision: 11, decisions: { "row-7": kept } }))
+        const expectedSome4 = A.last(t.gets)
+        assertTrue(O.isSome(expectedSome4), "expected A.last(t.gets)")
+        yield* Deferred.succeed(expectedSome4.value, t.at({ revision: 11, decisions: { "row-7": kept } }))
         yield* settle
         expect([t.heldBack(), t.confirming()]).toEqual([
           O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),

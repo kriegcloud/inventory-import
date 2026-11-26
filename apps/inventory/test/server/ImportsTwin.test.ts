@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The messy sample through the catalog's in-memory twins, held to the numbers the D1 adapter gives for the same
 // steps (Imports.slow.test.ts and TakeBack.slow.test.ts): one save, a confirm, a second load of the same file and a
 // take-back. A twin whose counts drifted from the adapter's fails here, fast. The twin's refusals (a stale accept, a
@@ -64,7 +65,9 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           params,
           payload: { revision: saved.revision, madeOn: {}, set: {}, clear: [] }
         })
-        const result = O.getOrThrow(confirmed.result)
+        const resultOption = confirmed.result
+        assertTrue(O.isSome(resultOption), "expected result to be present")
+        const result = resultOption.value
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
         const row18 = A.findFirst(result.rows, (row) => row.rowNumber === 18)
@@ -73,8 +76,12 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         )
         const stored = yield* client.items.list()
         expect(stored.length).toBe(155)
-        const crate = O.getOrThrow(A.findFirst(stored, (item) => item.sku === "XRR-0266"))
-        expect([crate.name, crate.stocking, digits(crate.vendors[1]?.unitCost)]).toEqual([
+        const crateOption = A.findFirst(stored, (item) => item.sku === "XRR-0266")
+        assertTrue(O.isSome(crateOption), "expected crate to be present")
+        const crate = crateOption.value
+        const vendor = A.get(crate.vendors, 1)
+        assertTrue(O.isSome(vendor), "expected the second vendor")
+        expect([crate.name, crate.stocking, digits(vendor.value.unitCost)]).toEqual([
           "Fiberglass Crate",
           { kind: "discontinued", on: "2025-02-26" },
           "3.87"
@@ -94,12 +101,9 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           }
         })
         expect(page.total).toBeGreaterThan(0)
-        expect(
-          A.every(
-            page.data,
-            (item) => item.category === "finished-goods" && Str.includes("oak")(Str.toLowerCase(item.name))
-          )
-        ).toBe(true)
+        expect(A.every(page.data, (item) => item.category === "finished-goods" && Str.includes("Oak")(item.name))).toBe(
+          true
+        )
 
         // The same file again: all 155 already there, row 55 (stored after its accept) among them, and row 18 is the
         // one new item.
@@ -109,7 +113,9 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           params: { id: again.id },
           payload: { revision: again.revision, madeOn: {}, set: {}, clear: [] }
         })
-        const secondResult = O.getOrThrow(second.result)
+        const secondResultOption = second.result
+        assertTrue(O.isSome(secondResultOption), "expected secondResult to be present")
+        const secondResult = secondResultOption.value
         expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 155, 44])
 
         // Taking the first import back removes its 155 and keeps the second's one.

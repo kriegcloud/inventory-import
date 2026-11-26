@@ -1,3 +1,5 @@
+import * as O from "effect/Option"
+import * as A from "effect/Array"
 // The imports that were confirmed, as the columns of a list: the way back to a past import's result, from the first
 import * as Atom from "effect/reactivity/Atom"
 import { answerOf } from "@inventory/client/Api"
@@ -23,72 +25,80 @@ const whole = new Intl.NumberFormat("en-US")
 
 /** The file's name, linking to the import's result: what it imported, the rows it left out, the take-back. */
 const fileColumn: ListColumn<PastImport> = {
+  width: O.none(),
   id: "file",
   label: "File",
-  value: (past) => past.fileName,
-  cell: (past) => (
+  value: O.some((past) => past.fileName),
+  cell: O.some((past) => (
     <a className="underline underline-offset-4" href={importAddress(past.id, "result")}>
       {past.fileName}
     </a>
-  ),
-  title: (past) => `Open the result of ${past.fileName}`
+  )),
+  title: O.some((past) => `Open the result of ${past.fileName}`)
 }
 
 const statusColumn: ListColumn<PastImport> = {
+  title: O.none(),
   id: "status",
   label: "Status",
-  width: 128,
-  value: (past) => statusWords[past.status].words,
-  cell: (past) => <StatusPill tone={statusWords[past.status].tone}>{statusWords[past.status].words}</StatusPill>,
+  width: O.some(128),
+  value: O.some((past) => statusWords[past.status].words),
+  cell: O.some((past) => (
+    <StatusPill tone={statusWords[past.status].tone}>{statusWords[past.status].words}</StatusPill>
+  )),
   facet: true
 }
 
 const itemsColumn: ListColumn<PastImport> = {
   id: "items",
   label: "Items",
-  width: 88,
+  width: O.some(88),
   align: "right",
-  value: (past) => past.items,
-  cell: (past) => whole.format(past.items),
-  title: (past) => `${whole.format(past.items)} items in the system came from this file`,
+  value: O.some((past) => past.items),
+  cell: O.some((past) => whole.format(past.items)),
+  title: O.some((past) => `${whole.format(past.items)} items in the system came from this file`),
   searchable: false
 }
 
 const notImportedColumn: ListColumn<PastImport> = {
+  title: O.none(),
   id: "notImported",
   label: "Not imported",
-  width: 116,
+  width: O.some(116),
   align: "right",
-  value: (past) => past.notImported,
-  cell: (past) => whole.format(past.notImported),
+  value: O.some((past) => past.notImported),
+  cell: O.some((past) => whole.format(past.notImported)),
   searchable: false
 }
 
 const rowsColumn: ListColumn<PastImport> = {
+  title: O.none(),
   id: "rows",
   label: "Rows",
-  width: 80,
+  width: O.some(80),
   align: "right",
-  value: (past) => past.rowCount,
-  cell: (past) => whole.format(past.rowCount),
+  value: O.some((past) => past.rowCount),
+  cell: O.some((past) => whole.format(past.rowCount)),
   searchable: false
 }
 
 const byColumn: ListColumn<PastImport> = {
+  title: O.none(),
+  cell: O.none(),
   id: "by",
   label: "Confirmed by",
-  width: 160,
-  value: (past) => past.confirmedByName,
+  width: O.some(160),
+  value: O.some((past) => past.confirmedByName),
   facet: true
 }
 
 const whenColumn: ListColumn<PastImport> = {
   id: "when",
   label: "When",
-  width: 132,
-  value: (past) => DateTime.formatIso(past.confirmedAt),
-  cell: (past) => whenShort(past.confirmedAt),
-  title: (past) => when(past.confirmedAt),
+  width: O.some(132),
+  value: O.some((past) => DateTime.formatIso(past.confirmedAt)),
+  cell: O.some((past) => whenShort(past.confirmedAt)),
+  title: O.some((past) => when(past.confirmedAt)),
   searchable: false
 }
 
@@ -114,16 +124,20 @@ export const pastImportColumnsShort: ReadonlyArray<ListColumn<PastImport>> = [
 /** What the imports list is, for its caption and its skeleton. */
 export const pastImportsCaption = "Imports that were confirmed"
 
-const noImports: ReadonlyArray<PastImport> = []
 const pastImportsAnswer = answerOf(pastImports)
 /** The confirmed imports as a list follows them: empty until they have been read. */
-export const pastImportRows = Atom.map(pastImportsAnswer, (answer) => answer?.imports ?? noImports)
+export const pastImportRows = Atom.map(pastImportsAnswer, (answer) =>
+  O.match(
+    O.map(answer, (answer) => answer.imports),
+    { onNone: A.empty, onSome: (imports) => imports }
+  )
+)
 const pastImportColumnsAtom = Atom.make(pastImportColumns)
 /** The few columns that fit the first screen, as its list follows them. */
 export const pastImportColumnsShortAtom = Atom.make(pastImportColumnsShort)
 
 /** The Activity page's "Imports" list: every confirmed import, each a link back to its result. */
-export function PastImportsList(props: { older: number }) {
+export function PastImportsList(props: { readonly older: number }) {
   const { older } = props
   return (
     <>

@@ -22,6 +22,7 @@ import { KeptNotices } from "@inventory/catalog-web/KeptNotices"
 import { askBeforeLeaving, importViewShown } from "@inventory/catalog-web/Imports"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as UrlParams from "effect/http/UrlParams"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { contentBelow } from "@inventory/ui/ContentWidth"
@@ -46,7 +47,7 @@ const peoplePath = "/people"
  * What shows for the moment a page's code is on its way: a skeleton of that page, in its own boxes, so nothing moves
  * when the page arrives. The import page's depends on its step.
  */
-function PageSkeleton(props: { path: string; params: URLSearchParams }) {
+function PageSkeleton(props: { readonly path: string; readonly params: URLSearchParams }) {
   const { path, params } = props
   if (path === "/items") {
     return <TablePageSkeleton title="Items" line action caption="Items" columns={someColumns(7)} />
@@ -57,7 +58,11 @@ function PageSkeleton(props: { path: string; params: URLSearchParams }) {
   if (path === peoplePath) {
     return <TablePageSkeleton title="People" line caption="People in the organization" columns={someColumns(4)} />
   }
-  const step = params.get("import") === null ? "upload" : (params.get("step") ?? "review")
+  const address = UrlParams.fromInput(params)
+  const step = O.match(UrlParams.getFirst(address, "import"), {
+    onNone: () => "upload",
+    onSome: () => O.match(UrlParams.getFirst(address, "step"), { onNone: () => "review", onSome: (step) => step })
+  })
   return (
     <div className="flex h-full flex-col">
       <StepsSkeleton />
@@ -81,44 +86,56 @@ const noImport = Atom.make(AsyncResult.initial<never, never>())
  * Where the person is, in the bar beside the sidebar's button: the organization, the page, and the file when an
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
-function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
+function Crumbs(props: { readonly page: AppPage; readonly importId: O.Option<ImportId> }) {
   const { actor } = useAtomValue(sessionView)
   // The same read the import page shows: no second request.
-  const opened = useAtomValue(props.importId === undefined ? noImport : importViewShown(props.importId))
-  const fileName = AsyncResult.isSuccess(opened) ? opened.value.fileName : undefined
-  const inImport = props.page.path === "/" && props.importId !== undefined
+  const opened = useAtomValue(O.match(props.importId, { onNone: () => noImport, onSome: importViewShown }))
+  const fileName = AsyncResult.isSuccess(opened) ? O.some(opened.value.fileName) : O.none()
+  const inImport = props.page.path === "/" && O.isSome(props.importId)
   // The organization is already named at the top of the sidebar: beside a narrow page the bar keeps its room.
   const short = useAtomValue(contentBelow(1024))
   return (
     <Breadcrumb>
       <BreadcrumbList className="flex-nowrap">
-        {actor === undefined || short ? null : (
-          <>
-            <BreadcrumbItem className="min-w-0">
-              <span className="block truncate">{actor.organizationName}</span>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-          </>
+        {O.match(
+          O.filter(actor, () => !short),
+          {
+            onNone: () => null,
+            onSome: (actor) => (
+              <>
+                <BreadcrumbItem className="min-w-0">
+                  <span className="block truncate">{actor.organizationName}</span>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            )
+          }
         )}
         <BreadcrumbItem>
           {inImport ? (
             <BreadcrumbLink asChild>
-              <a {...linkTo("/")}>{props.page.label}</a>
+              <a {...linkTo("/", O.none())}>{props.page.label}</a>
             </BreadcrumbLink>
           ) : (
             <BreadcrumbPage>{props.page.label}</BreadcrumbPage>
           )}
         </BreadcrumbItem>
-        {inImport && fileName !== undefined ? (
-          <>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <BreadcrumbPage>
-                <span className="block truncate">{fileName}</span>
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </>
-        ) : null}
+        {O.match(
+          O.filter(fileName, () => inImport),
+          {
+            onNone: () => null,
+            onSome: (fileName) => (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem className="min-w-0">
+                  <BreadcrumbPage>
+                    <span className="block truncate">{fileName}</span>
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </>
+            )
+          }
+        )}
       </BreadcrumbList>
     </Breadcrumb>
   )
@@ -149,15 +166,15 @@ function SessionNotice() {
   const { error } = useAtomValue(sessionView)
   const ask = useAtomRefresh(session)
   const narrow = useAtomValue(isNarrow)
-  if (error === null) return null
+  if (O.isNone(error)) return null
   return (
     <Alert className={narrow ? "mx-4 my-3 w-auto flex-none" : "mx-6 my-4 w-auto flex-none"}>
       <AlertTitle>We could not check that you are still signed in</AlertTitle>
       <AlertDescription>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="min-w-0">
-            {sayError(error).sentence} Nothing you decide or save is sent until we can. It is checked again by itself
-            every half minute, and at once when the connection comes back.
+            {sayError(error.value, { fields: {} }).sentence} Nothing you decide or save is sent until we can. It is
+            checked again by itself every half minute, and at once when the connection comes back.
           </p>
           <Button variant="outline" size="xs" onClick={ask}>
             Check now
@@ -168,7 +185,7 @@ function SessionNotice() {
   )
 }
 
-function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSearchParams }) {
+function WorkspaceFrame(props: { readonly current: AppPage; readonly path: string; readonly params: URLSearchParams }) {
   const { current, path, params } = props
   return (
     <AppShell

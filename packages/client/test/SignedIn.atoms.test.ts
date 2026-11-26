@@ -31,7 +31,7 @@ import {
   provideWhoIsSignedInAsked
 } from "@inventory/client/MemberAtoms"
 
-const someone = (id: string, organization = "org_prairie") =>
+const someone = (id: string, organization: string) =>
   O.some(
     Member.make({
       id: MemberId.make(id),
@@ -41,8 +41,8 @@ const someone = (id: string, organization = "org_prairie") =>
       organizationName: DisplayName.make(organization)
     })
   )
-const dana = someone("mem_dana")
-const marcus = someone("mem_marcus")
+const dana = someone("mem_dana", "org_prairie")
+const marcus = someone("mem_marcus", "org_prairie")
 
 const settle = Effect.sleep("10 millis")
 
@@ -68,7 +68,9 @@ const world = () => {
       (send) => asPressed(send)
     )
   })
-  const save = makeApiAtoms(SaveServer).write<string>()((server, what) => server.save(what))
+  const save = makeApiAtoms(SaveServer).write<string>()({
+    reactivityKeys: O.none()
+  })((server, what) => server.save(what))
   const registry = AtomRegistry.make({
     initialValues: [provideApi(layer), provideMember(who), provideWhoIsSignedInAsked(asked)]
   })
@@ -126,7 +128,7 @@ describe("state that is one member's", () => {
     // Written before anything reads it, as a press on a screen that is not drawn writes it.
     registry.set(typed, "hex bolt")
     // The same member, as a session asked again answers: a new object that says the same.
-    registry.set(who, someone("mem_dana"))
+    registry.set(who, someone("mem_dana", "org_prairie"))
     expect(registry.get(typed)).toBe("hex bolt")
     registry.set(who, marcus)
     expect(registry.get(typed)).toBe("")
@@ -144,7 +146,7 @@ describe("state of a screen that is not drawn for a moment", () => {
     registry.set(typed, "hex bolt")
     // Nobody is known for a moment, and then the same member: nothing reads the state meanwhile.
     registry.set(who, O.none())
-    registry.set(who, someone("mem_dana"))
+    registry.set(who, someone("mem_dana", "org_prairie"))
     expect(registry.get(typed)).toBe("hex bolt")
     registry.set(who, marcus)
     expect(registry.get(typed)).toBe("")
@@ -172,7 +174,7 @@ describe("state kept for the page", () => {
 })
 
 describe("a session's answer, as a page takes it", () => {
-  const take = (before: O.Option<Member>, after: O.Option<Member>, chosen = false) => {
+  const take = (before: O.Option<Member>, after: O.Option<Member>, chosen: boolean) => {
     const left: Array<string> = []
     return answeredFor({ answer: "the answer", before, after, chosen, leave: () => left.push("left") }).pipe(
       Effect.timeoutOption("5 millis"),
@@ -184,9 +186,9 @@ describe("a session's answer, as a page takes it", () => {
     Effect.gen(function* () {
       const taken = yield* Effect.all(
         [
-          take(dana, someone("mem_dana")),
-          take(O.none(), marcus),
-          take(O.none(), O.none()),
+          take(dana, someone("mem_dana", "org_prairie"), false),
+          take(O.none(), marcus, false),
+          take(O.none(), O.none(), false),
           take(dana, someone("mem_dana_northline", "org_northline"), true)
         ],
         { concurrency: 1 }
@@ -198,7 +200,11 @@ describe("a session's answer, as a page takes it", () => {
   it.live("leaves the page, which never hears it, when it is anybody else, another organization or nobody", () =>
     Effect.gen(function* () {
       const taken = yield* Effect.all(
-        [take(dana, marcus), take(dana, someone("mem_dana", "org_northline")), take(dana, O.none())],
+        [
+          take(dana, marcus, false),
+          take(dana, someone("mem_dana", "org_northline"), false),
+          take(dana, O.none(), false)
+        ],
         { concurrency: 1 }
       )
       expect(A.map(taken, ({ answer, left }) => [O.isSome(answer), left])).toEqual(A.makeBy(3, () => [false, ["left"]]))

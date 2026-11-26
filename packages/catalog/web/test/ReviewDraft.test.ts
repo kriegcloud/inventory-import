@@ -1,3 +1,10 @@
+import type { SaveAnswer } from "./support/catalog.ts"
+import { Suggestion, suggestedByRule } from "@inventory/catalog-contract/Suggestion"
+import { RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
+import { ItemFields, active } from "@inventory/catalog-contract/Item"
+import * as BigDecimal from "effect/BigDecimal"
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
+import { assertTrue } from "@effect/vitest/utils"
 // The review's draft while its screen is open, without the screen: the machine (`Draft.machine.ts`, tested on its own
 // against every ordering) wired to the import's read and to the server. What is held here is the wiring: that a save
 // sends the rows the person changed and nothing else, that its answer goes into the view held, that the server is
@@ -18,13 +25,12 @@ import {
   type DecisionDelta,
   type SaveRequest,
   decisionFromFlags,
-  type SavedDecisions,
-  type DecidedSince
+  type SavedDecisions
 } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { AlreadyImported } from "@inventory/catalog-contract/ImportRejection"
-import type { StagedTable } from "@inventory/catalog-contract/Staged"
+import { StagedTable } from "@inventory/catalog-contract/Staged"
 import { DraftEvent, type RowChanges, settled } from "../src/Draft.machine.ts"
 import { giveView, importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
@@ -39,10 +45,13 @@ import {
   shownDecisions,
   whileCurrent
 } from "../src/ReviewDraft.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 // What is said to the person.
-const page = vi.hoisted(() => ({ said: [] as Array<string> }))
+const page = vi.hoisted(() => ({ said: Array<string>() }))
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => page.said.push(title), {
     dismiss: () => undefined,
@@ -53,12 +62,7 @@ vi.mock("sonner", () => ({
 }))
 
 /** What the server answers a save with. */
-type Saved = {
-  readonly revision: number
-  readonly changed: boolean
-  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
-  readonly decidedSince: ReadonlyArray<DecidedSince>
-}
+type Saved = SaveAnswer
 
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
@@ -76,6 +80,7 @@ const world = (id: ImportId) => {
     readonly answer: Deferred.Deferred<Saved, Refusal>
   }> = []
   const registry = registryFor({
+    ...registryStart,
     writesRetried: true,
     endpoints: {
       imports: {
@@ -117,18 +122,43 @@ const world = (id: ImportId) => {
       }
     },
     give: (view: ImportView) => registry.set(importView(id), view),
-    answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
+    answerGet: (n: number, view: ImportView) => {
+      const requiredEntry1 = A.get(gets, n)
+      assertTrue(O.isSome(requiredEntry1), "expected gets[n]")
+      return Deferred.succeed(requiredEntry1.value, view)
+    },
     /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
-    answerSave: (n: number, revision: number, changed = true) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [], decidedSince: [] }),
-    refuseSave: (n: number) =>
-      Deferred.fail(saves[n]!.answer, AlreadyImported.make({ reason: "This import was confirmed already." })),
+    answerSave: (n: number, revision: number, changed: boolean) => {
+      const requiredEntry2 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry2), "expected saves[n]")
+      return Deferred.succeed(requiredEntry2.value.answer, { revision, changed, notApplied: [], decidedSince: [] })
+    },
+    refuseSave: (n: number) => {
+      const requiredEntry3 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry3), "expected saves[n]")
+      return Deferred.fail(
+        requiredEntry3.value.answer,
+        AlreadyImported.make({ reason: "This import was confirmed already." })
+      )
+    },
     /** The server fails the save itself: the client sends it again, later. */
-    failSave: (n: number) => Deferred.fail(saves[n]!.answer, HttpApiError.InternalServerErrorProblem.make({})),
+    failSave: (n: number) => {
+      const requiredEntry4 = A.get(saves, n)
+      assertTrue(O.isSome(requiredEntry4), "expected saves[n]")
+      return Deferred.fail(requiredEntry4.value.answer, HttpApiError.InternalServerErrorProblem.make({}))
+    },
     gets: () => gets.length,
-    held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
+    held: () => {
+      const expectedSome1 = registry.get(importView(id)).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome1), "expected registry.get(importView(id)).pipe(AsyncResult.value)")
+      return expectedSome1.value
+    },
     draft: () => registry.get(draftOf(id)),
-    shown: () => O.getOrThrow(registry.get(shownDecisions(id))),
+    shown: () => {
+      const expectedSome2 = registry.get(shownDecisions(id))
+      assertTrue(O.isSome(expectedSome2), "expected registry.get(shownDecisions(id))")
+      return expectedSome2.value
+    },
     epoch: () => registry.get(regionEpoch(id))
   }
 }
@@ -151,9 +181,20 @@ describe("a saved decision", () => {
         yield* settle
         expect(t.deltas()).toEqual([{ set: { "row-1": out }, clear: [] }])
         // Suggestions arrive while the save is out.
-        const suggestions = [{ rowId: "row-3" }] as unknown as ImportView["suggestions"]
+        const suggestions = [
+          Suggestion.cases.name.make({
+            id: SuggestionId.make("00000000-0000-4000-8000-000000000003"),
+            rowId: RowId.make("row-3"),
+            rowNumber: 3,
+            from: "",
+            to: "Bolt",
+            by: suggestedByRule,
+            confidence: "low",
+            basis: "Description names a bolt"
+          })
+        ]
         t.give(t.at({ revision: 10, decisions: { "row-7": kept }, suggestions }))
-        yield* t.answerSave(0, 11)
+        yield* t.answerSave(0, 11, true)
         yield* settle
         const held = t.held()
         expect([held.revision, held.decisions, held.suggestions]).toEqual([
@@ -179,7 +220,7 @@ describe("a saved decision", () => {
         decide(t.registry, id, { "row-1": O.some(out) })
         yield* settle
         // Two revisions on: somebody else saved between.
-        yield* t.answerSave(0, 12)
+        yield* t.answerSave(0, 12, true)
         yield* settle
         expect(t.gets()).toBe(1)
         expect(t.shown()).toEqual({ "row-1": out })
@@ -204,17 +245,34 @@ describe("a saved decision", () => {
       const typed = decisionFromFlags({ edits: { sku: "AB-1" } })
       decide(t.registry, id, { "row-1": O.some(typed) })
       yield* settle
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       // Asked, and still out.
       expect(t.gets()).toBe(1)
       decide(t.registry, id, { "row-2": O.some(out) })
       yield* settle
-      yield* t.answerSave(1, 12)
+      yield* t.answerSave(1, 12, true)
       yield* settle
       // The second save's answer is put into the view while the ask is out, and does not end it: one ask, still out.
       expect([t.gets(), t.held().revision]).toEqual([1, 12])
-      const stored = [{ sku: "AB-1" }] as unknown as ImportView["storedItems"]
+      const stored = [
+        ItemFields.make({
+          sku: "ABC-1001",
+          name: "Bolt",
+          description: O.none(),
+          category: "components",
+          uom: "EA",
+          unitCost: BigDecimal.make(1n, 0),
+          quantityOnHand: 1,
+          reorderPoint: O.none(),
+          stocking: active,
+          lotTracked: false,
+          tags: [],
+          firstReceivedOn: O.none(),
+          dimensions: O.none(),
+          vendors: []
+        })
+      ]
       // The ask lands with what the server held when it left. The view keeps the later picture the save put in place,
       // and the server is asked once more, for what that save changed.
       yield* t.answerGet(0, t.at({ revision: 11, decisions: { "row-1": typed }, storedItems: stored }))
@@ -243,7 +301,7 @@ describe("a saved decision", () => {
         yield* settle
         expect(t.gets()).toBe(1)
         // Two revisions on: somebody else saved between. The read left before this answer, so it may not have it.
-        yield* t.answerSave(0, 12)
+        yield* t.answerSave(0, 12, true)
         yield* settle
         expect(t.gets()).toBe(1)
         // It was: the server read the import before it wrote the save. It is asked once more, and that one has both.
@@ -277,7 +335,7 @@ describe("a saved decision", () => {
         yield* Effect.sleep("1500 millis")
         expect(t.saves.length).toBe(2)
         // The second try answers: somebody else saved between. The read out left before this answer.
-        yield* t.answerSave(1, 12)
+        yield* t.answerSave(1, 12, true)
         yield* settle
         yield* t.answerGet(0, t.at({ revision: 10 }))
         yield* settle
@@ -303,7 +361,7 @@ describe("a saved decision", () => {
       // The save leaves while that read is out, and its answer says somebody else saved between.
       decide(t.registry, id, { "row-1": O.some(out) })
       yield* settle
-      yield* t.answerSave(0, 12)
+      yield* t.answerSave(0, 12, true)
       yield* settle
       // The read is not ended: it lands with what the server held before the save, and only then is asked once more.
       expect(t.gets()).toBe(1)
@@ -327,7 +385,7 @@ describe("a saved decision", () => {
       yield* settle
       decide(t.registry, id, { "row-1": O.some(out), "row-2": O.some(out), "row-3": O.some(out) })
       yield* settle
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       expect(t.gets()).toBe(0)
     })
@@ -375,7 +433,7 @@ describe("leaving the Review step and coming back", () => {
         leave()
         yield* settle
         const before = t.epoch()
-        yield* t.answerSave(0, 11)
+        yield* t.answerSave(0, 11, true)
         yield* settle
         expect([t.held().revision, t.held().decisions]).toEqual([11, { "row-12": out }])
         // The answer moved the view by the person's own row, and let the draft go (nobody looks): one new epoch, for
@@ -396,7 +454,7 @@ describe("leaving the Review step and coming back", () => {
       yield* settle
       decide(t.registry, id, { "row-1": O.some(out) })
       yield* settle
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       leave()
       yield* settle
@@ -434,7 +492,15 @@ describe("the review's input", () => {
     Effect.gen(function* () {
       const id = importNo(9)
       const t = world(id)
-      const table = { rows: [] } as unknown as StagedTable
+      const table = StagedTable.make({
+        fileName: "items.csv",
+        kind: "csv",
+        sheet: O.none(),
+        headerRowNumber: 1,
+        columns: [{ index: 0, letter: "A", label: "SKU" }],
+        rows: [],
+        notes: []
+      })
       t.registry.set(importTable(id), table)
       t.registry.mount(importTable(id))
       t.give(t.at({ revision: 10 }))
@@ -504,10 +570,11 @@ describe("the region's decisions for one import", () => {
       const before = t.registry.get(reviewState(id))
       const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} })]
       const left = act({
+        columns: reviewColumns,
         rows,
         state: before,
         action: { type: "leaveOut" as const, rowIds: ["row-2"] },
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       }).state
@@ -520,15 +587,16 @@ describe("the region's decisions for one import", () => {
 
       // The undo takes back exactly the row of the step it undoes, while the first save is still out.
       const undone = act({
+        columns: reviewColumns,
         rows,
         state: left,
         action: { type: "undo" as const },
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       })
       t.registry.set(reviewState(id), undone.state)
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       expect(t.deltas()[1]).toEqual({ set: {}, clear: ["row-2"] })
       expect(t.shown()).toEqual({ "row-7": kept })
@@ -566,10 +634,11 @@ describe("the region's decisions for one import", () => {
       // And a write the replaced region still makes reaches nobody.
       const rowsOf = [ReviewRow.make({ id: "row-2", line: 2, cells: {} })]
       const late = act({
+        columns: reviewColumns,
         rows: rowsOf,
         state: t.registry.get(mine),
         action: { type: "leaveOut" as const, rowIds: ["row-2"] },
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       }).state

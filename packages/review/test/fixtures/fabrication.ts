@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 /**
  * Made-up stock for a small fabrication shop, for the review gallery and its tests. Development only: nothing in
  * the app imports this. The shape of the mess is fixed per block of 178 rows: 136 ready (17 of them with a
@@ -6,52 +7,66 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 export const problemKinds: ReadonlyArray<ProblemKind> = [
-  ProblemKind.make({ id: "unit", label: "Unknown unit", tone: "decision", help: "The unit is not on your unit list." }),
+  ProblemKind.make({
+    id: "unit",
+    label: "Unknown unit",
+    tone: "decision",
+    help: O.some("The unit is not on your unit list."),
+    fixable: true
+  }),
   ProblemKind.make({
     id: "cost",
     label: "No cost",
     tone: "blocker",
-    help: "Each needs a cost before it can be imported."
+    help: O.some("Each needs a cost before it can be imported."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "copy",
     label: "Same SKU",
     tone: "decision",
-    help: "Two different rows share a SKU. Give one a new SKU, or leave one out."
+    help: O.some("Two different rows share a SKU. Give one a new SKU, or leave one out."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "below",
     label: "Below zero",
     tone: "blocker",
-    help: "Stock cannot be below zero. Type the count."
+    help: O.some("Stock cannot be below zero. Type the count."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "name",
     label: "No name",
     tone: "blocker",
-    help: "No name in the file. The SKU is offered as the name."
+    help: O.some("No name in the file. The SKU is offered as the name."),
+    fixable: true
   })
 ]
 
 const units = ["pcs", "kg", "m", "L"] as const
 
-const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") =>
+const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model") =>
   ({ state: "matched", source, by, samples }) as const
 
 export const columns: ReadonlyArray<ReviewColumn> = [
   ReviewColumn.make({
+    display: identity,
     id: "name",
     label: "Item",
     size: "fill",
-    width: 200,
+    width: O.some(200),
     core: true,
-    match: matched("Item name", ["Flat bar 40 × 5", "Hex bolt M8 × 30", "Weld wire 0.9 mm"])
+    match: O.some(matched("Item name", ["Flat bar 40 × 5", "Hex bolt M8 × 30", "Weld wire 0.9 mm"], "name"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "sku",
     code: true,
     search: true,
@@ -59,57 +74,71 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     label: "SKU",
     core: true,
     under: true,
-    match: matched("SKU", ["FB-40-5", "HB-M8-30", "WW-09"])
+    match: O.some(matched("SKU", ["FB-40-5", "HB-M8-30", "WW-09"], "name"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "category",
     facet: true,
     label: "Category",
-    match: matched("Group", ["Bar", "Fasteners", "Welding"], "model")
+    match: O.some(matched("Group", ["Bar", "Fasteners", "Welding"], "model"))
   }),
-  ReviewColumn.make({ id: "unit", label: "Unit", core: true, priority: 2, match: matched("UOM", ["m", "PCS", "kg"]) }),
   ReviewColumn.make({
+    display: identity,
+    id: "unit",
+    label: "Unit",
+    core: true,
+    priority: O.some(2),
+    match: O.some(matched("UOM", ["m", "PCS", "kg"], "name"))
+  }),
+  ReviewColumn.make({
+    display: identity,
     id: "onHand",
     context: true,
     label: "On hand",
-    align: "right",
+    align: O.some("right"),
     core: true,
-    match: matched("Qty on hand", ["120", "1,200", "45"])
+    match: O.some(matched("Qty on hand", ["120", "1,200", "45"], "name"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "reorder",
     hidden: true,
     label: "Reorder at",
-    align: "right",
-    match: matched("Reorder point", ["20", "200", "10"])
+    align: O.some("right"),
+    match: O.some(matched("Reorder point", ["20", "200", "10"], "name"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "cost",
     label: "Cost",
-    align: "right",
-    match: matched("Unit cost", ["$4.85", "$0.18", "$3.40"])
+    align: O.some("right"),
+    match: O.some(matched("Unit cost", ["$4.85", "$0.18", "$3.40"], "name"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "supplier",
     facet: true,
     context: true,
     label: "Supplier",
-    match: matched("Vendor", ["Harlow Steel", "Tri-County Fasteners", "Weldcraft Supply"], "model")
+    match: O.some(matched("Vendor", ["Harlow Steel", "Tri-County Fasteners", "Weldcraft Supply"], "model"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "bin",
     code: true,
     hidden: true,
     label: "Bin",
-    match: matched("Bin", ["A-04", "C-11", "D-02"])
+    match: O.some(matched("Bin", ["A-04", "C-11", "D-02"], "name"))
   }),
   ReviewColumn.make({
+    display: identity,
     id: "lead",
     hidden: true,
     label: "Lead time",
-    unit: "days",
-    align: "right",
-    match: matched("Lead time (days)", ["5", "3", "7"])
+    unit: O.some("days"),
+    align: O.some("right"),
+    match: O.some(matched("Lead time (days)", ["5", "3", "7"], "name"))
   })
 ]
 
@@ -118,33 +147,34 @@ export const columnsUnmatched: ReadonlyArray<ReviewColumn> = columns.map((column
   column.id === "unit"
     ? {
         ...column,
-        match: {
-          state: "unmatched",
+        match: O.some({
+          state: "unmatched" as const,
           candidates: [
             { source: "UOM", samples: ["m", "PCS", "kg"] },
             { source: "Pack", samples: ["bundle", "box 100", "spool"] }
           ]
-        }
+        })
       }
     : column
 )
 
 type Family = {
-  name: string
-  code: string
-  category: string
-  unit: (typeof units)[number]
-  supplier: string
-  sizes: ReadonlyArray<readonly [label: string, code: string]>
-  cost: number
+  readonly name: string
+  readonly code: string
+  readonly category: string
+  readonly unit: (typeof units)[number]
+  readonly supplier: string
+  readonly sizes: A.NonEmptyReadonlyArray<readonly [label: string, code: string]>
+  readonly cost: number
 }
 
-const pairs = (list: ReadonlyArray<string>): ReadonlyArray<readonly [string, string]> =>
-  list.map(
+const pairs = (list: A.NonEmptyReadonlyArray<string>): A.NonEmptyReadonlyArray<readonly [string, string]> =>
+  A.map(
+    list,
     (label) => [label, label.replace(/ mm$/, "").replace(/ × /g, "-").replace(/ /g, "-").replace(/\./g, "")] as const
   )
 
-const families: ReadonlyArray<Family> = [
+const families: A.NonEmptyReadonlyArray<Family> = [
   {
     name: "Flat bar",
     code: "FB",
@@ -442,23 +472,23 @@ const eachFix = (from: string): Fix =>
   Fix.make({
     column: "unit",
     to: "pcs",
-    by: "rule",
+    by: O.some("rule"),
     confidence: O.some("high"),
     kind: "unit",
-    group: "unit:each",
-    why: { basis: `"${from}" means each: one piece.`, detail: "Matched against your unit list: pcs, kg, m, L." }
+    group: O.some("unit:each"),
+    why: { basis: `"${from}" means each: one piece.`, detail: O.some("Matched against your unit list: pcs, kg, m, L.") }
   })
 
 const lengthFix: Fix = Fix.make({
   column: "unit",
   to: "pcs",
-  by: "model",
+  by: O.some("model"),
   confidence: O.some("low"),
   kind: "unit",
-  group: "unit:length",
+  group: O.some("unit:length"),
   why: {
     basis: "A stock length is usually one piece.",
-    detail: "Choose m if you count this stock in metres. Only the unit changes; quantities stay as they are.",
+    detail: O.some("Choose m if you count this stock in metres. Only the unit changes; quantities stay as they are."),
     alternatives: ["m"]
   }
 })
@@ -467,17 +497,29 @@ const caseFix = (to: "kg" | "pcs"): Fix =>
   Fix.make({
     column: "unit",
     to,
-    by: "rule",
+    by: O.some("rule"),
     confidence: O.some("high"),
     kind: "unit",
-    group: `unit:case:${to}`,
+    group: O.some(`unit:case:${to}`),
     why: { basis: `The same unit as ${to}, spelled another way.` }
   })
 
+type StockCells = Record<
+  "name" | "sku" | "category" | "unit" | "onHand" | "reorder" | "cost" | "supplier" | "bin" | "lead",
+  string
+>
+
 /** The file as the review reads it: `size` rows, the same mix in every block of 178. `clean` removes every problem. */
-export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: boolean }): ReadonlyArray<ReviewRow> {
-  const rows: Array<ReviewRow> = []
-  const used = MutableHashMap.empty<string, number>()
+export function makeRows(input: {
+  readonly size: number
+  readonly clean?: boolean
+  readonly withoutUnit?: boolean
+}): ReadonlyArray<ReviewRow> {
+  const rows: Array<ReviewRow & { readonly cells: StockCells }> = []
+  const cycling = A.map(families, (family) => {
+    const turn = MutableRef.make(0)
+    return { ...family, next: () => MutableRef.getAndIncrement(turn) }
+  })
   for (let position = 0; position < input.size; position += 1) {
     const rank = rankOf(position % block)
     const lot = Math.floor(position / block)
@@ -485,23 +527,24 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     // The role picks the kind of item so the mess is believable: bolts counted "each", bar bought in "lengths".
     const pool =
       role === "each" || role === "pcs"
-        ? families.filter((family) => family.unit === "pcs")
+        ? cycling.filter((family) => family.unit === "pcs")
         : role === "length"
-          ? families.filter((family) => family.unit === "m")
+          ? cycling.filter((family) => family.unit === "m")
           : role === "kg"
-            ? families.filter((family) => family.unit === "kg")
-            : families
-    const family = pool[position % pool.length] ?? families[0]!
-    const turn = O.getOrElse(MutableHashMap.get(used, family.code), () => 0)
-    MutableHashMap.set(used, family.code, turn + 1)
-    const size = family.sizes[turn % family.sizes.length] ?? family.sizes[0]!
+            ? cycling.filter((family) => family.unit === "kg")
+            : cycling
+    const family = pool[position % pool.length] ?? A.headNonEmpty(cycling)
+    const turn = family.next()
+    const size = A.reduce(family.sizes, A.headNonEmpty(family.sizes), (chosen, size, index) =>
+      index === turn % family.sizes.length ? size : chosen
+    )
     const series = Math.floor(turn / family.sizes.length)
     const suffix =
       series === 0 ? "" : ` / ${String.fromCharCode(65 + (series % 26))}${series > 25 ? Math.floor(series / 26) : ""}`
     const id = `r${position + 1}`
     const line = position + 2
     const onHand = ((position * 37) % 23) * (family.unit === "pcs" ? 50 : 5) + (family.unit === "pcs" ? 100 : 10)
-    const cells: Record<string, string> = {
+    const cells: StockCells = {
       name: `${family.name} ${size[0]}${suffix}`,
       sku: `${family.code}-${size[1]}${suffix === "" ? "" : `-${suffix.slice(3)}`}`,
       category: family.category,
@@ -513,55 +556,57 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
       bin: `${"ABCDEF"[position % 6]}-${String((position % 14) + 1).padStart(2, "0")}`,
       lead: String(3 + (position % 5) * 2)
     }
-    let problem: Problem | undefined
-    let applied: ReadonlyArray<Fix> | undefined
+    let problem: O.Option<Problem> = O.none()
+    let applied: ReadonlyArray<Fix> = []
     // Ranks pair up (21 with 22, 23 with 24, ...): the later row repeats the earlier row's SKU.
     const copy = (): void => {
       const otherRank = role === "copyA" ? rank + 1 : rank - 1
       const otherPosition = lot * block + ((otherRank * 51) % block)
       if (otherPosition >= input.size) return
-      problem = Problem.make({
+      problem = Problem.makeOption({
         kind: "copy",
-        column: "sku",
-        ask: "Type a new SKU",
-        rivals: [`r${otherPosition + 1}`]
+        column: O.some("sku"),
+        ask: O.some("Type a new SKU"),
+        rivals: O.some([`r${otherPosition + 1}`])
       })
     }
     Role.match(role, {
       each: () => {
         cells.unit = rank < 6 ? "ea" : "each"
-        problem = Problem.make({ kind: "unit", column: "unit", fix: eachFix(cells.unit) })
+        problem = Problem.makeOption({ kind: "unit", column: O.some("unit"), fix: O.some(eachFix(cells.unit)) })
       },
       length: () => {
         cells.unit = "length"
-        problem = Problem.make({ kind: "unit", column: "unit", fix: lengthFix })
+        problem = Problem.makeOption({ kind: "unit", column: O.some("unit"), fix: O.some(lengthFix) })
       },
       cost: () => {
         cells.cost = ""
-        problem = Problem.make({ kind: "cost", column: "cost", ask: "Type a cost" })
+        problem = Problem.makeOption({ kind: "cost", column: O.some("cost"), ask: O.some("Type a cost") })
       },
       copyA: copy,
       copyB: copy,
       below: () => {
         cells.onHand = `-${(position % 9) + 3}`
-        problem = Problem.make({ kind: "below", column: "onHand", ask: "Type the count" })
+        problem = Problem.makeOption({ kind: "below", column: O.some("onHand"), ask: O.some("Type the count") })
       },
       name: () => {
         cells.name = ""
-        problem = Problem.make({
+        problem = Problem.makeOption({
           kind: "name",
-          column: "name",
-          fix: {
-            column: "name",
-            to: cells.sku ?? "",
-            by: "rule",
-            confidence: O.some("medium"),
-            kind: "name",
-            why: {
-              basis: "The file has no name for this row.",
-              detail: "Its SKU is the only label it has, so the SKU is offered as the name."
-            }
-          }
+          column: O.some("name"),
+          fix: O.some(
+            Fix.make({
+              column: "name",
+              to: cells.sku,
+              by: O.some("rule"),
+              confidence: O.some("medium"),
+              kind: "name",
+              why: {
+                basis: "The file has no name for this row.",
+                detail: O.some("Its SKU is the only label it has, so the SKU is offered as the name.")
+              }
+            })
+          )
         })
       },
       kg: () => {
@@ -576,67 +621,85 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     })
     if (input.withoutUnit === true) {
       cells.unit = ""
-      applied = undefined
-      if (problem?.kind === "unit") problem = undefined
+      applied = []
+      problem = O.filter(problem, (value) => value.kind !== "unit")
     }
-    rows.push(
-      ReviewRow.make({
-        id,
-        line,
-        cells,
-        ...(applied === undefined ? {} : { applied }),
-        ...(problem === undefined ? {} : { problem })
-      })
-    )
+    rows.push({ ...ReviewRow.make({ id, line, cells, applied, problem }), cells })
   }
   // The guess for "length" is made from the file, not from a sentence: which unit the other rows of the same
   // categories use decides what is suggested, and the count is the basis shown to the person.
-  const guessed = rows.filter((row) => row.problem?.fix?.group === "unit:length")
+  const guessed = rows.filter((row) =>
+    O.exists(
+      O.flatMap(row.problem, (problem) => problem.fix),
+      (fix) => O.contains(fix.group, "unit:length")
+    )
+  )
   if (guessed.length > 0) {
-    const categories = A.dedupe(guessed.map((row) => row.cells.category ?? ""))
-    const tally = MutableHashMap.empty<string, number>()
-    const counted = (unit: string): number => O.getOrElse(MutableHashMap.get(tally, unit), () => 0)
+    const categories = A.dedupe(guessed.map((row) => row.cells.category))
+    const tally = { m: 0, pcs: 0 }
     for (const row of rows) {
-      const unit = row.cells.unit ?? ""
-      if (row.problem !== undefined || row.applied !== undefined) continue
-      if (!categories.includes(row.cells.category ?? "") || (unit !== "m" && unit !== "pcs")) continue
-      MutableHashMap.set(tally, unit, counted(unit) + 1)
+      O.match(row.problem, {
+        onNone: () => {
+          const unit = row.cells.unit
+          if (row.applied.length > 0) return
+          if (!categories.includes(row.cells.category) || (unit !== "m" && unit !== "pcs")) return
+          tally[unit] += 1
+        },
+        onSome: () => undefined
+      })
     }
-    const m = counted("m")
-    const pcs = counted("pcs")
+    const m = tally.m
+    const pcs = tally.pcs
     const [to, other] = m >= pcs ? (["m", "pcs"] as const) : (["pcs", "m"] as const)
     const fix: Fix = Fix.make({
       ...lengthFix,
       to,
       why: {
         basis: `${Math.max(m, pcs)} other ${categories.join(" and ")} rows in this file use ${to}; ${Math.min(m, pcs)} use ${other}.`,
-        detail: "Only the unit changes; quantities stay as they are.",
+        detail: O.some("Only the unit changes; quantities stay as they are."),
         alternatives: [other]
       }
     })
     for (const [index, row] of rows.entries()) {
-      if (row.problem?.fix?.group === "unit:length") rows[index] = { ...row, problem: { ...row.problem, fix } }
+      if (
+        O.exists(
+          O.flatMap(row.problem, (problem) => problem.fix),
+          (fix) => O.contains(fix.group, "unit:length")
+        )
+      )
+        rows[index] = { ...row, problem: O.map(row.problem, (problem) => ({ ...problem, fix: O.some(fix) })) }
     }
   }
   // The later row of each pair repeats the earlier row's SKU: that is what makes them copies.
   const byId = MutableHashMap.fromIterable(rows.map((row) => [row.id, row] as const))
   return rows.map((row) => {
-    const rival = row.problem?.rivals?.[0]
-    const other = rival === undefined ? undefined : O.getOrUndefined(MutableHashMap.get(byId, rival))
-    if (other === undefined || other.line > row.line) return row
-    return { ...row, cells: { ...row.cells, sku: other.cells.sku ?? "" } }
+    const rival = O.flatMap(
+      O.flatMap(row.problem, (problem) => problem.rivals),
+      A.head
+    )
+    const other = O.flatMap(rival, (id) => MutableHashMap.get(byId, id))
+    return O.match(other, {
+      onNone: () => row,
+      onSome: (other) => (other.line > row.line ? row : { ...row, cells: { ...row.cells, sku: other.cells.sku } })
+    })
   })
 }
 
 /** The gallery's pure check of one row after the person typed a value. Copies need the whole file, so not here. */
-export function recheck(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined {
+export function recheck(input: {
+  readonly row: ReviewRow
+  readonly cells: Readonly<Record<string, string>>
+}): O.Option<Problem> {
   const { cells } = input
-  if ((cells.name ?? "").trim() === "") return Problem.make({ kind: "name", column: "name" })
-  if (!(units as ReadonlyArray<string>).includes(cells.unit ?? ""))
-    return Problem.make({ kind: "unit", column: "unit" })
-  if (!/^\$?\d[\d,]*(\.\d+)?$/.test((cells.cost ?? "").trim())) return Problem.make({ kind: "cost", column: "cost" })
-  if ((cells.onHand ?? "").trim().startsWith("-")) return Problem.make({ kind: "below", column: "onHand" })
-  return undefined
+  if (O.match(R.get(cells, "name"), { onNone: () => true, onSome: (name) => name.trim() === "" }))
+    return Problem.makeOption({ kind: "name", column: O.some("name") })
+  if (!O.exists(R.get(cells, "unit"), (unit) => A.some(units, (known) => known === unit)))
+    return Problem.makeOption({ kind: "unit", column: O.some("unit") })
+  if (!O.exists(R.get(cells, "cost"), (cost) => /^\$?\d[\d,]*(\.\d+)?$/.test(cost.trim())))
+    return Problem.makeOption({ kind: "cost", column: O.some("cost") })
+  if (O.exists(R.get(cells, "onHand"), (onHand) => onHand.trim().startsWith("-")))
+    return Problem.makeOption({ kind: "below", column: O.some("onHand") })
+  return O.none()
 }
 
 export const activity = (rows: number): Activity =>
@@ -646,22 +709,32 @@ export const activity = (rows: number): Activity =>
         id: "read",
         by: "read",
         label: `Read ${whole.format(rows)} rows and 10 columns`,
-        detail: "items.csv, first sheet, header on line 1"
+        detail: O.some("items.csv, first sheet, header on line 1")
       },
-      { id: "match", by: "rule", label: "Matched 8 columns by name", detail: "Exact after trimming case and spaces" },
+      {
+        id: "match",
+        by: "rule",
+        label: "Matched 8 columns by name",
+        detail: O.some("Exact after trimming case and spaces")
+      },
       {
         id: "match-model",
         by: "model",
         label: "Matched 2 columns by meaning",
-        detail: "Group → Category, Vendor → Supplier"
+        detail: O.some("Group → Category, Vendor → Supplier")
       },
-      { id: "fix", by: "rule", label: "Applied 17 spelling fixes", detail: "KG, Kgs → kg · PCS, Pcs. → pcs" },
-      { id: "flag", by: "rule", label: "Flagged 42 rows", detail: "Unit, cost, SKU, stock level and name checks" },
+      { id: "fix", by: "rule", label: "Applied 17 spelling fixes", detail: O.some("KG, Kgs → kg · PCS, Pcs. → pcs") },
+      {
+        id: "flag",
+        by: "rule",
+        label: "Flagged 42 rows",
+        detail: O.some("Unit, cost, SKU, stock level and name checks")
+      },
       {
         id: "propose",
         by: "model",
         label: "Guessed a unit for 3 rows",
-        detail: "length → pcs or m, low confidence: left for you to choose"
+        detail: O.some("length → pcs or m, low confidence: left for you to choose")
       }
     ],
     allowed: ["Read the uploaded file", "Read your unit list and stored SKUs", "Propose a value from your lists"],

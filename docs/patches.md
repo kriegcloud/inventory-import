@@ -23,11 +23,14 @@ Report the defect upstream as well. A patch here does not replace the report, an
 is.
 
 One patch is of another kind, by Benjamin's decision (2026-11-22: "Teach the prover"): `03-a-schemas-own-guards`
-fixes no wrong answer. The prover of `@alchemy.run/domain` read a case told with `effect/Match` and nothing a schema
-gives for the same question, so the review's model told every case twice; and it knew an event or a rejection by `new`
-alone, so the files with a `decide` were the one place built without `.make` (2026-11-22: "Teach the prover .make").
-The patch adds a model of each of those functions to the prover. Its rules are in "A patch that teaches the prover", below, and the text to send the library's
-authors is [the note on it](upstream-prover-schema-guards.md).
+began as a patch that fixed no wrong answer. On the first pin the prover of `@alchemy.run/domain` read a case told with
+`effect/Match` and nothing a schema gives for the same question, so the review's model told every case twice; and it
+knew an event or a rejection by `new` alone (2026-11-22: "Teach the prover .make"). Since the pin at `e1c3e6d` the
+library reads `.make`, `constTrue`, `constFalse` and a tagged union's `guards`, `isAnyOf`, `match` and `matchOrElse`
+itself, so the patch is smaller and now also fixes wrong answers: it adds `Schema.is`, which the library still does not
+read, and makes a guard exact, where the library answers yes for a check it does not read and finds no case for a union
+told by a number. Its rules are in "A patch that teaches the prover", below, and the text to send the library's authors
+is [the note on it](upstream-prover-schema-guards.md).
 
 ## Where patches live
 
@@ -37,12 +40,10 @@ Everything is in one workspace, `packages/patches` (`@inventory/patches`):
 packages/patches/
   alchemy-domain/                              one folder for each patched package
     01-computed-instance-id.patch              one file for each defect: a header, then the diff
-    02-text-length-in-a-template.patch
     03-a-schemas-own-guards.patch
   alchemy-domain.patch                         what bun reads: built from the folder, never edited
   test/alchemy-domain/
     01-computed-instance-id/                   each patch's test, and the small code it runs
-    02-text-length-in-a-template/
     03-a-schemas-own-guards/                   with `mutants.json`: the wrong readings its test must notice
   mutants/run.py                               runs them (below)
 ```
@@ -51,7 +52,7 @@ packages/patches/
   another, in the order of their names. The two digits in a name are that order: a later patch is a diff of the
   package with the earlier ones applied. `bun run beep patches build` writes the file.
 - **The root's `package.json`** names the file under `patchedDependencies`, by the package and its resolution:
-  `"@alchemy.run/domain@vendor/alchemy/alchemy.run-domain-734c27a.tgz": "packages/patches/alchemy-domain.patch"`.
+  `"@alchemy.run/domain@vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz": "packages/patches/alchemy-domain.patch"`.
 - **The workspace depends on each patched package**, so the tests run in `bun run check` like any package's.
 
 ## The header
@@ -62,7 +63,7 @@ field above it.
 | Field | What it says |
 | --- | --- |
 | `Package` | The dependency's name |
-| `Applies-to` | Its resolution, as `bun.lock` writes it after the `@`: an exact version for a package from a registry (`4.1.5`), the kept file for a package kept as a file (`vendor/alchemy/alchemy.run-domain-734c27a.tgz`, whose name carries the commit) |
+| `Applies-to` | Its resolution, as `bun.lock` writes it after the `@`: an exact version for a package from a registry (`4.1.5`), the kept file for a package kept as a file (`vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz`, whose name carries the commit) |
 | `Upstream` | The address of the issue or pull request, whole (`https://`, a host and a path), or `not yet reported` |
 | `Why` | What goes wrong without it, for us |
 | `Remove-when` | What has to be true for the patch to be dropped |
@@ -92,8 +93,8 @@ read as "the tag matches" where the library checks the whole case would prove ru
 patch is held to more than its test passing:
 
 - **It answers exactly or not at all.** Where the prover cannot say what the function answers (a schema with a check
-  it does not read, such as a pattern; a value it cannot see into), the model says "not read" and the rule is not
-  proved. It never answers yes for what it did not read. The test has a case for that.
+  it does not read, such as a pattern; a value it cannot see into), the model says so ("not supported", the library's
+  word for code it does not read) and the rule is not proved. It never answers yes for what it did not read. The test has a case for that.
 - **Its test has, for each function, one rule that holds and one broken on purpose.** A model that always said yes
   would lose the second, one that always said no would lose the first.
 - **Its wrong readings are written down and run.** `mutants.json` beside the test lists them, each one text replaced
@@ -101,19 +102,19 @@ patch is held to more than its test passing:
   check ignored, a missing field allowed. `bun run --cwd packages/patches mutants` copies the installed package for
   each, makes the change in the copy and runs the test there, where it has to fail. A mutant the test lets through is
   a wrong model the test cannot tell from the right one: add the rule that tells them apart. Run it after any change
-  to such a patch or its test (29 mutants, about a minute; needs python3). It is not part of `bun run check`.
+  to such a patch or its test (26 mutants, about a minute; needs python3). It is not part of `bun run check`.
 - **The prover's own second opinion stays on.** A proof ends by running the real code on inputs picked for each path
   and comparing ("Agreed with the real code"): the test asserts that line, and it is what caught the one wrong model
   this patch had while it was written (a class the prover loads a second time, read as another class).
 
-Where the third patch cannot answer as the library does, it says "not read": a check on a union, a struct or a literal
+Where the third patch cannot answer as the library does, it says "not supported": a check on a union, a struct or a literal
 (it applies a check to a text, a number and a list only), a union told by a number, a literal asked of a division, a
-struct asked of a list. Two aggregates beside the ticket hold that (`Unread.aggregate.ts`, each guard "not read") and
+struct asked of a list. Two aggregates beside the ticket hold that (`Unread.aggregate.ts`, each guard "not supported") and
 what it does answer exactly (`Exact.aggregate.ts`: a class told by its name, a whole number within 2^53 - 1, a key
 that must be written, `Schema.Void`).
 
 What the third patch does not do: it reads no pattern. A text held to a pattern (`S.isPattern`) is still a check the
-prover does not read, so a rule cannot be proved from it, and a guard asked of such a schema is "not read".
+prover does not read, so a rule cannot be proved from it, and a guard asked of such a schema is "not supported".
 
 ## Making a patch
 

@@ -4,7 +4,7 @@ import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ReviewWords } from "@inventory/review/ReviewTypes"
 
 /** A cell's text, or "Not set" in grey when the file left it empty. */
-export function Text(props: { value: string }) {
+export function Text(props: { readonly value: string }) {
   return props.value.trim() === "" ? <NotSet /> : <>{props.value}</>
 }
 
@@ -18,7 +18,9 @@ export const importWords = {
   already: "Already there",
   notImported: "Not imported",
   takenBack: "Taken back",
-  all: "All"
+  all: "All",
+  // Who decided, where no name is recorded for the decision. Never the person who confirmed.
+  notRecorded: "Not recorded"
 } as const
 
 /**
@@ -62,7 +64,7 @@ export const heldBackSentence = (input: {
   readonly why: {
     readonly read: boolean
     readonly apart: number
-    readonly accepts: ReadonlyArray<{ readonly kind?: string }>
+    readonly accepts: ReadonlyArray<{ readonly kind: string }>
   }
   /** The accepts taken back, in words. */
   readonly accepts: string
@@ -81,7 +83,7 @@ export const heldBackSentence = (input: {
   const taken =
     why.accepts.length === 0
       ? ""
-      : A.every(why.accepts, (taken) => (taken.kind ?? "accept") === "accept")
+      : A.every(why.accepts, (taken) => taken.kind === "accept")
         ? ` A column was matched again after you accepted its proposal, so ${one ? "that accept was" : "those accepts were"} taken back: ${accepts}.`
         : ` A column was matched again after you decided, so ${one ? "that decision was" : "those decisions were"} taken back: ${accepts}.`
   return `Nothing was imported: ${rows}${taken} The review and its totals below show the import as it is now. Check them, then import again.`
@@ -96,7 +98,7 @@ const outcomeTone = {
 } as const satisfies Record<string, Tone>
 
 /** Where a row stands, in words and colour. */
-export function OutcomePill(props: { outcome: keyof typeof outcomeTone }) {
+export function OutcomePill(props: { readonly outcome: keyof typeof outcomeTone }) {
   return <StatusPill tone={outcomeTone[props.outcome]}>{importWords[props.outcome]}</StatusPill>
 }
 

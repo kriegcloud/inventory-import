@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // What a match took back is named (Benjamin, 2026-11-20, group 3: "the screen names it as taken back"): the match keeps
 // it with the draft by field and kind, its answer and every later view carry it until the import is confirmed, and its
 // audit line counts it. Also, over the twins: a Replace whose row stops reading under the new column is taken back,
@@ -373,13 +374,13 @@ describe("a draft that keeps changing under a request", () => {
           .pipe(as(marcus))
         const store = yield* ImportStore
         const ref = yield* CatalogMemoryRef
-        const found = yield* store.find(dana.organizationId, view.id)
+        const found = yield* store.find(view.id, dana.organizationId)
         const draft = O.getOrThrow(found)
         // Every time the review is asked, somebody changes the catalog: every try is overtaken.
         const asked = MutableRef.make(0)
         const answer = yield* store.matchColumn(
-          dana,
           draft,
+          dana,
           { field: "unitCost", column: O.some(column("Net cost")) },
           "Unit cost",
           () =>
@@ -405,13 +406,41 @@ describe("a draft that keeps changing under a request", () => {
         // A store whose every try is overtaken: a match always busy, a save always finding the columns matched again.
         const overtaken = ImportStore.of({
           ...inner,
-          matchColumn: Effect.fn("overtaken.matchColumn")(function* () {
-            return yield* Effect.succeed("busy" as const)
-          }),
-          decide: Effect.fn("overtaken.decide")(function* () {
-            MutableRef.update(tried, (n) => n + 1)
-            return yield* Effect.succeed(decisionsRematched)
-          })
+          matchColumn: dual(
+            5,
+            (
+              self: Parameters<ImportStore["Service"]["matchColumn"]>[0],
+              actor: Parameters<ImportStore["Service"]["matchColumn"]>[1],
+              choice: Parameters<ImportStore["Service"]["matchColumn"]>[2],
+              detail: Parameters<ImportStore["Service"]["matchColumn"]>[3],
+              compare: Parameters<ImportStore["Service"]["matchColumn"]>[4]
+            ) => {
+              const perform = Effect.fn("overtaken.matchColumn")(function* (
+                ..._args: Parameters<ImportStore["Service"]["matchColumn"]>
+              ) {
+                return yield* Effect.succeed("busy" as const)
+              })
+              return perform(self, actor, choice, detail, compare)
+            }
+          ),
+          decide: dual(
+            5,
+            (
+              self: Parameters<ImportStore["Service"]["decide"]>[0],
+              actor: Parameters<ImportStore["Service"]["decide"]>[1],
+              delta: Parameters<ImportStore["Service"]["decide"]>[2],
+              read: Parameters<ImportStore["Service"]["decide"]>[3],
+              expected: Parameters<ImportStore["Service"]["decide"]>[4]
+            ) => {
+              const perform = Effect.fn("overtaken.decide")(function* (
+                ..._args: Parameters<ImportStore["Service"]["decide"]>
+              ) {
+                MutableRef.update(tried, (n) => n + 1)
+                return yield* Effect.succeed(decisionsRematched)
+              })
+              return perform(self, actor, delta, read, expected)
+            }
+          )
         })
         const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, overtaken))
         const saving = yield* Effect.flip(
@@ -445,9 +474,23 @@ describe("a draft that keeps changing under a request", () => {
         // A store whose every save and confirm finds an item its judgement read changed since.
         const overtaken = ImportStore.of({
           ...inner,
-          decide: Effect.fn("overtaken.decide")(function* () {
-            return yield* Effect.succeed(decisionsItemsChanged)
-          }),
+          decide: dual(
+            5,
+            (
+              self: Parameters<ImportStore["Service"]["decide"]>[0],
+              actor: Parameters<ImportStore["Service"]["decide"]>[1],
+              delta: Parameters<ImportStore["Service"]["decide"]>[2],
+              read: Parameters<ImportStore["Service"]["decide"]>[3],
+              expected: Parameters<ImportStore["Service"]["decide"]>[4]
+            ) => {
+              const perform = Effect.fn("overtaken.decide")(function* (
+                ..._args: Parameters<ImportStore["Service"]["decide"]>
+              ) {
+                return yield* Effect.succeed(decisionsItemsChanged)
+              })
+              return perform(self, actor, delta, read, expected)
+            }
+          ),
           commit: Effect.fn("overtaken.commit")(function* () {
             return yield* Effect.succeed(confirmItemsChanged)
           })
@@ -621,10 +664,24 @@ describe("what changes between a judgement of the decisions and its write", () =
     })
     const windowedStore = ImportStore.of({
       ...inner,
-      decide: Effect.fn("windowed.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
-        if (step === "decide") yield* once
-        return yield* inner.decide(...args)
-      }),
+      decide: dual(
+        5,
+        (
+          self: Parameters<ImportStore["Service"]["decide"]>[0],
+          actor: Parameters<ImportStore["Service"]["decide"]>[1],
+          delta: Parameters<ImportStore["Service"]["decide"]>[2],
+          read: Parameters<ImportStore["Service"]["decide"]>[3],
+          expected: Parameters<ImportStore["Service"]["decide"]>[4]
+        ) => {
+          const perform = Effect.fn("windowed.decide")(function* (
+            ...args: Parameters<ImportStore["Service"]["decide"]>
+          ) {
+            if (step === "decide") yield* once
+            return yield* inner.decide(...args)
+          })
+          return perform(self, actor, delta, read, expected)
+        }
+      ),
       commit: Effect.fn("windowed.commit")(function* (write: ConfirmWrite) {
         if (step === "commit") yield* once
         return yield* inner.commit(write)

@@ -1,6 +1,7 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import * as Str from "effect/String"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
@@ -28,15 +29,15 @@ const withEarly = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
     Effect.fnUntraced(function* (response, request) {
       if (request.method !== "GET") return yield* response
       const answer = takeEarly(Str.replace(/^https?:\/\/[^/]+/, "")(request.url))
-      if (answer === undefined) return yield* response
-      const native = yield* Effect.tryPromise({
-        try: () => answer,
-        catch: (cause) =>
-          new HttpClientError.HttpClientError({
-            reason: new HttpClientError.TransportError({ request, cause })
-          })
+      return yield* O.match(answer, {
+        onNone: () => response,
+        onSome: (answer) =>
+          Effect.tryPromise({
+            try: () => answer,
+            catch: (cause) =>
+              new HttpClientError.HttpClientError({ reason: new HttpClientError.TransportError({ request, cause }) })
+          }).pipe(Effect.map((native) => HttpClientResponse.fromWeb(request, native)))
       })
-      return HttpClientResponse.fromWeb(request, native)
     })
   )
 

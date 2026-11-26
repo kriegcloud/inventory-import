@@ -1,5 +1,6 @@
 import { expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as MutableRef from "effect/MutableRef"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
@@ -13,7 +14,15 @@ import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedServe } from "../../src/server/App.ts"
 import { Collector, RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
-import { afterAnswerInto, inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
+import {
+  afterAnswerInto,
+  inMemoryApp,
+  settingsLayer,
+  settled,
+  testOrigin,
+  testSettings,
+  noNetwork
+} from "./support/app.ts"
 
 // Tracing that leaves the Worker is built per request (src/server/RequestTelemetry.ts): each request gets its own
 // exporters, its handler's spans go to them, and they are closed (which sends what they hold) only after the answer,
@@ -28,10 +37,16 @@ const dana = Member.make({
   organizationName: "Example Works (test)"
 })
 
-const app = inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")) })
+const app = inMemoryApp({
+  docs: false,
+  http: noNetwork,
+  settings: testSettings,
+  member: dana,
+  ai: OpenRouterTest.off("noKey", ModelId.make("test/model"))
+})
 
 /** One recording exporter per request: the spans it was handed, and whether its scope has been closed. */
-type Exported = { spans: Array<string>; ended: number; closed: boolean }
+type Exported = { readonly spans: ReadonlyArray<string>; readonly ended: number; readonly closed: boolean }
 
 /** A `fetch` built as the Worker's, with `collector` per request, and what it handed to `waitUntil`. */
 const serving = (collector: O.Option<(scope: Scope.Scope) => Effect.Effect<Tracer.Tracer>>) =>
@@ -67,21 +82,32 @@ it.live("gives each request its own exporters, and closes them after the answer,
       const served = yield* serving(
         O.some((scope) =>
           Effect.gen(function* () {
-            const mine: Exported = { spans: [], ended: 0, closed: false }
+            const spans: Array<string> = []
+            const ended = MutableRef.make(0)
+            const closed = MutableRef.make(false)
+            const mine: Exported = {
+              spans,
+              get ended() {
+                return MutableRef.get(ended)
+              },
+              get closed() {
+                return MutableRef.get(closed)
+              }
+            }
             exports.push(mine)
             yield* Scope.addFinalizer(
               scope,
               Effect.sync(() => {
-                mine.closed = true
+                MutableRef.set(closed, true)
               })
             )
             return Tracer.make({
               span: (options) => {
                 const span = new Tracer.NativeSpan(options)
-                mine.spans.push(options.name)
+                spans.push(options.name)
                 const end = span.end.bind(span)
                 span.end = (endTime, exit) => {
-                  mine.ended += 1
+                  MutableRef.update(ended, (count) => count + 1)
                   end(endTime, exit)
                 }
                 return span

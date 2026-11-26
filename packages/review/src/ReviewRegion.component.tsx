@@ -1,5 +1,7 @@
+import * as S from "effect/Schema"
+import { facetColumn } from "./internal/facetColumn.ts"
+import { platform, byId } from "./internal/browser.ts"
 import { ColumnMatch } from "@inventory/review/ReviewTypes"
-import type { Column } from "@tanstack/react-table"
 import {
   CheckIcon,
   CircleHelpIcon,
@@ -13,6 +15,7 @@ import {
   Undo2Icon
 } from "lucide-react"
 import * as HashSet from "effect/HashSet"
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import { useAtomMount, useAtomSet, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as Atom from "effect/reactivity/Atom"
@@ -31,7 +34,6 @@ import {
 } from "@inventory/ui/components/alert-dialog"
 import { Button } from "@inventory/ui/components/button"
 import { DataTableFacetedFilter } from "@inventory/ui/components/data-table/data-table-faceted-filter"
-import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { DataTableViewOptions } from "@inventory/ui/components/data-table/data-table-view-options"
 import {
   DropdownMenu,
@@ -56,7 +58,7 @@ import { GridScope, ReviewGrid } from "./internal/ReviewGrid.tsx"
 import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
 import {
-  type Density,
+  Density,
   density as keptDensity,
   type Region,
   type RegionInput,
@@ -65,7 +67,7 @@ import {
   type RegionUi,
   TableScope
 } from "./ReviewRegion.atoms.ts"
-import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
+import { FilterId, type Activity, type ReviewRegionProps, type RowView } from "@inventory/review/ReviewTypes"
 
 // Each union's own guard, made once: these run for every row and every cell.
 const isColumnMatchUnmatched = ColumnMatch.guards.unmatched
@@ -78,17 +80,17 @@ const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module
 
 const whole = new Intl.NumberFormat("en-US")
 /** The keys for undo and redo as the person's keyboard says them: Command on a Mac, Ctrl elsewhere. */
-const onMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
+const onMac = O.exists(platform(), (platform) => /Mac|iPhone|iPad/.test(platform))
 const undoKeys = onMac ? "\u2318Z" : "Ctrl+Z"
 const redoKeys = onMac ? "\u21e7\u2318Z" : "Ctrl+Shift+Z"
 const stepTag = { read: "Read", rule: "Rule", model: "Model" } as const
 /** What the run did, behind one button: steps tagged Read, Rule or Model, what it was allowed to do, and what it cost. */
 function ActivityPanel(props: {
-  activity: Activity
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  narrow: boolean
-  returnFocus: React.RefObject<HTMLButtonElement | null>
+  readonly activity: Activity
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly narrow: boolean
+  readonly returnFocus: React.RefObject<HTMLButtonElement | null>
 }) {
   const body = (
     <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-6 text-sm">
@@ -99,8 +101,9 @@ function ActivityPanel(props: {
           id: step.id,
           label: step.label,
           status: "done" as const,
-          tag: stepTag[step.by],
-          ...(step.detail === undefined ? {} : { output: step.detail })
+          tag: O.some(stepTag[step.by]),
+          input: O.none(),
+          output: step.detail
         }))}
       />
       <section aria-label="Allowed to" className="flex flex-col gap-2">
@@ -164,7 +167,7 @@ function ActivityPanel(props: {
  */
 function ToolButton({
   label,
-  tip,
+  tip = label,
   narrow,
   disabled,
   variant = "ghost",
@@ -172,11 +175,11 @@ function ToolButton({
   children,
   ...rest
 }: Omit<React.ComponentProps<typeof Button>, "variant" | "size"> & {
-  label: string
+  readonly label: string
   /** The tooltip, when it says more than the label (a shortcut, the step it would undo). */
-  tip?: string
-  narrow: boolean
-  variant?: "ghost" | "attention"
+  readonly tip?: string
+  readonly narrow: boolean
+  readonly variant?: "ghost" | "attention"
 }) {
   return (
     <Tooltip>
@@ -194,7 +197,7 @@ function ToolButton({
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{tip ?? label}</TooltipContent>
+      <TooltipContent>{tip}</TooltipContent>
     </Tooltip>
   )
 }
@@ -225,19 +228,26 @@ const heldFileName = "not-imported.csv"
  * atom too: the region writes it with every action, and whoever keeps the decisions reads it there.
  */
 export function ReviewRegion(props: ReviewRegionProps) {
+  const {
+    recheck = noRecheck,
+    ruleFixes = proposes,
+    words = ownWords,
+    rowAction = noRowAction,
+    readOnly = deciding
+  } = props
   const id = useId()
   return (
     <RegionScope.Provider
       value={{
         rows: props.rows,
         columns: props.columns,
-        recheck: props.recheck ?? noRecheck,
+        recheck,
         decisions: props.decisions,
         problemKinds: props.problemKinds,
-        ruleFixes: props.ruleFixes ?? proposes,
-        words: props.words ?? ownWords,
-        rowAction: props.rowAction ?? noRowAction,
-        readOnly: props.readOnly ?? deciding,
+        ruleFixes,
+        words,
+        rowAction,
+        readOnly,
         id
       }}
     >
@@ -263,7 +273,10 @@ function RegionWithTable(props: ReviewRegionProps) {
   )
 }
 
-type WithTable = ReviewRegionProps & { region: Region; table: ReturnType<typeof useDataTable<RowView>>["table"] }
+type WithTable = ReviewRegionProps & {
+  readonly region: Region
+  readonly table: ReturnType<typeof useDataTable<RowView>>["table"]
+}
 
 /** The grid's atoms are made here, above the region's body: its footer reads from them which group's accept leads. */
 function RegionWithGrid(props: WithTable) {
@@ -275,8 +288,16 @@ function RegionWithGrid(props: WithTable) {
   )
 }
 
-function RegionBody(props: WithTable & { regionTable: RegionTable }) {
-  const { region, table, regionTable } = props
+function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
+  const {
+    region,
+    table,
+    regionTable,
+    error = "Try again, or choose the file again.",
+    importNote = "",
+    totals = []
+  } = props
+  const cellEditor = O.fromNullishOr(props.cellEditor)
   const grid = useAtomValue(GridScope.use())
   const layout = useAtomValue(regionLayout)
   const narrow = layout === "narrow"
@@ -293,8 +314,8 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const change = region.change
   const state = useAtomValue(region.input.decisions)
   const { activityOpen, whyOpen, confirmOpen, search, said } = own
-  const setPicked = (next: FilterId | undefined) => change(() => ({ picked: next }))
-  const setKind = (next: string | undefined) => change(() => ({ kind: next }))
+  const setPicked = (next: O.Option<FilterId>) => change(() => ({ picked: next }))
+  const setKind = (next: O.Option<string>) => change(() => ({ kind: next }))
   const setActivityOpen = (next: boolean) => change(() => ({ activityOpen: next }))
   const setWhyOpen = (next: boolean) => change(() => ({ whyOpen: next }))
   const setConfirmOpen = (next: boolean) => change(() => ({ confirmOpen: next }))
@@ -311,8 +332,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const views = useAtomValue(region.views)
   const counts = useAtomValue(region.counts)
   const left = useAtomValue(region.left)
-  const openedOn = useAtomValue(region.opened)
-  const opened = O.getOrUndefined(openedOn)
+  const opened = useAtomValue(region.opened)
   const filter = useAtomValue(region.filter)
   const work = useAtomValue(region.work)
   const activeKind = useAtomValue(region.activeKind)
@@ -328,20 +348,20 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   // Compact (36 px rows) or comfortable (44 px), remembered in this browser: a preference, not progress.
   const density = useAtomValue(keptDensity)
   const chooseDensity = useAtomSet(keptDensity)
-  const main = primary({ columns, counts, noun: props.noun, closing: props.closingLabel, words })
+  const main = primary({ columns, counts, noun: props.noun, closing: O.fromNullishOr(props.closingLabel), words })
 
   const importButton = useRef<HTMLButtonElement>(null)
   const activityReturn = useRef<HTMLButtonElement>(null)
   const { run, step } = regionTable
 
   const chooseFilter = (next: FilterId) => {
-    setPicked(next)
-    setKind(undefined)
+    setPicked(O.some(next))
+    setKind(O.none())
   }
   // A kind picked on the work list: the table shows it; focus stays on the list, where the arrow keys go on.
   const pickKind = (kindId: string) => {
-    setPicked("needs")
-    setKind(kindId)
+    setPicked(O.some("needs"))
+    setKind(O.some(kindId))
   }
   const pressMain = () =>
     Primary.$match(main, {
@@ -354,9 +374,10 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       Done: () => undefined,
       Blocked: ({ columnId }) => {
         // On a desk the choice is in the column's own header; on a phone it is in the columns sheet.
-        const select = document.getElementById(`review-match-${columnId}`)
-        if (select !== null) select.focus()
-        else props.onShowMatching?.()
+        O.match(byId(`review-match-${columnId}`), {
+          onSome: (select) => select.focus(),
+          onNone: () => props.onShowMatching?.()
+        })
       }
     })
   // The confirm step is opened by the import button without being its trigger, so it hands focus back itself.
@@ -376,9 +397,17 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
 
   const noun = props.noun[1]
   // The tabs say the caller's words (`words`), and the table's caption follows them.
-  const activeLabel = work.find((item) => item.kind.id === activeKind)?.kind.label
-  const caption = `${props.title}: ${(filter === "auto" ? words.auto : words[filter]).toLowerCase()}${activeLabel === undefined ? "" : `, ${activeLabel}`}, ${whole.format(ordered.length)} ${ordered.length === 1 ? props.noun[0] : noun}`
-  const filters: ReadonlyArray<{ id: FilterId; label: string; n: number }> = [
+  const activeLabel = O.map(
+    A.findFirst(work, (item) => O.contains(activeKind, item.kind.id)),
+    (item) => item.kind.label
+  )
+  const statusCaption = `${props.title}: ${(filter === "auto" ? words.auto : words[filter]).toLowerCase()}`
+  const countCaption = `${whole.format(ordered.length)} ${ordered.length === 1 ? props.noun[0] : noun}`
+  const caption = O.match(activeLabel, {
+    onNone: () => `${statusCaption}, ${countCaption}`,
+    onSome: (label) => `${statusCaption}, ${label}, ${countCaption}`
+  })
+  const filters: ReadonlyArray<{ readonly id: FilterId; readonly label: string; readonly n: number }> = [
     { id: "needs", label: words.needs, n: counts.needs },
     // Rows nothing here can fix are not decisions: they have their own tab, shown while there are any.
     ...(counts.cannot > 0 || filter === "cannot"
@@ -392,8 +421,8 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       : []),
     { id: "all", label: words.all, n: counts.total }
   ]
-  const lastStep = state.undo[state.undo.length - 1]
-  const nextRedo = state.redo[state.redo.length - 1]
+  const lastStep = A.last(state.undo)
+  const nextRedo = A.last(state.redo)
   const held = counts.needs + counts.cannot + counts.out + counts.stored
 
   const showAll = (
@@ -413,8 +442,8 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
     ) : (
       <span className="inline-flex items-center gap-1">
         {filter === "needs" && search === ""
-          ? counts.needs > 0 && activeLabel !== undefined
-            ? `Nothing left under ${activeLabel}.`
+          ? counts.needs > 0 && O.isSome(activeLabel)
+            ? `Nothing left under ${activeLabel.value}.`
             : "Nothing left to decide."
           : `No ${noun} here.`}
         {filter === "needs" && counts.needs > 0 && search === "" ? (
@@ -432,20 +461,26 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const undoButton = readOnly ? null : (
     <>
       <ToolButton
-        label={lastStep === undefined ? "Undo" : `Undo: ${lastStep.label}`}
-        tip={lastStep === undefined ? "Nothing to undo" : `Undo: ${lastStep.label.toLowerCase()} (${undoKeys})`}
+        label={O.match(lastStep, { onNone: () => "Undo", onSome: (step) => `Undo: ${step.label}` })}
+        tip={O.match(lastStep, {
+          onNone: () => "Nothing to undo",
+          onSome: (step) => `Undo: ${step.label.toLowerCase()} (${undoKeys})`
+        })}
         narrow={narrow}
-        disabled={lastStep === undefined}
-        onClick={() => run({ type: "undo" as const })}
+        disabled={O.isNone(lastStep)}
+        onClick={() => run({ type: "undo" as const }, O.none())}
       >
         <Undo2Icon aria-hidden />
       </ToolButton>
       <ToolButton
-        label={nextRedo === undefined ? "Redo" : `Redo: ${nextRedo.label}`}
-        tip={nextRedo === undefined ? "Nothing to redo" : `Redo: ${nextRedo.label.toLowerCase()} (${redoKeys})`}
+        label={O.match(nextRedo, { onNone: () => "Redo", onSome: (step) => `Redo: ${step.label}` })}
+        tip={O.match(nextRedo, {
+          onNone: () => "Nothing to redo",
+          onSome: (step) => `Redo: ${step.label.toLowerCase()} (${redoKeys})`
+        })}
         narrow={narrow}
-        disabled={nextRedo === undefined}
-        onClick={() => run({ type: "redo" as const })}
+        disabled={O.isNone(nextRedo)}
+        onClick={() => run({ type: "redo" as const }, O.none())}
       >
         <Redo2Icon aria-hidden />
       </ToolButton>
@@ -460,7 +495,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       aria-label="Show"
       value={filter === "auto" ? "" : filter}
       onValueChange={(next) => {
-        if (next !== "") chooseFilter(next as FilterId)
+        if (S.is(FilterId)(next)) chooseFilter(next)
       }}
       // On a phone the tabs stand apart and wrap onto a second line: every one is on screen, none past its edge.
       {...(narrow ? { spacing: 1, className: "w-full flex-wrap" } : {})}
@@ -487,7 +522,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
 
   // Which columns show: the data table's own column toggle, on the review's one table instance. Which file column
   // fed each field is the Match step's to say: the button beside it goes there, amber while a field has no column.
-  const unmatched = columns.filter((column) => isColumnMatchUnmatched(column.match)).length
+  const unmatched = columns.filter((column) => O.exists(column.match, isColumnMatchUnmatched)).length
   const matchButton =
     props.onShowMatching === undefined ? null : (
       <ToolButton
@@ -517,27 +552,31 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const filterMenu =
     facets.length === 0 ? null : (
       <>
-        {facets.map((facet) => (
-          <DataTableFacetedFilter
-            key={facet.column.id}
-            column={
-              {
-                id: facet.column.id,
-                table,
-                columnDef: { meta: { label: facet.column.label } },
-                getFilterValue: () => facet.picked,
-                setFilterValue: (next: unknown) =>
-                  setFacetPicked((before) => ({
-                    ...before,
-                    [facet.column.id]: Array.isArray(next) ? (next as ReadonlyArray<string>) : []
-                  }))
-              } as unknown as Column<DataTableFeatures, RowView, string>
-            }
-            title={facet.column.label}
-            options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
-            multiple
-          />
-        ))}
+        {facets.map((facet) =>
+          O.match(O.fromUndefinedOr(table.getColumn(facet.column.id)), {
+            onNone: () => null,
+            onSome: (column) => (
+              <DataTableFacetedFilter
+                key={facet.column.id}
+                column={facetColumn({
+                  table,
+                  column,
+                  picked: facet.picked,
+                  pick: (next: unknown) =>
+                    setFacetPicked((before) => ({
+                      ...before,
+                      [facet.column.id]: Array.isArray(next)
+                        ? A.filter(next, (value): value is string => typeof value === "string")
+                        : []
+                    }))
+                })}
+                title={facet.column.label}
+                options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
+                multiple
+              />
+            )
+          })
+        )}
       </>
     )
 
@@ -554,7 +593,12 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
         <TooltipContent>Row height</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={density} onValueChange={(next) => chooseDensity(next as Density)}>
+        <DropdownMenuRadioGroup
+          value={density}
+          onValueChange={(next) => {
+            if (S.is(Density)(next)) chooseDensity(next)
+          }}
+        >
           <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
@@ -635,30 +679,34 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const finished = isPrimaryDone(main)
   const idle = isPrimaryIdle(main)
   const importButtonNode =
-    readOnly || loading || rows.length === 0 || embedded ? null : finished ? (
-      // On a phone the words take two lines rather than push the next step past the screen's edge.
-      <span className="flex min-w-0 items-center gap-2">
-        <span role="status" className="min-w-0 text-sm leading-tight font-medium">
-          {main.label}
-        </span>
-        <span className="flex flex-none">{props.emptyAction}</span>
-      </span>
-    ) : (
-      <Button
-        ref={importButton}
-        data-import-button=""
-        variant={waits || idle ? "outline" : "default"}
-        size={narrow ? "touch" : "sm"}
-        className={confirmOpen ? "invisible flex-none" : "flex-none"}
-        disabled={props.importing === true || idle}
-        onClick={pressMain}
-      >
-        {/* The same words on every tab: only the button's weight says whether a decision waits. While the caller
+    readOnly || loading || rows.length === 0 || embedded
+      ? O.none()
+      : O.some(
+          finished ? (
+            // On a phone the words take two lines rather than push the next step past the screen's edge.
+            <span className="flex min-w-0 items-center gap-2">
+              <span role="status" className="min-w-0 text-sm leading-tight font-medium">
+                {main.label}
+              </span>
+              <span className="flex flex-none">{props.emptyAction}</span>
+            </span>
+          ) : (
+            <Button
+              ref={importButton}
+              data-import-button=""
+              variant={waits || idle ? "outline" : "default"}
+              size={narrow ? "touch" : "sm"}
+              className={confirmOpen ? "invisible flex-none" : "flex-none"}
+              disabled={props.importing === true || idle}
+              onClick={pressMain}
+            >
+              {/* The same words on every tab: only the button's weight says whether a decision waits. While the caller
             writes the import, the button says so: what is written is the server's to decide. */}
-        {props.importing === true ? <Spinner /> : null}
-        {importLabel}
-      </Button>
-    )
+              {props.importing === true ? <Spinner /> : null}
+              {importLabel}
+            </Button>
+          )
+        )
 
   // The one line under the title: what the run found, and the rules' own fixes when they arrived applied.
   const facts = props.summary.length > 0 ? props.summary : [`${whole.format(counts.total)} rows`]
@@ -670,7 +718,11 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
           variant="quiet"
           size={narrow ? "touch" : "xs"}
           aria-pressed={filter === "auto"}
-          onClick={() => chooseFilter(filter === "auto" ? (opened?.filter ?? "needs") : "auto")}
+          onClick={() =>
+            chooseFilter(
+              filter === "auto" ? O.match(opened, { onNone: () => "needs", onSome: (opened) => opened.filter }) : "auto"
+            )
+          }
         >
           <CheckIcon aria-hidden />
           {whole.format(counts.applied)} auto-fixed
@@ -691,10 +743,10 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
             heldLine(counts, words),
             // The caller's sums are of the rows it will import, so they are said as that.
             // With nothing to import there is nothing to add up.
-            ...(props.totals === undefined || props.totals.length === 0 || counts.ready === 0
+            ...(totals.length === 0 || counts.ready === 0
               ? []
               : [
-                  `${whole.format(counts.ready)} to import: ${props.totals.map((total) => `${total.label} ${total.value}`).join(", ")}`
+                  `${whole.format(counts.ready)} to import: ${totals.map((total) => `${total.label} ${total.value}`).join(", ")}`
                 ])
           ]
             .filter((part) => part !== "")
@@ -767,7 +819,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
     <div className="p-4">
       <Alert variant="destructive" className="max-w-xl">
         <AlertTitle>The review could not be prepared</AlertTitle>
-        <AlertDescription>{props.error ?? "Try again, or choose the file again."}</AlertDescription>
+        <AlertDescription>{error}</AlertDescription>
       </Alert>
       {props.onRetry === undefined ? null : (
         <Button variant="outline" size={narrow ? "touch" : "sm"} className="mt-3" onClick={props.onRetry}>
@@ -785,7 +837,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       caption={caption}
       empty={empty}
       onMatch={readOnly ? undefined : props.onMatchColumn}
-      cellEditor={props.cellEditor}
+      cellEditor={cellEditor}
     />
   )
 
@@ -796,7 +848,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
         onOpenChange={setConfirmOpen}
         onCloseAutoFocus={backToImport}
         title={`${main.label}?`}
-        description={`${confirmLine({ counts, noun: props.noun, words })} ${props.importNote ?? ""}`}
+        description={`${confirmLine({ counts, noun: props.noun, words })} ${importNote}`}
         footer={
           <>
             <Button size="touch" onClick={confirm}>
@@ -866,14 +918,14 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                 progress={
                   filter === "cannot"
                     ? { total: counts.blocked, left: counts.blocked }
-                    : { total: opened?.decisions ?? left, left }
+                    : { total: O.match(opened, { onNone: () => left, onSome: (opened) => opened.decisions }), left }
                 }
                 onSplit={(groupId) => setSplit((before) => HashSet.add(before, groupId))}
                 undo={undoButton}
                 loading={loading}
                 caption={caption}
                 empty={empty}
-                cellEditor={props.cellEditor}
+                cellEditor={cellEditor}
               />
               <div className="flex h-16 flex-none items-center gap-2 px-4">
                 <p
@@ -891,7 +943,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                 <span role="status" className="sr-only">
                   {said}
                 </span>
-                {importButtonNode}
+                {O.match(importButtonNode, { onNone: () => null, onSome: (button) => button })}
               </div>
             </>
           )}
@@ -942,12 +994,17 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                     </div>
                     <div className="ml-auto flex min-w-0 items-center gap-2">
                       {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
-                      {importButtonNode === null ? null : <span className="flex">{importButtonNode}</span>}
+                      {O.match(importButtonNode, {
+                        onNone: () => null,
+                        onSome: (button) => <span className="flex">{button}</span>
+                      })}
                     </div>
                   </>
                 ) : (
                   <>
-                    <span className="ml-auto flex flex-none">{importButtonNode}</span>
+                    <span className="ml-auto flex flex-none">
+                      {O.match(importButtonNode, { onNone: () => null, onSome: (button) => button })}
+                    </span>
                     <div className="flex w-full items-center gap-1">
                       {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
                       <span className="flex-1" />
@@ -964,11 +1021,11 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                   </>
                 )}
               </div>
-              {listMode === "chips" ? (
+              {O.contains(listMode, "chips") ? (
                 <WorkList items={work} active={activeKind} onPick={pickKind} mode="chips" />
               ) : null}
               <div className="flex min-h-0 flex-1">
-                {listMode === "rail" ? (
+                {O.contains(listMode, "rail") ? (
                   <WorkList items={work} active={activeKind} onPick={pickKind} mode="rail" />
                 ) : null}
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">{tableNode}</div>

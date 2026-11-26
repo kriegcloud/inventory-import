@@ -1,3 +1,6 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
+import { fixableBy } from "@inventory/review/ReviewDraft"
 // A draft saved before the review region became a package, and before its decision became a tagged union, still
 // restores. The fixture is the exact localStorage text that build wrote, kept as .txt so no formatter touches it. The
 // rule that would hurt if wrong: a person's unfinished review is never thrown away by a new build.
@@ -15,6 +18,9 @@ import { ReviewRow } from "@inventory/review/ReviewTypes"
 import { restoredReview, SavedProgress } from "@inventory/review/SavedProgress"
 import before from "./fixtures/draft-before-the-move.txt?raw"
 
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
+
 const asText = S.fromJsonString(SavedProgress)
 
 describe("a draft saved by the build before the move", () => {
@@ -30,14 +36,17 @@ describe("a draft saved by the build before the move", () => {
   it.effect("gives the region the same decisions and the same undo and redo history", () =>
     Effect.gen(function* () {
       const progress = yield* S.decodeEffect(asText)(before)
-      const review = O.getOrThrow(progress.review)
+      assertTrue(O.isSome(progress.review), "expected a present test value")
+      const review = progress.review.value
       const state = restoredReview(review)
       expect(A.sort([...HashMap.keys(state.decisions)], Order.String)).toEqual(["row-148", "row-195"])
       expect(O.map(HashMap.get(state.decisions, "row-148"), (d) => d.accepted)).toEqual(O.some(["sku"]))
       expect(A.map(state.undo, (step) => step.label)).toEqual(["2 fixes accepted"])
       expect(A.map(state.redo, (step) => step.label)).toEqual(["2 rows left out"])
       // The redo step holds the two rows as they were when it was undone: left out, not kept before.
-      const redone = state.redo[0]?.before ?? HashMap.empty()
+      const redo = state.redo[0]
+      assertDefined(redo)
+      const redone = redo.before
       expect(O.map(O.flatten(HashMap.get(redone, "row-55")), (d) => d.place)).toEqual(
         O.some({ kind: "leftOut", wasKept: false })
       )
@@ -49,7 +58,15 @@ describe("a draft saved by the build before the move", () => {
           cells: {}
         })
       )
-      const after = act({ rows, state, action: { type: "redo" } }).state
+      const after = act({
+        columns: reviewColumns,
+        recheck: O.none(),
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state,
+        action: { type: "redo" }
+      }).state
       expect(O.map(R.get(R.fromEntries(after.decisions), "row-191"), (d) => d.place.kind)).toEqual(O.some("leftOut"))
     })
   )

@@ -5,7 +5,10 @@
  *
  * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`, `??=`,
  * `||` and `||=` before a value written out, `getOrElse`, and outside a `.tsx` file a default given to a parameter or
- * a destructured name), a comparison with `null` or `undefined`, an Option turned
+ * a destructured name, an `onNone` arrow returning a number, empty string/array/object, null or undefined in
+ * contract/model/host, and direct or piped `Result.getOrThrow`/`Effect.runSync` calls in src outside tests), a comparison
+ * with `null` or `undefined`,
+ * a test if/ternary guarded by Option/Result/Exit, an unwrapped `S.optionalKey` in contract/model/host, an Option turned
  * back into a missing value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not
  * `SchemaGetter`'s or `SchemaTransformation`'s. The law does not judge whether a place is "really" a default: a law
  * that judges is argued with, and one that reads types costs the whole program on every run.
@@ -76,6 +79,76 @@ export interface DefaultsExemption {
  */
 export const exemptions: ReadonlyArray<DefaultsExemption> = [
   {
+    file: "packages/access/host/src/internal/authOptions.ts",
+    kinds: ["absence"],
+    why: "Better Auth's own API: its session hook passes a null context and wants undefined back when there is nothing to change (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/access/web/src/Session.atoms.ts",
+    kinds: ["absence"],
+    why: "the browser's own API: window and document are undefined where no page is (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/encoding.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/header.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/machine.ts",
+    kinds: ["absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/csv/src/internal/sniff.ts",
+    kinds: ["absence"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/container.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/formula.ts",
+    kinds: ["fallback"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/numberFormat.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/ooxml.ts",
+    kinds: ["fallback", "absence"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/sheet.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/workbookPart.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/internal/writer.ts",
+    kinds: ["fallback", "absence", "normalise"],
+    why: "a reader of a file's bytes and markup: an Option for each byte, capture or position would cost the loop that reads every cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/model/src/Reading/Spreadsheet.rules.ts",
+    kinds: ["absence"],
+    why: "Cell.shown and Cell.formula stay keys left out because the table crosses the worker by postMessage, where an Option loses its prototype; shownOf and formulaOf read them as Options (Benjamin, 2026-11-25)"
+  },
+  {
     file: "packages/catalog/model/src/Review/CellReading.rules.ts",
     kinds: ["normalise"],
     why: "a file cell's reader: its clean-up is a proposal the person sees as before and after"
@@ -84,6 +157,51 @@ export const exemptions: ReadonlyArray<DefaultsExemption> = [
     file: "packages/catalog/model/src/Review/CellRules.rules.ts",
     kinds: ["normalise"],
     why: "the text a file cell gives the review: its trim is a proposal the person sees as before and after (Benjamin, 2026-11-23)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/CellForms.tsx",
+    kinds: ["normalise"],
+    why: "the repair box of a reviewed cell: the trim reads what the person typed over the file's value, shown as before and after (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/itemText.ts",
+    kinds: ["normalise"],
+    why: "how a reviewed cell's number, vendors and tags are shown: the trim is for display of the file's own text (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/WhyFlagged.tsx",
+    kinds: ["normalise"],
+    why: "the file's own name and SKU shown beside why a row was flagged: the trim is for display of a reviewed cell (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/cellDrafts.ts",
+    kinds: ["normalise"],
+    why: "the reader of what the person typed into a reviewed cell's repair box (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/format.tsx",
+    kinds: ["normalise"],
+    why: "a reviewed cell's whitespace made visible: the trim tells a value with spaces from one without (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/client/src/Storage.browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for client: Storage, the window and Web Locks hand back null or undefined, read here once and passed on as Options (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/catalog/web/src/internal/browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for catalog/web: DOM queries, a ref's current, a dataset, URL parameters and dropped files, read here once and passed on as Options (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/review/src/internal/browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for the review region, which may not import client: Storage, IndexedDB and DOM queries, read here once and passed on as Options (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/ui/src/internal/browser.ts",
+    kinds: ["absence"],
+    why: "the browser's edge for ui: whether a dialog owns a keyboard event, read from the DOM here once (Benjamin, 2026-11-26)"
   },
   {
     file: "packages/catalog/contract/src/Item/SkuKey.rules.ts",
@@ -233,9 +351,9 @@ export type DefaultsFinding = typeof DefaultsFinding.Type
 /** What to write instead, for each kind: the line an agent reads the moment it wrote the place. */
 const remedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
-    "a `??`, a `||` before a value, a getOrElse, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
+    "a `??`, a `||` before a value, a getOrElse, a zero-argument synchronous onNone expression arrow returning a number, empty string/array/object, null or undefined in contract/model/host, a Result.getOrThrow or Effect.runSync call in src outside tests, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
   absence:
-    "a comparison with null or undefined. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
+    "a comparison with null or undefined, or an unwrapped S.optionalKey in contract/model/host. Give the optional key an OptionFrom*, a decoding default, absentAsNone or emptyWhenLeftOut wrapper. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
   unwrap:
     "O.getOrUndefined or O.getOrNull turns an Option back into a missing value. Keep the Option and O.match it where it is used",
   normalise:
@@ -246,7 +364,7 @@ const testRemedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
     "a `??` or a getOrElse in a test hides a value that is missing. Narrow with assertSome, assertDefined or assertSuccess from @effect/vitest/utils, which fail with the value",
   absence:
-    "a comparison with null or undefined in a test. Narrow with assertSome, assertNone or assertDefined from @effect/vitest/utils"
+    "a comparison with null or undefined, an unwrapped optionalKey, or an Option/Result/Exit guard in a test if or ternary. Narrow with assertSome, assertNone or assertDefined from @effect/vitest/utils; for Result use assertSuccess/assertFailure, and for Exit use assertExitSuccess/assertExitFailure"
 }
 
 /** One line of the code at a place: its first line, cut where a longer one would fill the screen. */
@@ -512,7 +630,7 @@ export const defaults = Effect.fn("Defaults.defaults")(function* (
   if (write && A.isReadonlyArrayNonEmpty(only)) return A.of<DefaultsFinding>(DefaultsFinding.cases.NoWrite.make({}))
   const inScope = scopeOf(Str.split("\0")(listed.stdout), Str.split("\0")(vendored.stdout))
   // A named file is read as the caller wrote it: from the root, from the folder the command runs in, or in full.
-  const asked = A.map(only, (file) => repo.relative(repo.root, repo.resolve(repo.cwd, file)))
+  const asked = A.map(only, (file) => repo.relative(repo.resolve(repo.cwd, file), repo.root))
   const present = yield* Effect.filter(inScope, (file) => repo.exists(repo.join(repo.root, file)), { concurrency: 1 })
   const files = A.isReadonlyArrayNonEmpty(asked) ? A.filter(present, (file) => A.contains(asked, file)) : present
   const baselinePath = repo.join(repo.root, baselineFile)

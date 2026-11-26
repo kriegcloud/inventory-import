@@ -1,9 +1,9 @@
 // The header view: the first record names the columns, every later record becomes an object of own properties keyed
-// by those names. Keys are set with `setOwnProperty`, so a heading named `__proto__` is data, never a prototype.
+// by those names. `R.fromEntries` makes own properties, so a heading named `__proto__` is data, never a prototype.
 // A short record fills its missing cells with ""; a long record's extra cells have no heading and are dropped.
-import { setOwnProperty } from "@beep/utils/Record"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import { CsvFatal, DuplicateHeader, EmptyHeader } from "../CsvDiagnostic.schema.ts"
 import type { CsvRecord } from "../CsvTable.schema.ts"
@@ -14,7 +14,7 @@ export type HeaderRow = { readonly [name: string]: string }
 /** The table as objects keyed by its first record, or the fatal findings about the header. */
 export const toHeaderRows = (table: {
   readonly records: ReadonlyArray<CsvRecord>
-}): Result.Result<ReadonlyArray<HeaderRow>, ReadonlyArray<CsvFatal>> =>
+}): Result.Result<ReadonlyArray<HeaderRow>, A.NonEmptyReadonlyArray<CsvFatal>> =>
   O.match(A.head(table.records), {
     onNone: () => Result.succeed([]),
     onSome: (header) => {
@@ -29,13 +29,11 @@ export const toHeaderRows = (table: {
           problems.push(CsvFatal.make({ finding: DuplicateHeader.make({ field, firstField, name }) }))
         }
       })
-      if (problems.length > 0) return Result.fail(problems)
+      if (A.isReadonlyArrayNonEmpty(problems)) return Result.fail(problems)
       return Result.succeed(
-        A.map(A.drop(table.records, 1), (record) => {
-          const row: { [name: string]: string } = {}
-          A.forEach(header, (name, index) => setOwnProperty(row, name, record[index] ?? ""))
-          return row
-        })
+        A.map(A.drop(table.records, 1), (record) =>
+          R.fromEntries(A.map(header, (name, index): readonly [string, string] => [name, record[index] ?? ""]))
+        )
       )
     }
   })

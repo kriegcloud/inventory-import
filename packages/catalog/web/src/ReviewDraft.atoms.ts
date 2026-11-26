@@ -148,7 +148,8 @@ const isLocal = DraftEffect.$match({
 const rowWords = (rowId: string): string => Str.replace("-", " ")(rowId)
 
 /** A field as the person knows it: "Unit cost". */
-const fieldWords = (field: string): string => O.getOrElse(R.get<string, string>(fieldLabels, field), () => field)
+const fieldWords = (field: string): string =>
+  O.match(R.get<string, string>(fieldLabels, field), { onNone: () => field, onSome: (label) => label })
 
 /**
  * The decisions the server did not apply, in a sentence, each by what it was and its row: "Unit cost on row 55; the
@@ -165,27 +166,26 @@ export const acceptsWords = (accepts: ReadonlyArray<StaleAccept>): string =>
         twin: `the row kept of two on ${row} (${field} matched again)`,
         undo: `the undone fix of ${field} on ${row}`
       }
-      return said[taken.kind ?? "accept"]
+      return said[taken.kind]
     }),
     "; "
   )
 
 /** True when every decision taken back was an accept: said in the words an accept always had. */
 const onlyAccepts = (accepts: ReadonlyArray<StaleAccept>): boolean =>
-  A.every(accepts, (taken) => (taken.kind ?? "accept") === "accept")
+  A.every(accepts, (taken) => taken.kind === "accept")
 
 /** The scope this browser keeps one import's review under, for the person signed in; none while nobody is. */
 const scopeFor = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
   signedIn.pipe(
-    O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` })),
-    O.getOrUndefined
+    O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` }))
   )
 
 /** A confirm ends the draft and its undo history: nothing of either comes back on the next visit. */
 const forget = (registry: AtomRegistry.AtomRegistry, id: ImportId): void => {
   const scope = scopeFor(registry.get(member), id)
   registry.set(progressOf(scope), O.none())
-  if (scope !== undefined) catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore))
+  O.map(scope, (scope) => catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore)))
 }
 
 /**
@@ -256,7 +256,7 @@ const perform = (input: {
                 ? DraftEvent.SaveSignedOut({ id: sent })
                 : isTransient(error) || S.is(DraftBusy)(error)
                   ? DraftEvent.SaveFailed({ id: sent })
-                  : DraftEvent.SaveRefused({ id: sent, reason: sayError(error).sentence })
+                  : DraftEvent.SaveRefused({ id: sent, reason: sayError(error, { fields: {} }).sentence })
             )
           }
         )
@@ -334,7 +334,7 @@ const perform = (input: {
     // Off the review with no picture held (Save again pressed on another page, before the step had read the import),
     // nothing hands a view to the draft: it is read here, and handed over, so what waits is judged and sent on it.
     Ask: () => {
-      importView(id).askAgain(registry, O.getOrUndefined(registry.get(lastAnswered(id))))
+      importView(id).askAgain(registry, registry.get(lastAnswered(id)))
       const now = registry.get(draftOf(id))
       if (now.onScreen || O.isSome(now.held)) return
       void call((api) => api.imports.get({ params: { id } })).then(
@@ -382,7 +382,7 @@ const perform = (input: {
             // The picture the confirm answered with: rows decided while it was out are named on the result.
             happened(DraftEvent.ConfirmDone({ id: sent, revision: view.revision, decisions: view.decisions }))
             forget(registry, id)
-            if (onScreen) navigate(importAddress(view.id, "result"))
+            if (onScreen) navigate(importAddress(view.id, "result"), { replace: false })
           },
           (error: unknown) => {
             answered(registry, id)
@@ -392,7 +392,7 @@ const perform = (input: {
             }
             // Closed already, or the answer was lost: the machine sends nothing and asks for the import, whose picture
             // says what was written.
-            toastError(error)
+            toastError(error, { lead: O.none() })
             happened(DraftEvent.ConfirmFailed({ id: sent }))
           }
         )
@@ -419,7 +419,7 @@ const keeping = ({ id, registry }: { readonly registry: AtomRegistry.AtomRegistr
     registry,
     id,
     waits: waiting(registry.get(draftOf(id))),
-    fileName: O.flatMap(importView(id).peek(registry), (view) => O.fromNullishOr(view.fileName))
+    fileName: O.map(importView(id).peek(registry), (view) => view.fileName)
   })
 
 /**
@@ -520,7 +520,7 @@ export const takeBacksNamed = perKey((id: ImportId) =>
   Atom.readable((get): ReadonlyArray<MatchTakeBack> => {
     const dismissed = O.match(dismissedKey(get(member), id), {
       onNone: (): ReadonlyArray<string> => [],
-      onSome: (key) => O.getOrElse(get(takeBackDismissals(key)), (): ReadonlyArray<string> => [])
+      onSome: (key) => O.match(get(takeBackDismissals(key)), { onNone: A.empty, onSome: (dismissed) => dismissed })
     })
     return O.match(viewOf(get, id), {
       onNone: (): ReadonlyArray<MatchTakeBack> => [],
@@ -556,7 +556,7 @@ export const dismissTakeBack = perKey((id: ImportId) =>
         takeBackDismissals(key),
         O.some(
           A.dedupe([
-            ...O.getOrElse(ctx.get(takeBackDismissals(key)), (): ReadonlyArray<string> => []),
+            ...O.match(ctx.get(takeBackDismissals(key)), { onNone: A.empty, onSome: (dismissed) => dismissed }),
             takeBackKey(taken)
           ])
         )
@@ -628,7 +628,11 @@ export const followDraft = perKey((id: ImportId) =>
     Atom.readable((get) => {
       const registry = get.registry
       const takeUp = () =>
-        takeUpGoneTabs({ registry, id, take: (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })) })
+        takeUpGoneTabs({
+          registry,
+          id,
+          take: (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ here: false, kept }))
+        })
       // What this browser kept of the person's waiting rows (from before a reload) comes back with the step.
       registry.set(draftEvents(id), DraftEvent.Opened({ kept: keptWaiting({ registry, id }) }))
       // And what the person's tabs that are gone kept for it: taken up by this one (never from a tab still open).
@@ -695,18 +699,22 @@ const stateHeld = perKey((id: ImportId) => Atom.map(reviewLocal(id), (local) => 
  * keeps it apart (`toServerDecisions`, `toRegionDecisions`).
  */
 const startState = perKey((id: ImportId) =>
-  Atom.readable((get): ReviewState => {
-    const decisions = O.getOrElse(get(shownDecisions(id)), (): SavedDecisions => ({}))
-    // Read as it stands when the review starts: every decision after that is kept there, and starts nothing again.
-    const kept = O.flatMap(get.once(progressFor(get, id)), (progress) => progress.review)
-    return O.match(kept, {
-      onNone: () => restored(toRegionDecisions(decisions)),
-      onSome: (review) =>
-        Eq.equals(toServerDecisions(review.decisions), decisions)
-          ? restoredReview(review)
-          : restored(toRegionDecisions(decisions))
+  Atom.readable((get): ReviewState =>
+    O.match(get(shownDecisions(id)), {
+      onNone: () => restored({}),
+      onSome: (decisions) => {
+        // Read as it stands when the review starts: later decisions start nothing again.
+        const kept = O.flatMap(get.once(progressFor(get, id)), (progress) => progress.review)
+        return O.match(kept, {
+          onNone: () => restored(toRegionDecisions(decisions)),
+          onSome: (review) =>
+            Eq.equals(toServerDecisions(review.decisions), decisions)
+              ? restoredReview(review)
+              : restored(toRegionDecisions(decisions))
+        })
+      }
     })
-  })
+  )
 )
 
 /**
@@ -717,7 +725,7 @@ const startState = perKey((id: ImportId) =>
  */
 export const reviewState = perKey((id: ImportId) =>
   Atom.writable(
-    (get): ReviewState => O.getOrElse(get(stateHeld(id)), () => get(startState(id))),
+    (get): ReviewState => O.match(get(stateHeld(id)), { onNone: () => get(startState(id)), onSome: (state) => state }),
     (ctx, next: ReviewState) => {
       const before = toServerDecisions(saved(ctx.get(reviewState(id))))
       const decisions = saved(next)

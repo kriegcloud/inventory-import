@@ -13,7 +13,10 @@
     "./BetterAuthSession": "./src/BetterAuth.schema.ts",
     "./BetterAuthConfig": "./src/BetterAuth.config.ts",
     "./BetterAuthError": "./src/BetterAuth.errors.ts",
-    "./BetterAuthTest": "./src/BetterAuth.test-layer.ts"
+    "./BetterAuthTest": "./src/BetterAuth.test-layer.ts",
+    "./Client": "./src/BetterAuthClient.service.ts",
+    "./ClientSchema": "./src/BetterAuthClient.schema.ts",
+    "./Hooks": "./src/BetterAuth.hooks.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

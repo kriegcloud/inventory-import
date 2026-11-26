@@ -3,7 +3,7 @@
 // ones, and it fails when a run does not come to what it must. No Java and no jar is used here: the real run is the
 // package's `reason` task, in `bun run check:full`.
 import { describe, expect, it } from "@effect/vitest"
-import { assertSome } from "@effect/vitest/utils"
+import { assertSome, assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -85,9 +85,10 @@ const gate = Effect.fn("gate")(function* (asked: Case) {
     javas: Effect.succeed(given.javas),
     jar: Effect.map(Ref.get(fetches), (made) => (A.isReadonlyArrayEmpty(made) ? given.jar : given.fetched)),
     fetch: Effect.fnUntraced(function* (url: string) {
-      if (O.isSome(given.fetchFails)) {
-        return yield* JarNotFetched.make({ url, reason: given.fetchFails.value })
-      }
+      yield* O.match(given.fetchFails, {
+        onNone: () => Effect.void,
+        onSome: (reason) => Effect.fail(JarNotFetched.make({ url, reason }))
+      })
       yield* Ref.update(fetches, A.append(url))
     }),
     robot: Effect.fnUntraced(function* ({ command, document, java }) {
@@ -101,11 +102,10 @@ const gate = Effect.fn("gate")(function* (asked: Case) {
 
 /** The refusal a case ends in, as its sentence; "" when the gate passed. */
 const refusalOf = (given: Case) =>
-  Effect.map(gate(given), (run) => ({
-    ...run,
-    refusal: Result.isFailure(run.result) ? O.some(run.result.failure) : O.none(),
-    sentence: Result.isFailure(run.result) ? refusalSentence(run.result.failure) : ""
-  }))
+  Effect.map(gate(given), (run) => {
+    assertTrue(Result.isFailure(run.result), "expected the tested value to be present")
+    return { ...run, refusal: O.some(run.result.failure), sentence: refusalSentence(run.result.failure) }
+  })
 
 /** A run's path in the packet, as gate 9 names it. */
 const inPacket = (file: string): string => `${packetFolder}${file}`
@@ -168,7 +168,8 @@ describe("gate 9, the reasoner's checks", () => {
   it.effect("passes on Java 17 and the approved jar: every run, each named for its ban or its fixture", () =>
     Effect.gen(function* () {
       const run = yield* gate({})
-      expect(Result.isSuccess(run.result) ? run.result.success : []).toStrictEqual([
+      assertTrue(Result.isSuccess(run.result), "expected the tested value to be present")
+      expect(run.result.success).toStrictEqual([
         `ROBOT v1.9.11 (sha256 ${run.pin.sha256}) with HermiT under Java 17.0.2 at /opt/java-17/bin/java`,
         "ban 1, the near miss: the same person is a member of two tenants: the thread's graph is in the DL profile and consistent",
         "ban 2, the near miss: an audit entry names a member of the person, in the tenant: fixtures/reason/entry-names-member.ttl is in the DL profile and consistent",
@@ -267,7 +268,8 @@ describe("gate 9, the reasoner's checks", () => {
     Effect.gen(function* () {
       const run = yield* gate({ jar: O.none() })
       expect(run.fetches).toStrictEqual([run.pin.url])
-      expect(Result.isSuccess(run.result) ? run.result.success[0] : "").toContain(", fetched now)")
+      assertTrue(Result.isSuccess(run.result), "expected the tested value to be present")
+      expect(run.result.success[0]).toContain(", fetched now)")
     })
   )
 

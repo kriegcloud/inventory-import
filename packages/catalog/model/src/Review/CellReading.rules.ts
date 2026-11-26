@@ -154,10 +154,10 @@ const encodeDimensions = S.encodeOption(DimensionsCell)
 // `withPreferred` gives the cell back as it was written but for the one flag it changes.
 const VendorCell = S.Struct({
   vendor_name: S.OptionFromOptionalKey(S.String),
-  vendor_sku: S.String.pipe(S.NullOr, S.optionalKey),
+  vendor_sku: S.String.pipe(S.NullOr, S.OptionFromOptionalKey),
   unit_cost: S.OptionFromOptionalKey(S.Union([S.Finite, S.String])),
-  lead_time_days: S.Finite.pipe(S.NullOr, S.optionalKey),
-  is_preferred: S.optionalKey(S.Boolean)
+  lead_time_days: S.Finite.pipe(S.NullOr, S.OptionFromOptionalKey),
+  is_preferred: S.OptionFromOptionalKey(S.Boolean)
 })
 const VendorsCell = VendorCell.pipe(S.Array, S.fromJsonString)
 const decodeVendors = S.decodeUnknownOption(VendorsCell)
@@ -165,8 +165,8 @@ const encodeVendors = S.encodeOption(VendorsCell)
 
 /** A value of a cell that holds JSON: read (`ok`), or the sentence that says what is wrong with it (`bad`). */
 export type Read<A> = Data.TaggedEnum<{
-  ok: { readonly value: A }
-  bad: { readonly message: string }
+  readonly ok: { readonly value: A }
+  readonly bad: { readonly message: string }
 }>
 
 /** A value of a cell that holds JSON, read. */
@@ -288,17 +288,17 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
         `${place} (${named(name)}) has the unit cost ${named(`${written.value}`)}, not 0 or more with up to 4 decimals.`
       )
     }
-    const lead = O.fromNullishOr(vendor.lead_time_days)
+    const lead = O.flatMap(vendor.lead_time_days, O.fromNullOr)
     const wrongLead = O.filter(lead, (days) => !Number.isInteger(days) || days < 0)
     if (O.isSome(wrongLead)) {
       return bad(`${place} (${named(name)}) has the lead time ${wrongLead.value}, not a whole number of days.`)
     }
     return ok({
       vendorName: name,
-      vendorSku: O.fromNullishOr(vendor.vendor_sku),
+      vendorSku: O.flatMap(vendor.vendor_sku, O.fromNullOr),
       unitCost: cost.value,
       leadTimeDays: lead,
-      isPreferred: vendor.is_preferred === true
+      isPreferred: O.contains(vendor.is_preferred, true)
     })
   })
   const wrong = A.findFirst(read, Read.$match({ ok: () => O.none<string>(), bad: ({ message }) => O.some(message) }))
@@ -309,7 +309,7 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
 /** The vendors cell again with only the vendor at `keep` preferred: one reading of a cell that marks several. */
 export const withPreferred = (input: { readonly text: string; readonly keep: number }): O.Option<string> =>
   O.flatMap(decodeVendors(input.text), (cell) =>
-    encodeVendors(A.map(cell, (vendor, index) => ({ ...vendor, is_preferred: index === input.keep })))
+    encodeVendors(A.map(cell, (vendor, index) => ({ ...vendor, is_preferred: O.some(index === input.keep) })))
   )
 
 /**
@@ -349,13 +349,10 @@ export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => (
           encodeVendors(
             A.map(item.vendors, (vendor) => ({
               vendor_name: O.some(vendor.vendorName),
-              ...O.match(vendor.vendorSku, { onNone: () => ({}), onSome: (vendor_sku) => ({ vendor_sku }) }),
+              vendor_sku: vendor.vendorSku,
               unit_cost: O.some(Number(costDigits(vendor.unitCost))),
-              ...O.match(vendor.leadTimeDays, {
-                onNone: () => ({}),
-                onSome: (lead_time_days) => ({ lead_time_days })
-              }),
-              is_preferred: vendor.isPreferred
+              lead_time_days: vendor.leadTimeDays,
+              is_preferred: O.some(vendor.isPreferred)
             }))
           )
         )

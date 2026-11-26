@@ -7,9 +7,9 @@ import * as AsyncResult from "effect/reactivity/AsyncResult"
 /** What a screen draws from one read. */
 export interface Drawn<A> {
   /** The answer, also while it is being asked again; none before the first one came. */
-  readonly data: A | undefined
+  readonly data: O.Option<A>
   /** Why it could not be read, while it is not being asked again; null otherwise. */
-  readonly error: unknown
+  readonly error: O.Option<unknown>
   readonly isError: boolean
   /** Shown from before while it is asked again. */
   readonly updating: boolean
@@ -17,11 +17,11 @@ export interface Drawn<A> {
 
 /** One read as a screen draws it. */
 export const resultOf = <A, E>(result: AsyncResult.AsyncResult<A, E>): Drawn<A> => {
-  const error = AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
+  const error = AsyncResult.isFailure(result) && !result.waiting ? O.some(result.cause.pipe(Cause.squash)) : O.none()
   return {
-    data: result.pipe(AsyncResult.value, O.getOrUndefined),
+    data: AsyncResult.value(result),
     error,
-    isError: error !== null,
+    isError: O.isSome(error),
     updating: result.waiting
   }
 }
@@ -29,7 +29,7 @@ export const resultOf = <A, E>(result: AsyncResult.AsyncResult<A, E>): Drawn<A> 
 /** What a screen draws from one read of something its address names (an import, its staged rows). */
 export interface Opened<A> {
   /** The answer, also from before a read that failed; never of something found gone. */
-  readonly data: A | undefined
+  readonly data: O.Option<A>
   /** Why there is nothing to draw: the first read failed, or what the address names is gone. None otherwise. */
   readonly refused: O.Option<unknown>
   /** True where it is gone, said by the server: whatever was read before is not drawn. */
@@ -52,7 +52,7 @@ export const openedOf = <A, E>(input: {
   const failed = AsyncResult.isFailure(read) ? O.some(read.cause.pipe(Cause.squash)) : O.none<unknown>()
   const gone = O.exists(failed, input.isGone)
   return {
-    data: gone ? undefined : O.getOrUndefined(held),
+    data: gone ? O.none() : held,
     refused: gone || (O.isNone(held) && !read.waiting) ? failed : O.none(),
     gone,
     behind: gone || O.isNone(held) ? O.none() : failed

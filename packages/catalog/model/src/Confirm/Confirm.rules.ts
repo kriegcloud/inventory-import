@@ -7,9 +7,7 @@ import { DecidedBy, decidedByNobody, decidedByPerson, maxReason } from "@invento
 import { ItemFields } from "@inventory/catalog-contract/Item"
 import { maxPart, RowNumber } from "@inventory/catalog-contract/Staged"
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import type { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
-import { identity } from "effect/Function"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -24,7 +22,9 @@ export class PlannedChange extends S.Opaque<PlannedChange, { readonly brand: uni
   S.Struct({
     change: Change,
     decidedByName: S.Option(S.String).pipe(
-      S.annotateKey({ description: "Who accepted or typed the value; none when a rule applied it" })
+      S.annotateKey({
+        description: "Who accepted or typed the value; none when a rule applied it, or when no name is recorded"
+      })
     )
   }).annotate({ identifier: "PlannedChange", description: "A changed value a confirm will record" })
 ) {}
@@ -166,19 +166,17 @@ export const plannedItems = (
 /**
  * The plan of a confirm, from the review as it stands. A ready row is created, or replaces the stored item when the
  * person chose that; a row already there is skipped; a row left out says who left it out (`authors` holds who
- * decided each row, the actor where nobody is recorded), and a row still waiting says nobody settled it.
+ * decided each row), and a row still waiting says nobody settled it. A decision nobody is recorded for, or whose
+ * stored name is too long or empty to show, names no one: the person who confirms is never named in their place
+ * (Benjamin, 2026-11-26).
  */
 export const confirmPlan = (input: {
   readonly draft: ImportId
   readonly review: Review
   readonly authors: Readonly<Record<string, string>>
-  readonly actor: Member
 }): ConfirmPlan => {
-  const { review, authors, actor } = input
-  const who = (rowId: string): string => O.match(R.get(authors, rowId), { onNone: () => actor.name, onSome: identity })
-  // A name stored before names were checked, too long or empty, is said as the confirming person's.
-  const person = (rowId: string): DecidedBy =>
-    decidedByPerson(O.match(S.decodeOption(DisplayName)(who(rowId)), { onNone: () => actor.name, onSome: identity }))
+  const { review, authors } = input
+  const who = (rowId: string): O.Option<DisplayName> => O.flatMap(R.get(authors, rowId), S.decodeOption(DisplayName))
   const rows = A.map(review.rows, (row): PlannedRow => {
     const at = {
       rowNumber: row.rowNumber,
@@ -195,7 +193,7 @@ export const confirmPlan = (input: {
         changes: A.map(row.changes, (change) =>
           PlannedChange.make({
             change,
-            decidedByName: changeDecidedBy(change) === "person" ? O.some(who(row.id)) : O.none()
+            decidedByName: changeDecidedBy(change) === "person" ? who(row.id) : O.none()
           })
         )
       }
@@ -205,7 +203,7 @@ export const confirmPlan = (input: {
     return PlannedNotImported.make({
       ...at,
       reason: why,
-      decidedBy: RowStatus.is.out(row.status) ? person(row.id) : decidedByNobody
+      decidedBy: RowStatus.is.out(row.status) ? decidedByPerson(who(row.id)) : decidedByNobody
     })
   })
   return ConfirmPlan.make({ draft: input.draft, rows })

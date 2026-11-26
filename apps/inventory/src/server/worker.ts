@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { D1 } from "@beep/d1/D1"
 import { env, waitUntil } from "cloudflare:workers"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -25,7 +26,12 @@ const app = makeApp({
   identity: SessionIdentityLive,
   // Better Auth takes the D1 binding itself. Its work after an answer (rate-limit updates, cleanup) is handed to
   // `waitUntil`, so the answer does not wait for it and the Worker is not stopped before it is done.
-  auth: signIn({ database: env.DB, production: import.meta.env.PROD, backgroundTasks: waitUntil }),
+  auth: signIn({
+    database: env.DB,
+    production: import.meta.env.PROD,
+    backgroundTasks: O.some(waitUntil),
+    rateLimit: true
+  }),
   production: import.meta.env.PROD,
   docs: import.meta.env.DEV,
   // The one place the Worker's fetch is chosen: the collector's exporters and the browser's batches go through it.

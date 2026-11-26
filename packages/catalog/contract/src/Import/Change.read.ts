@@ -38,7 +38,14 @@ const changed = {
   to: S.String.pipe(S.annotateKey({ description: "The value the import wrote in its place", examples: ["BX"] }))
 }
 const proposalBasis = S.String.pipe(S.annotateKey({ description: "What the proposal rested on, in a sentence" }))
-const proposalConfidence = Confidence.pipe(S.annotateKey({ description: "How sure the proposal's source was" }))
+const proposalConfidence = Confidence.pipe(
+  S.annotateKey({
+    description:
+      "How sure the proposal's source was. Left out for a proposal stored before confidence was kept: nothing is " +
+      "claimed for it."
+  }),
+  S.OptionFromOptionalKey
+)
 
 class AppliedByRule extends S.Opaque<AppliedByRule, { readonly brand: unique symbol }>()(
   S.Struct({ how: S.tag("appliedByRule"), ...changed, basis: proposalBasis, confidence: proposalConfidence }).annotate({
@@ -99,7 +106,7 @@ export const changeBasis = (change: Change): O.Option<string> =>
 
 /** How sure a proposal's source was; none for a value the person typed. */
 export const changeConfidence = (change: Change): O.Option<Confidence> =>
-  Change.guards.typed(change) ? O.none() : O.some(change.confidence)
+  Change.guards.typed(change) ? O.none() : change.confidence
 
 /** The words `importChange.how` has always held for each case, and the activity view shows where there is no basis. */
 export const changeHowWords = {
@@ -120,18 +127,17 @@ export type StoredChange = {
 }
 
 /**
- * What a proposal stored by an older build, with no basis or confidence, reads as: no basis, and low confidence, the
- * least it can claim. No recorded decision backs these two values; they are listed for Benjamin's ruling in
- * goals/defaults-at-boundaries (SPEC, "Defaults nobody decided"). A row of the current build always has both.
+ * What a proposal stored by an older build, with no basis, reads as: no basis. Its confidence stays absent: a
+ * proposal that recorded none claims none (Benjamin, 2026-11-26).
  */
-const unrecorded: { readonly basis: string; readonly confidence: Confidence } = { basis: "", confidence: "low" }
+const unrecordedBasis = ""
 
 /** The change the stored columns say. */
 export const changeFromStored = (stored: StoredChange): Change => {
   const core = { field: stored.field, from: stored.from, to: stored.to }
   const said = {
-    basis: O.match(stored.basis, { onNone: () => unrecorded.basis, onSome: identity }),
-    confidence: O.match(stored.confidence, { onNone: () => unrecorded.confidence, onSome: identity })
+    basis: O.match(stored.basis, { onNone: () => unrecordedBasis, onSome: identity }),
+    confidence: stored.confidence
   }
   return stored.how === "typed or chose a value"
     ? TypedValue.make(core)

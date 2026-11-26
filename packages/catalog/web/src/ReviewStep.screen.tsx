@@ -1,3 +1,5 @@
+import { refCallback } from "./internal/browser.ts"
+import { rowName } from "@inventory/review/ReviewDraft"
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -60,20 +62,20 @@ import { offersSuggestions } from "@inventory/catalog-model/Suggest"
 const whole = new Intl.NumberFormat("en-US")
 
 /** The two cells that hold JSON are fixed in a form of their own, not as raw text in one box. */
-const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
+const cellEditor = (input: { readonly row: ReviewRow; readonly column: string; readonly value: string }) =>
   input.column === "dimensions"
-    ? {
+    ? O.some({
         label: "Fix dimensions",
-        title: `Dimensions, row ${input.row.label ?? input.row.line}`,
+        title: `Dimensions, row ${rowName(input.row)}`,
         render: (save: (value: string) => void) => <DimensionsForm value={input.value} onSave={save} />
-      }
+      })
     : input.column === "vendors"
-      ? {
+      ? O.some({
           label: "Fix vendors",
-          title: `Vendors, row ${input.row.label ?? input.row.line}`,
+          title: `Vendors, row ${rowName(input.row)}`,
           render: (save: (value: string) => void) => <VendorsForm value={input.value} onSave={save} />
-        }
-      : undefined
+        })
+      : O.none()
 
 /** The review of every row with the decisions shown: the same pure review the server runs at the confirm. */
 const currentReview = perKey((id: ImportId) =>
@@ -113,14 +115,16 @@ const recheckOf = perKey((id: ImportId) =>
   Atom.readable((get) =>
     O.map(get(reviewInput(id)), (input) => {
       const check = recheckRow(input)
-      return (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined => {
+      return (asked: {
+        readonly row: ReviewRow
+        readonly cells: Readonly<Record<string, string>>
+      }): O.Option<Problem> => {
         const problem = check({ id: asked.row.id, values: asked.cells })
         // The check knows the typed values and not the keep-or-replace answer: once that is given, what is still open
         // is what the review of every decision says (the row's own problem).
         const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
         if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
-        // The region takes no problem as undefined: the screen's last step.
-        return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
+        return O.map(problem, (problem) => toRegionProblem(problem, { withoutRivals: false }))
       }
     })
   )
@@ -145,12 +149,16 @@ const regionGiven = perKey((id: ImportId) =>
  * review of 50,000 rows takes the browser most of a second in one go: the skeleton is drawn first (a deferred value),
  * so the person sees what is coming instead of the last screen standing still.
  */
-export function ReviewStep(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
+export function ReviewStep(props: {
+  readonly view: ImportView
+  readonly table: StagedTable
+  readonly canImport: boolean
+}) {
   const painted = useDeferredValue(true, false)
   return painted ? <ReviewBody {...props} /> : <ReviewSkeleton title={`Review ${props.view.fileName}`} />
 }
 
-function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
+function ReviewBody(props: { readonly view: ImportView; readonly table: StagedTable; readonly canImport: boolean }) {
   const { view, table } = props
   const [local, setLocal] = useAtom(reviewLocal(view.id))
   const happened = useAtomSet(draftEvents(view.id))
@@ -165,14 +173,14 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // The person picked a file column for a field the headings left without one, from inside the review.
   const matching = useAtomValue(matchColumn).waiting
   const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
-  const match = (pick: { field: Field; column: number }, done?: () => void) => {
+  const match = (pick: { readonly field: Field; readonly column: number }, done: () => void) => {
     // True between a match made on this screen and the new view it returns, so the update is not announced as
     // someone else's.
     happened(DraftEvent.MatchStarted())
     void matchOne({ id: view.id, field: pick.field, column: O.some(pick.column) }).then((exit) => {
       happened(DraftEvent.MatchEnded())
-      done?.()
-      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash))
+      done()
+      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
     })
   }
   // Asks for suggestions where the rules have none. Nothing it returns changes a row: each waits for the person.
@@ -181,9 +189,9 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const suggest = () =>
     void suggestNow(view.id).then((exit) => {
       if (Exit.isSuccess(exit)) setLocal((now) => ({ ...now, suggested: O.some(exit.value) }))
-      else toastError(exit.cause.pipe(Cause.squash), { lead: "No suggestions were made." })
+      else toastError(exit.cause.pipe(Cause.squash), { lead: O.some("No suggestions were made.") })
     })
-  const suggested = O.getOrUndefined(local.suggested)
+  const suggested = local.suggested
 
   // The confirm is the draft's to send (`ReviewDraft.atoms.ts`): it names the picture this screen holds and carries
   // the person's rows not saved yet. Made on a picture somebody has changed since, it is refused and nothing is
@@ -217,13 +225,6 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       suggestion.kind === "column" &&
       current.mapping.some((matched) => matched.field === suggestion.field && O.isNone(matchedColumn(matched)))
   )
-  const answered =
-    suggested === undefined
-      ? undefined
-      : AnsweredBy.match(suggested.answeredBy, {
-          Model: (by) => `Answered by the model ${by.model}.`,
-          Rules: (by) => `Answered by the fixed rules, not a model: ${by.reason}`
-        })
   // Offered for a row that cannot be imported, and for a heading no field reads while a field has no column.
   const canSuggest = offersSuggestions({
     cannot: counts.cannot,
@@ -231,7 +232,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     unusedColumns: current.unusedColumns
   })
   const summaryAction =
-    !props.canImport || (!canSuggest && columnSuggestions.length === 0 && suggested === undefined) ? null : (
+    !props.canImport || (!canSuggest && columnSuggestions.length === 0 && O.isNone(suggested)) ? null : (
       <>
         {!canSuggest ? null : (
           <Button variant="outline" size="xs" disabled={suggesting} onClick={suggest}>
@@ -245,15 +246,27 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
             variant="outline"
             size="xs"
             disabled={matching}
-            onClick={() => match({ field: suggestion.field, column: suggestion.column })}
+            onClick={() => match({ field: suggestion.field, column: suggestion.column }, () => {})}
           >
             Use column “{suggestion.heading}” for {fieldLabels[suggestion.field]}
           </Button>
         ))}
-        {suggested === undefined || suggesting ? null : (
-          <span role="status" className="min-w-0 text-foreground">
-            {[...(suggested.lines.length === 0 ? ["Suggested nothing new"] : suggested.lines), answered].join(". ")}
-          </span>
+        {O.match(
+          O.filter(suggested, () => !suggesting),
+          {
+            onNone: () => null,
+            onSome: (suggested) => (
+              <span role="status" className="min-w-0 text-foreground">
+                {[
+                  ...(suggested.lines.length === 0 ? ["Suggested nothing new"] : suggested.lines),
+                  AnsweredBy.match(suggested.answeredBy, {
+                    Model: (by) => `Answered by the model ${by.model}.`,
+                    Rules: (by) => `Answered by the fixed rules, not a model: ${by.reason}`
+                  })
+                ].join(". ")}
+              </span>
+            )
+          }
         )}
       </>
     )
@@ -330,17 +343,25 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         {...(view.createdRows.length > 0 ? { closingLabel: "Close this import" } : {})}
         importing={committing}
         onMatchColumn={(columnId, source) => {
-          const column = table.columns.find((candidate) => candidate.label === source)
-          const field = fields.find((candidate) => candidate === columnId)
-          if (column === undefined || field === undefined) return
-          // The server decides what a new match takes back (accepts, keep-or-replace answers, rows kept of two and
-          // undone fixes that rest on the column): the review starts again from its answer, and names them above.
-          const working = toast.loading(`Matching ${column.label}`)
-          match({ field, column: column.index }, () => toast.dismiss(working))
+          O.map(
+            O.all({
+              column: A.findFirst(table.columns, (candidate) => candidate.label === source),
+              field: A.findFirst(fields, (candidate) => candidate === columnId)
+            }),
+            ({ column, field }) => {
+              // The server decides what this new match takes back and the review follows its answer.
+              const working = toast.loading(`Matching ${column.label}`)
+              match({ field, column: column.index }, () => toast.dismiss(working))
+            }
+          )
         }}
-        onShowMatching={() => navigate(importAddress(view.id, "match"))}
+        onShowMatching={() => navigate(importAddress(view.id, "match"), { replace: false })}
         emptyAction={
-          <Button variant="outline" size="sm" onClick={() => navigate(importAddress(view.id, "upload"))}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(importAddress(view.id, "upload"), { replace: false })}
+          >
             Choose another file
           </Button>
         }
@@ -354,7 +375,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
  * The review with the lines that stand above it, in the step's fixed height: however many lines there are, they scroll
  * in their own part of it and the review takes the rest, so Import never leaves the screen.
  */
-export function AboveReview(props: { lines: ReactNode; children: ReactNode }) {
+export function AboveReview(props: { readonly lines: ReactNode; readonly children: ReactNode }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="max-h-2/5 flex-none overflow-y-auto">{props.lines}</div>
@@ -367,7 +388,7 @@ export function AboveReview(props: { lines: ReactNode; children: ReactNode }) {
  * Said above the review while decisions wait after a save that failed: they are on the screen and kept in this
  * browser, not on the server yet. It stays until they are saved; the button sends them now.
  */
-function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
+function NotSavedYet(props: { readonly rows: number; readonly onSaveAgain: () => void }) {
   const narrow = useAtomValue(isNarrow)
   if (props.rows === 0) return null
   const one = props.rows === 1
@@ -393,8 +414,9 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
 const linesShownOf = Atom.family((_key: string) => Atom.make(linesAtOnce))
 
 /** Takes the person to a line: where a press of Import stopped, or the next one once that is settled. */
-const goThere = (line: HTMLElement | null): void => {
-  if (line === null) return
+const goThere = (found: O.Option<HTMLElement>): void => {
+  if (O.isNone(found)) return
+  const line = found.value
   const go = () => {
     line.focus({ preventScroll: true })
     line.scrollIntoView({ block: "nearest" })
@@ -410,13 +432,19 @@ const goThere = (line: HTMLElement | null): void => {
   window.setTimeout(() => document.removeEventListener("focusin", back), 1000)
 }
 
+const goToLine = refCallback(goThere)
+
 /**
  * The rows that wait for the person, above the review, by what they ask (decided since by someone else or another tab,
  * otherwise in a closed tab of theirs, or not saved): every answer of a row said, and the person picks, row by row or
  * many at once. Nothing is sent, and nothing is imported, until they do; a press of Import says so and goes to the first
  * line. Only how many there are is read out as it changes.
  */
-function LinesAsking(props: { id: ImportId; canDecide: boolean; onSettle: (picks: ReadonlyArray<LinePick>) => void }) {
+function LinesAsking(props: {
+  readonly id: ImportId
+  readonly canDecide: boolean
+  readonly onSettle: (picks: ReadonlyArray<LinePick>) => void
+}) {
   const narrow = useAtomValue(isNarrow)
   const lines = useAtomValue(reviewLines(props.id))
   const stopped = useAtomValue(importStopped(props.id))
@@ -453,10 +481,10 @@ function LinesAsking(props: { id: ImportId; canDecide: boolean; onSettle: (picks
 
 /** The lines of one kind, the first few of them, with the presses that settle many. */
 function LinesOf(props: {
-  id: ImportId
-  group: LineGroup
-  stopped: number
-  onSettle: (picks: ReadonlyArray<LinePick>) => void
+  readonly id: ImportId
+  readonly group: LineGroup
+  readonly stopped: number
+  readonly onSettle: (picks: ReadonlyArray<LinePick>) => void
 }) {
   const { group, stopped } = props
   const [drawn, draw] = useAtom(linesShownOf(`${props.id}:${group.asked}`))
@@ -477,7 +505,7 @@ function LinesOf(props: {
           <li
             // Stopped here: the first line takes the focus at each press of Import, and the next one once it is settled.
             key={at === 0 && stopped > 0 ? `${line.rowId}:${stopped}` : line.rowId}
-            {...(at === 0 && stopped > 0 ? { ref: goThere } : {})}
+            {...(at === 0 && stopped > 0 ? { ref: goToLine } : {})}
             tabIndex={-1}
             className="flex flex-wrap items-center gap-x-3 gap-y-1"
           >
@@ -515,8 +543,8 @@ function LinesOf(props: {
  * line stays until the person dismisses it, or every row of it was decided again.
  */
 function MatchTakeBacks(props: {
-  taken: ReadonlyArray<{ readonly taken: MatchTakeBack; readonly text: string }>
-  onDismiss: (taken: MatchTakeBack) => void
+  readonly taken: ReadonlyArray<{ readonly taken: MatchTakeBack; readonly text: string }>
+  readonly onDismiss: (taken: MatchTakeBack) => void
 }) {
   const narrow = useAtomValue(isNarrow)
   if (!A.isReadonlyArrayNonEmpty(props.taken)) return null
@@ -554,7 +582,7 @@ function MatchTakeBacks(props: {
  * Said above the review when a confirm was not made because the import had changed on another screen: nothing was
  * imported, the review below already shows the import as it is now, and the person confirms again.
  */
-function NotImportedYet(props: { why: O.Option<HeldBack> }) {
+function NotImportedYet(props: { readonly why: O.Option<HeldBack> }) {
   const narrow = useAtomValue(isNarrow)
   if (O.isNone(props.why)) return null
   return (
@@ -572,7 +600,7 @@ function NotImportedYet(props: { why: O.Option<HeldBack> }) {
  * What the reader could not take at the file's word, said above the table before the person imports: each warning
  * in the sentence the reader wrote, with the cells or rows it names. Nothing here changes a row's outcome.
  */
-function ReaderWarnings(props: { table: Pick<StagedTable, "notes"> }) {
+function ReaderWarnings(props: { readonly table: Pick<StagedTable, "notes"> }) {
   const warnings = readerWarnings(props.table)
   // The same side room the review below takes, from the room the page has (the sidebar is already taken off).
   const narrow = useAtomValue(isNarrow)

@@ -1,5 +1,5 @@
 Package: @alchemy.run/domain
-Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
+Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
 Upstream: not yet reported
 Why: When a decision's `keyOf` builds an instance's id from two fields (`${cmd.importId}/${cmd.row}`), the prover
   replays the solver's answer under an empty id, on a stream the real `keyOf` never reads. A rule the decision

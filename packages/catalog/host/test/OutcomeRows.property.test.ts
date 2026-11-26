@@ -64,13 +64,13 @@ describe("the outcome rows a confirm stores", () => {
           update: () => expect([row.status, row.reason, row.decidedBy]).toEqual(["update", "", null]),
           already: (already) =>
             expect([row.status, row.reason, row.decidedBy]).toEqual(["already", already.reason, null]),
-          notImported: (out) =>
-            expect([row.status, row.reason, row.decidedBy, row.decidedByName]).toEqual([
-              "notImported",
-              out.reason,
-              out.decidedBy.kind,
-              DecidedBy.guards.person(out.decidedBy) ? out.decidedBy.name : null
-            ])
+          notImported: (out) => {
+            expect([row.status, row.reason, row.decidedBy]).toEqual(["notImported", out.reason, out.decidedBy.kind])
+            // A person with no recorded name is stored as a person and no name: never as someone else's.
+            expect(O.fromNullOr(row.decidedByName)).toEqual(
+              DecidedBy.guards.person(out.decidedBy) ? out.decidedBy.name : O.none()
+            )
+          }
         })
       }),
     runs
@@ -94,8 +94,10 @@ describe("the outcome rows a confirm stores", () => {
         const hasReason = stored.outcome === "already" || stored.outcome === "notImported"
         expect(outcomeReasonOf(shown)).toEqual(hasReason ? O.some(stored.reason) : O.none())
         if (RowOutcome.guards.notImported(shown)) {
-          const named = DecidedBy.guards.person(shown.decidedBy) ? O.some(shown.decidedBy.name) : O.none()
+          const named = DecidedBy.guards.person(shown.decidedBy) ? shown.decidedBy.name : O.none()
           const byAPerson = O.filter(stored.decidedBy, (who) => who === "person")
+          // A row a person left out stays a person's, with or without a name: it never reads as nobody's.
+          expect(DecidedBy.guards.person(shown.decidedBy)).toBe(O.isSome(byAPerson))
           expect(named).toEqual(O.flatMap(byAPerson, () => O.filter(stored.decidedByName, readable)))
         }
       }),

@@ -577,7 +577,7 @@ export const depsUpdate = Effect.fn("Deps.depsUpdate")(function* (mode: Mode, pa
     files,
     Effect.fnUntraced(function* (absolute) {
       const text = yield* repo.text(absolute)
-      return asksIn(repo.relative(repo.root, absolute))(text)
+      return asksIn(repo.relative(absolute, repo.root))(text)
     }),
     { concurrency: 1 }
   )

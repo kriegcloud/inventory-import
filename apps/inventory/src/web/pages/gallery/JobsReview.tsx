@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
 import { restored, saved } from "@inventory/review/ReviewDraft"
-import type { ReviewRow } from "@inventory/review/ReviewTypes"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@inventory/ui/components/item"
@@ -54,23 +54,30 @@ const jobReviews = Atom.readable((get) => reviewJobs({ jobs, decisions: get(jobD
 /** The questions on the lines of the jobs still in. */
 const jobQuestionRows = Atom.map(jobsLeftOut, (leftOut) => questionRows(jobs, leftOut))
 
+/** A job question keeps the fixture's complete row and requires the parent job named by its cells. */
+const JobQuestion = ReviewRow.mapFields((fields) => ({
+  ...fields,
+  cells: S.StructWithRest(
+    S.Struct({ job: S.String.annotateKey({ description: "Parent job whose lines are left out together" }) }),
+    [S.Record(S.String, S.String)]
+  ).annotateKey({ description: "Reviewed cells with the parent job required; other columns remain open" })
+})).annotate({ description: "A review question belonging to one parent job" })
+const readJobQuestion = S.decodeUnknownOption(S.toType(JobQuestion))
+
 /** "Leave job … out" on every question's row, as the atom the region takes its rows' own answer from. */
 const leaveJobAction = Atom.readable((get) =>
-  O.some((row: ReviewRow) => {
-    const code = row.cells.job
-    return code === undefined
-      ? undefined
-      : {
-          label: `Leave job ${code} out`,
-          onSelect: () =>
-            get.registry.update(jobsLeftOut, (before) =>
-              A.append(
-                A.filter(before, (at) => at !== code),
-                code
-              )
-            )
-        }
-  })
+  O.some((row: ReviewRow) =>
+    O.map(readJobQuestion(row), (question) => ({
+      label: `Leave job ${question.cells.job} out`,
+      onSelect: () =>
+        get.registry.update(jobsLeftOut, (before) =>
+          A.append(
+            A.filter(before, (at) => at !== question.cells.job),
+            question.cells.job
+          )
+        )
+    }))
+  )
 )
 const jobLineKinds = Atom.make(lineKinds)
 // A line's own "ready" is an answered question: the job it belongs to is what is Ready.
@@ -96,7 +103,7 @@ export function JobsReview() {
   const linesIn = A.reduce(reviews, 0, (total, review) => total + review.importing)
   const linesAll = A.reduce(jobs, 0, (total, job) => total + job.lines.length)
   const shown = filter === "all" ? reviews : A.filter(reviews, (review) => review.status === filter)
-  const filters: ReadonlyArray<{ id: JobFilter; label: string; n: number }> = [
+  const filters: ReadonlyArray<{ readonly id: JobFilter; readonly label: string; readonly n: number }> = [
     { id: "waiting", label: pageWords.needs, n: tally.waiting },
     { id: "ready", label: pageWords.ready, n: tally.ready },
     ...(tally.out > 0 || filter === "out" ? [{ id: "out" as const, label: pageWords.out, n: tally.out }] : []),
@@ -190,13 +197,13 @@ export function JobsReview() {
       ) : view === "jobs" ? (
         <RecordsTable
           key={filter}
-          caption={`Jobs in jobs.csv: ${O.getOrElse(
-            O.map(
-              A.findFirst(filters, (entry) => entry.id === filter),
-              (entry) => entry.label
-            ),
-            () => "All"
-          )}`}
+          caption={O.match(
+            A.findFirst(filters, (entry) => entry.id === filter),
+            {
+              onNone: () => "Jobs in jobs.csv: All",
+              onSome: (entry) => `Jobs in jobs.csv: ${entry.label}`
+            }
+          )}
           columns={jobColumns({
             onAnswer: () => setView("questions"),
             onLeaveOut: (code) =>
@@ -266,9 +273,9 @@ export function JobsReview() {
 
 /** The jobs' columns: what each becomes and why on one line, and the one answer that fits it. */
 function jobColumns(actions: {
-  onAnswer: () => void
-  onLeaveOut: (code: string) => void
-  onBringBack: (code: string) => void
+  readonly onAnswer: () => void
+  readonly onLeaveOut: (code: string) => void
+  readonly onBringBack: (code: string) => void
 }): ReadonlyArray<RecordColumn<JobReview>> {
   return [
     {

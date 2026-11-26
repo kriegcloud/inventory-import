@@ -7,6 +7,7 @@
 import type { D1Database } from "@cloudflare/workers-types"
 import { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { BetterAuthSettings } from "@beep/better-auth/BetterAuthConfig"
+import type { AuthBackgroundTasks } from "@beep/better-auth/Hooks"
 import { RequestSource } from "@inventory/kernel/SameOrigin"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -18,6 +19,7 @@ import { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { mayCreateAccount } from "@inventory/access-model/SignUp"
 import { passwordToVerify } from "@inventory/access-model/StagePassword"
 import { authSettings } from "./Config.ts"
+import * as R from "effect/Record"
 import { authOptions } from "./internal/authOptions.ts"
 import { testAccountPassword } from "./internal/TestAccounts.ts"
 
@@ -31,9 +33,9 @@ export const signIn = (options: {
   readonly database: D1Database
   readonly production: boolean
   /** The Worker's `waitUntil`, so Better Auth's work after an answer is not cut off. Absent in tests. */
-  readonly backgroundTasks?: ((promise: Promise<unknown>) => void) | undefined
+  readonly backgroundTasks: O.Option<AuthBackgroundTasks>
   /** Off only in tests that sign in many times from one address. */
-  readonly rateLimit?: boolean | undefined
+  readonly rateLimit: boolean
 }) =>
   Layer.unwrap(
     Effect.gen(function* () {
@@ -48,21 +50,20 @@ export const signIn = (options: {
           authOptions({
             database: options.database,
             secret: resolved.secret,
-            baseURL: O.getOrUndefined(resolved.baseURL),
+            baseURL: resolved.baseURL,
             // Secure cookies in a production build, unless the configured address is plain http (a private network
             // without TLS: a browser drops a Secure cookie there, and nobody could sign in); and under
             // `bun run dev:https` once BETTER_AUTH_URL names its https address.
             secureCookies: resolved.secureCookies,
             pwnedPasswordCheck: settings.pwnedPasswordCheck,
-            mayCreateAccount: (email) => mayCreateAccount(settings.signUp, email),
-            passwordToVerify: (typed) =>
-              O.getOrUndefined(
-                passwordToVerify({
-                  stage: O.map(settings.testAccountPassword, Redacted.value),
-                  repository: testAccountPassword,
-                  typed
-                })
-              ),
+            mayCreateAccount: O.some((email) => mayCreateAccount(settings.signUp, email)),
+            passwordToVerify: O.some((typed) =>
+              passwordToVerify({
+                stage: O.map(settings.testAccountPassword, Redacted.value),
+                repository: testAccountPassword,
+                typed
+              })
+            ),
             backgroundTasks: options.backgroundTasks,
             rateLimit: options.rateLimit
           })
@@ -93,10 +94,7 @@ export const SignInRoute = BetterAuth.route({
     })
     if (RequestSource.allows(source)) return O.none()
     yield* Effect.logWarning("Refused a sign-in request from another site").pipe(
-      Effect.annotateLogs({
-        "http.origin": O.getOrElse(source.origin, () => ""),
-        "http.sec_fetch_site": O.getOrElse(source.fetchSite, () => "")
-      })
+      Effect.annotateLogs(R.getSomes({ "http.origin": source.origin, "http.sec_fetch_site": source.fetchSite }))
     )
     const answer = yield* refused
     return O.some(answer)

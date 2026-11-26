@@ -22,7 +22,23 @@ import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Path from "effect/Path"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import { opEnvFile, ownEnvFile, referencesIn } from "./OpReferences.rules.ts"
+
+import { $InfraId } from "./internal/identity.ts"
+
+const $I = $InfraId.create("OpReferences")
+
+/** A refusal from the vault provider, retained as the cause when stack construction stops. */
+export class SecretReferencesError extends S.TaggedError<SecretReferencesError, { readonly brand: unique symbol }>(
+  $I`SecretReferencesError`
+)(
+  "SecretReferencesError",
+  { cause: S.Defect({ includeStack: true }).pipe(S.annotateKey({ description: "The vault provider's failure" })) },
+  $I.annoteError<SecretReferencesError>("SecretReferencesError", {
+    description: "The vault provider could not load the requested secret references"
+  })
+) {}
 
 /** A `secrets` entry that reads this package's `env/op.env`. */
 export class OpEnvReferences extends Data.TaggedClass("@beep/infra/SecretProvider::OpEnvReferences")<{
@@ -46,8 +62,7 @@ const ofProcess = (name: string) =>
  */
 export const referencesWanted = Effect.fn("OpReferences.referencesWanted")(function* (names: ReadonlyArray<string>) {
   const workflow = yield* ofProcess("CI")
-  const ci = O.getOrElse(workflow, () => "")
-  if (ci !== "" && ci !== "false" && ci !== "0") return R.empty<string, string>()
+  if (O.exists(workflow, (ci) => ci !== "" && ci !== "false" && ci !== "0")) return R.empty<string, string>()
   // A variable set in the shell wins over this entry anyway, so 1Password is not asked for it: a stage run by hand
   // with its secret exported needs no 1Password in its profile. Set and empty counts as set: Alchemy keeps an empty
   // variable of the process and ranks it over what 1Password answers, so asking would only be thrown away.
@@ -77,9 +92,11 @@ export const opEnvReferences = (names: (stage: string) => ReadonlyArray<string>)
         // The library types a provider's failure as unknown. A stack's only typed failure is a missing setting, so
         // 1Password refusing (not unlocked, a reference it does not know) stops the stack as a defect, printed whole.
         if (R.isEmptyRecord(references)) return Layer.empty
-        // The unknown is the library's own type for a provider's layer, and it is made a defect on the same line.
-        // @effect-diagnostics-next-line anyUnknownInErrorContext:off
-        return OnePassword.SecretReferences({ references }).layer.pipe(Layer.orDie)
+        const loaded: Layer.Layer<never, SecretReferencesError, Secrets.SecretsServices> = Layer.catch(
+          OnePassword.SecretReferences({ references }).layer,
+          (cause) => SecretReferencesError.make({ cause }).pipe(Effect.fail, Layer.effectDiscard)
+        )
+        return loaded.pipe(Layer.orDie)
       })
     )
   })

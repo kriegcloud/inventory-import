@@ -1,3 +1,4 @@
+import { assertedValue } from "./support"
 // A read belongs to the member who asked: switching organization shows nothing of the previous one's answer, not even
 // marked as waiting, and asks again for the new one. And a key said to have changed (`invalidate`) makes a read
 // registered under it ask again.
@@ -48,10 +49,10 @@ const world = () => {
     )
   })
   const api = makeApiAtoms(RowServer)
-  const rows = api.query((server) => server.rows, { reactivityKeys: ["rows"] })
+  const rows = api.query((server) => server.rows, { keep: "unwatched", reactivityKeys: O.some(["rows"]) })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer), provideMember(signedIn)] })
   registry.mount(rows)
-  const seen = () => registry.get(rows).pipe(AsyncResult.value, O.getOrUndefined)
+  const seen = () => registry.get(rows).pipe(AsyncResult.value, assertedValue)
   return { registry, signedIn, rows, seen, reads: () => reads }
 }
 

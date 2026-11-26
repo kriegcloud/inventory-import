@@ -11,7 +11,7 @@ import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { safeRedirectPath } from "../../src/server/security.ts"
-import { inMemoryApp, send, TestFetch } from "./support/app.ts"
+import { inMemoryApp, send, TestFetch, noNetwork, testSettings } from "./support/app.ts"
 
 // What the Worker sends back over HTTP, through the same `fetch` it exports: headers, the cross-origin policy, the
 // cross-site write check, request validation and the OpenAPI document. Storage is in memory; nothing here needs SQL.
@@ -24,7 +24,15 @@ const dana = Member.make({
   organizationName: "Example Works (test)"
 })
 
-const App = TestFetch.layer(inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")) }))
+const App = TestFetch.layer(
+  inMemoryApp({
+    docs: false,
+    http: noNetwork,
+    settings: testSettings,
+    member: dana,
+    ai: OpenRouterTest.off("noKey", ModelId.make("test/model"))
+  })
+)
 
 // The parts of the OpenAPI document the document's own corrections (src/api/v1/Document.ts) change.
 const Operation = S.Struct({
@@ -56,18 +64,35 @@ layer(App)("the API over HTTP", (it) => {
     Effect.gen(function* () {
       // Another site, and another app on this machine (a localhost origin), get no CORS grant.
       for (const origin of ["https://elsewhere.example", "http://localhost:5999"]) {
-        const read = yield* send({ path: "/api/v1/system/status", headers: { origin } })
+        const read = yield* send({
+          method: "GET",
+          body: O.none(),
+          actingAs: O.none(),
+          path: "/api/v1/system/status",
+          headers: { origin }
+        })
         expect(read.status).toBe(200)
         expect(read.headers.get("access-control-allow-origin")).toBeNull()
         const preflight = yield* send({
+          body: O.none(),
+          actingAs: O.none(),
           path: "/api/v1/assistant/view",
           method: "OPTIONS",
           headers: { origin, "access-control-request-method": "POST" }
         })
         expect(preflight.headers.get("access-control-allow-origin")).toBeNull()
       }
-      const missing = yield* send({ path: "/api/v1/no-such-thing" })
-      for (const answer of [yield* send({ path: "/api/v1/system/status" }), missing]) {
+      const missing = yield* send({
+        method: "GET",
+        body: O.none(),
+        actingAs: O.none(),
+        headers: {},
+        path: "/api/v1/no-such-thing"
+      })
+      for (const answer of [
+        yield* send({ method: "GET", body: O.none(), actingAs: O.none(), headers: {}, path: "/api/v1/system/status" }),
+        missing
+      ]) {
         expect(R.fromEntries(answer.headers)).toMatchObject({
           "cache-control": "no-store",
           "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
@@ -87,7 +112,13 @@ layer(App)("the API over HTTP", (it) => {
   it.effect("refuses a write another site asked for before it acts as anyone, and takes the app's own", () =>
     Effect.gen(function* () {
       const write = (headers: Record<string, string>) =>
-        send({ path: "/api/v1/assistant/view", body: view("sort by name"), headers })
+        send({
+          method: "POST",
+          actingAs: O.none(),
+          path: "/api/v1/assistant/view",
+          body: O.some(view("sort by name")),
+          headers
+        })
       const crossSite = yield* write({ "sec-fetch-site": "cross-site", origin: "https://elsewhere.example" })
       expect(crossSite.status).toBe(403)
       // The answer is the typed refusal: it decodes as one, or the test stops here.
@@ -99,7 +130,13 @@ layer(App)("the API over HTTP", (it) => {
       expect((yield* write({ "sec-fetch-site": "same-origin" })).status).toBe(200)
       expect((yield* write({ origin: "http://localhost:5320" })).status).toBe(200)
       // Reading is never refused: no other origin can see the answer anyway.
-      const read = yield* send({ path: "/api/v1/activity", headers: { "sec-fetch-site": "cross-site" } })
+      const read = yield* send({
+        method: "GET",
+        body: O.none(),
+        actingAs: O.none(),
+        path: "/api/v1/activity",
+        headers: { "sec-fetch-site": "cross-site" }
+      })
       expect(read.status).toBe(200)
     })
   )
@@ -107,8 +144,11 @@ layer(App)("the API over HTTP", (it) => {
   it.effect("lists every problem in a request at once, with the message written for a missing field", () =>
     Effect.gen(function* () {
       const twoWrong = yield* send({
+        method: "POST",
+        actingAs: O.none(),
+        headers: {},
         path: "/api/v1/assistant/view",
-        body: { ...view("  "), table: Str.repeat(41)("x") }
+        body: O.some({ ...view("  "), table: Str.repeat(41)("x") })
       })
       expect(twoWrong.status).toBe(400)
       const problem = yield* S.decodeUnknownEffect(ProblemDocument)(twoWrong.json)
@@ -116,7 +156,13 @@ layer(App)("the API over HTTP", (it) => {
         ["payload", "prompt"],
         ["payload", "table"]
       ])
-      const missing = yield* send({ path: "/api/v1/assistant/view", body: { ...view("x"), prompt: undefined } })
+      const missing = yield* send({
+        method: "POST",
+        actingAs: O.none(),
+        headers: {},
+        path: "/api/v1/assistant/view",
+        body: O.some({ ...view("x"), prompt: undefined })
+      })
       const absent = yield* S.decodeUnknownEffect(ProblemDocument)(missing.json)
       expect(A.map(absent.errors, (issue) => issue.message)).toEqual(["Type what you want to see in the table."])
     })
@@ -124,7 +170,13 @@ layer(App)("the API over HTTP", (it) => {
 
   it.effect("serves the OpenAPI document with the descriptions written on the schemas, and no reference page", () =>
     Effect.gen(function* () {
-      const document = yield* send({ path: "/api/v1/openapi.json" })
+      const document = yield* send({
+        method: "GET",
+        body: O.none(),
+        actingAs: O.none(),
+        headers: {},
+        path: "/api/v1/openapi.json"
+      })
       expect(document.status).toBe(200)
       expect(document.json).toMatchObject({ info: { title: "Items API", version: "1.0.0" } })
       // A schema description, a field description and a key description each reach the document.
@@ -149,7 +201,9 @@ layer(App)("the API over HTTP", (it) => {
       expect(A.filter(R.keys(spec.components.schemas), Str.endsWith("Encoded"))).toEqual([])
       // Nor a numbered second copy of a schema, nor one named by its whole path: each shape is in the document once.
       expect(A.filter(R.keys(spec.components.schemas), (name) => /_\d+$|^_beep_/.test(name))).toEqual([])
-      expect((yield* send({ path: "/api/v1/docs" })).status).toBe(404)
+      expect(
+        (yield* send({ method: "GET", body: O.none(), actingAs: O.none(), headers: {}, path: "/api/v1/docs" })).status
+      ).toBe(404)
     })
   )
 })

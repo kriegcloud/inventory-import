@@ -31,12 +31,11 @@ export interface Api<Client> {
  * The helpers for one client, run on `runtime`, which must provide `tag`. The app calls it once for the whole
  * contract; a web package calls it with its own tag over the same runtime.
  */
-export const makeApi = <Id, Client, R>(
+export const makeApi = <Client, R>(
   runtime: ManagedRuntime.ManagedRuntime<R, never>,
-  tag: Context.Key<Id, Client> & (Id extends R ? unknown : never)
+  tag: Context.Key<R, Client>
 ): Api<Client> => {
-  const run = <A, E>(use: (client: Client) => Effect.Effect<A, E>) =>
-    Effect.flatMap(tag as unknown as Effect.Effect<Client, never, R>, use)
+  const run = <A, E>(use: (client: Client) => Effect.Effect<A, E>) => Effect.flatMap(tag, use)
   const call: Call<Client> = (use) =>
     runtime.runPromiseExit(run(use)).then((exit) => {
       if (Exit.isSuccess(exit)) return exit.value

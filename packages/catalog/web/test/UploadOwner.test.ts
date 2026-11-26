@@ -1,3 +1,7 @@
+import { uploadDiscard } from "@inventory/catalog-contract/Upload"
+import * as MutableRef from "effect/MutableRef"
+import { assertTrue } from "@effect/vitest/utils"
+import * as O from "effect/Option"
 // An upload is one member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody
 // else. Another organization the person switches to waits for it: still sending, it is stopped, what reached the server
 // deleted and said; being prepared, its answer is waited for and said with its own reason. The chosen file is kept where
@@ -14,32 +18,34 @@ import * as Result from "effect/Result"
 import { vi } from "vitest"
 import { makeApi } from "@inventory/client/ApiRuntime"
 import { leavingApp } from "@inventory/ui/Route"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { settledBeforeOwnSwitch } from "@inventory/client/MemberAtoms"
 import type * as Fiber from "effect/Fiber"
-import { type CatalogApiClient, CatalogClient, configureCatalog } from "../src/Catalog.runtime.ts"
-import { ReadMessage } from "../src/internal/protocol.ts"
+import { CatalogClient, configureCatalog } from "../src/Catalog.runtime.ts"
+import { ReadMessage, type PlainHead } from "../src/internal/protocol.ts"
 import { UploadState } from "../src/Upload.machine.ts"
 import { startUpload, UploadEnd, uploadState } from "../src/Upload.controller.ts"
-import { importId, registryFor, viewAt } from "./support/catalog.ts"
-import { memberOf, sessionStandIn } from "./support/session.ts"
+import { catalogClientWith, importId, registryFor, viewAt, registryStart } from "./support/catalog.ts"
+import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its window, the reader's worker (the test says what it has read), and what is asked of the server as the
 // page goes.
 const browser = vi.hoisted(() => {
-  const readers: Array<{ onmessage: ((event: { data: unknown }) => void) | null; ended: boolean }> = []
-  const asked: Array<string> = []
+  const readers: Array<{
+    readonly onmessage: ((event: { readonly data: unknown }) => void) | null
+    readonly ended: MutableRef.MutableRef<boolean>
+  }> = []
+  const asked: Array<O.Option<string>> = []
   class Reader {
-    onmessage: ((event: { data: unknown }) => void) | null = null
-    onerror: unknown = null
-    ended = false
+    readonly onmessage: ((event: { readonly data: unknown }) => void) | null = null
+    readonly onerror: unknown = null
+    readonly ended = MutableRef.make(false)
     postMessage() {
       readers.push(this)
     }
     terminate() {
-      this.ended = true
+      this.ended.current = true
     }
   }
   Object.assign(globalThis, {
@@ -50,17 +56,17 @@ const browser = vi.hoisted(() => {
       history: { pushState: () => undefined, replaceState: () => undefined }
     }),
     fetch: (_address: unknown, init: RequestInit) => {
-      asked.push(init.method ?? "")
+      asked.push(O.fromUndefinedOr(init.method))
       return Promise.resolve(new Response(null, { status: 204 }))
     }
   })
-  return { readers, asked, said: [] as Array<string>, described: [] as Array<string> }
+  return { readers, asked, said: Array<string>(), described: Array<O.Option<string>>() }
 })
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => browser.said.push(title), {
     error: (title: string, options?: { readonly description?: string }) => {
       browser.said.push(title)
-      browser.described.push(options?.description ?? "")
+      browser.described.push(O.fromUndefinedOr(options?.description))
     },
     dismiss: () => undefined
   })
@@ -68,12 +74,19 @@ vi.mock("sonner", () => ({
 vi.mock("../src/ReviewStep.screen.tsx", () => ({ ReviewStep: () => null }))
 
 const settle = Effect.sleep("20 millis")
-const uploadId = importId as ImportId
-const head = { fileName: "items.csv", sheet: null, columns: [], notes: [] }
+const uploadId = importId
+const head = {
+  fileName: "items.csv",
+  kind: "csv",
+  headerRowNumber: 1,
+  sheet: null,
+  columns: [{ index: 0, letter: "A", label: "SKU" }],
+  notes: []
+} satisfies PlainHead
 
 /** A page on which Dana has chosen a file: the server takes each step, or not until the test says. */
 const world = () => {
-  const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+  const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
   const sent: Array<string> = []
   const finished = Deferred.makeUnsafe<Result.Result<ImportView, FileProblem>>()
   const step = <A>(name: string, answer: A) =>
@@ -82,19 +95,28 @@ const world = () => {
       return Result.succeed(answer)
     })
   // The stand-in holds only the endpoints an upload calls: the rest of the client is never reached.
-  const client = {
+  const client = catalogClientWith({
     imports: {
       beginUpload: () => step("begin", { id: uploadId }),
-      putChunk: () => step("chunk", {}),
+      putChunk: () => step("chunk", { seq: 0, rows: 0 }),
       finishUpload: () =>
         Effect.suspend(() => {
           sent.push("finish")
           return Deferred.await(finished)
         }),
-      discardUpload: () => Effect.sync(() => sent.push("discard"))
+      discardUpload: () =>
+        Effect.sync(() => {
+          sent.push("discard")
+          return uploadDiscard(true)
+        })
     }
-  } as unknown as CatalogApiClient
-  const registry = registryFor({ endpoints: client, signedIn: session.signedIn, asked: session.asked })
+  })
+  const registry = registryFor({
+    ...registryStart,
+    endpoints: client,
+    signedIn: O.some(session.signedIn),
+    asked: O.some(session.asked)
+  })
   configureCatalog({
     ...makeApi(ManagedRuntime.make(Layer.succeed(CatalogClient, client)), CatalogClient),
     runtime: ManagedRuntime.make(Layer.empty),
@@ -105,18 +127,22 @@ const world = () => {
   browser.asked.length = 0
   const ended: Array<UploadEnd> = []
   registry.mount(startUpload)
-  registry.set(startUpload, { file: new File(["a"], "items.csv"), onEnd: (end) => ended.push(end) })
-  const reader = browser.readers[browser.readers.length - 1]!
+  registry.set(startUpload, { sheet: O.none(), file: new File(["a"], "items.csv"), onEnd: (end) => ended.push(end) })
+  const requiredEntry1 = A.get(browser.readers, browser.readers.length - 1)
+  assertTrue(O.isSome(requiredEntry1), "expected browser.readers[browser.readers.length - 1]")
+  const reader = requiredEntry1.value
   const says = (message: ReadMessage) => reader.onmessage?.({ data: message })
   /** The file's head is read: the upload begins. */
-  const begin = () => says(ReadMessage.Head({ head: head as never, chunkSizes: [1, 1], workbook: null }))
+  const begin = () => says(ReadMessage.Head({ head, chunkSizes: [1, 1], workbook: null }))
   const chunk = (seq: number) => says(ReadMessage.Chunk({ seq, rows: [] }))
   /** She picks her other organization, and the session answers it. */
   const switched = Effect.gen(function* () {
     session.choose("org_northline")
     registry.refresh(session.signedIn)
     yield* settle
-    yield* session.answer(memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" }))
+    yield* session.answer(
+      memberOf({ ...memberStart, id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
+    )
     yield* settle
   })
   const state = () => registry.get(uploadState)
@@ -134,7 +160,7 @@ describe("an upload", () => {
       t.chunk(0)
       yield* settle
       expect(t.sent).toEqual(["begin"])
-      yield* t.session.answer(memberOf({ id: "mem_dana" }))
+      yield* t.session.answer(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
       yield* settle
       expect(t.sent).toEqual(["begin", "chunk"])
       t.says(ReadMessage.Crashed({ message: "Enough." }))
@@ -151,7 +177,7 @@ describe("an upload", () => {
       yield* settle
       t.chunk(0)
       t.chunk(1)
-      yield* t.session.answer(memberOf({ id: "mem_marcus" }))
+      yield* t.session.answer(memberOf({ ...memberStart, account: "mem_marcus", id: "mem_marcus" }))
       yield* settle
       // The app leaves the page: what the page asks as it goes would be asked as Marcus.
       window.dispatchEvent(new Event(leavingApp))
@@ -168,7 +194,7 @@ describe("an upload", () => {
       yield* settle
       window.dispatchEvent(new Event("pagehide"))
       yield* settle
-      expect(browser.asked).toEqual(["DELETE"])
+      expect(browser.asked).toEqual([O.some("DELETE")])
       t.says(ReadMessage.Crashed({ message: "Enough." }))
       yield* settle
     })
@@ -183,7 +209,7 @@ describe("an upload", () => {
       yield* settle
       yield* t.switched
       // At once, whatever the reader reads next.
-      expect([t.reader.ended, t.state(), browser.said]).toEqual([
+      expect([t.reader.ended.current, t.state(), browser.said]).toEqual([
         true,
         UploadState.cases.Idle.make({}),
         ["items.csv was not uploaded"]
@@ -208,7 +234,7 @@ describe("an upload", () => {
       yield* t.switched
       expect(t.state()).toEqual(UploadState.cases.Idle.make({}))
       // Another file chosen here meanwhile is told to wait, not dropped without a word.
-      t.registry.set(startUpload, { file: new File(["b"], "more.csv") })
+      t.registry.set(startUpload, { sheet: O.none(), onEnd: () => {}, file: new File(["b"], "more.csv") })
       yield* settle
       expect(browser.said).toEqual(["items.csv is still being prepared for the organization you chose it in"])
       yield* Deferred.succeed(t.finished, Result.succeed(viewAt({ revision: 1, fileName: "items.csv", mapping: [] })))
@@ -232,7 +258,7 @@ describe("an upload", () => {
 })
 
 /** Whether the switch has stopped waiting. */
-const ended = (fiber: Fiber.Fiber<unknown, unknown>): boolean => fiber.pollUnsafe() !== undefined
+const ended = (fiber: Fiber.Fiber<unknown, unknown>): boolean => O.isSome(O.fromUndefinedOr(fiber.pollUnsafe()))
 
 describe("an upload, when the person presses another organization", () => {
   it.live("still sending: is stopped and what reached the server deleted, as her, before the switch is sent", () =>
@@ -245,7 +271,7 @@ describe("an upload, when the person presses another organization", () => {
       const switching = yield* Effect.forkChild(settledBeforeOwnSwitch(t.registry))
       yield* settle
       // Done before the switch: nothing more is read or sent, and what was staged is deleted.
-      expect([ended(switching), t.reader.ended, t.sent]).toEqual([true, true, ["begin", "chunk", "discard"]])
+      expect([ended(switching), t.reader.ended.current, t.sent]).toEqual([true, true, ["begin", "chunk", "discard"]])
       expect([t.state(), browser.said, A.map(t.ended, UploadEnd.$is("Failed"))]).toEqual([
         UploadState.cases.Idle.make({}),
         ["items.csv was not uploaded"],
@@ -279,7 +305,7 @@ describe("an upload, when the person presses another organization", () => {
       expect([ended(switching), A.last(t.sent)]).toEqual([true, A.last(["discard"])])
       expect([browser.said, browser.described]).toEqual([
         ["items.csv was not uploaded"],
-        ["items.csv has more rows than one import takes. Split it into files of 5,000 rows or fewer."]
+        [O.some("items.csv has more rows than one import takes. Split it into files of 5,000 rows or fewer.")]
       ])
     })
   )

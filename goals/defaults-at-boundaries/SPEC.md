@@ -74,6 +74,25 @@ packages' boundaries are listed at the start of each lane (PLAN.md), as part of 
 
 ## Defaults nobody decided
 
+**Ruled 2026-11-26** (Benjamin, by dialog; each is in the root `DECISIONS.md`). The tables below stay as the record
+of what was put to him.
+
+| Rows | Ruling | State |
+| --- | --- | --- |
+| `ItemEdit.rules.ts`, an empty Quantity on hand box | Refused: a number is asked for, nothing stored until one is typed | built 2026-11-26, not seen on screen |
+| `Confirm.rules.ts`, who decided a row nobody is recorded for | "Not recorded", never the confirming person | built 2026-11-26, not seen on screen |
+| `ProposalSource.words.ts` `ProposalLead` and `Change.read.ts` `confidence` | No confidence word; a stored proposal with none is asked, never applied | built 2026-11-26, not seen on screen |
+| `ReviewRegion.types.ts`, kind `fixable` | Required on every kind, no default | built 2026-11-26, not seen on screen |
+| Data saved before a field was kept: `Change.read.ts` `basis`, `Import.read.ts` `MatchTakeBack`, `Mapping.read.ts` `knownFrom`, `Rematch.rules.ts` `savedAtOf`, `Draft.machine.ts` `Named` and `Side`, `storedWaiting.ts` `LegacySide`, `Conversation.machine.ts` `LegacyRules` | Kept, each value on its schema | decided as it stands |
+| `CellReading.rules.ts` `readDimensions`, no unit | cm (decided 2026-11-23, root `DECISIONS.md`) | decided as it stands |
+| Every other row of both tables | Kept as it is | decided as it stands |
+
+Outside the tables, the same round: `ImportStore.listOpen` and `listPast` take one options argument
+(`{ organizationId, limit }`) and are not dual (built 2026-11-26); the three behaviours the sweep changed (the `SameOrigin`
+refusal log leaves out a header that was not sent, a saved assistant view leaves out a filter value it cannot read,
+rows from the reader worker are rebuilt with `disableChecks`) are kept. The session hook in
+`access/host/src/internal/authOptions.ts` needs no exemption: it holds none of the law's places now.
+
 A fallback that no recorded decision backs. Its value moves onto the schema unchanged and is listed here, with how
 many rows of `public/samples/items_messy.csv` it touches and one example. Benjamin rules on the list in one round
 once the pilot's places have moved. The table grows as each package moves; "rows" is counted from the sample when
@@ -81,6 +100,7 @@ the value moves.
 
 | File | Field | Value | Rows of the messy sample | Example |
 | --- | --- | --- | --- | --- |
+| `ui/src/ProposalSource.words.ts` `ProposalLead` | unstated confidence in a lead sentence | `medium`, unchanged, on the constructor field | presentation only; no stored item value changes; missing-confidence display count not measured | a suggestion with no source or confidence reads "Suggestion, medium confidence" |
 | `contract/src/Import/Change.read.ts` | `basis` of a stored proposal with no basis | `""` | 0 (only rows written before the column was kept) | none in the sample |
 | `contract/src/Import/Change.read.ts` | `confidence` of a stored proposal with none | `"low"` | 0 (as above) | none in the sample |
 | `contract/src/Import/Import.read.ts` | `MatchTakeBack.matched`, `reads`, `saved` on an entry stored before each was kept | to be read from their readers when moved | 0 | none in the sample |
@@ -92,6 +112,54 @@ the value moves.
 | `model/src/Confirm/Confirm.rules.ts` | who decided a row nobody is recorded for, and a stored name too long or empty to show | the confirming person's name | 0 on a fresh import: every decision of the sample's review records its author | none in the sample |
 | `model/src/Review/Review.rules.ts` `recheckRow` | a field the screen's row sends no value for, as the person types | `""`, an empty cell (`emptyText`) | not an import path: the screen sends every field of a row | none in the sample |
 | `model/src/Review/CellReading.rules.ts` `readDimensions` | the unit of a dimensions cell that names none | `cm` | 0: every dimensions cell of the sample names its unit (108 cm, 19 in) | `{"length":31.2,"width":41.4,"height":2}` reads as cm |
+| `drivers/openrouter/src/internal/plan.ts` | provider input/output token totals missing, undefined or NULL | `0` each, on the provider response schema | 0 (model calls are optional assistance, not stored import rows) | a scripted reply with no usage reports 0 tokens |
+| `drivers/openrouter/src/internal/plan.ts` | provider response with no valid model name | the requested model, matched where the answer is built | 0 (no stored import row changes) | scripted reply without response metadata attributes the answer to `scripted/primary` |
+| `drivers/better-auth/src/BetterAuth.schema.ts` | library options with absent, undefined or NULL `basePath` | `/api/auth` | 0 (sign-in routing, not an import row) | the default sign-in endpoint `/api/auth/sign-in/email` |
+| `access/web/src/SignIn.screen.tsx` `OrganizationSlugStem` | the slug of a new organization whose name has no letter or digit | `organization` (plus the random suffix) | 0 (sign-up, not an import row) | a name of `!!!` gets the slug `organization-1a2b3c` |
+| `catalog/web/src/Draft.machine.ts` `Named` | other sides and server comparisons missing from an older stored named decision | empty records for `beside` and `theirs`, unchanged, supplied by the owned Named maker at the stored reader | 0 on a fresh import; older browser entries only | a saved left-over decision with no `beside` or `theirs` key |
+| `catalog/web/src/ItemEditor.state.ts` `EditorForm` | an optional description, reorder point or received/discontinued date when the edit form opens | an empty text box, unchanged, on the form field constructor defaults | not an import path | an item with no description opens Description as a blank box |
+| `catalog/web/src/internal/storedWaiting.ts` `LegacySide`, `Draft.machine.ts` `Side` | a legacy row with no per-row revision, or a side with no values seen | revision 0; server may hold no decision (`[None]`), unchanged | 0 on a fresh import; legacy browser drafts only | an old draft has `madeOn: {}` and no `seen` key for row a |
+| `catalog/web/src/internal/view.ts` `FilterItem` | an assistant filter whose column is unknown or whose operator takes no value | `text` variant and an empty filter value, unchanged, now field constructor defaults | 0; table view only | `isEmpty` uses an empty internal value; an unknown column retains the text variant |
+| `catalog/web/src/internal/cellDrafts.ts` `DimensionsDraft`, `VendorDraft` | pieces missing from a cell cut short when its repair form opens, and a newly added vendor | blank text fields, preferred false, dimensions cm, unchanged, on the complete form makers | no automatic import path; only a form the person opens and reviews | `[{"vendor_name":"Acme","vendor_sku":"A-1` opens with the recovered name/SKU and blank cost/lead boxes |
+| `catalog/web/src/Conversation.machine.ts` `LegacyRules` | a version 1 rules attribution whose note was null | the unchanged empty reason string on the complete legacy Rules maker | 0; old assistant conversations only | a version 1 entry with `answeredBy: "Rules", note: null` |
+
+| `catalog/web/src/Upload.machine.ts` `UploadProgress` | a step before reading or saving has a known total | done 0 and total None, unchanged, on the complete progress maker | 0; progress bar only | an idle upload has an indeterminate bar with no completed rows |
+
+Review source row 9 (2026-11-26) retains the following pre-existing defaults on entry schemas. These are presentation
+or empty-state policies, not new import rules; no stored item value changes. They remain listed for Benjamin's
+ruling where the repository gives no separate decision for the value. Counts below come from a local read, stage,
+review and adapter run of the messy sample in propose mode; this was not an on-screen import. Stored row values
+and encoded progress bytes do not change.
+
+| File | Field | Value | Rows of the messy sample | Example |
+| --- | --- | --- | --- | --- |
+| `review/src/ReviewRegion.types.ts` | column `size` | `fit` | 200 rows, 14 of 16 columns | SKU without a size is fit to its measured content |
+| `review/src/ReviewRegion.types.ts` | column core/hidden/facet/search/context/under/code flags | `false` | 200 rows; omitted flag counts across 16 columns: 12 core, 14 hidden/facet/context, 15 search/under/code | an omitted hidden flag shows the column at first |
+| `review/src/ReviewRegion.types.ts` | kind `fixable` | `true` | 45 rows with a problem; the caller can explicitly mark a kind false as before | a kind without fixable stays in Needs a decision |
+| `review/src/ReviewRegion.types.ts` | row `stored`, choice `suggested` | `false` | 200 rows for stored; 2 rows with 10 choices for suggested | an unmarked choice has no suggested suffix |
+| `review/src/ReviewRegion.types.ts` | row applied fixes; why alternatives/labels/targets; draft redo | empty arrays | 183 rows without applied fixes; 26/27/32 rows with a fix lacking alternatives/labels/targets; no sample saved draft lacks redo | a row with no applied fixes starts with none |
+| `review/src/ReviewRegion.types.ts` | review words | existing words in `ReviewWords`, unchanged | 200 rows; 11 words use defaults, while the app overrides stored and all | no caller override still says Ready and Needs a decision |
+| `review/src/ReviewDecision.schema.ts` | absent stored flags/lists/edits | false/empty arrays/empty record | 17 initial decision records; out/kept/accepted/edits are absent on 17, reverted on 0 | `{}` still means an open row with nothing accepted, undone or typed, and encodes as `{}` |
+
+The legacy progress fixture still round-trips byte for byte. `SubmittedText` in `review/src/internal/parts.tsx`
+models the form's pre-existing trim-on-submit and refusal of a blank box; it does not normalize a file cell. Raw
+input stays in the box and the trimmed nonempty submission is decoded at the actual input event.
+
+Foundation modeling row 8 (2026-11-26) moves no new undecided product fallback to a schema. CSV/XLSX API callers
+now explicitly select the already-existing options-schema defaults; fixture builders use named starting values.
+Short CSV/header cells, malformed workbook metadata and parser compatibility fallbacks remain unchanged and are
+listed individually in [VERDICTS](VERDICTS.md#remaining-counted-sites), rather than hidden behind new fallback-only
+decodes. Row 8 remains incomplete while those places remain; none is an approved exemption.
+
+The new-kind pilot follow-up also retained these values on schemas (2026-11-25):
+
+| File | Field | Value | Rows of the messy sample | Example |
+| --- | --- | --- | --- | --- |
+| `model/src/Import/ImportStore.store.ts` | `StoredDecisions.saves` when no draft is found | `0` | 0 on a fresh import; the draft exists | a lookup of an import that no longer exists has no saves |
+
+The two plain optional keys `Cell.shown` and `Cell.formula` remain exemption candidates, not approved exemptions:
+`{ type: "number", text: "123", shown: "00123" }` crosses the reader's worker by `postMessage`, and an Option there
+would lose its prototype. No exemption or baseline was changed in this follow-up.
 
 ## What the law should count, beyond today
 

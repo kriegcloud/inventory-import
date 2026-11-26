@@ -1,3 +1,4 @@
+import { assertExitFailure, assertTrue } from "@effect/vitest/utils"
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -71,8 +72,10 @@ layer(Layer.empty)("settings that are not valid", (it) => {
         Layer.build,
         Effect.exit
       )
-      expect(Exit.isFailure(exit)).toBe(true)
-      const pretty = Exit.isFailure(exit) ? Cause.pretty(exit.cause) : ""
+      assertTrue(Exit.isFailure(exit), "expected failureCause to be present")
+      const failureCause = exit.cause
+      assertExitFailure(exit, failureCause)
+      const pretty = Cause.pretty(exit.cause)
       expect(pretty).toContain("LOG_LEVEL")
       expect(pretty).toContain('"Info"')
     })

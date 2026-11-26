@@ -6,6 +6,7 @@
 // go to localStorage through an atom per key (`SavedProgress.hook.ts`); the file itself is a Blob in IndexedDB,
 // written once when it is chosen and read again by the worker on return.
 import * as S from "effect/Schema"
+import * as A from "effect/Array"
 import type * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -30,7 +31,7 @@ export type ProgressScope = {
  * // "progress:v1:org_prairie:mem_dana:import"
  */
 export const progressKey = (scope: ProgressScope): string =>
-  ["progress", "v1", scope.organizationId, scope.memberId, scope.screen].map(escapePart).join(":")
+  A.join(A.map(["progress", "v1", scope.organizationId, scope.memberId, scope.screen], escapePart), ":")
 
 // Only the separator and the escape character are escaped: injective, and unlike encodeURIComponent it never throws
 // (a lone surrogate in an id made it throw; the property test found it).
@@ -128,15 +129,15 @@ export class SavedProgress extends S.Opaque<SavedProgress, { readonly brand: uni
 const toStoredStep = (step: DraftStep): StoredStep =>
   StoredStep.make({
     label: step.label,
-    before: step.before.map(([rowId, decision]) => [rowId, O.fromNullOr(decision)] as const),
-    focus: O.fromNullOr(step.focus)
+    before: step.before,
+    focus: step.focus
   })
 
 const fromStoredStep = (step: StoredStep): DraftStep =>
   DraftStep.make({
     label: step.label,
-    before: step.before.map(([rowId, decision]) => [rowId, O.getOrNull(decision)] as const),
-    focus: O.getOrNull(step.focus)
+    before: step.before,
+    focus: step.focus
   })
 
 /** The review region's decisions with their undo and redo history, as stored. */
@@ -144,8 +145,8 @@ export const storedReview = (state: ReviewState): StoredReview => {
   const draft = toDraft(state)
   return StoredReview.make({
     decisions: draft.decisions,
-    undo: draft.undo.map(toStoredStep),
-    redo: (draft.redo ?? []).map(toStoredStep)
+    undo: A.map(draft.undo, toStoredStep),
+    redo: A.map(draft.redo, toStoredStep)
   })
 }
 
@@ -154,7 +155,7 @@ export const restoredReview = (review: StoredReview): ReviewState =>
   fromDraft(
     ReviewDraft.make({
       decisions: review.decisions,
-      undo: review.undo.map(fromStoredStep),
-      redo: review.redo.map(fromStoredStep)
+      undo: A.map(review.undo, fromStoredStep),
+      redo: A.map(review.redo, fromStoredStep)
     })
   )

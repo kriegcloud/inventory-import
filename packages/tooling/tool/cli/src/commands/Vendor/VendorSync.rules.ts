@@ -149,7 +149,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
   const posixDir = (file: string) => repo.dirname(file)
 
   const relativeTo = (testFile: string, target: string): string => {
-    const relative = repo.relative(posixDir(testFile), target)
+    const relative = repo.relative(target, posixDir(testFile))
     return Str.startsWith(".")(relative) ? relative : `./${relative}`
   }
   const header = (pkgDir: string, file: string, patched: boolean): string =>
@@ -276,7 +276,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
   const rootPackage = yield* repo.text(repo.join(repo.root, "package.json"))
   const asked = vendoredSpec(cataloguedIn(rootPackage))
   const asking = (entries: Record<string, string>) => R.map(entries, (version, name) => asked(name, version))
-  const versionOf = (name: string): string => (name === "type-fest" ? "^6.0.1" : "workspace:*")
+  const versionOf = (name: string): string => (name === "type-fest" ? "^6.0.3" : "workspace:*")
   const versioned = (names: ReadonlyArray<string>) => A.map(names, (name) => [name, versionOf(name)] as const)
 
   /** Writes package.json, the tsconfigs, the vitest config, the README and test support; returns the local files. */
@@ -290,7 +290,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     const testFiles = A.map(tests[pkg.name] ?? [], (name) => `test/${name}`)
     const sourceDependencies = yield* dependenciesOf(pkg, sources)
     const dependencies = R.fromEntries(
-      A.sort(A.append(versioned(sourceDependencies), ["effect", "4.1.5"] as const), byLocale)
+      A.sort(A.append(versioned(sourceDependencies), ["effect", "4.1.6"] as const), byLocale)
     )
     const testDependencies = yield* dependenciesOf(pkg, testFiles)
     const testTexts = yield* Effect.forEach(testFiles, (file) => repo.text(repo.join(target, file)), { concurrency: 1 })
@@ -298,10 +298,10 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
       A.sort(
         A.flatten<ReadonlyArray<ReadonlyArray<readonly [string, string]>>>([
           versioned(A.filter(testDependencies, (name) => !R.has(dependencies, name))),
-          [["@effect/vitest", "4.1.5"]],
-          A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.5"]] : [],
-          [["@types/node", "^22.20.5"]],
-          [["vitest", "^5.1.0"]]
+          [["@effect/vitest", "4.1.6"]],
+          A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.6"]] : [],
+          [["@types/node", "^22.20.7"]],
+          [["vitest", "^5.1.2"]]
         ]),
         byLocale
       )
@@ -324,7 +324,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
       devDependencies: asking(devDependencies)
     }).pipe(Effect.orDie)
     yield* repo.write(repo.join(target, "package.json"), `${packageJson}\n`)
-    const base = repo.relative(pkg.dir, "tsconfig.base.json")
+    const base = repo.relative("tsconfig.base.json", pkg.dir)
     const tsconfig = (include: ReadonlyArray<string>) =>
       pretty({ extends: base, include, compilerOptions: { types: ["node"] } }).pipe(
         Effect.orDie,
@@ -336,7 +336,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     yield* repo.write(repo.join(target, "tsconfig.test.json"), testConfig)
     // The repository's test limits (vitest.shared.ts), as every package of its own has them: a kit package's
     // property tests are what timed out on CI's runner under vitest's 5 s.
-    const shared = repo.relative(pkg.dir, "vitest.shared.ts")
+    const shared = repo.relative("vitest.shared.ts", pkg.dir)
     yield* repo.write(
       repo.join(target, "vitest.config.ts"),
       `import { defineConfig } from "vitest/config"\nimport { limits } from "${shared}"\n\nexport default defineConfig({ test: { include: ["test/**/*.test.ts"], ...limits } })\n`

@@ -2,6 +2,7 @@
 // none, and a name outside the registry a maker was bound to is a type error. The vocabulary is an example library's,
 // not this repository's: the package names no term of any one vocabulary.
 import { describe, expect, it } from "@effect/vitest"
+import { assertDefined } from "@effect/vitest/utils"
 import type { Curie, VocabShape } from "@beep/identity/Vocab"
 import * as Arbitrary from "effect/Arbitrary"
 import * as A from "effect/Array"
@@ -139,7 +140,9 @@ describe("reading a struct", () => {
 
   it("reads the record's class pointer from its schema annotations, written through annoteSchema's extras", () => {
     expect(marks.mark).toEqual(term("lib:Book"))
-    expect(S.resolveAnnotations(Book)?.["description"]).toBe("A book the library holds")
+    const annotations = S.resolveAnnotations(Book)
+    assertDefined(annotations)
+    expect(annotations["description"]).toBe("A book the library holds")
   })
 
   it("reads the subject's id on a branded field", () => {

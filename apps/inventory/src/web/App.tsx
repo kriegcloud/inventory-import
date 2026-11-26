@@ -4,6 +4,7 @@ import { SignedIn } from "@/components/app/SignedIn"
 import { Skeleton } from "@inventory/ui/components/skeleton"
 import { useAtomValue } from "@effect/atom-react"
 import * as Str from "effect/String"
+import * as O from "effect/Option"
 import { location } from "@inventory/ui/Route"
 import { workspace } from "./preload.ts"
 
@@ -14,24 +15,24 @@ const Workspace = lazy(workspace)
 
 // Development only: the review region's gallery at /gallery/review. In a production build the condition is a
 // constant false, so the page and its made-up data are not in the bundle.
-const ReviewGallery = import.meta.env.DEV ? lazy(() => import("@/pages/ReviewGallery")) : undefined
+const ReviewGallery = import.meta.env.DEV ? O.some(lazy(() => import("@/pages/ReviewGallery"))) : O.none()
 // Development only too: the data grid's typing page at /gallery/grid, which `bun run grid:keys` drives in a browser.
-const GridGallery = import.meta.env.DEV ? lazy(() => import("@/pages/GridGallery")) : undefined
+const GridGallery = import.meta.env.DEV ? O.some(lazy(() => import("@/pages/GridGallery"))) : O.none()
 
 /** The app: the sign-in screen for anyone not signed in, the workspace for a member of an organization. */
 export default function App() {
   const { path } = useAtomValue(location)
-  if (ReviewGallery !== undefined && Str.startsWith("/gallery/review")(path)) {
+  if (O.isSome(ReviewGallery) && Str.startsWith("/gallery/review")(path)) {
     return (
       <Suspense fallback={null}>
-        <ReviewGallery />
+        <ReviewGallery.value />
       </Suspense>
     )
   }
-  if (GridGallery !== undefined && Str.startsWith("/gallery/grid")(path)) {
+  if (O.isSome(GridGallery) && Str.startsWith("/gallery/grid")(path)) {
     return (
       <Suspense fallback={null}>
-        <GridGallery />
+        <GridGallery.value />
       </Suspense>
     )
   }

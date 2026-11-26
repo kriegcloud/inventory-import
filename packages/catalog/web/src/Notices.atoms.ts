@@ -7,7 +7,9 @@
 // read only by that tab while that member is signed in on it. A tab that never comes back never reads its record, so
 // they are bounded: whenever one is written, the member's records older than 30 days go, and all but the newest 20; one
 // record names at most the newest 20 imports.
+import { storageKey, storageText } from "@inventory/client/Storage"
 import * as A from "effect/Array"
+import { identity } from "effect/Function"
 import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
@@ -21,7 +23,7 @@ import { thisTab } from "@inventory/client/TabAtoms"
 import { kept } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { eachOnce, type Named } from "./Draft.machine.ts"
-import { Notice, NoticesKept, noticesFromText, noticesText } from "./internal/notices.ts"
+import { namedIn, Notice, NoticesKept, noticesFromText, noticesText } from "./internal/notices.ts"
 
 /** The member a record is kept for. */
 interface Member {
@@ -39,10 +41,10 @@ const noticesAt = Atom.family((key: string) =>
   kept({ key, schema: NoticesKept, defaultValue: (): NoticesKept => O.none() })
 )
 
-const listOf = (stored: NoticesKept): ReadonlyArray<Notice> => O.getOrElse(stored, (): ReadonlyArray<Notice> => [])
+const listOf = (stored: NoticesKept): ReadonlyArray<Notice> => O.match(stored, { onNone: A.empty, onSome: identity })
 
 /** True for a notice of rows that were only to be named. */
-const isNamed = (one: Notice): boolean => Notice.guards.TakenUp(one) && one.named === true
+const isNamed = (one: Notice): boolean => Notice.guards.TakenUp(one) && O.contains(one.named, true)
 
 /** True for two notices about the same import that say the same thing happened to it. */
 const sameNotice = (one: Notice, other: Notice): boolean =>
@@ -50,21 +52,17 @@ const sameNotice = (one: Notice, other: Notice): boolean =>
   Notice.guards.TakenUp(one) === Notice.guards.TakenUp(other) &&
   isNamed(one) === isNamed(other)
 
-/** A removed import's decisions, as they are named: an older page kept nothing of what the import held. */
-const namedIn = ({ beside, rows, theirs }: Extract<Notice, { readonly rows: Named["rows"] }>): Named => ({
-  rows,
-  beside,
-  theirs: theirs ?? {}
-})
-
 /** Two notices of the same thing as one: the rows of both, and the file's name where either knows it. */
 const together = (before: Notice, now: Notice): Notice => {
   const fileName = O.orElse(now.fileName, () => before.fileName)
-  return Notice.guards.TakenUp(before) && Notice.guards.TakenUp(now)
-    ? { ...now, fileName, rows: A.dedupe([...before.rows, ...now.rows]) }
-    : Notice.guards.Removed(before) && Notice.guards.Removed(now)
-      ? { ...now, fileName, ...eachOnce([namedIn(before), namedIn(now)]) }
-      : now
+  if (Notice.guards.TakenUp(before) && Notice.guards.TakenUp(now)) {
+    return { ...now, fileName, rows: A.dedupe([...before.rows, ...now.rows]) }
+  }
+  if (Notice.guards.Removed(before) && Notice.guards.Removed(now)) {
+    const named = eachOnce([namedIn(before), namedIn(now)])
+    return { ...now, fileName, ...named, theirs: O.some(named.theirs) }
+  }
+  return now
 }
 
 /** The notices with one more: together with the one that says the same of the same import, the newest ones kept. */
@@ -85,13 +83,13 @@ const bounding = (storage: Storage, of: Member): void => {
   const prefix = progressKey({ organizationId: of.organizationId, memberId: of.id, screen: "notices:" })
   const records: Array<{ readonly key: string; readonly at: number }> = []
   for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index)
-    if (key === null || !Str.startsWith(prefix)(key)) continue
-    records.push({ key, at: newest(noticesFromText(storage.getItem(key))) })
+    const key = storageKey(index)(storage)
+    if (O.isNone(key) || !Str.startsWith(prefix)(key.value)) continue
+    records.push({ key: key.value, at: storageText(key.value)(storage).pipe(noticesFromText, newest) })
   }
   const newestFirst = A.sort(
     records,
-    Order.mapInput(Order.flip(Order.Number), (record: { at: number }) => record.at)
+    Order.mapInput(Order.flip(Order.Number), (record: { readonly at: number }) => record.at)
   )
   const oldest = DateTime.toEpochMillis(DateTime.subtract(DateTime.nowUnsafe(), { days: keptFor.days }))
   A.forEach(newestFirst, (record, n) => {
@@ -116,7 +114,7 @@ const leave = (input: {
   // Storage refused (full, or turned off): the decisions are with the tab that took them up, and only this is not said.
   sharedStorage.attempt((storage) => {
     if (!here) {
-      const text = noticesText(withNotice(noticesFromText(storage.getItem(key)), notice))
+      const text = noticesText(withNotice(noticesFromText(storageText(key)(storage)), notice))
       O.map(text, (kept) => storage.setItem(key, kept))
     }
     bounding(storage, of)
@@ -150,7 +148,7 @@ export const leaveTakenUp = (input: {
       importId: from.id,
       fileName: from.fileName,
       rows,
-      ...(named ? { named } : {}),
+      named: O.liftPredicate((named: boolean) => named)(named),
       at
     })
   })
@@ -171,7 +169,13 @@ export const leaveRemoved = (input: {
     registry,
     of,
     tab,
-    notice: Notice.cases.Removed.make({ importId: from.id, fileName: from.fileName, ...named, at })
+    notice: Notice.cases.Removed.make({
+      importId: from.id,
+      fileName: from.fileName,
+      ...named,
+      theirs: O.some(named.theirs),
+      at
+    })
   })
 }
 

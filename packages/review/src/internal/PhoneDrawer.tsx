@@ -13,15 +13,15 @@ import {
  * drawer's code (vaul) is fetched only on a phone, after the review is drawn, and never on a desk.
  */
 export function PhoneDrawer(props: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCloseAutoFocus: (event: Event) => void
-  title: ReactNode
-  description: ReactNode
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly onCloseAutoFocus: (event: Event) => void
+  readonly title: ReactNode
+  readonly description: ReactNode
   /** The description is for a screen reader only. */
-  quietDescription?: boolean
-  footer?: ReactNode
-  children: ReactNode
+  readonly quietDescription?: boolean
+  readonly footer?: ReactNode
+  readonly children: ReactNode
 }) {
   return (
     <Drawer open={props.open} onOpenChange={props.onOpenChange} autoFocus>

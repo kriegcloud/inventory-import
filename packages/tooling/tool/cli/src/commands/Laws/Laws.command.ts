@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
+import { diagnosticDirective } from "../Scratch/Scratch.templates.ts"
 import { emit } from "../../Report.schema.ts"
 import { assertions, assertionsLedger, assertionsSentence } from "./Assertions.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
@@ -97,10 +98,12 @@ export const promisesCommand = Command.make("promises", {}, () =>
   Command.withDescription("No Promise is written: no async, await, new Promise, Promise.*, Promise type or .then chain")
 )
 
-/** `laws diagnostics`: no `@effect-diagnostics` directive turns a rule off, but in the files listed. */
+/** `laws diagnostics`: no diagnostic directive turns a rule off, but in the files listed. */
 export const diagnosticsCommand = Command.make("diagnostics", {}, () =>
   Effect.flatMap(diagnostics(), emit(diagnosticsSentence))
-).pipe(Command.withDescription("No @effect-diagnostics directive turns a rule off, in any code file git would commit"))
+).pipe(
+  Command.withDescription(`No ${diagnosticDirective} directive turns a rule off, in any code file git would commit`)
+)
 
 /** `laws dual`: every helper declared with two values or more takes the one it acts on first and is dual. */
 export const dualCommand = Command.make("dual", {}, () => Effect.flatMap(dualHelpers, emit(dualSentence))).pipe(
@@ -136,7 +139,7 @@ export const effectImportsCommand = Command.make("effect-imports", { write, chec
 ).pipe(Command.withDescription("Every Effect import comes from its module's own path under its one name"))
 
 /**
- * `beep-cli laws defaults [--write] [file...]`: no file holds more fallbacks, comparisons with null or undefined,
+ * `beep-cli laws defaults [--write] [file...]`: no file holds more fallbacks, absence checks (including test guards and unwrapped optionalKey),
  * Options turned back into missing values, or clean-ups outside a schema than the baseline allows. Given files it
  * reads only those, which is how an edit is answered at once.
  */

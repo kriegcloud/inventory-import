@@ -11,7 +11,7 @@ import { createElement } from "react"
 import { prerender } from "react-dom/static"
 import { vi } from "vitest"
 import { progressKey } from "@inventory/review/SavedProgress"
-import { openPage, signedInAs } from "./support/page.ts"
+import { openPage, signedInAs, pageStart } from "./support/page.ts"
 
 // A cold start of the app's modules, on a busy machine.
 
@@ -46,8 +46,8 @@ const removed =
   `"rows":{"row-12":null},"beside":{},"at":1764000000000}]`
 
 /** A page of the app signed in as Dana, at `at`, with what this browser keeps. */
-const load = Effect.fnUntraced(function* (at: string, kept: Record<string, string> = {}) {
-  const page = openPage({ at, kept, tab: { "inventory:tab": "tab-1" } })
+const load = Effect.fnUntraced(function* (at: string, kept: Record<string, string>) {
+  const page = openPage({ ...pageStart(), at, kept, tab: { "inventory:tab": "tab-1" } })
   vi.resetModules()
   const [root, atomReact, workspace, imports, member] = yield* Effect.all(
     [
@@ -61,7 +61,7 @@ const load = Effect.fnUntraced(function* (at: string, kept: Record<string, strin
   )
   const registry = root.rootRegistry({ api: Layer.empty })
   yield* settle
-  page.asked[0]?.answer(signedInAs("dana"))
+  page.asked[0]?.answer(signedInAs({ who: "dana", organization: "prairie" }), 200)
   yield* settle
   const drawn = Effect.suspend(() => {
     drawing.mounted.length = 0
@@ -93,7 +93,7 @@ describe("the workspace", () => {
             Str.includes("Row 12")(html)
           ]).toEqual([true, true, true])
         }
-        const t = yield* load("/")
+        const t = yield* load("/", {})
         const html = yield* t.drawn
         expect([Str.includes("THE IMPORT PAGE")(html), Str.includes("was removed")(html)]).toEqual([true, false])
       })
@@ -102,7 +102,7 @@ describe("the workspace", () => {
   it.live("says when who is signed in could not be checked, and goes on drawing the page", () =>
     Effect.gen(function* () {
       const said = "We could not check that you are still signed in"
-      const t = yield* load("/items")
+      const t = yield* load("/items", {})
       const before = yield* t.drawn
       t.member.askWhoIsSignedIn(t.registry)
       yield* settle
@@ -122,7 +122,7 @@ describe("the workspace", () => {
 
   it.live("keeps the browser's question before the page is left, whatever page is shown", () =>
     Effect.gen(function* () {
-      const t = yield* load("/people")
+      const t = yield* load("/people", {})
       yield* t.drawn
       expect(A.some(drawing.mounted, (atom) => atom === t.imports.askBeforeLeaving)).toBe(true)
     })

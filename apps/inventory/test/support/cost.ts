@@ -4,6 +4,5 @@ import { costDigits, type UnitCost } from "@inventory/catalog-contract/Item"
 /** The cost the digits say. */
 export const cost = (digits: string): UnitCost => BigDecimal.fromStringUnsafe(digits)
 
-/** A cost as its digits, or undefined for none: what an expectation compares. */
-export const digits = (value: UnitCost | undefined): string | undefined =>
-  value === undefined ? undefined : costDigits(value)
+/** A required cost as its digits: what an expectation compares. */
+export const digits = (value: UnitCost): string => costDigits(value)

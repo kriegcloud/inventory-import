@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // The Items table's questions, answered in SQL: one page of an organization's items, searched, sorted and
 // filtered, and what the table's filters can offer. The one rule not to break: nothing from the request is ever SQL
 // text. A column id becomes a column only through the fixed tables below, every value is a bound parameter, and the
@@ -156,7 +157,7 @@ export const ItemStoreD1 = Layer.effect(
       sql.and([
         sql`organizationId = ${org}`,
         ...O.toArray(narrowed.search),
-        ...O.match(narrowed.filters, { onNone: () => [], onSome: (group) => [sql`(${group})`] })
+        ...O.match(narrowed.filters, { onNone: A.empty, onSome: (group) => [sql`(${group})`] })
       ])
     const pageRows = (narrowed: Narrowed, order: Statement.Fragment) =>
       D1.statement({
@@ -354,8 +355,8 @@ export const ItemStoreD1 = Layer.effect(
         const ends = O.flatMap(O.all([A.get(value, 0), A.get(value, 1)]), ([low, high]) => O.all([end(low), end(high)]))
         return O.flatMap(ends, ([from, to]) => {
           const clauses = [
-            ...O.match(from, { onNone: () => [], onSome: (cents) => [sql`${column} >= ${cents}`] }),
-            ...O.match(to, { onNone: () => [], onSome: (cents) => [sql`${column} <= ${cents}`] })
+            ...O.match(from, { onNone: A.empty, onSome: (cents) => [sql`${column} >= ${cents}`] }),
+            ...O.match(to, { onNone: A.empty, onSome: (cents) => [sql`${column} <= ${cents}`] })
           ]
           return A.isReadonlyArrayNonEmpty(clauses) ? O.some(sql`(${sql.and(clauses)})`) : O.none()
         })
@@ -452,7 +453,10 @@ export const ItemStoreD1 = Layer.effect(
         pageRows(narrowed, order)({ org: organizationId, perPage: query.perPage, offset }),
         pageCount(narrowed)(organizationId)
       ])
-      const total = O.match(A.head(count), { onNone: () => 0, onSome: (row) => row.n })
+      const total = yield* O.match(A.head(count), {
+        onNone: () => Effect.die("item count returned no row"),
+        onSome: (row) => Effect.succeed(row.n)
+      })
       return { data: A.map(data, storedItem), total, pageCount: Math.ceil(total / query.perPage) }
     }, Effect.orDie)
 
@@ -547,6 +551,10 @@ export const ItemStoreD1 = Layer.effect(
         : EditOutcome.cases.Changed.make({ item: stored })
     }, Effect.orDie)
 
-    return ItemStore.of({ page, facets, edit })
+    return ItemStore.of({
+      page: dual(2, (self: ItemQuery, organizationId: OrganizationId) => page(organizationId, self)),
+      facets,
+      edit: dual(3, (self: string, actor: Member, change: ItemEdit) => edit(actor, self, change))
+    })
   })
 ).pipe(Layer.provide(SecureRandom.layerWebCrypto))

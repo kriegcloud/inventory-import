@@ -1,6 +1,7 @@
 // The laws: a table written and read back is the same table; canonical text read and written back is the same text;
 // and reading in pieces, split anywhere, gives what reading at once gives.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
@@ -29,7 +30,10 @@ describe("round trip", () => {
         [Arbitrary.schema(CsvTable)],
         ([table]) => {
           const text = Csv.stringify(table, CsvWriteOptions.make({ delimiter, terminator }))
-          const read = Result.getOrThrow(Csv.parseResult(text, readWith(delimiter)))
+          const result = Csv.parseResult(text, readWith(delimiter))
+          const resultExpected = Result.isSuccess(result)
+          assertTrue(resultExpected)
+          const read = result.success
           expect(read.table.records).toEqual(table.records)
           expect(Csv.stringify(read.table, CsvWriteOptions.make({ delimiter, terminator }))).toBe(text)
         },
@@ -87,11 +91,17 @@ describe("chunk invariance", () => {
           Stream.runCollect,
           Effect.result
         )
-        if (Result.isSuccess(whole)) {
-          expect(Result.isSuccess(streamed)).toBe(true)
-          if (Result.isSuccess(streamed))
-            expect(A.map(streamed.success, (slice) => slice.cells)).toEqual(whole.success.table.records)
-        } else expect(Result.isFailure(streamed)).toBe(true)
+        Result.match(whole, {
+          onFailure: () => {
+            const streamedExpected = Result.isFailure(streamed)
+            assertTrue(streamedExpected)
+          },
+          onSuccess: (read) => {
+            const streamedExpected = Result.isSuccess(streamed)
+            assertTrue(streamedExpected)
+            expect(A.map(streamed.success, (slice) => slice.cells)).toEqual(read.table.records)
+          }
+        })
       }),
     runs
   )
@@ -111,9 +121,17 @@ describe("chunk invariance", () => {
           Stream.runCollect,
           Effect.result
         )
-        if (Result.isSuccess(whole) && Result.isSuccess(streamed)) {
-          expect(A.map(streamed.success, (slice) => slice.cells)).toEqual(whole.success.table.records)
-        } else expect(Result.isFailure(streamed)).toBe(Result.isFailure(whole))
+        Result.match(whole, {
+          onFailure: () => {
+            const streamedExpected = Result.isFailure(streamed)
+            assertTrue(streamedExpected)
+          },
+          onSuccess: (read) => {
+            const streamedExpected = Result.isSuccess(streamed)
+            assertTrue(streamedExpected)
+            expect(A.map(streamed.success, (slice) => slice.cells)).toEqual(read.table.records)
+          }
+        })
       }),
     runs
   )
@@ -124,7 +142,10 @@ describe("decodeSchema", () => {
     Effect.gen(function* () {
       const Row = S.Struct({ SKU: S.String, Qty: S.FiniteFromString })
       const bytes = new TextEncoder().encode("SKU,Qty\nBRK-040,12\nBLT-0042,3\n")
-      const rows = yield* Stream.make(bytes).pipe(Stream.pipeThroughChannel(Csv.decodeSchema(Row)()), Stream.runCollect)
+      const rows = yield* Stream.make(bytes).pipe(
+        Stream.pipeThroughChannel(Csv.decodeSchema(Row)(CsvReadOptions.default)),
+        Stream.runCollect
+      )
       expect(rows).toEqual([
         { SKU: "BRK-040", Qty: 12 },
         { SKU: "BLT-0042", Qty: 3 }

@@ -3,6 +3,7 @@
 // key its SKU is compared by, every piece bound is a JSON array of exactly the items it was cut from, and a list is cut
 // by the bytes its JSON really has, never past what D1 takes in one value.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { ItemInsert, ItemsPiece } from "@inventory/catalog-host/ImportRows"
 import { jsonPieces, pieceBytes } from "@inventory/catalog-host/Pieces"
@@ -87,7 +88,8 @@ describe("the items a confirm writes", () => {
         const text = yield* S.encodeEffect(ItemsPiece)(items)
         const rows = rowsOf(text)
         expect(O.map(rows, A.length)).toEqual(O.some(items.length))
-        if (O.isSome(rows)) {
+        assertTrue(O.isSome(rows), "expected the tested value to be present")
+        {
           A.forEach(rows.value, (row) => expect(row.skuKey).toBe(skuKey({ sku: row.sku })))
         }
       }),
@@ -126,7 +128,8 @@ describe("the items a confirm writes", () => {
         A.forEach(drawn, (group, index) => {
           if (group.length > 1) expect(pieceSize(group)).toBeLessThanOrEqual(pieceBytes)
           const next = O.flatMap(A.get(drawn, index + 1), A.head)
-          if (O.isSome(next)) {
+          if (index + 1 < drawn.length) {
+            assertTrue(O.isSome(next), "expected the tested value to be present")
             const fits = group.length < most && pieceSize(A.append(group, next.value)) <= pieceBytes
             expect(fits).toBe(false)
           }

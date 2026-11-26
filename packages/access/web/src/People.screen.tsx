@@ -1,4 +1,7 @@
 import { useAtom, useAtomMount, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
+import { identity } from "effect/Function"
+import * as R from "effect/Record"
 import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -46,7 +49,7 @@ import { optimisticChange, optimisticWrite, shown } from "@inventory/client/Opti
 import { AddPerson as AddPersonCommand, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { Person } from "@inventory/access-contract/Person"
 import type { MemberId } from "@inventory/kernel/Ids"
-import { hasRole, type Role } from "@inventory/kernel/Role"
+import { hasRole, Role } from "@inventory/kernel/Role"
 import { when } from "@inventory/ui/Dates"
 import { sayError } from "@inventory/client/SayError"
 import { accessApi, accessKeys } from "./Access.runtime.ts"
@@ -61,14 +64,16 @@ const personOf = ({ saving: _saving, ...person }: PersonRow): Person => Person.m
 /** A role as one word, as the Role column's filter and the rows of people who cannot change it show it. */
 const roleWords: Record<Role, string> = { viewer: "Viewer", editor: "Editor", admin: "Admin" }
 
-const roles: ReadonlyArray<{ value: Role; label: string }> = [
+const roles: ReadonlyArray<{ readonly value: Role; readonly label: string }> = [
   { value: "viewer", label: "Viewer: can look" },
   { value: "editor", label: "Editor: can import" },
   { value: "admin", label: "Admin: can manage people" }
 ]
 
 /** The people of the organization, as the server has them, with each optimistic change on top while it is saved. */
-const people = shown(accessApi.query((api) => api.people.list(), { reactivityKeys: accessKeys.people }))
+const people = shown(
+  accessApi.query((api) => api.people.list(), { keep: "unwatched", reactivityKeys: O.some(accessKeys.people) })
+)
 
 /** The people whose role is on its way to the server: their row shows the new role, and waits for it. */
 const savingRoles = Atom.make(HashSet.empty<MemberId>())
@@ -93,13 +98,13 @@ const setRole = optimisticWrite({
   send: sendRoleChange,
   changes: [
     optimisticChange(people, (list: ReadonlyArray<Person>, input: RoleChange) =>
-      list.map((entry) =>
+      A.map(list, (entry) =>
         entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.role }) : entry
       )
     )
   ],
   failed: (input) => `${input.person.name}'s role was not changed.`,
-  settled: accessKeys.activity
+  settled: O.some(accessKeys.activity)
 })
 
 /** A removal, shown at once and put back, with the reason, if the server refuses (an organization keeps an admin). */
@@ -107,11 +112,11 @@ const remove = optimisticWrite({
   send: (person: Person) => accessApi.send((api) => api.people.remove({ params: { memberId: person.memberId } })),
   changes: [
     optimisticChange(people, (list: ReadonlyArray<Person>, person: Person) =>
-      list.filter((entry) => entry.memberId !== person.memberId)
+      A.filter(list, (entry) => entry.memberId !== person.memberId)
     )
   ],
   failed: (person) => `${person.name} was not removed.`,
-  settled: accessKeys.activity
+  settled: O.some(accessKeys.activity)
 })
 
 /** The add form: whether it is open, and what the person signed in has typed in it. */
@@ -126,7 +131,7 @@ export const addRole = ofMember((): Role => "editor")
 const addPerson = accessApi.write<{ readonly email: string; readonly role: Role }>()(
   (api, input) =>
     S.decodeEffect(AddPersonCommand)(input).pipe(Effect.flatMap((payload) => api.people.add({ payload }))),
-  { reactivityKeys: [...accessKeys.people, ...accessKeys.activity] }
+  { reactivityKeys: O.some([...accessKeys.people, ...accessKeys.activity]) }
 )
 
 /**
@@ -144,9 +149,11 @@ function AddPerson() {
   const add = useAtomSet(addPerson, { mode: "promiseExit" })
   const reset = useAtomSet(addPerson)
   const pending = result.waiting
-  const outcome = result.pipe(AsyncResult.value, O.getOrUndefined)
-  const problem = !pending && outcome !== undefined && Result.isFailure(outcome) ? outcome.failure : undefined
-  const failed = !pending && AsyncResult.isFailure(result) ? Cause.squash(result.cause) : null
+  const problem = O.flatMap(
+    O.filter(AsyncResult.value(result), () => !pending),
+    Result.getFailure
+  )
+  const failed = !pending && AsyncResult.isFailure(result) ? result.cause.pipe(Cause.squash, O.some) : O.none()
   return (
     <Dialog
       open={open}
@@ -188,29 +195,42 @@ function AddPerson() {
             </Field>
             <Field>
               <FieldLabel htmlFor={roleId}>Role</FieldLabel>
-              <NativeSelect id={roleId} value={role} onChange={(event) => setRole(event.target.value as Role)}>
-                {roles.map((entry) => (
+              <NativeSelect
+                id={roleId}
+                value={role}
+                onChange={(event) => {
+                  const role = event.target.value
+                  if (S.is(Role)(role)) setRole(role)
+                }}
+              >
+                {A.map(roles, (entry) => (
                   <NativeSelectOption key={entry.value} value={entry.value}>
                     {entry.label}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
             </Field>
-            {problem === undefined ? null : (
-              <Alert variant="destructive">
-                <AlertTitle>Not added</AlertTitle>
-                <AlertDescription>
-                  <p>{problem.problem}</p>
-                  <p>{problem.todo}</p>
-                </AlertDescription>
-              </Alert>
-            )}
-            {failed === null ? null : (
-              <Alert variant="destructive">
-                <AlertTitle>Not added</AlertTitle>
-                <AlertDescription>{sayError(failed).sentence}</AlertDescription>
-              </Alert>
-            )}
+            {O.match(problem, {
+              onNone: () => null,
+              onSome: (problem) => (
+                <Alert variant="destructive">
+                  <AlertTitle>Not added</AlertTitle>
+                  <AlertDescription>
+                    <p>{problem.problem}</p>
+                    <p>{problem.todo}</p>
+                  </AlertDescription>
+                </Alert>
+              )
+            })}
+            {O.match(failed, {
+              onNone: () => null,
+              onSome: (failed) => (
+                <Alert variant="destructive">
+                  <AlertTitle>Not added</AlertTitle>
+                  <AlertDescription>{sayError(failed, { fields: {} }).sentence}</AlertDescription>
+                </Alert>
+              )
+            })}
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -223,8 +243,6 @@ function AddPerson() {
   )
 }
 
-const noPeople: ReadonlyArray<Person> = []
-
 /**
  * The list's rows: each says whether its role is on its way to the server. Carried in the row itself: the table
  * redraws a row when its data changes, and the list the server sends back after a change can be the very object shown
@@ -232,7 +250,7 @@ const noPeople: ReadonlyArray<Person> = []
  */
 const peopleRows = Atom.readable((get): ReadonlyArray<PersonRow> => {
   const saving = get(savingRoles)
-  return (get(people).pipe(AsyncResult.value, O.getOrUndefined) ?? noPeople).map((person) => ({
+  return A.map(O.match(AsyncResult.value(get(people)), { onNone: A.empty<Person>, onSome: identity }), (person) => ({
     ...person,
     saving: HashSet.has(saving, person.memberId)
   }))
@@ -243,43 +261,49 @@ const peopleRows = Atom.readable((get): ReadonlyArray<PersonRow> => {
  * write through the registry they are read in, so the columns are made again only when the person signed in changes.
  */
 const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> => {
-  const actor = O.getOrUndefined(get(signedIn))
-  const admin = actor !== undefined && hasRole(actor.role, "admin")
+  const actor = get(signedIn)
+  const admin = O.exists(actor, (member) => hasRole(member.role, "admin"))
   const registry = get.registry
   const changeRole = (change: { readonly person: Person; readonly role: Role }) => registry.set(setRole, change)
   const removePerson = (person: Person) => registry.set(remove, person)
   return [
     {
+      title: O.none(),
       id: "name",
       label: "Name",
-      width: 280,
-      value: (person) => person.name,
+      width: O.some(280),
+      value: O.some((person) => person.name),
       // The signed-in person's own row says so: the role and Remove beside it act on themself.
-      cell: (person) =>
-        person.memberId === actor?.id ? (
+      cell: O.some((person) =>
+        O.exists(actor, (member) => person.memberId === member.id) ? (
           <>
             {person.name} <span className="font-normal text-muted-foreground">(you)</span>
           </>
         ) : (
           person.name
         )
+      )
     },
     {
+      width: O.none(),
       id: "email",
       label: "Email",
-      value: (person) => O.getOrElse(person.email, () => ""),
-      cell: (person) => O.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email }),
-      title: (person) => O.getOrElse(person.email, () => "Not set"),
+      value: O.some((person) => O.match(person.email, { onNone: () => "", onSome: identity })),
+      cell: O.some((person) =>
+        O.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email })
+      ),
+      title: O.some((person) => O.match(person.email, { onNone: () => "Not set", onSome: identity })),
       blank: (person) => O.isNone(person.email)
     },
     {
+      title: O.none(),
       id: "role",
       label: "Role",
-      width: 260,
+      width: O.some(260),
       // Admin, Editor, Viewer: in the order of what each may do, and alphabetical too.
-      value: (person) => roleWords[person.role],
+      value: O.some((person) => roleWords[person.role]),
       facet: true,
-      cell: (person) =>
+      cell: O.some((person) =>
         admin && O.isSome(person.email) ? (
           <NativeSelect
             size="sm"
@@ -287,9 +311,12 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
             value={person.role}
             // This person's role is on its way to the server: the new one shows, and a second change waits for it.
             disabled={person.saving}
-            onChange={(event) => changeRole({ person: personOf(person), role: event.target.value as Role })}
+            onChange={(event) => {
+              const role = event.target.value
+              if (S.is(Role)(role)) changeRole({ person: personOf(person), role })
+            }}
           >
-            {roles.map((entry) => (
+            {A.map(roles, (entry) => (
               <NativeSelectOption key={entry.value} value={entry.value}>
                 {entry.label}
               </NativeSelectOption>
@@ -298,26 +325,29 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
         ) : (
           roleWords[person.role]
         )
+      )
     },
     {
       id: "joined",
       label: "Joined",
-      width: 190,
+      width: O.some(190),
       // Sorted by the moment itself, as ISO text.
-      value: (person) => O.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso }),
+      value: O.some((person) => O.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso })),
       searchable: false,
-      cell: (person) => O.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when }),
-      title: (person) => O.match(person.joinedAt, { onNone: () => "Not set", onSome: when }),
+      cell: O.some((person) => O.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when })),
+      title: O.some((person) => O.match(person.joinedAt, { onNone: () => "Not set", onSome: when })),
       blank: (person) => O.isNone(person.joinedAt)
     },
     ...(admin
       ? [
           {
+            title: O.none(),
+            value: O.none(),
             id: "actions",
             label: "Remove",
-            width: 120,
+            width: O.some(120),
             end: true,
-            cell: (person: PersonRow) => (
+            cell: O.some((person: PersonRow) => (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="ghost" size="xs">
@@ -328,7 +358,9 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
                   <AlertDialogHeader>
                     <AlertDialogTitle>Remove {person.name}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      They lose access to {actor?.organizationName} at once. Their account and what they imported stay.
+                      They lose access to{" "}
+                      {O.match(actor, { onNone: () => null, onSome: (member) => member.organizationName })} at once.
+                      Their account and what they imported stay.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -337,7 +369,7 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            )
+            ))
           }
         ]
       : [])
@@ -347,55 +379,69 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
 /** Who is in the organization and with what role. An admin adds people, changes roles and removes members here. */
 export function PeoplePage() {
   const who = useAtomValue(signedIn)
-  const actor = O.getOrUndefined(who)
-  const admin = actor !== undefined && hasRole(actor.role, "admin")
+  const admin = O.exists(who, (member) => hasRole(member.role, "admin"))
   const list = useAtomValue(people)
   const askAgain = useAtomRefresh(people)
   // The two writes the list's cells make are mounted while the page is, so one under way is not let go.
   useAtomMount(setRole)
   useAtomMount(remove)
   const columns = useAtomValue(peopleColumns)
-  const data = list.pipe(AsyncResult.value, O.getOrUndefined)
-  const error = AsyncResult.isFailure(list) && !list.waiting ? Cause.squash(list.cause) : null
-  const count = data?.length ?? 0
+  const data = AsyncResult.value(list)
+  const error = AsyncResult.isFailure(list) && !list.waiting ? list.cause.pipe(Cause.squash, O.some) : O.none()
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="People"
-        line={
-          actor !== undefined && data !== undefined
-            ? `${actor.organizationName} · ${count} ${count === 1 ? "person" : "people"}`
-            : error === null
-              ? "loading"
-              : undefined
-        }
+        {...R.getSomes({
+          line: O.orElse(
+            O.map(
+              O.all({ actor: who, data }),
+              ({ actor, data }) =>
+                `${actor.organizationName} · ${data.length} ${data.length === 1 ? "person" : "people"}`
+            ),
+            () => (O.isNone(error) ? O.some("loading") : O.none())
+          )
+        })}
         actions={admin ? <AddPerson /> : undefined}
       />
-      {error !== null ? (
-        <div className="px-4 sm:px-9">
-          <Alert variant="destructive">
-            <AlertTitle>The people could not be loaded</AlertTitle>
-            <AlertDescription>
-              {sayError(error).sentence}
-              <Button variant="outline" size="sm" onClick={askAgain}>
-                Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      ) : data === undefined ? (
-        <TableSkeleton caption="People in the organization" columns={columns} />
-      ) : (
-        <ListTable
-          caption="People in the organization"
-          searchLabel="Search people"
-          columns={peopleColumns}
-          rows={peopleRows}
-          rowKey={(person) => person.memberId}
-          empty="Nobody is here yet."
-          updating={list.waiting}
-        />
-      )}
+      {O.match(error, {
+        onSome: (error) => (
+          <div className="px-4 sm:px-9">
+            <Alert variant="destructive">
+              <AlertTitle>The people could not be loaded</AlertTitle>
+              <AlertDescription>
+                {sayError(error, { fields: {} }).sentence}
+                <Button variant="outline" size="sm" onClick={askAgain}>
+                  Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        ),
+        onNone: () =>
+          O.match(data, {
+            onNone: () => (
+              <TableSkeleton
+                caption="People in the organization"
+                columns={A.map(columns, (column) => ({
+                  label: O.some(column.label),
+                  ...R.getSomes({ width: column.width })
+                }))}
+              />
+            ),
+            onSome: () => (
+              <ListTable
+                caption="People in the organization"
+                searchLabel="Search people"
+                columns={peopleColumns}
+                rows={peopleRows}
+                rowKey={(person) => person.memberId}
+                empty="Nobody is here yet."
+                updating={list.waiting}
+              />
+            )
+          })
+      })}
     </div>
   )
 }

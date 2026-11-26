@@ -34,7 +34,7 @@ Places by package on 2026-11-23, from the baseline:
 | 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | partly, in two lanes: 88 places cleared, 81 exempt in eleven files that read bytes and markup (decided 2026-11-26), 17 left in the two codecs and the xlsx schema files (sheet and column names compared without case; a codec's own cell reading) |
 | 9 | `packages/review` | 586 | Codex lane | partly, in three lanes: the region's optional data are Options from `ReviewRow` to the last step of each screen (321 of 474 source places), the tests narrow with asserts (74 of 94), and the browser's reads are in `internal/browser.ts` (exempt for absence, decided 2026-11-26). Left: about 120 in source, most in `internal/ReviewGrid.tsx` (50) and `ReviewRegion.atoms.ts` (19): sparse cell lookups (`view.cells[id] ?? ""`), counters, and a component's own optional props, which stay counted (decided 2026-11-26); 20 in two test fixtures the gallery imports, which cannot use the test asserts |
 | 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | partly, in three lanes: every caller states its reactivity keys, `keep`, toast lead and `sayError` fields; the browser's reads are in `client/src/Storage.browser.ts` and `ui/src/internal/browser.ts` (exempt for absence). Left: about 55, named in VERDICTS: `Effect.runSync` in `Json.codec.ts` and `Api.atoms.ts`, `ListTable`'s facet counts and search clean-ups, `SayError`'s path wording, and components' own optional props |
-| 11 | `packages/catalog/web` | 572 | Codex lane | done but for the tests' second pass (running) and one place: 292 of 324 source places cleared, the editor is Closed or Open, worker messages cross encoded; five files that show or repair a reviewed cell are exempt for clean-ups and `internal/browser.ts` for absence (decided 2026-11-26). Left in source: the table hook's page count before the first read (`ItemsPage.screen.tsx`) and a ReactNode check in `ImportPage.screen.tsx` |
+| 11 | `packages/catalog/web` | 572 | Codex lane | done but for 46 places in its tests and two in source: 292 of 324 source places cleared, the editor is Closed or Open, worker messages cross encoded; five files that show or repair a reviewed cell are exempt for clean-ups and `internal/browser.ts` for absence (decided 2026-11-26). Left in source: the table hook's page count before the first read (`ItemsPage.screen.tsx`) and a ReactNode check in `ImportPage.screen.tsx` |
 | 12 | `packages/access/web` | 37 | Codex lane | done: no line of the baseline names it but the two exempt edges (`Session.atoms.ts`, `internal/authClient.ts`: the browser's and Better Auth's own APIs, decided 2026-11-26). The slug of a new organization is a schema's (`OrganizationSlugStem`), compared with the old helper on five names; not seen on screen, since sign-up is closed in development |
 | 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | partly: tests 95 to 4 (a first round that read `.valueOrUndefined` was refused and redone; the law now counts it), source 51 to 18. Left: the OpenAPI document's JSON (`api/v1/Document.ts`), `SameOrigin`'s header reads, and gallery pages |
 | 14 | `packages/infra` | 7 | Codex lane | done: 15 places under the new reader, all cleared; the stage plan is unchanged and no alchemy command was run. Two `onFailure: () => []` branches stay, which the law does not count |
@@ -138,6 +138,14 @@ Cannot import 21, Ready 0, Already there 154, All 200 (the changed item asks kee
 lane: pressed "Leave out 2" there, it read Needs a decision 21, Ready 2, Left out 2; reloaded the page, it read the
 same and offered "Undo: 2 rows left out".
 
+
+2026-11-26, the sweep's last state, at `744ce47c`: the baseline names 50 files and 295 places (136 fallback, 108
+absence, 2 unwrap, 49 clean-up; main: 1,687). `bun run check:full` passes (112 tasks) and the Verify lock equals
+`main`'s. On port 5174 from a fresh database: pressed "Use items_messy.csv"; Review read Needs a decision 24, Cannot
+import 21, Ready 155, All 200; pressed "Import 155, skip 45", then "Import 155 items" in the dialog "Import 155
+items?"; Result read Not imported 45, Imported 155, Already there 0, All 200; Items read "155 items". Screenshot
+`.scratch/shots/sweep-3-result.png`. Not seen on screen: Match (the sample needs none), the table assistant, People
+after the last lanes, sign-up, and a phone width.
 
 What the lanes taught, beyond the pilot's list:
 

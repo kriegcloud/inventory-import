@@ -20,7 +20,7 @@ import { vocabulary } from "@inventory/kernel/Terms"
 import decisionLog from "../../../explorations/erp-ontology/DECISIONS.md?raw"
 import exceptionFile from "../exceptions/no-gist-parent.json" with { type: "json" }
 import { constructsExceptions, constructsVocabulary } from "./support/constructs.ts"
-import { coverageFaults, coverageReport, coverageRows, notTerms } from "./support/coverage.ts"
+import { coverageFaults, coverageReport, coverageRows, enumSchemes, notTerms } from "./support/coverage.ts"
 
 const strict = { onExcessProperty: "error", errors: "all" } as const
 const decodeVocabulary = S.decodeUnknownEffect(Vocabulary, strict)
@@ -455,7 +455,45 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
           O.flatMap(R.get(decoded.schemes, "ContactPointKindScheme"), (scheme) => R.get(scheme.concepts, "email"))
         )
       ).toBe(true)
+      // The enums paragraph is read: its four schemes, and none from "`CompanyKind` chooses a class and is no scheme".
+      expect(enumSchemes(coverageReport)).toStrictEqual([
+        "AccountStatusScheme",
+        "ContactTypeScheme",
+        "ContactPurposeScheme",
+        "MembershipStatusScheme"
+      ])
+      // `Company.contacts` and `Organization.members`, given no property and no path, have none of their name.
+      expect(R.has(decoded.objectProperties, "contacts")).toBe(false)
+      expect(R.has(decoded.datatypeProperties, "contacts")).toBe(false)
+      expect(R.has(decoded.objectProperties, "members")).toBe(false)
+      expect(R.has(decoded.datatypeProperties, "members")).toBe(false)
     })
+  )
+
+  it.effect(
+    "planted: a dotted name that is no field of the table, or an excused word off its own row, is one fault",
+    () =>
+      Effect.gen(function* () {
+        const decoded = yield* decodeVocabulary(vocabulary)
+        expect(
+          coverageFaults({
+            report: edited(
+              "| `CurrentUser` | `id` | as `User.id`: unplaced (158) |",
+              "| `CurrentUser` | `id` | as `User.idd`: unplaced (158) |"
+            ),
+            vocabulary: decoded
+          })
+        ).toStrictEqual(["CurrentUser `id`: User.idd is no field of the table"])
+        expect(
+          coverageFaults({
+            report: edited(
+              "| `Company` | `status` | `accountStatus` (130) |",
+              "| `Company` | `status` | `company` (130) |"
+            ),
+            vocabulary: decoded
+          })
+        ).toStrictEqual(["Company `status`: company is no term of the module"])
+      })
   )
 
   it.effect("planted: a placement on a name the module lacks, or on no class for a type's record, is one fault", () =>
@@ -476,6 +514,23 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
           vocabulary: decoded
         })
       ).toStrictEqual(["Address: no row names a class of the module for its record"])
+      // `UserProfile`'s class is read from `OrganizationMember`'s `profile` row only: moved to another type, or given
+      // another field, it names none.
+      expect(
+        coverageFaults({
+          report: edited("| `OrganizationMember` | `profile` | part of", "| `Organization` | `profile` | part of"),
+          vocabulary: decoded
+        })
+      ).toStrictEqual(["UserProfile: no row names a class of the module for its record"])
+      expect(
+        coverageFaults({
+          report: edited(
+            "| `OrganizationMember` | `profile` | part of",
+            "| `OrganizationMember` | `preferences` | part of"
+          ),
+          vocabulary: decoded
+        })
+      ).toStrictEqual(["UserProfile: no row names a class of the module for its record"])
     })
   )
 
@@ -494,10 +549,11 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
         ])
         expect(
           coverageFaults({
-            report: edited("| `UserProfile` | `email` | unplaced:", "| `UserProfile` | `name` | unplaced:"),
+            // `Address.id`, which no view's row names, so the edit leaves every dotted name a field of the table.
+            report: edited("| `Address` | `id` | unplaced:", "| `Address` | `name` | unplaced:"),
             vocabulary: decoded
           })
-        ).toStrictEqual(["UserProfile `name`: the table says unplaced, and the module holds the property name"])
+        ).toStrictEqual(["Address `name`: the table says unplaced, and the module holds the property name"])
         expect(
           coverageFaults({
             report: edited("| `Company` | `customFields`, `files` |", "| `Company` | `customFields`, `extension` |"),
@@ -506,10 +562,35 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
         ).toStrictEqual([
           "Company `customFields`, `extension`: the table says later, and the module holds the property extension"
         ])
+        // A view's row read after its "as `Type.field`: ".
+        expect(
+          coverageFaults({
+            report: edited(
+              "| `CurrentUser` | `id` | as `User.id`: unplaced (158) |",
+              "| `CurrentUser` | `name` | as `User.id`: unplaced (158) |"
+            ),
+            vocabulary: decoded
+          })
+        ).toStrictEqual(["CurrentUser `name`: the table says unplaced, and the module holds the property name"])
+        // The two fields whose fact is stated from the other side, each given a property of its name.
+        const withContacts = yield* decodeVocabulary({
+          ...vocabulary,
+          datatypeProperties: { ...vocabulary.datatypeProperties, contacts: vocabulary.datatypeProperties.jobTitle }
+        })
+        expect(coverageFaults({ report: coverageReport, vocabulary: withContacts })).toStrictEqual([
+          "Company `contacts`: the table says no property, and the module holds the property contacts"
+        ])
+        const withMembers = yield* decodeVocabulary({
+          ...vocabulary,
+          datatypeProperties: { ...vocabulary.datatypeProperties, members: vocabulary.datatypeProperties.jobTitle }
+        })
+        expect(coverageFaults({ report: coverageReport, vocabulary: withMembers })).toStrictEqual([
+          "Organization `members`: the table says no path, and the module holds the property members"
+        ])
       })
   )
 
-  it.effect("planted: a scheme the enums name that the module lacks is one fault", () =>
+  it.effect("planted: a scheme the enums name that the module lacks, or no scheme read at all, is one fault", () =>
     Effect.gen(function* () {
       const decoded = yield* decodeVocabulary(vocabulary)
       expect(
@@ -518,6 +599,15 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
           vocabulary: decoded
         })
       ).toStrictEqual(["the enums name ContactKindScheme, which is no scheme of the module"])
+      expect(
+        coverageFaults({
+          report: edited("`AccountStatusScheme`; `ContactType`", "`AccountStatus`; `ContactType`"),
+          vocabulary: decoded
+        })
+      ).toStrictEqual(["the enums name AccountStatus, which is no scheme of the module"])
+      expect(
+        coverageFaults({ report: edited("Enums: `CompanyKind`", "Enum types: `CompanyKind`"), vocabulary: decoded })
+      ).toStrictEqual(["report 18 section 9 holds no enums paragraph that names a scheme"])
     })
   )
 
@@ -534,7 +624,7 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
             ),
             vocabulary: decoded
           })
-        ).toStrictEqual(['the excused word phoneNumber is in no "Placed as" cell'])
+        ).toStrictEqual(['the excused word phoneNumber is not in the "Placed as" cell of UserProfile `phoneNumberExt`'])
         const withKind = yield* decodeVocabulary({
           ...vocabulary,
           datatypeProperties: { ...vocabulary.datatypeProperties, kind: vocabulary.datatypeProperties.jobTitle }
@@ -552,7 +642,11 @@ describe("gate 4, Sutton's coverage table against the module (report 18 section 
       expect(A.length(coverageRows(moved))).toBe(0)
       expect(coverageFaults({ report: moved, vocabulary: decoded })).toStrictEqual([
         `report 18 section 9 holds no row of its table under "## 9. Sutton's slice-1 records, as answered"`,
-        ...A.map(notTerms, (name) => `the excused word ${name} is in no "Placed as" cell`)
+        "report 18 section 9 holds no enums paragraph that names a scheme",
+        ...A.map(
+          notTerms,
+          ([word, type, at]) => `the excused word ${word} is not in the "Placed as" cell of ${type} ${at}`
+        )
       ])
     })
   )

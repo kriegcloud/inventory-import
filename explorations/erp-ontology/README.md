@@ -26,7 +26,7 @@ thread is built, on branch `docs/erp-ontology-packet`, its commits not pushed: t
 ROBOT v1.9.11 was approved and tried outside the repository (112). Its jar is 82,708,624 bytes, sha256
 `53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`. Under Java 17.0.2 the DL profile check
 passed a small test ontology, HermiT found it consistent with exit 0, and an inconsistent variant exited 1. Java 17
-is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job (written, not yet run on GitHub), with
+is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job (passing on GitHub since 2026-11-23), with
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
 Slice 1, the party slice, follows the thread. Benjamin will take each of the 63 open decisions with a concrete record

@@ -18,6 +18,9 @@ import samenessQuery from "../../../../explorations/erp-ontology/assets/requirem
 import stewardshipFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P07.fixture.ttl?raw"
 import stewardshipQuery from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P07.rq?raw"
 import modelCallFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/model-call.ttl?raw"
+import contactsFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P03.fixture.ttl?raw"
+import contactsQuery from "../../../../explorations/erp-ontology/assets/requirements/cq/CQ-P03.rq?raw"
+import suttonPartyFixture from "../../../../explorations/erp-ontology/assets/requirements/cq/sutton-party.ttl?raw"
 import ontologyText from "../../generated/inventory.owl.ttl?raw"
 import { threadHandWritten } from "../../src/Thread.ts"
 
@@ -31,7 +34,9 @@ export const handWrittenFixtures: ReadonlyArray<readonly [name: string, text: st
   ["CQ-P04.fixture.ttl", identityFixture],
   ["CQ-P05.fixture.ttl", samenessFixture],
   ["model-call.ttl", modelCallFixture],
-  ["CQ-P07.fixture.ttl", stewardshipFixture]
+  ["CQ-P07.fixture.ttl", stewardshipFixture],
+  ["CQ-P03.fixture.ttl", contactsFixture],
+  ["sutton-party.ttl", suttonPartyFixture]
 ]
 
 /** The fixture of the planted query: one node typed only `inv:Tenant`. */
@@ -60,6 +65,16 @@ export const sameness = { query: samenessQuery, fixture: samenessFixture } as co
 
 /** CQ-P07, the tenants that keep no active admin, and its fixture. */
 export const stewardship = { query: stewardshipQuery, fixture: stewardshipFixture } as const
+
+/** CQ-P03, the people a tenant reaches at each account and for which purpose, and its fixture. */
+export const contacts = { query: contactsQuery, fixture: contactsFixture } as const
+
+/**
+ * The fixture sutton-party.ttl: one record of each Sutton type the coverage table places, read by guard 3 for the
+ * properties no question's fixture states (report 18 section 4). No question answers from it; CQ-P03 is asked of it
+ * only to show that it gives no row (decision 140).
+ */
+export const suttonParty: string = suttonPartyFixture
 
 /** The committed OWL file, as `bun run ontology:write` wrote it. */
 export const ontology: string = ontologyText

@@ -59,11 +59,12 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
-  // Decision 129 with 176: each new term and Party's exception entry name the accepting decision, and the thread's 21
+  // Decision 129 with 176: each new term and Party's exception entry name the accepting decision, and the thread's 20
   // other terms keep 111, Person, Organization and grantScope among them, whose new links change no text of theirs.
-  // Member's text changed in step 11 (report 18 section 7), so it names 176 now.
+  // Member's text changed in step 11 (report 18 section 3.2) and membershipIn's in step 12 (decision 169, report 18
+  // section 4.4), so both name 176 now.
   it.effect(
-    "the thread's 21 other terms name decision 111, the slice's forty-four name 176, and so does Party's exception entry",
+    "the thread's 20 other terms name decision 111, the slice's ninety-six name 176, and so does Party's exception entry",
     () =>
       Effect.gen(function* () {
         const decoded = yield* decodeVocabulary(vocabulary)
@@ -79,6 +80,10 @@ describe("gate 4, vocabulary coherence", () => {
           "AgentRun",
           "ModelCall",
           "SignInAccount",
+          "PostalAddress",
+          "ContactPoint",
+          "ContactAssignment",
+          "membershipIn",
           "recordOf",
           "decidesOn",
           "identityOutcome",
@@ -90,6 +95,22 @@ describe("gate 4, vocabulary coherence", () => {
           "maxRole",
           "callPurpose",
           "calledFor",
+          "hasPostalAddress",
+          "addressPurpose",
+          "defaultFor",
+          "hasContactPoint",
+          "contactPointKind",
+          "contactPerson",
+          "contactAccount",
+          "assignmentPoint",
+          "servesPurpose",
+          "contactAt",
+          "contactType",
+          "contactOwner",
+          "primaryContact",
+          "accountStatus",
+          "membershipWorkspace",
+          "memberContactPoint",
           "sourceSystem",
           "sourceType",
           "sourceId",
@@ -103,6 +124,19 @@ describe("gate 4, vocabulary coherence", () => {
           "name",
           "agentName",
           "calledAt",
+          "addressLines",
+          "locality",
+          "region",
+          "postalCode",
+          "countryCode",
+          "contactValue",
+          "extension",
+          "givenName",
+          "middleName",
+          "familyName",
+          "jobTitle",
+          "profileImage",
+          "profileText",
           "IdentityOutcomeScheme",
           "sameParty",
           "differentParties",
@@ -114,13 +148,32 @@ describe("gate 4, vocabulary coherence", () => {
           "ModelCallPurposeScheme",
           "view",
           "check",
-          "suggest"
+          "suggest",
+          "ContactPurposeScheme",
+          "billing",
+          "shipping",
+          "receiving",
+          "ordering",
+          "ship_from",
+          "manufacturing",
+          "other",
+          "ContactPointKindScheme",
+          "email",
+          "phone",
+          "ContactTypeScheme",
+          "customer",
+          "marketing",
+          "sales",
+          "vendor",
+          "AccountStatusScheme",
+          "active",
+          "archived"
         ])
-        expect(named111).toHaveLength(21)
+        expect(named111).toHaveLength(20)
         expect(A.map(named111, ([key]) => key)).toEqual(
           expect.arrayContaining(["Person", "Organization", "grantScope"])
         )
-        expect(termRatifications(decoded)).toHaveLength(65)
+        expect(termRatifications(decoded)).toHaveLength(116)
         expect(A.map(exceptions, (entry) => [entry.class, entry.ratification.decision])).toEqual([
           ["Role", 97],
           ["Party", 176]
@@ -189,6 +242,30 @@ describe("gate 4, vocabulary coherence", () => {
         ["C9", "datatypeProperty", "eventTime"]
       ])
     })
+  )
+
+  // Report 18 sections 4.1 and 8 (decisions 166 and 174): the three address links pass C9 because gist:hasAddress
+  // declares no domain and the range gist:Address, which PostalAddress and ContactPoint reach through their gist
+  // parents; the kernel's literal above is the near miss. Given the range gist:Event, or taken off the list, each fails.
+  it.effect(
+    "reports exactly C9 on the three address links when hasAddress declares another range, or leaves the list",
+    () =>
+      Effect.gen(function* () {
+        const exceptions = yield* decodeExceptions(exceptionFile)
+        const { hasAddress, ...others } = vocabulary.gist.properties
+        const ranged = yield* decodeVocabulary({
+          ...vocabulary,
+          gist: { ...vocabulary.gist, properties: { ...others, hasAddress: { ...hasAddress, range: "Event" } } }
+        })
+        const unlisted = yield* decodeVocabulary({ ...vocabulary, gist: { ...vocabulary.gist, properties: others } })
+        const links = [
+          ["C9", "objectProperty", "hasPostalAddress"],
+          ["C9", "objectProperty", "hasContactPoint"],
+          ["C9", "objectProperty", "memberContactPoint"]
+        ]
+        expect(named(coherenceFindings({ vocabulary: ranged, exceptions, decisions }))).toEqual(links)
+        expect(named(coherenceFindings({ vocabulary: unlisted, exceptions, decisions }))).toEqual(links)
+      })
   )
 
   it.effect(
@@ -273,19 +350,26 @@ describe("gate 4, vocabulary coherence", () => {
           properties: {
             isAbout: constructsVocabulary.gist.properties.isAbout,
             atDateTime: constructsVocabulary.gist.properties.atDateTime,
-            plantedAttribute: constructsVocabulary.gist.properties.plantedAttribute
+            plantedAttribute: constructsVocabulary.gist.properties.plantedAttribute,
+            hasAddress: constructsVocabulary.gist.properties.hasAddress
           }
         }
       }
       const found = yield* findingsOfCopy(planted)
       // The retired relation is held to its gist parent too: C9 reads every property, live or retired. The kernel's
-      // identityOutcome, membershipStatus and callPurpose sit under isCategorizedBy too, and name under gist's name
-      // (decision 176); eventTime keeps atDateTime on the list.
+      // identityOutcome, membershipStatus, callPurpose, addressPurpose, contactPointKind, servesPurpose, contactType and
+      // accountStatus sit under isCategorizedBy too, and name under gist's name (decision 176); eventTime keeps
+      // atDateTime on the list, and the three address links hasAddress.
       expect(found).toEqual([
         ["C9", "objectProperty", "grantScope"],
         ["C9", "objectProperty", "identityOutcome"],
         ["C9", "objectProperty", "membershipStatus"],
         ["C9", "objectProperty", "callPurpose"],
+        ["C9", "objectProperty", "addressPurpose"],
+        ["C9", "objectProperty", "contactPointKind"],
+        ["C9", "objectProperty", "servesPurpose"],
+        ["C9", "objectProperty", "contactType"],
+        ["C9", "objectProperty", "accountStatus"],
         ["C9", "objectProperty", "workspaceMembership"],
         ["C9", "datatypeProperty", "name"]
       ])

@@ -37,7 +37,8 @@ gist also uses axioms the project does not copy:
 
 The projection copies exactly the `owl:disjointWith` pairs gist states between classes it takes (decision 15).
 The thin thread has three: `gist:Organization` and `gist:Content`, `gist:Organization` and
-`gist:PhysicalIdentifiableItem`, and `gist:PhysicalIdentifiableItem` and `gist:Content`.
+`gist:PhysicalIdentifiableItem`, and `gist:PhysicalIdentifiableItem` and `gist:Content`. The party slice adds one,
+`gist:PhysicalAddress` and `gist:ElectronicAddress` (report 18 section 8, decision 176).
 
 ## The classes this ERP needs
 
@@ -63,6 +64,7 @@ Decision 13 admits the seven gist classes in bold for the thin thread (report 14
 | Physical amount (mass) | `gist:PhysicalSubstance` | none | An undifferentiated amount of material; mass nouns | 250 kg of flour in a bin |
 | Equipment | `gist:Equipment` | `gist:PhysicalIdentifiableItem` | Human-made tangible property used to do a task, other than land or buildings | A forklift, a filler |
 | Place on earth | `gist:GeoLocation`, `gist:GeoRegion`, `gist:GeoPoint` | `gist:GeoLocation`: none; `gist:GeoRegion` and `gist:GeoPoint`: `gist:GeoLocation` | A location with the earth as frame; a bounded region; a point by latitude and longitude | A site's area, a dock's coordinates |
+| Address (either kind) | `gist:Address` | `gist:Content` | A reference a routing method can locate, physical or electronic; the parent of the two below | Ancestor of a postal address and a contact point |
 | Address | `gist:PhysicalAddress`, `gist:ElectronicAddress` | `gist:Address` (itself under `gist:Content`) | A reference that a routing method can locate, where things or messages are sent | A ship-to address, an email address |
 | Event | `gist:Event` | none | Something that occurs over time | A receipt, a count |
 | Transaction | `gist:Transaction` | `gist:Event` | An exchange or transfer of goods, services or funds | A shipment received, a sale |
@@ -90,8 +92,8 @@ Properties gist offers for these classes (all exist in 14.1.0 as named): `gist:h
 `gist:isAbout`, `gist:hasBroader`, `gist:isIdentifiedBy`, `gist:idText`, `gist:uniqueText`, `gist:isAllocatedBy`,
 `gist:name`, `gist:atDateTime`, `gist:plannedStartDateTime`, `gist:actualStartDateTime`. Use one direction of each;
 gist itself defines no `gist:hasPart`, and none is added here. The thin thread takes no gist property; the party slice
-takes `gist:isCategorizedBy` and `gist:isAbout` first, then `gist:atDateTime`, then `gist:name` (report 18 section 8,
-decision 176). When
+takes `gist:isCategorizedBy` and `gist:isAbout` first, then `gist:atDateTime`, then `gist:name`, then `gist:hasAddress`
+(report 18 section 8, decision 176). When
 a slice takes one, copy its named `rdfs:subPropertyOf` links, never its domain or range. Put an `inv:` property under it
 only if the local property's domain and range fall under the gist property's (decision 16).
 

@@ -3,6 +3,8 @@
 # companion that finds the tenants that do keep one. It starts from each tenant, never from the memberships, so a
 # tenant with no members is a row (report 04 section 3.1). An admin who is not removed is a member whose stage is
 # active, holding a grant of the admin role (decision 136); the grant's scope is not read (report 18 section 10).
+# A membership that names a source's workspace lets its person act there, not here, so it counts no admin
+# (decision 154).
 # Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
 PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -15,6 +17,7 @@ WHERE {
     ?member rdf:type/rdfs:subClassOf* inv:Member ;
             inv:membershipIn ?tenant ;
             inv:membershipStatus inv:MembershipStatusScheme-active .
+    FILTER NOT EXISTS { ?member inv:membershipWorkspace ?workspace }
     ?grant rdf:type/rdfs:subClassOf* inv:Grant ;
            inv:grantedTo ?member ;
            inv:grantsRole inv:MemberRoleScheme-admin .

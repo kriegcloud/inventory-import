@@ -1,6 +1,6 @@
 // Gate 8, the question suite (report 14 sections 5 and 6.8; decision 120): CQ-P06 and CQ-P11 asked of
-// `threadGraph()` in Oxigraph, with no reasoner, and the party slice's CQ-P01, CQ-P02, CQ-P09, CQ-P04 and the CQ-P05
-// ASK asked of their hand-written fixtures, which no record holds (report 18 section 10). Every question walks
+// `threadGraph()` in Oxigraph, with no reasoner, and the party slice's CQ-P01, CQ-P02, CQ-P09, CQ-P04, the CQ-P05 ASK,
+// CQ-P07 and CQ-P03 asked of their hand-written fixtures, which no record holds (report 18 section 10). Every question walks
 // `rdf:type/rdfs:subClassOf*` and is asked of its graph with the committed OWL file beside it (decision 27), so a node
 // typed by a subclass is found.
 //
@@ -33,12 +33,14 @@ import { ask, askWhether } from "./support/ask.ts"
 import {
   bareType,
   bareTypeQuery,
+  contacts,
   handWrittenFixtures,
   identity,
   ontology,
   roleless,
   sameness,
   stewardship,
+  suttonParty,
   tenancy,
   trading
 } from "./support/fixtures.ts"
@@ -126,6 +128,7 @@ const tradingVariables = ["tenant", "organization"]
 const tenancyVariables = ["record", "tenants"]
 const identityVariables = ["tenant", "a", "b", "decider", "at", "evidence"]
 const stewardshipVariables = ["tenant"]
+const contactsVariables = ["tenant", "account", "person", "purpose", "value"]
 
 /** A party question's hand-written fixture as a graph: no record holds what it states, so nothing is lifted. */
 const fixtureGraph = (text: string) =>
@@ -230,7 +233,8 @@ describe("gate 8, the questions", () => {
         roleless.query,
         tenancy.query,
         identity.query,
-        stewardship.query
+        stewardship.query,
+        contacts.query
       ]) {
         expect(query).toContain(`PREFIX inv: <${vocabulary.namespace}>`)
         expect(query).toContain(`PREFIX rdf: <${RdfVocab.rdf.iri}>`)
@@ -660,6 +664,248 @@ describe("gate 8, CQ-P07 and its must-fail cases", () => {
       )
       const rows = yield* asked(graph, anyTenant, stewardshipVariables)
       expect(rows).toStrictEqual([])
+    })
+  )
+})
+
+/** The clause CQ-P06, its mutant M5 and CQ-P07 share, which leaves out a membership that names a workspace. */
+const workspaceClause = "FILTER NOT EXISTS { ?member inv:membershipWorkspace ?workspace }"
+
+/** A question as committed, with the workspace clause taken out: checked to change the text. */
+const withoutWorkspaceClause = (query: string) => {
+  const planted = Str.replace(workspaceClause, "")(query)
+  expect(planted).not.toBe(query)
+  return planted
+}
+
+// Decision 154: a Sutton membership names the workspace it lets its person act in, and CQ-P06 and CQ-P07 leave it out.
+// A Sutton member holds no grant (decision 131), so the membership below, naming a workspace beside a grant, is a plant
+// made in the test, as report 18 section 10 says of CQ-P07's; the same membership naming none is the near miss.
+describe("gate 8, a membership that names a source's workspace (decision 154)", () => {
+  it.effect("CQ-P06: test_RaviWorks naming a workspace is no row; without the clause, or the link, it is one", () =>
+    Effect.gen(function* () {
+      const graph = yield* threadGraph()
+      const n = yield* names
+      const p = yield* partyNames
+      const expected = yield* expectedMembers
+      const named = [...graph, link(n.raviWorks, n.inv("membershipWorkspace"), p.record("test_SuttonWorkspace"))]
+      const rows = yield* asked(named, membersAndRoles, membersVariables)
+      expect(rows).toStrictEqual(A.drop(expected, 1))
+      const planted = yield* asked(named, withoutWorkspaceClause(membersAndRoles), membersVariables)
+      expect(planted).toStrictEqual(expected)
+      const nearMiss = yield* asked(graph, membersAndRoles, membersVariables)
+      expect(nearMiss).toStrictEqual(expected)
+      // M5 leaves it out as the question does, so it still differs from it by its join alone.
+      const mutant = yield* asked(named, mutantThroughPerson, membersVariables)
+      expect(A.filter(mutant, (row) => A.contains(row, n.raviWorks))).toStrictEqual([])
+      const plantedMutant = yield* asked(named, withoutWorkspaceClause(mutantThroughPerson), membersVariables)
+      expect(A.filter(plantedMutant, (row) => A.contains(row, n.raviWorks))).toHaveLength(2)
+    })
+  )
+
+  it.effect(
+    "CQ-P07: an active admin naming a workspace keeps test_SecondOrg a row; without the clause, or the link, it is none",
+    () =>
+      Effect.gen(function* () {
+        const p = yield* partyNames
+        const graph = yield* fixtureGraph(stewardship.fixture)
+        const empty = p.data("test_EmptyOrg", "Tenant", "test_EmptyOrg")
+        const member = p.member("test_SecondSuttonAdmin")
+        const grant = p.grant("test_SecondSuttonAdminGrant")
+        const admin = [
+          link(member, type, p.inv("Member")),
+          link(member, p.inv("membershipIn"), p.second),
+          link(member, p.inv("membershipStatus"), p.inv("MembershipStatusScheme-active")),
+          link(grant, type, p.inv("Grant")),
+          link(grant, p.inv("grantedTo"), member),
+          link(grant, p.inv("grantsRole"), p.admin)
+        ]
+        const naming = [
+          ...graph,
+          ...admin,
+          link(member, p.inv("membershipWorkspace"), p.record("test_SuttonWorkspace"))
+        ]
+        const rows = yield* asked(naming, stewardship.query, stewardshipVariables)
+        expect(rows).toStrictEqual([[empty], [p.second]])
+        const planted = yield* asked(naming, withoutWorkspaceClause(stewardship.query), stewardshipVariables)
+        expect(planted).toStrictEqual([[empty]])
+        const nearMiss = yield* asked([...graph, ...admin], stewardship.query, stewardshipVariables)
+        expect(nearMiss).toStrictEqual([[empty]])
+      })
+  )
+})
+
+/** CQ-P03 as committed with one clause changed: each plant below is checked to change the text. */
+const plantedContacts = (from: string, to: string) => {
+  const planted = Str.replace(from, to)(contacts.query)
+  expect(planted).not.toBe(contacts.query)
+  return planted
+}
+
+/** CQ-P03's purpose clause, read from the assignment itself. */
+const ownPurpose = "OPTIONAL { ?assignment inv:servesPurpose ?purpose }"
+
+/** The names of CQ-P03's fixture, built from the vocabulary. */
+const contactNames = Effect.gen(function* () {
+  const p = yield* partyNames
+  const { vocabulary } = yield* threadContext
+  const assignment = (name: string) => `${vocabulary.base}/fixture/ContactAssignment/${name}`
+  return {
+    ...p,
+    assignment,
+    bakery: p.organization("test_Bakery"),
+    mill: p.organization("test_Mill"),
+    pat: p.individual("test_Pat"),
+    sam: p.individual("test_Sam"),
+    patRecord: p.record("test_PatRecord"),
+    samRecord: p.record("test_SamRecord"),
+    patPoint: `${p.record("test_PatRecord")}/email`,
+    samPoint: `${p.record("test_SamRecord")}/email`,
+    billing: p.inv("ContactPurposeScheme-billing"),
+    receiving: p.inv("ContactPurposeScheme-receiving")
+  }
+})
+
+/** CQ-P03's three rows on its fixture: each purpose at its own account, and test_Sam's assignment with none. */
+const contactRows = Effect.map(contactNames, (c) => ({
+  patBilling: [c.works, c.bakery, c.pat, c.billing, "test_pat@example.org"],
+  samUnstated: [c.works, c.bakery, c.sam, "", "test_sam@example.org"],
+  patReceiving: [c.works, c.mill, c.pat, c.receiving, "test_pat@example.org"]
+}))
+
+describe("gate 8, CQ-P03: the people a tenant reaches at each account, for which purpose", () => {
+  it.effect("test_Pat billing at test_Bakery and receiving at test_Mill, test_Sam at test_Bakery with no purpose", () =>
+    Effect.gen(function* () {
+      const r = yield* contactRows
+      const graph = yield* fixtureGraph(contacts.fixture)
+      const rows = yield* asked(graph, contacts.query, contactsVariables)
+      expect(rows).toStrictEqual([r.patBilling, r.samUnstated, r.patReceiving])
+    })
+  )
+
+  // Report 04: joining the purpose on the person or on the point alone mixes the accounts, since both of test_Pat's
+  // assignments name one person and one point.
+  it.effect("must-fail: the purpose read through the person, or through the point, lists each at both accounts", () =>
+    Effect.gen(function* () {
+      const c = yield* contactNames
+      const r = yield* contactRows
+      const graph = yield* fixtureGraph(contacts.fixture)
+      const mixed = [
+        r.patBilling,
+        [c.works, c.bakery, c.pat, c.receiving, "test_pat@example.org"],
+        r.samUnstated,
+        [c.works, c.mill, c.pat, c.billing, "test_pat@example.org"],
+        r.patReceiving
+      ]
+      const throughPerson = plantedContacts(
+        ownPurpose,
+        "OPTIONAL { ?other inv:contactPerson ?person ; inv:servesPurpose ?purpose }"
+      )
+      const throughPoint = plantedContacts(
+        ownPurpose,
+        "OPTIONAL { ?other inv:assignmentPoint ?point ; inv:servesPurpose ?purpose }"
+      )
+      const byPerson = yield* asked(graph, throughPerson, contactsVariables)
+      const byPoint = yield* asked(graph, throughPoint, contactsVariables)
+      expect([byPerson, byPoint]).toStrictEqual([mixed, mixed])
+    })
+  )
+
+  it.effect("an assignment with no purpose is listed under none; with the purpose required it is missing", () =>
+    Effect.gen(function* () {
+      const r = yield* contactRows
+      const graph = yield* fixtureGraph(contacts.fixture)
+      const required = plantedContacts(ownPurpose, "?assignment inv:servesPurpose ?purpose .")
+      const rows = yield* asked(graph, required, contactsVariables)
+      expect(rows).toStrictEqual([r.patBilling, r.patReceiving])
+    })
+  )
+
+  // Each type step: the node left untyped loses its rows, and the query with that step taken out lists them again.
+  it.effect("an assignment, account, person or point that is not typed so is no row, each by its own type step", () =>
+    Effect.gen(function* () {
+      const c = yield* contactNames
+      const r = yield* contactRows
+      const graph = yield* fixtureGraph(contacts.fixture)
+      const all = [r.patBilling, r.samUnstated, r.patReceiving]
+      const cases: ReadonlyArray<readonly [string, string, string, ReadonlyArray<ReadonlyArray<string>>]> = [
+        [
+          c.assignment("test_PatBilling"),
+          "?assignment rdf:type/rdfs:subClassOf* inv:ContactAssignment ;",
+          "?assignment",
+          [r.samUnstated, r.patReceiving]
+        ],
+        [c.bakery, "  ?account rdf:type/rdfs:subClassOf* inv:Party .\n", "", [r.patReceiving]],
+        [c.pat, "  ?person rdf:type/rdfs:subClassOf* inv:Person .\n", "", [r.samUnstated]],
+        [c.patPoint, "?point rdf:type/rdfs:subClassOf* inv:ContactPoint ;", "?point", [r.samUnstated]]
+      ]
+      for (const [subject, step, replacement, left] of cases) {
+        const untyped = dropped(graph, subject, type)
+        expect(untyped).toHaveLength(graph.length - 1)
+        const rows = yield* asked(untyped, contacts.query, contactsVariables)
+        expect(rows).toStrictEqual(left)
+        const stepless = yield* asked(untyped, plantedContacts(step, replacement), contactsVariables)
+        expect(stepless).toStrictEqual(all)
+      }
+    })
+  )
+
+  it.effect("must-fail: an assignment that states no tenant is no row", () =>
+    Effect.gen(function* () {
+      const c = yield* contactNames
+      const r = yield* contactRows
+      const graph = yield* fixtureGraph(contacts.fixture)
+      const untenanted = dropped(graph, c.assignment("test_SamUnstated"), c.inv("inTenant"))
+      expect(untenanted).toHaveLength(graph.length - 1)
+      const rows = yield* asked(untenanted, contacts.query, contactsVariables)
+      expect(rows).toStrictEqual([r.patBilling, r.patReceiving])
+    })
+  )
+
+  // Decision 159: the tenant's record of the person gives the point, which both of test_Pat's assignments name; the
+  // query reads neither the record nor its link (report 18 section 10).
+  it.effect("the point is the email field of the person's record, and the answer stands without the records", () =>
+    Effect.gen(function* () {
+      const c = yield* contactNames
+      const r = yield* contactRows
+      const graph = yield* fixtureGraph(contacts.fixture)
+      expect(objectsOf(graph, c.patRecord, c.inv("recordOf"))).toStrictEqual([c.pat])
+      expect(objectsOf(graph, c.patRecord, c.inv("hasContactPoint"))).toStrictEqual([c.patPoint])
+      expect(objectsOf(graph, c.samRecord, c.inv("hasContactPoint"))).toStrictEqual([c.samPoint])
+      expect(objectsOf(graph, c.assignment("test_PatBilling"), c.inv("assignmentPoint"))).toStrictEqual([c.patPoint])
+      expect(objectsOf(graph, c.assignment("test_PatReceiving"), c.inv("assignmentPoint"))).toStrictEqual([c.patPoint])
+      const recordless = withoutSubjects(graph, [c.patRecord, c.samRecord])
+      expect(recordless.length).toBeLessThan(graph.length)
+      const rows = yield* asked(recordless, contacts.query, contactsVariables)
+      expect(rows).toStrictEqual([r.patBilling, r.samUnstated, r.patReceiving])
+    })
+  )
+
+  // Decisions 126 and 140: no contact assignment is made for a Sutton record, so sutton-party.ttl, which states a
+  // contact, its company and its points, gives CQ-P03 no row.
+  it.effect("must-fail: sutton-party.ttl, a source that records no contact's purpose, gives no row", () =>
+    Effect.gen(function* () {
+      const c = yield* contactNames
+      const graph = yield* fixtureGraph(suttonParty)
+      expect(A.some(graph, withPredicate(c.inv("contactAt")))).toBe(true)
+      expect(A.some(graph, withPredicate(c.inv("hasContactPoint")))).toBe(true)
+      const rows = yield* asked(graph, contacts.query, contactsVariables)
+      expect(rows).toStrictEqual([])
+    })
+  )
+
+  // Decision 12: Party is never typed directly, so the account's type step needs the walk even on the graph as typed.
+  it.effect("the walk: the same rows one subclass down, and its bare twin finds no account typed a Party", () =>
+    Effect.gen(function* () {
+      const graph = yield* fixtureGraph(contacts.fixture)
+      const rows = yield* asked(graph, contacts.query, contactsVariables)
+      const below = yield* asked(movedDown(graph), contacts.query, contactsVariables)
+      expect(rows).not.toStrictEqual([])
+      expect(below).toStrictEqual(rows)
+      const bare = bareStep(contacts.query)
+      expect(bare).not.toContain(walk)
+      const bareRows = yield* asked(graph, bare, contactsVariables)
+      expect(bareRows).toStrictEqual([])
     })
   )
 })
@@ -1601,9 +1847,10 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
-  // The forward plant of step 5 (PLAN, Steps 9 to 11): the party fixtures state seventeen properties no other text
+  // The forward plant of step 5 (PLAN, Steps 9 to 12): the party fixtures state forty-six properties no other text
   // states, so guard 3 fed CQ-P06's text alone, as before step 5, reports them; CQ-P04's fixture alone states the six
-  // of step 10, and CQ-P07's and model-call.ttl the four of step 11, so with one left out guard 3 reports its own.
+  // of step 10, CQ-P07's and model-call.ttl the four of step 11, and CQ-P03's and sutton-party.ttl twenty-seven of step
+  // 12's twenty-nine, so with one left out guard 3 reports its own.
   it.effect(
     "guard 3 reads every hand-written fixture text: with CQ-P06's alone or left out, a property is unshown",
     () =>
@@ -1618,7 +1865,9 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "CQ-P04.fixture.ttl",
           "CQ-P05.fixture.ttl",
           "model-call.ttl",
-          "CQ-P07.fixture.ttl"
+          "CQ-P07.fixture.ttl",
+          "CQ-P03.fixture.ttl",
+          "sutton-party.ttl"
         ])
         const texts = yield* Effect.forEach(
           handWrittenFixtures,
@@ -1647,6 +1896,22 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "membershipStatus",
           "callPurpose",
           "calledFor",
+          "hasPostalAddress",
+          "addressPurpose",
+          "defaultFor",
+          "hasContactPoint",
+          "contactPointKind",
+          "contactPerson",
+          "contactAccount",
+          "assignmentPoint",
+          "servesPurpose",
+          "contactAt",
+          "contactType",
+          "contactOwner",
+          "primaryContact",
+          "accountStatus",
+          "membershipWorkspace",
+          "memberContactPoint",
           "sourceSystem",
           "sourceType",
           "sourceId",
@@ -1655,7 +1920,20 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "isVendor",
           "eventTime",
           "evidenceText",
-          "calledAt"
+          "calledAt",
+          "addressLines",
+          "locality",
+          "region",
+          "postalCode",
+          "countryCode",
+          "contactValue",
+          "extension",
+          "givenName",
+          "middleName",
+          "familyName",
+          "jobTitle",
+          "profileImage",
+          "profileText"
         ])
         const notIdentity = A.filter(texts, ({ name }) => name !== "CQ-P04.fixture.ttl")
         const withoutIdentity = A.flatMap(notIdentity, ({ graph }) => graph)
@@ -1668,15 +1946,66 @@ describe("gate 8, the guards on the fixture's two parts", () => {
           "eventTime",
           "evidenceText"
         ])
-        // Step 11's two fixtures: CQ-P07's alone states the stage, and model-call.ttl alone the model call's three.
+        // Step 11's two fixtures: CQ-P07's states the stage, as sutton-party.ttl does from step 12 for the Sutton member
+        // (report 18 section 4.1), so with both left out guard 3 reports it, and with CQ-P07's alone left out nothing;
+        // model-call.ttl alone states the model call's three.
         const notStewardship = A.filter(texts, ({ name }) => name !== "CQ-P07.fixture.ttl")
         const withoutStewardship = A.flatMap(notStewardship, ({ graph }) => graph)
         expect(withoutStewardship).not.toStrictEqual([])
-        expect(unshown(context.vocabulary, withoutStewardship)).toStrictEqual(["membershipStatus"])
+        expect(unshown(context.vocabulary, withoutStewardship)).toStrictEqual([])
+        const unstaged = A.filter(notStewardship, ({ name }) => name !== "sutton-party.ttl")
+        const withoutStages = A.flatMap(unstaged, ({ graph }) => graph)
+        const allButSutton = A.filter(texts, ({ name }) => name !== "sutton-party.ttl")
+        const suttonOnly = unshown(
+          context.vocabulary,
+          A.flatMap(allButSutton, ({ graph }) => graph)
+        )
+        expect(
+          A.filter(unshown(context.vocabulary, withoutStages), (key) => !A.contains(suttonOnly, key))
+        ).toStrictEqual(["membershipStatus"])
         const notCalls = A.filter(texts, ({ name }) => name !== "model-call.ttl")
         const withoutCalls = A.flatMap(notCalls, ({ graph }) => graph)
         expect(withoutCalls).not.toStrictEqual([])
         expect(unshown(context.vocabulary, withoutCalls)).toStrictEqual(["callPurpose", "calledFor", "calledAt"])
+        // Step 12's two fixtures: CQ-P03's alone states the assignment's four, and sutton-party.ttl alone the coverage's
+        // twenty-three; the point a record gives and its text both state.
+        const notContacts = A.filter(texts, ({ name }) => name !== "CQ-P03.fixture.ttl")
+        const withoutContacts = A.flatMap(notContacts, ({ graph }) => graph)
+        expect(withoutContacts).not.toStrictEqual([])
+        expect(unshown(context.vocabulary, withoutContacts)).toStrictEqual([
+          "contactPerson",
+          "contactAccount",
+          "assignmentPoint",
+          "servesPurpose"
+        ])
+        const notSutton = A.filter(texts, ({ name }) => name !== "sutton-party.ttl")
+        const withoutSutton = A.flatMap(notSutton, ({ graph }) => graph)
+        expect(withoutSutton).not.toStrictEqual([])
+        expect(unshown(context.vocabulary, withoutSutton)).toStrictEqual([
+          "hasPostalAddress",
+          "addressPurpose",
+          "defaultFor",
+          "contactPointKind",
+          "contactAt",
+          "contactType",
+          "contactOwner",
+          "primaryContact",
+          "accountStatus",
+          "membershipWorkspace",
+          "memberContactPoint",
+          "addressLines",
+          "locality",
+          "region",
+          "postalCode",
+          "countryCode",
+          "extension",
+          "givenName",
+          "middleName",
+          "familyName",
+          "jobTitle",
+          "profileImage",
+          "profileText"
+        ])
       })
   )
 

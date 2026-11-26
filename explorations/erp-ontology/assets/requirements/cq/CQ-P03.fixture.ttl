@@ -1,0 +1,55 @@
+# The fixture of CQ-P03 (report 04, report 18 section 10, decision 140): a source that records a contact's purpose,
+# never Sutton's. test_Pat is the billing contact at test_Bakery and the receiving contact at test_Mill, both
+# assignments naming one contact point, the email field of test_ExampleWorks's record of test_Pat, which gives it by
+# hasContactPoint (decision 159). test_Sam is a contact at test_Bakery with no purpose, on a point of his own record.
+# Every assignment and record states its tenant, the basis of its criterion. Nothing here is a record of this app, and
+# every name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+
+<fixture/Organization/test_Bakery> a inv:Organization .
+<fixture/Organization/test_Mill> a inv:Organization .
+<fixture/Person/test_Pat> a inv:Person .
+<fixture/Person/test_Sam> a inv:Person .
+
+<fixture/SourceRecord/test_PatRecord> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Contact" ;
+  inv:sourceId "C0001" ;
+  inv:recordOf <fixture/Person/test_Pat> ;
+  inv:hasContactPoint <fixture/SourceRecord/test_PatRecord/email> .
+<fixture/SourceRecord/test_PatRecord/email> a inv:ContactPoint ;
+  inv:contactValue "test_pat@example.org" .
+
+<fixture/SourceRecord/test_SamRecord> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Contact" ;
+  inv:sourceId "C0002" ;
+  inv:recordOf <fixture/Person/test_Sam> ;
+  inv:hasContactPoint <fixture/SourceRecord/test_SamRecord/email> .
+<fixture/SourceRecord/test_SamRecord/email> a inv:ContactPoint ;
+  inv:contactValue "test_sam@example.org" .
+
+<fixture/ContactAssignment/test_PatBilling> a inv:ContactAssignment ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:contactAccount <fixture/Organization/test_Bakery> ;
+  inv:contactPerson <fixture/Person/test_Pat> ;
+  inv:assignmentPoint <fixture/SourceRecord/test_PatRecord/email> ;
+  inv:servesPurpose inv:ContactPurposeScheme-billing .
+
+<fixture/ContactAssignment/test_PatReceiving> a inv:ContactAssignment ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:contactAccount <fixture/Organization/test_Mill> ;
+  inv:contactPerson <fixture/Person/test_Pat> ;
+  inv:assignmentPoint <fixture/SourceRecord/test_PatRecord/email> ;
+  inv:servesPurpose inv:ContactPurposeScheme-receiving .
+
+<fixture/ContactAssignment/test_SamUnstated> a inv:ContactAssignment ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:contactAccount <fixture/Organization/test_Bakery> ;
+  inv:contactPerson <fixture/Person/test_Sam> ;
+  inv:assignmentPoint <fixture/SourceRecord/test_SamRecord/email> .

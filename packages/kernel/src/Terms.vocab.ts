@@ -9,7 +9,8 @@
  * section 2's text as decision 111 accepted it, and they name 111: `Person` and `Organization` keep it with their
  * category parent `Party` (decision 12), `Person` with `storesId: false` (decision 161), and `grantScope` with its link
  * to `gist:isCategorizedBy` (decision 17), each listed by decision 176 without changing the term's text. `Member`,
- * whose definition, criterion and basis report 18 changed (decisions P2, 137, 154 and 158), names 176 instead. The
+ * whose definition, criterion and basis report 18 changed (decisions P2, 137, 154 and 158), and `membershipIn`, whose
+ * definition decision 169 reworded, name 176 instead. The
  * party slice's terms are report 18's text as decision 176 accepted it, and they name 176. It is never built with
  * `Vocabulary.make`, whose record keys widen to `string` and would let any text pass as a term's name. `base` is the
  * one IRI literal; every other IRI of the vocabulary is derived from it.
@@ -53,20 +54,26 @@ export const vocabulary = {
       TemporalRelation: {},
       Assignment: { parent: "TemporalRelation" },
       Event: {},
-      Determination: { parent: "Event" }
+      Determination: { parent: "Event" },
+      Address: { parent: "Content" },
+      PhysicalAddress: { parent: "Address" },
+      ElectronicAddress: { parent: "Address" }
     },
     disjointPairs: [
       ["Organization", "Content"],
       ["Organization", "PhysicalIdentifiableItem"],
-      ["PhysicalIdentifiableItem", "Content"]
+      ["PhysicalIdentifiableItem", "Content"],
+      ["PhysicalAddress", "ElectronicAddress"]
     ],
     // Report 18 section 8, read from the pinned file: `isCategorizedBy` declares no domain and no range, `isAbout` the
-    // domain `gist:Content` and no range, `atDateTime` no domain and the range `xsd:dateTime`, and `name` neither.
+    // domain `gist:Content` and no range, `atDateTime` no domain and the range `xsd:dateTime`, `name` neither, and
+    // `hasAddress` no domain and the range `gist:Address`.
     properties: {
       isCategorizedBy: { kind: "object" },
       isAbout: { kind: "object", domain: "Content" },
       atDateTime: { kind: "datatype", range: "xsd:dateTime" },
-      name: { kind: "datatype" }
+      name: { kind: "datatype" },
+      hasAddress: { kind: "object", range: "Address" }
     }
   },
   classes: {
@@ -255,6 +262,46 @@ export const vocabulary = {
           "the UserId this application gives the account, never its email, which can change (decision 104); an account another system issued, such as a Sutton User, waits until that system's records are lifted (decision 158)."
       },
       ratification: partySlice
+    },
+    PostalAddress: {
+      prefLabel: "Postal address",
+      definition:
+        "A physical address, written as lines, locality, region, postal code and country, that a tenant's record of a party gives for receiving or sending goods, documents or invoices.",
+      tag: "information",
+      parent: { kind: "gist", name: "PhysicalAddress" },
+      identity: {
+        kind: "stated",
+        criterion:
+          "its own record id within the tenant; equal text on two records is two addresses (decision 138), and an id a source issued waits until that source's records are lifted (decisions 158 and 173).",
+        restsOn: ["inTenant"]
+      },
+      ratification: partySlice
+    },
+    ContactPoint: {
+      prefLabel: "Contact point",
+      definition: "An electronic address, an email address or a telephone number, at which a party is reached.",
+      tag: "information",
+      parent: { kind: "gist", name: "ElectronicAddress" },
+      identity: {
+        kind: "stated",
+        criterion:
+          "the record that gives it and the field it is read from, so a contact's email is one point and its phone another, never its value alone (decision 159)."
+      },
+      ratification: partySlice
+    },
+    ContactAssignment: {
+      prefLabel: "Contact assignment",
+      definition:
+        "A relationship naming one person to reach at one account for a stated purpose using a particular contact point.",
+      tag: "relator",
+      parent: { kind: "gist", name: "Assignment" },
+      identity: {
+        kind: "stated",
+        criterion:
+          "the tenant and the assignment's own id within its tenant, never the person or the contact point alone (decisions 39 and 43); an id a source issued waits until that source's records are lifted (decision 158).",
+        restsOn: ["inTenant"]
+      },
+      ratification: partySlice
     }
   },
   objectProperties: {
@@ -268,10 +315,11 @@ export const vocabulary = {
     },
     membershipIn: {
       prefLabel: "membership in",
-      definition: "Links a membership to the tenant it lets its person act in.",
+      definition:
+        "Links a membership to the tenant it belongs to, in whose workspace, or in a source's workspace it names, it lets its person act.",
       domain: "Member",
       range: { kind: "class", key: "Tenant" },
-      ratification
+      ratification: partySlice
     },
     grantedTo: {
       prefLabel: "granted to",
@@ -396,6 +444,150 @@ export const vocabulary = {
       definition: "Links a model call to the member whose action asked for it.",
       domain: "ModelCall",
       range: { kind: "class", key: "Member" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    hasPostalAddress: {
+      prefLabel: "has postal address",
+      definition: "Links the tenant's record of a party to a postal address that record gives.",
+      domain: "SourceRecord",
+      range: { kind: "class", key: "PostalAddress" },
+      subPropertyOf: { kind: "gist", name: "hasAddress" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    addressPurpose: {
+      prefLabel: "address purpose",
+      definition:
+        "Links a postal address to a purpose its record types it for, such as billing, shipping or ship from; one address may have several.",
+      domain: "PostalAddress",
+      range: { kind: "scheme", key: "ContactPurposeScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    defaultFor: {
+      prefLabel: "default for",
+      definition: "Links a postal address to a purpose for which it is the one used when an order names no other.",
+      domain: "PostalAddress",
+      range: { kind: "scheme", key: "ContactPurposeScheme" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    hasContactPoint: {
+      prefLabel: "has contact point",
+      definition: "Links the tenant's record of a party to an email address or telephone number that record gives.",
+      domain: "SourceRecord",
+      range: { kind: "class", key: "ContactPoint" },
+      subPropertyOf: { kind: "gist", name: "hasAddress" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactPointKind: {
+      prefLabel: "contact point kind",
+      definition:
+        "Links a contact point to what kind of electronic address it is: an email address or a telephone number.",
+      domain: "ContactPoint",
+      range: { kind: "scheme", key: "ContactPointKindScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactPerson: {
+      prefLabel: "contact person",
+      definition: "Links a contact assignment to the person to reach on it.",
+      domain: "ContactAssignment",
+      range: { kind: "class", key: "Person" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactAccount: {
+      prefLabel: "contact account",
+      definition:
+        "Links a contact assignment to the account at which its person serves its purpose, an organization or a person.",
+      domain: "ContactAssignment",
+      range: { kind: "class", key: "Party" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    assignmentPoint: {
+      prefLabel: "assignment point",
+      definition: "Links a contact assignment to the contact point to use for it.",
+      domain: "ContactAssignment",
+      range: { kind: "class", key: "ContactPoint" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    servesPurpose: {
+      prefLabel: "serves purpose",
+      definition:
+        "Links a contact assignment to the business exchange for which to reach its person at its account using its point.",
+      domain: "ContactAssignment",
+      range: { kind: "scheme", key: "ContactPurposeScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactAt: {
+      prefLabel: "contact at",
+      definition:
+        "Links the tenant's record of a contact to the tenant's record of the company the contact belongs to, stating no purpose.",
+      domain: "SourceRecord",
+      range: { kind: "class", key: "SourceRecord" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactType: {
+      prefLabel: "contact type",
+      definition: "Links the tenant's record of a contact to the kind the tenant files the contact under.",
+      domain: "SourceRecord",
+      range: { kind: "scheme", key: "ContactTypeScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactOwner: {
+      prefLabel: "contact owner",
+      definition: "Links the tenant's record of a contact to a member of the tenant who owns the contact.",
+      domain: "SourceRecord",
+      range: { kind: "class", key: "Member" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    primaryContact: {
+      prefLabel: "primary contact",
+      definition: "Links the tenant's record of a company to the tenant's record of the contact it names first.",
+      domain: "SourceRecord",
+      range: { kind: "class", key: "SourceRecord" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    accountStatus: {
+      prefLabel: "account status",
+      definition:
+        "Links the tenant's record of a party to whether the tenant still trades with the party or has archived the record.",
+      domain: "SourceRecord",
+      range: { kind: "scheme", key: "AccountStatusScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    membershipWorkspace: {
+      prefLabel: "membership workspace",
+      definition:
+        "Links a membership to the source's record of the workspace it lets its person act in, stated only where that workspace is another system's, such as a Sutton organization's.",
+      domain: "Member",
+      range: { kind: "class", key: "SourceRecord" },
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    memberContactPoint: {
+      prefLabel: "member contact point",
+      definition:
+        "Links a membership to an email address or telephone number that its profile in the tenant gives for its person, such as a personal email or phone.",
+      domain: "Member",
+      range: { kind: "class", key: "ContactPoint" },
+      subPropertyOf: { kind: "gist", name: "hasAddress" },
       evidence: "fixture",
       ratification: partySlice
     }
@@ -524,6 +716,114 @@ export const vocabulary = {
       datatype: "xsd:dateTime",
       evidence: "fixture",
       ratification: partySlice
+    },
+    addressLines: {
+      prefLabel: "address lines",
+      definition: "The street lines of a postal address, in order and as written, one line break between two lines.",
+      domain: "PostalAddress",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    locality: {
+      prefLabel: "locality",
+      definition: "The town or city of a postal address, as written.",
+      domain: "PostalAddress",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    region: {
+      prefLabel: "region",
+      definition: "The state, province or other region of a postal address, as written.",
+      domain: "PostalAddress",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    postalCode: {
+      prefLabel: "postal code",
+      definition: "The postal code of a postal address, kept as text so leading zeros survive.",
+      domain: "PostalAddress",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    countryCode: {
+      prefLabel: "country code",
+      definition:
+        "The country of a postal address as a two-letter ISO 3166 code, stated only once a person accepts the code read from the source's own text.",
+      domain: "PostalAddress",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    contactValue: {
+      prefLabel: "contact value",
+      definition: "The text of an email address or telephone number, as written in the source.",
+      domain: "ContactPoint",
+      datatype: "xsd:string",
+      designation: "email",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    extension: {
+      prefLabel: "extension",
+      definition: "The extension to dial after a telephone number, as written in the source.",
+      domain: "ContactPoint",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    givenName: {
+      prefLabel: "given name",
+      definition: "A person's given name as a record or a membership's profile writes it.",
+      datatype: "xsd:string",
+      designation: "name",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    middleName: {
+      prefLabel: "middle name",
+      definition: "A person's middle name as a record or a membership's profile writes it.",
+      datatype: "xsd:string",
+      designation: "name",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    familyName: {
+      prefLabel: "family name",
+      definition: "A person's family name as a record or a membership's profile writes it.",
+      datatype: "xsd:string",
+      designation: "name",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    jobTitle: {
+      prefLabel: "job title",
+      definition: "The title of a person's job at the organization a record or a membership names, as written.",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    profileImage: {
+      prefLabel: "profile image",
+      definition:
+        "The picture the profile of a membership shows for its person, as the source gives it, such as a link to an image file.",
+      domain: "Member",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    profileText: {
+      prefLabel: "profile text",
+      altLabels: ["About"],
+      definition:
+        "The text a person writes about themselves on the profile of one membership, as written in the source.",
+      domain: "Member",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
     }
   },
   schemes: {
@@ -649,6 +949,127 @@ export const vocabulary = {
         suggest: {
           prefLabel: "Import suggestions",
           definition: "A model call purpose in which the app asks for proposals for the rows of an import.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
+    },
+    ContactPurposeScheme: {
+      prefLabel: "Contact purpose",
+      definition:
+        "A controlled vocabulary of the purposes for which a party is reached or served: on a contact assignment, the purpose of one person at one account; on a postal address, a use its record types it for.",
+      closed: false,
+      concepts: {
+        billing: {
+          prefLabel: "Billing",
+          altLabels: ["Bill-to"],
+          definition:
+            "A contact purpose for which invoices and payment questions are sent to the contact point or the address.",
+          ratification: partySlice
+        },
+        shipping: {
+          prefLabel: "Shipping",
+          altLabels: ["Ship-to"],
+          definition:
+            "A contact purpose for which goods sent to the party are delivered to the address, or arranged with the person reached for it.",
+          ratification: partySlice
+        },
+        receiving: {
+          prefLabel: "Receiving",
+          altLabels: ["Receiving dock"],
+          definition:
+            "A contact purpose for goods arriving at the party's site: the address where they are taken in, or the person who takes them in.",
+          ratification: partySlice
+        },
+        ordering: {
+          prefLabel: "Ordering",
+          altLabels: ["Purchase orders"],
+          definition: "A contact purpose for which purchase orders and order questions are sent to the contact point.",
+          ratification: partySlice
+        },
+        ship_from: {
+          prefLabel: "Ship from",
+          definition: "A contact purpose for which an address is where goods the party sends leave from.",
+          ratification: partySlice
+        },
+        manufacturing: {
+          prefLabel: "Manufacturing",
+          definition:
+            "A contact purpose for which an address is where the party has goods made, as its record types it.",
+          ratification: partySlice
+        },
+        other: {
+          prefLabel: "Other",
+          definition: "A contact purpose for an address its record types as none of the others.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
+    },
+    ContactPointKindScheme: {
+      prefLabel: "Contact point kind",
+      definition: "A controlled vocabulary of the kinds of electronic address at which a party is reached.",
+      closed: false,
+      concepts: {
+        email: {
+          prefLabel: "Email address",
+          altLabels: ["Email"],
+          definition: "A contact point kind for an address that electronic mail is sent to.",
+          ratification: partySlice
+        },
+        phone: {
+          prefLabel: "Telephone number",
+          altLabels: ["Phone"],
+          definition: "A contact point kind for a number that a call or a text message reaches.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
+    },
+    ContactTypeScheme: {
+      prefLabel: "Contact type",
+      definition:
+        "A controlled vocabulary of the kinds a tenant files its contacts under, one per contact, apart from any purpose a contact is reached for.",
+      closed: false,
+      concepts: {
+        customer: {
+          prefLabel: "Customer",
+          definition: "A contact type by which the tenant files a contact as someone at a customer.",
+          ratification: partySlice
+        },
+        marketing: {
+          prefLabel: "Marketing",
+          definition: "A contact type by which the tenant files a contact as someone it reaches for marketing.",
+          ratification: partySlice
+        },
+        sales: {
+          prefLabel: "Sales",
+          definition: "A contact type by which the tenant files a contact as someone it deals with on sales.",
+          ratification: partySlice
+        },
+        vendor: {
+          prefLabel: "Vendor",
+          definition: "A contact type by which the tenant files a contact as someone at a vendor.",
+          ratification: partySlice
+        }
+      },
+      ratification: partySlice
+    },
+    AccountStatusScheme: {
+      prefLabel: "Account status",
+      definition:
+        "A controlled vocabulary of whether the tenant still trades with a party it holds a record of or has set that record aside.",
+      closed: false,
+      concepts: {
+        active: {
+          prefLabel: "Active",
+          definition: "An account status in which the tenant still trades with the party.",
+          ratification: partySlice
+        },
+        archived: {
+          prefLabel: "Archived",
+          definition:
+            "An account status in which the tenant has set the party's record aside and keeps it only for past records.",
           ratification: partySlice
         }
       },

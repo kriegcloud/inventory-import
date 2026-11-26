@@ -4,41 +4,59 @@
 // (`Problem.message`, `Proposal.basis`); nothing is reworded or guessed.
 import { Code } from "@inventory/ui/Code"
 import type { ReviewRow } from "@inventory/review/ReviewTypes"
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import * as O from "effect/Option"
 import { problemKinds, type Proposal, type Review, rowPlace } from "@inventory/catalog-model/Review"
 
 /** How many rows the panel lists in full; past it, it says how many more and how to narrow the view. */
 const listed = 100
 
-const kindLabel = (id: string): string => problemKinds.find((kind) => kind.id === id)?.label ?? id
+const kindLabel = (id: string): string =>
+  O.match(
+    A.findFirst(problemKinds, (kind) => kind.id === id),
+    { onNone: () => id, onSome: (kind) => kind.label }
+  )
 
 const proposalWords = (proposal: Proposal): string => {
   const who = proposal.by === "model" ? "The model" : "A rule"
-  const values = [proposal.to, ...proposal.alternatives].map((value, at) => proposal.labels[at] ?? value)
+  const values = A.map(A.prepend(proposal.alternatives, proposal.to), (value, at) =>
+    O.match(A.get(proposal.labels, at), { onNone: () => value, onSome: (label) => label })
+  )
   return proposal.confidence === "low"
     ? `${who} asks: ${values.map((value) => (value === "" ? "empty" : value)).join(" or ")}?`
     : `${who} proposes ${values[0] === "" ? "empty" : values[0]} (${proposal.confidence} confidence).`
 }
 
 /** Every reason of each flagged row on screen, the rows named, counted by kind first. */
-export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Review }) {
-  const found = props.rows.flatMap((row) => {
-    const reviewed = props.current.rows.find((candidate) => candidate.id === row.id)
-    if (reviewed === undefined) return []
-    // A form-only fix already in force is not a reason the row waits: it is listed under the row's changes.
-    const open = reviewed.problems.filter(
-      (problem) =>
-        !O.exists(
-          problem.proposal,
-          (proposal) => proposal.lossless && problem.field !== null && reviewed.values[problem.field] === proposal.to
-        )
+export function WhyFlagged(props: { readonly rows: ReadonlyArray<ReviewRow>; readonly current: Review }) {
+  const found = A.getSomes(
+    A.map(props.rows, (row) =>
+      O.flatMap(
+        A.findFirst(props.current.rows, (candidate) => candidate.id === row.id),
+        (reviewed) => {
+          // A form-only fix already in force is not a reason the row waits: it is listed under the row's changes.
+          const open = reviewed.problems.filter(
+            (problem) =>
+              !O.exists(
+                problem.proposal,
+                (proposal) =>
+                  proposal.lossless && O.exists(problem.field, (field) => reviewed.values[field] === proposal.to)
+              )
+          )
+          return open.length === 0 ? O.none() : O.some({ ...reviewed, problems: open })
+        }
+      )
     )
-    return open.length === 0 ? [] : [{ ...reviewed, problems: open }]
-  })
+  )
   const byKind = new Intl.NumberFormat("en-US")
-  const counts = found
-    .flatMap((row) => row.problems.map((problem) => problem.kind))
-    .reduce<Record<string, number>>((tally, kind) => ({ ...tally, [kind]: (tally[kind] ?? 0) + 1 }), {})
+  const counts = R.map(
+    A.groupBy(
+      A.flatMap(found, (row) => A.map(row.problems, (problem) => problem.kind)),
+      (kind): string => kind
+    ),
+    (problems) => problems.length
+  )
   return (
     <div className="flex flex-col gap-4 text-sm">
       <p>
@@ -64,7 +82,13 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
             </span>
             <ul className="flex flex-col gap-1.5 pl-4">
               {row.problems.map((problem, at) => (
-                <li key={`${problem.kind}:${problem.field ?? ""}:${at}`} className="list-disc">
+                <li
+                  key={O.match(problem.field, {
+                    onNone: () => `${problem.kind}::${at}`,
+                    onSome: (field) => `${problem.kind}:${field}:${at}`
+                  })}
+                  className="list-disc"
+                >
                   <span className="text-muted-foreground">{kindLabel(problem.kind)}: </span>
                   {problem.message}
                   {O.match(problem.proposal, {

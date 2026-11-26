@@ -96,6 +96,7 @@ const serving = (settings: Record<string, string>) =>
     Effect.sync(() => {
       const pending: Array<Fiber.Fiber<void>> = []
       const app = inMemoryApp({
+        docs: false,
         member: tom,
         ai: OpenRouterTest.off("noKey", ModelId.make("test/model")),
         http: network,
@@ -115,7 +116,7 @@ const serving = (settings: Record<string, string>) =>
     (served) => served.dispose
   )
 
-const page = (path: string, init: RequestInit = {}) => new Request(`${testOrigin}${path}`, init)
+const page = (path: string, init: RequestInit) => new Request(`${testOrigin}${path}`, init)
 
 it.live("on: each request sends its traces, logs and metrics after it has answered", () =>
   Effect.scoped(
@@ -123,7 +124,7 @@ it.live("on: each request sends its traces, logs and metrics after it has answer
       collectorSeen.reset()
       const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
       for (const path of ["/api/v1/identity/me", "/api/v1/activity", "/api/v1/system/status"]) {
-        const answer = yield* served.serve(page(path))
+        const answer = yield* served.serve(page(path, {}))
         expect(answer.status).toBe(200)
       }
       yield* settled(served.pending)
@@ -139,13 +140,13 @@ it.live("on: every batch names this isolate as one instance, so its counters are
     Effect.gen(function* () {
       collectorSeen.reset()
       const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
-      for (const path of ["/api/v1/identity/me", "/api/v1/activity"]) yield* served.serve(page(path))
+      for (const path of ["/api/v1/identity/me", "/api/v1/activity"]) yield* served.serve(page(path, {}))
       yield* settled(served.pending)
       const instances = A.dedupe(
         A.flatMap(collectorSeen.bodies, (body) =>
           A.flatMap(
             A.fromIterable(Str.matchAll(/"key":"service\.instance\.id","value":\{"stringValue":"([^"]+)"/g)(body)),
-            (m) => (m[1] === undefined ? [] : [m[1]])
+            (m) => A.fromNullishOr(m[1])
           )
         )
       )
@@ -162,7 +163,7 @@ it.live(
       Effect.gen(function* () {
         collectorSeen.reset()
         const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
-        const status = yield* Effect.flatMap(served.serve(page("/api/otlp/status")), jsonOf)
+        const status = yield* Effect.flatMap(served.serve(page("/api/otlp/status", {})), jsonOf)
         expect(status).toEqual({ on: true })
         const batch = (site: string) =>
           page("/api/otlp/v1/traces", {
@@ -190,8 +191,8 @@ it.live("off, the default: nothing is sent, and the page is told so without a fa
     Effect.gen(function* () {
       collectorSeen.reset()
       const served = yield* serving(testSettings)
-      const me = yield* served.serve(page("/api/v1/identity/me"))
-      const status = yield* Effect.flatMap(served.serve(page("/api/otlp/status")), jsonOf)
+      const me = yield* served.serve(page("/api/v1/identity/me", {}))
+      const status = yield* Effect.flatMap(served.serve(page("/api/otlp/status", {})), jsonOf)
       const forward = yield* served.serve(page("/api/otlp/v1/traces", { method: "POST", body: "{}" }))
       yield* settled(served.pending)
       expect({ me: me.status, status, forward: forward.status }).toEqual({

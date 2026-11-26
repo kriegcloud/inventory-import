@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // "Suggest what the rules cannot" on items_messy.csv: the guard turns down what the file does not support, a stored
 // suggestion never applies itself, with no model the rules answer and say so, and a model's answer is rated by the
 // guard, never by the model.
@@ -16,6 +17,7 @@ import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-con
 import { storedSuggestion, suggestedByModel, type Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { digest, guard, type SuggestSource } from "@inventory/catalog-model/Suggest"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { ModelPolicy } from "@beep/openrouter/OpenRouterConfig"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { propose } from "@inventory/catalog-model/SuggestionsHandler"
 import { taken as callTaken, usedUp as callsUsedUp } from "@inventory/catalog-model/ModelAllowance"
@@ -23,10 +25,7 @@ import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
 import { usedUpWords } from "@inventory/access-contract/ModelAllowance"
 import { stage } from "./support/files.ts"
 
-const sourceOf = (
-  suggestions: ReadonlyArray<Suggestion> = [],
-  flags: Readonly<Record<string, RowDecisionFlags.Encoded>> = {}
-) =>
+const sourceOf = (suggestions: ReadonlyArray<Suggestion>, flags: Readonly<Record<string, RowDecisionFlags.Encoded>>) =>
   Effect.map(stage(new File([messy], "items_messy.csv")), (table): SuggestSource => ({
     table,
     review: review({
@@ -40,13 +39,17 @@ const sourceOf = (
     suggestions
   }))
 
-const rowOf = (source: SuggestSource, rowNumber: number) =>
-  O.getOrThrow(A.findFirst(source.review.rows, (row) => row.rowNumber === rowNumber))
+const rowOf = (source: SuggestSource, rowNumber: number) => {
+  const valueOption = A.findFirst(source.review.rows, (row) => row.rowNumber === rowNumber)
+  assertTrue(O.isSome(valueOption), "expected value to be present")
+  const value = valueOption.value
+  return value
+}
 
 describe("the guard", () => {
   it.effect("turns down a category outside the five, a name over 120 characters and a row nobody asked about", () =>
     Effect.gen(function* () {
-      const source = yield* sourceOf()
+      const source = yield* sourceOf([], {})
       // Rows 7 and 83 have no name and a description; row 142 has neither, so nothing is asked about it.
       expect(A.map(digest(source).rowsWithoutName, (row) => row.rowNumber)).toEqual([7, 83])
       expect(A.map(digest(source).rowsWithoutCategory, (row) => row.rowNumber)).toEqual([40, 116])
@@ -96,7 +99,7 @@ describe("the guard", () => {
 describe("a stored suggestion", () => {
   it.effect("never applies itself: the row stays Cannot import until the person accepts it", () =>
     Effect.gen(function* () {
-      const blank = yield* sourceOf()
+      const blank = yield* sourceOf([], {})
       const made = guard({
         source: blank,
         by: suggestedByModel("scripted/model"),
@@ -105,10 +108,13 @@ describe("a stored suggestion", () => {
       const stored = A.map(made, (suggestion, index): Suggestion =>
         storedSuggestion({ id: SuggestionId.make(`00000000-0000-4000-8000-00000000000${index}`), made: suggestion })
       )
-      const waiting = yield* sourceOf(stored)
+      const waiting = yield* sourceOf(stored, {})
       const row = rowOf(waiting, 7)
       expect([row.outcome, row.values.name, row.item, row.changes]).toEqual(["cannot", "", O.none(), []])
-      expect(O.getOrThrow(O.flatMap(A.head(row.problems), (problem) => problem.proposal))).toMatchObject({
+      const proposalOption = O.flatMap(A.head(row.problems), (problem) => problem.proposal)
+      assertTrue(O.isSome(proposalOption), "expected proposal to be present")
+      const proposal = proposalOption.value
+      expect(proposal).toMatchObject({
         to: "Nylon Coil",
         by: "model",
         lossless: false
@@ -117,7 +123,10 @@ describe("a stored suggestion", () => {
       expect(waiting.review.counts).toEqual(blank.review.counts)
       const accepted = yield* sourceOf(stored, { "row-7": { accepted: ["name"] } })
       const taken = rowOf(accepted, 7)
-      expect([taken.status, O.getOrThrow(taken.item).name]).toEqual(["ready", "Nylon Coil"])
+      const takenItemOption = taken.item
+      assertTrue(O.isSome(takenItemOption), "expected takenItem to be present")
+      const takenItem = takenItemOption.value
+      expect([taken.status, takenItem.name]).toEqual(["ready", "Nylon Coil"])
       expect(taken.changes).toMatchObject([
         { how: "acceptedProposal", field: "name", to: "Nylon Coil", source: "model" }
       ])
@@ -130,7 +139,7 @@ layer(AnswererOpenRouter.pipe(Layer.provide(OpenRouterTest.off("noKey", ModelId.
   (it) => {
     it.effect("the rules answer and say so: a name from each description, no category, and no call is taken", () =>
       Effect.gen(function* () {
-        const source = yield* sourceOf()
+        const source = yield* sourceOf([], {})
         const taken = yield* Ref.make(0)
         const proposed = yield* propose({
           source,
@@ -160,12 +169,16 @@ layer(AnswererOpenRouter.pipe(Layer.provide(OpenRouterTest.off("noKey", ModelId.
 
 const answer =
   '{"names":[{"rowNumber":7,"name":"Nylon Coil"}],"categories":[{"rowNumber":40,"category":"finished-goods"},{"rowNumber":116,"category":"Misc"}],"columns":[]}'
-const scripted = OpenRouterTest.scripted([{ text: answer }], { model: ModelId.make("scripted/model") })
+const scripted = OpenRouterTest.scripted([{ text: answer, modelId: O.none() }], {
+  model: ModelId.make("scripted/model"),
+  fallbackModels: [],
+  policy: ModelPolicy.default
+})
 
 layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (it) => {
   it.effect("one call is taken, the answer goes through the guard, and with the allowance used the rules answer", () =>
     Effect.gen(function* () {
-      const source = yield* sourceOf()
+      const source = yield* sourceOf([], {})
       const taken = yield* Ref.make(0)
       const proposed = yield* propose({
         source,

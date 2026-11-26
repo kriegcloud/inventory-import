@@ -200,7 +200,7 @@ export const patchesProve = Effect.fn("PatchesProve.patchesProve")(function* () 
       A.filter(files, (path) => !Str.includes("/node_modules/")(path)),
       Effect.fnUntraced(function* (path) {
         const data = yield* repo.bytes(path)
-        yield* repo.writeBytes(repo.join(copy, repo.relative(source, path)), data)
+        yield* repo.writeBytes(repo.join(copy, repo.relative(path, source)), data)
       }),
       { concurrency: 1, discard: true }
     )
@@ -212,7 +212,7 @@ export const patchesProve = Effect.fn("PatchesProve.patchesProve")(function* () 
       copy,
       "--reporter=json",
       `--outputFile=${result}`,
-      repo.relative(source, testFile)
+      repo.relative(testFile, source)
     ])
     const said = firstLine(`${ran.stderr}\n${ran.stdout}`)
     if (!(yield* repo.exists(result))) return { counts: O.none<TestRun>(), said }

@@ -12,6 +12,8 @@ import * as Effect from "effect/Effect"
 import * as Tuple from "effect/Tuple"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as O from "effect/Option"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { $ReviewId } from "./internal/identity.ts"
 
@@ -171,8 +173,8 @@ export class ReviewDecision extends S.Opaque<ReviewDecision, { readonly brand: u
     R.isEmptyRecord(decision.edits)
 
   /** Whether the person has said anything about the row: proposals and group actions leave such rows alone. */
-  static readonly decidedByPerson = (decision: ReviewDecision | undefined): boolean =>
-    decision !== undefined && !ReviewDecision.isEmpty(decision)
+  static readonly decidedByPerson = (decision: O.Option<ReviewDecision>): boolean =>
+    O.exists(decision, (decision) => !ReviewDecision.isEmpty(decision))
 }
 
 /**
@@ -181,13 +183,51 @@ export class ReviewDecision extends S.Opaque<ReviewDecision, { readonly brand: u
  * @category schemas
  */
 export const DecisionFlags = S.Struct({
-  out: S.optionalKey(S.Boolean).pipe(S.annotateKey({ description: "True: left out" })),
-  kept: S.optionalKey(S.Boolean).pipe(
-    S.annotateKey({ description: "True: kept over its rivals (or before being left out)" })
+  out: S.Boolean.pipe(
+    S.annotateKey({ description: "True: left out" }),
+    S.optionalKey,
+    S.decodeTo(S.Boolean, {
+      decode: SchemaGetter.withDefault(Effect.succeed(false)),
+      encode: SchemaGetter.transformOptional(O.filter((value) => value))
+    }),
+    S.withConstructorDefault(Effect.succeed(false))
   ),
-  accepted: ColumnKey.pipe(S.Array, S.optionalKey, S.annotateKey({ description: "Columns whose fix was accepted" })),
-  reverted: ColumnKey.pipe(S.Array, S.optionalKey, S.annotateKey({ description: "Columns whose fix was undone" })),
-  edits: S.optionalKey(S.Record(ColumnKey, CellText)).pipe(S.annotateKey({ description: "Values typed, by column" }))
+  kept: S.Boolean.pipe(
+    S.annotateKey({ description: "True: kept over its rivals (or before being left out)" }),
+    S.optionalKey,
+    S.decodeTo(S.Boolean, {
+      decode: SchemaGetter.withDefault(Effect.succeed(false)),
+      encode: SchemaGetter.transformOptional(O.filter((value) => value))
+    }),
+    S.withConstructorDefault(Effect.succeed(false))
+  ),
+  accepted: S.Array(ColumnKey).pipe(
+    S.annotateKey({ description: "Columns whose fix was accepted" }),
+    S.optionalKey,
+    S.decodeTo(S.Array(ColumnKey), {
+      decode: SchemaGetter.withDefault<ReadonlyArray<string>>(Effect.succeed([])),
+      encode: SchemaGetter.transformOptional(O.filter((value) => !A.isReadonlyArrayEmpty(value)))
+    }),
+    S.withConstructorDefault(Effect.succeed([]))
+  ),
+  reverted: S.Array(ColumnKey).pipe(
+    S.annotateKey({ description: "Columns whose fix was undone" }),
+    S.optionalKey,
+    S.decodeTo(S.Array(ColumnKey), {
+      decode: SchemaGetter.withDefault<ReadonlyArray<string>>(Effect.succeed([])),
+      encode: SchemaGetter.transformOptional(O.filter((value) => !A.isReadonlyArrayEmpty(value)))
+    }),
+    S.withConstructorDefault(Effect.succeed([]))
+  ),
+  edits: S.Record(ColumnKey, CellText).pipe(
+    S.annotateKey({ description: "Values typed, by column" }),
+    S.optionalKey,
+    S.decodeTo(S.Record(ColumnKey, CellText), {
+      decode: SchemaGetter.withDefault(Effect.succeed({})),
+      encode: SchemaGetter.transformOptional(O.filter((value) => !R.isEmptyRecord(value)))
+    }),
+    S.withConstructorDefault(Effect.succeed({}))
+  )
 }).pipe($I.annoteSchema("DecisionFlags", { description: "A decision as drafts store it" }))
 
 /**
@@ -206,7 +246,7 @@ type DecisionParts = {
 }
 
 /** The flags of a decision: the stored form, every empty part left out. */
-export const toFlags = (decision: DecisionParts): DecisionFlags => ({
+export const toFlags = (decision: DecisionParts): typeof DecisionFlags.Encoded => ({
   ...(RowPlace.guards.leftOut(decision.place) ? { out: true } : {}),
   ...(RowPlace.guards.kept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept)
     ? { kept: true }
@@ -220,9 +260,9 @@ export const toFlags = (decision: DecisionParts): DecisionFlags => ({
 export const fromFlags = (flags: DecisionFlags): ReviewDecision =>
   ReviewDecision.make({
     place: flags.out === true ? leftOut(flags.kept === true) : flags.kept === true ? kept : open,
-    accepted: flags.accepted ?? [],
-    reverted: flags.reverted ?? [],
-    edits: flags.edits ?? {}
+    accepted: flags.accepted,
+    reverted: flags.reverted,
+    edits: flags.edits
   })
 
 /**
@@ -241,11 +281,18 @@ export const ReviewDecisionFromFlags = DecisionFlags.pipe(
             : flags.kept === true
               ? { kind: "kept" }
               : { kind: "open" },
-        accepted: flags.accepted ?? [],
-        reverted: flags.reverted ?? [],
-        edits: flags.edits ?? {}
+        accepted: flags.accepted,
+        reverted: flags.reverted,
+        edits: flags.edits
       }),
-      encode: toFlags
+      encode: (decision) => ({
+        out: RowPlace.guards.leftOut(decision.place),
+        kept:
+          RowPlace.guards.kept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept),
+        accepted: decision.accepted,
+        reverted: decision.reverted,
+        edits: decision.edits
+      })
     })
   ),
   $I.annoteSchema("ReviewDecisionFromFlags", { description: "A decision, stored as the flags drafts hold" })

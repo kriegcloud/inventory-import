@@ -1,6 +1,7 @@
 // The table assistant's command: what decodes, what the catalog refuses, and what the fixed rules read. The claim
 // that would hurt most if wrong is that an answer naming anything the table does not have is refused whole.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Result from "effect/Result"
@@ -84,18 +85,22 @@ describe("the command a model may answer", () => {
     { change: ViewChange },
     ({ change }) => {
       const outcome = check([change])
-      if (Result.isFailure(outcome)) return
-      for (const passed of outcome.success) {
-        if (ViewChange.isAnyOf(["clear", "search"])(passed)) continue
-        const found = A.findFirst(items, (c) => c.id === passed.column)
-        expect(O.isSome(found)).toBe(true)
-        if (ViewChange.guards.filter(passed) && O.isSome(found)) {
-          expect(found.value.operators).toContain(passed.operator)
-          if (found.value.type === "select") {
-            for (const value of passed.values) expect(found.value.values).toContain(value)
+      Result.match(outcome, {
+        onFailure: (sentence) => expect(sentence.length).toBeGreaterThan(0),
+        onSuccess: (changes) => {
+          for (const passed of changes) {
+            if (ViewChange.isAnyOf(["clear", "search"])(passed)) continue
+            const found = A.findFirst(items, (c) => c.id === passed.column)
+            assertTrue(O.isSome(found), "expected the tested value to be present")
+            if (ViewChange.guards.filter(passed)) {
+              expect(found.value.operators).toContain(passed.operator)
+              if (found.value.type === "select") {
+                for (const value of passed.values) expect(found.value.values).toContain(value)
+              }
+            }
           }
         }
-      }
+      })
     }
   )
 })
@@ -165,10 +170,8 @@ describe("the fixed rules", () => {
     )
     // Every answer the rules give passes the same check a model's does.
     const answer = readFlag("only preferred")
-    if (Result.isSuccess(answer))
-      expect(Result.isSuccess(checkCommand({ changes: answer.success, columns: flagged, searchable: false }))).toBe(
-        true
-      )
+    assertTrue(Result.isSuccess(answer), "expected the tested value to be present")
+    expect(Result.isSuccess(checkCommand({ changes: answer.success, columns: flagged, searchable: false }))).toBe(true)
   })
 
   it("read every request the README, the box's hint and its suggestions offer on the Items table", () => {
@@ -194,18 +197,19 @@ describe("the fixed rules", () => {
     for (const prompt of offered) {
       const answer = readByRules({ prompt, columns: withQuantity })
       expect(Result.isSuccess(answer), prompt).toBe(true)
-      if (Result.isSuccess(answer))
-        expect(
-          Result.isSuccess(checkCommand({ changes: answer.success, columns: withQuantity, searchable: true })),
-          prompt
-        ).toBe(true)
+      assertTrue(Result.isSuccess(answer), "expected the tested value to be present")
+      expect(
+        Result.isSuccess(checkCommand({ changes: answer.success, columns: withQuantity, searchable: true })),
+        prompt
+      ).toBe(true)
     }
   })
 
   it("refuse the whole request when one part is not theirs, naming that part", () => {
     const outcome = read("sort by name and show items with no vendor")
     expect(Result.isFailure(outcome)).toBe(true)
-    if (Result.isFailure(outcome)) expect(outcome.failure).toContain("“show items with no vendor”")
+    assertTrue(Result.isFailure(outcome), "expected the tested value to be present")
+    expect(outcome.failure).toContain("“show items with no vendor”")
     expect(Result.isFailure(read("sort by colour"))).toBe(true)
     expect(Result.isFailure(read("   "))).toBe(true)
   })

@@ -12,28 +12,28 @@ const head = /^(-?\d+):(-?\d+):(\d+):(\d+):(\d+):(\d+):/
 /** A seal read back: the level it holds and what was below it. None for a text that is no seal. */
 const unseal = (text: string): O.Option<{ readonly level: Level; readonly below: string }> => {
   const found = Str.match(head)(text)
-  if (O.isNone(found)) return O.none()
-  const [whole, change, madeOn, bySize, stepSize, labelSize, flagsSize] = found.value
-  const sizes = { by: Number(bySize), step: Number(stepSize), label: Number(labelSize), flags: Number(flagsSize) }
-  const start = whole.length
-  const stepAt = start + sizes.by
-  const labelAt = stepAt + sizes.step
-  const flagsAt = labelAt + sizes.label
-  const belowAt = flagsAt + sizes.flags
-  return O.some({
-    level: Level.make({
-      change: Number(change),
-      madeOn: Number(madeOn),
-      by: Str.slice(start, stepAt)(text),
-      step: Str.slice(stepAt, labelAt)(text),
-      label: Str.slice(labelAt, flagsAt)(text),
-      flags: Str.slice(flagsAt, belowAt)(text),
-      bySize: sizes.by,
-      stepSize: sizes.step,
-      labelSize: sizes.label,
-      flagsSize: sizes.flags
-    }),
-    below: Str.slice(belowAt)(text)
+  return O.map(found, ([whole, change, madeOn, bySize, stepSize, labelSize, flagsSize]) => {
+    const sizes = { by: Number(bySize), step: Number(stepSize), label: Number(labelSize), flags: Number(flagsSize) }
+    const start = whole.length
+    const stepAt = start + sizes.by
+    const labelAt = stepAt + sizes.step
+    const flagsAt = labelAt + sizes.label
+    const belowAt = flagsAt + sizes.flags
+    return {
+      level: Level.make({
+        change: Number(change),
+        madeOn: Number(madeOn),
+        by: Str.slice(start, stepAt)(text),
+        step: Str.slice(stepAt, labelAt)(text),
+        label: Str.slice(labelAt, flagsAt)(text),
+        flags: Str.slice(flagsAt, belowAt)(text),
+        bySize: sizes.by,
+        stepSize: sizes.step,
+        labelSize: sizes.label,
+        flagsSize: sizes.flags
+      }),
+      below: Str.slice(belowAt)(text)
+    }
   })
 }
 

@@ -70,7 +70,7 @@ export const testSettings = {
 } as const
 
 /** A ConfigProvider over plain values: what worker.ts builds from `env`, for a test. */
-export const settingsLayer = (values: Record<string, string> = testSettings) =>
+export const settingsLayer = (values: Record<string, string>) =>
   ConfigProvider.layer(ConfigProvider.fromUnknown(values))
 
 /**
@@ -93,17 +93,21 @@ export const DevToolsWhenAsked = Layer.unwrap(
  */
 export const TestDatabase = D1Test.layer(D1TestOptions.make({ migrations, seeds: [organizations] })).pipe(Layer.orDie)
 
+/** Starting authentication settings for a fixture. */
+export const authStart = { rateLimit: false, production: false }
+
 /**
  * Better Auth on the test database, as the Worker builds it: no `waitUntil`, rate limits off unless asked for, and a
  * development build unless `production` says otherwise.
  */
-export const TestAuth = (options: { readonly rateLimit?: boolean; readonly production?: boolean } = {}) =>
+export const TestAuth = (options: { readonly rateLimit: boolean; readonly production: boolean }) =>
   Layer.unwrap(
     Effect.gen(function* () {
       return signIn({
+        backgroundTasks: O.none(),
         database: yield* D1Binding,
-        production: options.production ?? false,
-        rateLimit: options.rateLimit ?? false
+        production: options.production,
+        rateLimit: options.rateLimit
       })
     })
   ).pipe(Layer.provide(TestDatabase))
@@ -136,11 +140,11 @@ export const SignedOutAuth = BetterAuthTest.signedOut
 export const TestApp = makeApp({
   database: TestDatabase,
   identity: HeaderIdentity,
-  auth: TestAuth(),
+  auth: TestAuth({ ...authStart }),
   production: false,
   docs: false,
   http: noNetwork
-}).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer()))
+}).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer(testSettings)))
 
 /**
  * The audit trail the in-memory app starts with: one line per organization, so a count has something to count. SQL
@@ -187,19 +191,19 @@ const InMemoryStorage = Layer.mergeAll(
  */
 export const inMemoryApp = <E, R>({
   ai,
-  docs = false,
-  http = noNetwork,
+  docs,
+  http,
   member,
-  settings = testSettings
+  settings
 }: {
   readonly member: Member
   readonly ai: Layer.Layer<OpenRouter, E, R>
   /** Mount the API reference page, as a development build does. */
-  readonly docs?: boolean
-  /** How the app's requests out (to the collector) are answered. Default: `noNetwork`. */
-  readonly http?: Layer.Layer<HttpClient.HttpClient>
-  /** The settings the app reads, as the Worker's `env` would give them. Default: `testSettings`. */
-  readonly settings?: Record<string, string>
+  readonly docs: boolean
+  /** How the app's requests out (to the collector) are answered. The caller supplies its network policy. */
+  readonly http: Layer.Layer<HttpClient.HttpClient>
+  /** The settings the app reads, as the Worker's `env` would give them. The caller supplies its starting settings. */
+  readonly settings: Record<string, string>
 }) =>
   makeRoutes({ docs, identity: HeaderIdentity }).pipe(
     Layer.provide(http),
@@ -254,7 +258,7 @@ const handlersOn = <E, R>(
    * A stand-in around the real import store, or a store of its own on the test database (a test that puts another
    * request between two steps): none by default.
    */
-  around?: Layer.Layer<ImportStore, never, StoreNeeds>
+  around: O.Option<Layer.Layer<ImportStore, never, StoreNeeds>>
 ) => {
   const services = servicesWith({ ai, production: false })
   return Handlers.pipe(
@@ -263,11 +267,16 @@ const handlersOn = <E, R>(
     Layer.provideMerge(HttpApiMiddleware.layerProblemDetails({ includeDetails: true })),
     // The header identity looks up whoever `as` named last, in the real `member` table.
     Layer.provide(directoryFollowing(() => MutableRef.get(acting))),
-    Layer.provideMerge(around === undefined ? services : around.pipe(Layer.provideMerge(services))),
+    Layer.provideMerge(
+      O.match(around, {
+        onNone: () => services,
+        onSome: (around) => around.pipe(Layer.provideMerge(services))
+      })
+    ),
     Layer.provide(SignedOutAuth),
     Layer.provideMerge(TestDatabase),
     Layer.provideMerge(HttpServer.layerServices),
-    Layer.provide(settingsLayer())
+    Layer.provide(settingsLayer(testSettings))
   )
 }
 
@@ -276,7 +285,7 @@ const handlersOn = <E, R>(
  * one), for the typed client (`HttpApiTest.groups`). Use `as(memberId)` on each call. Slow: name the file
  * `*.slow.test.ts`.
  */
-export const testAppWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) => handlersOn(ai)
+export const testAppWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) => handlersOn(ai, O.none())
 
 /** The typed-client app with no AI key: the state the app must be complete in. */
 export const TypedApp = testAppWith(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)))
@@ -288,7 +297,7 @@ export const TypedApp = testAppWith(OpenRouterTest.off("noKey", ModelId.make(tes
  * `*.slow.test.ts`.
  */
 export const testAppAround = (around: Layer.Layer<ImportStore, never, StoreNeeds>) =>
-  handlersOn(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)), around)
+  handlersOn(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)), O.some(around))
 
 /** The app as the Worker serves it: security headers included. `dispose` runs when the test block ends. */
 export class TestFetch extends Context.Service<
@@ -345,21 +354,24 @@ export const settled = (pending: ReadonlyArray<Fiber.Fiber<void>>): Effect.Effec
  */
 export const send = Effect.fn("test.send")(function* (options: {
   readonly path: string
-  readonly method?: string
-  readonly actingAs?: string
-  readonly body?: unknown
-  readonly headers?: Record<string, string>
+  readonly method: string
+  readonly actingAs: O.Option<string>
+  readonly body: O.Option<unknown>
+  readonly headers: Record<string, string>
 }) {
   const { handle } = yield* TestFetch
-  const body = options.body === undefined ? undefined : yield* toJson(options.body).pipe(Effect.orDie)
+  const body = yield* O.match(options.body, {
+    onNone: () => Effect.succeed(O.none<string>()),
+    onSome: (value) => toJson(value).pipe(Effect.orDie, Effect.asSome)
+  })
   const headers = new Headers(options.headers)
-  if (options.actingAs !== undefined) headers.set("x-acting-as", options.actingAs)
-  if (body !== undefined) headers.set("content-type", "application/json")
+  O.map(options.actingAs, (actor) => headers.set("x-acting-as", actor))
+  O.map(body, () => headers.set("content-type", "application/json"))
   const response = yield* handle(
     new Request(`${testOrigin}${options.path}`, {
-      method: options.method ?? (body === undefined ? "GET" : "POST"),
+      method: options.method,
       headers,
-      ...(body === undefined ? {} : { body })
+      ...O.match(body, { onNone: () => ({}), onSome: (body) => ({ body }) })
     })
   )
   const text = yield* textOf(response)
@@ -373,22 +385,23 @@ export const SeededAccounts = D1Test.seed(new URL("../../../seeds/accounts.sql",
   Layer.orDie
 )
 
+/** Starting sign-in app settings for a fixture. */
+export const signInStart = { settings: {}, production: false }
+
 /**
  * Sign-in end to end: the app exactly as the Worker builds it (the session identity, Better Auth's routes beside the
  * HttpApi), on a fresh test database with the test accounts, rate limits on, the breach check off unless the settings
  * turn it on, and a development build unless `production` says otherwise.
  */
-export const signInApp = (
-  options: { readonly settings?: Record<string, string>; readonly production?: boolean } = {}
-) =>
+export const signInApp = (options: { readonly settings: Record<string, string>; readonly production: boolean }) =>
   TestFetch.layer(
     // One layer, so the database, Better Auth and the seeding share one test database.
     Layer.merge(
       makeApp({
         database: TestDatabase,
         identity: SessionIdentityLive,
-        auth: TestAuth({ rateLimit: true, production: options.production ?? false }),
-        production: options.production ?? false,
+        auth: TestAuth({ ...authStart, rateLimit: true, production: options.production }),
+        production: options.production,
         docs: false,
         http: noNetwork
       }),
@@ -409,8 +422,8 @@ export const browser = (address: string) => {
   const send = Effect.fn("browser.send")(function* (
     method: "GET" | "POST" | "PUT" | "DELETE",
     path: string,
-    body?: unknown,
-    extra?: Record<string, string>
+    body: O.Option<unknown>,
+    extra: Record<string, string>
   ) {
     const { handle } = yield* TestFetch
     const headers: Record<string, string> = {
@@ -418,21 +431,26 @@ export const browser = (address: string) => {
       "sec-fetch-site": "same-origin",
       "cf-connecting-ip": address,
       ...(cookie === "" ? {} : { cookie }),
-      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...O.match(body, { onNone: () => ({}), onSome: () => ({ "content-type": "application/json" }) }),
       ...extra
     }
-    const payload = body === undefined ? undefined : yield* encodeAny(body).pipe(Effect.orDie)
+    const payload = yield* O.match(body, {
+      onNone: () => Effect.succeed(O.none<string>()),
+      onSome: (value) => encodeAny(value).pipe(Effect.orDie, Effect.asSome)
+    })
     const response = yield* handle(
       new Request(`${testOrigin}${path}`, {
         method,
         headers: R.filter(headers, (value) => value !== ""),
-        ...(payload === undefined ? {} : { body: payload })
+        ...O.match(payload, { onNone: () => ({}), onSome: (body) => ({ body }) })
       })
     )
-    const setCookie = O.getOrUndefined(
-      A.findFirst(response.headers.getSetCookie(), (line) => Str.includes("inventory.session_token=")(line))
+    const setCookie = A.findFirst(response.headers.getSetCookie(), (line) =>
+      Str.includes("inventory.session_token=")(line)
     )
-    if (setCookie !== undefined) cookie = Str.split(setCookie, ";")[0] ?? ""
+    O.map(setCookie, (value) => {
+      cookie = A.headNonEmpty(Str.split(value, ";"))
+    })
     const text = yield* textOf(response)
     const json = text === "" ? undefined : yield* decodeAny(text).pipe(Effect.orElseSucceed(() => text))
     return { status: response.status, json, setCookie }
@@ -440,6 +458,7 @@ export const browser = (address: string) => {
   return {
     send,
     cookie: () => cookie,
-    signIn: (email: string) => send("POST", "/api/auth/sign-in/email", { email, password: testAccountPassword })
+    signIn: (email: string) =>
+      send("POST", "/api/auth/sign-in/email", O.some({ email, password: testAccountPassword }), {})
   }
 }

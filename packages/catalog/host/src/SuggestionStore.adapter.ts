@@ -1,3 +1,4 @@
+import { dual } from "effect/Function"
 // Where an import's suggestions are stored: the `importSuggestion` table, read and written through the two mappers
 // of the contract, so the stored rows keep their shape. A write is one batch with its audit line.
 import * as O from "effect/Option"
@@ -25,13 +26,14 @@ import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 
 // A suggestion as its table's columns hold it; `suggestionFromStored` reads it and `suggestionToStored` writes it.
+const noRowId = "" as const
 const Stored = S.Struct({
   id: SuggestionId,
   kind: SuggestionKind,
   rowId: S.Union([RowId, S.Literal("")]).pipe(
     S.decodeTo(RowId.pipe(S.toType, S.Option), {
       decode: SchemaGetter.transform((id) => (id === "" ? O.none() : O.some(id))),
-      encode: SchemaGetter.transform(O.match({ onNone: () => "" as const, onSome: identity }))
+      encode: SchemaGetter.transform(O.match({ onNone: () => noRowId, onSome: identity }))
     })
   ),
   rowNumber: S.OptionFromNullOr(S.Int),
@@ -106,6 +108,9 @@ export const SuggestionStoreD1 = Layer.effect(
       return A.filter(write.suggestions, (suggestion) => A.contains(written, suggestion.id))
     }, Effect.orDie)
 
-    return SuggestionStore.of({ list, store })
+    return SuggestionStore.of({
+      list: dual(2, (self: ImportId, organizationId: OrganizationId) => list(organizationId, self)),
+      store
+    })
   })
 )

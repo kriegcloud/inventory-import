@@ -113,7 +113,7 @@ export const missingRules = (proof: {
   ),
   ...A.flatMap(recordsWithNoCommand(proof.decision), (event) =>
     O.match(R.get(ruleOfWhoMayChange, event), {
-      onNone: () => [`no rule of who may change is listed for ${event}`],
+      onNone: () => A.of(`no rule of who may change is listed for ${event}`),
       onSome: (names) =>
         A.map(
           A.filter(names, (name) => !A.some(proof.report.rules, (rule) => rule.name === name)),

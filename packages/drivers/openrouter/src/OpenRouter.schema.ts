@@ -11,6 +11,7 @@ import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import type * as Redacted from "effect/Redacted"
 import * as S from "effect/Schema"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as Tuple from "effect/Tuple"
 import type { OpenRouterSettings } from "./OpenRouter.config.ts"
 import { $OpenrouterId } from "./internal/identity.ts"
@@ -232,6 +233,38 @@ export class ModelPrompt extends S.Opaque<ModelPrompt, { readonly brand: unique 
 ) {}
 
 const TokenCount = S.Int.check(S.isGreaterThanOrEqualTo(0))
+
+/** A provider's absent or NULL token total retains the driver's existing zero fallback.
+ * @category schemas
+ */
+export const ReportedTokenCount = S.NullishOr(TokenCount).pipe(
+  S.decodeTo(TokenCount, {
+    decode: SchemaGetter.transformOptional<number, number | null | undefined>(O.flatMap(O.fromNullishOr)).pipe(
+      SchemaGetter.compose(SchemaGetter.withDefault(Effect.succeed(0)))
+    ),
+    encode: SchemaGetter.passthrough()
+  }),
+  S.withDecodingDefaultType(Effect.succeed(0)),
+  $I.annoteSchema("ReportedTokenCount", { description: "A provider token total, zero when not reported" })
+)
+
+/** The decoded provider token total.
+ * @category models
+ */
+export type ReportedTokenCount = typeof ReportedTokenCount.Type
+
+/** The two token totals reported by a provider, decoded together at the response boundary.
+ * @category schemas
+ */
+export const ReportedTokenTotals = S.Struct({
+  inputTokens: ReportedTokenCount.pipe(S.annotateKey({ description: "Tokens sent, zero when not reported" })),
+  outputTokens: ReportedTokenCount.pipe(S.annotateKey({ description: "Tokens answered, zero when not reported" }))
+}).pipe($I.annoteSchema("ReportedTokenTotals", { description: "A provider's input and output token totals" }))
+
+/** The decoded provider token totals.
+ * @category models
+ */
+export type ReportedTokenTotals = typeof ReportedTokenTotals.Type
 
 /**
  * What a call used: tokens in and out, and what it cost in millionths of a dollar when the provider said.

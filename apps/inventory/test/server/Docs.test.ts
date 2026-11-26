@@ -1,12 +1,14 @@
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as Effect from "effect/Effect"
 import * as Str from "effect/String"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { inMemoryApp, send, TestFetch } from "./support/app.ts"
+import { inMemoryApp, send, TestFetch, noNetwork, testSettings } from "./support/app.ts"
 
 // The API reference page a development build serves at /api/v1/docs: Scalar, from the bundled script (no CDN), under
 // a content security policy that allows exactly the page's two inline scripts by hash and nothing from elsewhere.
@@ -34,21 +36,31 @@ const sha256 = (text: string) =>
 
 layer(
   TestFetch.layer(
-    inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")), docs: true })
+    inMemoryApp({
+      http: noNetwork,
+      settings: testSettings,
+      member: dana,
+      ai: OpenRouterTest.off("noKey", ModelId.make("test/model")),
+      docs: true
+    })
   )
 )("the API reference page", (it) => {
   it.effect("is served with a policy that allows its own two scripts by hash and nothing else", () =>
     Effect.gen(function* () {
-      const page = yield* send({ path: "/api/v1/docs" })
+      const page = yield* send({ method: "GET", body: O.none(), actingAs: O.none(), headers: {}, path: "/api/v1/docs" })
       expect(page.status).toBe(200)
       expect(page.headers.get("content-type")).toContain("text/html")
-      const scripts = A.map(
-        A.fromIterable(Str.matchAll(/<script>([\s\S]*?)<\/script>/g)(page.text)),
-        (match) => match[1] ?? ""
-      )
+      const scripts = A.map(A.fromIterable(Str.matchAll(/<script>([\s\S]*?)<\/script>/g)(page.text)), (match) => {
+        const script = match[1]
+        assertDefined(script)
+        return script
+      })
       expect(scripts.length).toBe(2)
       const hashes = yield* Effect.forEach(scripts, sha256, { concurrency: 1 })
-      const policy = page.headers.get("content-security-policy") ?? ""
+      const policyOption = O.fromNullishOr(page.headers.get("content-security-policy"))
+      assertTrue(O.isSome(policyOption), "expected policy to be present")
+      const policy = policyOption.value
+      expect(policy).not.toBeNull()
       expect(policy).toContain(
         `script-src ${A.join(
           A.map(hashes, (hash) => `'sha256-${hash}'`),
@@ -60,7 +72,13 @@ layer(
       // No source other than this origin: in the browser the page made no request elsewhere (checked headless).
       expect(policy).not.toMatch(/https?:/)
       // The rest of the API keeps its own policy.
-      const status = yield* send({ path: "/api/v1/system/status" })
+      const status = yield* send({
+        method: "GET",
+        body: O.none(),
+        actingAs: O.none(),
+        headers: {},
+        path: "/api/v1/system/status"
+      })
       expect(status.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'none'")
     })
   )

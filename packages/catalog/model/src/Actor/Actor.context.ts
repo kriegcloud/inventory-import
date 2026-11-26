@@ -33,7 +33,7 @@ export class CurrentActor extends Domain.RequestContext<CurrentActor>()(
  * The middleware every command of the model names: it provides `CurrentActor`, or fails with the kernel's
  * `NotSignedIn` when nobody is signed in, so no command of the model is taken.
  */
-export class Session extends RpcMiddleware.Service<Session, { provides: CurrentActor }>()(
+export class Session extends RpcMiddleware.Service<Session, { readonly provides: CurrentActor }>()(
   "@inventory/catalog-model/Actor/Session",
   { error: NotSignedIn }
 ) {}

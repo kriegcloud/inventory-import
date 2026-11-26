@@ -1,6 +1,8 @@
 // What a tab has to say of the person's unsaved decisions, as this browser keeps it, and in words. The one thing not to
 // break: every row is named, with the decision where it was let go and not only moved.
 import * as O from "effect/Option"
+import * as Effect from "effect/Effect"
+import { Named } from "../Draft.machine.ts"
 import * as S from "effect/Schema"
 import { RowDecision } from "@inventory/catalog-contract/Decision"
 import { namedWords, rowsWords } from "./leftOver.ts"
@@ -15,7 +17,7 @@ export const Notice = S.TaggedUnion({
     fileName: S.OptionFromNullOr(S.String),
     rows: S.String.pipe(S.Array),
     // True for rows an import that was closed left over: only to be named, never sent.
-    named: S.Boolean.pipe(S.optionalKey),
+    named: S.Boolean.pipe(S.OptionFromOptionalKey, S.withConstructorDefault(Effect.succeedNone)),
     at: S.Finite
   },
   Removed: {
@@ -23,7 +25,10 @@ export const Notice = S.TaggedUnion({
     fileName: S.OptionFromNullOr(S.String),
     rows: S.Record(S.String, S.OptionFromNullOr(RowDecision)),
     beside: S.Record(S.String, RowDecision.pipe(S.OptionFromNullOr, S.Array)),
-    theirs: S.Record(S.String, S.OptionFromNullOr(RowDecision)).pipe(S.optionalKey),
+    theirs: S.Record(S.String, S.OptionFromNullOr(RowDecision)).pipe(
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    ),
     at: S.Finite
   }
 }).annotate({ description: "What a tab says of the person's unsaved decisions, until it is dismissed" })
@@ -45,8 +50,15 @@ const encodeText = S.encodeOption(asText)
 export const noticesText = (stored: NoticesKept): O.Option<string> => encodeText(stored)
 
 /** The notices from that text: none where there is none or it cannot be read. */
-export const noticesFromText = (text: string | null): NoticesKept =>
-  text === null ? O.none() : O.flatten(decodeText(text))
+export const noticesFromText = (text: O.Option<string>): NoticesKept =>
+  O.flatMap(text, (text) => O.flatten(decodeText(text)))
+
+/** A removed import's complete naming, supplying older missing comparisons through the Named maker. */
+export const namedIn = ({ beside, rows, theirs }: Extract<Notice, { readonly _tag: "Removed" }>): Named =>
+  O.match(theirs, {
+    onNone: () => Named.make({ rows, beside }),
+    onSome: (theirs) => Named.make({ rows, beside, theirs })
+  })
 
 /**
  * A notice in words: what happened, and to which rows of which import.
@@ -57,17 +69,16 @@ export const noticeWords = (notice: Notice): { readonly title: string; readonly 
   Notice.match(notice, {
     TakenUp: ({ fileName, named, rows }) => {
       const one = rows.length === 1
-      const what =
-        named === true
-          ? `your ${one ? "decision was" : "decisions were"} not part of the import that was confirmed, and another tab of yours names ${one ? "it" : "them"} now`
-          : `another tab of yours has your ${one ? "decision" : "decisions"} now, and this tab no longer does`
+      const what = O.contains(named, true)
+        ? `your ${one ? "decision was" : "decisions were"} not part of the import that was confirmed, and another tab of yours names ${one ? "it" : "them"} now`
+        : `another tab of yours has your ${one ? "decision" : "decisions"} now, and this tab no longer does`
       return {
         title: `Your ${one ? "decision was" : "decisions were"} taken up by another tab`,
-        text: `${rowsWords(rows)} of ${O.getOrElse(fileName, () => "an import")}: ${what}.`
+        text: `${rowsWords(rows)} of ${O.match(fileName, { onNone: () => "an import", onSome: (name) => name })}: ${what}.`
       }
     },
     Removed: (gone) => ({
-      title: `${O.getOrElse(gone.fileName, () => "An import")} was removed`,
-      text: `Your decisions on it that were not saved went with it. ${namedWords({ ...gone, theirs: gone.theirs ?? {} })}.`
+      title: `${O.match(gone.fileName, { onNone: () => "An import", onSome: (name) => name })} was removed`,
+      text: `Your decisions on it that were not saved went with it. ${namedWords(namedIn(gone))}.`
     })
   })

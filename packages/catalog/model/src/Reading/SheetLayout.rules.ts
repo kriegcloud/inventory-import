@@ -16,7 +16,7 @@ import {
   type ExtraCell,
   type Note,
   type NoteKind,
-  type Row,
+  Row,
   SheetChoiceReason,
   type SheetSummary,
   type SpreadsheetTable,
@@ -412,12 +412,14 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       }
     })
     if (rowHasSpaces) spacedCells.push(row.rowNumber)
-    rows.push({
-      rowNumber: row.rowNumber,
-      cells,
-      ...(extra.length > 0 ? { extra } : {}),
-      ...(row.hidden ? { hidden: true } : {})
-    })
+    rows.push(
+      Row.make({
+        rowNumber: row.rowNumber,
+        cells,
+        extra,
+        hidden: row.hidden
+      })
+    )
   }
 
   if (blankInside.length > 0) {

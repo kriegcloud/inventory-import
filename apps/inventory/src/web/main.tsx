@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { appRuntime } from "@/lib/api"
@@ -20,8 +21,14 @@ installTroubleSentences(modelSentences)
 void appRuntime.runPromise(startTelemetry)
 
 // The page, in its one atom registry (`Root`): this file makes none.
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <Root />
-  </StrictMode>
-)
+O.match(O.fromNullOr(document.getElementById("root")), {
+  onNone: () => {
+    throw new Error("The page's root element is missing.")
+  },
+  onSome: (root) =>
+    createRoot(root).render(
+      <StrictMode>
+        <Root />
+      </StrictMode>
+    )
+})

@@ -1,3 +1,5 @@
+import { dual } from "effect/Function"
+import * as P from "effect/Predicate"
 /**
  * The repository as the rules see it: where its root is, where the command was started, its workspaces, and the few
  * ways a rule reads it (a file's text, a JSON file through a schema, the files under a folder, a tool's answer).
@@ -88,7 +90,7 @@ export class Repo extends Context.Service<
     /** Joins path segments. */
     readonly join: (...segments: ReadonlyArray<string>) => string
     /** `path` as seen from `from`. */
-    readonly relative: (from: string, path: string) => string
+    readonly relative: { (from: string): (self: string) => string; (self: string, from: string): string }
     /** The folder a path is in. */
     readonly dirname: (path: string) => string
     /** An absolute path from segments, the first of which may be relative to the starting folder. */
@@ -100,9 +102,15 @@ export class Repo extends Context.Service<
     /** A file's bytes. */
     readonly bytes: (path: string) => Effect.Effect<Uint8Array, RepoError>
     /** Writes a file's text, making its folder first. */
-    readonly write: (path: string, text: string) => Effect.Effect<void, RepoError>
+    readonly write: {
+      (text: string): (self: string) => Effect.Effect<void, RepoError>
+      (self: string, text: string): Effect.Effect<void, RepoError>
+    }
     /** Writes a file's bytes, making its folder first. */
-    readonly writeBytes: (path: string, data: Uint8Array) => Effect.Effect<void, RepoError>
+    readonly writeBytes: {
+      (data: Uint8Array): (self: string) => Effect.Effect<void, RepoError>
+      (self: string, data: Uint8Array): Effect.Effect<void, RepoError>
+    }
     /** Removes a file or a whole folder; one that is not there is not an error. */
     readonly remove: (path: string) => Effect.Effect<void, RepoError>
     /** A path with its `.` and `..` segments resolved, still relative if it was. */
@@ -122,11 +130,10 @@ export class Repo extends Context.Service<
     /** The SHA-256 of some bytes, in hexadecimal. */
     readonly sha256: (data: Uint8Array) => Effect.Effect<string>
     /** Runs a tool and waits for it. A tool that cannot be started is a `RepoError`; a non-zero exit is an answer. */
-    readonly run: (
-      command: string,
-      args: ReadonlyArray<string>,
-      options?: RunOptions
-    ) => Effect.Effect<ToolAnswer, RepoError>
+    readonly run: {
+      (args: ReadonlyArray<string>, options?: RunOptions): (self: string) => Effect.Effect<ToolAnswer, RepoError>
+      (self: string, args: ReadonlyArray<string>, options?: RunOptions): Effect.Effect<ToolAnswer, RepoError>
+    }
   }
 >()($I`Repo`) {
   /**
@@ -290,14 +297,14 @@ export class Repo extends Context.Service<
           root,
           cwd,
           join: (...segments) => path.join(...segments),
-          relative: (from, to) => path.relative(from, to),
+          relative: dual(2, (self: string, from: string) => path.relative(from, self)),
           dirname: (file) => path.dirname(file),
           resolve: (...segments) => path.resolve(cwd, ...segments),
           exists,
           text,
           bytes,
-          write,
-          writeBytes,
+          write: dual(2, (self: string, text: string) => write(self, text)),
+          writeBytes: dual(2, (self: string, data: Uint8Array) => writeBytes(self, data)),
           remove,
           normalize: (file) => path.normalize(file),
           json,
@@ -306,7 +313,10 @@ export class Repo extends Context.Service<
           files,
           workspaces,
           sha256: Effect.fn("Repo.sha256")((data: Uint8Array) => digest.digestHex(Digest.sha256, data)),
-          run
+          run: dual(
+            (args) => P.isString(args[0]),
+            (self: string, args: ReadonlyArray<string>, options?: RunOptions) => run(self, args, options)
+          )
         }
       })
     )

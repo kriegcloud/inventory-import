@@ -27,12 +27,12 @@ const rows: ReadonlyArray<StagedRow> = [
 describe("a chunk of rows crossing from the reader to the page", () => {
   it.effect("decodes to the same rows after the copy, when it crosses in the wire's form", () =>
     Effect.gen(function* () {
-      const encoded = S.encodeOption(Chunk)(rows)
+      const wire = yield* S.encodeEffect(Chunk)(rows)
+      const encoded = O.some(wire)
       assertSome(
         O.map(encoded, (wire) => wire.length),
         2
       )
-      const wire = O.getOrThrow(encoded)
       const crossed = yield* S.decodeEffect(Chunk)(structuredClone(wire))
       deepStrictEqual(crossed, rows)
     })

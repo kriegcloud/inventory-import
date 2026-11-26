@@ -227,7 +227,7 @@ export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(functio
       answer.stderr
     )
     const named = A.map(A.fromIterable(Str.matchAll(/Unmatched file: ([^\r\n]+)/g)(answer.stderr)), (found) =>
-      repo.relative(repo.root, Str.trim(`${found[1]}`))
+      repo.relative(Str.trim(`${found[1]}`), repo.root)
     )
     if (O.isNone(summary) || summary.value[1] !== `${A.length(named)}`) {
       return yield* RepoError.make({

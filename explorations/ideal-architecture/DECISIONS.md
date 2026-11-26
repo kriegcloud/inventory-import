@@ -1953,3 +1953,137 @@ Answer: I chose each; the agent recommended the same each time.
   and `recheckRow`'s empty field. None touches a row of the messy sample. Rejected: putting each one to me now.
 
 Reverse: taking a file off `exemptions` counts its places again, and they move onto a schema in the same commit.
+
+### 2026-11-25 — the defaults sweep's lanes: what a literal `onNone` is, the cell's two keys, and `getOrThrow`
+
+Question: the first Codex lanes (the access packages, the kernel and drivers, the catalog under the law's new kinds)
+came back with the law at zero and the question still in the code: twelve `Result.getOrThrow(S.decodeResult(...))`
+in the access packages (one a decode per character in the password compare), predicates turned into double
+negations and sentences into schemas with a default, to get past `onNone: () => true` and `onNone: () => "the file"`.
+And two plain optional keys, `Cell.shown` and `Cell.formula`, that the pilot left because the table crosses the
+reader's worker.
+Answer: I chose each; the agent recommended the same each time.
+
+- A literal `onNone` is counted only where it stands in for data: a number, `""`, `[]`, `{}`, `null`, `undefined`.
+  `true`, `false` and text that is not empty are a case said in words, and are left alone. Rejected: every literal
+  counted (6 places in the catalog lane were rewritten to dodge it; 1 was left, `SheetLayout.rules.ts`, no sheet name
+  reads "the file"); every literal counted and files exempted one by one.
+- `Reading/Spreadsheet.rules.ts` goes on `exemptions` for absence: `Cell.shown` and `Cell.formula` stay keys left out
+  (2 places, `{ type: "number", text: "123", shown: "00123" }`), because the table crosses the worker by
+  `postMessage`, where an Option loses its prototype; `shownOf` and `formulaOf` read them as Options. Rejected:
+  crossing the worker encoded, as upload chunks do; leaving them in the baseline.
+- The law counts `Result.getOrThrow` and `Effect.runSync` in src folders, as a fallback. Rejected: leaving it to
+  review. The count the question gave was wrong: no file of ours holds a `Result.getOrThrow`; the one in
+  `packages/client/src/Http.runtime.ts` is `O.getOrThrow`, which the agent added to what is counted as the same
+  escape, and `Effect.runSync` is in six files (8 places).
+- Housekeeping: the seven merged `defaults` branches, local and on origin, and the worktrees `defaults-check` and
+  `defaults-law` are removed. The `wf_*` worktrees stay: 26 of 27 hold uncommitted files and 4 hold commits not on
+  main. The main checkout is on `main` again, and the sweep works only in worktrees.
+
+Reverse: widening the literal list or taking the file off `exemptions` counts those places again, and they are
+cleared in the same commit.
+
+### 2026-11-26 — the defaults sweep's first edges: the byte readers, Better Auth's API and the browser's
+
+Question: row 8 cleared 74 of 197 places in our csv and xlsx packages and stopped at the readers of bytes and markup:
+92 places in 11 files under `csv/src/internal` and `xlsx/src/internal` (`bytes[i] ?? 0` in the UTF-8 scan of
+`csv/src/internal/encoding.ts`). And three files hold places that are another library's API or the browser's.
+Answer: I chose each; the agent recommended the same each time.
+
+- The 11 reader files go on `exemptions` for the kinds each holds, with one reason: an Option for each byte, capture
+  or position would cost the loop that reads every cell. Rejected: a rewrite with a benchmark (the pilot took a
+  review from 1.2 s to 70 s with one fold); leaving them in the baseline. The other 31 places of those packages (the
+  codec and schema files, two test supports) go back to a lane.
+- `access/host/src/internal/authOptions.ts` (2, absence: Better Auth's session hook passes a null context and wants
+  `undefined` back), `access/web/src/internal/authClient.ts` (2, a fallback and an absence: its answer's error is
+  null or holds a message that may be left out) and `access/web/src/Session.atoms.ts` (2, absence:
+  `typeof window === "undefined"`) go on `exemptions`. Rejected: only the Better Auth two; ruling on every edge at
+  the end.
+- A second dev server runs on port 5174 from the sweep's worktree, with its own local database, while the browser
+  lanes merge; the messy sample is imported on it after each one.
+
+Reverse: taking a file off `exemptions` counts its places again, and they are cleared in the same commit.
+
+### 2026-11-26 — the defaults sweep's last edges: the browser's nulls, the reviewed cell's trims, a component's own props
+
+Question: after the lanes for review, catalog/web, client and ui, three kinds of place are left that no schema can
+take. About 50 read a null the browser hands back (Storage, `URLSearchParams`, Web Locks, DOM queries) in some 20
+files (`text === null` after `localStorage.getItem` in `catalog/web/src/internal/storedWaiting.ts`). 15 trims in five
+catalog/web files clean a cell of the file under review for display or a repair box (`row.file.name.trim()` in
+`internal/WhyFlagged.tsx`). About 49 compare a component's own optional prop with `undefined` to choose markup
+(`props.line === undefined` in `ui/src/PageHeader.component.tsx`).
+Answer: I chose each; the agent recommended the same each time.
+
+- The browser's nulls move into one small edge module a package, which reads the browser and returns Options; only
+  those modules go on `exemptions`, for absence. A screen then holds none. Rejected: exempting each file as it is;
+  leaving them in the baseline.
+- `catalog/web/src/internal/CellForms.tsx` (5), `itemText.ts` (6), `WhyFlagged.tsx` (2), `cellDrafts.ts` (1) and
+  `format.tsx` (1) go on `exemptions` for clean-ups only: each reads a reviewed cell, the case the rule of 2026-11-23
+  keeps a reader for. Rejected: leaving them in the baseline.
+- A component's check of its own optional prop stays counted in the baseline: the law cannot tell a prop from data
+  without reading types, a counted place costs nothing, and a new one is still refused. Rejected: exempting the
+  component files (their data checks would go uncounted too); teaching the law props.
+
+Also, without a question: the law counts `.valueOrUndefined` as an unwrap, beside `O.getOrUndefined` and
+`O.getOrNull`. A lane had cleared 69 test places by reading an Option's `valueOrUndefined` and asserting it defined,
+which is the same unwrap under another name; the agent added it under "the law counts getOrThrow" (2026-11-25) and
+the lane was redone.
+
+Reverse: taking a file off `exemptions` counts its places again, and they are cleared in the same commit.
+
+### 2026-11-26 — the review region's sparse cells: made total where rows enter
+
+Question: about 100 places in the review region read a row's cell that may be missing, or start a counter
+(`view.cells[column.id] ?? ""` in `review/src/internal/ReviewGrid.tsx`). A lane rewrote them with an Option a lookup
+and measured it: drawing the grid for the 200-row sample went from 32.1 ms to 34.1 ms, the queue's context from
+0.035 ms to 0.060 ms; told to revert anything measurably slower, it did.
+Answer: I chose; the agent recommended the same. A row's cells are made a complete record for the region's columns
+once, where rows enter the region, so a lookup cannot miss and no Option is made a cell. The lane shows the grid no
+slower than today, or the places stay. Rejected: accepting the 6%; leaving the places counted.
+
+Reverse: a row's cells go back to a sparse record and each lookup says its missing case.
+
+### 2026-11-26 — a service method is dual on the record it acts on
+
+Question: 24 methods of a `Context.Service` take two or more arguments (12 in `ImportStore`, for example
+`history(organizationId, importId)`), none is dual, and the dual law reads only a parameter named `cause`, `error`,
+`self` or `input`. Which argument is the one a method is dual on?
+Answer: I chose; the agent recommended the same. The record acted on comes first and is `self`; the organization is
+the setting: `history(importId, organizationId)` and `pipe(importId, store.history(organizationId))`. The nine methods
+that start with `organizationId` swap their arguments. A check requires every method of a `Context.Service` with two
+or more arguments to be dual. Rejected: one request value a method; the organization first.
+
+Reverse: the methods go back to plain argument lists and the check to the four names.
+
+### 2026-11-26 — a type assertion we need is written in one named helper
+
+Question: 96 files are listed as allowed to write `x as T`, with no reason (348 assertions: the kit 133, the
+registry's components 106, catalog/web 72, review 21, the rest 16). How is one we truly need marked?
+Answer: I chose; the agent recommended the same. One function is the only place `as` is written in our own code:
+`unsafeAssert<T>(value, "reason")`. Each use states its reason where it stands, a ledger lists each call with its
+reason, and a new one fails the check until I approve the line. `x!` is refused outright (the same day). Rejected: a
+list of files with reasons; zero with no exception.
+
+Reverse: the list of files comes back.
+
+### 2026-11-26 — the bans leave the registry's components as published
+
+Question: do the readonly, assertion and Promise bans reach `packages/ui/src/components` and `hooks` (readonly 1,265
+of 2,127 places, assertions 106, Promises 71)?
+Answer: I chose; the agent recommended the same. They stay as published, in lists of their own, so an update from the
+registry applies cleanly. Our own code goes to zero. Rejected: migrating them too.
+
+Reverse: the components are held to the bans and each update from a registry is edited again.
+
+### 2026-11-26 — the first five `unsafeAssert` calls are approved
+
+Question: with the 124 type assertions gone from our own code, five claims are left that a library's types cannot
+express, each written through `unsafeAssert` with its reason
+(`packages/tooling/tool/cli/ledgers/unsafe-asserts.json`). Are they approved?
+Answer: I approved all five; the agent proposed them. `apps/inventory/vite.config.ts` (the compression middleware's
+types ask for Express's request where Vite's Connect supplies what it uses); `packages/catalog/web/test/support/catalog.ts`
+(test stand-ins implement only the decoded response mode of the generated client's endpoints);
+`packages/review/test/ReviewRegion.atoms.test.ts` (a partial DOM fixture for the virtualizer's frame); and two in
+`packages/ui/src/ListTable.component.tsx` (a scoped atom and React context erase the table's row generic).
+
+Reverse: a call is taken out and its ledger line with it; the ledger only shrinks without a new approval.

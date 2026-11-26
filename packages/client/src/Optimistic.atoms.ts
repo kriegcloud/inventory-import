@@ -18,6 +18,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
@@ -103,7 +104,7 @@ export interface OptimisticWrite<Input, A, E, R> {
     input: Input,
     registry: AtomRegistry.AtomRegistry
   ) => { readonly label: string; readonly onClick: () => void } | undefined
-  readonly settled?: Reactivity.KeysInput
+  readonly settled: O.Option<Reactivity.KeysInput>
   readonly onAnswer?: (answer: A, input: Input, registry: AtomRegistry.AtomRegistry) => void
   readonly onRefused?: (error: E, input: Input, registry: AtomRegistry.AtomRegistry) => boolean
   /**
@@ -174,10 +175,7 @@ export const optimisticWrite = <Input, A, E, R>(
         for (const change of spec.changes) change.takeOff(registry, [press])
         if (Exit.isFailure(exit)) {
           // Still said: the change was theirs, and it was not saved.
-          toastError(
-            O.getOrElse(Cause.findErrorOption(exit.cause), () => Cause.squash(exit.cause)),
-            { lead: spec.failed(input) }
-          )
+          toastError(Cause.squash(exit.cause), { lead: O.some(spec.failed(input)) })
         }
       } else if (Exit.isSuccess(exit)) {
         registry.update(saved, A.append({ press, member: pressedAs }))
@@ -189,13 +187,10 @@ export const optimisticWrite = <Input, A, E, R>(
         const error = Cause.findErrorOption(exit.cause)
         if (!(O.isSome(error) && spec.onRefused?.(error.value, input, registry) === true)) {
           const retry = spec.retry?.(input, registry)
-          toastError(
-            O.getOrElse(error, () => Cause.squash(exit.cause)),
-            {
-              lead: spec.failed(input),
-              ...(retry === undefined ? {} : { action: retry })
-            }
-          )
+          toastError(Cause.squash(exit.cause), {
+            lead: O.some(spec.failed(input)),
+            ...R.getSomes({ action: O.fromUndefinedOr(retry) })
+          })
         }
       }
       if (registry.get(inFlight) === 0) {
@@ -219,7 +214,7 @@ export const optimisticWrite = <Input, A, E, R>(
             A.map(done, (one) => one.press)
           )
         }
-        if (spec.settled !== undefined && (mine.length > 0 || !left)) invalidate(spec.settled)
+        if (mine.length > 0 || !left) O.map(spec.settled, invalidate)
       }
       return yield* exit
     }, Effect.uninterruptible),

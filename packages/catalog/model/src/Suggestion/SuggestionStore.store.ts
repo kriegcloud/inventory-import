@@ -25,7 +25,10 @@ export class SuggestionStore extends Context.Service<
   SuggestionStore,
   {
     /** Every suggestion stored for the import, oldest first: what the review is given, on the server and the screen. */
-    readonly list: (organizationId: OrganizationId, importId: ImportId) => Effect.Effect<ReadonlyArray<Suggestion>>
+    readonly list: {
+      (organizationId: OrganizationId): (self: ImportId) => Effect.Effect<ReadonlyArray<Suggestion>>
+      (self: ImportId, organizationId: OrganizationId): Effect.Effect<ReadonlyArray<Suggestion>>
+    }
     /**
      * Stores the suggestions and the audit line in one batch, only while the import is open. A row and field that
      * already has a suggestion keeps it, so a second request stores nothing twice. Answers the ones this write stored.

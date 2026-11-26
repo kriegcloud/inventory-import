@@ -123,9 +123,12 @@ const followingMember = <A>(
       (get): Owned<A> => {
         const of = get(memberKey)
         // Built again for the same member (the session was asked again, and answered the same): what it holds stays.
-        return O.getOrElse(
+        return O.match(
           O.filter(get.self<Owned<A>>(), (before) => before.of === of),
-          () => ({ of, value: initial() })
+          {
+            onSome: (before) => before,
+            onNone: () => ({ of, value: initial() })
+          }
         )
       },
       // Read first: one that is written before anything read it would not follow the member, and outlive them.

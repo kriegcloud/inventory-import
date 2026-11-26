@@ -132,12 +132,12 @@ export const screens = Effect.fn("Screens.screens")(function* () {
     : A.empty<ScreensFinding>()
   const perPackage = A.flatMap(withScreens, (workspace) => {
     const name = String(workspace.manifest.name)
-    const where = repo.relative(repo.root, workspace.dir)
+    const where = repo.relative(workspace.dir, repo.root)
     const src = repo.join(workspace.dir, "src")
     const noSource = A.contains(sources, src)
       ? A.empty<ScreensFinding>()
       : A.of<ScreensFinding>(
-          ScreensFinding.cases.NoSource.make({ name, where, add: repo.relative(repo.dirname(css), src) })
+          ScreensFinding.cases.NoSource.make({ name, where, add: repo.relative(src, repo.dirname(css)) })
         )
     const notListed = O.contains(R.get(listed, name), workspace.dir)
       ? A.empty<ScreensFinding>()
@@ -154,7 +154,7 @@ export const screens = Effect.fn("Screens.screens")(function* () {
             present
               ? A.empty<ScreensFinding>()
               : A.of<ScreensFinding>(
-                  ScreensFinding.cases.NoPackage.make({ name, where: repo.relative(repo.root, dir) })
+                  ScreensFinding.cases.NoPackage.make({ name, where: repo.relative(dir, repo.root) })
                 )
           )
         ),
@@ -169,7 +169,7 @@ export const screens = Effect.fn("Screens.screens")(function* () {
           Effect.map((present) =>
             present
               ? A.empty<ScreensFinding>()
-              : A.of<ScreensFinding>(ScreensFinding.cases.NoFolder.make({ where: repo.relative(repo.root, dir) }))
+              : A.of<ScreensFinding>(ScreensFinding.cases.NoFolder.make({ where: repo.relative(dir, repo.root) }))
           )
         ),
     { concurrency: 1 }

@@ -23,12 +23,15 @@
 //    sent as its older parts first, so the server judges them on their own revision, and whole once that is answered.
 import * as A from "effect/Array"
 import * as Data from "effect/Data"
-import { dual } from "effect/Function"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
+import { dual, identity } from "effect/Function"
 import * as Eq from "effect/Equal"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import {
   type DecisionDelta,
+  RowDecision as DecisionValue,
   decisionFromFlags,
   hasKeep,
   isLeftOut,
@@ -37,6 +40,7 @@ import {
   type SavedDecisions,
   StoredChoice,
   storedUndecided,
+  StaleAccept,
   type TakenBackKind
 } from "@inventory/catalog-contract/Decision"
 
@@ -59,11 +63,7 @@ export interface Picture {
  * A decision the server did not apply: a column it rests on was matched again after it was made. `kind` says which
  * part of the row's decision it was (an accept when not said); `field` the field whose column was matched again.
  */
-export interface StaleAccept {
-  readonly rowId: string
-  readonly field: string
-  readonly kind?: TakenBackKind
-}
+export type { StaleAccept } from "@inventory/catalog-contract/Decision"
 
 /** A row of a save the server did not write: it waited, and what the server holds of it now is none of its `over`. */
 export interface DecidedSince {
@@ -75,29 +75,28 @@ export interface DecidedSince {
 export type MadeOn = Readonly<Record<string, number>>
 
 /** One decision of one row, the person's, that the server is not known to have. */
-export interface Side {
-  readonly decision: O.Option<RowDecision>
-  /** The revision of the picture it was first decided on. */
-  readonly madeOn: number
-  /** The parts of it decided on another revision than that (`partsOf`), each with its own. */
-  readonly dates: Readonly<Record<string, number>>
-  /**
-   * What the server may hold of the row that this decision stands over: first what the server was known to hold when
-   * the person began deciding it, then each decision sent from its tab whose fate is not known.
-   */
-  readonly seen: ReadonlyArray<O.Option<RowDecision>>
-  /** Pressed on the picture shown, and nothing says anybody saved since: it goes without `over`. */
-  readonly live: boolean
-  /** Decided in this tab; false for one a closed tab of the person's made. */
-  readonly here: boolean
-  /** Somebody else, or another tab, decided the row since: it is the person's to pick, never sent by itself. */
-  readonly overtaken: boolean
-  /**
-   * The server's sentence, where it refused this decision: it is then never sent by a pick. A closed tab's refused one
-   * that is `overtaken` was decided again in this tab: it goes once that decision is saved.
-   */
-  readonly refused: O.Option<string>
-}
+export const Side = S.Struct({
+  decision: S.Option(DecisionValue).annotateKey({ description: "The person's decision, or its take-back" }),
+  madeOn: S.Int.annotateKey({ description: "The draft revision this decision was made on" }),
+  dates: S.Record(S.String, S.Int).pipe(
+    S.annotateKey({ description: "Parts made on other revisions" }),
+    S.withConstructorDefault(Effect.succeed({}))
+  ),
+  seen: DecisionValue.pipe(
+    S.Option,
+    S.Array,
+    S.annotateKey({ description: "What the server may hold; older unknown sides allow no decision" }),
+    S.withConstructorDefault(Effect.succeed([O.none()]))
+  ),
+  live: S.Boolean.pipe(
+    S.annotateKey({ description: "Pressed on the picture now shown, without waiting" }),
+    S.withConstructorDefault(Effect.succeed(false))
+  ),
+  here: S.Boolean.annotateKey({ description: "Decided in this tab" }),
+  overtaken: S.Boolean.annotateKey({ description: "Somebody decided the row since" }),
+  refused: S.Option(S.String).annotateKey({ description: "The server's refusal sentence" })
+}).annotate({ description: "One decision of the person's that the server is not known to hold" })
+export type Side = typeof Side.Type
 
 /** The person's decisions, one a row. */
 export type Sides = Readonly<Record<string, Side>>
@@ -116,8 +115,8 @@ export type Lines = Readonly<Record<string, Line>>
 
 /** Which answer of a row's line the person picked: what the server holds, or one of the sides, named by its decision. */
 export type Keep = Data.TaggedEnum<{
-  Theirs: {}
-  Side: { readonly decision: O.Option<RowDecision> }
+  readonly Theirs: {}
+  readonly Side: { readonly decision: O.Option<RowDecision> }
 }>
 export const Keep = Data.taggedEnum<Keep>()
 
@@ -131,11 +130,20 @@ export interface LinePick {
  * Decisions of the person's to be named, row by row: one of each row, beside it whatever else of the same row was alive
  * (a closed tab's beside this tab's), each once; and, for a row decided since, what the import holds of it.
  */
-export interface Named {
-  readonly rows: RowChanges
-  readonly beside: Several
-  readonly theirs: RowChanges
-}
+export const Named = S.Struct({
+  rows: S.Record(S.String, DecisionValue.pipe(S.Option)).annotateKey({
+    description: "The person's decision of every named row"
+  }),
+  beside: S.Record(S.String, DecisionValue.pipe(S.Option, S.Array)).pipe(
+    S.annotateKey({ description: "Other decisions of the same rows; none before other sides were kept" }),
+    S.withConstructorDefault(Effect.succeed({}))
+  ),
+  theirs: S.Record(S.String, DecisionValue.pipe(S.Option)).pipe(
+    S.annotateKey({ description: "Decisions held by the import; none before that comparison was kept" }),
+    S.withConstructorDefault(Effect.succeed({}))
+  )
+}).annotate({ description: "The person's decisions to name, with other sides and the decisions held by the import" })
+export type Named = typeof Named.Type
 
 /**
  * The person's decisions the server has not taken, as this browser keeps them between visits: after a reload they come
@@ -172,11 +180,21 @@ export interface Stray {
  * read (`read` false: the button waits for it) or has been read, with how many rows it decides otherwise (`apart`; a
  * match changes no row) and the accepts the server took back because their column was matched again.
  */
-export interface HeldBack {
-  readonly read: boolean
-  readonly apart: number
-  readonly accepts: ReadonlyArray<StaleAccept>
-}
+export const HeldBack = S.Struct({
+  read: S.Boolean.pipe(
+    S.annotateKey({ description: "The newer picture has been read" }),
+    S.withConstructorDefault(Effect.succeed(false))
+  ),
+  apart: S.Int.pipe(
+    S.annotateKey({ description: "Rows decided otherwise since the press" }),
+    S.withConstructorDefault(Effect.succeed(0))
+  ),
+  accepts: S.Array(StaleAccept).pipe(
+    S.annotateKey({ description: "Decisions refused because columns moved" }),
+    S.withConstructorDefault(Effect.succeed([]))
+  )
+}).annotate({ description: "A confirm held until its newer picture has been read" })
+export type HeldBack = typeof HeldBack.Type
 
 /**
  * One import's draft on this screen. What the screen shows is `held`, with the person's own changes over it in the
@@ -326,22 +344,22 @@ export type DraftEvent = Data.TaggedEnum<{
    * A step of the import that follows its draft is drawn, the first time or again. `kept`: what this browser kept from
    * before a reload, read when the step is drawn.
    */
-  Opened: { readonly kept: O.Option<Waiting> }
+  readonly Opened: { readonly kept: O.Option<Waiting> }
   /** The Review step left the screen. */
-  Left: {}
+  readonly Left: {}
   /**
    * What a tab of the person's that is gone (closed or crashed) kept for this import, taken up by this tab; or, with
    * `here`, what this tab itself kept, read after its step had opened.
    */
-  TakenUp: { readonly kept: Waiting; readonly here?: boolean }
+  readonly TakenUp: { readonly kept: Waiting; readonly here: boolean }
   /** The person changed these rows. */
-  Decided: { readonly changes: RowChanges }
+  readonly Decided: { readonly changes: RowChanges }
   /**
    * The server answered the save of this id: the draft is at `revision`, and `changed` says whether this save is
    * what moved it there. When it changed nothing (the server already held every row as sent), `revision` is not the
    * person's own next one: it is wherever the draft had got to, with whatever others decided on the way.
    */
-  SaveAnswered: {
+  readonly SaveAnswered: {
     readonly id: number
     readonly revision: number
     readonly changed: boolean
@@ -351,60 +369,60 @@ export type DraftEvent = Data.TaggedEnum<{
     readonly decidedSince: ReadonlyArray<DecidedSince>
   }
   /** The save did not get through (the network, a server error): the rows are not lost, and wait. */
-  SaveFailed: { readonly id: number }
+  readonly SaveFailed: { readonly id: number }
   /**
    * The save was not taken because nobody is signed in: not a refusal. The rows wait, kept in this browser, and are
    * sent after the person signs in again.
    */
-  SaveSignedOut: { readonly id: number }
+  readonly SaveSignedOut: { readonly id: number }
   /** The person pressed "Save again". */
-  SaveAgain: {}
+  readonly SaveAgain: {}
   /**
    * The server refused the rows (the import was confirmed or removed meanwhile, the role was taken away), with its
    * sentence for the person.
    */
-  SaveRefused: { readonly id: number; readonly reason: string }
+  readonly SaveRefused: { readonly id: number; readonly reason: string }
   /** The person settled lines: which answer of each row stands. A refused decision is never sent by it. */
-  Settled: { readonly picks: ReadonlyArray<LinePick> }
+  readonly Settled: { readonly picks: ReadonlyArray<LinePick> }
   /**
    * A picture of the import arrived: a read, a match's answer, a card's Continue. `open`: whether the import can
    * still be decided; a picture of one that cannot ends the draft.
    */
-  ViewArrived: Picture & {
+  readonly ViewArrived: Picture & {
     readonly open: boolean
     /** How many times the import has been confirmed, taken back ones included: the view's history counts them. */
     readonly confirms: number
     /** True for the view the tab holds, given while it is asked anew: it is not that request's answer. */
-    readonly waiting?: boolean
+    readonly waiting: boolean
     /** The revisions fields' columns were matched on, as the view's choices say. */
-    readonly matches?: ReadonlyArray<number>
+    readonly matches: ReadonlyArray<number>
     /**
      * What each match took back (`ImportView.takenBack`): the revision it wrote and the rows it names. A change to
      * one of those rows that lands with that revision is named as taken back, not as a change on another screen; any
      * other change in the same jump still is.
      */
-    readonly takenBack?: ReadonlyArray<TakenBackAt>
+    readonly takenBack: ReadonlyArray<TakenBackAt>
   }
-  MatchStarted: {}
-  MatchEnded: {}
+  readonly MatchStarted: {}
+  readonly MatchEnded: {}
   /** The person pressed the confirm button. */
-  ConfirmPressed: {}
+  readonly ConfirmPressed: {}
   /**
    * The server made the confirm, and answered with the import as it now is: closed, with these decisions. Rows the
    * person decided while it was out were not part of it.
    */
-  ConfirmDone: Picture & { readonly id: number }
+  readonly ConfirmDone: Picture & { readonly id: number }
   /** The server refused the confirm and wrote nothing: the draft is at another revision than the one it named. */
-  ConfirmMoved: { readonly id: number }
+  readonly ConfirmMoved: { readonly id: number }
   /**
    * The confirm did not get through, or was refused for another reason (the import is closed): what was written is
    * not known until the import is read again.
    */
-  ConfirmFailed: { readonly id: number }
+  readonly ConfirmFailed: { readonly id: number }
   /** The server refused the confirm and wrote nothing: it carried accepts made before their column was matched again. */
-  ConfirmStale: { readonly id: number; readonly accepts: ReadonlyArray<StaleAccept> }
+  readonly ConfirmStale: { readonly id: number; readonly accepts: ReadonlyArray<StaleAccept> }
   /** The result screen has shown the rows that were left over. */
-  LeftOverNamed: {}
+  readonly LeftOverNamed: {}
 }>
 export const DraftEvent = Data.taggedEnum<DraftEvent>()
 
@@ -417,26 +435,26 @@ export interface TakenBackAt {
 /** What the person is told, in the machine's own terms: said only when the thing it is about was really out. */
 export type Said = Data.TaggedEnum<{
   /** A save did not get through: the rows are on the screen, not saved yet, and wait to be sent again. */
-  NotSaved: {}
+  readonly NotSaved: {}
   /** A save was not taken because nobody is signed in: the rows wait, and are sent after sign-in. */
-  SignedOut: {}
+  readonly SignedOut: {}
   /** The server refused a save: the rows it carried are on lines above the review, with `reason`. */
-  Refused: { readonly reason: string }
+  readonly Refused: { readonly reason: string }
   /** Decisions were not applied (a column they rest on was matched again): each row shows what it now reads. */
-  AcceptsTakenBack: { readonly accepts: ReadonlyArray<StaleAccept> }
+  readonly AcceptsTakenBack: { readonly accepts: ReadonlyArray<StaleAccept> }
   /** Rows sent while the review is not on screen were decided otherwise since: they are on lines there. */
-  DecidedSince: { readonly rows: ReadonlyArray<string> }
+  readonly DecidedSince: { readonly rows: ReadonlyArray<string> }
   /**
    * Rows sent while the review is not on screen were not written, and what the server holds of each is, as far as this
    * tab can tell, an earlier decision of the person's or what a match left of one: they are on lines there, which say
    * what is saved and not who saved it.
    */
-  SavedOtherwise: { readonly rows: ReadonlyArray<string> }
+  readonly SavedOtherwise: { readonly rows: ReadonlyArray<string> }
   /**
    * The person's decisions outlived a confirm of the import (it was confirmed, and opened again, before they were
    * sent): they were not part of it and are not sent into it.
    */
-  Outlived: Named
+  readonly Outlived: Named
 }>
 export const Said = Data.taggedEnum<Said>()
 
@@ -447,21 +465,21 @@ export type DraftEffect = Data.TaggedEnum<{
    * what `over` names only; say how it went with `SaveAnswered`, `SaveFailed`, `SaveSignedOut` or `SaveRefused`, and
    * this id.
    */
-  Send: { readonly id: number; readonly delta: DecisionDelta; readonly madeOn: MadeOn; readonly over: Several }
+  readonly Send: { readonly id: number; readonly delta: DecisionDelta; readonly madeOn: MadeOn; readonly over: Several }
   /** Tell the person. */
-  Say: { readonly what: Said }
+  readonly Say: { readonly what: Said }
   /** Ask the server for the import again. */
-  Ask: {}
+  readonly Ask: {}
   /** The person's own save moved the draft on by one: put that into the view held, with no request. */
-  Put: Picture
+  readonly Put: Picture
   /** The decisions under the region changed: draw it again from what is shown now. `announce`: say it was elsewhere. */
-  Restart: { readonly announce: boolean }
+  readonly Restart: { readonly announce: boolean }
   /**
    * Confirm the import as the screen shows it: the picture of `revision`, with the person's rows the server has not
    * been sent. Sent once; say how it went with `ConfirmDone`, `ConfirmMoved`, `ConfirmStale` or `ConfirmFailed`, and
    * this id.
    */
-  Confirm: {
+  readonly Confirm: {
     readonly id: number
     readonly revision: number
     readonly madeOn: MadeOn
@@ -542,7 +560,7 @@ export const changesBetween = (pair: {
 export const typedSkus = (decisions: SavedDecisions): string =>
   A.join(
     A.flatMap(R.toEntries(decisions), ([rowId, decision]) =>
-      decision.edits?.sku === undefined ? [] : [`${rowId}=${decision.edits.sku}`]
+      O.match(R.get(decision.edits, "sku"), { onNone: A.empty, onSome: (sku) => [`${rowId}=${sku}`] })
     ),
     "|"
   )
@@ -559,8 +577,8 @@ export const sameDecision: {
   (other: O.Option<RowDecision>): (one: O.Option<RowDecision>) => boolean
   (one: O.Option<RowDecision>, other: O.Option<RowDecision>): boolean
 } = dual(2, (one: O.Option<RowDecision>, other: O.Option<RowDecision>): boolean => {
-  const said = (decision: O.Option<RowDecision>): RowDecision => O.getOrElse(decision, () => nothingDecided)
-  return Eq.equals(said(one), said(other))
+  const meaningful = (decision: O.Option<RowDecision>) => O.filter(decision, (said) => !Eq.equals(said, nothingDecided))
+  return Eq.equals(meaningful(one), meaningful(other))
 })
 
 /** True when two screens show the same decision on every row: one with nothing in it reads as none. */
@@ -610,24 +628,22 @@ const withParts = (change: O.Option<RowDecision>, stays: (part: string) => boole
 const partsNamed = (taken: ReadonlyArray<StaleAccept>): ((rowId: string) => (part: string) => boolean) => {
   const byRow = A.groupBy(taken, (one) => one.rowId)
   return (rowId) => {
-    const named = A.flatMap(
-      O.getOrElse(R.get(byRow, rowId), (): ReadonlyArray<StaleAccept> => []),
-      ({ field, kind }) => {
-        const parts: Record<TakenBackKind, ReadonlyArray<string>> = {
-          accept: [`accept:${field}`],
-          undo: [`undo:${field}`],
-          stored: ["stored:keep", "stored:replace"],
-          twin: ["twin"]
-        }
-        return parts[kind ?? "accept"]
+    const named = A.flatMap(O.match(R.get(byRow, rowId), { onNone: A.empty, onSome: identity }), ({ field, kind }) => {
+      const parts: Record<TakenBackKind, ReadonlyArray<string>> = {
+        accept: [`accept:${field}`],
+        undo: [`undo:${field}`],
+        stored: ["stored:keep", "stored:replace"],
+        twin: ["twin"]
       }
-    )
+      return parts[kind]
+    })
     return (part) => A.contains(named, part)
   }
 }
 
 /** The revision one part of a decision was made on. */
-const dateOf = (side: Side, part: string): number => O.getOrElse(R.get(side.dates, part), () => side.madeOn)
+const dateOf = (side: Side, part: string): number =>
+  O.match(R.get(side.dates, part), { onNone: () => side.madeOn, onSome: identity })
 
 /** The revision of each part of a decision. */
 const datesIn = (side: Side): ReadonlyArray<number> => A.map(partsOf(side.decision), (part) => dateOf(side, part))
@@ -692,14 +708,16 @@ const known = (draft: Draft): SavedDecisions => over(heldDecisions(draft), lande
 
 /** What the server is known to hold of one row. */
 const knownOf = (draft: Draft, rowId: string): O.Option<RowDecision> =>
-  O.getOrElse(R.get(landedRows(draft), rowId), () => R.get(heldDecisions(draft), rowId))
+  O.match(R.get(landedRows(draft), rowId), { onNone: () => R.get(heldDecisions(draft), rowId), onSome: identity })
 
 /** The revision what is known of a row was said at: by an answer since the picture held, or by that picture. */
 const rowSaidAt = (draft: Draft, rowId: string): number =>
   O.match(draft.landed, {
     onNone: () => heldAt(draft),
     onSome: (landed) =>
-      R.has(landed.rows, rowId) ? O.getOrElse(R.get(landed.said, rowId), () => landed.at) : heldAt(draft)
+      R.has(landed.rows, rowId)
+        ? O.match(R.get(landed.said, rowId), { onNone: () => landed.at, onSome: identity })
+        : heldAt(draft)
   })
 
 /** True when what is known of a row is no older than the picture the decision was made on. */
@@ -854,10 +872,7 @@ export const linesShown = (draft: Draft): Readonly<Record<string, LineShown>> =>
         rowSaidAt(draft, rowId) <= heldAt(draft) &&
         A.isReadonlyArrayNonEmpty(own) &&
         !A.some(own, (side) => ownEarlier(draft, rowId, side, theirs)) &&
-        !hasDecision(
-          O.getOrElse(R.get(draft.sentBefore, rowId), () => []),
-          theirs
-        )
+        !hasDecision(O.match(R.get(draft.sentBefore, rowId), { onNone: A.empty, onSome: identity }), theirs)
       )
     })
   }))
@@ -958,7 +973,10 @@ const linedRow = (draft: Draft, book: Book, rowId: string): void => {
       O.filter(waits, (side) => side.here),
       (side) => {
         book.sentBefore[rowId] = A.takeRight(
-          eachDecision([...O.getOrElse(R.get(book.sentBefore, rowId), () => []), ...side.seen]),
+          eachDecision([
+            ...O.match(R.get(book.sentBefore, rowId), { onNone: A.empty, onSome: identity }),
+            ...side.seen
+          ]),
           overBound
         )
         const others = sidesOf(book, rowId)
@@ -1004,7 +1022,7 @@ const linedRow = (draft: Draft, book: Book, rowId: string): void => {
   if (A.isReadonlyArrayNonEmpty(heldHere)) {
     book.sentBefore[rowId] = A.takeRight(
       eachDecision([
-        ...O.getOrElse(R.get(book.sentBefore, rowId), () => []),
+        ...O.match(R.get(book.sentBefore, rowId), { onNone: A.empty, onSome: identity }),
         ...A.flatMap(heldHere, (side) => side.seen)
       ]),
       overBound
@@ -1075,7 +1093,7 @@ const naming = (decisions: ReadonlyArray<OfRow>, theirs: RowChanges): Named => {
   const beside: Record<string, ReadonlyArray<O.Option<RowDecision>>> = {}
   for (const [rowId, decision] of decisions) {
     const first = R.get(rows, rowId)
-    const others = O.getOrElse(R.get(beside, rowId), (): ReadonlyArray<O.Option<RowDecision>> => [])
+    const others = O.match(R.get(beside, rowId), { onNone: A.empty, onSome: identity })
     if (O.isNone(first)) rows[rowId] = decision
     else if (!hasDecision([first.value, ...others], decision)) beside[rowId] = [...others, decision]
   }
@@ -1106,17 +1124,19 @@ export const eachOnce = (several: ReadonlyArray<Named>): Named =>
  * @example decisionsIn(kept).rows // { "row-12": some(left out) }
  */
 export const decisionsIn = (kept: Waiting): Named =>
-  O.getOrElse(kept.leftOver, () =>
-    naming(
-      [
-        ...R.toEntries(changesOf(kept.rows)),
-        ...A.flatMap(R.toEntries(kept.lines), ([rowId, line]) =>
-          A.map(line.sides, (side): OfRow => [rowId, side.decision])
-        )
-      ],
-      R.getSomes(R.map(kept.lines, (line) => line.theirs))
-    )
-  )
+  O.match(kept.leftOver, {
+    onSome: identity,
+    onNone: () =>
+      naming(
+        [
+          ...R.toEntries(changesOf(kept.rows)),
+          ...A.flatMap(R.toEntries(kept.lines), ([rowId, line]) =>
+            A.map(line.sides, (side): OfRow => [rowId, side.decision])
+          )
+        ],
+        R.getSomes(R.map(kept.lines, (line) => line.theirs))
+      )
+  })
 
 /** A naming as the import stands: the decisions it does not hold (what it holds was taken), and what it holds instead. */
 const againstImport = (named: Named, decisions: SavedDecisions): O.Option<Named> => {
@@ -1404,7 +1424,11 @@ const answering = (draft: Draft, sent: Sides, event: Answer): Stepped => {
   const answered = editing({ ...draft, flight: O.none() }, (book) => {
     for (const [rowId, side] of R.toEntries(sent)) {
       if (R.has(since, rowId)) {
-        const asks: Side = { ...O.getOrElse(latest(book, rowId), () => side), overtaken: true, live: false }
+        const asks: Side = {
+          ...O.match(latest(book, rowId), { onNone: () => side, onSome: identity }),
+          overtaken: true,
+          live: false
+        }
         const others = A.filter(sidesOf(book, rowId), (one) => !ownSide(one))
         delete book.unsent[rowId]
         putLine(book, rowId, withSides([asks], others))
@@ -1504,15 +1528,15 @@ const saidOf = (
  */
 const holdingBack = (
   draft: Draft,
-  why: { readonly until: number; readonly accepts?: ReadonlyArray<StaleAccept> }
+  why: { readonly until: number; readonly accepts: ReadonlyArray<StaleAccept> }
 ): Draft => {
-  const before = O.getOrElse(draft.heldBack, (): HeldBack => ({ read: false, apart: 0, accepts: [] }))
+  const before = O.match(draft.heldBack, { onNone: () => HeldBack.make({}), onSome: identity })
   return reached({
     ...draft,
     confirm: "idle",
     seenWhileWaiting: O.none(),
     heldUntil: O.isSome(draft.heldBack) ? Math.max(draft.heldUntil, why.until) : why.until,
-    heldBack: O.some({ read: false, apart: before.apart, accepts: [...before.accepts, ...(why.accepts ?? [])] })
+    heldBack: O.some({ read: false, apart: before.apart, accepts: [...before.accepts, ...why.accepts] })
   })
 }
 
@@ -1703,7 +1727,7 @@ const following = (draft: Draft, picture: Picture, takenBack: ReadonlyArray<Take
             : draft.confirm === "waiting"
               ? A.isReadonlyArrayNonEmpty(apart)
                 ? // A newer picture from elsewhere holds the confirm back: it is the newer picture, read.
-                  holdingBack(after, { until: picture.revision })
+                  holdingBack(after, { until: picture.revision, accepts: [] })
                 : // Nothing shown changed: it may be the picture the person's own save leaves. Its answer tells.
                   { ...after, seenWhileWaiting: O.some(picture.revision) }
               : after,
@@ -1748,8 +1772,8 @@ const arriving = (draft: Draft, event: Data.TaggedEnum.Value<DraftEvent, "ViewAr
     ...reopened,
     ...(confirmedSince ? { unsent: {}, lines: {} } : {}),
     confirms: O.some(confirms),
-    matches: A.dedupe([...reopened.matches, ...(event.matches ?? [])]),
-    takenBack: event.takenBack ?? [],
+    matches: A.dedupe([...reopened.matches, ...event.matches]),
+    takenBack: event.takenBack,
     waitsForPicture: reopened.waitsForPicture && !(isAnswer && revision >= heldAt(reopened)),
     // A closed picture seen while the confirm was out, and since outdated by this open one (the import was opened
     // again): the confirm's answer no longer ends the draft on it.
@@ -1758,7 +1782,7 @@ const arriving = (draft: Draft, event: Data.TaggedEnum.Value<DraftEvent, "ViewAr
   const named: ReadonlyArray<DraftEffect> = A.map(A.getSomes([unnamed, outlived]), (what) =>
     DraftEffect.Say({ what: Said.Outlived(what) })
   )
-  const arrived = then({ draft: followed, effects: named }, (now) => following(now, picture, event.takenBack ?? []))
+  const arrived = then({ draft: followed, effects: named }, (now) => following(now, picture, event.takenBack))
   // An answer of the server's: it can be reached, so what waits goes. The view the tab holds, given while it is asked
   // anew, is no answer: the one that is out brings it.
   return isAnswer ? then(arrived, sending) : arrived
@@ -1798,7 +1822,7 @@ const deciding = (draft: Draft, book: Book, rowId: string, decision: O.Option<Ro
         onNone: () => [
           theirs,
           ...A.flatMap(replaced, (one) => one.seen),
-          ...O.getOrElse(R.get(book.sentBefore, rowId), () => [])
+          ...O.match(R.get(book.sentBefore, rowId), { onNone: A.empty, onSome: identity })
         ],
         onSome: (one) => [...one.seen, ...(sameDecision(R.get(shown(draft), rowId), theirs) ? [theirs] : [])]
       }),
@@ -1846,7 +1870,10 @@ const picking = (draft: Draft, book: Book, { keep, rowId }: LinePick): void => {
   // What is saved stays: the line goes, and what its sides may have put on the server is remembered.
   const keepSaved = (): void => {
     book.sentBefore[rowId] = A.takeRight(
-      eachDecision([...O.getOrElse(R.get(book.sentBefore, rowId), () => []), ...A.flatMap(sides, mayHold)]),
+      eachDecision([
+        ...O.match(R.get(book.sentBefore, rowId), { onNone: A.empty, onSome: identity }),
+        ...A.flatMap(sides, mayHold)
+      ]),
       overBound
     )
     delete book.lines[rowId]
@@ -1950,7 +1977,7 @@ const takingUpAll = (draft: Draft, kept: Waiting, here: boolean): Stepped => {
 /**
  * What one event does to a draft, and what to do about it.
  *
- * @example step(emptyDraft, DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 })).draft.held // some: revision 4
+ * @example step(emptyDraft, DraftEvent.ViewArrived({waiting: false, matches: [], takenBack: [],  revision: 4, decisions: {}, open: true, confirms: 0 })).draft.held // some: revision 4
  */
 export const step: {
   (event: DraftEvent): (draft: Draft) => Stepped
@@ -2094,7 +2121,10 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       // The picture held is known to be behind (somebody else saved before the person's last save): the newer one
       // is asked for, and the confirm waits for the person to have seen it.
       if (O.isSome(pressed.landed)) {
-        return { draft: holdingBack(pressed, { until: pressed.landed.value.at }), effects: [DraftEffect.Ask()] }
+        return {
+          draft: holdingBack(pressed, { until: pressed.landed.value.at, accepts: [] }),
+          effects: [DraftEffect.Ask()]
+        }
       }
       return confirming(pressed)
     },
@@ -2110,7 +2140,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         back: notLanded,
         // The server is past the revision the confirm named: the newer picture is one after it, at least.
         then: (back) =>
-          then(sending(holdingBack(back, { until: draft.confirmOn + 1 })), (after) => ({
+          then(sending(holdingBack(back, { until: draft.confirmOn + 1, accepts: [] })), (after) => ({
             draft: after,
             effects: [DraftEffect.Ask()]
           }))

@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { CheckIcon, ChevronRightIcon, CircleAlertIcon, LoaderIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/ui/components/collapsible"
@@ -9,11 +10,11 @@ export interface RunStep {
   readonly label: string
   readonly status: "running" | "done" | "failed"
   /** Tool name and arguments, shown when the person opens the step. */
-  readonly input?: ReactNode
+  readonly input: O.Option<ReactNode>
   /** What the step returned or decided. */
-  readonly output?: ReactNode
+  readonly output: O.Option<ReactNode>
   /** Who did the step, in one word ("Read", "Rule", "Model"), shown at the end of the line. */
-  readonly tag?: string
+  readonly tag: O.Option<string>
 }
 
 const icons = {
@@ -28,7 +29,11 @@ const statusWords = { running: "Running", done: "Done", failed: "Failed" } as co
  * The visible record of a run: who ran it, then one line per step, each opening to show its input and output.
  * It is a log the person can audit, not a chat. `producer` says which path made the result ("AI" or "Rules").
  */
-export function AgentRun(props: { title: string; producer: string; steps: ReadonlyArray<RunStep> }) {
+export function AgentRun(props: {
+  readonly title: string
+  readonly producer: string
+  readonly steps: ReadonlyArray<RunStep>
+}) {
   const running = props.steps.some((step) => step.status === "running")
   return (
     <section aria-label={props.title} className="flex flex-col gap-2">
@@ -38,7 +43,7 @@ export function AgentRun(props: { title: string; producer: string; steps: Readon
       </div>
       <ol aria-live="polite" aria-busy={running} className="flex flex-col border-l pl-3">
         {props.steps.map((step) => {
-          const hasDetail = step.input !== undefined || step.output !== undefined
+          const hasDetail = O.isSome(step.input) || O.isSome(step.output)
           const line = (
             // A step that opens shows the rest of itself below, so its line is cut to one. A step with nothing to
             // open has only this line to say what happened (a cell that could not be read, by name), so it wraps.
@@ -52,11 +57,14 @@ export function AgentRun(props: { title: string; producer: string; steps: Readon
               {icons[step.status]}
               <span className="sr-only">{statusWords[step.status]}: </span>
               <span className={hasDetail ? "truncate" : "min-w-0 break-words"}>{step.label}</span>
-              {step.tag === undefined ? null : (
-                <span className="ml-auto shrink-0 rounded-chip bg-secondary px-1.5 text-xs text-secondary-foreground">
-                  {step.tag}
-                </span>
-              )}
+              {O.match(step.tag, {
+                onNone: () => null,
+                onSome: (tag) => (
+                  <span className="ml-auto shrink-0 rounded-chip bg-secondary px-1.5 text-xs text-secondary-foreground">
+                    {tag}
+                  </span>
+                )
+              })}
             </span>
           )
           return (
@@ -76,18 +84,24 @@ export function AgentRun(props: { title: string; producer: string; steps: Readon
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <dl className="mt-1.5 grid grid-cols-label-value gap-x-3 gap-y-1 pl-5.5 text-xs">
-                      {step.input === undefined ? null : (
-                        <>
-                          <dt className="text-muted-foreground">Read</dt>
-                          <dd className="min-w-0 break-words">{step.input}</dd>
-                        </>
-                      )}
-                      {step.output === undefined ? null : (
-                        <>
-                          <dt className="text-muted-foreground">Result</dt>
-                          <dd className="min-w-0 break-words">{step.output}</dd>
-                        </>
-                      )}
+                      {O.match(step.input, {
+                        onNone: () => null,
+                        onSome: (input) => (
+                          <>
+                            <dt className="text-muted-foreground">Read</dt>
+                            <dd className="min-w-0 break-words">{input}</dd>
+                          </>
+                        )
+                      })}
+                      {O.match(step.output, {
+                        onNone: () => null,
+                        onSome: (output) => (
+                          <>
+                            <dt className="text-muted-foreground">Result</dt>
+                            <dd className="min-w-0 break-words">{output}</dd>
+                          </>
+                        )
+                      })}
                     </dl>
                   </CollapsibleContent>
                 </Collapsible>

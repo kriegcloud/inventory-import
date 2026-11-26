@@ -1,11 +1,15 @@
+import { identity } from "effect/Function"
 // Turns the domain's review into what the review region takes, and back. The region holds no item words; this file
 // holds no rules. The one thing a reader must not break: a row's `problem` is always the first thing still open
 // *given the decisions so far*, because the region re-checks a row only after the person types, not after they
 // accept a fix.
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import * as O from "effect/Option"
 import { filledAt } from "@inventory/catalog-model/CellRules"
 import {
   Choice,
+  ColumnMatch as RegionColumnMatch,
   Fix,
   Problem as RegionProblem,
   ProblemKind,
@@ -13,7 +17,7 @@ import {
   ReviewRow
 } from "@inventory/review/ReviewTypes"
 import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
-import { fromFlags, toFlags } from "@inventory/review/ReviewDecision"
+import { DecisionFlags, fromFlags, toFlags } from "@inventory/review/ReviewDecision"
 import {
   type Problem,
   problemKinds,
@@ -24,7 +28,9 @@ import {
 } from "@inventory/catalog-model/Review"
 import {
   decisionFromFlags,
-  nothingDecided,
+  decisionOfRow,
+  storedKeep,
+  storedReplace,
   decisionToFlags,
   hasKeep,
   type SavedDecisions
@@ -33,6 +39,7 @@ import { type ColumnMatch, matchedColumn } from "@inventory/catalog-contract/Map
 import {
   type Field,
   fieldLabels,
+  fieldWords,
   requiredFields,
   type StagedColumn,
   type StagedTable
@@ -53,15 +60,16 @@ export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) =
 // each row still shows its own old and new value and is given its own.
 const trimLabel = "the value without its spaces"
 
-const toFix = (proposal: Proposal, reason?: string): Fix =>
+const toFix = (proposal: Proposal, reason: O.Option<string>): Fix =>
   Fix.make({
-    ...(reason === undefined ? {} : { reason }),
+    reason,
     column: proposal.field,
     to: proposal.to,
-    by: proposal.by,
+    by: O.some(proposal.by),
     confidence: O.some(proposal.confidence),
     kind: proposal.kind,
-    ...(proposal.kind === "spaces" ? { group: `${proposal.field}:trim`, label: trimLabel } : { group: proposal.group }),
+    group: O.some(proposal.kind === "spaces" ? `${proposal.field}:trim` : proposal.group),
+    label: proposal.kind === "spaces" ? O.some(trimLabel) : O.none(),
     why: {
       basis: proposal.basis,
       // What each value means, when the values do not speak for themselves ("2024-04-06 (month first)"): the words on
@@ -91,49 +99,44 @@ const storedWords: Readonly<Record<string, string>> = {
  * categories, the units of measure, true or false, or what to do with a stored item that differs. The list is the
  * domain's (`Problem.choices`). None is proposed in the cell and none is suggested.
  */
-const choicesFor = (
-  problem: Problem
-): { readonly ask: string; readonly choices: ReadonlyArray<Choice> } | undefined => {
-  if (O.isSome(problem.proposal) || problem.field === null || problem.choices.length === 0) return undefined
-  return {
-    // Keep or replace is a choice about the stored item, not a value of the SKU the problem sits on.
+const choicesFor = (problem: Problem): O.Option<{ readonly ask: string; readonly choices: ReadonlyArray<Choice> }> => {
+  if (O.isSome(problem.proposal) || problem.choices.length === 0) return O.none()
+  return O.map(problem.field, (field) => ({
     ask:
       problem.kind === "changed"
         ? "Keep or replace"
-        : (problem.ask ?? `Choose ${fieldLabels[problem.field].toLowerCase()}`),
-    choices: problem.choices.map((value) => Choice.make({ value, label: storedWords[value] ?? value }))
-  }
+        : O.match(problem.ask, {
+            onNone: () => `Choose ${field === "sku" ? "sku" : fieldWords[field]}`,
+            onSome: (ask) => ask
+          }),
+    choices: A.map(problem.choices, (value) =>
+      Choice.make({
+        value,
+        label: O.match(R.get(storedWords, value), { onNone: () => value, onSome: (label) => label })
+      })
+    )
+  }))
 }
 
 /**
  * A domain problem as the region shows it. Its proposal rides along as the fix; a value with no proposal that has to
  * be one of a short list is a pick between equal buttons (`choices`) instead of a box to type in.
  */
-export const toRegionProblem = (
-  problem: Problem,
-  options: { readonly withoutRivals?: boolean } = {}
-): RegionProblem => {
+export const toRegionProblem = (problem: Problem, options: { readonly withoutRivals: boolean }): RegionProblem => {
   const pick = choicesFor(problem)
   return RegionProblem.make({
     kind: problem.kind,
-    // Each problem's own tone: a SKU in lower case is a decision, a SKU "ab-12" must be typed again.
-    tone: problem.tone,
-    // The domain's sentence names the column and the value: every row says why, with a fix or without one.
-    reason: problem.message,
-    // Keep or replace is no value of the SKU: it goes under its own column (`storedChoice`).
-    ...(problem.kind === "changed"
-      ? { column: storedChoice }
-      : problem.field === null
-        ? {}
-        : { column: problem.field }),
-    ...(pick !== undefined
-      ? { ask: pick.ask, choices: pick.choices }
-      : problem.ask === null
-        ? {}
-        : { ask: problem.ask }),
-    ...(problem.note === null ? {} : { note: problem.note }),
-    ...O.match(problem.proposal, { onNone: () => ({}), onSome: (proposal) => ({ fix: toFix(proposal) }) }),
-    ...(problem.rivals.length === 0 || options.withoutRivals === true ? {} : { rivals: problem.rivals })
+    tone: O.some(problem.tone),
+    reason: O.some(problem.message),
+    column: problem.kind === "changed" ? O.some(storedChoice) : problem.field,
+    ask: O.orElse(
+      O.map(pick, (pick) => pick.ask),
+      () => problem.ask
+    ),
+    choices: O.map(pick, (pick) => pick.choices),
+    note: problem.note,
+    fix: O.map(problem.proposal, (proposal) => toFix(proposal, O.none())),
+    rivals: problem.rivals.length === 0 || options.withoutRivals ? O.none() : O.some(problem.rivals)
   })
 }
 
@@ -151,45 +154,43 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
   const where = {
     id: row.id,
     line: row.rowNumber,
-    ...O.match(row.part, {
-      onNone: () => ({}),
-      onSome: (part) => ({ label: rowPlace({ rowNumber: row.rowNumber, label: O.some(part.label) }) })
-    })
+    label: O.map(row.part, (part) => rowPlace({ rowNumber: row.rowNumber, label: O.some(part.label) }))
   }
   // Already stored: nothing to decide and nothing written; the region counts it apart under All with its tag.
   if (row.status === "already") return ReviewRow.make({ ...where, cells: row.file, stored: true })
-  const accepted = decisions[row.id]?.accepted ?? []
+  const decided = decisionOfRow(decisions, row.id)
+  const accepted = decided.accepted
   // A lossless rule fix is always offered through `applied` (the region holds it back or puts it in force from
   // the decisions). A fix the person accepted joins them, so the region shows it in force and moves on.
   // Each carries the domain's sentence for the value it changes, so a fix held back for the person says why too.
-  const applied = row.proposals
-    .filter((proposal) => proposal.lossless || accepted.includes(proposal.field))
-    .map((proposal) => {
-      const message = row.problems.find((problem) => problem.field === proposal.field)?.message
-      return toFix(proposal, message === undefined ? undefined : reasonShown(message, row.reasons.length))
-    })
-  const open = row.problems.find((problem) => !O.exists(problem.proposal, (proposal) => proposal.lossless))
+  const applied = A.map(
+    A.filter(row.proposals, (proposal) => proposal.lossless || A.contains(accepted, proposal.field)),
+    (proposal) => {
+      const message = A.findFirst(row.problems, (problem) => O.contains(problem.field, proposal.field))
+      return toFix(
+        proposal,
+        O.map(message, (problem) => reasonShown(problem.message, row.reasons.length))
+      )
+    }
+  )
+  const open = A.findFirst(row.problems, (problem) => !O.exists(problem.proposal, (proposal) => proposal.lossless))
   // The region settles a row with rivals by itself once the row is kept or a rival's SKU was typed. The server is
   // stricter (only the first kept row wins, and a typed SKU can collide again), so where the two would differ the
   // problem is handed over without its rivals and stays open until the domain says it is settled.
-  const stricter =
-    open !== undefined &&
-    ((decisions[row.id] !== undefined && hasKeep(decisions[row.id] ?? nothingDecided)) ||
-      open.rivals.some((id) => decisions[id]?.edits["sku"] !== undefined))
+  const stricter = O.exists(
+    open,
+    (open) => hasKeep(decided) || A.some(open.rivals, (id) => R.has(decisionOfRow(decisions, id).edits, "sku"))
+  )
   return ReviewRow.make({
     ...where,
     cells: row.file,
     // Where the domain counts the row: Cannot import when any problem needs a typed value, however the first reads.
-    ...(row.status === "needs" ? { blocked: row.outcome === "cannot" } : {}),
+    blocked: row.status === "needs" ? O.some(row.outcome === "cannot") : O.none(),
     ...(applied.length === 0 ? {} : { applied }),
-    ...(open === undefined
-      ? {}
-      : {
-          problem: {
-            ...toRegionProblem(open, { withoutRivals: stricter }),
-            reason: reasonShown(open.message, row.reasons.length)
-          }
-        })
+    problem: O.map(open, (open) => ({
+      ...toRegionProblem(open, { withoutRivals: stricter }),
+      reason: O.some(reasonShown(open.message, row.reasons.length))
+    }))
   })
 }
 
@@ -198,64 +199,66 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
  * (counted apart, nothing to decide), so the tabs add up to the file and a second load of the same file says so.
  */
 export const toRegionRows = (current: Review, decisions: SavedDecisions): ReadonlyArray<ReviewRow> =>
-  current.rows.map((row) => toRegionRow(row, decisions))
+  A.map(current.rows, (row) => toRegionRow(row, decisions))
 
-const isStoredChoice = (value: string | undefined): value is "keep" | "replace" =>
-  value === "keep" || value === "replace"
+const isStoredChoice = (value: string): value is "keep" | "replace" => value === "keep" || value === "replace"
 
 /**
  * The region's decisions as the server takes them: the region's `ReviewDecision` as the flags the server stores, and a
  * keep-or-replace answer moved from the typed values (`edits[storedChoice]`) to `stored`, where the review reads it.
  */
 export const toServerDecisions = (decisions: RegionDecisions): SavedDecisions =>
-  Object.fromEntries(
-    Object.entries(decisions).map(([id, decision]) => {
-      // Through the flags the two share: the region's decision and the server's are stored in the same form.
-      const flags = toFlags(decision)
-      const answer = flags.edits?.[storedChoice]
-      if (!isStoredChoice(answer)) return [id, decisionFromFlags(flags)]
-      const { edits, ...rest } = flags
-      const { [storedChoice]: _answer, ...typed } = edits ?? {}
-      return [
-        id,
-        decisionFromFlags({ ...rest, ...(Object.keys(typed).length === 0 ? {} : { edits: typed }), stored: answer })
-      ]
+  R.map(decisions, (decision) => {
+    // Decode the review library's encoded flags once, so edited fields are required from here on.
+    const row = decisionFromFlags(toFlags(decision))
+    return O.match(O.filter(R.get(decision.edits, storedChoice), isStoredChoice), {
+      onNone: () => row,
+      onSome: (answer) => ({
+        ...row,
+        edits: R.remove(row.edits, storedChoice),
+        stored: answer === "keep" ? storedKeep : storedReplace
+      })
     })
-  )
+  })
 
 /** The server's decisions as the region holds them: the inverse of `toServerDecisions`. */
 export const toRegionDecisions = (decisions: SavedDecisions): RegionDecisions =>
-  Object.fromEntries(
-    Object.entries(decisions).map(([id, decision]) => {
-      const { stored, ...flags } = decisionToFlags(decision)
-      return [
-        id,
-        fromFlags(stored === "undecided" ? flags : { ...flags, edits: { ...flags.edits, [storedChoice]: stored } })
-      ]
-    })
-  )
+  R.map(decisions, (decision) => {
+    const { stored, ...flags } = decisionToFlags(decision)
+    return fromFlags(
+      DecisionFlags.make(
+        stored === "undecided" ? flags : { ...flags, edits: { ...flags.edits, [storedChoice]: stored } }
+      )
+    )
+  })
 
 // The name and the description are sentences: they share the room and end in an ellipsis, whole on hover. Every other
 // column is as wide as its longest value, measured by the region, and never cut; short of room the lowest priority
 // moves into the row's detail and the SKU under the name. What is drawn for a cost, the tags, the dimensions and the
 // vendors is what the Items page draws; the file's text is what the checks and the edits see.
-const layout: Record<Field, Omit<typeof ReviewColumn.Encoded, "id" | "label" | "match">> = {
-  name: { size: "fill", width: 200, core: true },
-  sku: { search: true, under: true, context: true, code: true, priority: 9 },
-  category: { core: true, facet: true, priority: 8 },
-  uom: { core: true, facet: true, context: true, priority: 8 },
-  unitCost: { align: "right", core: true, priority: 7, display: costText },
+const layout: Record<Field, Omit<Parameters<typeof ReviewColumn.make>[0], "id" | "label" | "match">> = {
+  name: { display: identity, size: "fill", width: O.some(200), core: true },
+  sku: { display: identity, search: true, under: true, context: true, code: true, priority: O.some(9) },
+  category: { display: identity, core: true, facet: true, priority: O.some(8) },
+  uom: { display: identity, core: true, facet: true, context: true, priority: O.some(8) },
+  unitCost: { align: O.some("right"), core: true, priority: O.some(7), display: costText },
   // A quantity is counted in the row's own unit of measure; an empty one is imported as the default the brief gives.
-  quantityOnHand: { align: "right", priority: 6, unitFrom: "uom", byDefault: "0", display: countText },
-  reorderPoint: { align: "right", priority: 3, unitFrom: "uom", display: countText },
-  isActive: { priority: 4, byDefault: "true" },
-  lotTracked: { priority: 2, byDefault: "false" },
-  tags: { priority: 2, display: tagsCellText },
-  firstReceivedOn: { priority: 3 },
-  discontinuedOn: { priority: 4 },
-  dimensions: { priority: 1, display: dimensionsCellText },
-  vendors: { priority: 5, display: vendorsCellText },
-  description: { size: "fill", width: 200, hidden: true }
+  quantityOnHand: {
+    align: O.some("right"),
+    priority: O.some(6),
+    unitFrom: O.some("uom"),
+    byDefault: O.some("0"),
+    display: countText
+  },
+  reorderPoint: { align: O.some("right"), priority: O.some(3), unitFrom: O.some("uom"), display: countText },
+  isActive: { display: identity, priority: O.some(4), byDefault: O.some("true") },
+  lotTracked: { display: identity, priority: O.some(2), byDefault: O.some("false") },
+  tags: { priority: O.some(2), display: tagsCellText },
+  firstReceivedOn: { display: identity, priority: O.some(3) },
+  discontinuedOn: { display: identity, priority: O.some(4) },
+  dimensions: { priority: O.some(1), display: dimensionsCellText },
+  vendors: { priority: O.some(5), display: vendorsCellText },
+  description: { display: identity, size: "fill", width: O.some(200), hidden: true }
 }
 
 const order: ReadonlyArray<Field> = [
@@ -299,7 +302,7 @@ export const regionColumns = (
 ): ReadonlyArray<ReviewColumn> => [
   ...itemColumns(mapping, unused, table),
   // Holds the answer for a row whose SKU is stored with other values; never a column of the file.
-  ReviewColumn.make({ id: storedChoice, label: "Stored item", hidden: true })
+  ReviewColumn.make({ display: identity, id: storedChoice, label: "Stored item", hidden: true })
 ]
 
 const itemColumns = (
@@ -308,29 +311,27 @@ const itemColumns = (
   table: StagedTable
 ): ReadonlyArray<ReviewColumn> =>
   order.map((field) => {
-    const match = mapping.find((candidate) => candidate.field === field)
-    const column = match === undefined ? O.none() : matchedColumn(match)
-    const missing = match !== undefined && O.isNone(column) && requiredFields.includes(field) && unused.length > 0
+    const match = A.findFirst(mapping, (candidate) => candidate.field === field)
+    const column = O.flatMap(match, matchedColumn)
+    const missing = O.isSome(match) && O.isNone(column) && A.contains(requiredFields, field) && unused.length > 0
     return ReviewColumn.make({
       id: field,
       label: fieldLabels[field],
       ...layout[field],
-      ...(O.isNone(column)
-        ? missing
-          ? {
-              match: {
-                state: "unmatched" as const,
-                candidates: unused.map((column) => ({ source: column.label, samples: samplesOf(table, column.index) }))
-              }
-            }
-          : {}
-        : {
-            match: {
-              state: "matched" as const,
-              source: column.value.header,
-              by: "name",
-              samples: column.value.examples
-            }
+      match: O.orElse(
+        O.map(column, (column) =>
+          RegionColumnMatch.cases.matched.make({
+            source: column.header,
+            by: "name",
+            samples: column.examples
           })
+        ),
+        () =>
+          missing
+            ? RegionColumnMatch.cases.unmatched.makeOption({
+                candidates: unused.map((column) => ({ source: column.label, samples: samplesOf(table, column.index) }))
+              })
+            : O.none()
+      )
     })
   })

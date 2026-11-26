@@ -277,7 +277,7 @@ const notWaiting = Effect.fn("PatchesCheck.notWaiting")(function* () {
   if (!(yield* repo.exists(rootFile))) return none
   const read = Effect.fnUntraced(function* (absolute: string) {
     const text = yield* repo.text(absolute)
-    const config = yield* decodeJsonc(TurboTasks)(repo.relative(repo.root, absolute), text)
+    const config = yield* decodeJsonc(TurboTasks)(repo.relative(absolute, repo.root), text)
     return R.map(config.tasks ?? {}, (task) => task.dependsOn ?? A.empty<string>())
   })
   const root = yield* read(rootFile)
@@ -292,7 +292,7 @@ const notWaiting = Effect.fn("PatchesCheck.notWaiting")(function* () {
       const absolute = repo.join(workspace.dir, "turbo.json")
       if (!(yield* repo.exists(absolute))) return none
       const text = yield* repo.text(absolute)
-      const file = repo.relative(repo.root, absolute)
+      const file = repo.relative(absolute, repo.root)
       const config = yield* decodeJsonc(TurboTasks)(file, text)
       return A.flatMap(R.toEntries(config.tasks ?? {}), ([task, stated]) =>
         stated.dependsOn === undefined || reaches(stated.dependsOn) ? none : one(cases.NotWaiting.make({ file, task }))

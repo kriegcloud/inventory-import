@@ -11,7 +11,7 @@ import { CsvRecordSlice, CsvTable } from "@beep/csv/CsvTable"
 import { MachineState } from "../src/internal/machine.ts"
 
 const runs = { arbitrary: { runs: 50 } }
-const schemas = {
+const schemas: Record<string, S.Top> = {
   CsvIndex,
   CsvByteOffset,
   CsvTextSpan,
@@ -29,9 +29,9 @@ describe("every schema generates only valid values", () => {
   for (const [name, schema] of R.toEntries(schemas)) {
     it.prop(
       name,
-      [Arbitrary.schema(schema as S.Top)],
+      [Arbitrary.schema(schema)],
       ([value]) => {
-        expect(S.is(schema as S.Top)(value)).toBe(true)
+        expect(S.is(schema)(value)).toBe(true)
       },
       runs
     )

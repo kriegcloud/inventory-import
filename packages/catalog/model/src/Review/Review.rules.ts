@@ -250,15 +250,15 @@ export type Problem = {
   readonly kind: ProblemKindId
   /** blocker: only a typed or chosen value settles it (Cannot import). decision: there is a proposal or a choice to take. */
   readonly tone: "blocker" | "decision"
-  readonly field: Field | null
+  readonly field: O.Option<Field>
   /** A full sentence naming the column and the value: the reason in the not-imported file. */
   readonly message: string
   /** What the edit button says when typing is the only honest option. */
-  readonly ask: string | null
+  readonly ask: O.Option<string>
   /** The values the field may take, when it is one of a list (a category, a unit, true or false); empty otherwise. */
   readonly choices: ReadonlyArray<string>
   /** A few words beside the tag ("also row 31"). */
-  readonly note: string | null
+  readonly note: O.Option<string>
   readonly proposal: O.Option<Proposal>
   /** The ids (`rowId`) of the other rows that share this row's SKU. */
   readonly rivals: ReadonlyArray<string>
@@ -826,7 +826,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
 type Wrong = {
   readonly kind: ProblemKindId
   readonly message: string
-  readonly ask: string | null
+  readonly ask: O.Option<string>
   /** The values the field may take, when it is one of a list; empty otherwise. */
   readonly choices: ReadonlyArray<string>
 }
@@ -844,18 +844,18 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     return O.some({
       kind: "column",
       message: `The file has no column for ${label}.`,
-      ask: `Type the ${asked}`,
+      ask: O.some(`Type the ${asked}`),
       choices: []
     })
   }
   if (empty && required)
-    return O.some({ kind: "missing", message: `${label} is empty.`, ask: `Type the ${asked}`, choices: [] })
+    return O.some({ kind: "missing", message: `${label} is empty.`, ask: O.some(`Type the ${asked}`), choices: [] })
   // One problem for the row, filed on Active: the two cells contradict each other, and that is one question.
   if (field === "isActive" && (empty || text === "true") && discontinuedYetActive(values)) {
     return O.some({
       kind: "discontinued",
       message: `Discontinued on ${named(cellValue(values.discontinuedOn))}, yet Active is ${empty ? "empty, which means true" : "true"}. A discontinued item is not active.`,
-      ask: "Choose not active",
+      ask: O.some("Choose not active"),
       choices: ["true", "false"]
     })
   }
@@ -863,22 +863,22 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   if (field === "sku") {
     if (skuPattern.test(text)) return O.none()
     return hasSpacesRound(text) && skuPattern.test(cellValue(text))
-      ? O.some({ kind: "spaces", message: `SKU ${said(text)} has spaces around it.`, ask: null, choices: [] })
+      ? O.some({ kind: "spaces", message: `SKU ${said(text)} has spaces around it.`, ask: O.none(), choices: [] })
       : O.some({
           kind: "sku",
           message: `SKU ${said(cellValue(text))} is not three capital letters, a hyphen and four digits, like BLT-0042.`,
-          ask: "Type the SKU",
+          ask: O.some("Type the SKU"),
           choices: []
         })
   }
   if (field === "name") {
     if (hasSpacesRound(text))
-      return O.some({ kind: "spaces", message: `Name ${said(text)} has spaces around it.`, ask: null, choices: [] })
+      return O.some({ kind: "spaces", message: `Name ${said(text)} has spaces around it.`, ask: O.none(), choices: [] })
     return text.length > maxNameLength
       ? O.some({
           kind: "name",
           message: `Name is ${text.length} characters long. A name has at most ${maxNameLength}.`,
-          ask: "Shorten the name",
+          ask: O.some("Shorten the name"),
           choices: []
         })
       : O.none()
@@ -889,7 +889,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : O.some({
           kind: "category",
           message: `Category ${said(text)} is not one of the ${categories.length} categories.`,
-          ask: "Pick a category",
+          ask: O.some("Pick a category"),
           choices: categories
         })
   }
@@ -899,7 +899,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : O.some({
           kind: "uom",
           message: `Unit of measure ${said(text)} is not one of ${A.join(uoms, ", ")}.`,
-          ask: "Pick a unit",
+          ask: O.some("Pick a unit"),
           choices: uoms
         })
   }
@@ -913,7 +913,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
         : /^\$?\d+\.\d{5,}$/.test(shown)
           ? `Unit cost ${said(shown)} has more than 4 decimals.`
           : `Unit cost ${said(shown)} is not an amount in dollars written as digits.`,
-      ask: "Type the unit cost",
+      ask: O.some("Type the unit cost"),
       choices: []
     })
   }
@@ -927,7 +927,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
         : /^-\d/.test(shown)
           ? `${label} ${said(shown)} is below zero.`
           : `${label} ${said(shown)} is not a whole number written as digits.`,
-      ask: `Type the ${asked}`,
+      ask: O.some(`Type the ${asked}`),
       choices: []
     })
   }
@@ -937,7 +937,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : O.some({
           kind: "boolean",
           message: `${label} ${said(cellValue(text))} is not true or false.`,
-          ask: "Choose true or false",
+          ask: O.some("Choose true or false"),
           choices: ["true", "false"]
         })
   }
@@ -948,7 +948,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : O.some({
           kind: "tags",
           message: `Tags ${said(text)} are not lower case, each once.`,
-          ask: "Type the tags",
+          ask: O.some("Type the tags"),
           choices: []
         })
   }
@@ -962,7 +962,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
             : twoDigitYear(text)
               ? `${label} “${cellValue(text)}” has a two-digit year; type it as year-month-day.`
               : `${label} ${said(cellValue(text))} is not written as year-month-day.`,
-          ask: "Type the date",
+          ask: O.some("Type the date"),
           choices: []
         })
   }
@@ -970,12 +970,22 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     const read = readDimensions(text)
     return wasRead(read)
       ? O.none()
-      : O.some({ kind: "dimensions", message: read.message, ask: "Correct the dimensions, or clear them", choices: [] })
+      : O.some({
+          kind: "dimensions",
+          message: read.message,
+          ask: O.some("Correct the dimensions, or clear them"),
+          choices: []
+        })
   }
   if (field === "vendors") {
     const read = readVendors(text)
     if (!wasRead(read)) {
-      return O.some({ kind: "vendors", message: read.message, ask: "Correct the vendors, or clear them", choices: [] })
+      return O.some({
+        kind: "vendors",
+        message: read.message,
+        ask: O.some("Correct the vendors, or clear them"),
+        choices: []
+      })
     }
     const preferred = preferredOf(read.value)
     return preferred.length > 1
@@ -985,7 +995,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
             A.map(preferred, (vendor) => named(vendor.vendorName)),
             ", "
           )}). An item has at most one.`,
-          ask: "Choose the preferred vendor",
+          ask: O.some("Choose the preferred vendor"),
           choices: []
         })
       : O.none()
@@ -1038,11 +1048,11 @@ const problemsOf = (
       return {
         kind: wrong.kind,
         tone: toneOf(wrong.kind, proposed),
-        field,
+        field: O.some(field),
         message: wrong.message,
         ask: wrong.ask,
         choices: wrong.choices,
-        note: null,
+        note: O.none(),
         proposal: proposed,
         rivals: []
       }
@@ -1055,11 +1065,11 @@ const problemsOf = (
           {
             kind: "stored",
             tone: "blocker",
-            field: "sku",
+            field: O.some("sku"),
             message: `SKU ${named(cellValue(values.sku))} is already there: an item your organization has uses it.`,
-            ask: "Type another SKU",
+            ask: O.some("Type another SKU"),
             choices: [],
-            note: null,
+            note: O.none(),
             proposal: O.none(),
             rivals: []
           }
@@ -1082,13 +1092,13 @@ const problemsOf = (
           {
             kind: copies ? "duplicate" : "clash",
             tone: "decision",
-            field: "sku",
+            field: O.some("sku"),
             message: copies
               ? `This row is a copy of row ${where}.`
               : `SKU ${named(inCapitals(cellValue(values.sku)))} is also on row ${where} with different values. Keep one row, or leave one out.`,
-            ask: "Type another SKU",
+            ask: O.some("Type another SKU"),
             choices: [],
-            note: `${copies ? "copy of" : "also"} row ${where}`,
+            note: O.some(`${copies ? "copy of" : "also"} row ${where}`),
             proposal: O.none(),
             rivals: ids
           }
@@ -1317,14 +1327,14 @@ export const review = (input: {
         ? O.some({
             kind: "changed",
             tone: "decision",
-            field: "sku",
+            field: O.some("sku"),
             message: `SKU ${named(sku)} is already there with other values (${A.join(
               A.map(entry.stored, (difference) => fieldLabels[difference.field]),
               ", "
             )}). Keep the stored item, or replace it with this row.`,
-            ask: null,
+            ask: O.none(),
             choices: ["keep", "replace"],
-            note: `${plural(entry.stored.length, "value differs", "values differ")}`,
+            note: O.some(`${plural(entry.stored.length, "value differs", "values differ")}`),
             proposal: O.none(),
             rivals: []
           })

@@ -39,16 +39,14 @@ import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { UploadNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
-import { requiredFields, type StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
-import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
+import { requiredFields, StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { savedRows } from "@inventory/catalog-model/Upload"
 import { rowsOf, UploadState } from "./Upload.machine.ts"
 import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
 import { importTable, importView, openWorkbook } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
-import { ReadMessage } from "./internal/protocol.ts"
-import type { ReadRequest } from "./internal/protocol.ts"
+import { ReadMessage, ReadRequest, ReaderWorkbook, ReaderProgress } from "./internal/protocol.ts"
 import { sayError } from "@inventory/client/SayError"
 import { catalogKeys } from "./Catalog.keys.ts"
 
@@ -142,12 +140,12 @@ const set = (registry: AtomRegistry.AtomRegistry, next: UploadState) => {
 
 /** How an upload ended, for a caller that keeps something until it does (the chosen file, for Continue). */
 export type UploadEnd = Data.TaggedEnum<{
-  Arrived: {}
-  Cancelled: {}
+  readonly Arrived: {}
+  readonly Cancelled: {}
   /** The file itself cannot be staged: reading it again would find the same. */
-  Refused: {}
+  readonly Refused: {}
   /** Reading the file or saving its rows failed; a save may work when tried again. */
-  Failed: { readonly step: "read" | "save" }
+  readonly Failed: { readonly step: "read" | "save" }
 }>
 /** Builds and tells apart how an upload ended. */
 export const UploadEnd = Data.taggedEnum<UploadEnd>()
@@ -159,7 +157,7 @@ export const UploadEnd = Data.taggedEnum<UploadEnd>()
 interface Running {
   readonly fiber: Fiber.Fiber<Finished, UploadError>
   readonly fileName: string
-  readonly uploadId: ImportId | null
+  readonly uploadId: O.Option<ImportId>
   readonly onEnd: (end: UploadEnd) => void
   /** Who the upload was started as: it is sent as them alone, and its import is theirs. */
   readonly startedAs: string
@@ -177,40 +175,45 @@ const uploadRunning = Atom.make<O.Option<Running>>(O.none()).pipe(Atom.keepAlive
 type Finished = {
   readonly view: ImportView
   readonly table: StagedTable
-  readonly workbook: { readonly sheets: ReadonlyArray<SheetSummary>; readonly chosen: SheetChoice } | null
+  readonly workbook: ReaderWorkbook
 }
 
 /** The reader worker as a stream of its messages. Closing the stream (done, failed or interrupted) ends the worker. */
 const reader = (request: ReadRequest) =>
   Stream.callback<ReadMessage>((queue) =>
-    Effect.acquireRelease(
-      Effect.sync(() => {
-        const worker = new Worker(new URL("./internal/reader.worker.ts", import.meta.url), {
-          type: "module",
-          name: "spreadsheet-reader"
-        })
-        worker.onmessage = (event: MessageEvent<ReadMessage>) => {
-          Queue.offerUnsafe(queue, event.data)
-          if (isLast(event.data)) Queue.endUnsafe(queue)
-        }
-        // The worker's file could not be loaded or crashed: a sentence, not a hang.
-        worker.onerror = (event) => {
-          event.preventDefault()
-          Queue.offerUnsafe(
-            queue,
-            ReadMessage.Crashed({
-              message: `"${request.file.name}" could not be read. Reload the page and choose it again.`
-            })
-          )
-          Queue.endUnsafe(queue)
-        }
-        worker.postMessage(request)
-        return worker
-      }),
-      (worker) => Effect.sync(() => worker.terminate())
-    )
+    Effect.gen(function* () {
+      const wire = yield* S.encodeEffect(ReadRequest)(request).pipe(Effect.orDie)
+      return yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          const worker = new Worker(new URL("./internal/reader.worker.ts", import.meta.url), {
+            type: "module",
+            name: "spreadsheet-reader"
+          })
+          worker.onmessage = (event: MessageEvent<ReadMessage>) => {
+            Queue.offerUnsafe(queue, event.data)
+            if (isLast(event.data)) Queue.endUnsafe(queue)
+          }
+          // The worker's file could not be loaded or crashed: a sentence, not a hang.
+          worker.onerror = (event) => {
+            event.preventDefault()
+            Queue.offerUnsafe(
+              queue,
+              ReadMessage.Crashed({
+                message: `"${request.file.name}" could not be read. Reload the page and choose it again.`
+              })
+            )
+            Queue.endUnsafe(queue)
+          }
+          worker.postMessage(wire)
+          return worker
+        }),
+        (worker) => Effect.sync(() => worker.terminate())
+      )
+    })
   )
 
+// The head is internal wire data; parse its structure/Options here, leaving bounds to the existing server read.
+const decodeHead = S.decodeEffect(StagedHead, { disableChecks: true })
 const decodeChunk = S.decodeEffect(S.Array(StagedRow))
 
 /** Reads `file` in the worker, sends it in chunks as they arrive, and finishes it. Reports each step to the store. */
@@ -222,32 +225,27 @@ const program = Effect.fn("upload.program")(function* (
 ) {
   const fileName = request.file.name
   const mine = asStarter({ registry, startedAs })
-  const begun = yield* Deferred.make<{ readonly id: ImportId; readonly sizes: ReadonlyArray<number> }>()
+  const begun = yield* Deferred.make<{
+    readonly id: ImportId
+    readonly sizes: ReadonlyArray<number>
+    readonly head: StagedHead
+    readonly workbook: ReaderWorkbook
+  }>()
   const chunks: Array<ReadonlyArray<StagedRow>> = []
   const acknowledged: Array<number> = []
-  let head: StagedHead | undefined
-  let workbook: Finished["workbook"] = null
 
   // Every step's own errors (a typed refusal, the network) end the stream the same way, so they are not told apart
   // here: the observer in `start` turns whatever ended it into a sentence.
   const handle = (message: ReadMessage): Effect.Effect<void, UploadError> =>
     ReadMessage.$match(message, {
-      Progress: (progress) =>
-        Effect.sync(() =>
-          set(
-            registry,
-            UploadState.cases.Reading.make({
-              fileName,
-              rowsRead: progress.rowsRead,
-              rows: rowsOf(progress)
-            })
-          )
-        ),
+      Progress: Effect.fn("Upload.progress")(function* (progress) {
+        const read = yield* S.decodeEffect(ReaderProgress)(progress).pipe(Effect.orDie)
+        set(registry, UploadState.cases.Reading.make({ fileName, rowsRead: read.rowsRead, rows: rowsOf(read) }))
+      }),
       Head: Effect.fn("Upload.head")(function* (message) {
-        // The sheet crossed the threads as its name or null: the Option is made again here.
-        const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
-        head = read
-        workbook = message.workbook
+        // The head crossed in its schema's encoded form; decode once after structured clone, as for chunks.
+        const read = yield* decodeHead(message.head).pipe(Effect.orDie)
+        const workbook = yield* S.decodeEffect(ReaderWorkbook)(message.workbook).pipe(Effect.orDie)
         const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
         // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
         // begin can be retried like every other step.
@@ -257,10 +255,10 @@ const program = Effect.fn("upload.program")(function* (
           .pipe(mine, staged)
         registry.update(
           uploadRunning,
-          O.map((now) => ({ ...now, uploadId: id }))
+          O.map((now) => ({ ...now, uploadId: O.some(id) }))
         )
         set(registry, UploadState.cases.Saving.make({ fileName, uploadId: id, rowsSaved: 0, rows }))
-        yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
+        yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes, head: read, workbook })
       }),
       Chunk: Effect.fn("Upload.chunk")(function* (message) {
         // The rows crossed the threads in the wire's form (protocol.ts): decoded once here. Our own reader made
@@ -290,11 +288,10 @@ const program = Effect.fn("upload.program")(function* (
     })
 
   yield* reader(request).pipe(Stream.mapEffect(handle, { concurrency: inFlight }), Stream.runDrain)
-  const { id, sizes } = yield* Deferred.await(begun)
+  const { id, sizes, head, workbook } = yield* Deferred.await(begun)
   const rows = sizes.reduce((sum, size) => sum + size, 0)
   set(registry, UploadState.cases.Preparing.make({ fileName, uploadId: id, rows }))
   const view = yield* client.imports.finishUpload({ params: { id } }).pipe(mine, staged)
-  if (head === undefined) return yield* Effect.die("the reader sent chunks without a head")
   const table: StagedTable = { ...head, rows: chunks.flat() }
   return { view, table, workbook } satisfies Finished
 })
@@ -303,9 +300,14 @@ const program = Effect.fn("upload.program")(function* (
 const discard = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly startedAs: string
-  readonly uploadId: ImportId
+  readonly uploadId: O.Option<ImportId>
 }): Promise<boolean> =>
-  fork((client) => client.imports.discardUpload({ params: { id: input.uploadId } }).pipe(asStarter(input)))
+  fork((client) =>
+    O.match(input.uploadId, {
+      onNone: () => Effect.void,
+      onSome: (id) => client.imports.discardUpload({ params: { id } }).pipe(asStarter(input))
+    })
+  )
     .pipe(Fiber.join, runExit)
     .then(Exit.isSuccess)
 
@@ -330,21 +332,24 @@ const arrive = (input: {
   registry.set(importTable(view.id), table)
   invalidate(catalogKeys.openImports)
   invalidate(catalogKeys.activity)
-  if (workbook !== null) {
+  O.map(workbook, (workbook) =>
     registry.set(openWorkbook(view.id), O.some({ file: input.file, sheets: workbook.sheets, chosen: workbook.chosen }))
-  }
+  )
   // Straight to the review when every required field found its column by heading; to Match when one did not.
   const unmatched = view.mapping.some((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
   const next = importAddress(view.id, unmatched ? "match" : "review")
-  if (window.location.pathname === "/") navigate(next)
-  else toast(`${view.fileName} is ready to review`, { action: { label: "Open", onClick: () => navigate(next) } })
+  if (window.location.pathname === "/") navigate(next, { replace: false })
+  else
+    toast(`${view.fileName} is ready to review`, {
+      action: { label: "Open", onClick: () => navigate(next, { replace: false }) }
+    })
 }
 
 /** Starts reading and sending `file`; `onEnd` is told how it ended. Ignored while another upload is under way. */
 const start = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly file: File
-  readonly sheet: string | null
+  readonly sheet: O.Option<string>
   readonly onEnd: (end: UploadEnd) => void
 }) => {
   const { file, registry } = input
@@ -363,7 +368,7 @@ const start = (input: {
     UploadState.cases.Reading.make({
       fileName: file.name,
       rowsRead: 0,
-      rows: rowsOf({ rowsAbout: null, exact: false })
+      rows: rowsOf({ rowsAbout: O.none(), exact: false })
     })
   )
   const startedAs = registry.get(memberKey)
@@ -399,8 +404,8 @@ const start = (input: {
         if (running.last) return Deferred.await(running.ended)
         return Effect.promise(() =>
           fiber.pipe(Fiber.interrupt, runExit).then(() => {
-            const uploadId = O.getOrNull(O.flatMap(mine(), (now) => O.fromNullOr(now.uploadId)))
-            return uploadId === null ? true : discard({ registry, startedAs, uploadId })
+            const uploadId = O.flatMap(mine(), (now) => now.uploadId)
+            return discard({ registry, startedAs, uploadId })
           })
         ).pipe(Effect.andThen(Effect.sync(leftBehind)))
       }
@@ -416,12 +421,15 @@ const start = (input: {
   })
   // Leaving the page mid-upload: ask the server to delete what arrived, in a request that outlives the page.
   const onHide = () => {
-    const id = O.getOrNull(O.map(mine(), (now) => now.uploadId))
-    if (id === null) return
-    void request(`${apiPrefixOf()}/imports/uploads/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      keepalive: true
-    }).catch(() => {})
+    O.map(
+      O.flatMap(mine(), (now) => now.uploadId),
+      (id) => {
+        void request(`${apiPrefixOf()}/imports/uploads/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          keepalive: true
+        }).catch(() => {})
+      }
+    )
   }
   // The app itself leaves the page (a sign-out, somebody else signed in): whoever is signed in by then is not who
   // uploaded it, so nothing is asked of the server as them. It deletes what arrived within the hour.
@@ -433,7 +441,7 @@ const start = (input: {
     O.some({
       fiber,
       fileName: file.name,
-      uploadId: null,
+      uploadId: O.none(),
       onEnd: input.onEnd,
       startedAs,
       last: false,
@@ -472,14 +480,14 @@ const start = (input: {
     const error = Cause.squash(exit.cause)
     // Nothing half-sent stays behind, as its member (a switch waits for this); the server would also delete it within
     // the hour.
-    const discarded = uploadId === null ? Promise.resolve(true) : discard({ registry, startedAs, uploadId })
+    const discarded = discard({ registry, startedAs, uploadId })
     void discarded.then(() => Deferred.doneUnsafe(ended, Exit.void))
     // Nobody is signed in: the page's idea of who is signed in is out of date. The chosen file stays kept, to continue.
     if (S.is(NotSignedIn)(error)) askWhoIsSignedIn(registry)
     // Its own reason, said where the person is next when they are leaving its organization: what the screen holds of
     // it is that organization's, and is let go with it.
     if (leaving || registry.get(memberKey) !== startedAs) {
-      void toast.error(`${file.name} was not uploaded`, { description: sayError(error).sentence })
+      void toast.error(`${file.name} was not uploaded`, { description: sayError(error, { fields: {} }).sentence })
     }
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
@@ -494,7 +502,7 @@ const start = (input: {
       UploadState.cases.Failed.make({
         fileName: file.name,
         step: read ? "read" : "save",
-        message: read ? error.message : sayError(error).sentence
+        message: read ? error.message : sayError(error, { fields: {} }).sentence
       })
     )
   })
@@ -515,14 +523,14 @@ const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
     .pipe(Fiber.interrupt, runExit)
     .then(() => {
       // The server may have given the upload its id while the cancel was on its way.
-      const uploadId = O.getOrElse(
+      const uploadId = O.match(
         O.map(registry.get(uploadRunning), (now) => now.uploadId),
-        () => current.uploadId
+        { onNone: () => current.uploadId, onSome: (id) => id }
       )
       registry.set(uploadRunning, O.none())
       current.stop()
       current.onEnd(UploadEnd.Cancelled())
-      return uploadId === null ? true : discard({ registry, startedAs: current.startedAs, uploadId })
+      return discard({ registry, startedAs: current.startedAs, uploadId })
     })
     .then((answered) => {
       Deferred.doneUnsafe(current.ended, Exit.void)
@@ -538,8 +546,8 @@ const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
 /** What starting an upload takes: the file, the sheet of a workbook, and who to tell how the upload ended. */
 export interface UploadStart {
   readonly file: File
-  readonly sheet?: string
-  readonly onEnd?: (end: UploadEnd) => void
+  readonly sheet: O.Option<string>
+  readonly onEnd: (end: UploadEnd) => void
 }
 
 /**
@@ -547,7 +555,7 @@ export interface UploadStart {
  * `onEnd` says how it ended. The upload carries on while the person opens another page.
  */
 export const startUpload = Atom.fnSync((input: UploadStart, get) => {
-  start({ registry: get.registry, file: input.file, sheet: input.sheet ?? null, onEnd: input.onEnd ?? (() => {}) })
+  start({ registry: get.registry, file: input.file, sheet: input.sheet, onEnd: input.onEnd })
 })
 
 /** Stops the upload under way and deletes what reached the server; not offered once the import is being prepared. */

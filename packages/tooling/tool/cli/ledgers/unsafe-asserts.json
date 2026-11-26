@@ -1,0 +1,15 @@
+{
+  "apps/inventory/vite.config.ts": {
+    "Compression only uses the Node request and response operations supplied by Vite Connect; its declarations unnecessarily require Express request extensions.": 1
+  },
+  "packages/catalog/web/test/support/catalog.ts": {
+    "HttpApiClient endpoint methods quantify over responseMode and select conditional return types; these test stand-ins implement only the decoded response mode used by the catalog screens, and tests provide every endpoint they exercise.": 1
+  },
+  "packages/review/test/ReviewRegion.atoms.test.ts": {
+    "This fixture implements the scroll, size and event operations used by the virtualizer; TypeScript requires unrelated HTMLDivElement members.": 1
+  },
+  "packages/ui/src/ListTable.component.tsx": {
+    "ListScope was created from this ListTable<Row> columns; React context erases the shared row generic.": 1,
+    "This scope is paired with ListBody<Row>; ScopedAtom cannot preserve a component generic across its context.": 1
+  }
+}

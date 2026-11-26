@@ -15,10 +15,18 @@ import * as ExecutionPlan from "effect/ExecutionPlan"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
+import { identity } from "effect/Function"
 import * as Str from "effect/String"
 import { ModelPolicy } from "../OpenRouter.config.ts"
 import { ModelUnavailable } from "../OpenRouter.errors.ts"
-import { isTransient, ModelAnswered, type ModelPrompt, ModelUsage, troubleOf } from "../OpenRouter.schema.ts"
+import {
+  isTransient,
+  ModelAnswered,
+  type ModelPrompt,
+  ModelUsage,
+  ReportedTokenTotals,
+  troubleOf
+} from "../OpenRouter.schema.ts"
 
 /** A schema a model can answer with: an object on the wire, decoded with no services. */
 export type AnswerSchema = S.Codec<unknown, Record<string, unknown>, never, never>
@@ -111,20 +119,26 @@ export const ask = <Sc extends AnswerSchema>(options: {
       duration: policy.deadline,
       orElse: () => Effect.fail(ModelUnavailable.make({ trouble: "down", retryable: true }))
     }),
-    Effect.map((response) => {
-      const model = O.getOrElse(answeredModel(response.content), () => options.model)
-      return {
-        value: response.value,
-        answered: ModelAnswered.make({
-          model,
-          fallback: A.some(options.fallbackModels, (fallback) => Str.startsWith(fallback)(model)),
-          usage: ModelUsage.make({
-            inputTokens: response.usage.inputTokens.total ?? 0,
-            outputTokens: response.usage.outputTokens.total ?? 0,
-            costMicroUsd: costMicroUsd(response.content)
+    Effect.flatMap((response) =>
+      Effect.gen(function* () {
+        const model = O.match(answeredModel(response.content), { onNone: () => options.model, onSome: identity })
+        const { inputTokens, outputTokens } = yield* S.decodeEffect(ReportedTokenTotals)({
+          inputTokens: response.usage.inputTokens.total,
+          outputTokens: response.usage.outputTokens.total
+        }).pipe(Effect.orDie)
+        return {
+          value: response.value,
+          answered: ModelAnswered.make({
+            model,
+            fallback: A.some(options.fallbackModels, (fallback) => Str.startsWith(fallback)(model)),
+            usage: ModelUsage.make({
+              inputTokens,
+              outputTokens,
+              costMicroUsd: costMicroUsd(response.content)
+            })
           })
-        })
-      }
-    })
+        }
+      })
+    )
   )
 }

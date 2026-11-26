@@ -101,7 +101,10 @@ describe("RequestSource.allows", () => {
 
   it("leaves reading alone, and a request no browser page made", () => {
     expect(from("GET", "cross-site", "https://elsewhere.example")).toBe(true)
+    expect(from("gEt", "cross-site", "https://elsewhere.example")).toBe(true)
     expect(from("HEAD", "cross-site", undefined)).toBe(true)
+    expect(from("hEaD", "cross-site", undefined)).toBe(true)
+    expect(from("oPtIoNs", "cross-site", "https://elsewhere.example")).toBe(true)
     expect(from("POST", undefined, undefined)).toBe(true)
   })
 })

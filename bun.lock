@@ -26,6 +26,7 @@
         "@beep/d1": "workspace:*",
         "@beep/openrouter": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@beep/unsafe-assert": "workspace:*",
         "@dnd-kit/core": "catalog:",
         "@dnd-kit/modifiers": "catalog:",
         "@dnd-kit/sortable": "catalog:",
@@ -232,6 +233,7 @@
       "dependencies": {
         "@beep/csv": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@beep/unsafe-assert": "workspace:*",
         "@beep/xlsx": "workspace:*",
         "@effect/atom-react": "catalog:",
         "@inventory/catalog-contract": "workspace:*",
@@ -437,6 +439,10 @@
         "vitest": "catalog:",
       },
     },
+    "packages/foundation/typing/unsafe-assert": {
+      "name": "@beep/unsafe-assert",
+      "version": "0.0.0",
+    },
     "packages/infra": {
       "name": "@beep/infra",
       "version": "0.0.0",
@@ -512,6 +518,7 @@
       "dependencies": {
         "@beep/identity": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@beep/unsafe-assert": "workspace:*",
         "@effect/atom-react": "catalog:",
         "@inventory/ui": "workspace:*",
         "@tanstack/react-table": "catalog:",
@@ -566,6 +573,7 @@
       "dependencies": {
         "@base-ui/react": "catalog:",
         "@beep/schema": "workspace:*",
+        "@beep/unsafe-assert": "workspace:*",
         "@dnd-kit/core": "catalog:",
         "@dnd-kit/modifiers": "catalog:",
         "@dnd-kit/sortable": "catalog:",
@@ -731,6 +739,8 @@
     "@beep/schema": ["@beep/schema@workspace:packages/foundation/modeling/schema"],
 
     "@beep/types": ["@beep/types@workspace:packages/foundation/primitive/types"],
+
+    "@beep/unsafe-assert": ["@beep/unsafe-assert@workspace:packages/foundation/typing/unsafe-assert"],
 
     "@beep/utils": ["@beep/utils@workspace:packages/foundation/modeling/utils"],
 

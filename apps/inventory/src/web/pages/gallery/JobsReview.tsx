@@ -59,8 +59,8 @@ const leaveJobAction = Atom.readable((get) =>
   O.some((row: ReviewRow) => {
     const code = row.cells.job
     return code === undefined
-      ? undefined
-      : {
+      ? O.none()
+      : O.some({
           label: `Leave job ${code} out`,
           onSelect: () =>
             get.registry.update(jobsLeftOut, (before) =>
@@ -69,7 +69,7 @@ const leaveJobAction = Atom.readable((get) =>
                 code
               )
             )
-        }
+        })
   })
 )
 const jobLineKinds = Atom.make(lineKinds)
@@ -96,7 +96,7 @@ export function JobsReview() {
   const linesIn = A.reduce(reviews, 0, (total, review) => total + review.importing)
   const linesAll = A.reduce(jobs, 0, (total, job) => total + job.lines.length)
   const shown = filter === "all" ? reviews : A.filter(reviews, (review) => review.status === filter)
-  const filters: ReadonlyArray<{ id: JobFilter; label: string; n: number }> = [
+  const filters: ReadonlyArray<{ readonly id: JobFilter; readonly label: string; readonly n: number }> = [
     { id: "waiting", label: pageWords.needs, n: tally.waiting },
     { id: "ready", label: pageWords.ready, n: tally.ready },
     ...(tally.out > 0 || filter === "out" ? [{ id: "out" as const, label: pageWords.out, n: tally.out }] : []),
@@ -190,13 +190,13 @@ export function JobsReview() {
       ) : view === "jobs" ? (
         <RecordsTable
           key={filter}
-          caption={`Jobs in jobs.csv: ${O.getOrElse(
-            O.map(
-              A.findFirst(filters, (entry) => entry.id === filter),
-              (entry) => entry.label
-            ),
-            () => "All"
-          )}`}
+          caption={O.match(
+            A.findFirst(filters, (entry) => entry.id === filter),
+            {
+              onNone: () => "Jobs in jobs.csv: All",
+              onSome: (entry) => `Jobs in jobs.csv: ${entry.label}`
+            }
+          )}
           columns={jobColumns({
             onAnswer: () => setView("questions"),
             onLeaveOut: (code) =>
@@ -266,9 +266,9 @@ export function JobsReview() {
 
 /** The jobs' columns: what each becomes and why on one line, and the one answer that fits it. */
 function jobColumns(actions: {
-  onAnswer: () => void
-  onLeaveOut: (code: string) => void
-  onBringBack: (code: string) => void
+  readonly onAnswer: () => void
+  readonly onLeaveOut: (code: string) => void
+  readonly onBringBack: (code: string) => void
 }): ReadonlyArray<RecordColumn<JobReview>> {
   return [
     {

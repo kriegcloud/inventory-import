@@ -1,3 +1,6 @@
+import { assertNone, assertSome } from "@effect/vitest/utils"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as O from "effect/Option"
 // What a screen builds from a read's data must not be built again when the read is asked again and answers the same.
 // The read itself changes twice per refresh (waiting, then answered); its answer, kept the same object while it is
 // equal, does not. The Items table's columns were built from the read, so every refresh drew every cell again, and an
@@ -19,6 +22,20 @@ class Server extends Context.Service<Server, { readonly facets: Effect.Effect<Fa
 const settle = Effect.sleep("15 millis")
 
 describe("what is built from a read's answer", () => {
+  it("distinguishes loading and error from a successful empty answer", () => {
+    const read = Atom.make<AsyncResult.AsyncResult<ReadonlyArray<string>, string>>(AsyncResult.initial())
+    const answer = answerOf(read)
+    const registry = AtomRegistry.make()
+    const release = registry.mount(answer)
+    assertNone(registry.get(answer))
+    registry.set(read, AsyncResult.fail("offline"))
+    assertNone(registry.get(answer))
+    registry.set(read, AsyncResult.success([]))
+    assertSome(registry.get(answer), [])
+    release()
+    registry.dispose()
+  })
+
   it.live("is built once per answer, however often the read is asked again", () =>
     Effect.gen(function* () {
       let asked = 0
@@ -29,7 +46,10 @@ describe("what is built from a read's answer", () => {
           return { categories: [...categories] }
         })
       })
-      const read = makeApiAtoms(Server).query((server) => server.facets)
+      const read = makeApiAtoms(Server).query({
+        keep: "unwatched",
+        reactivityKeys: O.none()
+      })((server) => server.facets)
       const answer = answerOf(read)
       let fromAnswer = 0
       let fromRead = 0

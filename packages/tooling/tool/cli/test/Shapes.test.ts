@@ -63,6 +63,132 @@ describe("laws dual and readonly", () => {
     expect(lines(helpers, helpersNotDual)).toEqual([2, 3, 4])
   })
 
+  it("requires dual call signatures on inline, interface and object-alias service methods", () => {
+    const source = `import * as Context from "effect/Context"
+class Inline extends Context.Service<Inline, {
+  readonly read: (organization: string, query: string) => number
+  write(actor: string, id: string, value: number): number
+  readonly one: (organization: string) => number
+  readonly ready: number
+}>()("Inline") {}
+interface Shape {
+  readonly read: (organization: string, query: string) => number
+}
+class Named extends Context.Service<Named, Shape>()("Named") {}
+type Alias = { readonly read: (organization: string, query: string) => number }
+class Aliased extends Context.Service<Aliased, Alias>()("Aliased") {}
+type DualRead = {
+  (query: string): (self: string) => number
+  (self: string, query: string): number
+}
+class Good extends Context.Service<Good, { readonly read: DualRead }>()("Good") {}
+interface LibraryOptions { read(organization: string, query: string): number }
+const options: LibraryOptions = { read: (organization, query) => 1 }
+`
+    expect(lines(source, helpersNotDual)).toEqual([3, 4, 9, 12])
+  })
+
+  it("requires Effect Function dual implementations in service layers, including shorthand and memory twins", () => {
+    const source = `import * as Layer from "effect/Layer"
+import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
+const live = Layer.effect(Store, Effect.gen(function* () {
+  const read = Effect.fn("read")(function* (organization: string, query: string) { return 1 })
+  return Store.of({ read, one: (organization: string) => 1 })
+}))
+const memory = Layer.succeed(Store, { read: (organization: string, query: string) => 1 })
+const good = Layer.succeed(Store, { read: dual(2, (self: string, query: string) => 1) })
+const fake = Layer.succeed(Store, { read: Other.dual(2, (organization: string, query: string) => 1) })
+const options = { read: (organization: string, query: string) => 1 }
+const library = Library.configure(options)
+`
+    expect(lines(source, helpersNotDual)).toEqual([6, 8, 10])
+  })
+
+  it("rejects wrong subjects, mismatched arities, missing currying and a foreign dual", () => {
+    const source = `import * as Context from "effect/Context"
+import * as Layer from "effect/Layer"
+import { dual } from "another-library"
+class Wrong extends Context.Service<Wrong, {
+  readonly order: { (q: string): (self: string) => number; (q: string, self: string): number }
+  readonly arity: { (q: string): (self: string) => number; (self: string, q: string, n: number): number }
+  readonly bare: { (self: string, q: string): number }
+  readonly types: { (q: number): (self: string) => number; (self: string, q: string): number }
+  readonly result: { (q: string): (self: string) => string; (self: string, q: string): number }
+}>()("Wrong") {}
+const memory = Layer.succeed(Wrong, { read: dual(2, (self: string, q: string) => 1) })
+`
+    expect(lines(source, helpersNotDual)).toEqual([5, 6, 7, 8, 9, 11])
+  })
+
+  it("resolves service implementations in their block and ignores callback objects", () => {
+    const source = `import * as Layer from "effect/Layer"
+import * as Effect from "effect/Effect"
+import * as F from "effect/Function"
+const read = F.dual(2, (self: string, query: string) => 1)
+const unrelated = Effect.gen(function* () {
+  const read = (self: string, query: string) => 1
+  return { read }
+})
+const live = Layer.effect(Store, Effect.gen(function* () {
+  const options = { callback: (self: string, query: string) => 1 }
+  Library.configure(options)
+  return Store.of({ read })
+}))
+`
+    expect(lines(source, helpersNotDual)).toEqual([6])
+  })
+
+  it("accepts multi-argument currying and optional-argument predicates, and rejects a shadowed dual", () => {
+    const source = `import * as Context from "effect/Context"
+import * as Layer from "effect/Layer"
+import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
+class Store extends Context.Service<Store, {
+  readonly run: {
+    (args: string[], options?: object): (self: string) => number
+    (self: string, args: string[], options?: object): number
+  }
+}>()("Store") {}
+const good = Layer.succeed(Store, { run: dual((args) => args.length >= 2, (self: string, args: string[], options?: object) => 1) })
+const bad = Layer.effect(Store, Effect.gen(function* () {
+  const dual = (arity: number, body: unknown) => body
+  return Store.of({ run: dual(2, (self: string, args: string[]) => 1) })
+}))
+`
+    expect(lines(source, helpersNotDual)).toEqual([14])
+  })
+
+  it("requires both forms for multi-parameter currying and leaves single-parameter json pipeable", () => {
+    const source = `import * as Context from "effect/Context"
+class Store extends Context.Service<Store, {
+  readonly json: (schema: string) => (path: string) => number
+  readonly twoRest: (query: string, limit: number) => (self: string) => number
+}>()("Store") {}
+`
+    expect(lines(source, helpersNotDual)).toEqual([4])
+  })
+
+  it("does not read callback options passed to an unrelated factory in Layer.succeed", () => {
+    const source = `import * as Layer from "effect/Layer"
+const live = Layer.succeed(Store, Library.configure({ callback: (organization: string, query: string) => 1 }))
+const owned = Layer.succeed(Store, Store.of({ read: (organization: string, query: string) => 1 }))
+`
+    expect(lines(source, helpersNotDual)).toEqual([3])
+  })
+
+  it.effect("prints an actionable line for a service method that has no dual contract", () =>
+    Effect.gen(function* () {
+      const source = `import * as Context from "effect/Context"
+export class Store extends Context.Service<Store, {
+  readonly read: (organization: string, query: string) => number
+}>()("Store") {}
+`
+      const said = yield* inTree({ "packages/x/src/store.ts": source }, inRepository(dualHelpers, dualSentence))
+      expect(said).toContain(`err: packages/x/src/store.ts:3  ${dualSpec.instead}`)
+    })
+  )
+
   it("reads a property that is not readonly, and not one in another library's augmented types", () => {
     // Each place is said: line 2 holds three (c, nested and f).
     expect(lines(shapes, mutableProperties)).toEqual([1, 2, 2, 2])

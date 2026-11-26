@@ -89,7 +89,7 @@ export const exactExports = Effect.fn("Exports.exactExports")(function* () {
             A.flatMap(files, (file) =>
               A.contains(targets, file)
                 ? A.empty<ExportsFinding>()
-                : A.of<ExportsFinding>(ExportsFinding.cases.Unlisted.make({ file: repo.relative(root, file) }))
+                : A.of<ExportsFinding>(ExportsFinding.cases.Unlisted.make({ file: repo.relative(file, root) }))
             )
           )
         ),

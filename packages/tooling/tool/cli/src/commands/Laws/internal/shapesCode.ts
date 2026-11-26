@@ -2,7 +2,7 @@
 //
 // A helper is a function of ours given a name where it is declared: `function f(a, b) {}`, `const f = (a, b) => …`
 // with no type of its own on `f`, or `const f = Effect.fn("f")(function* (a, b) {…})`. What a library's type sets the
-// order of is not read: a function handed to a call, a method or a callback in an object (a call's options, a
+// order of is not read outside service contracts and layer implementations: a function handed to a call, a method or a callback in an object (a call's options, a
 // reducer, an interface's method), a class's method, and a `const` typed by a library (`const f: Reducer = …`). The law covers the clear case and no more: a helper of two
 // values or more (a TypeScript `this` parameter is not one) that names one `cause`, `error`, `self` or `input` is
 // written `dual`, that one first; one written `dual(…)` that names it after another is refused too. Which value a
@@ -17,6 +17,7 @@
 // make readonly; a `declare namespace` of our own is read.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import { children, isNode, type Node } from "./tryCode.ts"
@@ -105,36 +106,330 @@ const nodesOf = (program: Node): ReadonlyArray<Node> => {
   return all
 }
 
+/** A named module member; unrelated libraries' similarly named helpers do not qualify. */
+const moduleMember = (call: Node, module: string, member: string): boolean => {
+  const callee = call["callee"]
+  return (
+    isNode(callee) &&
+    callee.type === "MemberExpression" &&
+    isNode(callee["object"]) &&
+    callee["object"]["name"] === module &&
+    isNode(callee["property"]) &&
+    callee["property"]["name"] === member
+  )
+}
+
+/** A local declaration, resolved only in the containing scope, with cycles left unread. */
+const localValue = (value: unknown, all: ReadonlyArray<Node>, seen: ReadonlyArray<number>): O.Option<Node> => {
+  const node = unwrapped(value)
+  if (!isNode(node) || A.contains(seen, node.start)) return O.none()
+  if (node.type !== "Identifier") return O.some(node)
+  const declarations = A.filter(
+    all,
+    (candidate) =>
+      candidate.type === "VariableDeclarator" &&
+      candidate.start < node.start &&
+      A.every(
+        all,
+        (scope) =>
+          scope.type !== "BlockStatement" ||
+          !(scope.start < candidate.start && candidate.end < scope.end) ||
+          (scope.start < node.start && node.end < scope.end)
+      ) &&
+      isNode(candidate["id"]) &&
+      candidate["id"]["name"] === node["name"]
+  )
+  return O.flatMap(
+    A.head(
+      A.sort(
+        declarations,
+        Order.mapInput(Order.Number, (declaration: Node) => -declaration.start)
+      )
+    ),
+    (declaration) => localValue(declaration["init"], all, [...seen, node.start])
+  )
+}
+
+/** Resolve a local interface or alias, without following imported library types. */
+const localType = (value: unknown, all: ReadonlyArray<Node>, seen: ReadonlyArray<string>): O.Option<Node> => {
+  if (!isNode(value)) return O.none()
+  if (value.type === "TSTypeAnnotation") return localType(value["typeAnnotation"], all, seen)
+  if (value.type !== "TSTypeReference") return O.some(value)
+  const name = value["typeName"]
+  if (!isNode(name) || !P.isString(name["name"]) || A.contains(seen, name["name"])) return O.none()
+  const key = name["name"]
+  return O.flatMap(
+    A.findFirst(
+      all,
+      (node) =>
+        (node.type === "TSInterfaceDeclaration" || node.type === "TSTypeAliasDeclaration") &&
+        isNode(node["id"]) &&
+        node["id"]["name"] === key
+    ),
+    (node) =>
+      localType(node.type === "TSInterfaceDeclaration" ? node["body"] : node["typeAnnotation"], all, [...seen, key])
+  )
+}
+
+const typeMembers = (node: Node): ReadonlyArray<Node> =>
+  nodesIn(node.type === "TSInterfaceBody" ? node["body"] : node["members"])
+
+/** Call signatures of a service property, including an object alias's overloads. */
+const signaturesOf = (member: Node, all: ReadonlyArray<Node>): ReadonlyArray<Node> => {
+  if (member.type === "TSMethodSignature") return [member]
+  return O.match(localType(member["typeAnnotation"], all, []), {
+    onNone: () => [],
+    onSome: (type) =>
+      type.type === "TSFunctionType"
+        ? [type]
+        : A.filter(typeMembers(type), (node) => node.type === "TSCallSignatureDeclaration")
+  })
+}
+
+/** Compare syntax, excluding parser locations and literal spelling. Imported types remain opaque names. */
+const sameSyntax = (left: unknown, right: unknown): boolean => {
+  if (left === right) return true
+  if (A.isArray(left) && A.isArray(right))
+    return left.length === right.length && A.every(left, (value, index) => sameSyntax(value, right[index]))
+  if (!P.isObject(left) || !P.isObject(right)) return false
+  const fields = (value: object) => A.filter(R.toEntries(value), ([key]) => !A.contains(["start", "end", "raw"], key))
+  const entries = fields(left)
+  return (
+    entries.length === fields(right).length &&
+    A.every(entries, ([key, value]) => O.exists(R.get(right, key), (other) => sameSyntax(value, other)))
+  )
+}
+
+const sameParameter = (left: Node, right: Node): boolean =>
+  left["optional"] === right["optional"] && sameSyntax(left["typeAnnotation"], right["typeAnnotation"])
+
+/** Match the subject, remaining parameter types and result type across the two call forms. */
+const hasDataLast = (first: Node, signatures: ReadonlyArray<Node>, all: ReadonlyArray<Node>): boolean => {
+  const direct = valuesOf(first)
+  const subject = A.head(direct)
+  if (!O.exists(subject, (parameter) => O.contains(parameterName(parameter), "self"))) return false
+  return A.some(signatures, (last) => {
+    const rest = valuesOf(last)
+    if (
+      rest.length !== direct.length - 1 ||
+      !A.every(rest, (parameter, index) =>
+        O.exists(A.get(direct, index + 1), (other) => sameParameter(parameter, other))
+      )
+    )
+      return false
+    return O.exists(
+      localType(last["returnType"], all, []),
+      (result) =>
+        result.type === "TSFunctionType" &&
+        valuesOf(result).length === 1 &&
+        O.exists(
+          A.head(valuesOf(result)),
+          (parameter) =>
+            O.contains(parameterName(parameter), "self") &&
+            O.exists(subject, (other) => sameParameter(parameter, other))
+        ) &&
+        sameSyntax(first["returnType"], result["returnType"])
+    )
+  })
+}
+
+/** Only the installed Effect Function module supplies the service implementation combinator. */
+const effectDual = (call: Node, all: ReadonlyArray<Node>): boolean => {
+  const callee = call["callee"]
+  if (!isNode(callee)) return false
+  const binding = callee.type === "MemberExpression" ? callee["object"] : callee
+  if (O.isSome(localValue(binding, all, []))) return false
+  return A.some(all, (node) => {
+    if (node.type !== "ImportDeclaration" || !isNode(node["source"]) || node["source"]["value"] !== "effect/Function")
+      return false
+    return A.some(nodesIn(node["specifiers"]), (specifier) => {
+      const local = specifier["local"]
+      if (!isNode(local)) return false
+      if (specifier.type === "ImportNamespaceSpecifier")
+        return P.isString(local["name"]) && moduleMember(call, local["name"], "dual")
+      const imported = specifier["imported"]
+      return (
+        isNode(imported) &&
+        imported["name"] === "dual" &&
+        callee.type === "Identifier" &&
+        callee["name"] === local["name"]
+      )
+    })
+  })
+}
+
+/** Only the layer factory's own returns construct its service; callback return values belong to the callback. */
+const layerReturns = (effect: Node): ReadonlyArray<Node> => {
+  const factory = A.findFirst(
+    nodesOf(effect),
+    (node) => node.type === "CallExpression" && effectMember(node, ["gen", "sync"])
+  )
+  if (O.isNone(factory)) return []
+  const body = A.findFirst(nodesIn(factory.value["arguments"]), isFunction)
+  if (O.isNone(body) || !isNode(body.value["body"])) return []
+  const found: Array<Node> = []
+  const left: Array<Node> = [body.value["body"]]
+  while (A.isArrayNonEmpty(left)) {
+    const node = A.lastNonEmpty(left)
+    left.splice(-1, 1)
+    if (
+      node.type === "FunctionExpression" ||
+      node.type === "ArrowFunctionExpression" ||
+      node.type === "FunctionDeclaration"
+    )
+      continue
+    if (node.type === "ReturnStatement") found.push(node)
+    else for (const child of children(node)) left.push(child)
+  }
+  return found
+}
+
+/** Service contracts and the exact objects supplied to service layers. */
+const servicesNotDual = (all: ReadonlyArray<Node>): ReadonlyArray<number> => {
+  const found: Array<number> = []
+  for (const node of all) {
+    if (node.type === "ClassDeclaration" && isNode(node["superClass"])) {
+      const outer = node["superClass"]
+      const call = outer["callee"]
+      if (isNode(call) && call.type === "CallExpression" && moduleMember(call, "Context", "Service")) {
+        const args = call["typeArguments"]
+        const shape = isNode(args) ? A.get(nodesIn(args["params"]), 1) : O.none()
+        for (const type of A.fromOption(O.flatMap(shape, (value) => localType(value, all, [])))) {
+          for (const member of typeMembers(type)) {
+            const signatures = signaturesOf(member, all)
+            if (
+              A.some(signatures, (signature) => {
+                const returned = localType(signature["returnType"], all, [])
+                if (O.exists(returned, (result) => result.type === "TSFunctionType")) {
+                  return (
+                    valuesOf(signature).length >= 2 &&
+                    !A.some(
+                      signatures,
+                      (direct) => valuesOf(direct).length >= 2 && hasDataLast(direct, [signature], all)
+                    )
+                  )
+                }
+                return valuesOf(signature).length >= 2 && !hasDataLast(signature, signatures, all)
+              })
+            ) {
+              found.push(member.start)
+            }
+          }
+        }
+      }
+    }
+    if (
+      node.type !== "CallExpression" ||
+      !(moduleMember(node, "Layer", "effect") || moduleMember(node, "Layer", "succeed"))
+    )
+      continue
+    const args = nodesIn(node["arguments"])
+    const service = A.head(args)
+    const supplied = A.get(args, 1)
+    if (O.isNone(service) || O.isNone(supplied)) continue
+    const objects: Array<Node> = []
+    if (moduleMember(node, "Layer", "succeed")) {
+      const direct = localValue(supplied.value, all, [])
+      if (
+        O.isSome(direct) &&
+        (direct.value.type === "ObjectExpression" ||
+          (direct.value.type === "CallExpression" &&
+            P.isString(service.value["name"]) &&
+            moduleMember(direct.value, service.value["name"], "of")))
+      )
+        objects.push(direct.value)
+    } else {
+      for (const returned of layerReturns(supplied.value)) {
+        if (returned.type !== "ReturnStatement") continue
+        const value = localValue(returned["argument"], all, [])
+        if (
+          O.isSome(value) &&
+          (value.value.type === "ObjectExpression" ||
+            (value.value.type === "CallExpression" &&
+              P.isString(service.value["name"]) &&
+              moduleMember(value.value, service.value["name"], "of")))
+        ) {
+          objects.push(value.value)
+        }
+      }
+    }
+    for (const object of objects) {
+      const made = object.type === "CallExpression" ? A.head(nodesIn(object["arguments"])) : O.some(object)
+      if (O.isNone(made)) continue
+      const resolved = localValue(made.value, all, [])
+      if (O.isNone(resolved) || resolved.value.type !== "ObjectExpression") continue
+      for (const property of nodesIn(resolved.value["properties"])) {
+        const value = localValue(property["value"], all, [])
+        if (O.isNone(value)) continue
+        const implementation = value.value
+        if (implementation.type === "CallExpression" && effectDual(implementation, all)) {
+          const bodies = A.flatMap(nodesIn(implementation["arguments"]), (argument) =>
+            isFunction(argument) ? [argument] : A.fromOption(effectFnBody(argument))
+          )
+          if (
+            A.some(
+              bodies,
+              (body) =>
+                valuesOf(body).length >= 2 &&
+                !O.exists(A.head(valuesOf(body)), (parameter) => O.contains(parameterName(parameter), "self"))
+            )
+          )
+            found.push(property.start)
+          continue
+        }
+        const body =
+          implementation.type === "CallExpression"
+            ? effectFnBody(implementation)
+            : isFunction(implementation)
+              ? O.some(implementation)
+              : O.none()
+        if (
+          O.exists(body, (fn) => valuesOf(fn).length >= 2) ||
+          (implementation.type === "CallExpression" && O.exists(calleeName(implementation), (name) => name === "dual"))
+        ) {
+          found.push(property.start)
+        }
+      }
+    }
+  }
+  return A.dedupe(found)
+}
+
 /**
  * Where a declared helper of two values or more names the value it acts on and is not `dual`.
  *
  * @example helpersNotDual(program of "const refusal = (method, key, cause) => 1") // [its offset]
  */
-export const helpersNotDual = (program: Node): ReadonlyArray<number> =>
-  A.flatMap(nodesOf(program), (node) => {
-    if (node.type === "FunctionDeclaration" && namesSubject(node)) return [node.start]
-    if (node.type !== "VariableDeclarator") return []
-    const init = unwrapped(node["init"])
-    // `dual(2, (self, that) => …)`: dual, so it is read only for the order of its values, typed or not (the house
-    // style writes a dual's two signatures on the const).
-    if (isNode(init) && init.type === "CallExpression" && O.exists(calleeName(init), (name) => name === "dual")) {
-      // Its body is a function, or one an `Effect.fn` makes (`dual(2, Effect.fn("f")(function* (self, n) …))`).
-      const bodies = A.flatMap(nodesIn(init["arguments"]), (argument): ReadonlyArray<Node> =>
-        argument.type === "CallExpression"
-          ? A.fromOption(effectFnBody(argument))
-          : isFunction(argument)
-            ? [argument]
-            : []
-      )
-      return A.some(bodies, subjectAfterFirst) ? [node.start] : []
-    }
-    // Any other `const` with a type of its own is typed by that type, which sets its order. Without the checker the
-    // law cannot tell a type of ours from a library's, so neither is read.
-    if (isNode(node["id"]) && isNode(node["id"]["typeAnnotation"])) return []
-    if (isFunction(init)) return namesSubject(init) ? [node.start] : []
-    if (!isNode(init) || init.type !== "CallExpression") return []
-    return O.exists(effectFnBody(init), namesSubject) ? [node.start] : []
-  })
+export const helpersNotDual = (program: Node): ReadonlyArray<number> => {
+  const all = nodesOf(program)
+  return A.dedupe([
+    ...servicesNotDual(all),
+    ...A.flatMap(all, (node) => {
+      if (node.type === "FunctionDeclaration" && namesSubject(node)) return [node.start]
+      if (node.type !== "VariableDeclarator") return []
+      const init = unwrapped(node["init"])
+      // `dual(2, (self, that) => …)`: dual, so it is read only for the order of its values, typed or not (the house
+      // style writes a dual's two signatures on the const).
+      if (isNode(init) && init.type === "CallExpression" && O.exists(calleeName(init), (name) => name === "dual")) {
+        // Its body is a function, or one an `Effect.fn` makes (`dual(2, Effect.fn("f")(function* (self, n) …))`).
+        const bodies = A.flatMap(nodesIn(init["arguments"]), (argument): ReadonlyArray<Node> =>
+          argument.type === "CallExpression"
+            ? A.fromOption(effectFnBody(argument))
+            : isFunction(argument)
+              ? [argument]
+              : []
+        )
+        return A.some(bodies, subjectAfterFirst) ? [node.start] : []
+      }
+      // Any other `const` with a type of its own is typed by that type, which sets its order. Without the checker the
+      // law cannot tell a type of ours from a library's, so neither is read.
+      if (isNode(node["id"]) && isNode(node["id"]["typeAnnotation"])) return []
+      if (isFunction(init)) return namesSubject(init) ? [node.start] : []
+      if (!isNode(init) || init.type !== "CallExpression") return []
+      return O.exists(effectFnBody(init), namesSubject) ? [node.start] : []
+    })
+  ])
+}
 
 /** Whether a module declaration augments another's types: `declare global`, or `declare module "…"` named by a string. */
 const augments = (node: Node): boolean =>

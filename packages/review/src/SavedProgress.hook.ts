@@ -1,6 +1,7 @@
 // The browser half of saved progress: the chosen file in IndexedDB, the progress as an atom per key that is the
 // browser's own record of it (`Atom.kvs` over `localStorage`), and the hook a screen reads it with. The stored shape
 // and its keys are in `SavedProgress.schema.ts`.
+import { fileDatabase } from "./internal/browser.ts"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
@@ -20,8 +21,9 @@ const files = "files"
 export class FileNotKept extends S.TaggedError<FileNotKept, { readonly brand: unique symbol }>()("FileNotKept", {}) {}
 
 const openFiles = Effect.callback<IDBDatabase, FileNotKept>((resume) => {
-  if (typeof indexedDB === "undefined") return resume(Effect.fail(FileNotKept.make()))
-  const request = indexedDB.open(database, 1)
+  const available = fileDatabase()
+  if (O.isNone(available)) return resume(Effect.fail(FileNotKept.make()))
+  const request = available.value.open(database, 1)
   request.onupgradeneeded = () => request.result.createObjectStore(files)
   request.onsuccess = () => resume(Effect.succeed(request.result))
   request.onerror = () => resume(Effect.fail(FileNotKept.make()))
@@ -81,9 +83,9 @@ const noProgress: Atom.Writable<O.Option<SavedProgress>, O.Option<SavedProgress>
  * history there with every decision). With no scope yet nothing is read or written.
  */
 export const progressOf = (
-  scope: ProgressScope | undefined
+  scope: O.Option<ProgressScope>
 ): Atom.Writable<O.Option<SavedProgress>, O.Option<SavedProgress>> =>
-  scope === undefined ? noProgress : progressAt(progressKey(scope))
+  O.match(scope, { onNone: () => noProgress, onSome: (scope) => progressAt(progressKey(scope)) })
 
 /** The progress to keep after a change: what was kept (or a first record), the change over it, and the time now. */
 export const progressWith = (input: {
@@ -91,9 +93,10 @@ export const progressWith = (input: {
   readonly change: Partial<Omit<SavedProgress, "version" | "savedAt">>
 }): O.Option<SavedProgress> => {
   const now = DateTime.nowUnsafe()
-  return O.some(
-    SavedProgress.make({ ...O.getOrElse(input.before, () => SavedProgress.first(now)), ...input.change, savedAt: now })
-  )
+  return O.match(input.before, {
+    onNone: () => O.some(SavedProgress.make({ ...SavedProgress.first(now), ...input.change, savedAt: now })),
+    onSome: (before) => O.some(SavedProgress.make({ ...before, ...input.change, savedAt: now }))
+  })
 }
 
 /**
@@ -106,40 +109,36 @@ export const progressWith = (input: {
  * anywhere interrupts it.
  */
 export function useSavedProgress(
-  scope: ProgressScope | undefined,
+  scope: O.Option<ProgressScope>,
   browserRuntime: ManagedRuntime.ManagedRuntime<never, never>
 ) {
   const at = progressOf(scope)
   const kept = useAtomValue(at)
-  const saved = O.getOrUndefined(kept)
+  const saved = kept
   // Given a function, the setter works the change out from the progress as it stands when written, so two changes in
   // one tick both land.
   const update = useAtomSet(at)
 
   const save = (change: Partial<Omit<SavedProgress, "version" | "savedAt">>) => {
-    if (scope === undefined) return
+    if (O.isNone(scope)) return
     update((before) => progressWith({ before, change }))
   }
 
   const keepFile = (file: File) => {
-    if (scope === undefined) return
-    browserRuntime.runFork(saveFile(scope, file).pipe(Effect.ignore))
+    if (O.isNone(scope)) return
+    browserRuntime.runFork(saveFile(scope.value, file).pipe(Effect.ignore))
   }
 
-  const file = (): Promise<File | undefined> =>
-    scope === undefined
-      ? Promise.resolve(undefined)
-      : browserRuntime.runPromise(
-          loadFile(scope).pipe(
-            Effect.map(O.getOrUndefined),
-            Effect.orElseSucceed(() => undefined)
-          )
-        )
+  const file = (): Promise<O.Option<File>> =>
+    O.match(scope, {
+      onNone: () => Promise.resolve(O.none<File>()),
+      onSome: (scope) => browserRuntime.runPromise(loadFile(scope).pipe(Effect.orElseSucceed(O.none<File>)))
+    })
 
   const clear = () => {
-    if (scope === undefined) return
+    if (O.isNone(scope)) return
     update(() => O.none())
-    browserRuntime.runFork(dropFile(scope).pipe(Effect.ignore))
+    browserRuntime.runFork(dropFile(scope.value).pipe(Effect.ignore))
   }
 
   return { saved, save, keepFile, file, clear }

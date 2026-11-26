@@ -7,6 +7,7 @@ import { pipe } from "effect/Function"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import * as S from "effect/Schema"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as Str from "effect/String"
 import {
   CheckIcon,
@@ -55,7 +56,7 @@ import { type Theme, theme as themeChoice } from "@inventory/ui/Theme"
 import { BrandMark } from "./BrandMark.tsx"
 
 /** A page the sidebar links to. `path` is its address; `icon` is all that shows when the sidebar is collapsed. */
-export type AppPage = { path: string; label: string; icon: LucideIcon }
+export type AppPage = { readonly path: string; readonly label: string; readonly icon: LucideIcon }
 
 /** The app's pages, in the order the sidebar lists them. */
 export const appPages: ReadonlyArray<AppPage> = [
@@ -65,18 +66,27 @@ export const appPages: ReadonlyArray<AppPage> = [
   { path: "/people", label: "People", icon: UsersIcon }
 ]
 
-const initials = (name: string): string =>
-  pipe(
-    Str.split(name, /\s+/),
-    A.map((word) => O.getOrElse(Str.at(word, 0), () => "")),
-    A.join(""),
-    Str.takeLeft(2),
-    Str.toUpperCase
-  )
+/** The initials displayed for a name: the original first-letter, two-character and uppercase rules. */
+const Initials = S.String.pipe(
+  S.decodeTo(S.String, {
+    decode: SchemaGetter.transform((name: string) =>
+      pipe(
+        Str.split(name, /\s+/),
+        A.map((word) => Str.at(word, 0)),
+        A.getSomes,
+        A.join(""),
+        Str.takeLeft(2)
+      )
+    ),
+    encode: SchemaGetter.passthrough()
+  }),
+  S.decodeTo(S.String, { decode: SchemaGetter.toUpperCase(), encode: SchemaGetter.passthrough() }),
+  S.annotate({ description: "The two initials shown in the signed-in person's avatar" })
+)
 
 const roleWords = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
-const themes: ReadonlyArray<{ value: Theme; label: string; icon: LucideIcon }> = [
+const themes: ReadonlyArray<{ readonly value: Theme; readonly label: string; readonly icon: LucideIcon }> = [
   { value: "light", label: "Light", icon: SunIcon },
   { value: "dark", label: "Dark", icon: MoonIcon },
   { value: "system", label: "System", icon: MonitorIcon }
@@ -104,7 +114,7 @@ const switchSaid = Atom.fn(
     const switching = toast.loading(`Switching to ${target.name}`)
     const exit = yield* Effect.exit(get.setResult(switchOrganization, target.id))
     toast.dismiss(switching)
-    if (Exit.isFailure(exit)) toastError(Cause.squash(exit.cause), { lead: `Still in ${target.from}.` })
+    if (Exit.isFailure(exit)) toastError(Cause.squash(exit.cause), { lead: O.some(`Still in ${target.from}.`) })
   })
 )
 
@@ -125,7 +135,7 @@ const signInSaid = Atom.fn(
       Effect.catch((refused) =>
         Effect.sync(() => {
           toast.dismiss(switching)
-          toastError(refused.cause, { lead: `Still signed in as ${target.from}.` })
+          toastError(refused.cause, { lead: O.some(`Still signed in as ${target.from}.`) })
         })
       )
     )
@@ -135,7 +145,9 @@ const signInSaid = Atom.fn(
 /** Signing out; a refusal is said, and the person stays signed in. */
 const signOutSaid = Atom.fn(() =>
   Effect.tryPromise({ try: () => signOut(), catch: (cause) => AccountNotChanged.make({ cause }) }).pipe(
-    Effect.catch((refused) => Effect.sync(() => toastError(refused.cause, { lead: "You are still signed in." })))
+    Effect.catch((refused) =>
+      Effect.sync(() => toastError(refused.cause, { lead: O.some("You are still signed in.") }))
+    )
   )
 )
 
@@ -144,10 +156,11 @@ const signOutSaid = Atom.fn(() =>
  * server changes the session's organization after checking membership, and everything on screen is asked for again.
  */
 function OrganizationPicker() {
-  const { actor, organizations } = useAtomValue(sessionView)
+  const { actor: member, organizations } = useAtomValue(sessionView)
   const switchTo = useAtomSet(switchSaid)
   const { isMobile } = useSidebar()
-  if (actor === undefined) return null
+  if (O.isNone(member)) return null
+  const actor = member.value
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -181,7 +194,7 @@ function OrganizationPicker() {
                   key={organization.id}
                   onSelect={() => {
                     if (organization.id !== actor.organizationId) {
-                      navigate(addressInAnother(window.location))
+                      navigate(addressInAnother(window.location), { replace: false })
                       // The server checks the membership, so the switch is not shown before it answers: it says
                       // what it is doing, and the pages show their skeletons once it has.
                       switchTo({ id: organization.id, name: organization.name, from: actor.organizationName })
@@ -208,28 +221,33 @@ function OrganizationPicker() {
  * test accounts (TEST_ACCOUNTS, on in development only), signing in as another of them in one click.
  */
 function UserMenu() {
-  const { actor, email, features } = useAtomValue(sessionView)
+  const { actor: member, email, features } = useAtomValue(sessionView)
   const theme = useAtomValue(themeChoice)
   const setTheme = useAtomSet(themeChoice)
   const signInTo = useAtomSet(signInSaid)
   const leave = useAtomSet(signOutSaid)
   const { isMobile } = useSidebar()
-  if (actor === undefined) return null
+  if (O.isNone(member)) return null
+  const actor = member.value
   // The test accounts other than the signed-in one, with the password they share: only while the server offers them.
   const offered = O.flatMap(features, (known) =>
     O.flatMap(known.testAccounts, (accounts) => {
-      const others = A.filter(accounts.accounts, (account) => account.email !== email)
+      const others = A.filter(accounts.accounts, (account) => !O.contains(email, account.email))
       return others.length === 0 ? O.none() : O.some({ password: accounts.password, others })
     })
   )
   const who = (
     <>
       <Avatar>
-        <AvatarFallback>{initials(actor.name)}</AvatarFallback>
+        <AvatarFallback>
+          {O.match(S.decodeOption(Initials)(actor.name), { onNone: () => null, onSome: (initials) => initials })}
+        </AvatarFallback>
       </Avatar>
       <span className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{actor.name}</span>
-        <span className="truncate text-xs text-muted-foreground">{email}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {O.match(email, { onNone: () => null, onSome: (email) => email })}
+        </span>
       </span>
     </>
   )
@@ -329,7 +347,7 @@ function UserMenu() {
  * The app's sidebar: the organization at the top, the pages, and the signed-in person at the foot. It folds to a
  * strip of icons (the rail, the header's button or Ctrl+B) and is a drawer on a phone.
  */
-export function AppSidebar(props: { current: string | undefined }) {
+export function AppSidebar(props: { readonly current: string | undefined }) {
   const { isMobile, setOpenMobile } = useSidebar()
   return (
     <Sidebar collapsible="icon">
@@ -353,7 +371,10 @@ export function AppSidebar(props: { current: string | undefined }) {
                     <a
                       aria-current={page.path === props.current ? "page" : undefined}
                       // On a phone the sidebar is a drawer over the page: going somewhere closes it.
-                      {...linkTo(page.path, () => setOpenMobile(false))}
+                      {...linkTo(
+                        page.path,
+                        O.some(() => setOpenMobile(false))
+                      )}
                     >
                       <page.icon />
                       <span>{page.label}</span>

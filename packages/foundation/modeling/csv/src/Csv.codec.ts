@@ -11,6 +11,7 @@
  * @packageDocumentation
  */
 import * as A from "effect/Array"
+import { dual } from "effect/Function"
 import * as ByteSize from "effect/ByteSize"
 import * as Channel from "effect/Channel"
 import * as Effect from "effect/Effect"
@@ -30,7 +31,7 @@ import {
   CsvDetectEncoding,
   CsvReadOptions,
   CsvWriteOptions,
-  type CsvDelimiter
+  CsvDelimiter
 } from "./CsvOptions.schema.ts"
 
 type CodecOptions = CsvCodecOptions | { readonly read: ReadOptions; readonly write: WriteOptions }
@@ -63,6 +64,10 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 
 // ── reading ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+const SepLineMatch = S.Tuple([S.String, CsvDelimiter, S.String]).annotate({
+  description: "A successful sep-line match, its required delimiter and line ending"
+})
+
 const sepLine = /^sep=([,;\t|])(\r\n|\n|\r)/
 
 interface Prepared {
@@ -73,13 +78,18 @@ interface Prepared {
 }
 
 /** Strips a BOM, honours a `sep=` line when asked, and settles the delimiter. */
-const prepare = (input: string, options: ReadOptions): Prepared => {
+const prepare: {
+  (options: ReadOptions): (input: string) => Prepared
+  (input: string, options: ReadOptions): Prepared
+} = dual(2, (input: string, options: ReadOptions): Prepared => {
   const bom = Str.startsWith("﻿")(input)
   const unmarked = bom ? Str.slice(1)(input) : input
-  const sep = options.excelSepHint ? O.fromNullishOr(sepLine.exec(unmarked)) : O.none()
+  const sep = options.excelSepHint
+    ? O.flatMap(O.fromNullishOr(sepLine.exec(unmarked)), S.decodeUnknownOption(SepLineMatch))
+    : O.none()
   const text = O.match(sep, { onNone: () => unmarked, onSome: (match) => Str.slice(match[0].length)(unmarked) })
   const delimiter: CsvDelimiterFound = O.match(sep, {
-    onSome: (match) => CsvDelimiterFromSepLine.make({ delimiter: (match[1] ?? ",") as CsvDelimiter }),
+    onSome: (match) => CsvDelimiterFromSepLine.make({ delimiter: match[1] }),
     onNone: () =>
       options.delimiter.kind === "fixed"
         ? CsvDelimiterGiven.make({ delimiter: options.delimiter.delimiter })
@@ -108,7 +118,7 @@ const prepare = (input: string, options: ReadOptions): Prepared => {
       limits: options.limits
     })
   }
-}
+})
 
 interface Ran {
   readonly records: ReadonlyArray<RawRecord>
@@ -241,8 +251,14 @@ const WHOLE = Number.MAX_SAFE_INTEGER
 
 // ── schema plumbing ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-const issue = (error: CsvParseError, input: unknown): SchemaIssue.Issue =>
-  new SchemaIssue.InvalidValue({ message: error.message }, input)
+const issue: {
+  (actual: unknown): (error: CsvParseError) => SchemaIssue.Issue
+  (error: CsvParseError, actual: unknown): SchemaIssue.Issue
+} = dual(
+  2,
+  (error: CsvParseError, actual: unknown): SchemaIssue.Issue =>
+    new SchemaIssue.InvalidValue({ message: error.message }, actual)
+)
 
 const tableFromText = (text: string, options: CodecOptions) =>
   Effect.mapBoth(Effect.fromResult(readText(text, options.read, WHOLE, noProgress)), {
@@ -345,8 +361,8 @@ const decodeStringChannel = <IE, Done>(
   Channel.identity<A.NonEmptyReadonlyArray<string>, IE, Done>().pipe(
     Channel.mapAccum(
       (): Pending => ({ phase: "buffering", buffer: "", first: true }),
-      (pending, chunks: A.NonEmptyReadonlyArray<string>) =>
-        stepText(pending, A.join(chunks, ""), options) as readonly [Pending, ReadonlyArray<Emitted>],
+      (pending, chunks: A.NonEmptyReadonlyArray<string>): readonly [Pending, ReadonlyArray<Emitted>] =>
+        stepText(pending, A.join(chunks, ""), options),
       { onHalt: (pending) => [...haltText(pending, options)] }
     ),
     Channel.mapEffect(failOnError)
@@ -387,8 +403,9 @@ const concatBytes = (left: Uint8Array, right: Uint8Array): Uint8Array => {
 
 /** How many trailing bytes start a UTF-8 sequence that the chunk does not finish. */
 const incompleteTail = (bytes: Uint8Array): number => {
-  for (let back = 1; back <= Math.min(3, bytes.length); back += 1) {
-    const b = bytes[bytes.length - back] ?? 0
+  let back = 0
+  for (const b of bytes.slice(Math.max(0, bytes.length - 3)).reverse()) {
+    back += 1
     if ((b & 0xc0) === 0x80) continue
     const need = b >= 0xf0 ? 4 : b >= 0xe0 ? 3 : b >= 0xc0 ? 2 : 1
     return need > back ? back : 0
@@ -488,8 +505,8 @@ const bytesToText = <IE, Done>(
       (pending, chunks: A.NonEmptyReadonlyArray<Uint8Array>) =>
         A.reduce(
           chunks,
-          [pending, [] as ReadonlyArray<Text>] as readonly [BytesPending, ReadonlyArray<Text>],
-          (acc, chunk) => {
+          [pending, A.empty<Text>()],
+          (acc: readonly [BytesPending, ReadonlyArray<Text>], chunk): readonly [BytesPending, ReadonlyArray<Text>] => {
             const [next, texts] = stepBytes(acc[0], chunk, options)
             return [next, [...acc[1], ...texts]] as const
           }
@@ -517,7 +534,7 @@ const encodeStringChannel = <IE, Done>(
         onHalt: (first) => (!first && options.finalTerminator ? [options.terminator === "CRLF" ? "\r\n" : "\n"] : [])
       }
     ),
-    Channel.map((text) => A.of(text) as A.NonEmptyReadonlyArray<string>)
+    Channel.map((text) => A.of(text))
   )
 
 // ── the facade ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -529,13 +546,14 @@ const encodeStringChannel = <IE, Done>(
  *
  * ```ts
  * import { Csv } from "@beep/csv/Csv"
+ * import { CsvReadOptions } from "@beep/csv/CsvOptions"
  * import { CsvRead } from "@beep/csv/CsvRead"
- * import * as Result from "effect/Result"
+ * import * as Effect from "effect/Effect"
  *
- * const read = Result.getOrThrow(Csv.parseResult('SKU;Name\nBRK-040;"Bracket" 40 mm\n'))
- * read.table.records // => [["SKU", "Name"], ["BRK-040", 'Bracket" 40 mm\n']] (quote read past, as a warning)
- * read.delimiter.delimiter // => ";"
- * CsvRead.warnings(read).length // => 1
+ * const program = Effect.gen(function* () {
+ *   const read = yield* Csv.parse('SKU;Name\nBRK-040;"Bracket" 40 mm\n', CsvReadOptions.default)
+ *   return { records: read.table.records, delimiter: read.delimiter.delimiter, warnings: CsvRead.warnings(read).length }
+ * })
  * ```
  *
  * @category utilities
@@ -544,28 +562,22 @@ export class Csv {
   private constructor() {}
 
   /** Reads CSV text, synchronously. A lenient read succeeds with its warnings in `outcome`. */
-  static parseResult(
-    text: string,
-    options: CsvReadOptions = CsvReadOptions.default
-  ): Result.Result<CsvRead, CsvParseError> {
+  static parseResult(text: string, options: CsvReadOptions): Result.Result<CsvRead, CsvParseError> {
     return readText(text, options, WHOLE, noProgress)
   }
 
   /** {@link Csv.parseResult} as an `Effect`, with its span. */
-  static readonly parse = Effect.fn("Csv.parse")((text: string, options?: CsvReadOptions) =>
+  static readonly parse = Effect.fn("Csv.parse")((text: string, options: CsvReadOptions) =>
     Effect.fromResult(Csv.parseResult(text, options))
   )
 
   /** Reads CSV bytes, detecting or fixing the encoding; `source` says how. */
-  static parseBytesResult(
-    bytes: Uint8Array,
-    options: CsvReadOptions = CsvReadOptions.default
-  ): Result.Result<CsvRead, CsvParseError> {
+  static parseBytesResult(bytes: Uint8Array, options: CsvReadOptions): Result.Result<CsvRead, CsvParseError> {
     return readBytes(bytes, options, WHOLE, noProgress)
   }
 
   /** {@link Csv.parseBytesResult} as an `Effect`, with its span. */
-  static readonly parseBytes = Effect.fn("Csv.parseBytes")((bytes: Uint8Array, options?: CsvReadOptions) =>
+  static readonly parseBytes = Effect.fn("Csv.parseBytes")((bytes: Uint8Array, options: CsvReadOptions) =>
     Effect.fromResult(Csv.parseBytesResult(bytes, options))
   )
 
@@ -596,20 +608,17 @@ export class Csv {
   }
 
   /** Writes a table as canonical CSV text. Total: every table has a spelling. */
-  static stringify(table: Pick<CsvTable, "records">, options: CsvWriteOptions = CsvWriteOptions.default): string {
+  static stringify(table: Pick<CsvTable, "records">, options: CsvWriteOptions): string {
     return writeTable({ table, options })
   }
 
   /** Writes a table as UTF-8 bytes. */
-  static stringifyBytes(
-    table: Pick<CsvTable, "records">,
-    options: CsvWriteOptions = CsvWriteOptions.default
-  ): Uint8Array {
+  static stringifyBytes(table: Pick<CsvTable, "records">, options: CsvWriteOptions): Uint8Array {
     return encodeUtf8(Csv.stringify(table, options))
   }
 
   /** A `Codec<CsvTable, string>`: decode reads (warnings are dropped; call `parse` to see them), encode writes. */
-  static fromString(options: CsvCodecOptions = CsvCodecOptions.default): S.Codec<CsvTable, string> {
+  static fromString(options: CsvCodecOptions): S.Codec<CsvTable, string> {
     return S.String.pipe(
       S.decodeTo(
         CsvTable,
@@ -623,10 +632,10 @@ export class Csv {
   }
 
   /** {@link Csv.fromString} with every default, pre-bound. */
-  static readonly CsvFromString: S.Codec<CsvTable, string> = Csv.fromString()
+  static readonly CsvFromString: S.Codec<CsvTable, string> = Csv.fromString(CsvCodecOptions.default)
 
   /** A `Codec<CsvTable, Uint8Array>`: bytes decode through the encoding rules, encode as UTF-8. */
-  static fromBytes(options: CsvCodecOptions = CsvCodecOptions.default): S.Codec<CsvTable, Uint8Array> {
+  static fromBytes(options: CsvCodecOptions): S.Codec<CsvTable, Uint8Array> {
     return S.Uint8Array.pipe(
       S.decodeTo(
         CsvTable,
@@ -649,9 +658,7 @@ export class Csv {
    * A codec of rows keyed by the first record's headings. An empty or repeated heading fails the decode; a heading
    * named `__proto__` is an ordinary key.
    */
-  static recordsFromString(
-    options: CsvCodecOptions = CsvCodecOptions.default
-  ): S.Codec<ReadonlyArray<HeaderRow>, string> {
+  static recordsFromString(options: CsvCodecOptions): S.Codec<ReadonlyArray<HeaderRow>, string> {
     return S.String.pipe(
       S.decodeTo(
         S.Array(S.Record(S.String, S.String)),
@@ -659,17 +666,11 @@ export class Csv {
           decode: (text: string) =>
             Effect.flatMap(tableFromText(text, options), (table) =>
               Effect.mapError(Effect.fromResult(toHeaderRows(table)), (fatals) =>
-                issue(
-                  CsvParseError.make({ diagnostics: A.isReadonlyArrayNonEmpty(fatals) ? fatals : ([] as never) }),
-                  text
-                )
+                issue(CsvParseError.make({ diagnostics: fatals }), text)
               )
             ),
           encode: (rows: ReadonlyArray<HeaderRow>) => {
-            const header = O.getOrElse(
-              O.map(A.head(rows), (row) => R.keys(row)),
-              () => []
-            )
+            const header = O.match(A.head(rows), { onNone: A.empty<string>, onSome: R.keys })
             const records = A.map([header, ...A.map(rows, (row) => A.map(header, (name) => row[name] ?? ""))], (r) =>
               A.isReadonlyArrayNonEmpty(r) ? r : ([""] as const)
             )
@@ -687,13 +688,16 @@ export class Csv {
 
   /** Composes the header view with a target schema: `Csv.schema(S.Array(Row))`. */
   static readonly schema: TextDecodeTo<CsvCodecOptions> = makeTextDecodeTo((options?: CsvCodecOptions) =>
-    Csv.recordsFromString(options)
+    O.match(O.fromUndefinedOr(options), {
+      onNone: () => Csv.recordsFromString(CsvCodecOptions.default),
+      onSome: Csv.recordsFromString
+    })
   )
 
   /** Binds a target schema to the header view once, with its two directions. */
   static bind<T, E, RD = never, RE = never>(
     target: S.Codec<T, E, RD, RE>,
-    options: CsvCodecOptions = CsvCodecOptions.default
+    options: CsvCodecOptions
   ): CsvBoundCodec<T, RD, RE> {
     const schema = Csv.recordsFromString(options).pipe(S.decodeTo(target))
     return { schema, decode: S.decodeEffect(schema), encode: S.encodeEffect(schema) }
@@ -701,7 +705,7 @@ export class Csv {
 
   /** A channel from text chunks to records with where they were; a fatal finding fails it. */
   static decodeString<IE = never, Done = unknown>(
-    options: CsvReadOptions = CsvReadOptions.default
+    options: CsvReadOptions
   ): Channel.Channel<
     A.NonEmptyReadonlyArray<CsvRecordSlice>,
     IE | CsvParseError,
@@ -715,7 +719,7 @@ export class Csv {
 
   /** A channel from bytes to records: the encoding is decided within the detect window, then held. */
   static decode<IE = never, Done = unknown>(
-    options: CsvReadOptions = CsvReadOptions.default
+    options: CsvReadOptions
   ): Channel.Channel<
     A.NonEmptyReadonlyArray<CsvRecordSlice>,
     IE | CsvParseError,
@@ -733,7 +737,7 @@ export class Csv {
    */
   static decodeSchema<Row extends S.Top>(row: Row) {
     return <IE = never, Done = unknown>(
-      options: CsvReadOptions = CsvReadOptions.default
+      options: CsvReadOptions
     ): Channel.Channel<
       A.NonEmptyReadonlyArray<Row["Type"]>,
       IE | CsvParseError | S.SchemaError,
@@ -743,26 +747,27 @@ export class Csv {
       Done,
       Row["DecodingServices"]
     > => {
-      const decodeRows = S.decodeUnknownEffect(S.Array(row))
+      const decodeRows = S.decodeUnknownEffect(S.NonEmptyArray(row))
       return Csv.decode<IE, Done>(options).pipe(
         Channel.mapAccum(
           (): O.Option<CsvRecord> => O.none(),
           (header, slices: A.NonEmptyReadonlyArray<CsvRecordSlice>) => {
-            const head = O.orElse(header, () => O.some(A.headNonEmpty(slices).cells))
-            const body = O.isNone(header) ? A.drop(slices, 1) : slices
-            return [head, A.isReadonlyArrayNonEmpty(body) ? [{ header: head, body }] : []] as const
+            const [head, body] = O.match(header, {
+              onNone: () => [A.headNonEmpty(slices).cells, A.drop(slices, 1)] as const,
+              onSome: (head) => [head, slices] as const
+            })
+            return [O.some(head), A.isReadonlyArrayNonEmpty(body) ? [{ header: head, body }] : []] as const
           }
         ),
         Channel.mapEffect(({ header, body }) =>
           Effect.flatMap(
             Effect.fromResult(
-              Result.mapError(
-                toHeaderRows({ records: [O.getOrElse(header, () => [""] as const), ...A.map(body, (s) => s.cells)] }),
-                (fatals) => CsvParseError.make({ diagnostics: fatals as A.NonEmptyReadonlyArray<CsvFatal> })
+              Result.mapError(toHeaderRows({ records: [header, ...A.map(body, (s) => s.cells)] }), (fatals) =>
+                CsvParseError.make({ diagnostics: fatals })
               )
             ),
             (rows) => decodeRows(rows)
-          ).pipe(Effect.map((rows) => rows as A.NonEmptyReadonlyArray<Row["Type"]>))
+          )
         )
       )
     }
@@ -770,22 +775,20 @@ export class Csv {
 
   /** A channel from records to canonical text chunks. */
   static encodeString<IE = never, Done = unknown>(
-    options: CsvWriteOptions = CsvWriteOptions.default
+    options: CsvWriteOptions
   ): Channel.Channel<A.NonEmptyReadonlyArray<string>, IE, Done, A.NonEmptyReadonlyArray<CsvRecord>, IE, Done> {
     return encodeStringChannel<IE, Done>(options)
   }
 
   /** A channel from records to UTF-8 bytes. */
   static encode<IE = never, Done = unknown>(
-    options: CsvWriteOptions = CsvWriteOptions.default
+    options: CsvWriteOptions
   ): Channel.Channel<A.NonEmptyReadonlyArray<Uint8Array>, IE, Done, A.NonEmptyReadonlyArray<CsvRecord>, IE, Done> {
-    return encodeStringChannel<IE, Done>(options).pipe(
-      Channel.map((texts) => A.map(texts, encodeUtf8) as A.NonEmptyReadonlyArray<Uint8Array>)
-    )
+    return encodeStringChannel<IE, Done>(options).pipe(Channel.map((texts) => A.map(texts, encodeUtf8)))
   }
 
   /** The delimiter detected from a sample, or none. */
-  static sniff(sample: string, options: CsvReadOptions = CsvReadOptions.default): O.Option<CsvDelimiter> {
+  static sniff(sample: string, options: CsvReadOptions): O.Option<CsvDelimiter> {
     return sniffDelimiter({
       sample: Str.slice(0, SNIFF_WINDOW)(sample),
       candidates: options.delimiter.kind === "detect" ? options.delimiter.candidates : [options.delimiter.delimiter],

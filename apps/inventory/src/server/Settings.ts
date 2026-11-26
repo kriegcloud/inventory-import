@@ -2,7 +2,6 @@ import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
-import * as Str from "effect/String"
 import * as S from "effect/Schema"
 
 // SETTINGS. Every setting and secret the server reads is declared here, as an `effect/Config`, and nowhere else reads
@@ -51,9 +50,15 @@ export const optionalUrl = (name: string) =>
  */
 export const devToolsSettings = optionalUrl("EFFECT_DEVTOOLS_URL")
 
+/** Blank detection preserves the exact secret; only its presence is classified. */
+const NonBlankKey = S.String.check(S.isPattern(/\S/)).annotate({
+  identifier: "NonBlankKey",
+  description: "A model key containing at least one non-whitespace character."
+})
+
 /** A key that is set but blank (`OPENROUTER_API_KEY=" "`) is the same as no key. */
 const present = (key: O.Option<Redacted.Redacted<string>>) =>
-  O.filter(key, (value) => value.pipe(Redacted.value, Str.trim) !== "")
+  O.filter(key, (value) => value.pipe(Redacted.value, S.is(NonBlankKey)))
 
 /**
  * The model settings. AI is on only when a key is set and `AI_ENABLED` is not false; otherwise every feature uses

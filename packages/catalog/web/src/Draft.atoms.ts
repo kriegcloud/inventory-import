@@ -8,10 +8,11 @@
 // two; Benjamin, 2026-11-20, G3); and under the tab that decided them ("Each tab keeps its own", G4): a tab keeps and
 // sends only its own, takes up rows only from a tab that is gone, and never writes over or erases another tab's entry.
 // Nothing here is a module-level variable a screen depends on: the tab, the owner and the counts are atoms.
+import { browserWindow, requestAvailable, storageText } from "@inventory/client/Storage"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
-import { pipe } from "effect/Function"
+import { identity, pipe } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -175,13 +176,13 @@ const claimOf = (entry: Entry): string => `inventory-kept:${entry.key}`
 const takeEntry = (registry: AtomRegistry.AtomRegistry, key: string, take: (stored: StoredWaiting) => void): void => {
   // Read and erased as one: where the browser refuses either, it is not taken.
   const text = sharedStorage.attempt((storage) => {
-    const found = storage.getItem(key)
+    const found = storageText(key)(storage)
     storage.removeItem(key)
     return found
   })
   if (O.isNone(text)) return
   registry.set(waitingAt(key), O.none())
-  take(storedFromText(text.value))
+  take(text.pipe(O.flatten, storedFromText))
 }
 
 /**
@@ -246,23 +247,35 @@ const claimKept = "500 millis"
 const claiming = (locks: LockManager, entry: Entry, then: () => void): void => {
   const nothing = () => Effect.runPromise(Effect.void)
   const claim = () =>
-    locks.request(claimOf(entry), { ifAvailable: true }, (lock) =>
-      lock === null
-        ? nothing()
-        : locks
-            .query()
-            .then((snapshot) =>
-              O.exists(entry.tab, (tab) => A.some(snapshot.held ?? [], (held) => held.name === lockOf(tab)))
-                ? nothing()
-                : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.sleep(claimKept))))
-            )
-    )
+    requestAvailable({
+      locks,
+      name: claimOf(entry),
+      options: { ifAvailable: true },
+      use: (lock) =>
+        O.isNone(lock)
+          ? nothing()
+          : locks
+              .query()
+              .then((snapshot) =>
+                O.exists(entry.tab, (tab) =>
+                  A.some(
+                    O.match(O.fromUndefinedOr(snapshot.held), { onNone: A.empty, onSome: identity }),
+                    (held) => held.name === lockOf(tab)
+                  )
+                )
+                  ? nothing()
+                  : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.sleep(claimKept))))
+              )
+    })
   O.match(entry.tab, {
     onNone: () => void claim(),
     onSome: (tab) =>
-      void locks.request(takingOf(tab), { mode: "shared", ifAvailable: true }, (lock) =>
-        lock === null ? nothing() : claim()
-      )
+      void requestAvailable({
+        locks,
+        name: takingOf(tab),
+        options: { mode: "shared", ifAvailable: true },
+        use: (lock) => (O.isNone(lock) ? nothing() : claim())
+      })
   })
 }
 
@@ -273,8 +286,12 @@ const claiming = (locks: LockManager, entry: Entry, then: () => void): void => {
 const takingGone = (entries: ReadonlyArray<Entry>, then: (entry: Entry) => void): void => {
   const locks = browserLocks()
   for (const entry of entries) {
-    if (locks !== undefined) claiming(locks, entry, () => then(entry))
-    else if (O.isNone(entry.tab)) then(entry)
+    O.match(locks, {
+      onSome: (locks) => claiming(locks, entry, () => then(entry)),
+      onNone: () => {
+        if (O.isNone(entry.tab)) then(entry)
+      }
+    })
   }
 }
 
@@ -358,7 +375,7 @@ export const keepWaiting = (input: {
   // Counted under the key they are kept under, and under the import's id alone while nobody, or no tab, is known.
   registry.update(entriesToSend, (now) => {
     const before = HashSet.remove(now, id)
-    const of = O.getOrElse(key, () => id)
+    const of = O.match(key, { onNone: () => id, onSome: (key) => key })
     return waits ? HashSet.add(before, of) : unread ? before : HashSet.remove(before, of)
   })
 }
@@ -444,14 +461,14 @@ export const forgetDraft = (input: DraftIn): void =>
  * and named in this tab until dismissed (Benjamin, 2026-11-21: nothing is dropped unnamed). Rows of a member of another
  * organization are not that import's: they stay. Waits for this tab's id, under which they are named.
  */
-const letRemovedGo = (input: DraftIn & { readonly organizationId: string; readonly also?: O.Option<Owner> }): void => {
+const letRemovedGo = (input: DraftIn & { readonly organizationId: string; readonly also: O.Option<Owner> }): void => {
   const { id, organizationId, registry } = input
   onceTabKnown(registry, (tab) =>
     lettingGo({
       registry,
       id,
       owners: A.filter(
-        membersHere({ registry, id, also: input.also ?? O.none() }),
+        membersHere({ registry, id, also: input.also }),
         (owner) => owner.organizationId === organizationId
       ),
       gone: ({ fileName, named, owner }) => leaveRemoved({ registry, of: owner, tab, from: { id, fileName }, named })
@@ -468,7 +485,7 @@ export const removedHere = (input: DraftIn & { readonly error: ImportNotFound })
   const { error, id, registry } = input
   const of = O.orElse(ownerOf({ registry, id }), () => registry.get(member))
   if (!O.exists(of, (one) => one.organizationId === error.organizationId)) return false
-  letRemovedGo({ registry, id, organizationId: error.organizationId })
+  letRemovedGo({ registry, id, organizationId: error.organizationId, also: O.none() })
   return true
 }
 
@@ -505,10 +522,11 @@ const entriesOfThisTab = (input: {
   const escaped = (screen: string) => Str.slice(bare)(progressKey({ organizationId: "", memberId: "", screen }))
   const start = escaped("import:")
   const end = escaped(`:waiting:${tab}`)
-  const found: Array<{ key: string; id: ImportId; sends: boolean; own: boolean }> = []
+  const found: Array<{ readonly key: string; readonly id: ImportId; readonly sends: boolean; readonly own: boolean }> =
+    []
   for (const key of keys.value) {
     if (!Str.endsWith(end)(key)) continue
-    const screen = O.getOrElse(A.last(Str.split(":")(key)), () => "")
+    const screen = A.lastNonEmpty(Str.split(":")(key))
     if (!Str.startsWith(start)(screen)) continue
     const id = pipe(
       screen,
@@ -554,7 +572,9 @@ const forgetIfRemoved = ({ id, of, registry }: DraftIn & { readonly of: Owner })
  * original's), and again when somebody else is signed in: what the last one's entries still have to send stays counted.
  */
 export const askBeforeLeaving = Atom.readable((get) => {
-  if (typeof window === "undefined") return
+  const browser = browserWindow()
+  if (O.isNone(browser)) return
+  const window = browser.value
   const registry = get.registry
   // Rows this tab kept before a reload wait to be sent wherever the person is, whether or not their import's step is
   // opened again: they count from the start.

@@ -21,7 +21,9 @@ import * as O from "effect/Option"
 import * as Path from "effect/Path"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
-import * as Str from "effect/String"
+import * as R from "effect/Record"
+import * as S from "effect/Schema"
+import { NonBlankSecret } from "./internal/Secret.ts"
 import { InfraStage } from "./InfraStage.context.ts"
 import { secretNamesOf } from "./OpReferences.rules.ts"
 import { opEnvReferences } from "./OpReferences.secrets.ts"
@@ -45,7 +47,7 @@ const model = { AI_MODEL: "anthropic/claude-haiku-5.5", AI_FALLBACK_MODELS: "goo
 const secretOf = (variable: string) =>
   Config.Redacted(variable).pipe(
     Config.option,
-    Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+    Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
   )
 
 const textFrom = Effect.fnUntraced(function* (source: StagePlan["signUp"]) {
@@ -134,16 +136,10 @@ export default Alchemy.Stack(
         BETTER_AUTH_URL: Cloudflare.Worker.URL,
         BETTER_AUTH_SECRET: signInSecret.text,
         ...model,
-        ...O.match(modelKey, { onNone: () => ({}), onSome: (key) => ({ OPENROUTER_API_KEY: key }) }),
-        ...O.match(mintedPassword, {
-          onNone: () => ({}),
-          onSome: (password) => ({ TEST_ACCOUNT_PASSWORD: password.text })
-        }),
-        ...O.match(givenPassword, {
-          onNone: () => ({}),
-          onSome: (password) => ({ TEST_ACCOUNT_PASSWORD: password })
-        }),
-        ...O.match(signUp, { onNone: () => ({}), onSome: (emails) => ({ SIGN_UP: emails }) })
+        ...R.getSomes({ OPENROUTER_API_KEY: modelKey }),
+        ...R.getSomes({ TEST_ACCOUNT_PASSWORD: O.map(mintedPassword, (password) => password.text) }),
+        ...R.getSomes({ TEST_ACCOUNT_PASSWORD: givenPassword }),
+        ...R.getSomes({ SIGN_UP: signUp })
       }
     })
 

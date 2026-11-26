@@ -6,6 +6,8 @@ import type { Api, Call, Fork } from "@inventory/client/ApiRuntime"
 import { makeApiAtoms } from "@inventory/client/Api"
 import type { SameOrigin } from "@inventory/kernel/SameOrigin"
 import * as Context from "effect/Context"
+import * as O from "effect/Option"
+import { identity } from "effect/Function"
 import type * as Effect from "effect/Effect"
 import type * as Exit from "effect/Exit"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
@@ -39,17 +41,20 @@ export type CatalogBinding = Api<CatalogApiClient> & {
   readonly apiPrefix: string
 }
 
-let bound: CatalogBinding | undefined
+let bound: O.Option<CatalogBinding> = O.none()
 
 /** Binds the catalog screens to the app's runtime. The app calls it once, before it mounts a screen. */
 export const configureCatalog = (binding: CatalogBinding): void => {
-  bound = binding
+  bound = O.some(binding)
 }
 
-const binding = (): CatalogBinding => {
-  if (bound === undefined) throw new Error("configureCatalog was not called before a catalog screen ran")
-  return bound
-}
+const binding = (): CatalogBinding =>
+  O.match(bound, {
+    onNone: () => {
+      throw new Error("configureCatalog was not called before a catalog screen ran")
+    },
+    onSome: identity
+  })
 
 /**
  * Runs one write as a Promise, for a write that is not an atom's (the review's draft sends its saves itself). A

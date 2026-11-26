@@ -81,7 +81,7 @@ const Ended = () => (
  * stay drawn while the session is asked again, and are drawn anew, with nothing typed or open in them, for another
  * organization the person switches to.
  */
-export function SignedIn(props: { title: string; children: ReactNode }) {
+export function SignedIn(props: { readonly title: string; readonly children: ReactNode }) {
   const { status, error, features, probablySignedOut } = useAtomValue(sessionView)
   const retry = useAtomRefresh(session)
   const refresh = useAtomSet(refreshSession)
@@ -92,11 +92,11 @@ export function SignedIn(props: { title: string; children: ReactNode }) {
   if (status === "ready") return <Fragment key={drawnFor}>{props.children}</Fragment>
   return (
     <AppShell title={props.title}>
-      {error !== null ? (
+      {O.isSome(error) ? (
         <Alert variant="destructive" className="mx-auto max-w-sm">
           <AlertTitle>Could not open the app</AlertTitle>
           <AlertDescription>
-            <p>{sayError(error).sentence}</p>
+            <p>{sayError(error.value, { fields: {} }).sentence}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={retry}>
                 Try again

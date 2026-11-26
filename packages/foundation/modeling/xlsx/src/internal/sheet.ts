@@ -7,6 +7,9 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
 import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableList from "effect/MutableList"
+import * as MutableRef from "effect/MutableRef"
+import * as Order from "effect/Order"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -20,10 +23,10 @@ import {
   XlsxErrorCode,
   XlsxNumberFormat,
   holdsSomething,
-  type XlsxDate,
-  type XlsxNumber,
-  type XlsxText,
-  type XlsxUnreadable,
+  XlsxDate,
+  XlsxNumber,
+  XlsxText,
+  XlsxUnreadable,
   type XlsxValue
 } from "../XlsxCell.schema.ts"
 import {
@@ -41,13 +44,13 @@ import {
   type XlsxLimit
 } from "../XlsxDiagnostic.schema.ts"
 import { MAX_SERIAL } from "../XlsxSerial.schema.ts"
-import type { XlsxRow } from "../XlsxWorkbook.schema.ts"
+import { XlsxRow } from "../XlsxWorkbook.schema.ts"
 import { stop, type Caps } from "./container.ts"
 import { shifted } from "./formula.ts"
 import { isTrue, localName, unescaped, type XmlEvent } from "./ooxml.ts"
 import { serialOf } from "./serial.ts"
 import { isXmlSafe } from "./text.ts"
-import { detached, trusted } from "./trusted.ts"
+import { detached } from "./trusted.ts"
 import { styleOf, type StyleFormat } from "./workbookPart.ts"
 
 /** A cell as a row holds it. */
@@ -134,53 +137,53 @@ const columnOf = (reference: string): number => {
  * `failed` holds the finding that stopped the read, after which events are ignored.
  */
 export class SheetReader {
-  readonly warnings: Array<XlsxWarning> = []
-  failed: O.Option<XlsxFatal> = O.none()
+  private readonly warningBuffer = MutableList.make<XlsxWarning>()
+  private readonly failedRef = MutableRef.make<O.Option<XlsxFatal>>(O.none())
 
-  private depth = 0
-  private section = ""
-  private declared: O.Option<XlsxRange> = O.none()
-  private readonly merges: Array<XlsxRange> = []
-  private readonly hiddenColumns: Array<number> = []
+  private readonly depth = MutableRef.make(0)
+  private readonly section = MutableRef.make("")
+  private readonly declared = MutableRef.make<O.Option<XlsxRange>>(O.none())
+  private readonly merges = MutableList.make<XlsxRange>()
+  private readonly hiddenColumns = MutableList.make<number>()
   private readonly masters = MutableHashMap.empty<
     string,
     { readonly text: string; readonly column: number; readonly row: number }
   >()
   private readonly notShown = MutableHashMap.empty<string, number>()
 
-  private rowCount = 0
-  private rowsWithValues = 0
-  private cellsWithValues = 0
-  private lastRowWithValues = 0
-  private previousRow = 0
-  private unordered = false
-  private firstColumn = Number.MAX_SAFE_INTEGER
-  private lastColumn = -1
-  private firstRow = 0
+  private readonly rowCount = MutableRef.make(0)
+  private readonly rowsWithValues = MutableRef.make(0)
+  private readonly cellsWithValues = MutableRef.make(0)
+  private readonly lastRowWithValues = MutableRef.make(0)
+  private readonly previousRow = MutableRef.make(0)
+  private readonly unordered = MutableRef.make(false)
+  private readonly firstColumn = MutableRef.make(Number.MAX_SAFE_INTEGER)
+  private readonly lastColumn = MutableRef.make(-1)
+  private readonly firstRow = MutableRef.make(0)
 
-  private inRow = false
-  private rowNumber = 0
-  private rowHidden = false
-  private cells: Array<ReadCell> = []
-  private cellsSorted = true
-  private lastCellColumn = -1
-  private held = 0
+  private readonly inRow = MutableRef.make(false)
+  private readonly rowNumber = MutableRef.make(0)
+  private readonly rowHidden = MutableRef.make(false)
+  private readonly cells = MutableList.make<ReadCell>()
+  private readonly cellsSorted = MutableRef.make(true)
+  private readonly lastCellColumn = MutableRef.make(-1)
+  private readonly held = MutableRef.make(0)
 
-  private inCell = false
-  private cellColumn = 0
-  private cellType: CellType = "n"
-  private cellStyle = -1
-  private cellReference = ""
-  private target: "" | "v" | "f" | "t" = ""
-  private targetDepth = -1
-  private skipDepth = -1
-  private hasValue = false
-  private valueText = ""
-  private hasInline = false
-  private inlineText = ""
-  private hasFormula = false
-  private formulaText = ""
-  private formulaShared = ""
+  private readonly inCell = MutableRef.make(false)
+  private readonly cellColumn = MutableRef.make(0)
+  private readonly cellType = MutableRef.make<CellType>("n")
+  private readonly cellStyle = MutableRef.make(-1)
+  private readonly cellReference = MutableRef.make("")
+  private readonly target = MutableRef.make<"" | "v" | "f" | "t">("")
+  private readonly targetDepth = MutableRef.make(-1)
+  private readonly skipDepth = MutableRef.make(-1)
+  private readonly hasValue = MutableRef.make(false)
+  private readonly valueText = MutableRef.make("")
+  private readonly hasInline = MutableRef.make(false)
+  private readonly inlineText = MutableRef.make("")
+  private readonly hasFormula = MutableRef.make(false)
+  private readonly formulaText = MutableRef.make("")
+  private readonly formulaShared = MutableRef.make("")
 
   private readonly sheet: string
   private readonly path: string
@@ -188,6 +191,16 @@ export class SheetReader {
   private readonly strings: ReadonlyArray<string>
   private readonly date1904: boolean
   private readonly caps: Caps
+
+  /** Findings accumulated so far, in file order. */
+  get warnings(): ReadonlyArray<XlsxWarning> {
+    return MutableList.toArray(this.warningBuffer)
+  }
+
+  /** The fatal finding that stopped the sheet, if any. */
+  get failed(): O.Option<XlsxFatal> {
+    return this.failedRef.current
+  }
 
   constructor(input: {
     readonly sheet: string
@@ -225,36 +238,36 @@ export class SheetReader {
   }
 
   private text(text: string): ReadonlyArray<ReadRow> {
-    if (this.target === "v") this.valueText += text
-    else if (this.target === "t") this.inlineText += text
-    else if (this.target === "f") this.formulaText += text
+    if (this.target.current === "v") this.valueText.current += text
+    else if (this.target.current === "t") this.inlineText.current += text
+    else if (this.target.current === "f") this.formulaText.current += text
     return none
   }
 
   private opened(name: string, attributes: Readonly<Record<string, string>>): ReadonlyArray<ReadRow> {
-    this.depth += 1
+    this.depth.current += 1
     this.start(localName(name), attributes)
     return none
   }
 
   private closed(): ReadonlyArray<ReadRow> {
-    const depth = this.depth
-    this.depth -= 1
-    if (depth === this.targetDepth) {
-      this.target = ""
-      this.targetDepth = -1
+    const depth = this.depth.current
+    this.depth.current -= 1
+    if (depth === this.targetDepth.current) {
+      this.target.current = ""
+      this.targetDepth.current = -1
       return none
     }
-    if (depth === this.skipDepth) {
-      this.skipDepth = -1
+    if (depth === this.skipDepth.current) {
+      this.skipDepth.current = -1
       return none
     }
-    if (this.inCell && depth === 4) {
+    if (this.inCell.current && depth === 4) {
       this.endCell()
       return none
     }
-    if (this.inRow && depth === 3) return this.endRow()
-    if (depth === 2) this.section = ""
+    if (this.inRow.current && depth === 3) return this.endRow()
+    if (depth === 2) this.section.current = ""
     return none
   }
 
@@ -264,92 +277,93 @@ export class SheetReader {
       this.warn(FormatNotShown.make({ sheet: this.sheet, code: Str.slice(0, 255)(code), cells }))
     }
     const found =
-      this.lastRowWithValues === 0
+      this.lastRowWithValues.current === 0
         ? O.none()
         : O.some(
             XlsxRange.make({
-              first: XlsxAddress.make({ column: this.firstColumn, row: this.firstRow }),
-              last: XlsxAddress.make({ column: this.lastColumn, row: this.lastRowWithValues })
+              first: XlsxAddress.make({ column: this.firstColumn.current, row: this.firstRow.current }),
+              last: XlsxAddress.make({ column: this.lastColumn.current, row: this.lastRowWithValues.current })
             })
           )
-    if (O.isSome(this.declared) && O.isSome(found)) {
-      const declared = this.declared.value
+    if (O.isSome(this.declared.current) && O.isSome(found)) {
+      const declared = this.declared.current.value
       if (!XlsxRange.contains(declared, found.value.first) || !XlsxRange.contains(declared, found.value.last)) {
         this.warn(DeclaredExtentWrong.make({ sheet: this.sheet, declared, found }))
       }
     }
     return {
-      declared: this.declared,
-      merges: this.merges,
-      hiddenColumns: this.hiddenColumns,
-      rows: this.rowCount,
-      rowsWithValues: this.rowsWithValues,
-      cellsWithValues: this.cellsWithValues,
-      lastRow: this.lastRowWithValues === 0 ? O.none() : O.some(this.lastRowWithValues),
-      unordered: this.unordered
+      declared: this.declared.current,
+      merges: MutableList.toArray(this.merges),
+      hiddenColumns: MutableList.toArray(this.hiddenColumns),
+      rows: this.rowCount.current,
+      rowsWithValues: this.rowsWithValues.current,
+      cellsWithValues: this.cellsWithValues.current,
+      lastRow: this.lastRowWithValues.current === 0 ? O.none() : O.some(this.lastRowWithValues.current),
+      unordered: this.unordered.current
     }
   }
 
   private warn(finding: XlsxWarning["finding"]): void {
-    if (this.warnings.length < 10_000) this.warnings.push(XlsxWarning.make({ finding }))
+    if (this.warningBuffer.length < 10_000) MutableList.append(this.warningBuffer, XlsxWarning.make({ finding }))
   }
 
   private fail(limit: XlsxLimit): void {
-    this.failed = O.some(stop(LimitExceeded.make({ limit, path: Str.slice(0, 1024)(this.path) })))
+    this.failedRef.current = O.some(stop(LimitExceeded.make({ limit, path: Str.slice(0, 1024)(this.path) })))
   }
 
   private start(name: string, attributes: Readonly<Record<string, string>>): void {
-    const depth = this.depth
-    if (this.skipDepth !== -1) return
+    const depth = this.depth.current
+    if (this.skipDepth.current !== -1) return
     if (depth === 2) {
-      this.section = name
-      if (name === "dimension") this.declared = XlsxRange.parse(attributes["ref"] ?? "")
+      this.section.current = name
+      if (name === "dimension") this.declared.current = XlsxRange.parse(attributes["ref"] ?? "")
       return
     }
     if (depth === 3) {
-      if (this.section === "sheetData" && name === "row") this.startRow(attributes)
-      else if (this.section === "mergeCells" && name === "mergeCell") {
+      if (this.section.current === "sheetData" && name === "row") this.startRow(attributes)
+      else if (this.section.current === "mergeCells" && name === "mergeCell") {
         const range = XlsxRange.parse(attributes["ref"] ?? "")
-        if (O.isSome(range)) this.merges.push(range.value)
-      } else if (this.section === "cols" && name === "col" && isTrue(attributes["hidden"])) {
+        if (O.isSome(range)) MutableList.append(this.merges, range.value)
+      } else if (this.section.current === "cols" && name === "col" && isTrue(attributes["hidden"])) {
         const first = Number(attributes["min"])
         const last = Math.min(Number(attributes["max"]), this.caps.columns)
         if (Number.isInteger(first) && Number.isInteger(last)) {
-          for (let column = Math.max(first, 1); column <= last; column += 1) this.hiddenColumns.push(column - 1)
+          for (let column = Math.max(first, 1); column <= last; column += 1)
+            MutableList.append(this.hiddenColumns, column - 1)
         }
       }
       return
     }
-    if (depth === 4 && this.inRow && name === "c") {
+    if (depth === 4 && this.inRow.current && name === "c") {
       this.startCell(attributes)
       return
     }
-    if (!this.inCell) return
+    if (!this.inCell.current) return
     if (depth === 5) {
       if (name === "v") {
-        this.hasValue = true
-        this.target = "v"
-        this.targetDepth = depth
+        this.hasValue.current = true
+        this.target.current = "v"
+        this.targetDepth.current = depth
       } else if (name === "f") {
-        this.hasFormula = true
-        this.formulaShared = attributes["t"] === "shared" ? (attributes["si"] ?? "") : ""
-        this.target = "f"
-        this.targetDepth = depth
-      } else if (name === "is") this.hasInline = true
+        this.hasFormula.current = true
+        this.formulaShared.current = attributes["t"] === "shared" ? (attributes["si"] ?? "") : ""
+        this.target.current = "f"
+        this.targetDepth.current = depth
+      } else if (name === "is") this.hasInline.current = true
       return
     }
-    if (this.hasInline && this.target === "") {
-      if (name === "rPh") this.skipDepth = depth
+    if (this.hasInline.current && this.target.current === "") {
+      if (name === "rPh") this.skipDepth.current = depth
       else if (name === "t") {
-        this.target = "t"
-        this.targetDepth = depth
+        this.target.current = "t"
+        this.targetDepth.current = depth
       }
     }
   }
 
   private startRow(attributes: Readonly<Record<string, string>>): void {
     const written = attributes["r"]
-    let number = this.previousRow + 1
+    let number = this.previousRow.current + 1
     if (written !== undefined) {
       const parsed = Number(written)
       if (Number.isInteger(parsed) && parsed >= 1) number = parsed
@@ -358,74 +372,88 @@ export class SheetReader {
           BadAddress.make({ sheet: this.sheet, row: Math.min(number, MAX_ROW), raw: Str.slice(0, 255)(written) })
         )
     }
-    this.rowCount += 1
-    if (number > MAX_ROW || this.rowCount > this.caps.rows) {
+    this.rowCount.current += 1
+    if (number > MAX_ROW || this.rowCount.current > this.caps.rows) {
       this.fail("rows")
       return
     }
-    if (number <= this.previousRow) {
-      this.unordered = true
+    if (number <= this.previousRow.current) {
+      this.unordered.current = true
       this.warn(RowOutOfOrder.make({ sheet: this.sheet, row: number }))
-    } else this.previousRow = number
-    this.inRow = true
-    this.rowNumber = number
-    this.rowHidden = isTrue(attributes["hidden"])
-    this.cells = []
-    this.cellsSorted = true
-    this.lastCellColumn = -1
-    this.held = 0
+    } else this.previousRow.current = number
+    this.inRow.current = true
+    this.rowNumber.current = number
+    this.rowHidden.current = isTrue(attributes["hidden"])
+    MutableList.clear(this.cells)
+    this.cellsSorted.current = true
+    this.lastCellColumn.current = -1
+    this.held.current = 0
   }
 
   private endRow(): ReadonlyArray<ReadRow> {
-    this.inRow = false
+    this.inRow.current = false
     if (O.isSome(this.failed)) return none
-    if (!this.cellsSorted) this.cells.sort((a, b) => a.column - b.column)
-    if (this.held > 0) {
-      this.rowsWithValues += 1
-      this.cellsWithValues += this.held
-      if (this.firstRow === 0 || this.rowNumber < this.firstRow) this.firstRow = this.rowNumber
-      if (this.rowNumber > this.lastRowWithValues) this.lastRowWithValues = this.rowNumber
+    const cells = MutableList.toArray(this.cells)
+    if (this.held.current > 0) {
+      this.rowsWithValues.current += 1
+      this.cellsWithValues.current += this.held.current
+      if (this.firstRow.current === 0 || this.rowNumber.current < this.firstRow.current)
+        this.firstRow.current = this.rowNumber.current
+      if (this.rowNumber.current > this.lastRowWithValues.current)
+        this.lastRowWithValues.current = this.rowNumber.current
     }
-    return [{ number: this.rowNumber, hidden: this.rowHidden, cells: this.cells }]
+    return [
+      {
+        number: this.rowNumber.current,
+        hidden: this.rowHidden.current,
+        cells: this.cellsSorted.current
+          ? cells
+          : A.sort(
+              cells,
+              Order.mapInput(Order.Number, (cell: ReadCell) => cell.column)
+            )
+      }
+    ]
   }
 
   private startCell(attributes: Readonly<Record<string, string>>): void {
     const written = attributes["r"]
-    let column = this.lastCellColumn + 1
+    let column = this.lastCellColumn.current + 1
     if (written !== undefined) {
       const parsed = columnOf(written)
       if (parsed >= 0) column = parsed
-      else this.warn(BadAddress.make({ sheet: this.sheet, row: this.rowNumber, raw: Str.slice(0, 255)(written) }))
+      else
+        this.warn(BadAddress.make({ sheet: this.sheet, row: this.rowNumber.current, raw: Str.slice(0, 255)(written) }))
     }
     if (column >= this.caps.columns) {
       this.fail("columns")
       return
     }
-    this.inCell = true
-    this.cellColumn = column
-    this.cellReference = written ?? ""
-    this.cellType = O.getOrElse(R.get(cellTypes, attributes["t"] ?? "n"), (): CellType => "n")
+    this.inCell.current = true
+    this.cellColumn.current = column
+    this.cellReference.current = written ?? ""
+    this.cellType.current = O.getOrElse(R.get(cellTypes, attributes["t"] ?? "n"), (): CellType => "n")
     const style = attributes["s"]
-    this.cellStyle = style === undefined ? -1 : Number(style)
-    this.hasValue = false
-    this.valueText = ""
-    this.hasInline = false
-    this.inlineText = ""
-    this.hasFormula = false
-    this.formulaText = ""
-    this.formulaShared = ""
+    this.cellStyle.current = style === undefined ? -1 : Number(style)
+    this.hasValue.current = false
+    this.valueText.current = ""
+    this.hasInline.current = false
+    this.inlineText.current = ""
+    this.hasFormula.current = false
+    this.formulaText.current = ""
+    this.formulaShared.current = ""
   }
 
   private styleFormat(address: () => XlsxAddress): StyleFormat {
-    if (this.cellStyle === -1) return this.styles[0] ?? general
-    const style = this.styles[this.cellStyle]
+    if (this.cellStyle.current === -1) return this.styles[0] ?? general
+    const style = this.styles[this.cellStyle.current]
     if (style !== undefined) return style
-    if (this.styles.length > 0 || this.cellStyle !== 0) {
+    if (this.styles.length > 0 || this.cellStyle.current !== 0) {
       this.warn(
         UnknownStyle.make({
           sheet: this.sheet,
           address: address(),
-          style: Number.isInteger(this.cellStyle) && this.cellStyle >= 0 ? this.cellStyle : 0
+          style: Number.isInteger(this.cellStyle.current) && this.cellStyle.current >= 0 ? this.cellStyle.current : 0
         })
       )
     }
@@ -433,18 +461,18 @@ export class SheetReader {
   }
 
   private endCell(): void {
-    this.inCell = false
+    this.inCell.current = false
     if (O.isSome(this.failed)) return
-    const column = this.cellColumn
-    const row = this.rowNumber
+    const column = this.cellColumn.current
+    const row = this.rowNumber.current
     const address = (): XlsxAddress => XlsxAddress.make({ column, row })
     let formula: O.Option<string> = O.none()
-    if (this.hasFormula) {
-      let text = this.formulaText
-      if (this.formulaShared !== "") {
-        if (text !== "") MutableHashMap.set(this.masters, this.formulaShared, { text, column, row })
+    if (this.hasFormula.current) {
+      let text = this.formulaText.current
+      if (this.formulaShared.current !== "") {
+        if (text !== "") MutableHashMap.set(this.masters, this.formulaShared.current, { text, column, row })
         else {
-          const master = MutableHashMap.get(this.masters, this.formulaShared)
+          const master = MutableHashMap.get(this.masters, this.formulaShared.current)
           if (O.isSome(master)) {
             text = shifted({
               formula: master.value.text,
@@ -462,7 +490,7 @@ export class SheetReader {
     }
     let style = this.styleFormat(address)
     let value: XlsxValue = blank
-    const raw = this.hasInline ? this.inlineText : this.valueText
+    const raw = this.hasInline.current ? this.inlineText.current : this.valueText.current
     if (raw.length > this.caps.cellChars) {
       this.fail("cellChars")
       return
@@ -470,23 +498,29 @@ export class SheetReader {
     const unreadable = (reason: UnreadableCell["reason"]): XlsxValue => {
       this.warn(UnreadableCell.make({ sheet: this.sheet, address: address(), reason }))
       const written = unescaped(raw)
-      return trusted<XlsxUnreadable>({
-        kind: "Unreadable",
-        raw: detached(S.is(XlsxErrorCode)(written) ? `'${written}` : written)
-      })
+      return XlsxUnreadable.make(
+        {
+          kind: "Unreadable",
+          raw: detached(S.is(XlsxErrorCode)(written) ? `'${written}` : written)
+        },
+        { disableChecks: true }
+      )
     }
-    if (this.cellType === "inlineStr") {
-      if (this.hasInline) value = trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) })
-    } else if (this.hasValue || this.hasInline) {
+    if (this.cellType.current === "inlineStr") {
+      if (this.hasInline.current)
+        value = XlsxText.make({ kind: "Text", text: detached(unescaped(raw)) }, { disableChecks: true })
+    } else if (this.hasValue.current || this.hasInline.current) {
       value = CellType.matchOrElse(
-        this.cellType,
+        this.cellType.current,
         {
           s: () => {
             const index = Number(Str.trim(raw))
             const text = Number.isInteger(index) && index >= 0 ? this.strings[index] : undefined
-            return text === undefined ? unreadable("sharedString") : trusted<XlsxText>({ kind: "Text", text })
+            return text === undefined
+              ? unreadable("sharedString")
+              : XlsxText.make({ kind: "Text", text }, { disableChecks: true })
           },
-          str: () => trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) }),
+          str: () => XlsxText.make({ kind: "Text", text: detached(unescaped(raw)) }, { disableChecks: true }),
           b: () => {
             const text = Str.toLowerCase(Str.trim(raw))
             return text === "1" || text === "true" ? yes : text === "0" || text === "false" ? no : unreadable("boolean")
@@ -510,7 +544,7 @@ export class SheetReader {
                   })
             if (serial === undefined || serial > MAX_SERIAL) return unreadable("date")
             if (!style.dated) style = shortDate
-            return trusted<XlsxDate>({ kind: "Date", serial })
+            return XlsxDate.make({ kind: "Date", serial }, { disableChecks: true })
           }
         },
         // A number, which is also what a cell of no type or of a type nobody knows holds.
@@ -520,8 +554,8 @@ export class SheetReader {
           const number = numberText.test(text) ? Number(text) : Number.NaN
           if (!Number.isFinite(number)) return unreadable("number")
           return style.dated && number >= 0 && number <= MAX_SERIAL
-            ? trusted<XlsxDate>({ kind: "Date", serial: number })
-            : trusted<XlsxNumber>({ kind: "Number", value: number })
+            ? XlsxDate.make({ kind: "Date", serial: number }, { disableChecks: true })
+            : XlsxNumber.make({ kind: "Number", value: number }, { disableChecks: true })
         }
       )
     }
@@ -534,21 +568,21 @@ export class SheetReader {
       }
       if (style.notShown) this.countNotShown(style.format.code)
     } else if (value.kind === "Number" && style.notShown && !style.dated) this.countNotShown(style.format.code)
-    if (column <= this.lastCellColumn) {
-      for (const cell of this.cells) {
+    if (column <= this.lastCellColumn.current) {
+      for (const cell of MutableList.toArray(this.cells)) {
         if (cell.column === column) {
-          this.warn(BadAddress.make({ sheet: this.sheet, row, raw: Str.slice(0, 255)(this.cellReference) }))
+          this.warn(BadAddress.make({ sheet: this.sheet, row, raw: Str.slice(0, 255)(this.cellReference.current) }))
           return
         }
       }
-      this.cellsSorted = false
-    } else this.lastCellColumn = column
+      this.cellsSorted.current = false
+    } else this.lastCellColumn.current = column
     if (holdsSomething(value)) {
-      this.held += 1
-      if (column < this.firstColumn) this.firstColumn = column
-      if (column > this.lastColumn) this.lastColumn = column
+      this.held.current += 1
+      if (column < this.firstColumn.current) this.firstColumn.current = column
+      if (column > this.lastColumn.current) this.lastColumn.current = column
     }
-    this.cells.push({ column, value, formula, format: style.format })
+    MutableList.append(this.cells, { column, value, formula, format: style.format })
   }
 
   private countNotShown(code: string): void {
@@ -557,4 +591,4 @@ export class SheetReader {
 }
 
 /** A read row as the `XlsxRow` it is. */
-export const toRow = (row: ReadRow): XlsxRow => trusted<XlsxRow>(row)
+export const toRow = (row: ReadRow): XlsxRow => XlsxRow.make(row, { disableChecks: true })

@@ -1,3 +1,6 @@
+import { assertDefined } from "@effect/vitest/utils"
+import * as R from "effect/Record"
+import { assertedValue } from "./support"
 // Two edits of one item in flight, the second answered first: the screen shows both at once, ends with both after the
 // server has answered, and reads the item again once, not twice (goals/atoms/PLAN.md, "two writes in flight"). A
 // refused edit is taken back the moment it is refused while the other keeps showing (Benjamin: "Take it back at
@@ -45,7 +48,9 @@ const memberOf = (organization: string) =>
 /** Long enough for the registry to run what a write started. */
 const settle = Effect.sleep("10 millis")
 
-const world = (options: { readonly idleTTL?: number; readonly readAgainAfterRefusal?: boolean } = {}) => {
+const worldStart = { idleTTL: O.none<number>(), readAgainAfterRefusal: false }
+const world = (overrides: Partial<typeof worldStart>) => {
+  const options = { ...worldStart, ...overrides }
   let item: Item = { name: "Bolt", unit: "each" }
   let reads = 0
   const signedIn = Atom.make(memberOf("org_prairie"))
@@ -64,28 +69,37 @@ const world = (options: { readonly idleTTL?: number; readonly readAgainAfterRefu
     })
   })
   const api = makeApiAtoms(Server)
-  const itemShown = shown(api.query((server) => server.read))
+  const itemShown = shown(api.query((server) => server.read, { keep: "unwatched", reactivityKeys: O.none() }))
   const edit = optimisticWrite({
+    settled: O.none(),
     send: (input: Edit) => api.send((server) => server.edit(input)),
     changes: [optimisticChange(itemShown, (now: Item, input: Edit) => ({ ...now, ...input }))],
     failed: () => "The item was not saved.",
     onRefused: () => true,
-    ...(options.readAgainAfterRefusal === undefined ? {} : { readAgainAfterRefusal: options.readAgainAfterRefusal })
+    readAgainAfterRefusal: options.readAgainAfterRefusal
   })
   const registry = AtomRegistry.make({
     initialValues: [provideApi(layer), provideMember(signedIn)],
-    ...(options.idleTTL === undefined ? {} : { defaultIdleTTL: options.idleTTL })
+    ...R.getSomes({ defaultIdleTTL: options.idleTTL })
   })
   registry.mount(itemShown)
   // The row that holds the write: let go when the row leaves the screen.
   const leave = registry.mount(edit)
   const seen = () => {
     const result = registry.get(itemShown)
-    return { item: result.pipe(AsyncResult.value, O.getOrUndefined), waiting: result.waiting }
+    return { item: result.pipe(AsyncResult.value, assertedValue), waiting: result.waiting }
   }
   const press = (input: Edit) => registry.set(edit, input)
-  const answer = (n: number) => Deferred.succeed(answers[n]!, undefined)
-  const refuse = (n: number) => Deferred.fail(answers[n]!, Refused.make({}))
+  const answer = (n: number) => {
+    const answer = answers[n]
+    assertDefined(answer)
+    return Deferred.succeed(answer, undefined)
+  }
+  const refuse = (n: number) => {
+    const answer = answers[n]
+    assertDefined(answer)
+    return Deferred.fail(answer, Refused.make({}))
+  }
   /** The write's own result, as the row's Save button reads it: busy while a press is out, then the answer. */
   const write = () => {
     const result = registry.get(edit)
@@ -99,7 +113,7 @@ const world = (options: { readonly idleTTL?: number; readonly readAgainAfterRefu
 describe("two optimistic edits in flight", () => {
   it.live("shows both at once and ends with both, read again once", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       yield* settle
       t.press({ name: "Hex bolt" })
       t.press({ unit: "box" })
@@ -121,7 +135,7 @@ describe("two optimistic edits in flight", () => {
 
   it.live("takes a refused edit back at once, keeps the other, and ends at the server's word", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       yield* settle
       t.press({ name: "Hex bolt" })
       t.press({ unit: "box" })
@@ -140,7 +154,7 @@ describe("two optimistic edits in flight", () => {
 
   it.live("ends where it started, without reading again, when both are refused", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       yield* settle
       t.press({ name: "Hex bolt" })
       t.press({ unit: "box" })
@@ -160,7 +174,7 @@ describe("an optimistic edit whose row leaves the screen", () => {
   it.live("runs to its end: saved, nothing left on its way, read again once", () =>
     Effect.gen(function* () {
       // The registry lets an atom nobody reads go after 20 ms, as the app's does after 400.
-      const t = world({ idleTTL: 20 })
+      const t = world({ idleTTL: O.some(20) })
       yield* settle
       t.press({ name: "Hex bolt" })
       yield* settle
@@ -187,7 +201,7 @@ describe("an optimistic edit whose row leaves the screen", () => {
 describe("an optimistic edit that answers after the person switched organization", () => {
   it.live("takes its change off and reads nothing again: the reads on screen are the other organization's", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       yield* settle
       expect(t.reads()).toBe(1)
       t.press({ name: "Hex bolt" })
@@ -208,7 +222,7 @@ describe("an optimistic edit that answers after the person switched organization
 
   it.live("still reads again what the person signed in now saved, when an older save for another answers last", () =>
     Effect.gen(function* () {
-      const t = world()
+      const t = world({})
       yield* settle
       t.press({ name: "Hex bolt" })
       yield* settle

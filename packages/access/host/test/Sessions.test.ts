@@ -10,11 +10,11 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 
-const app = (build: { readonly production: boolean }, settings: Record<string, string> = {}) =>
+const app = (build: { readonly production: boolean }, settings?: Record<string, string>) =>
   accessServices(build).pipe(
     Layer.provide(accessMemory()),
     Layer.provide(BetterAuthTest.signedOut),
-    Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(settings)))
+    Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ ...settings })))
   )
 const answer = Effect.flatMap(Sessions, (sessions) => sessions.state(new Headers()))
 

@@ -1,3 +1,5 @@
+import { dual } from "effect/Function"
+import { StoredDecisions } from "./Import/ImportStore.store.ts"
 // The catalog's ports in memory: the twins a test runs the handlers on. One state holds what the tables hold, and
 // each write is one pure step from a state to the next, as each write on D1 is one atomic batch. The one thing not
 // to break: a twin answers what the D1 adapter answers. Where the adapter guards a write ("the import is still
@@ -818,10 +820,7 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
         const low = O.flatMap(A.get(values, 0), asNumber)
         const high = O.flatMap(A.get(values, 1), asNumber)
         if (O.isNone(low) && O.isNone(high)) return O.none()
-        return O.some(
-          O.match(low, { onNone: () => true, onSome: (min) => n >= min }) &&
-            O.match(high, { onNone: () => true, onSome: (max) => n <= max })
-        )
+        return O.some(!O.exists(low, (min) => n < min) && !O.exists(high, (max) => n > max))
       }
       return O.map(O.flatMap(typed, asNumber), (wanted) =>
         FilterOperator.matchOrElse(
@@ -1333,7 +1332,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           notImported: row.notImported
         }),
         ...O.match(row.takeBack, {
-          onNone: (): ReadonlyArray<ImportEvent> => [],
+          onNone: A.empty<ImportEvent>,
           onSome: (taken): ReadonlyArray<ImportEvent> =>
             O.exists(A.head(sameTakeBack(row)), (first) => first.id === row.id)
               ? [
@@ -1385,12 +1384,12 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           )
         )
         const all = A.dedupeWith([...created, ...replaced], (a, b) => a.item.id === b.item.id)
-        const when = (entry: MemItem): number =>
-          O.match(entry.updatedAt, { onNone: () => 0, onSome: DateTime.toEpochMillis })
+        // An item with no recorded update sorts after every one that has one.
+        const when = (entry: MemItem): O.Option<number> => O.map(entry.updatedAt, DateTime.toEpochMillis)
         return A.sort(
           all,
           Order.combine(
-            Order.flip(Order.mapInput(Order.Number, when)),
+            Order.flip(Order.mapInput(O.makeOrder(Order.Number), when)),
             Order.mapInput(Order.String, (entry: MemItem) => entry.item.sku)
           )
         )
@@ -1422,109 +1421,146 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
     })
 
     return ImportStore.of({
-      beginUpload,
-      findUpload: Effect.fnUntraced(function* (actor: Member, id: string) {
-        const state = yield* Ref.get(ref)
-        return O.map(uploadOf(state, actor, id), asUpload)
-      }),
-      putChunk,
-      uploadChunks: Effect.fnUntraced(function* (actor: Member, upload: Upload) {
-        const state = yield* Ref.get(ref)
-        return O.match(uploadOf(state, actor, upload.id), {
-          onNone: () => [],
-          onSome: (found) =>
-            A.sort(
-              found.chunks,
-              Order.mapInput(Order.Number, (chunk: { readonly seq: number }) => chunk.seq)
-            )
+      beginUpload: dual(
+        4,
+        (
+          self: StagedHead,
+          actor: Member,
+          key: UploadKey,
+          counts: { readonly rowCount: number; readonly chunkCount: number }
+        ) => beginUpload(actor, key, self, counts)
+      ),
+      findUpload: dual(2, (self: string, actor: Member) => {
+        const perform = Effect.fnUntraced(function* (actor: Member, id: string) {
+          const state = yield* Ref.get(ref)
+          return O.map(uploadOf(state, actor, id), asUpload)
         })
+        return perform(actor, self)
       }),
-      finishUpload,
-      discardUpload: Effect.fnUntraced(function* (actor: Member, id: string) {
-        return yield* Ref.modify(ref, (state): readonly [boolean, CatalogState] =>
-          O.match(uploadOf(state, actor, id), {
-            onNone: () => [false, state],
-            onSome: (found) => [true, { ...state, uploads: A.filter(state.uploads, (entry) => entry !== found) }]
-          })
-        )
-      }),
-      find: Effect.fnUntraced(function* (organizationId: OrganizationId, id: string) {
-        const state = yield* Ref.get(ref)
-        return O.map(A.findFirst(state.drafts, sameDraft(organizationId, id)), (entry) => entry.draft)
-      }),
-      listOpen: Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
-        const state = yield* Ref.get(ref)
-        const open = A.reverse(
-          A.sort(
-            A.filter(
-              state.drafts,
-              (entry) => entry.organizationId === organizationId && DraftStatus.is.open(entry.draft.status)
-            ),
-            Order.mapInput(DateTime.Order, (entry: MemDraft) => entry.draft.createdAt)
-          )
-        )
-        return { drafts: A.map(A.take(open, limit), (entry) => entry.draft), total: open.length }
-      }),
-      listPast: Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
-        const state = yield* Ref.get(ref)
-        const past = A.getSomes(
-          A.map(
-            A.filter(state.drafts, (entry) => entry.organizationId === organizationId),
-            (entry) =>
-              O.map(
-                A.last(
-                  A.sort(
-                    A.filter(
-                      state.confirms,
-                      (confirm) => confirm.organizationId === organizationId && confirm.importId === entry.draft.id
-                    ),
-                    byMoment
-                  )
-                ),
-                (last) => ({ entry, last })
+      putChunk: dual(4, (self: Upload, actor: Member, seq: number, rows: ReadonlyArray<StagedRow>) =>
+        putChunk(actor, self, seq, rows)
+      ),
+      uploadChunks: dual(2, (self: Upload, actor: Member) => {
+        const perform = Effect.fnUntraced(function* (actor: Member, upload: Upload) {
+          const state = yield* Ref.get(ref)
+          return O.match(uploadOf(state, actor, upload.id), {
+            onNone: A.empty,
+            onSome: (found) =>
+              A.sort(
+                found.chunks,
+                Order.mapInput(Order.Number, (chunk: { readonly seq: number }) => chunk.seq)
               )
-          )
-        )
-        const newest = A.reverse(
-          A.sort(
-            past,
-            Order.mapInput(DateTime.Order, (row: { readonly last: MemConfirm }) => row.last.at)
-          )
-        )
-        const imports = A.map(A.take(newest, limit), ({ entry, last }): PastImport => ({
-          id: entry.draft.id,
-          fileName: entry.draft.fileName,
-          rowCount: entry.draft.rowCount,
-          status: entry.draft.status,
-          confirmedByName: last.byName,
-          confirmedAt: last.at,
-          items: A.filter(
-            state.items,
-            (item) => item.organizationId === organizationId && item.importId === entry.draft.id
-          ).length,
-          notImported: last.notImported
-        }))
-        return { imports, total: past.length }
-      }),
-      remove,
-      decisions: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
-        const state = yield* Ref.get(ref)
-        const found = A.findFirst(state.drafts, sameDraft(organizationId, importId))
-        const stored = O.match(found, {
-          onNone: (): ReadonlyArray<MemDecision> => [],
-          onSome: (entry) => entry.decisions
+          })
         })
-        return {
-          decisions: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.decision] as const)),
-          authors: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.author] as const)),
-          deciders: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.authorId] as const)),
-          savedAt: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.savedAt] as const)),
-          lastSavedBy: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedBy] as const)),
-          lastSavedOn: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedOn] as const)),
-          saves: O.match(found, { onNone: () => 0, onSome: (entry) => entry.saves })
-        }
+        return perform(actor, self)
       }),
-      decide,
+      finishUpload: dual(3, (self: Upload, actor: Member, needsAtStart: number) =>
+        finishUpload(actor, self, needsAtStart)
+      ),
+      discardUpload: dual(2, (self: string, actor: Member) => {
+        const perform = Effect.fnUntraced(function* (actor: Member, id: string) {
+          return yield* Ref.modify(ref, (state): readonly [boolean, CatalogState] =>
+            O.match(uploadOf(state, actor, id), {
+              onNone: () => [false, state],
+              onSome: (found) => [true, { ...state, uploads: A.filter(state.uploads, (entry) => entry !== found) }]
+            })
+          )
+        })
+        return perform(actor, self)
+      }),
+      find: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, id: string) {
+          const state = yield* Ref.get(ref)
+          return O.map(A.findFirst(state.drafts, sameDraft(organizationId, id)), (entry) => entry.draft)
+        })
+        return perform(organizationId, self)
+      }),
+      listOpen: dual(2, (self: number, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
+          const state = yield* Ref.get(ref)
+          const open = A.reverse(
+            A.sort(
+              A.filter(
+                state.drafts,
+                (entry) => entry.organizationId === organizationId && DraftStatus.is.open(entry.draft.status)
+              ),
+              Order.mapInput(DateTime.Order, (entry: MemDraft) => entry.draft.createdAt)
+            )
+          )
+          return { drafts: A.map(A.take(open, limit), (entry) => entry.draft), total: open.length }
+        })
+        return perform(organizationId, self)
+      }),
+      listPast: dual(2, (self: number, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
+          const state = yield* Ref.get(ref)
+          const past = A.getSomes(
+            A.map(
+              A.filter(state.drafts, (entry) => entry.organizationId === organizationId),
+              (entry) =>
+                O.map(
+                  A.last(
+                    A.sort(
+                      A.filter(
+                        state.confirms,
+                        (confirm) => confirm.organizationId === organizationId && confirm.importId === entry.draft.id
+                      ),
+                      byMoment
+                    )
+                  ),
+                  (last) => ({ entry, last })
+                )
+            )
+          )
+          const newest = A.reverse(
+            A.sort(
+              past,
+              Order.mapInput(DateTime.Order, (row: { readonly last: MemConfirm }) => row.last.at)
+            )
+          )
+          const imports = A.map(A.take(newest, limit), ({ entry, last }): PastImport => ({
+            id: entry.draft.id,
+            fileName: entry.draft.fileName,
+            rowCount: entry.draft.rowCount,
+            status: entry.draft.status,
+            confirmedByName: last.byName,
+            confirmedAt: last.at,
+            items: A.filter(
+              state.items,
+              (item) => item.organizationId === organizationId && item.importId === entry.draft.id
+            ).length,
+            notImported: last.notImported
+          }))
+          return { imports, total: past.length }
+        })
+        return perform(organizationId, self)
+      }),
+      remove: dual(2, (self: Draft, actor: Member) => remove(actor, self)),
+      decisions: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
+          const state = yield* Ref.get(ref)
+          const found = A.findFirst(state.drafts, sameDraft(organizationId, importId))
+          const stored = O.match(found, {
+            onNone: A.empty<MemDecision>,
+            onSome: (entry) => entry.decisions
+          })
+          return StoredDecisions.make({
+            decisions: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.decision] as const)),
+            authors: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.author] as const)),
+            deciders: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.authorId] as const)),
+            savedAt: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.savedAt] as const)),
+            lastSavedBy: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedBy] as const)),
+            lastSavedOn: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedOn] as const)),
+            ...R.getSomes({ saves: O.map(found, (entry) => entry.saves) })
+          })
+        })
+        return perform(organizationId, self)
+      }),
+      decide: dual(
+        5,
+        (self: Draft, actor: Member, delta: DecisionDelta, read: ItemsAsRead, expected: O.Option<ComparedAt>) =>
+          decide(actor, self, delta, read, expected)
+      ),
       choices: Effect.fnUntraced(function* (draft: Draft) {
         return yield* S.decodeEffect(ChoicesJson)(draft.choicesJson)
       }, Effect.orDie),
@@ -1534,19 +1570,33 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       takenBack: Effect.fnUntraced(function* (draft: Draft) {
         return yield* S.decodeEffect(TakenBackJson)(draft.takenBackJson)
       }, Effect.orDie),
-      matchColumn,
-      createdRows: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
-        const state = yield* Ref.get(ref)
-        return A.map(
-          A.filter(
-            state.outcomes,
-            (row) =>
-              row.organizationId === organizationId && row.importId === importId && OutcomeKind.is.created(row.outcome)
-          ),
-          (row) => ({ rowNumber: row.rowNumber, part: row.part })
-        )
+      matchColumn: dual(
+        5,
+        (
+          self: Draft,
+          actor: Member,
+          choice: { readonly field: Field; readonly column: O.Option<number> },
+          detail: string,
+          compare: CompareAtMatch
+        ) => matchColumn(actor, self, choice, detail, compare)
+      ),
+      createdRows: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
+          const state = yield* Ref.get(ref)
+          return A.map(
+            A.filter(
+              state.outcomes,
+              (row) =>
+                row.organizationId === organizationId &&
+                row.importId === importId &&
+                OutcomeKind.is.created(row.outcome)
+            ),
+            (row) => ({ rowNumber: row.rowNumber, part: row.part })
+          )
+        })
+        return perform(organizationId, self)
       }),
-      reopen,
+      reopen: dual(2, (self: Draft, actor: Member) => reopen(actor, self)),
       changes: Effect.fnUntraced(function* (organizationId: OrganizationId) {
         const state = yield* Ref.get(ref)
         const mine = A.filter(state.changes, (entry) => entry.organizationId === organizationId)
@@ -1585,45 +1635,54 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           )
         )
       }),
-      table: Effect.fnUntraced(function* (organizationId: OrganizationId, draft: Draft) {
-        const state = yield* Ref.get(ref)
-        const head = yield* S.decodeEffect(StagedHeadJson)(draft.headJson)
-        const table: StagedTable = {
-          ...head,
-          rows: O.match(A.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {
-            onNone: () => [],
-            onSome: (entry) => entry.rows
-          })
-        }
-        return table
-      }, Effect.orDie),
-      storedAmong: Effect.fnUntraced(function* (organizationId: OrganizationId, keys: ReadonlyArray<string>) {
-        const state = yield* Ref.get(ref)
-        return A.filter(itemsOfOrg(state, organizationId), (item) => A.contains(keys, skuKey(item)))
+      table: dual(2, (self: Draft, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, draft: Draft) {
+          const state = yield* Ref.get(ref)
+          const head = yield* S.decodeEffect(StagedHeadJson)(draft.headJson)
+          const table: StagedTable = {
+            ...head,
+            rows: O.match(A.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {
+              onNone: A.empty,
+              onSome: (entry) => entry.rows
+            })
+          }
+          return table
+        }, Effect.orDie)
+        return perform(organizationId, self)
       }),
-      fixed: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
-        const state = yield* Ref.get(ref)
-        const written = A.filter(
-          state.changes,
-          (entry) =>
-            entry.organizationId === organizationId &&
-            entry.importId === importId &&
-            changeDecidedBy(entry.change) === "rule" &&
-            Change.guards.appliedByRule(entry.change) &&
-            A.some(
-              state.outcomes,
-              (row) =>
-                row.organizationId === organizationId &&
-                row.importId === importId &&
-                row.rowNumber === entry.rowNumber &&
-                row.part === entry.part &&
-                (OutcomeKind.is.created(row.outcome) || OutcomeKind.is.updated(row.outcome))
-            )
-        )
-        return {
-          rows: A.dedupe(A.map(written, (entry) => `${entry.rowNumber}.${entry.part}`)).length,
-          cells: written.length
-        }
+      storedAmong: dual(2, (self: ReadonlyArray<string>, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, keys: ReadonlyArray<string>) {
+          const state = yield* Ref.get(ref)
+          return A.filter(itemsOfOrg(state, organizationId), (item) => A.contains(keys, skuKey(item)))
+        })
+        return perform(organizationId, self)
+      }),
+      fixed: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
+          const state = yield* Ref.get(ref)
+          const written = A.filter(
+            state.changes,
+            (entry) =>
+              entry.organizationId === organizationId &&
+              entry.importId === importId &&
+              changeDecidedBy(entry.change) === "rule" &&
+              Change.guards.appliedByRule(entry.change) &&
+              A.some(
+                state.outcomes,
+                (row) =>
+                  row.organizationId === organizationId &&
+                  row.importId === importId &&
+                  row.rowNumber === entry.rowNumber &&
+                  row.part === entry.part &&
+                  (OutcomeKind.is.created(row.outcome) || OutcomeKind.is.updated(row.outcome))
+              )
+          )
+          return {
+            rows: A.dedupe(A.map(written, (entry) => `${entry.rowNumber}.${entry.part}`)).length,
+            cells: written.length
+          }
+        })
+        return perform(organizationId, self)
       }),
       commit: Effect.fnUntraced(function* (write: ConfirmWrite) {
         const unsaved = yield* Effect.forEach(
@@ -1637,28 +1696,31 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       takeBack: Effect.fnUntraced(function* (write: TakeBackWrite) {
         return yield* Ref.modify(ref, (state) => takeBackStep(state, write))
       }),
-      history,
-      takeBackState,
-      outcomes: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
-        const state = yield* Ref.get(ref)
-        const rows = A.sort(
-          A.filter(state.outcomes, (row) => row.organizationId === organizationId && row.importId === importId),
-          Order.combine(
-            Order.mapInput(Order.Number, (row: MemOutcome) => row.rowNumber),
-            Order.mapInput(Order.Number, (row: MemOutcome) => row.part)
+      history: dual(2, (self: string, organizationId: OrganizationId) => history(organizationId, self)),
+      takeBackState: dual(2, (self: string, organizationId: OrganizationId) => takeBackState(organizationId, self)),
+      outcomes: dual(2, (self: string, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
+          const state = yield* Ref.get(ref)
+          const rows = A.sort(
+            A.filter(state.outcomes, (row) => row.organizationId === organizationId && row.importId === importId),
+            Order.combine(
+              Order.mapInput(Order.Number, (row: MemOutcome) => row.rowNumber),
+              Order.mapInput(Order.Number, (row: MemOutcome) => row.part)
+            )
           )
-        )
-        return A.map(rows, (row): RowOutcome =>
-          outcomeOf({
-            rowNumber: row.rowNumber,
-            part: row.part === 0 ? O.none() : O.some(row.part),
-            sku: row.sku,
-            name: row.name,
-            outcome: row.outcome,
-            reason: row.reason,
-            decidedBy: row.decidedBy
-          })
-        )
+          return A.map(rows, (row): RowOutcome =>
+            outcomeOf({
+              rowNumber: row.rowNumber,
+              part: row.part === 0 ? O.none() : O.some(row.part),
+              sku: row.sku,
+              name: row.name,
+              outcome: row.outcome,
+              reason: row.reason,
+              decidedBy: row.decidedBy
+            })
+          )
+        })
+        return perform(organizationId, self)
       }),
       items: Effect.fnUntraced(function* (organizationId: OrganizationId) {
         const state = yield* Ref.get(ref)
@@ -1735,15 +1797,18 @@ export const ItemStoreMemory: Layer.Layer<ItemStore, never, CatalogMemoryRef> = 
       })
     })
     return ItemStore.of({
-      page: Effect.fnUntraced(function* (organizationId: OrganizationId, query: ItemQuery) {
-        const state = yield* Ref.get(ref)
-        return pageOf(of(state, organizationId), query)
+      page: dual(2, (self: ItemQuery, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, query: ItemQuery) {
+          const state = yield* Ref.get(ref)
+          return pageOf(of(state, organizationId), query)
+        })
+        return perform(organizationId, self)
       }),
       facets: Effect.fnUntraced(function* (organizationId: OrganizationId) {
         const state = yield* Ref.get(ref)
         return facetsOf(of(state, organizationId))
       }),
-      edit
+      edit: dual(3, (self: string, actor: Member, change: ItemEdit) => edit(actor, self, change))
     })
   })
 ).pipe(Layer.provide(SecureRandom.layerWebCrypto))
@@ -1760,15 +1825,18 @@ export const SuggestionStoreMemory: Layer.Layer<SuggestionStore, never, CatalogM
         category: (cell) => `${cell.rowId}:category`
       })
     return SuggestionStore.of({
-      list: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: ImportId) {
-        const state = yield* Ref.get(ref)
-        return A.map(
-          A.filter(
-            state.suggestions,
-            (entry) => entry.organizationId === organizationId && entry.importId === importId
-          ),
-          (entry) => entry.suggestion
-        )
+      list: dual(2, (self: ImportId, organizationId: OrganizationId) => {
+        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: ImportId) {
+          const state = yield* Ref.get(ref)
+          return A.map(
+            A.filter(
+              state.suggestions,
+              (entry) => entry.organizationId === organizationId && entry.importId === importId
+            ),
+            (entry) => entry.suggestion
+          )
+        })
+        return perform(organizationId, self)
       }),
       store: Effect.fnUntraced(function* (write: StoreSuggestions) {
         return yield* Ref.modify(ref, (state): readonly [ReadonlyArray<Suggestion>, CatalogState] => {

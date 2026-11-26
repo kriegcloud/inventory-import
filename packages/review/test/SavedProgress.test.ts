@@ -1,3 +1,6 @@
+import type { ReviewColumn } from "@inventory/review/ReviewTypes"
+import { assertDefined } from "@effect/vitest/utils"
+import { fixableBy } from "@inventory/review/ReviewDraft"
 // What a refresh brings back. The rules that would hurt if wrong: progress saved for one person in one organization is
 // never read for anyone else; the decisions and the undo history come back exactly as they were left; a draft that no
 // longer decodes is never shown half; and what this browser kept before the atoms kept it is still read.
@@ -13,7 +16,7 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { describe, expect, vi } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
 import { act, emptyState } from "@inventory/review/ReviewDraft"
-import { ReviewRow } from "@inventory/review/ReviewTypes"
+import { Problem, ReviewRow } from "@inventory/review/ReviewTypes"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
 import {
   progressKey,
@@ -26,9 +29,13 @@ import {
 import { progressOf } from "@inventory/review/SavedProgressHook"
 import { density } from "../src/Density.atoms.ts"
 
+/** These rule-only cases declare no drawing columns; the same domain is reused between decisions. */
+const reviewColumns: ReadonlyArray<ReviewColumn> = []
+
 // The browser's storage, which outlives a refresh. `refuse` makes it a full disk: every write throws.
 const browser = vi.hoisted(() => {
-  const state = { items: {} as Record<string, string>, refuse: false }
+  const items: Record<string, string> = {}
+  const state = { items, refuse: false }
   Object.assign(globalThis, {
     window: {
       localStorage: {
@@ -93,20 +100,20 @@ describe("saved progress", () => {
         yield* fresh
         const dana = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
         // Written with nobody reading it, as a Confirm or a decision made outside any screen writes it.
-        page().set(progressOf(dana), O.some(progress("review")))
+        page().set(progressOf(O.some(dana)), O.some(progress("review")))
         yield* settle
         expect(R.keys(browser.items)).toEqual([progressKey(dana)])
         const next = page()
-        expect(O.map(next.get(progressOf(dana)), (kept) => kept.step)).toEqual(O.some("review"))
-        expect(next.get(progressOf({ ...dana, memberId: "mem_marcus" }))).toEqual(O.none())
-        expect(next.get(progressOf({ ...dana, organizationId: "org_northline" }))).toEqual(O.none())
+        expect(O.map(next.get(progressOf(O.some(dana))), (kept) => kept.step)).toEqual(O.some("review"))
+        expect(next.get(progressOf(O.some({ ...dana, memberId: "mem_marcus" })))).toEqual(O.none())
+        expect(next.get(progressOf(O.some({ ...dana, organizationId: "org_northline" })))).toEqual(O.none())
         yield* settle
         // Looking at somebody's progress that is not there writes nothing under their key.
         expect(R.keys(browser.items)).toEqual([progressKey(dana)])
-        next.set(progressOf(dana), O.none())
+        next.set(progressOf(O.some(dana)), O.none())
         yield* settle
         expect(R.keys(browser.items)).toEqual([])
-        expect(page().get(progressOf(dana))).toEqual(O.none())
+        expect(page().get(progressOf(O.some(dana)))).toEqual(O.none())
       })
   )
 
@@ -116,11 +123,11 @@ describe("saved progress", () => {
       const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
       const text = yield* S.encodeEffect(S.fromJsonString(SavedProgress))(progress("review"))
       browser.items[progressKey(scope)] = text
-      const read = page().get(progressOf(scope))
+      const read = page().get(progressOf(O.some(scope)))
       expect(O.map(read, (kept) => [kept.step, kept.decided, kept.needed])).toEqual(O.some(["review", 1, 4]))
       // And what the atom writes is that text: an older page of the app still reads it.
       delete browser.items[progressKey(scope)]
-      page().set(progressOf(scope), read)
+      page().set(progressOf(O.some(scope)), read)
       yield* settle
       expect(browser.items[progressKey(scope)]).toBe(text)
     })
@@ -132,10 +139,10 @@ describe("saved progress", () => {
       const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
       browser.items[progressKey(scope)] = '{"version":0,"step":"review"}'
       const first = page()
-      expect(first.get(progressOf(scope))).toEqual(O.none())
-      first.set(progressOf(scope), O.some(progress("match")))
+      expect(first.get(progressOf(O.some(scope)))).toEqual(O.none())
+      first.set(progressOf(O.some(scope)), O.some(progress("match")))
       yield* settle
-      expect(O.map(page().get(progressOf(scope)), (kept) => kept.step)).toEqual(O.some("match"))
+      expect(O.map(page().get(progressOf(O.some(scope))), (kept) => kept.step)).toEqual(O.some("match"))
     })
   )
 
@@ -145,10 +152,10 @@ describe("saved progress", () => {
       browser.refuse = true
       const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
       const here = page()
-      const stop = here.mount(progressOf(scope))
-      here.set(progressOf(scope), O.some(progress("review")))
+      const stop = here.mount(progressOf(O.some(scope)))
+      here.set(progressOf(O.some(scope)), O.some(progress("review")))
       yield* settle
-      expect(O.map(here.get(progressOf(scope)), (kept) => kept.step)).toEqual(O.some("review"))
+      expect(O.map(here.get(progressOf(O.some(scope))), (kept) => kept.step)).toEqual(O.some("review"))
       expect(R.keys(browser.items)).toEqual([])
       stop()
     })
@@ -175,7 +182,7 @@ describe("saved progress", () => {
       id: `row-${i + 2}`,
       line: i + 2,
       cells: { name: `Item ${i}`, qty: "" },
-      problem: { kind: "blank", column: "qty" }
+      problem: O.some(Problem.make({ kind: "blank", column: O.some("qty") }))
     })
   )
   const Step = S.Struct({
@@ -197,15 +204,41 @@ describe("saved progress", () => {
         let state: ReviewState = emptyState
         for (const step of steps) {
           const row = rows[step.row]
-          if (row === undefined) continue
+          assertDefined(row)
           const action = step.leaveOut
             ? { type: "leaveOut" as const, rowIds: [row.id] }
             : { type: "edit" as const, rowId: row.id, column: "qty", value: step.value }
-          state = act({ rows, state, action }).state
+          state = act({
+            columns: reviewColumns,
+            recheck: O.none(),
+            fixable: fixableBy([]),
+            rejects: false,
+            rows,
+            state,
+            action
+          }).state
         }
-        for (let i = 0; i < undos; i++) state = act({ rows, state, action: { type: "undo" as const } }).state
+        for (let i = 0; i < undos; i++)
+          state = act({
+            columns: reviewColumns,
+            recheck: O.none(),
+            fixable: fixableBy([]),
+            rejects: false,
+            rows,
+            state,
+            action: { type: "undo" as const }
+          }).state
         // And one redo, so the redo history makes the trip too.
-        if (undos > 1) state = act({ rows, state, action: { type: "redo" as const } }).state
+        if (undos > 1)
+          state = act({
+            columns: reviewColumns,
+            recheck: O.none(),
+            fixable: fixableBy([]),
+            rejects: false,
+            rows,
+            state,
+            action: { type: "redo" as const }
+          }).state
         // What a refresh does: the decisions handed out, kept as JSON text, decoded and handed back.
         const text = yield* S.encodeEffect(asText)(storedReview(state))
         const stored = yield* S.decodeEffect(asText)(text)
@@ -216,12 +249,34 @@ describe("saved progress", () => {
         expect(plainOf(back.decisions)).toEqual(plainOf(state.decisions))
         expect(history(back)).toEqual(history(state))
         const redoHistory = (of: ReviewState) =>
-          A.map(of.redo ?? [], (step) => [step.label, R.fromEntries(step.before), step.focus])
+          A.map(of.redo, (step) => [step.label, R.fromEntries(step.before), step.focus])
         expect(redoHistory(back)).toEqual(redoHistory(state))
         // Undo after the refresh takes back the same step it would have taken before it.
         if (state.undo.length > 0) {
-          expect(plainOf(act({ rows, state: back, action: { type: "undo" as const } }).state.decisions)).toEqual(
-            plainOf(act({ rows, state, action: { type: "undo" as const } }).state.decisions)
+          expect(
+            plainOf(
+              act({
+                columns: reviewColumns,
+                recheck: O.none(),
+                fixable: fixableBy([]),
+                rejects: false,
+                rows,
+                state: back,
+                action: { type: "undo" as const }
+              }).state.decisions
+            )
+          ).toEqual(
+            plainOf(
+              act({
+                columns: reviewColumns,
+                recheck: O.none(),
+                fixable: fixableBy([]),
+                rejects: false,
+                rows,
+                state,
+                action: { type: "undo" as const }
+              }).state.decisions
+            )
           )
         }
       })

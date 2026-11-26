@@ -3,6 +3,7 @@
 // what the package writes, the package reads what SheetJS writes, and the text the package displays for a number or
 // a date is the text SheetJS displayed, except where the comments below say the old text was wrong.
 import { describe, expect, it } from "@effect/vitest"
+import { assertDefined } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
@@ -21,14 +22,14 @@ import {
   XlsxText,
   XlsxValue
 } from "@beep/xlsx/XlsxCell"
-import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
+import { XlsxLimits, XlsxReadOptions, XlsxWriteOptions } from "@beep/xlsx/XlsxOptions"
 import { XlsxDateSystem } from "@beep/xlsx/XlsxSerial"
 import { XlsxRow, XlsxSheetInfo, XlsxSheetState, XlsxWorkbook, XlsxWorksheet } from "@beep/xlsx/XlsxWorkbook"
 
 const runs = { arbitrary: { runs: 100 } }
 // What SheetJS shows for a value under a format: nothing where SheetJS refuses the format.
-const formatted = (code: string, value: number, date1904 = false): string | undefined =>
-  O.getOrUndefined(O.liftThrowable(() => SSF.format(code, value, { date1904 }) as string)())
+const formatted = (code: string, value: number, date1904: boolean): O.Option<string> =>
+  O.flatMap(O.liftThrowable((): unknown => SSF.format(code, value, { date1904 }))(), S.decodeUnknownOption(S.String))
 
 // Text a spreadsheet would hold: printable, since SheetJS does not keep every control character.
 const Words = S.String.check(S.isPattern(/^[ -~]{0,40}$/))
@@ -92,17 +93,18 @@ const ours = (book: typeof Book.Type): XlsxWorkbook =>
 
 /** One of our cells as SheetJS would hold it: its type, its value, its formula and its format. */
 const asSheetJs = (cell: XlsxWorkbook["sheets"][number]["rows"][number]["cells"][number]) => {
-  const formula = O.getOrUndefined(cell.formula)
+  const formula = cell.formula
   return XlsxValue.matchOrElse(
     cell.value,
     {
-      Text: ({ text }) => (text === "" ? undefined : ["s", text, formula, undefined]),
-      Number: ({ value }) => ["n", value, formula, cell.format.code === "General" ? undefined : cell.format.code],
-      Date: ({ serial }) => ["n", serial, formula, cell.format.code],
-      Boolean: ({ value }) => ["b", value, formula, undefined],
-      Error: ({ code }) => ["e", code, formula, undefined]
+      Text: ({ text }) => (text === "" ? O.none() : O.some(["s", text, formula, O.none()])),
+      Number: ({ value }) =>
+        O.some(["n", value, formula, O.liftPredicate(cell.format.code, (code) => code !== "General")]),
+      Date: ({ serial }) => O.some(["n", serial, formula, O.some(cell.format.code)]),
+      Boolean: ({ value }) => O.some(["b", value, formula, O.none()]),
+      Error: ({ code }) => O.some(["e", code, formula, O.none()])
     },
-    () => undefined
+    O.none
   )
 }
 
@@ -129,17 +131,33 @@ const errorNumbers: { readonly [code in XlsxErrorCode]: number } = {
 }
 
 /** One SheetJS cell in the same four parts. */
-const fromSheetJs = (cell: CellObject | undefined) => {
-  if (cell === undefined || cell.t === "z" || (cell.t === "s" && cell.v === "")) return undefined
-  const format = typeof cell.z === "string" && cell.z !== "General" ? cell.z : undefined
-  return [cell.t, cell.t === "e" ? errorCodes[Number(cell.v)] : cell.v, cell.f, cell.t === "n" ? format : undefined]
-}
+const fromSheetJs = (input: CellObject | undefined) =>
+  O.flatMap(O.fromUndefinedOr(input), (cell) => {
+    if (cell.t === "z" || (cell.t === "s" && cell.v === "")) return O.none()
+    const format = O.liftPredicate(cell.z, (value): value is string => typeof value === "string" && value !== "General")
+    return O.some([
+      cell.t,
+      cell.t === "e" ? errorCodes[Number(cell.v)] : cell.v,
+      O.fromUndefinedOr(cell.f),
+      cell.t === "n" ? format : O.none()
+    ])
+  })
 
-// SheetJS leaves holes where a sheet has no row or no cell; spreading an array turns each hole into undefined.
-const gridOf = (sheet: WorkSheet | undefined) => {
-  const data = (sheet?.["!data"] ?? []) as ReadonlyArray<ReadonlyArray<CellObject | undefined> | null | undefined>
-  return A.map([...data], (row) => A.filter(A.map([...(row ?? [])], fromSheetJs), (cell) => cell !== undefined))
-}
+// SheetJS leaves holes where a sheet has no row or no cell. Fold each absent row once; keep actual cells as Options.
+const gridOf = (sheet: WorkSheet | undefined) =>
+  O.match(
+    O.flatMap(O.fromUndefinedOr(sheet), (found) => O.fromUndefinedOr(found["!data"])),
+    {
+      onNone: A.empty,
+      onSome: (data) =>
+        A.map([...data], (row) =>
+          O.match(O.fromNullishOr(row), {
+            onNone: A.empty,
+            onSome: (cells) => A.getSomes(A.map([...cells], fromSheetJs))
+          })
+        )
+    }
+  )
 
 const large = XlsxReadOptions.make({ limits: XlsxLimits.make({}) })
 
@@ -150,18 +168,25 @@ describe("SheetJS reads what the package writes", () => {
     ([book]) =>
       Effect.gen(function* () {
         const workbook = ours(book)
-        const bytes = yield* Xlsx.stringify(workbook)
+        const bytes = yield* Xlsx.stringify(workbook, XlsxWriteOptions.default)
         const theirs = read(bytes, { type: "array", dense: true, cellFormula: true, cellNF: true, cellStyles: true })
         expect(theirs.SheetNames).toEqual(A.map(workbook.sheets, (sheet) => sheet.info.name))
         expect(theirs.Workbook?.WBProps?.date1904 === true).toBe(book.dateSystem === "1904")
-        expect(A.map(theirs.Workbook?.Sheets ?? [], (sheet) => sheet.Hidden ?? 0)).toEqual(
+        assertDefined(theirs.Workbook)
+        assertDefined(theirs.Workbook.Sheets)
+        expect(
+          A.map(theirs.Workbook.Sheets, (sheet) => {
+            assertDefined(sheet.Hidden)
+            return sheet.Hidden
+          })
+        ).toEqual(
           A.map(workbook.sheets, (sheet) =>
             sheet.info.state === "visible" ? 0 : sheet.info.state === "hidden" ? 1 : 2
           )
         )
         for (const sheet of workbook.sheets) {
           const expected = A.filter(
-            A.map(sheet.rows, (row) => A.filter(A.map(row.cells, asSheetJs), (cell) => cell !== undefined)),
+            A.map(sheet.rows, (row) => A.getSomes(A.map(row.cells, asSheetJs))),
             (row) => row.length > 0
           )
           expect(A.filter(gridOf(theirs.Sheets[sheet.info.name]), (row) => row.length > 0)).toEqual(expected)
@@ -199,9 +224,10 @@ describe("the package reads what SheetJS writes", () => {
             Hidden: index === 0 || book.state === "visible" ? 0 : book.state === "hidden" ? 1 : 2
           }))
         }
-        const bytes = new Uint8Array(
-          write(theirs, { type: "array", bookType: "xlsx", compression: true }) as ArrayBuffer
+        const buffer = yield* S.decodeUnknownEffect(S.instanceOf(ArrayBuffer))(
+          write(theirs, { type: "array", bookType: "xlsx", compression: true })
         )
+        const bytes = new Uint8Array(buffer)
         const found = yield* Xlsx.parse(bytes, large)
         expect(S.is(XlsxWorkbook)(found.workbook)).toBe(true)
         expect(found.workbook.dateSystem).toBe(book.dateSystem)
@@ -211,7 +237,7 @@ describe("the package reads what SheetJS writes", () => {
         const again = read(bytes, { type: "array", dense: true, cellFormula: true, cellNF: true, cellStyles: true })
         for (const sheet of found.workbook.sheets) {
           const mine = A.filter(
-            A.map(sheet.rows, (row) => A.filter(A.map(row.cells, asSheetJs), (cell) => cell !== undefined)),
+            A.map(sheet.rows, (row) => A.getSomes(A.map(row.cells, asSheetJs))),
             (row) => row.length > 0
           )
           expect(mine).toEqual(A.filter(gridOf(again.Sheets[sheet.info.name]), (row) => row.length > 0))
@@ -230,7 +256,7 @@ describe("displayed text is what SheetJS displayed", () => {
     "for the General format, on any number",
     [Arbitrary.schema(Any)],
     ([value]) => {
-      expect(O.getOrUndefined(number(value, "General"))).toBe(formatted("General", value))
+      expect(number(value, "General")).toEqual(formatted("General", value, false))
     },
     { arbitrary: { runs: 2000 } }
   )
@@ -256,7 +282,7 @@ describe("displayed text is what SheetJS displayed", () => {
     [Arbitrary.schema(Cents)],
     ([cents]) => {
       for (const code of codes)
-        expect([code, O.getOrUndefined(number(cents / 100, code))]).toEqual([code, formatted(code, cents / 100)])
+        expect([code, number(cents / 100, code)]).toEqual([code, formatted(code, cents / 100, false)])
     },
     { arbitrary: { runs: 500 } }
   )
@@ -267,7 +293,7 @@ describe("displayed text is what SheetJS displayed", () => {
     [Arbitrary.schema(Whole)],
     ([value]) => {
       for (const code of ["00000", "000", "0", "#,##0", "0%"]) {
-        expect([code, O.getOrUndefined(number(value, code))]).toEqual([code, formatted(code, value)])
+        expect([code, number(value, code)]).toEqual([code, formatted(code, value, false)])
       }
     },
     { arbitrary: { runs: 500 } }
@@ -308,10 +334,7 @@ describe("displayed text is what SheetJS displayed", () => {
       const serial = day + seconds / 86_400
       for (const code of dates) {
         const cell = { value: XlsxDate.make({ serial }), format: XlsxNumberFormat.make({ id: 164, code }) }
-        expect([code, O.getOrUndefined(XlsxCell.shown(cell, system))]).toEqual([
-          code,
-          formatted(code, serial, system === "1904")
-        ])
+        expect([code, XlsxCell.shown(cell, system)]).toEqual([code, formatted(code, serial, system === "1904")])
       }
     },
     { arbitrary: { runs: 500 } }

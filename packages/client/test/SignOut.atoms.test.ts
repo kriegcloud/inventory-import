@@ -1,3 +1,5 @@
+import { assertDefined, assertNone } from "@effect/vitest/utils"
+import { assertedValue } from "./support"
 // Reads belong to one member and organization (Benjamin: "Keyed reads, and drop them on sign-out"). A sign-out lets go
 // of every read held, at once: none is left in the held map nor in the registry, and the next person to sign in on the
 // tab starts from the skeleton and never sees the first one's rows. A switch of organization keeps the person's reads
@@ -41,12 +43,12 @@ const world = () => {
   const layer = Layer.succeed(RowServer, {
     rows: Effect.sleep("20 millis").pipe(Effect.andThen(Effect.sync(() => `rows of ${session}`)))
   })
-  const rows = makeApiAtoms(RowServer).query((server) => server.rows)
+  const rows = makeApiAtoms(RowServer).query((server) => server.rows, { keep: "unwatched", reactivityKeys: O.none() })
   const registry = AtomRegistry.make({
     initialValues: [provideApi(layer), provideMember(signedIn)],
     defaultIdleTTL: 50
   })
-  const seen = () => registry.get(rows).pipe(AsyncResult.value, O.getOrUndefined)
+  const seen = () => registry.get(rows).pipe(AsyncResult.value, assertedValue)
   // Every answer the registry still holds, anywhere.
   const heldValues = () =>
     A.flatMap(A.fromIterable(registry.getNodes().values()), (node) =>
@@ -86,13 +88,15 @@ describe("signing out", () => {
 
       // Marcus signs in on the same tab: the skeleton, then his rows, never hers.
       t.signIn(someone("mem_marcus", "org_prairie"))
-      const seen: Array<string | undefined> = []
+      const seen: Array<O.Option<string>> = []
       t.registry.mount(t.rows)
       for (let i = 0; i < 10; i++) {
-        seen.push(t.seen())
+        seen.push(AsyncResult.value(t.registry.get(t.rows)))
         yield* Effect.sleep("10 millis")
       }
-      expect(seen[0]).toBeUndefined()
+      const first = seen[0]
+      assertDefined(first)
+      assertNone(first)
       expect(seen).not.toContain("rows of mem_dana in org_prairie")
       expect(t.seen()).toBe("rows of mem_marcus in org_prairie")
     })

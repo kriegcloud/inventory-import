@@ -40,25 +40,24 @@ const play = (from: Draft, events: ReadonlyArray<DraftEvent>): Stepped =>
     const next = step(before.draft, event)
     return { draft: next.draft, effects: [...before.effects, ...next.effects] }
   })
-const view = (revision: number, decisions: SavedDecisions = {}) =>
+const view = (revision: number, decisions: SavedDecisions) =>
   DraftEvent.ViewArrived({ revision, decisions, open: true, confirms: 0 })
-const at4 = (decisions: SavedDecisions = {}) =>
+const at4 = (decisions: SavedDecisions) =>
   play(emptyDraft, [DraftEvent.Opened({ kept: O.none() }), view(4, decisions)]).draft
 const decide = (rowId: string, decision: O.Option<Decision>) => DraftEvent.Decided({ changes: { [rowId]: decision } })
 const answered = (id: number, revision: number) =>
   DraftEvent.SaveAnswered({ id, revision, changed: true, notApplied: [], decidedSince: [] })
 const sends = (stepped: Stepped) => A.filter(stepped.effects, DraftEffect.$is("Send"))
-const closed = (decision: O.Option<Decision>, parts: Partial<Side> = {}): Side => ({
-  decision,
+const sideStart: Omit<Side, "decision"> = {
   madeOn: 3,
   dates: {},
   seen: [O.none()],
   live: false,
   here: false,
   overtaken: false,
-  refused: O.none(),
-  ...parts
-})
+  refused: O.none()
+}
+const closed = (decision: O.Option<Decision>, parts: Omit<Side, "decision">): Side => ({ decision, ...parts })
 const lineOfA = (sides: ReadonlyArray<Side>): Waiting => ({
   rows: {},
   lines: { a: { sides, theirs: O.none() } },
@@ -67,7 +66,7 @@ const lineOfA = (sides: ReadonlyArray<Side>): Waiting => ({
 })
 const takeUp = (kept: Waiting) => DraftEvent.TakenUp({ kept })
 const pick = (keep: Keep) => DraftEvent.Settled({ picks: [{ rowId: "a", keep }] })
-const wordsOfA = (draft: Draft, canDecide = true) =>
+const wordsOfA = (draft: Draft, canDecide: boolean) =>
   O.map(R.get(linesShown(draft), "a"), (line) => {
     const { actions, text } = lineWords({ rowId: "a", line, canDecide })
     return { text, labels: A.map(actions, (action) => action.label) }
@@ -75,14 +74,14 @@ const wordsOfA = (draft: Draft, canDecide = true) =>
 
 describe("a line while this tab's own decision of its row is on its way", () => {
   // This tab keeps row a (on its way); a closed tab had left it out; somebody else accepts a proposal on it meanwhile.
-  const asking = play(at4(), [
+  const asking = play(at4({}), [
     decide("a", O.some(kept)),
-    takeUp(lineOfA([closed(O.some(out))])),
+    takeUp(lineOfA([closed(O.some(out), { ...sideStart })])),
     view(5, { a: accepted })
   ])
 
   it("offers no pick, and says they wait for its answer: none could be undone by it", () => {
-    expect(wordsOfA(asking.draft)).toEqual(
+    expect(wordsOfA(asking.draft, true)).toEqual(
       O.some({
         text: "Row a: saved now: accepted the proposal for Unit cost. This tab: kept over the other row with its SKU (being saved). Your closed tab: left out. What to keep can be picked once this tab's decision of it is saved.",
         labels: []
@@ -95,7 +94,7 @@ describe("a line while this tab's own decision of its row is on its way", () => 
 
   it("then follows what the server holds: this tab's saved decision against the closed tab's, said as this tab's", () => {
     const saved = step(asking.draft, answered(1, 6))
-    expect(wordsOfA(saved.draft)).toEqual(
+    expect(wordsOfA(saved.draft, true)).toEqual(
       O.some({
         text: "Row a: This tab: kept over the other row with its SKU. Your closed tab: left out.",
         labels: ["Keep this tab's", "Use the closed tab's"]
@@ -105,7 +104,7 @@ describe("a line while this tab's own decision of its row is on its way", () => 
 
   it("is left out of a press for many, which says how many it covers", () => {
     const line = (going: O.Option<O.Option<Decision>>): LineShown => ({
-      sides: [closed(O.some(out), { here: true, overtaken: true })],
+      sides: [closed(O.some(out), { ...sideStart, here: true, overtaken: true })],
       theirs: O.some(kept).pipe(O.some),
       going,
       since: true
@@ -127,8 +126,8 @@ describe("a line while this tab's own decision of its row is on its way", () => 
 
 describe("a closed tab's refused decision of a row", () => {
   it("lets the confirm go once she has decided that row again and it is saved", () => {
-    const refused = closed(O.some(out), { refused: O.some("Your role was changed.") })
-    const decided = play(at4(), [takeUp(lineOfA([refused])), decide("a", O.some(kept))])
+    const refused = closed(O.some(out), { ...sideStart, refused: O.some("Your role was changed.") })
+    const decided = play(at4({}), [takeUp(lineOfA([refused])), decide("a", O.some(kept))])
     // While her decision is on its way the refused one is still on the line: she sees it as she decides.
     expect(R.has(decided.draft.lines, "a")).toBe(true)
     const saved = step(decided.draft, answered(1, 5))
@@ -137,8 +136,8 @@ describe("a closed tab's refused decision of a row", () => {
   })
 
   it("decided again and refused in this tab too: both are on the line, nothing is sent, the confirm waits", () => {
-    const refused = closed(O.some(out), { refused: O.some("Your role was changed.") })
-    const decided = play(at4(), [takeUp(lineOfA([refused])), decide("a", O.some(kept))])
+    const refused = closed(O.some(out), { ...sideStart, refused: O.some("Your role was changed.") })
+    const decided = play(at4({}), [takeUp(lineOfA([refused])), decide("a", O.some(kept))])
     const again = step(decided.draft, DraftEvent.SaveRefused({ id: 1, reason: "Your role was changed." }))
     expect(O.map(R.get(again.draft.lines, "a"), (line) => A.map(line.sides, (side) => side.decision))).toEqual(
       O.some([O.some(kept)])
@@ -150,7 +149,7 @@ describe("a closed tab's refused decision of a row", () => {
 describe("a member who can only view", () => {
   it("is offered no pick of a closed tab's decision, nor of this tab's, nor one press that sends many", () => {
     const line: LineShown = {
-      sides: [closed(O.some(kept), { here: true }), closed(O.some(out))],
+      sides: [closed(O.some(kept), { ...sideStart, here: true }), closed(O.some(out), { ...sideStart })],
       theirs: O.some(O.some(accepted)),
       going: O.none(),
       since: true
@@ -167,7 +166,7 @@ describe("the confirm and a row that waits", () => {
   it("sends the row first where what it stands over is not the picture the confirm names, and confirms after", () => {
     // Her kept of row a waits over an accept a match took back since: the picture holds what the match left (left
     // out), which the screen explains, but the server must judge the row before a confirm names that picture.
-    const side: Side = { ...closed(O.some(kept), { seen: [O.some(acceptedOut)] }), here: true }
+    const side: Side = { ...closed(O.some(kept), { ...sideStart, seen: [O.some(acceptedOut)] }), here: true }
     const draft: Draft = {
       ...at4({ a: out }),
       matches: [4],
@@ -184,7 +183,11 @@ describe("the confirm and a row that waits", () => {
 
   it("refused for an accept taken back, a row left with nothing goes as a put-back where the server holds more", () => {
     // Row a is kept on the server; she accepted a proposal on it instead, and the confirm carried that.
-    const side: Side = { ...closed(O.some(accepted), { seen: [O.some(kept)], madeOn: 4 }), here: true, live: true }
+    const side: Side = {
+      ...closed(O.some(accepted), { ...sideStart, seen: [O.some(kept)], madeOn: 4 }),
+      here: true,
+      live: true
+    }
     const confirmed = step({ ...at4({ a: kept }), unsent: { a: side } }, DraftEvent.ConfirmPressed())
     expect(A.map(confirmed.effects, DraftEffect.$is("Confirm"))).toEqual([true])
     const stale = step(
@@ -228,7 +231,7 @@ describe("the line that names what a match took back", () => {
 })
 
 describe("what an older page kept", () => {
-  const older = (held: object, rows: object = {}): O.Option<Waiting> =>
+  const older = (held: object, rows: object): O.Option<Waiting> =>
     waitingFromText(Formatter.formatJson({ madeOn: { "row-12": 4 }, leftOver: false, rows, held: { "row-12": held } }))
   const read = (kept: O.Option<Waiting>) =>
     O.map(kept, (waits) =>
@@ -239,9 +242,9 @@ describe("what an older page kept", () => {
     )
 
   it("reads a row held as decided elsewhere as this tab's decision against theirs", () => {
-    expect(read(older({ mine: { out: true }, madeOn: 3, why: { kind: "elsewhere", theirs: { kept: true } } }))).toEqual(
-      O.some({ "row-12": { sides: [[O.some(out), true, true]], theirs: O.some(O.some(kept)) } })
-    )
+    expect(
+      read(older({ mine: { out: true }, madeOn: 3, why: { kind: "elsewhere", theirs: { kept: true } } }, {}))
+    ).toEqual(O.some({ "row-12": { sides: [[O.some(out), true, true]], theirs: O.some(O.some(kept)) } }))
   })
 
   it("reads a row held for closed tabs, with no decision of this tab's named, as the closed tabs' line alone", () => {

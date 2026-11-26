@@ -7,7 +7,7 @@ import { expect } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Eq from "effect/Equal"
 import * as Formatter from "effect/Formatter"
-import { dual } from "effect/Function"
+import { identity, dual } from "effect/Function"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
@@ -112,7 +112,7 @@ const withoutAccept = (value: Value): Value => O.map(value, (decision) => ({ ...
 const hasAccept = (value: Value): boolean => O.exists(value, (decision) => decision.accepted.length > 0)
 
 const isIn = (values: ReadonlyArray<Value> | undefined, one: Value): boolean =>
-  A.some(values ?? [], (other) => sameDecision(other, one))
+  A.some(O.match(O.fromUndefinedOr(values), { onNone: A.empty, onSome: identity }), (other) => sameDecision(other, one))
 
 /** The import as the server has it at one revision: what a read answers with. */
 export interface Snapshot extends Picture {
@@ -285,7 +285,8 @@ const plain = (decisions: SavedDecisions): SavedDecisions =>
   R.filter(decisions, (one) => !sameDecision(O.some(one), O.none()))
 
 /** What the person sees in the region: its own decisions, or the draft's while it has made none. */
-export const regionShows = (world: World): SavedDecisions => plain(O.getOrElse(world.region, () => shown(world.draft)))
+export const regionShows = (world: World): SavedDecisions =>
+  plain(O.match(world.region, { onNone: () => shown(world.draft), onSome: identity }))
 
 /** The server moves on by one. */
 const moves = (world: World, next: Partial<Snapshot>): void => {
@@ -301,7 +302,7 @@ const stores = (world: World, row: string, value: Value, by: Writer): void => {
   const byElse = by === "somebody else"
   if (!sameDecision(R.get(world.server.decisions, row), value)) world.decidedByHer[row] = !byElse
   world.everHeld[row] = [...(world.everHeld[row] ?? [O.none()]), value]
-  world.writes[row] = [...(world.writes[row] ?? []), { value, by }]
+  world.writes[row] = [...O.match(R.get(world.writes, row), { onNone: A.empty, onSome: identity }), { value, by }]
   world.byElse[row] = byElse
   // What the person picked to stay is moot once somebody else writes the row again.
   if (byElse) delete world.promised[row]
@@ -352,7 +353,9 @@ const replaces = (
   )
   if (told) return
   expect(
-    A.some([stored, ...(world.before[row] ?? [])], (one) => isIn(saw, one)),
+    A.some([stored, ...O.match(R.get(world.before, row), { onNone: A.empty, onSome: identity })], (one) =>
+      isIn(saw, one)
+    ),
     `row ${row}: somebody else's ${Formatter.format(stored)} was replaced by ${Formatter.format(value)} unasked (the person had seen ${Formatter.format(saw)})`
   ).toBe(true)
 }
@@ -365,7 +368,8 @@ const keeps = (world: World, row: string, written: Value): void =>
 
 /** Every row of a save or a confirm is a decision a tab of hers sent. */
 const sent = (world: World, rows: RowChanges): void => {
-  for (const [row, value] of R.toEntries(rows)) world.sentByHer[row] = [...(world.sentByHer[row] ?? []), value]
+  for (const [row, value] of R.toEntries(rows))
+    world.sentByHer[row] = [...O.match(R.get(world.sentByHer, row), { onNone: A.empty, onSome: identity }), value]
 }
 
 /** True when the decision sent is the one made, or what is left of it without its accept. */
@@ -405,7 +409,7 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
     if (stale) notApplied.push({ rowId: row, field: "unitCost", kind: "accept" })
     replaces(world, { row, value: written, named: names, isLive: A.contains(save.live, row) })
     keeps(world, row, written)
-    world.sentByHer[row] = [...(world.sentByHer[row] ?? []), written]
+    world.sentByHer[row] = [...O.match(R.get(world.sentByHer, row), { onNone: A.empty, onSome: identity }), written]
     // A closed tab's decision this tab took up and sent is that tab's: the line may say another tab decided it.
     const by: Writer = A.some(world.facts, (fact) => fact.row === row && !fact.here && isPartOf(fact.value, written))
       ? "another tab"
@@ -426,7 +430,7 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
 }
 
 /** A view reaches the step that is drawn. `waiting`: it is given while a read of it is out. */
-const arrive = (world: World, view: Snapshot, isWaiting = false): void => {
+const arrive = (world: World, view: Snapshot, isWaiting: boolean): void => {
   // The server moved on since the picture the screen holds, or says the same revision otherwise: somebody (or a save of
   // hers whose answer is still out) saved since what waits or is on its way was pressed, and none of it is a live press
   // any more, nor is what she presses over a row on its way. Her screen showed her own decision there, never what the
@@ -460,7 +464,10 @@ const arrive = (world: World, view: Snapshot, isWaiting = false): void => {
 /** The person can see these decisions from now on. */
 const sees = (world: World, decisions: SavedDecisions): void => {
   for (const row of ["a", "b", "c"]) {
-    world.couldSee[row] = [...(world.couldSee[row] ?? []), R.get(decisions, row)]
+    world.couldSee[row] = [
+      ...O.match(R.get(world.couldSee, row), { onNone: A.empty, onSome: identity }),
+      R.get(decisions, row)
+    ]
   }
 }
 
@@ -477,7 +484,7 @@ const put = (world: World, view: Snapshot): void => {
 const ownRows = (world: World, rows: RowChanges): void => {
   for (const [row, value] of R.toEntries(rows)) {
     expect(
-      A.some(world.made[row] ?? [], (made) => isPartOf(made, value)),
+      A.some(O.match(R.get(world.made, row), { onNone: A.empty, onSome: identity }), (made) => isPartOf(made, value)),
       `row ${row} is sent as ${Formatter.format(value)}, which the person never decided`
     ).toBe(true)
     // Sent as a refused decision only when nothing else she made explains it: a decision of hers that the server
@@ -491,12 +498,17 @@ const ownRows = (world: World, rows: RowChanges): void => {
           one.row === row &&
           sameDecision(one.value, value) &&
           !isUnanswered &&
-          !A.some(world.made[row] ?? [], (made) => isPartOf(made, value) && !sameDecision(made, one.value))
+          !A.some(
+            O.match(R.get(world.made, row), { onNone: A.empty, onSome: identity }),
+            (made) => isPartOf(made, value) && !sameDecision(made, one.value)
+          )
       ),
       `row ${row} is sent as the server refused it`
     ).toBe(false)
     expect(
-      A.some(world.draft.lines[row]?.sides ?? [], (side) => O.isNone(side.refused)),
+      A.some(O.match(O.fromUndefinedOr(world.draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }), (side) =>
+        O.isNone(side.refused)
+      ),
       `row ${row} is sent while its line asks`
     ).toBe(false)
   }
@@ -524,12 +536,12 @@ const perform = (world: World, effect: DraftEffect): void =>
       // What it names of each row the person knew of: she saw it, or a tab of hers sent it.
       for (const [row, named] of R.toEntries(names)) {
         const knew = [
-          ...(world.couldSee[row] ?? []),
+          ...O.match(R.get(world.couldSee, row), { onNone: A.empty, onSome: identity }),
           ...A.flatMap(
             A.filter(world.pressedOver, (press: World["pressedOver"][number]) => press.row === row),
             (press: World["pressedOver"][number]) => press.saw
           ),
-          ...(world.sentByHer[row] ?? [])
+          ...O.match(R.get(world.sentByHer, row), { onNone: A.empty, onSome: identity })
         ]
         for (const one of named) {
           expect(isIn(knew, one), `row ${row} names ${Formatter.format(one)}, which the person never knew of`).toBe(
@@ -613,19 +625,22 @@ const dispatchIn = (world: World, event: DraftEvent): void => {
   const stepped = step(before, event)
   // Whenever what the screen shows changes and the person did not do it, the region is told to start again: its own
   // state would otherwise go on saying what it said. (The first view of a visit starts the region itself.)
-  if (
-    !DraftEvent.$is("Decided")(event) &&
-    before.onScreen &&
-    stepped.draft.onScreen &&
-    O.isSome(before.held) &&
-    O.isSome(stepped.draft.held) &&
-    !Eq.equals(shown(before), shown(stepped.draft))
-  ) {
-    expect(
-      A.some(stepped.effects, DraftEffect.$is("Restart")),
-      `what the screen shows changed without the person (${Formatter.format(event)}), and the region was not told`
-    ).toBe(true)
-  }
+  O.match(O.all([before.held, stepped.draft.held]), {
+    onNone: () => {},
+    onSome: () => {
+      if (
+        !DraftEvent.$is("Decided")(event) &&
+        before.onScreen &&
+        stepped.draft.onScreen &&
+        !Eq.equals(shown(before), shown(stepped.draft))
+      ) {
+        expect(
+          A.some(stepped.effects, DraftEffect.$is("Restart")),
+          `what the screen shows changed without the person (${Formatter.format(event)}), and the region was not told`
+        ).toBe(true)
+      }
+    }
+  })
   // "Updated with what changed on another screen" is said only of another's change: never of a refusal, a close, the
   // person's own pick or confirm, or a draft let go while nobody looked.
   for (const effect of stepped.effects) {
@@ -654,7 +669,10 @@ const dispatchIn = (world: World, event: DraftEvent): void => {
       O.filter(line.theirs, () => Str.includes("decided since by someone else")(text)),
       (theirs) =>
         void expect(
-          A.some(world.writes[row] ?? [], (one) => one.by !== "this tab" && sameDecision(one.value, theirs)),
+          A.some(
+            O.match(R.get(world.writes, row), { onNone: A.empty, onSome: identity }),
+            (one) => one.by !== "this tab" && sameDecision(one.value, theirs)
+          ),
           `row ${row}: the line says ${Formatter.format(theirs)} was decided since by someone else or another tab, and only this tab wrote it`
         ).toBe(true)
     )
@@ -662,7 +680,7 @@ const dispatchIn = (world: World, event: DraftEvent): void => {
   for (const [row, line] of R.toEntries(world.draft.lines)) {
     // What a line says somebody decided since can be seen.
     O.map(line.theirs, (value) => {
-      world.couldSee[row] = [...(world.couldSee[row] ?? []), value]
+      world.couldSee[row] = [...O.match(R.get(world.couldSee, row), { onNone: A.empty, onSome: identity }), value]
     })
   }
   for (const effect of stepped.effects) perform(world, effect)
@@ -685,17 +703,17 @@ const allWaited = (world: World): void => {
 }
 
 /** The person's press of one decision: what they could see then is what it may replace. */
-const presses = (world: World, row: string, value: Value, more: ReadonlyArray<Value> = []): void => {
+const presses = (world: World, row: string, value: Value, more: ReadonlyArray<Value>): void => {
   const own = A.filter(world.pressedOver, (press: World["pressedOver"][number]) => press.row === row)
   // Decided over their own earlier decision: what that one may replace, and itself.
   const saw = [
-    ...(world.couldSee[row] ?? []),
+    ...O.match(R.get(world.couldSee, row), { onNone: A.empty, onSome: identity }),
     ...more,
     ...A.flatMap(own, (press: World["pressedOver"][number]) => press.saw),
     ...A.map(own, (p) => p.value)
   ]
   world.pressedOver = [...world.pressedOver, { row, value, saw }]
-  world.made[row] = [...(world.made[row] ?? []), value]
+  world.made[row] = [...O.match(R.get(world.made, row), { onNone: A.empty, onSome: identity }), value]
 }
 
 /** Where the person's decisions are now: waiting, on their way, on a line, or left over to be named. */
@@ -916,7 +934,10 @@ const runIn = (world: World, command: Command): void => {
       const value = valueOf(to)
       const showed = R.get(before, row)
       const wasPending = A.contains(pending(world.draft), row)
-      const own = A.filter(world.draft.lines[row]?.sides ?? [], (side) => side.here)
+      const own = A.filter(
+        O.match(O.fromUndefinedOr(world.draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }),
+        (side) => side.here
+      )
       // Their earlier decision of the row, shown on the screen or this tab's on its line, is replaced by this one.
       world.facts = A.filter(
         world.facts,
@@ -977,14 +998,17 @@ const runIn = (world: World, command: Command): void => {
       for (const row of rows) {
         const was = R.get(world.server.decisions, row)
         const left = withoutAccept(was)
-        world.before[row] = [...(world.before[row] ?? []), was]
-        world.everHeld[row] = [...(world.everHeld[row] ?? []), left]
+        world.before[row] = [...O.match(R.get(world.before, row), { onNone: A.empty, onSome: identity }), was]
+        world.everHeld[row] = [...O.match(R.get(world.everHeld, row), { onNone: A.empty, onSome: identity }), left]
         // What a match left of a decision is still its writer's.
         const by = O.getOrElse(
-          O.map(A.last(world.writes[row] ?? []), (one) => one.by),
+          O.map(A.last(O.match(R.get(world.writes, row), { onNone: A.empty, onSome: identity })), (one) => one.by),
           (): Writer => "somebody else"
         )
-        world.writes[row] = [...(world.writes[row] ?? []), { value: left, by }]
+        world.writes[row] = [
+          ...O.match(R.get(world.writes, row), { onNone: A.empty, onSome: identity }),
+          { value: left, by }
+        ]
         delete world.confirmed[row]
         if (O.isSome(left)) decisions[row] = left.value
       }
@@ -1131,7 +1155,7 @@ const runIn = (world: World, command: Command): void => {
       const then = world.history[madeOn]!
       const base = R.get(then.decisions, row)
       const value = valueOf(to)
-      const side = (decision: Value, parts: Partial<Side> = {}): Side => ({
+      const side = (decision: Value, parts: Partial<Side>): Side => ({
         decision,
         madeOn,
         dates: {},
@@ -1146,7 +1170,7 @@ const runIn = (world: World, command: Command): void => {
       const other = valueOf(to === "out" ? "kept" : "out")
       const add = (one: Value): void => {
         world.facts = [...world.facts, { row, value: one, here: false }]
-        world.made[row] = [...(world.made[row] ?? []), one]
+        world.made[row] = [...O.match(R.get(world.made, row), { onNone: A.empty, onSome: identity }), one]
         world.pressedOver = [...world.pressedOver, { row, value: one, saw: [base, one] }]
       }
       if (sameDecision(base, value)) return
@@ -1156,7 +1180,7 @@ const runIn = (world: World, command: Command): void => {
       if (landed) {
         // Its last save reached the server, and its answer was lost with the tab.
         stores(world, row, value, "another tab")
-        world.sentByHer[row] = [...(world.sentByHer[row] ?? []), value]
+        world.sentByHer[row] = [...O.match(R.get(world.sentByHer, row), { onNone: A.empty, onSome: identity }), value]
         delete world.confirmed[row]
         moves(world, { decisions: over(world.server.decisions, { [row]: value }) })
       }
@@ -1195,7 +1219,10 @@ const runIn = (world: World, command: Command): void => {
           [
             ...A.fromOption(onItsWay),
             ...A.fromOption(R.get(before.unsent, row)),
-            ...A.filter(before.lines[row]?.sides ?? [], (one) => one.here && O.isNone(one.refused))
+            ...A.filter(
+              O.match(O.fromUndefinedOr(before.lines[row]?.sides), { onNone: A.empty, onSome: identity }),
+              (one) => one.here && O.isNone(one.refused)
+            )
           ],
           (mine) => sameDecision(mine.decision, one.value)
         )
@@ -1211,7 +1238,9 @@ const runIn = (world: World, command: Command): void => {
       ]
       const ofRow = (draft: Draft) => [
         ...ownOf(draft),
-        A.filter(draft.lines[row]?.sides ?? [], (side) => O.isNone(side.refused))
+        A.filter(O.match(O.fromUndefinedOr(draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }), (side) =>
+          O.isNone(side.refused)
+        )
       ]
       if (!Eq.equals(ofRow(before), ofRow(world.draft))) {
         if (A.some(ownOf(before), O.isSome) && Eq.equals(ownOf(before), ownOf(world.draft))) {
@@ -1234,9 +1263,11 @@ const runIn = (world: World, command: Command): void => {
 /** True when the person's latest decision of a row is the one sent: nothing was decided of it since. */
 const latestIs = (world: World, row: string, value: Value): boolean =>
   !R.has(world.draft.unsent, row) &&
-  !A.some(world.draft.lines[row]?.sides ?? [], (side) => O.isNone(side.refused)) &&
+  !A.some(O.match(O.fromUndefinedOr(world.draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }), (side) =>
+    O.isNone(side.refused)
+  ) &&
   O.exists(world.draft.flight, (flight) => R.has(flight.rows, row)) &&
-  A.some(world.made[row] ?? [], (made) => isPartOf(made, value))
+  A.some(O.match(R.get(world.made, row), { onNone: A.empty, onSome: identity }), (made) => isPartOf(made, value))
 
 /**
  * True when the decision of a row this tab sent is the latest of this tab's: nothing was decided of it here since (a
@@ -1244,9 +1275,12 @@ const latestIs = (world: World, row: string, value: Value): boolean =>
  */
 const latestHere = (world: World, row: string, value: Value): boolean =>
   !R.has(world.draft.unsent, row) &&
-  !A.some(world.draft.lines[row]?.sides ?? [], (side) => side.here && O.isNone(side.refused)) &&
+  !A.some(
+    O.match(O.fromUndefinedOr(world.draft.lines[row]?.sides), { onNone: A.empty, onSome: identity }),
+    (side) => side.here && O.isNone(side.refused)
+  ) &&
   O.exists(world.draft.flight, (flight) => R.has(flight.rows, row)) &&
-  A.some(world.made[row] ?? [], (made) => isPartOf(made, value))
+  A.some(O.match(R.get(world.made, row), { onNone: A.empty, onSome: identity }), (made) => isPartOf(made, value))
 
 /** Nothing is on its way between the screen and the server, and nothing of the person's waits to be sent. */
 const still = (world: World): boolean =>
@@ -1328,41 +1362,47 @@ export const holds = (world: World): void => {
       "on screen, the draft holds another revision than the tab's view"
     ).toEqual(O.map(world.view, (view) => view.revision))
   }
-  if (O.isSome(draft.held)) {
-    const onScreen = shown(draft)
-    for (const [row, value] of R.toEntries(world.confirmed)) {
-      expect(
-        sameDecision(R.get(onScreen, row), value),
-        `what the server took of row ${row} is not on screen: ${Formatter.format(R.get(onScreen, row))}, not ${Formatter.format(value)}`
-      ).toBe(true)
+  O.match(draft.held, {
+    onNone: () => {},
+    onSome: () => {
+      const onScreen = shown(draft)
+      for (const [row, value] of R.toEntries(world.confirmed)) {
+        expect(
+          sameDecision(R.get(onScreen, row), value),
+          `what the server took of row ${row} is not on screen: ${Formatter.format(R.get(onScreen, row))}, not ${Formatter.format(value)}`
+        ).toBe(true)
+      }
     }
-  }
-  if (!draft.onScreen || O.isNone(draft.held)) return
-  // What the region shows is what the draft shows: the counts, the confirm button and the rows say one thing.
-  expect(regionShows(world), "the region shows another thing than the draft").toEqual(plain(shown(draft)))
-  if (!still(world)) return
-  // With nothing on its way and nothing waiting to be sent, the screen waits for nothing: it holds no saved row over
-  // a picture that lacks it (nobody would bring the newer one), it is not behind a revision it has been told of,
-  // and when that revision is the server's latest, what it shows is what the server holds, but for its lines.
-  expect(O.isNone(draft.landed), "a saved row still waits for a picture nobody asked for").toBe(true)
-  // A pick of a decision of hers ends with it on the server, or asked about again on a line.
-  if (world.server.open) {
-    for (const [row, promise] of R.toEntries(world.promised)) {
-      if (promise.stays || R.has(draft.lines, row)) continue
-      expect(
-        isPartOf(promise.value, R.get(world.server.decisions, row)),
-        `row ${row}: she picked ${Formatter.format(promise.value)}, and the server holds ${Formatter.format(R.get(world.server.decisions, row))} with no line`
-      ).toBe(true)
+  })
+  if (!draft.onScreen) return
+  O.match(draft.held, {
+    onNone: () => {},
+    onSome: (held) => {
+      // What the region shows is what the draft shows: the counts, the confirm button and the rows say one thing.
+      expect(regionShows(world), "the region shows another thing than the draft").toEqual(plain(shown(draft)))
+      if (!still(world)) return
+      // With nothing on its way and nothing waiting to be sent, the screen waits for nothing: it holds no saved row over
+      // a picture that lacks it (nobody would bring the newer one), it is not behind a revision it has been told of,
+      // and when that revision is the server's latest, what it shows is what the server holds, but for its lines.
+      expect(O.isNone(draft.landed), "a saved row still waits for a picture nobody asked for").toBe(true)
+      // A pick of a decision of hers ends with it on the server, or asked about again on a line.
+      if (world.server.open) {
+        for (const [row, promise] of R.toEntries(world.promised)) {
+          if (promise.stays || R.has(draft.lines, row)) continue
+          expect(
+            isPartOf(promise.value, R.get(world.server.decisions, row)),
+            `row ${row}: she picked ${Formatter.format(promise.value)}, and the server holds ${Formatter.format(R.get(world.server.decisions, row))} with no line`
+          ).toBe(true)
+        }
+      }
+      expect(held.revision, "the screen is behind a revision it was told of").toBeGreaterThanOrEqual(world.told)
+      if (world.told >= world.server.revision && R.isEmptyReadonlyRecord(draft.lines)) {
+        expect(plain(shown(draft)), "the screen was told of the latest revision, and shows another thing").toEqual(
+          plain(world.server.decisions)
+        )
+      }
     }
-  }
-  expect(O.getOrThrow(draft.held).revision, "the screen is behind a revision it was told of").toBeGreaterThanOrEqual(
-    world.told
-  )
-  if (world.told >= world.server.revision && R.isEmptyReadonlyRecord(draft.lines)) {
-    expect(plain(shown(draft)), "the screen was told of the latest revision, and shows another thing").toEqual(
-      plain(world.server.decisions)
-    )
-  }
+  })
 }
 
 /** Everything on its way lands, the person settles every line, and presses "Save again". */
@@ -1481,7 +1521,7 @@ const enabledIn = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command
 }
 
 /** The review opened on an import with these decisions, as the page opens it: the view read first, then the step. */
-export const opened = (decisions: SavedDecisions = {}): World => {
+export const opened = (decisions: SavedDecisions): World => {
   const world = start(decisions)
   runIn(world, Command.cases.ComeBack.make({}))
   return world
@@ -1489,7 +1529,7 @@ export const opened = (decisions: SavedDecisions = {}): World => {
 
 /** The first thing that does not hold when `commands` are played from an opened review, in words; none if all holds. */
 export const broken = (commands: ReadonlyArray<Command>): O.Option<string> => {
-  const world = opened()
+  const world = opened({})
   const one = (command: Command): void => {
     runIn(world, command)
     holds(world)
@@ -1544,7 +1584,7 @@ export const Choices = S.Array(S.Tuple([Choice, Choice])).check(S.isMinLength(30
  * under its shortest ordering, as words, with what did not hold.
  */
 const playIn = (choices: typeof Choices.Type, may: Play): void => {
-  const world = opened()
+  const world = opened({})
   const commands: Array<Command> = []
   for (const [kind, which] of choices) {
     const kinds = enabledIn(world, may)

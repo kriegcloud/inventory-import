@@ -1,3 +1,4 @@
+import { assertDefined } from "@effect/vitest/utils"
 // The server applies the person's decisions with `review` (src/domain); the screen applies them with the review
 // region's own logic (src/web/components/review). These must agree, or the button would say "Import 9 items" and
 // the server would write a different number. This test drives the region's logic the way the screen does, through
@@ -10,7 +11,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
-import * as Str from "effect/String"
+import * as S from "effect/Schema"
 import { firstDecisions, itemsOfRow, noHistory, recheckRow, review } from "@inventory/catalog-model/Review"
 import { changeToStored } from "@inventory/catalog-contract/Change"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
@@ -48,7 +49,7 @@ const stage = (file: File): Effect.Effect<StagedTable> =>
   Effect.orDie(Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table })))
 
 /** One screen: the decisions the server would be sent, and the region's own state, kept in step. */
-const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: ReadonlyArray<ItemFields> = []) => {
+const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: ReadonlyArray<ItemFields>) => {
   const input = { ...noHistory, table, choices: [], storedItems }
   const check = recheckRow(input)
   const recheck = (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => {
@@ -93,7 +94,7 @@ describe("the screen and the server apply decisions the same way", () => {
     it.effect(`on the messy sample, with rule fixes set to ${mode}`, () =>
       Effect.gen(function* () {
         const table = yield* stage(sample("items_messy.csv"))
-        const s = screen(table, mode)
+        const s = screen(table, mode, [])
         const opened = s.agree()
         expect(opened.current.counts.rows).toBe(200)
 
@@ -112,44 +113,56 @@ describe("the screen and the server apply decisions the same way", () => {
         const left = A.filter(s.derive().views, (view) => view.status === "needs")
         expect(left.length).toBeGreaterThan(0)
         const typed = A.findFirst(left, (view) => view.problem?.column === "sku" && view.problem.rivals === undefined)
-        if (O.isSome(typed)) {
-          s.press({ type: "edit" as const, rowId: typed.value.row.id, column: "sku", value: "ZZZ-9999" })
-          s.agree()
-        }
+        O.match(typed, {
+          onNone: () => {},
+          onSome: (typed) => {
+            s.press({ type: "edit" as const, rowId: typed.row.id, column: "sku", value: "ZZZ-9999" })
+            s.agree()
+          }
+        })
         const picked = A.findFirst(
           s.derive().views,
           (view) => view.status === "needs" && view.problem?.choices !== undefined && view.problem.column !== undefined
         )
-        if (O.isSome(picked)) {
-          const choice = picked.value.problem?.choices?.[0]
-          const column = picked.value.problem?.column
-          if (choice !== undefined && column !== undefined) {
-            s.press({ type: "edit" as const, rowId: picked.value.row.id, column, value: choice.value })
-            s.agree()
+        O.match(picked, {
+          onNone: () => {},
+          onSome: (picked) => {
+            const choice = picked.problem?.choices?.[0]
+            const column = picked.problem?.column
+            if (choice !== undefined && column !== undefined) {
+              s.press({ type: "edit" as const, rowId: picked.row.id, column, value: choice.value })
+              s.agree()
+            }
           }
-        }
+        })
         const rivals = A.findFirst(
           s.derive().views,
           (view) => view.status === "needs" && view.problem?.rivals !== undefined
         )
-        if (O.isSome(rivals)) {
-          s.press({ type: "keep" as const, rowId: rivals.value.row.id })
-          s.agree()
-          // Only the first kept row may win: keeping its rival too must not make both ready.
-          const rival = rivals.value.problem?.rivals?.[0]
-          if (rival !== undefined) {
-            s.press({ type: "keep" as const, rowId: rival })
+        O.match(rivals, {
+          onNone: () => {},
+          onSome: (rivals) => {
+            s.press({ type: "keep" as const, rowId: rivals.row.id })
             s.agree()
+            // Only the first kept row may win: keeping its rival too must not make both ready.
+            const rival = rivals.problem?.rivals?.[0]
+            if (rival !== undefined) {
+              s.press({ type: "keep" as const, rowId: rival })
+              s.agree()
+            }
           }
-        }
+        })
         const out = A.findFirst(s.derive().views, (view) => view.status === "needs")
-        if (O.isSome(out)) {
-          s.press({ type: "leaveOut" as const, rowIds: [out.value.row.id] })
-          s.agree()
-          s.press({ type: "undo" as const })
-          s.agree()
-          s.press({ type: "redo" as const })
-        }
+        O.match(out, {
+          onNone: () => {},
+          onSome: (out) => {
+            s.press({ type: "leaveOut" as const, rowIds: [out.row.id] })
+            s.agree()
+            s.press({ type: "undo" as const })
+            s.agree()
+            s.press({ type: "redo" as const })
+          }
+        })
         const { current, views } = s.agree()
         const { counts } = current
         expect(counts.ready + counts.needs + counts.out + counts.already).toBe(counts.rows)
@@ -224,12 +237,14 @@ describe("a row discontinued yet active, on the screen", () => {
     Effect.gen(function* () {
       const table = yield* stage(sample("items_messy.csv"))
       for (const answer of ["Not active", "No discontinued date"]) {
-        const s = screen(table, "apply")
-        const view = O.getOrUndefined(A.findFirst(s.derive().views, (candidate) => candidate.row.id === "row-45"))
-        const fix = view?.problem?.fix
+        const s = screen(table, "apply", [])
+        const view = A.filter(s.derive().views, (candidate) => candidate.row.id === "row-45")[0]
+        assertDefined(view)
+        const fix = view.problem?.fix
+        assertDefined(fix)
         expect(fix?.why.labels).toEqual(["Not active", "No discontinued date"])
         expect(fix?.why.alternatives).toEqual([""])
-        if (fix === undefined) return
+        assertDefined(fix)
         const value = answer === "Not active" ? fix.to : ""
         s.press(
           value === fix.to
@@ -237,11 +252,10 @@ describe("a row discontinued yet active, on the screen", () => {
             : { type: "edit" as const, rowId: "row-45", column: columnFor(fix, value), value }
         )
         const { current, views } = s.agree()
-        const row = O.getOrUndefined(A.findFirst(current.rows, (candidate) => candidate.id === "row-45"))
-        expect(row?.status, answer).toBe("ready")
-        expect(O.getOrUndefined(A.findFirst(views, (candidate) => candidate.row.id === "row-45"))?.status, answer).toBe(
-          "ready"
-        )
+        const row = A.filter(current.rows, (candidate) => candidate.id === "row-45")[0]
+        assertDefined(row)
+        expect(row.status, answer).toBe("ready")
+        expect(A.filter(views, (candidate) => candidate.row.id === "row-45")[0]?.status, answer).toBe("ready")
         expect(
           O.map(
             O.flatMap(O.fromUndefinedOr(row), (found) => found.item),
@@ -251,9 +265,7 @@ describe("a row discontinued yet active, on the screen", () => {
         ).toEqual(O.some(answer === "Not active" ? { kind: "discontinued", on: "2025-06-30" } : { kind: "active" }))
         // Undone, the row asks again on both sides.
         s.press({ type: "undo" as const })
-        expect(
-          O.getOrUndefined(A.findFirst(s.agree().current.rows, (candidate) => candidate.id === "row-45"))?.outcome
-        ).toBe("decision")
+        expect(A.filter(s.agree().current.rows, (candidate) => candidate.id === "row-45")[0]?.outcome).toBe("decision")
       }
     })
   )
@@ -271,15 +283,17 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const picks = A.filter(rows, (row) => row.problem?.column === "category")
       expect(picks.length).toBe(1)
       for (const row of picks) {
+        const choices = row.problem?.choices
+        assertDefined(choices)
         expect(row.problem?.fix).toBeUndefined()
-        expect(A.map(row.problem?.choices ?? [], (choice) => choice.value)).toEqual([
+        expect(A.map(choices, (choice) => choice.value)).toEqual([
           "raw-materials",
           "components",
           "finished-goods",
           "packaging",
           "supplies"
         ])
-        expect(A.some(row.problem?.choices ?? [], (choice) => choice.suggested === true)).toBe(false)
+        expect(A.some(choices, (choice) => choice.suggested === true)).toBe(false)
       }
     })
   )
@@ -289,17 +303,20 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const table = yield* stage(
         new File([`${heading}\n ABC-0001,One,packaging,EA,1.00\nABC-0002 ,Two,packaging,EA,1.00\n`], "items.csv")
       )
-      const s = screen(table, "propose")
+      const s = screen(table, "propose", [])
       const groups = A.filter(waitingGroups({ views: s.derive().views }), (group) => group.kind === "spaces")
       expect(A.map(groups, (group) => [group.id, group.label, group.rowIds.length > 1])).toEqual([
         ["sku:trim", "the value without its spaces", true]
       ])
       const group = groups[0]
-      if (group === undefined) return
+      assertDefined(group)
       s.press({ type: "acceptGroup" as const, groupId: group.id, except: [] })
       const { current } = s.agree()
       const trimmed = A.filter(current.rows, (row) => A.contains(group.rowIds, row.id))
-      expect(A.map(trimmed, (row) => row.values.sku)).toEqual(A.map(trimmed, (row) => Str.trim(row.file.sku)))
+      const expectedSkus = yield* Effect.forEach(trimmed, (row) => S.decodeEffect(S.Trim)(row.file.sku), {
+        concurrency: 1
+      })
+      expect(A.map(trimmed, (row) => row.values.sku)).toEqual(expectedSkus)
       expect(A.dedupe(A.map(trimmed, (row) => row.values.sku)).length).toBe(trimmed.length)
     })
   )
@@ -327,11 +344,14 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         const s = screen(table, "apply", [stored])
         const opened = s.agree()
         const view = opened.views[0]
+        assertDefined(view)
+        const choices = view.problem?.choices
+        assertDefined(choices)
         expect(view?.status).toBe("needs")
         expect(view?.problem?.column).toBe(storedChoice)
         // The button says what the choice is, not the SKU column the problem sits on.
         expect(view?.problem?.ask).toBe("Keep or replace")
-        expect(A.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
+        expect(A.map(choices, (choice) => choice.value)).toEqual(["keep", "replace"])
         s.press({ type: "edit" as const, rowId: "row-2", column: storedChoice, value: answer })
         // As the server stores it: the one flag, and nothing else said about the row.
         const sent = s.decisions["row-2"]

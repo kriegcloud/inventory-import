@@ -1,3 +1,5 @@
+import * as R from "effect/Record"
+import { identity } from "effect/Function"
 // @effect-diagnostics nodeBuiltinImport:off
 // The definition of done for moving workbook reading onto @beep/xlsx: the reader gives exactly the table (cells with
 // their type, text, displayed text and formula, row numbers, Notes, the sheet list and the sheet chosen) or exactly
@@ -44,7 +46,7 @@ const sheetsOf: { readonly [name: string]: ReadonlyArray<string> } = {
 const cases: ReadonlyArray<XlsxCase> = [
   ...A.flatMap(fixtureNames, (name) => [
     { name, bytes: Effect.sync(() => bytesOf(name)), sheet: O.none<string>() },
-    ...A.map(sheetsOf[name] ?? [], (sheet) => ({
+    ...A.map(O.match(R.get(sheetsOf, name), { onNone: A.empty, onSome: identity }), (sheet) => ({
       name: `${name} sheet ${sheet}`,
       bytes: Effect.sync(() => bytesOf(name)),
       sheet: O.some(sheet)

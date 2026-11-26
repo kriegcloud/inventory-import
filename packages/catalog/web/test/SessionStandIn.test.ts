@@ -5,13 +5,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { memberKey } from "@inventory/client/MemberAtoms"
 import { registryFor } from "./support/catalog.ts"
-import { memberOf, sessionStandIn } from "./support/session.ts"
+import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 const settle = Effect.sleep("10 millis")
 
 /** Dana's page, in Prairie, and how to ask who is signed in again. */
 const page = Effect.fnUntraced(function* () {
-  const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+  const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
   const registry = registryFor({ endpoints: {}, signedIn: session.signedIn, asked: session.asked })
   registry.mount(memberKey)
   yield* settle
@@ -19,8 +19,18 @@ const page = Effect.fnUntraced(function* () {
   return { session, registry, ask, who: () => registry.get(memberKey) }
 })
 
-const danaInNorthline = memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
-const marcusInNorthline = memberOf({ id: "mem_marcus_northline", organization: "org_northline", account: "mem_marcus" })
+const danaInNorthline = memberOf({
+  ...memberStart,
+  id: "mem_dana_northline",
+  organization: "org_northline",
+  account: "mem_dana"
+})
+const marcusInNorthline = memberOf({
+  ...memberStart,
+  id: "mem_marcus_northline",
+  organization: "org_northline",
+  account: "mem_marcus"
+})
 
 describe("the person's own switch, as the tests' page has it", () => {
   it.live("is her own account in the organization she chose: the page goes on, as her member there", () =>
@@ -69,7 +79,7 @@ describe("the person's own switch, as the tests' page has it", () => {
       t.session.choose("org_northline")
       t.ask()
       yield* settle
-      yield* t.session.answer(memberOf({ id: "mem_dana" }))
+      yield* t.session.answer(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
       yield* settle
       t.ask()
       yield* settle

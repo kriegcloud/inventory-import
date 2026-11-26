@@ -25,7 +25,7 @@ import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import { draftEvents, draftOf, followDraft, reviewLocal, shownDecisions } from "../src/ReviewDraft.atoms.ts"
 import { openedOf } from "../src/internal/result.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
-import { memberOf, sessionStandIn } from "./support/session.ts"
+import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its storage, which outlives a page, and the tab's own.
 const browser = vi.hoisted(() => {
@@ -70,7 +70,7 @@ vi.mock("sonner", () => ({
 }))
 
 /** Lets the page do all it can with no time passing: each yield lets one more of its steps run. */
-const drained = (left = 20): Effect.Effect<void> =>
+const drained = (left: number): Effect.Effect<void> =>
   left === 0
     ? Effect.void
     : Effect.andThen(
@@ -81,7 +81,7 @@ const drained = (left = 20): Effect.Effect<void> =>
 /** Ten milliseconds of the page's time pass, and what fell due in them has run. */
 const tick = Effect.andThen(
   Effect.promise(() => vi.advanceTimersByTimeAsync(10)),
-  Effect.suspend(() => drained())
+  Effect.suspend(() => drained(20))
 )
 
 /** `span` milliseconds of the page's time pass, ten at a time, with all the page did in them run. */
@@ -102,7 +102,7 @@ const passes = (span: number): Effect.Effect<void> =>
 const longEnough = 2_000
 
 /** Waits until `done` holds, ten seconds of the page's time at most; fails naming `what` when it never does. */
-const until = (what: string, done: () => boolean, left = 1_000): Effect.Effect<void> =>
+const until = (what: string, done: () => boolean, left: number): Effect.Effect<void> =>
   done()
     ? Effect.void
     : left === 0
@@ -112,8 +112,8 @@ const until = (what: string, done: () => boolean, left = 1_000): Effect.Effect<v
           Effect.suspend(() => until(what, done, left - 1))
         )
 const out = decisionFromFlags({ out: true })
-const dana = memberOf({ id: "mem_dana" })
-const marcus = memberOf({ id: "mem_marcus" })
+const dana = memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" })
+const marcus = memberOf({ ...memberStart, account: "mem_marcus", id: "mem_marcus" })
 
 /** How a save fails: nobody signed in, or the server's own failure, which may pass. */
 type SaveFailure = NotSignedIn | HttpApiError.InternalServerErrorProblem
@@ -123,7 +123,7 @@ const keptOf = (id: ImportId, member: string) =>
   R.keys(R.filter(browser.kept, (_text, key) => Str.includes(`${id}%3Awaiting`)(key) && Str.includes(member)(key)))
 
 /** A page of the app on one import's review: the server answers a save as the test says. */
-const page = (id: ImportId, who = dana) => {
+const page = (id: ImportId, who: typeof dana) => {
   const session = sessionStandIn(who)
   const server: { signedOut: boolean; view: ImportView; notFoundIn: string | undefined; reads: number } = {
     signedOut: false,
@@ -207,12 +207,12 @@ const page = (id: ImportId, who = dana) => {
 
 /** A page whose save of row 2 was refused for nobody signed in, so who is signed in is being asked again. */
 const askedAgain = Effect.fnUntraced(function* (id: ImportId) {
-  const t = page(id)
+  const t = page(id, dana)
   // The review is drawn once its read has landed; a decision made before that is not the case here.
-  yield* until("the review drawn", t.onScreen)
+  yield* until("the review drawn", t.onScreen, 1_000)
   t.server.signedOut = true
   t.decide("row-2")
-  yield* until("who is signed in asked again", () => t.session.times() > 0)
+  yield* until("who is signed in asked again", () => t.session.times() > 0, 1_000)
   expect([t.sent(), t.session.times(), t.registry.get(t.session.asked)]).toEqual([[["row-2"]], 1, true])
   t.server.signedOut = false
   return t
@@ -226,7 +226,7 @@ describe("the review while who is signed in is asked again", () => {
       yield* passes(longEnough)
       expect([t.onScreen(), t.drew, A.length(t.saves)]).toEqual([true, ["skeleton", "review"], 1])
       yield* t.session.answer(dana)
-      yield* until("row 7 sent", () => A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7"))
+      yield* until("row 7 sent", () => A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7"), 1_000)
       // The row decided meanwhile goes; the one refused goes once the import's picture has checked it.
       expect([t.onScreen(), t.drew, A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7")]).toEqual([
         true,
@@ -245,7 +245,7 @@ describe("the review while who is signed in is asked again", () => {
       t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
       yield* passes(longEnough)
       yield* t.session.answer(marcus)
-      yield* until("the page left", () => t.session.left.times > 0)
+      yield* until("the page left", () => t.session.left.times > 0, 1_000)
       yield* passes(longEnough)
       expect([t.session.left.times, t.registry.get(memberKey), A.length(t.saves), t.commits]).toEqual([
         1,
@@ -256,7 +256,7 @@ describe("the review while who is signed in is asked again", () => {
       expect([A.length(keptOf(id, "mem_dana")), keptOf(id, "mem_marcus")]).toEqual([1, []])
       // Marcus's own page, in the same browser and tab.
       const his = page(id, marcus)
-      yield* until("his page's decisions shown", () => O.isSome(his.registry.get(shownDecisions(id))))
+      yield* until("his page's decisions shown", () => O.isSome(his.registry.get(shownDecisions(id))), 1_000)
       yield* passes(longEnough)
       expect([his.registry.get(shownDecisions(id)), his.saves, A.length(keptOf(id, "mem_dana"))]).toEqual([
         O.some({}),
@@ -267,7 +267,7 @@ describe("the review while who is signed in is asked again", () => {
       const hers = page(id, dana)
       // Her page sends once its reads have landed: waited for. A try that looked too early also left her rows kept, and
       // every further try then failed.
-      yield* until("her two rows sent", () => A.length(A.flatten(hers.sent())) >= 2)
+      yield* until("her two rows sent", () => A.length(A.flatten(hers.sent())) >= 2, 1_000)
       expect(A.sort(A.flatten(hers.sent()), Str.Order)).toEqual(["row-2", "row-7"])
     })
   )
@@ -282,9 +282,9 @@ describe("the review while who is signed in is asked again", () => {
       // Asked again: answered once that question is out, not one already failed.
       const asked = t.session.times()
       t.registry.refresh(t.session.signedIn)
-      yield* until("who is signed in asked once more", () => t.session.times() > asked)
+      yield* until("who is signed in asked once more", () => t.session.times() > asked, 1_000)
       yield* t.session.answer(dana)
-      yield* until("row 7 sent", () => A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7"))
+      yield* until("row 7 sent", () => A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7"), 1_000)
       expect(A.contains(A.flatten(A.drop(t.sent(), 1)), "row-7")).toBe(true)
     })
   )
@@ -292,15 +292,15 @@ describe("the review while who is signed in is asked again", () => {
   it.live("a confirm pressed meanwhile is not made until it is known, and then as the member who pressed it", () =>
     Effect.gen(function* () {
       const id = importNo(94)
-      const t = page(id)
-      yield* until("the review drawn", t.onScreen)
+      const t = page(id, dana)
+      yield* until("the review drawn", t.onScreen, 1_000)
       t.registry.refresh(t.session.signedIn)
-      yield* until("who is signed in asked again", () => t.session.times() > 0)
+      yield* until("who is signed in asked again", () => t.session.times() > 0, 1_000)
       t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
       yield* passes(longEnough)
       expect([t.registry.get(t.session.asked), t.commits]).toEqual([true, []])
       yield* t.session.answer(dana)
-      yield* until("the confirm made", () => A.length(t.commits) > 0)
+      yield* until("the confirm made", () => A.length(t.commits) > 0, 1_000)
       expect(A.length(t.commits)).toBe(1)
     })
   )
@@ -310,21 +310,21 @@ describe("the review while who is signed in is asked again", () => {
     () =>
       Effect.gen(function* () {
         const id = importNo(95)
-        const t = page(id)
-        yield* until("the review drawn", t.onScreen)
+        const t = page(id, dana)
+        yield* until("the review drawn", t.onScreen, 1_000)
         t.decide("row-2")
-        yield* until("row 2 sent", () => A.length(t.saves) > 0)
+        yield* until("row 2 sent", () => A.length(t.saves) > 0, 1_000)
         yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         // The failure lands, and the row waits to be sent again.
         yield* passes(100)
         t.session.choose("org_northline")
         t.registry.refresh(t.session.signedIn)
-        yield* until("who is signed in asked again", () => t.session.times() > 0)
+        yield* until("who is signed in asked again", () => t.session.times() > 0, 1_000)
         t.server.notFoundIn = "org_northline"
         yield* t.session.answer(
-          memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
+          memberOf({ ...memberStart, id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
         )
-        yield* until("the import drawn as gone", () => t.drew[t.drew.length - 1] === "gone")
+        yield* until("the import drawn as gone", () => t.drew[t.drew.length - 1] === "gone", 1_000)
         yield* passes(longEnough)
         expect([t.session.left.times, t.drew[t.drew.length - 1], A.length(t.saves)]).toEqual([0, "gone", 1])
         expect(A.length(keptOf(id, "mem_dana"))).toBe(1)
@@ -346,8 +346,8 @@ describe("an import not found while it is open", () => {
   it.live("removed: says so once, asks nobody who is signed in, and is never drawn again", () =>
     Effect.gen(function* () {
       const id = importNo(96)
-      const t = page(id)
-      yield* until("the review drawn", t.onScreen)
+      const t = page(id, dana)
+      yield* until("the review drawn", t.onScreen, 1_000)
       const { reads } = t.server
       t.server.notFoundIn = "org_prairie"
       importView(id).askAgain(t.registry)
@@ -359,7 +359,7 @@ describe("an import not found while it is open", () => {
   it.live("in another organization: asked once for each answer that said so, with no loop and no redraw", () =>
     Effect.gen(function* () {
       const id = importNo(97)
-      const t = page(id)
+      const t = page(id, dana)
       // Read more than a second ago: shown again, it would be asked again behind it.
       yield* passes(1_100)
       const { reads } = t.server

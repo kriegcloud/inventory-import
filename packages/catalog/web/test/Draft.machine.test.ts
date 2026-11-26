@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 // The review's draft against a server and a network that answer in any order (`support/draftWorld.ts`): the person
 // decides, somebody else saves or matches a column, a save is taken by the server and answered late or out of order,
 // fails or is refused, reads and other answers arrive out of turn, the person leaves the Review step and comes back,
@@ -45,7 +46,7 @@ const sentRows = (delta: DecisionDelta): ReadonlyArray<string> => [...R.keys(del
 const waits = (
   decision: O.Option<SavedDecisions[string]>,
   madeOn: number,
-  seen = [O.none<SavedDecisions[string]>()]
+  seen: ReadonlyArray<O.Option<SavedDecisions[string]>>
 ): Side => ({
   decision,
   madeOn,
@@ -105,7 +106,7 @@ describe("the review's draft, whatever order things happen in", () => {
 
 describe("the orderings that lost or hid a decision", () => {
   it("a row decided otherwise since, while an earlier decision of it was on its way, comes back after a reload on a line, and its earlier copy is not sent", () => {
-    const world = opened()
+    const world = opened({})
     for (const command of [
       Command.cases.SomeoneElse.make({ row: "b", to: "out" }),
       Command.cases.Decide.make({ row: "b", to: "kept" }),
@@ -130,7 +131,7 @@ describe("the orderings that lost or hid a decision", () => {
   })
 
   it("back on Review with a decision unsaved, another person's rows are still followed and never sent over", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.Leave.make({}))
@@ -173,7 +174,7 @@ describe("the orderings that lost or hid a decision", () => {
   })
 
   it("an answer from another request that lands after a later save keeps the decision just saved on screen", () => {
-    const world = opened()
+    const world = opened({})
     // A match is taken by the server; its answer is slow.
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.OtherAnswerSent.make({}))
@@ -192,7 +193,7 @@ describe("the orderings that lost or hid a decision", () => {
   })
 
   it("a decision the server refused is held with the reason on the next visit, not shown as standing, and not sent with the next one", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveRefused.make({}))
     run(world, Command.cases.Leave.make({}))
@@ -207,7 +208,7 @@ describe("the orderings that lost or hid a decision", () => {
   })
 
   it("a save waiting for Save again does not stop a newer draft from being followed", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
@@ -219,7 +220,7 @@ describe("the orderings that lost or hid a decision", () => {
   })
 
   it("a save answered after the person left is the person's own: the view moves on, and the return starts nothing again", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Leave.make({}))
     run(world, Command.cases.ServerTakesSave.make({}))
@@ -231,7 +232,7 @@ describe("the orderings that lost or hid a decision", () => {
   })
 
   it("a save the server counts as no change is not taken for the person's own next revision", () => {
-    const world = opened()
+    const world = opened({})
     // The person leaves a row out and takes that back while the save is out; the save fails and waits.
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
@@ -295,7 +296,7 @@ describe("a confirm", () => {
   })
 
   it("waits for the save that is out, then carries only the rows not sent yet, with no save beside it", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
     run(world, Command.cases.PressConfirm.make({}))
@@ -320,7 +321,7 @@ describe("a confirm", () => {
   })
 
   it("that waits is held back when its save's answer says somebody else saved in between", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.PressConfirm.make({}))
@@ -342,7 +343,7 @@ describe("a confirm", () => {
   })
 
   it("that waits is held back by a newer picture that arrives before its save is answered", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.ReturnToTab.make({}))
     run(world, Command.cases.ServerTakesRead.make({}))
@@ -367,7 +368,7 @@ describe("a confirm", () => {
   })
 
   it("that did not get through sends nothing and offers no Save again before the import is read; a read that says it is open sends the rows", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.PressConfirm.make({}))
@@ -392,7 +393,7 @@ describe("a confirm", () => {
   })
 
   it("that did not get through, then the step drawn again: the view given again is not the answer, and the next read is", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.PressConfirm.make({}))
@@ -413,7 +414,7 @@ describe("a confirm", () => {
 describe("rows that wait, kept in the browser", () => {
   /** Row a left out on revision 4, over nothing, never known to be sent. */
   const waitingA: O.Option<Waiting> = O.some({
-    rows: { a: waits(O.some(out), 4) },
+    rows: { a: waits(O.some(out), 4, [O.none<SavedDecisions[string]>()]) },
     lines: {},
     confirms: O.some(0),
     leftOver: O.none()
@@ -435,7 +436,7 @@ describe("rows that wait, kept in the browser", () => {
   })
 
   it("are sent again when a picture arrives after a save that failed, and the failure is said once", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     expect([world.said, notSaved(world.draft) > 0, O.isNone(A.last(world.saves))]).toEqual([1, true, true])
@@ -453,7 +454,7 @@ describe("rows that wait, kept in the browser", () => {
   })
 
   it("are named and never sent when somebody else confirms the import, and kept until the result has named them", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.SomeoneConfirms.make({}))
@@ -560,7 +561,7 @@ describe("a save that names what it was made on", () => {
 
 describe("a confirm and the rows around it (his answers 4 and 5)", () => {
   it("made while the person decided another row: the draft ends on the confirmed picture and that row is named", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.PressConfirm.make({}))
     run(world, Command.cases.ServerTakesConfirm.make({}))
     // The commit takes seconds on a large file; the region stays live.
@@ -575,7 +576,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
   })
 
   it("refused because somebody else confirmed it sends nothing: the import is read, and its rows are named", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.SomeoneConfirms.make({}))
@@ -593,7 +594,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
   })
 
   it("made, with its answer lost on the way back: nothing is sent, and the closed picture names nothing it wrote", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.SaveFails.make({}))
     run(world, Command.cases.PressConfirm.make({}))
@@ -608,7 +609,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
 
   it("kept from before a reload, of an import confirmed and opened again since: named once, and not sent into it", () => {
     const kept: O.Option<Waiting> = O.some({
-      rows: { a: waits(O.some(out), 4) },
+      rows: { a: waits(O.some(out), 4, [O.none<SavedDecisions[string]>()]) },
       lines: {},
       confirms: O.some(0),
       leftOver: O.none()
@@ -646,7 +647,7 @@ describe("what a save and a confirm name", () => {
   })
 
   it("decided and undone before anything of it was sent: the entry goes, and no clear is sent", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
@@ -686,7 +687,7 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
   const atFour = step(emptyDraft, DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 })).draft
 
   it("that waits for its save goes on the save's own picture, read before the save's answer", () => {
-    const world = opened()
+    const world = opened({})
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.PressConfirm.make({}))
     run(world, Command.cases.ServerTakesSave.make({}))
@@ -828,7 +829,7 @@ describe("orderings the properties met, pinned", () => {
       Command.cases.ServerTakesSave.make({}),
       Command.cases.SaveAnswers.make({})
     ]
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     expect([R.get(world.server.decisions, "a"), world.draft.lines]).toEqual([O.some(kept), {}])
     expect(broken(ordering)).toEqual(O.none())
@@ -866,7 +867,7 @@ describe("orderings the properties met, pinned", () => {
       Command.cases.ServerTakesSave.make({}),
       Command.cases.SaveAnswers.make({})
     ]
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     expect([R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")]).toEqual([O.some(kept), true])
     expect(broken(ordering)).toEqual(O.none())
@@ -909,7 +910,7 @@ describe("orderings the properties met, pinned", () => {
       ]
     ]
     const ends = A.map(orderings, (ordering) => {
-      const world = opened()
+      const world = opened({})
       for (const command of ordering) run(world, command)
       return [R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")] as const
     })
@@ -939,7 +940,7 @@ describe("orderings the properties met, pinned", () => {
       C.ServerTakesSave.make({}),
       C.SaveAnswers.make({})
     ]
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     expect([R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")]).toEqual([O.some(kept), true])
     expect(broken(ordering)).toEqual(O.none())
@@ -959,7 +960,7 @@ describe("orderings the properties met, pinned", () => {
       C.ServerTakesSave.make({}),
       C.SaveAnswers.make({})
     ]
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     expect([R.get(world.server.decisions, "a"), world.draft.lines]).toEqual([O.some(accepted), {}])
     expect(broken(ordering)).toEqual(O.none())
@@ -982,7 +983,7 @@ describe("orderings the properties met, pinned", () => {
       C.ServerTakesSave.make({}),
       C.SaveAnswers.make({})
     ]
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     expect([R.get(world.server.decisions, "a"), R.has(world.draft.lines, "a")]).toEqual([O.some(out), true])
     expect(broken(ordering)).toEqual(O.none())
@@ -1011,7 +1012,7 @@ describe("orderings the properties met, pinned", () => {
       Command.cases.Decide.make({ row: "a", to: "kept" }),
       Command.cases.SaveAnswers.make({})
     ]
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     // The press of Keep goes once the one on its way answered: over the decision she knew of, not as a live press.
     expect(A.map(world.saves, ({ over, live }) => [R.get(over, "a"), A.contains(live, "a")])).toEqual([
@@ -1172,7 +1173,7 @@ describe("orderings the properties met, pinned", () => {
   })
 
   it("on that ordering, her pick of the closed tab's decision goes at once: what an answer said of the row before the matches does not hold it on a line", () => {
-    const world = opened()
+    const world = opened({})
     for (const command of [
       Command.cases.SomeoneElse.make({ row: "a", to: "out" }),
       Command.cases.Decide.make({ row: "c", to: "acceptedOut" }),
@@ -1270,7 +1271,12 @@ describe("a save's answer that comes after its draft closed", () => {
       answer(1, 7, [{ rowId: "a", theirs: O.some(kept) }])
     ]
     const before = played(events)
-    expect(A.map(before.draft.lines.a?.sides ?? [], (side) => side.madeOn)).toEqual([4])
+    expect(
+      A.map(
+        O.match(O.fromUndefinedOr(before.draft.lines.a?.sides), { onNone: A.empty, onSome: identity }),
+        (side) => side.madeOn
+      )
+    ).toEqual([4])
     const picked = step(
       before.draft,
       DraftEvent.Settled({ picks: [{ rowId: "a", keep: Keep.Side({ decision: O.some(accepted) }) }] })
@@ -1366,7 +1372,11 @@ describe("a save's answer that comes after its draft closed", () => {
       answer(1, 9, [{ rowId: "a", theirs: O.some(accepted) }])
     ]
     const late = played(events)
-    const sides = (draft: Draft) => A.map(draft.lines.a?.sides ?? [], (side) => side.decision)
+    const sides = (draft: Draft) =>
+      A.map(
+        O.match(O.fromUndefinedOr(draft.lines.a?.sides), { onNone: A.empty, onSome: identity }),
+        (side) => side.decision
+      )
     expect([A.map(sends(late.effects), (send) => send.id), sides(late.draft)]).toEqual([[1, 2], [O.some(out)]])
     const both = played([...events, answer(2, 9, [{ rowId: "a", theirs: O.some(accepted) }])])
     expect([sides(both.draft), both.draft.unsent]).toEqual([[O.some(kept), O.some(out)], {}])
@@ -1393,7 +1403,7 @@ describe("what this tab sent whose answer never came back, as the properties' wo
   // rule that marks or forgets one is held here: a rule left out leaves the check off, or on, where it should not be.
   const D = Command.cases
   const after = (ordering: ReadonlyArray<Command>): ReadonlyArray<string> => {
-    const world = opened()
+    const world = opened({})
     for (const command of ordering) run(world, command)
     return R.keys(world.unanswered)
   }

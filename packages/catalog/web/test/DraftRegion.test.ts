@@ -61,7 +61,8 @@ const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} }), ReviewRow.mak
  * One import with a server that takes every save and answers the next revision; the app's idle time is 120 ms here.
  * With `reads`, the server answers a read of the import with what it holds; otherwise a read never answers.
  */
-const world = (id: ImportId, network: { down: boolean } = { down: false }, reads = false) => {
+const networkStart = { down: false }
+const world = (id: ImportId, network: { down: boolean }, reads: boolean) => {
   const saves: Array<DecisionDelta> = []
   const revision = { now: 10 }
   const stored: Record<string, SavedDecisions[string]> = {}
@@ -132,7 +133,7 @@ describe("the region beside the draft", () => {
   it.live("starts again from what is shown when another person's row arrives, and says so once", () =>
     Effect.gen(function* () {
       const id = importNo(41)
-      const t = world(id)
+      const t = world(id, { ...networkStart, down: false }, false)
       t.open()
       yield* settle
       page.said.length = 0
@@ -158,7 +159,7 @@ describe("the region beside the draft", () => {
   it.live("is not found as it was on a return inside the idle time, when the view changed meanwhile", () =>
     Effect.gen(function* () {
       const id = importNo(42)
-      const t = world(id)
+      const t = world(id, { ...networkStart, down: false }, false)
       const leave = t.open()
       yield* settle
       t.leaveOut("row-2")

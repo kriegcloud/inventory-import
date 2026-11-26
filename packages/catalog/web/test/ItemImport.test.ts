@@ -20,8 +20,8 @@ import { stage } from "./support/files.ts"
 // Decisions are written here as the flags a draft stores, and read through `decisionFromFlags`.
 const reviewOf = (
   table: StagedTable,
-  decisions: Readonly<Record<string, RowDecisionFlags.Encoded>> = {},
-  storedItems: ReadonlyArray<ItemFields> = []
+  decisions: Readonly<Record<string, RowDecisionFlags.Encoded>>,
+  storedItems: ReadonlyArray<ItemFields>
 ) => review({ ...noHistory, table, choices: [], decisions: R.map(decisions, decisionFromFlags), storedItems })
 
 const rowOf = (result: Review, rowNumber: number) =>
@@ -40,7 +40,7 @@ describe("items_clean.csv", () => {
   it.effect("is 25 ready rows with nothing proposed, and reads the nested cells and the cost from the digits", () =>
     Effect.gen(function* () {
       const table = yield* cleanTable
-      const result = reviewOf(table)
+      const result = reviewOf(table, {}, [])
       expect(result.counts).toMatchObject({ rows: 25, ready: 25, needs: 0, decision: 0, cannot: 0, out: 0, already: 0 })
       expect(result.fixed).toEqual({ rows: 0, cells: 0 })
       expect(A.flatMap(result.rows, (row) => row.proposals)).toEqual([])
@@ -75,7 +75,7 @@ describe("items_messy.csv", () => {
   it.effect("puts every row in one outcome, the outcomes add up to 200, and each kind is where DECISIONS.md says", () =>
     Effect.gen(function* () {
       const table = yield* messyTable
-      const result = reviewOf(table)
+      const result = reviewOf(table, {}, [])
       const { counts } = result
       expect(counts.rows).toBe(200)
       expect(counts.ready + counts.decision + counts.cannot + counts.out + counts.already).toBe(200)
@@ -119,7 +119,7 @@ describe("items_messy.csv", () => {
   it.effect("applies only the form-only fixes, lists each one, and a decision of the person takes one back", () =>
     Effect.gen(function* () {
       const table = yield* messyTable
-      const result = reviewOf(table)
+      const result = reviewOf(table, {}, [])
       expect(result.fixed).toEqual({ rows: 17, cells: 20 })
       const fixed = A.filter(result.rows, (row) => A.some(row.changes, (c) => c.how === "appliedByRule"))
       expect(A.map(fixed, (row) => row.rowNumber)).toEqual([
@@ -145,7 +145,7 @@ describe("items_messy.csv", () => {
       expect(digits(O.getOrThrow(rowOf(result, 173).item).unitCost)).toBe("26.41")
       expect(O.getOrThrow(rowOf(result, 198).item).tags).toEqual(["metal"])
       // Rejected: the file's value comes back and the row waits, with the same fix offered.
-      const undone = reviewOf(table, { "row-18": { reverted: ["uom"] } })
+      const undone = reviewOf(table, { "row-18": { reverted: ["uom"] } }, [])
       expect([rowOf(undone, 18).values.uom, rowOf(undone, 18).outcome, undone.fixed.rows]).toEqual([
         "bx",
         "decision",
@@ -161,15 +161,19 @@ describe("items_messy.csv", () => {
   it.effect("turns decisions into ready rows: accepted proposals, a kept row, a typed value", () =>
     Effect.gen(function* () {
       const table = yield* messyTable
-      const result = reviewOf(table, {
-        "row-55": { accepted: ["unitCost"] },
-        "row-85": { accepted: ["quantityOnHand"] },
-        "row-44": { edits: { firstReceivedOn: "2024-06-04" } },
-        "row-4": { kept: true },
-        "row-10": { out: true },
-        "row-45": { accepted: ["isActive"] },
-        "row-184": { edits: { unitCost: "12.5000" } }
-      })
+      const result = reviewOf(
+        table,
+        {
+          "row-55": { accepted: ["unitCost"] },
+          "row-85": { accepted: ["quantityOnHand"] },
+          "row-44": { edits: { firstReceivedOn: "2024-06-04" } },
+          "row-4": { kept: true },
+          "row-10": { out: true },
+          "row-45": { accepted: ["isActive"] },
+          "row-184": { edits: { unitCost: "12.5000" } }
+        },
+        []
+      )
       expect(digits(O.getOrThrow(rowOf(result, 55).item).unitCost)).toBe("35.82")
       expect(O.getOrThrow(rowOf(result, 85).item).quantityOnHand).toBe(1200)
       expect(O.getOrThrow(rowOf(result, 44).item).firstReceivedOn).toEqual(O.some("2024-06-04"))
@@ -188,7 +192,7 @@ describe("a row discontinued yet active", () => {
     Effect.gen(function* () {
       const table = yield* messyTable
       for (const line of [45, 164]) {
-        const asked = rowOf(reviewOf(table), line)
+        const asked = rowOf(reviewOf(table, {}, []), line)
         const about = A.filter(asked.problems, (problem) => problem.kind === "discontinued")
         expect(about.length, `row ${line}`).toBe(1)
         expect(O.getOrThrow(O.flatMap(A.head(about), (p) => p.proposal)), `row ${line}`).toMatchObject({
@@ -210,14 +214,14 @@ describe("a row discontinued yet active", () => {
         ).toEqual([])
         expect(asked.item).toEqual(O.none())
       }
-      const before = rowOf(reviewOf(table), 45)
+      const before = rowOf(reviewOf(table, {}, []), 45)
       expect(before.outcome).toBe("decision")
-      const notActive = rowOf(reviewOf(table, { "row-45": { accepted: ["isActive"] } }), 45)
+      const notActive = rowOf(reviewOf(table, { "row-45": { accepted: ["isActive"] } }, []), 45)
       expect([notActive.status, O.getOrThrow(notActive.item).stocking]).toEqual([
         "ready",
         { kind: "discontinued", on: "2025-06-30" }
       ])
-      const noDate = rowOf(reviewOf(table, { "row-45": { edits: { discontinuedOn: "" } } }), 45)
+      const noDate = rowOf(reviewOf(table, { "row-45": { edits: { discontinuedOn: "" } } }, []), 45)
       expect([noDate.status, O.getOrThrow(noDate.item).stocking]).toEqual(["ready", { kind: "active" }])
       expect(noDate.changes).toContainEqual(expect.objectContaining({ how: "typed", field: "discontinuedOn", to: "" }))
     })
@@ -228,7 +232,7 @@ describe("a second import", () => {
   it.effect("adds nothing for a row that says what is stored, and asks before a stored item changes", () =>
     Effect.gen(function* () {
       const table = yield* cleanTable
-      const stored = A.getSomes(A.map(reviewOf(table).rows, (row) => row.item))
+      const stored = A.getSomes(A.map(reviewOf(table, {}, []).rows, (row) => row.item))
       const again = reviewOf(table, {}, stored)
       expect([again.counts.already, again.counts.ready, again.counts.needs]).toEqual([25, 0, 0])
       // The stored SHH-9574 has another name and cost than the file's row 2: the row waits, and says where.

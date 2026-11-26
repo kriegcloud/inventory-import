@@ -13,12 +13,13 @@ const pkg = "http://schemas.openxmlformats.org/package/2006/relationships"
 const office = "application/vnd.openxmlformats-officedocument.spreadsheetml"
 
 /** A one-sheet workbook from hand-written parts: the sheet's XML, and a styles part whose style n is the nth code. */
+export const workbookStart = { codes: A.empty<string>(), strings: `${head}<sst xmlns="${main}"/>` }
 export const built = (input: {
   readonly sheet: string
-  readonly codes?: ReadonlyArray<string>
-  readonly strings?: string
+  readonly codes: ReadonlyArray<string>
+  readonly strings: string
 }) => {
-  const codes = input.codes ?? []
+  const codes = input.codes
   const styles =
     `${head}<styleSheet xmlns="${main}"><numFmts count="${codes.length}">` +
     A.join(
@@ -57,7 +58,7 @@ export const built = (input: {
         `<Relationship Id="rId3" Type="${rel}/sharedStrings" Target="sharedStrings.xml"/></Relationships>`
     ],
     ["xl/styles.xml", styles],
-    ["xl/sharedStrings.xml", input.strings ?? `${head}<sst xmlns="${main}"/>`],
+    ["xl/sharedStrings.xml", input.strings],
     ["xl/worksheets/sheet1.xml", input.sheet]
   ]
   return Stream.fromIterable(A.map(parts, ([path, text]) => Zip.file(path, text))).pipe(
@@ -78,7 +79,7 @@ export const built = (input: {
 const text = (ref: string, value: string) => `<c r="${ref}" t="inlineStr"><is><t>${value}</t></is></c>`
 const bare = (value: string) => `<c t="inlineStr"><is><t>${value}</t></is></c>`
 const header = `<row r="1">${text("A1", "SKU")}${text("B1", "Name")}${text("C1", "Quantity")}${text("D1", "Counted")}</row>`
-const sheetOf = (rows: string, before = "") =>
+const sheetOf = (rows: string, before: string) =>
   `${head}<worksheet xmlns="${main}">${before}<sheetData>${header}${rows}</sheetData></worksheet>`
 
 const sharedFormulas =
@@ -121,6 +122,7 @@ const prefixed =
 
 /** A workbook whose sheet declares rows 1 to 3 and holds rows 1 to 5. */
 export const lyingExtent = built({
+  ...workbookStart,
   sheet: sheetOf(
     A.join(
       A.map(
@@ -152,14 +154,26 @@ export interface XlsxCase {
 
 /** The files built by hand, and a fixture cut short. `read` loads a fixture's bytes. */
 export const builtCases = (read: (name: string) => Uint8Array): ReadonlyArray<XlsxCase> => [
-  { name: "built-shared-formulas", bytes: built({ sheet: sheetOf(sharedFormulas) }), sheet: O.none() },
-  { name: "built-text", bytes: built({ sheet: sheetOf(textRows), strings: textStrings }), sheet: O.none() },
-  { name: "built-formats", bytes: built({ sheet: sheetOf(formatRows), codes: formatCodes }), sheet: O.none() },
   {
-    name: "built-bare-references",
-    bytes: built({ sheet: sheetOf(bareRows, '<cols><col min="2" max="2" hidden="1"/></cols>') }),
+    name: "built-shared-formulas",
+    bytes: built({ ...workbookStart, sheet: sheetOf(sharedFormulas, "") }),
     sheet: O.none()
   },
-  { name: "built-prefixed", bytes: built({ sheet: prefixed }), sheet: O.none() },
+  {
+    name: "built-text",
+    bytes: built({ ...workbookStart, sheet: sheetOf(textRows, ""), strings: textStrings }),
+    sheet: O.none()
+  },
+  {
+    name: "built-formats",
+    bytes: built({ ...workbookStart, sheet: sheetOf(formatRows, ""), codes: formatCodes }),
+    sheet: O.none()
+  },
+  {
+    name: "built-bare-references",
+    bytes: built({ ...workbookStart, sheet: sheetOf(bareRows, '<cols><col min="2" max="2" hidden="1"/></cols>') }),
+    sheet: O.none()
+  },
+  { name: "built-prefixed", bytes: built({ ...workbookStart, sheet: prefixed }), sheet: O.none() },
   { name: "cut-short", bytes: Effect.sync(() => read("messy.xlsx").subarray(0, 3000)), sheet: O.none() }
 ]

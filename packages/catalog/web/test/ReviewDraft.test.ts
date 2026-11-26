@@ -119,7 +119,7 @@ const world = (id: ImportId) => {
     give: (view: ImportView) => registry.set(importView(id), view),
     answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
     /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
-    answerSave: (n: number, revision: number, changed = true) =>
+    answerSave: (n: number, revision: number, changed: boolean) =>
       Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [], decidedSince: [] }),
     refuseSave: (n: number) =>
       Deferred.fail(saves[n]!.answer, AlreadyImported.make({ reason: "This import was confirmed already." })),
@@ -153,7 +153,7 @@ describe("a saved decision", () => {
         // Suggestions arrive while the save is out.
         const suggestions = [{ rowId: "row-3" }] as unknown as ImportView["suggestions"]
         t.give(t.at({ revision: 10, decisions: { "row-7": kept }, suggestions }))
-        yield* t.answerSave(0, 11)
+        yield* t.answerSave(0, 11, true)
         yield* settle
         const held = t.held()
         expect([held.revision, held.decisions, held.suggestions]).toEqual([
@@ -179,7 +179,7 @@ describe("a saved decision", () => {
         decide(t.registry, id, { "row-1": O.some(out) })
         yield* settle
         // Two revisions on: somebody else saved between.
-        yield* t.answerSave(0, 12)
+        yield* t.answerSave(0, 12, true)
         yield* settle
         expect(t.gets()).toBe(1)
         expect(t.shown()).toEqual({ "row-1": out })
@@ -204,13 +204,13 @@ describe("a saved decision", () => {
       const typed = decisionFromFlags({ edits: { sku: "AB-1" } })
       decide(t.registry, id, { "row-1": O.some(typed) })
       yield* settle
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       // Asked, and still out.
       expect(t.gets()).toBe(1)
       decide(t.registry, id, { "row-2": O.some(out) })
       yield* settle
-      yield* t.answerSave(1, 12)
+      yield* t.answerSave(1, 12, true)
       yield* settle
       // The second save's answer is put into the view while the ask is out, and does not end it: one ask, still out.
       expect([t.gets(), t.held().revision]).toEqual([1, 12])
@@ -243,7 +243,7 @@ describe("a saved decision", () => {
         yield* settle
         expect(t.gets()).toBe(1)
         // Two revisions on: somebody else saved between. The read left before this answer, so it may not have it.
-        yield* t.answerSave(0, 12)
+        yield* t.answerSave(0, 12, true)
         yield* settle
         expect(t.gets()).toBe(1)
         // It was: the server read the import before it wrote the save. It is asked once more, and that one has both.
@@ -277,7 +277,7 @@ describe("a saved decision", () => {
         yield* Effect.sleep("1500 millis")
         expect(t.saves.length).toBe(2)
         // The second try answers: somebody else saved between. The read out left before this answer.
-        yield* t.answerSave(1, 12)
+        yield* t.answerSave(1, 12, true)
         yield* settle
         yield* t.answerGet(0, t.at({ revision: 10 }))
         yield* settle
@@ -303,7 +303,7 @@ describe("a saved decision", () => {
       // The save leaves while that read is out, and its answer says somebody else saved between.
       decide(t.registry, id, { "row-1": O.some(out) })
       yield* settle
-      yield* t.answerSave(0, 12)
+      yield* t.answerSave(0, 12, true)
       yield* settle
       // The read is not ended: it lands with what the server held before the save, and only then is asked once more.
       expect(t.gets()).toBe(1)
@@ -327,7 +327,7 @@ describe("a saved decision", () => {
       yield* settle
       decide(t.registry, id, { "row-1": O.some(out), "row-2": O.some(out), "row-3": O.some(out) })
       yield* settle
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       expect(t.gets()).toBe(0)
     })
@@ -375,7 +375,7 @@ describe("leaving the Review step and coming back", () => {
         leave()
         yield* settle
         const before = t.epoch()
-        yield* t.answerSave(0, 11)
+        yield* t.answerSave(0, 11, true)
         yield* settle
         expect([t.held().revision, t.held().decisions]).toEqual([11, { "row-12": out }])
         // The answer moved the view by the person's own row, and let the draft go (nobody looks): one new epoch, for
@@ -396,7 +396,7 @@ describe("leaving the Review step and coming back", () => {
       yield* settle
       decide(t.registry, id, { "row-1": O.some(out) })
       yield* settle
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       leave()
       yield* settle
@@ -528,7 +528,7 @@ describe("the region's decisions for one import", () => {
         rejects: false
       })
       t.registry.set(reviewState(id), undone.state)
-      yield* t.answerSave(0, 11)
+      yield* t.answerSave(0, 11, true)
       yield* settle
       expect(t.deltas()[1]).toEqual({ set: {}, clear: ["row-2"] })
       expect(t.shown()).toEqual({ "row-7": kept })

@@ -18,7 +18,9 @@ export const importWords = {
   already: "Already there",
   notImported: "Not imported",
   takenBack: "Taken back",
-  all: "All"
+  all: "All",
+  // Who decided, where no name is recorded for the decision. Never the person who confirmed.
+  notRecorded: "Not recorded"
 } as const
 
 /**

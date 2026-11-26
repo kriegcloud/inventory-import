@@ -1,4 +1,4 @@
-import { StoredDecisions } from "@inventory/catalog-model/ImportStore"
+import { type ImportListQuery, StoredDecisions } from "@inventory/catalog-model/ImportStore"
 // Storage for imports: the staged file, what each confirm did with each row, the items it created, and taking a
 // confirm back. SQL lives here only; every statement filters on the organization, and goes through a Schema both ways
 // (`SqlSchema` for a read, `D1.statement` from @beep/d1 for a write). The rules not to break: a confirm is the only
@@ -864,7 +864,7 @@ export const ImportStoreD1 = Layer.effect(
       ])
     }, Effect.orDie)
 
-    const listOpen = Effect.fn("Imports.listOpen")(function* (organizationId: OrganizationId, limit: number) {
+    const listOpen = Effect.fn("Imports.listOpen")(function* ({ organizationId, limit }: ImportListQuery) {
       const drafts = yield* findOpen({ org: organizationId, limit })
       const total = yield* countOpen(organizationId)
       return { drafts, total: total.n }
@@ -891,7 +891,7 @@ export const ImportStoreD1 = Layer.effect(
       Result: S.Struct({ n: S.Int }),
       execute: (org) => sql`SELECT COUNT(DISTINCT importId) AS n FROM importBatch WHERE organizationId = ${org}`
     })
-    const listPast = Effect.fn("Imports.listPast")(function* (organizationId: OrganizationId, limit: number) {
+    const listPast = Effect.fn("Imports.listPast")(function* ({ organizationId, limit }: ImportListQuery) {
       const imports = yield* findPast({ org: organizationId, limit })
       const total = yield* countPast(organizationId)
       return { imports, total: total.n }
@@ -1722,8 +1722,8 @@ export const ImportStoreD1 = Layer.effect(
           decide(actor, self, delta, read, expected)
       ),
       reopen: dual(2, (self: Draft, actor: Member) => reopen(actor, self)),
-      listOpen: dual(2, (self: number, organizationId: OrganizationId) => listOpen(organizationId, self)),
-      listPast: dual(2, (self: number, organizationId: OrganizationId) => listPast(organizationId, self)),
+      listOpen,
+      listPast,
       remove: dual(2, (self: Draft, actor: Member) => remove(actor, self)),
       choices,
       moves,

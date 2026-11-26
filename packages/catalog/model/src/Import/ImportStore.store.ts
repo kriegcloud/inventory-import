@@ -41,6 +41,20 @@ export const DraftStatus = LiteralKit(["open", "imported", "takenBack"]).annotat
 /** The decoded value of `DraftStatus`. */
 export type DraftStatus = typeof DraftStatus.Type
 
+/**
+ * Which of an organization's imports a list asks for: whose they are and how many at most. One named argument, not
+ * two in a row: a list has no value it acts on, so `limit` is never mistaken for one.
+ */
+export const ImportListQuery = S.Struct({
+  organizationId: OrganizationId.pipe(S.annotateKey({ description: "The organization whose imports are listed" })),
+  limit: S.Int.pipe(S.annotateKey({ description: "The most imports the list returns" }))
+}).annotate({
+  identifier: "ImportListQuery",
+  description: "Which of an organization's imports a list asks for, and how many at most"
+})
+/** {@link ImportListQuery}, as a list is asked. */
+export type ImportListQuery = typeof ImportListQuery.Type
+
 /** An import as stored, without its rows. */
 export const Draft = S.Struct({
   id: ImportId,
@@ -428,28 +442,16 @@ export class ImportStore extends Context.Service<
      * The organization's open imports, newest first, at most `limit` of them, and how many are open in all, so the
      * first screen can say how many it left out.
      */
-    readonly listOpen: {
-      (
-        organizationId: OrganizationId
-      ): (self: number) => Effect.Effect<{ readonly drafts: ReadonlyArray<Draft>; readonly total: number }>
-      (
-        self: number,
-        organizationId: OrganizationId
-      ): Effect.Effect<{ readonly drafts: ReadonlyArray<Draft>; readonly total: number }>
-    }
+    readonly listOpen: (
+      query: ImportListQuery
+    ) => Effect.Effect<{ readonly drafts: ReadonlyArray<Draft>; readonly total: number }>
     /**
      * The organization's imports that were confirmed at least once, last confirmed first, at most `limit`, each
      * with how many items in the system came from it now, and how many such imports there are in all.
      */
-    readonly listPast: {
-      (
-        organizationId: OrganizationId
-      ): (self: number) => Effect.Effect<{ readonly imports: ReadonlyArray<PastImport>; readonly total: number }>
-      (
-        self: number,
-        organizationId: OrganizationId
-      ): Effect.Effect<{ readonly imports: ReadonlyArray<PastImport>; readonly total: number }>
-    }
+    readonly listPast: (
+      query: ImportListQuery
+    ) => Effect.Effect<{ readonly imports: ReadonlyArray<PastImport>; readonly total: number }>
     /**
      * Removes an import that has no item in force, with everything that hangs off it (its confirms and what they
      * noted, once every one was taken back), and records who removed it, in one atomic batch. Returns false, having

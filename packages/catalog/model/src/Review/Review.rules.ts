@@ -1254,7 +1254,7 @@ export const review = (input: {
       if (O.isSome(proposed) && inForce(proposed.value, decision)) {
         const p = proposed.value
         const accepted = A.contains(decision.accepted, field)
-        const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
+        const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: O.some(p.confidence) }
         // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
         changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
         return p.to

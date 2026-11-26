@@ -30,8 +30,11 @@ class DecidedByPerson extends S.Opaque<DecidedByPerson, { readonly brand: unique
     kind: S.tag("person"),
     name: DisplayName.pipe(
       S.annotateKey({
-        description: "Who left the row out: the member's name as it was then, for the screen. Not an id"
-      })
+        description:
+          "Who left the row out: the member's name as it was then, for the screen. Not an id. Left out when no " +
+          "name is recorded for the decision: the result then says so, and never names the person who confirmed"
+      }),
+      S.OptionFromOptionalKey
     )
   }).annotate({ identifier: "DecidedByPerson", description: "A person left the row out" })
 ) {}
@@ -51,8 +54,8 @@ export const DecidedBy = DecidedByKind.mapMembers(() => Tuple.make(DecidedByPers
 /** The decoded value of `DecidedBy`. */
 export type DecidedBy = typeof DecidedBy.Type
 
-/** `name` left the row out. */
-export const decidedByPerson = (name: DisplayName): DecidedBy => DecidedByPerson.make({ name })
+/** `name` left the row out; none when a person did and no name is recorded for it. */
+export const decidedByPerson = (name: O.Option<DisplayName>): DecidedBy => DecidedByPerson.make({ name })
 /** Nobody had settled the row. */
 export const decidedByNobody: DecidedBy = DecidedByNobody.make({})
 

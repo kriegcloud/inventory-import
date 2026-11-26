@@ -7,6 +7,7 @@
  */
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Eq from "effect/Equal"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
@@ -28,6 +29,7 @@ import {
   XlsxRow,
   XlsxSheetCount,
   XlsxSheetInfo,
+  XlsxSheetNameKey,
   XlsxWorkbook,
   XlsxWorksheet,
   type XlsxSheetName
@@ -127,8 +129,8 @@ const chosen = (opened: Opened, options: ReadOptions): ReadonlyArray<SheetEntry>
     All: () => opened.sheets,
     First: () => A.take(opened.sheets, 1),
     Named: (choice) => {
-      const names = MutableHashSet.fromIterable(A.map(choice.names, Str.toLowerCase))
-      return A.filter(opened.sheets, (sheet) => MutableHashSet.has(names, Str.toLowerCase(sheet.name)))
+      const names = MutableHashSet.fromIterable(A.map(choice.names, (name) => S.decodeOption(XlsxSheetNameKey)(name)))
+      return A.filter(opened.sheets, (sheet) => MutableHashSet.has(names, S.decodeOption(XlsxSheetNameKey)(sheet.name)))
     }
   })
 
@@ -208,32 +210,34 @@ const headingOf = (value: XlsxValue): O.Option<string> =>
       : O.none()
 
 /** A sheet's rows under the headings of its first row. A heading that is empty or used twice stops the read. */
-const toRecords = (sheet: Pick<XlsxWorksheet, "rows" | "info">): Result.Result<ReadonlyArray<XlsxRecord>, string> => {
-  const header = sheet.rows[0]
-  if (header === undefined) return Result.succeed([])
-  const headings = MutableHashMap.empty<number, string>()
-  const used = MutableHashSet.empty<string>()
-  for (const cell of header.cells) {
-    const heading = headingOf(cell.value)
-    if (O.isNone(heading))
-      return Result.fail(`the heading in column ${cell.column + 1} of "${sheet.info.name}" is not text`)
-    if (MutableHashSet.has(used, heading.value)) return Result.fail(`the heading ${heading.value} is used twice`)
-    MutableHashSet.add(used, heading.value)
-    MutableHashMap.set(headings, cell.column, heading.value)
-  }
-  const blank = XlsxBlank.make({})
-  return Result.succeed(
-    A.map(A.drop(sheet.rows, 1), (row) => {
-      const record: { [heading: string]: XlsxValue } = {}
-      for (const [, heading] of headings) setOwnProperty(record, heading, blank)
-      for (const cell of row.cells) {
-        const heading = MutableHashMap.get(headings, cell.column)
-        if (O.isSome(heading)) setOwnProperty(record, heading.value, cell.value)
+const toRecords = (sheet: Pick<XlsxWorksheet, "rows" | "info">): Result.Result<ReadonlyArray<XlsxRecord>, string> =>
+  O.match(A.head(sheet.rows), {
+    onNone: () => Result.succeed([]),
+    onSome: (header) => {
+      const headings = MutableHashMap.empty<number, string>()
+      const used = MutableHashSet.empty<string>()
+      for (const cell of header.cells) {
+        const heading = headingOf(cell.value)
+        if (O.isNone(heading))
+          return Result.fail(`the heading in column ${cell.column + 1} of "${sheet.info.name}" is not text`)
+        if (MutableHashSet.has(used, heading.value)) return Result.fail(`the heading ${heading.value} is used twice`)
+        MutableHashSet.add(used, heading.value)
+        MutableHashMap.set(headings, cell.column, heading.value)
       }
-      return record
-    })
-  )
-}
+      const blank = XlsxBlank.make({})
+      return Result.succeed(
+        A.map(A.drop(sheet.rows, 1), (row) => {
+          const record: { [heading: string]: XlsxValue } = {}
+          for (const [, heading] of headings) setOwnProperty(record, heading, blank)
+          for (const cell of row.cells) {
+            const heading = MutableHashMap.get(headings, cell.column)
+            if (O.isSome(heading)) setOwnProperty(record, heading.value, cell.value)
+          }
+          return record
+        })
+      )
+    }
+  })
 
 /** Records as one sheet: the headings of the first record in the first row, a date under Excel's short date. */
 const fromRecords = (records: ReadonlyArray<XlsxRecord>, name: XlsxSheetName): XlsxWorkbook => {
@@ -361,7 +365,9 @@ export class Xlsx {
   ): Stream.Stream<XlsxRow, XlsxParseError> {
     return Stream.unwrap(
       Effect.map(open({ bytes, caps: capsOf(options.limits) }), (opened) => {
-        const entry = A.findFirst(opened.sheets, (found) => Str.toLowerCase(found.name) === Str.toLowerCase(sheet))
+        const entry = A.findFirst(opened.sheets, (found) =>
+          Eq.equals(S.decodeOption(XlsxSheetNameKey)(found.name), S.decodeOption(XlsxSheetNameKey)(sheet))
+        )
         if (O.isNone(entry)) {
           return Stream.fail(stop(MissingPart.make({ path: Str.slice(0, 1024)(`the sheet ${sheet}`) })))
         }
@@ -390,7 +396,9 @@ export class Xlsx {
     options: XlsxReadOptions | ReadOptions
   ) {
     const opened = yield* open({ bytes, caps: capsOf(options.limits) })
-    const entry = A.findFirst(opened.sheets, (found) => Str.toLowerCase(found.name) === Str.toLowerCase(sheet))
+    const entry = A.findFirst(opened.sheets, (found) =>
+      Eq.equals(S.decodeOption(XlsxSheetNameKey)(found.name), S.decodeOption(XlsxSheetNameKey)(sheet))
+    )
     if (O.isNone(entry)) {
       return yield* Effect.fail(stop(MissingPart.make({ path: Str.slice(0, 1024)(`the sheet ${sheet}`) })))
     }

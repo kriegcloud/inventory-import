@@ -2254,3 +2254,106 @@ a real browser Worker, hosted behavior or deployment. The fold test file and its
 No claim of zero test debt, approved edge exemptions, changed screen words or changed stored data is made.
 
 Needs the person: nothing. The retained places are named follow-up work; no exemption or new product rule was chosen.
+
+## Foundation modeling final lane, row 8, 2026-11-26
+
+Written before source edits. Scope is the five owned CSV/XLSX facade and schema files still named by the
+baseline: 17 places (3 fallback, 1 absence, 13 normalise). The eleven exempt internal readers, vendored kit,
+PLAN, baseline and all ledgers remain outside this lane.
+
+| Owner / field | Verdict | Intended boundary and form |
+| --- | --- | --- |
+| CSV separator regex captures | Required delimiter | Decode the successful regex tuple through a module-level capture schema; the expression guarantees the delimiter. Remove the fabricated comma and cast together. |
+| CSV sparse record cell at encoding | Existing empty-cell policy, retained | `row[name] ?? ""` represents a missing record key in the output. A decode solely to supply empty text would disguise it. No new policy or exemption. |
+| CSV parser trim setting | Required mode, retained | `options.trim` passes the parser mode; it asks no absence question and performs no trim. Leave the syntax-reader false positive unchanged. |
+| CSV applyTrim cell | Mode-dependent cleanup, conditional on quoted status | A trim schema can own the operation, but this synchronous string-returning API is consumed by the exempt parser. Do not introduce a throwing/result/runner unwrap to extract a schema result. Retain the two calls if the boundary cannot move without that forbidden parser edit. |
+| XLSX sheet lookup and uniqueness | Case-insensitive comparison keys | Module-level string schema owns lowercasing. Both sides decode through it, and Effect equality/hash compare the resulting keys without unwrapping an Option or changing written sheet names. Arbitrary uniqueness must use the same equality as the runtime check. |
+| XLSX column letters | Parsed optional column | Module-level uppercase schema; compose its optional decode with the existing optional bounded-column parser. Preserve the existing length guard before case conversion, including non-ASCII case expansion. |
+| XLSX records header | Empty/nonempty worksheet cases | Fold the first-row Option into the complete empty-record result or complete headed-record algorithm. No fabricated header. |
+| XLSX parseResult | Existing synchronous public API, retained | `Effect.runSync` cannot become another runner, throwing decoder or renamed unwrap. Migrating its public return contract is not an agreed behavior change. |
+
+No undecided data fallback moves onto a schema in this lane. Final remaining-place table, byte comparison and
+validation receipts follow after implementation. The OKF skill applies to this appended documentation section;
+existing document frontmatter and structure are preserved.
+
+### Final-lane changes and remaining places
+
+The final six-file scoped law reads **5 places: 2 fallback, 0 absence, 0 unwrap, 3 normalise**, down from the
+five baseline files' 17. The XLSX property test holds zero. Twelve places cleared; no baseline was rewritten.
+Every remaining scanner occurrence in the owned CSV/XLSX scope is in this table:
+
+| File (relative to packages/foundation/modeling/) | Line | Kind | Count | Example | Why retained / required follow-up |
+| --- | ---: | --- | ---: | --- | --- |
+| `csv/src/Csv.codec.ts` | 113 | normalise | 1 | `options.trim` | Required parser-mode property read, not a cleanup call. Removing it changes reader configuration; changing its name merely to escape the syntax reader is forbidden. Needs the orchestrator's scanner judgment; no exemption added. |
+| `csv/src/Csv.codec.ts` | 667 | fallback | 1 | `row[name] ?? ""` | Sparse records really encode a missing key as an empty CSV cell. Requires a coherent record/header boundary carrying missing cells through encoding; a schema used only to supply empty text is expressly forbidden. Existing value retained. |
+| `csv/src/CsvOptions.schema.ts` | 264 | normalise | 1 | `quoted ? cell : Str.trim(cell)` | `applyTrim` returns a plain string synchronously to the exempt machine. Returning a schema result needs an API change through that reader, which this lane may not edit; extracting it with a runner/throwing decoder or renamed unwrap is forbidden. Existing unquoted-only rule retained. |
+| `csv/src/CsvOptions.schema.ts` | 265 | normalise | 1 | `Str.trim(cell)` | Same boundary constraint for the all-cells trim case. It must move with the parser's cell boundary, preserving the selected dialect rule; no universal trim or new exemption. |
+| `xlsx/src/Xlsx.codec.ts` | 318 | fallback | 1 | `Effect.runSync` in `parseResult` | Existing synchronous Result API over an Effect reader. Another runner/throwing decoder is forbidden; changing the public return contract is not authorized behavior. Retain pending an explicit API migration. The current reader categorizes this as fallback, despite the law's unwrap wording. |
+
+`XlsxSheetNameKey` owns lowercasing and compares optional decode results with Effect equality/hash. It accepts
+all strings, so typed string inputs always decode; no fallback or Option unwrap extracts a key. Workbook names
+remain original strings. `uniqueBy` now uses Effect equality for numeric coordinates as well as these keys;
+Effect's arbitrary unique-value generator was inspected and uses the same equality/hash for object keys.
+The column-letter schema composes into the existing optional parser; the length guard still runs before Unicode
+uppercase expansion. The CSV separator tuple validates the successful regex's complete required captures and
+removes its impossible comma fallback and cast together. Empty XLSX worksheets fold to their complete records
+result; headed worksheets execute their full original algorithm.
+
+No caller outside the packages changed. Files changed:
+
+- `csv/src/Csv.codec.ts`
+- `xlsx/src/Xlsx.codec.ts`
+- `xlsx/src/XlsxAddress.schema.ts`
+- `xlsx/src/XlsxWorkbook.schema.ts`
+- `xlsx/test/Xlsx.property.test.ts`
+- this appended VERDICTS section (the only file outside the two packages).
+
+No new undecided fallback moved to a schema; SPEC remains unchanged. The three pre-existing uncounted
+missing-layout zero counters in `Xlsx.outline` remain as previously disclosed, not claimed cleared.
+
+### Final-lane byte proof and checks
+
+A temporary read-only comparison loads the four committed modules beside the current modules. It checked
+**39 CSV cases** (36 separator/line-ending/trim combinations and 3 empty/sparse/header record encodings),
+**16 complete XLSX ZIP-byte comparisons** (4 sheet names, stored/deflated, empty/headed), plus their parsed
+values, records, layouts, streams and named-sheet selections, and **267 column-reference cases**, including
+Unicode uppercase expansions and invalid references. All compared equal. Receipts and reproducer:
+`/tmp/defaults-modeling-final-proof/compare.ts`, `before-*.ts`, `result.log`.
+This is bounded byte evidence, not a claim that arbitrary XLSX read/write reproduces its original input archive:
+this writer is intentionally by-value and canonicalizes unsupported parts as documented before this lane.
+
+Package suites pass: **CSV 31 tests in 4 files; XLSX 95 tests in 5 files**. The round-trip tests are
+CSV `decode(encode(t)) = t` for all four delimiters and CRLF/LF (also asserts the rewritten text equals the first
+encoding) and `the Schema codec round-trips`; XLSX `is its canonical form`, `is the same stored or deflated`,
+`does not move under a second pass`, and `bytes to a workbook and back, as one Schema codec`, with the two-way
+SheetJS oracle properties. XLSX's existing round-trip tests prove values; the separate committed/current comparison
+above proves unchanged complete output bytes for the named bounded cases. Added checks cover key arbitrary
+validity, Unicode comparison, refusal of duplicate names differing by case, and retention of the original name
+through an actual encode/read. Both package type checks pass.
+
+Effect 4.1.5 source checked: Schema tuple/decoders/decode transformation, SchemaTransformation case conversion,
+Option flatMap/match, Array head/dedupeWith, Equal equality, MutableHashSet membership and the internal arbitrary
+unique-value equality/hash. No synchronous decoder/encoder, runtime runner, fallback-only schema, function schema,
+closure-default schema or Option-to-undefined conversion was introduced.
+
+Final `bun run check --env-mode=loose --continue` completed **104/105 tasks**, 66 cached, in **2m50.352s**.
+Its **only failure is the permitted ledger decrease**: `csv/src/Csv.codec.ts` now has **8** type assertions,
+while `packages/tooling/tool/cli/ledgers/assertions.json` still records **9**. The removed separator cast accounts
+for the decrease; the ledger is untouched. All other 104 tasks passed, including the repository-wide defaults
+law, both package suites, all type checks/lints, catalog web **401 tests in 38 files** with no retry, and the
+existing proof tasks. Receipt: `/tmp/defaults-modeling-final-check-final.log`. Temporary Bun/XDG cache paths
+under `/tmp` were used. An intermediate direct `_tag` comparison in the added test was corrected to
+`Result.isFailure`; the final tags law and full run pass that gate.
+
+`bun run beep laws defaults` with the six explicit source/test files passes at the five places listed above.
+`bun run format -- <changed files>`, `bun run docs:check`, and `git diff --check` pass; Markdown is excluded by
+the formatter and covered by the docs check, whose existing status-vocabulary warnings remain.
+Read-only Git comparisons confirm no diff in PLAN, SPEC, defaults-baseline.json, the Verify lock or tooling
+ledgers. No internal reader/writer, fixture, vendored file, stored data, exemption or caller outside the packages
+changed. No .dev.vars was read, UPDATE_VERIFY_LOCK was not set, and no commit or push was made; the tree is dirty.
+
+Not run: `check:full`, the separate slow D1/Verify/fold/build gates, a browser import/Confirm, a real browser Worker,
+hosted behavior or deployment. Not seen on screen. The byte comparison is local and bounded; it does not replace
+an on-screen 155-item acceptance run. This lane does not claim zero foundation places or the whole goal complete.
+
+Needs the person: nothing. The five retained places are follow-up work, not newly approved exemptions or policies.

@@ -30,7 +30,7 @@ import {
   CsvDetectEncoding,
   CsvReadOptions,
   CsvWriteOptions,
-  type CsvDelimiter
+  CsvDelimiter
 } from "./CsvOptions.schema.ts"
 
 type CodecOptions = CsvCodecOptions | { readonly read: ReadOptions; readonly write: WriteOptions }
@@ -63,6 +63,10 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 
 // ── reading ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+const SepLineMatch = S.Tuple([S.String, CsvDelimiter, S.String]).annotate({
+  description: "A successful sep-line match, its required delimiter and line ending"
+})
+
 const sepLine = /^sep=([,;\t|])(\r\n|\n|\r)/
 
 interface Prepared {
@@ -76,10 +80,12 @@ interface Prepared {
 const prepare = (input: string, options: ReadOptions): Prepared => {
   const bom = Str.startsWith("﻿")(input)
   const unmarked = bom ? Str.slice(1)(input) : input
-  const sep = options.excelSepHint ? O.fromNullishOr(sepLine.exec(unmarked)) : O.none()
+  const sep = options.excelSepHint
+    ? O.flatMap(O.fromNullishOr(sepLine.exec(unmarked)), S.decodeUnknownOption(SepLineMatch))
+    : O.none()
   const text = O.match(sep, { onNone: () => unmarked, onSome: (match) => Str.slice(match[0].length)(unmarked) })
   const delimiter: CsvDelimiterFound = O.match(sep, {
-    onSome: (match) => CsvDelimiterFromSepLine.make({ delimiter: (match[1] ?? ",") as CsvDelimiter }),
+    onSome: (match) => CsvDelimiterFromSepLine.make({ delimiter: match[1] }),
     onNone: () =>
       options.delimiter.kind === "fixed"
         ? CsvDelimiterGiven.make({ delimiter: options.delimiter.delimiter })

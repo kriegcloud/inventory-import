@@ -1,24 +1,30 @@
+import * as O from "effect/Option"
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Str from "effect/String"
 import { pwnedPasswordMessage } from "@inventory/access-host/AuthOptions"
-import { browser, signInApp } from "./support/app.ts"
+import { browser, signInApp, signInStart } from "./support/app.ts"
 
 // The breach check against the real Have I Been Pwned service, through the Worker's own composition with
 // PWNED_PASSWORD_CHECK on (network needed; `bun run check:full`). Only the first five characters of each password's
 // SHA-1 hash leave this machine, exactly as in production.
 
-layer(signInApp({ settings: { PWNED_PASSWORD_CHECK: "true" } }), { timeout: "60 seconds" })(
+layer(signInApp({ ...signInStart, settings: { PWNED_PASSWORD_CHECK: "true" } }), { timeout: "60 seconds" })(
   "the breach check against the real service",
   (it) => {
     it.effect("refuses a password from known breaches and accepts a strong one", () =>
       Effect.gen(function* () {
-        const refused = yield* browser("10.4.0.1").send("POST", "/api/auth/sign-up/email", {
-          name: "Breached Password",
-          email: "breached@example.test",
-          password: "password1234"
-        })
+        const refused = yield* browser("10.4.0.1").send(
+          "POST",
+          "/api/auth/sign-up/email",
+          O.some({
+            name: "Breached Password",
+            email: "breached@example.test",
+            password: "password1234"
+          }),
+          {}
+        )
         expect([refused.status, refused.json.message]).toEqual([400, pwnedPasswordMessage])
 
         // Twenty random bytes as hex: a password no breach can have held.
@@ -28,11 +34,16 @@ layer(signInApp({ settings: { PWNED_PASSWORD_CHECK: "true" } }), { timeout: "60 
           ),
           ""
         )
-        const accepted = yield* browser("10.4.0.2").send("POST", "/api/auth/sign-up/email", {
-          name: "Strong Password",
-          email: "strong@example.test",
-          password: strong
-        })
+        const accepted = yield* browser("10.4.0.2").send(
+          "POST",
+          "/api/auth/sign-up/email",
+          O.some({
+            name: "Strong Password",
+            email: "strong@example.test",
+            password: strong
+          }),
+          {}
+        )
         expect(accepted.status).toBe(200)
       })
     )

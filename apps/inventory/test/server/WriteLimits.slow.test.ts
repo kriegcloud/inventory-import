@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // D1 binds at most 100 values to a statement, and a file may have 50,000 rows (`maxStagedRows`). A save, a match and a
 // confirm check, inside their own batch, everything the judgement of a Replace across a re-match read: every SKU of the
 // file, every item stored under them, the import's created rows and its suggestions. None of them may stop working
@@ -90,7 +91,7 @@ const head: StagedHead = {
   kind: "csv",
   sheet: O.none(),
   headerRowNumber: 1,
-  columns: A.map(labels, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
+  columns: A.map(A.zip(labels, letters), ([label, letter], index) => ({ index, letter, label })),
   notes: []
 }
 const choices: ReadonlyArray<MappingChoice> = [{ field: "unitCost", column: O.some(listCost), by: "person", at: 1 }]
@@ -106,8 +107,11 @@ const Stored = S.Struct({
 /** The id the seeding gives the nth item, and the SKU of the nth row of the file. */
 const itemId = (n: number): ItemId => ItemId.make(`00000000-0000-4000-8000-${Str.padStart(12, "0")(`${n}`)}`)
 const prefixes = ["AAA", "AAB", "AAC", "AAD", "AAE"]
-const sku = (n: number): string =>
-  `${O.getOrElse(A.get(prefixes, Math.floor(n / 10_000)), () => "ZZZ")}-${Str.padStart(4, "0")(`${n % 10_000}`)}`
+const sku = (n: number): string => {
+  const prefix = A.get(prefixes, Math.floor(n / 10_000))
+  assertTrue(O.isSome(prefix), "expected a prefix for the generated SKU")
+  return `${prefix.value}-${Str.padStart(4, "0")(`${n % 10_000}`)}`
+}
 const counted = <A>(n: number, each: (index: number) => A): ReadonlyArray<A> => (n === 0 ? [] : A.makeBy(n, each))
 
 /**
@@ -203,7 +207,9 @@ layer(App)("the most rows one save may name", (it) => {
       yield* seeded(id, 1)
       const store = yield* ImportStore
       const found = yield* store.find(org, id)
-      const draft = O.getOrThrow(found)
+      const draftOption = found
+      assertTrue(O.isSome(draftOption), "expected draft to be present")
+      const draft = draftOption.value
       const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
         counted(maxStagedRows, (n) => [`row-${n + 2}`, out] as const)
       )
@@ -226,7 +232,10 @@ layer(App)("a save of long typed values", (it) => {
       const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
         counted(2000, (n) => [`row-${n + 2}`, typed] as const)
       )
-      const saved = yield* store.decide(marcus, O.getOrThrow(found), { set, clear: [] }, noItemsRead, O.none())
+      const foundDraftOption = found
+      assertTrue(O.isSome(foundDraftOption), "expected foundDraft to be present")
+      const foundDraft = foundDraftOption.value
+      const saved = yield* store.decide(marcus, foundDraft, { set, clear: [] }, noItemsRead, O.none())
       const held = yield* savedFor(id)
       expect([saved.kind, held]).toEqual(["saved", [[2000, 0]]])
     })
@@ -251,7 +260,12 @@ layer(App)("a save, a match and a confirm of long typed values whose bytes are m
           yield* seeded(id, index === 0 ? 1 : 0)
           const store = yield* ImportStore
           const at = yield* DateTime.now
-          const draftNow = Effect.map(store.find(org, id), O.getOrThrow)
+          const draftNow = Effect.map(store.find(org, id), (draft) => {
+            const valueOption = draft
+            assertTrue(O.isSome(valueOption), "expected value to be present")
+            const value = valueOption.value
+            return value
+          })
           // The unit accepted too, so a match of the unit rewrites every one of them.
           const typed = (by: string) =>
             decisionFromFlags({ accepted: ["uom"], edits: { description: Str.repeat(1500)(text), name: by } })
@@ -381,7 +395,9 @@ layer(App)("a confirm that writes every row of a file of 50,000", (it) => {
         const confirmed = yield* client.imports
           .commit({ params: { id }, payload: { revision: 1, madeOn: R.map(set, () => 0), set, clear: [] } })
           .pipe(as("mem_marcus"))
-        const result = O.getOrThrow(confirmed.result)
+        const resultOption = confirmed.result
+        assertTrue(O.isSome(resultOption), "expected result to be present")
+        const result = resultOption.value
         const written = maxStagedRows - leftOut
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([
           written - replaced,
@@ -415,7 +431,9 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       yield* createdBefore(id)
       const store = yield* ImportStore
       const found = yield* store.find(org, id)
-      const draft = O.getOrThrow(found)
+      const draftOption = found
+      assertTrue(O.isSome(draftOption), "expected draft to be present")
+      const draft = draftOption.value
       yield* store.decide(marcus, draft, { set: { "row-2": replace }, clear: [] }, noItemsRead, O.none())
       const answer = yield* store.matchColumn(
         marcus,
@@ -426,7 +444,10 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       )
       const after = yield* store.find(org, id)
       const held = yield* savedFor(id)
-      expect([answer, O.getOrThrow(after).revision, held]).toEqual(["saved", 3, [[1, 0]]])
+      const afterDraftOption = after
+      assertTrue(O.isSome(afterDraftOption), "expected afterDraft to be present")
+      const afterDraft = afterDraftOption.value
+      expect([answer, afterDraft.revision, held]).toEqual(["saved", 3, [[1, 0]]])
     })
   )
 
@@ -436,7 +457,9 @@ layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
       const store = yield* ImportStore
       const now = yield* DateTime.now
       const found = yield* store.find(org, id)
-      const before = O.getOrThrow(found)
+      const beforeOption = found
+      assertTrue(O.isSome(beforeOption), "expected before to be present")
+      const before = beforeOption.value
       const write = (confirm: string, read: ItemsAsRead) =>
         ConfirmWrite.make({
           draft: id,

@@ -15,7 +15,7 @@ interface Page {
   /** The names of the locks held. */
   readonly locks: Array<string>
   /** The requests that asked who is signed in, oldest first: each is answered when the test says. */
-  readonly asked: Array<{ readonly answer: (body: string, status?: number) => void; readonly fail: () => void }>
+  readonly asked: Array<{ readonly answer: (body: string, status: number) => void; readonly fail: () => void }>
 }
 
 const storage = (of: Record<string, string>) => ({
@@ -46,22 +46,26 @@ const open: { now: Page | undefined } = { now: undefined }
 globalThis.fetch = () => {
   const { promise, reject, resolve } = Promise.withResolvers<Response>()
   open.now?.asked.push({
-    answer: (body, status = 200) =>
-      resolve(new Response(body, { status, headers: { "content-type": "application/json" } })),
+    answer: (body, status) => resolve(new Response(body, { status, headers: { "content-type": "application/json" } })),
     fail: () => reject(new TypeError("the network"))
   })
   return promise
 }
 
+/** A fresh browser page starts here; its stores belong to that page. */
+export const pageStart = () => ({ at: "/", kept: {}, tab: {} })
+
 /** Puts a page in place of the one before it, at `at`, with what the browser keeps, and gives what it does. */
-export const openPage = (
-  input: { readonly at?: string; readonly kept?: Record<string, string>; readonly tab?: Record<string, string> } = {}
-): Page => {
+export const openPage = (input: {
+  readonly at: string
+  readonly kept: Record<string, string>
+  readonly tab: Record<string, string>
+}): Page => {
   const page: Page = {
     left: [],
     reloads: { times: 0 },
-    kept: input.kept ?? {},
-    tab: input.tab ?? {},
+    kept: input.kept,
+    tab: input.tab,
     locks: [],
     asked: []
   }
@@ -81,7 +85,7 @@ export const openPage = (
     location.search = url.search
     location.href = url.href
   }
-  goTo(null, "", input.at ?? "/")
+  goTo(null, "", input.at)
   const window = Object.assign(new EventTarget(), {
     innerWidth: 1440,
     location,
@@ -115,9 +119,13 @@ const features = `"features":{"testAccounts":null,"pwnedPasswordCheck":false,"si
 const organizations = `"organizations":[{"id":"org_prairie","name":"Prairie"},{"id":"org_northline","name":"Northline"}]`
 
 /** The session's answer for a member: their account (named in lower case), and the organization they act in. */
-export const signedInAs = (
-  ...[who, organization = "prairie"]: ["dana" | "marcus", ("prairie" | "northline")?]
-): string =>
+export const signedInAs = ({
+  who,
+  organization
+}: {
+  readonly who: "dana" | "marcus"
+  readonly organization: "prairie" | "northline"
+}): string =>
   `{"status":"ready","email":"${who}@example.com","actor":{"id":"mem_${who}","name":"${who}","role":"admin",` +
   `"organizationId":"org_${organization}","organizationName":"${organization}"},${organizations},${features}}`
 

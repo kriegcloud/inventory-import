@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // Rows of a save that waited, on the real handlers and SQL, a fresh D1 for each rule (Benjamin, 2026-11-20: "Hold it,
 // show both, ask"): such a row is written only while what is stored of it is one of the decisions the sender knows the
 // server may hold, or one of those as a match since left it; otherwise it is named with what is stored, and the other
@@ -21,22 +22,35 @@ import { upload } from "./support/upload.ts"
 
 const headings = ["sku", "name", "category", "uom", "unit_cost", "quantity_on_hand", "Alt code", "Net cost"] as const
 const letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
-type Line = Partial<Record<(typeof headings)[number], string>>
-const column = (heading: (typeof headings)[number]): number =>
-  O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
+type Line = Record<(typeof headings)[number], string>
+const column = (heading: (typeof headings)[number]): number => {
+  const valueOption = A.findFirstIndex(headings, (candidate) => candidate === heading)
+  assertTrue(O.isSome(valueOption), "expected value to be present")
+  const value = valueOption.value
+  return value
+}
 const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
   fileName,
   kind: "csv",
   sheet: O.none(),
   headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
+  columns: A.map(A.zip(headings, letters), ([label, letter], index) => ({ index, letter, label })),
   notes: [],
   rows: A.map(lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
+    cells: A.map(headings, (heading) => ({ text: line[heading], shown: O.none() }))
   }))
 })
-const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
+const item = {
+  sku: "",
+  name: "",
+  unit_cost: "",
+  "Alt code": "",
+  "Net cost": "",
+  category: "packaging",
+  uom: "EA",
+  quantity_on_hand: "10"
+}
 const stocked = tableOf("stocked.csv", [
   { ...item, sku: "AAA-0001", name: "Oak Crate", unit_cost: "12.50" },
   { ...item, sku: "AAA-0002", name: "Steel Bolt", unit_cost: "3" }

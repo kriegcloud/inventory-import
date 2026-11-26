@@ -948,4 +948,64 @@ Baseline, Verify lock, PLAN, exemptions, vendored code and internal reader/write
 155-item Confirm path was not exercised in a browser in this lane; the previous packet's acceptance is not new
 end-to-end proof for these edits. No `UPDATE_VERIFY_LOCK` was used.
 
+## App tests lane, row 13, 2026-11-26
+
+Scope: `apps/inventory/test`, plus this verdict section. The starting dirty-tree changes are preserved.
+The original scoped inventory selected 49 files and held 95 sites: 37 fallback, 36 absence, 19 unwrap,
+and three normalise. The corrected inventory holds **four sites: one fallback, zero absence, zero unwrap,
+and three normalise**. These retained sites are named below; no exemption or baseline changed.
+
+| Fields / owner | Verdict | Reason and boundary |
+| --- | --- | --- |
+| Assistant Results; import/take-back results; stored rows, columns and indices | Required expected variants in tests | Assert `Result.isSuccess`, `Result.isFailure`, or `O.isSome` on the tagged value with `assertTrue`, then read its own `success`, `failure`, or `value`. Existing payload expectations remain unconditional. No optional-value extraction precedes the assertion. |
+| Startup Exit failures | Required Failure variant | Assert `Exit.isFailure` on the Exit, then read its `cause`; keep the message expectations. |
+| People email and document property values | Explicit Option data | People comparisons retain Some/None. The property combines both writable Options and asserts its full proposition in both branches. |
+| TestAuth, signInApp, model and suggestion fixtures | Required fixture inputs | Callers state settings, production/rate limits and model replies. Existing named starting fixtures are preserved. |
+| settingsLayer and inMemoryApp | Required configuration | Settings, docs and HTTP layers are required and supplied at every caller, including the security and telemetry suites. No helper picks an omitted configuration. |
+| send and browser.send | Required method and headers; Option body and actor | Callers state the method, request body presence and actor presence. Some(null) encodes JSON null; None omits the RequestInit body property. Body presence sets content-type. Header construction preserves browser Origin, cookie and empty-header behavior. |
+| MatchAtomic batch hooks and Rematch before hook | Required Option capabilities | Each hook-builder caller supplies Some(effect/function) or None, including empty entries and retry-generating callbacks. None runs no hook; Some runs the original effect in the original order. |
+| People signedUp membership | Required Option input | Callers explicitly choose whether the signed-up account is linked to an existing member. None skips only that update. |
+| Cost digits | Required cost | Callers supply a UnitCost. ImportsTwin asserts the second vendor exists before reading its cost. |
+| Staged row fixtures | Required columns | Line records have every heading. Their named starting item explicitly supplies blank cells; tableOf reads the required field without filling it. Fixed headings and letters remain paired. |
+| Upload key/chunks and generated SKU prefixes | Explicit Option key; required chunk/prefix | A new upload explicitly requests a fresh key with None. Retry keys use Some. Required chunk/prefix positions assert Some; no empty chunk or ZZZ stand-in is supplied. |
+| Page response status and browser fixture starts | Required fixture inputs | Every response caller supplies its status. Each page still gets fresh storage through pageStart; at/kept/tab and signed-in identity/organization stay explicit. |
+| Cookie capture | Response-header Option | Keep the actual header Option until assertions. An absent response cookie leaves the previously captured cookie in place. |
+
+### App test residual inventory
+
+Every retained law occurrence is listed here, relative to `apps/inventory/test/`.
+
+| File | Line | Kind | Expression | Reason retained |
+| --- | --- | --- | --- | --- |
+| `web/support/page.ts` | 22 | fallback | `of[key] ?? null` | Implements the third-party browser Storage.getItem contract: a missing key returns null. Storage.key also returns null for an absent index. |
+| `server/ImportsTwin.test.ts` | 107 | normalise | `Str.toLowerCase(item.name)` | Compares stored display names against the search predicate for oak, preserving the search-behavior assertion. It does not change the stored item. |
+| `server/MatchAtomic.slow.test.ts` | 192 | normalise | `Str.toLowerCase(column.label)` | Finds the staged column by its displayed reorder heading, preserving the alternate-column scenario. It does not change the column. |
+| `server/StaleAccepts.slow.test.ts` | 34 | normalise | `Str.toLowerCase(column.label)` | The same displayed-heading lookup for the stale-accepts scenario. It does not change the staged data. |
+
+RequestInit is an external platform shape: optional body is omitted through the Option branch at construction.
+The SQL row types in People and WaitedRows still model database NULLs. Browser fakes retain the DOM's null results,
+React element inspections retain React-owned optional props, and the HTTP fixtures preserve their existing untyped
+empty-response representation. None is a defaulted helper argument. Optional chaining already present in unrelated
+expectations and page-response scheduling was not expanded into a new fixture policy.
+
+### App test changes and proof
+
+All renamed unwraps were replaced by assertions on their actual Option, Result or Exit. The grep
+`rg -n 'valueOrUndefined|O\.(getOrUndefined|getOrNull|getOrThrow)' apps/inventory/test` returns no matches.
+The explicit-file scoped law passes for all 49 tracked test files with the four occurrences above.
+No baseline, Verify lock, PLAN, SPEC, vendored code, exemption or application source was changed. No .dev.vars
+was read. No commit or push was made. Effect assertion signatures and the pilot tests were read locally.
+
+Validation: the app typecheck passes. The formatter passes on all changed test files. Full
+`bun run check --env-mode=loose` passes 105/105 tasks, 82 cached, in 10.99s; the app fast suite passes
+70 tests in 19 files with no retry. Log: `/tmp/app-correction-check.log`.
+`bun run --cwd apps/inventory test:slow` passes 133 tests in 24 files in 67.03s, with no retry.
+Log: `/tmp/app-correction-slow.log`. Final documentation and scope checks also pass.
+
+The initial plain check hit Bun's read-only temporary directory; the initial slow attempt hit Wrangler's
+read-only default registry. Reruns use BUN_TMPDIR, BUN_INSTALL_CACHE_DIR, XDG_CACHE_HOME,
+WRANGLER_REGISTRY_PATH and TURBO_CACHE_DIR under /tmp as needed. Loose environment mode passes those
+locations through Turbo. No repository configuration was changed for the sandbox.
+No browser, hosted deployment or check:full was run; not seen on screen.
+
 Needs the person: nothing.

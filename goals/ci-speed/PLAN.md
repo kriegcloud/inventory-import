@@ -23,7 +23,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | built ("Step 8" below) |
 | 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
-| 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | todo |
+| 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | built ("Step 10" below) |
 | 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | todo |
 
 Steps 1 to 8 and 10 wait on nothing of Benjamin's. Every estimate is capped by the other job: steps 2 and 3 reach their
@@ -158,6 +158,31 @@ replayed with it. `check:full`, `bun run test` and CI's `slow` job run both. Run
 
 Nothing in the app's slow tests reads a file outside its own folder or a package it imports (its migrations, seeds
 and `wrangler.jsonc` are in the folder), so the default inputs hold what they read. Not yet seen: a run of CI.
+
+## Step 10, fewer property runs on a pull request
+
+`PROPERTY_RUNS` is read once, in `vitest.shared.ts`, through Effect's `Config` (`full` or `short`; unset is `full`;
+any other value stops the test run at its start and names what it expected), and handed to every test through
+Vitest's `provide`. A test reads it with `runsOf({ full, short })` (`packages/catalog/model/test/support.ts`);
+`WaitedRows.property` asks for 2,000 and 500. The `test` task names it in its `env`, so it is in the hash and strict
+mode lets it through.
+
+CI sets `short` on a pull request only, in a step of `rest` and `web` that writes it to the job's environment. A
+push leaves it unset, as a workstation does: turbo hashes unset, empty and `full` as three different values (seen
+below), so only unset lets a push and a workstation share a result made at today's counts once the cache is shared
+(step 9). The nightly's proofs job runs the model's tests again with nothing replayed and the variable unset. Run on
+2026-11-26:
+
+| Trial | Result |
+| --- | --- |
+| `WaitedRows.property.test.ts` alone, unset | 37.6 s |
+| The same, `short` | 6.4 s |
+| The same, `sohrt` | stopped at start: `Expected "full" \| "short" at ["PROPERTY_RUNS"]` |
+| `@inventory/catalog-model#test` hash: unset, `short`, `full`, empty | four different hashes |
+| The model's whole `test` task under turbo, `short` | 21 files passed, 6.2 s |
+
+Only the one property moved; the three others at 2,000 (`ItemFields.arbitrary`, `Row.property`, the xlsx oracle)
+take a few seconds each and keep their counts, as the decision named only this one.
 
 ## Choices made along the way
 

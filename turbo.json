@@ -58,9 +58,11 @@
       "outputs": []
     },
     // The fast tests. Their limits and retries are the root's (vitest.shared.ts, vitest.retries.ts), which every
-    // package's vitest.config.ts imports.
+    // package's vitest.config.ts imports. `PROPERTY_RUNS` gives the longest properties fewer runs on a pull request
+    // (vitest.shared.ts), so it is in the hash: a result made at one count is never replayed at the other.
     "test": {
       "dependsOn": ["transit"],
+      "env": ["PROPERTY_RUNS"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts", "$TURBO_ROOT$/vitest.retries.ts"],
       "outputs": []
     },

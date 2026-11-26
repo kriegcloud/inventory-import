@@ -41,6 +41,11 @@ jobs:
       - name: Prove, search and fold, nothing replayed
         timeout-minutes: 100
         run: bunx turbo run prove verify fold --force --concurrency=2 --summarize
+      # The model's tests with the longest properties at today's counts, nothing replayed: a pull request runs them
+      # fewer times (`PROPERTY_RUNS=short`, vitest.shared.ts); here the variable is unset, as on a push to main.
+      - name: The model's properties at today's counts, nothing replayed
+        timeout-minutes: 20
+        run: bunx turbo run test --filter=@inventory/catalog-model --force --summarize
       - name: Open the issue, or add to it
         if: failure()
         uses: actions/github-script@v9

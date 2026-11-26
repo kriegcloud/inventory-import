@@ -76,7 +76,9 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   wrong. It is three jobs that start at once, each on a runner of its own under that same rule: the catalog's
   screens (`web`), the slow tests with the live one and the data grid (`slow`) and everything else (`rest`); the job the rule on
   main requires waits for the three, and each job keeps turbo's own time for every task with the run
-  (`goals/ci-speed`). A job given more than that is timed over several runs first. The runner has four cores; turbo's own ten tasks at once, each test run with a worker per core, made tests
+  (`goals/ci-speed`). On a pull request the longest properties run fewer times (`PROPERTY_RUNS=short`, read in
+  `vitest.shared.ts` and hashed by the `test` task); a push to main and the nightly leave it unset and run today's
+  counts. A job given more than that is timed over several runs first. The runner has four cores; turbo's own ten tasks at once, each test run with a worker per core, made tests
   several times slower than they are (ten at once on four pinned cores: 117 s, and red on three tests' limits).
   To see what the runner sees:
   `VITEST_MAX_WORKERS=1 taskset -c 0-3 bun run check:full -- --force --continue --concurrency=2` (green three times

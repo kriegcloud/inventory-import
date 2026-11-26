@@ -14,6 +14,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import { emptyText } from "@inventory/catalog-model/CellReading"
 import { columnLetter } from "@inventory/catalog-model/SheetLayout"
+import { inject } from "vitest"
 
 const member = (id: string, name: string, role: Role, organization: string): Member =>
   Member.make({
@@ -137,3 +138,20 @@ export const stage = Effect.fnUntraced(function* (table: StagedTable) {
   const finished = yield* imports.finishUpload({ params: { id } })
   return yield* Effect.fromResult(finished)
 })
+
+declare module "vitest" {
+  export interface ProvidedContext {
+    /** `short` on a pull request's CI, `full` everywhere else (vitest.shared.ts). */
+    readonly propertyRuns: "full" | "short"
+  }
+}
+
+/**
+ * A long property's run count: `full` where today's count runs (a workstation, the push to main, the nightly), `short`
+ * on a pull request's CI. The variable is the root's (`PROPERTY_RUNS`, read once in vitest.shared.ts).
+ *
+ * @example
+ * runsOf({ full: 2000, short: 500 }) // 500 on a pull request, 2000 elsewhere
+ */
+export const runsOf = (counts: { readonly full: number; readonly short: number }): number =>
+  inject("propertyRuns") === "short" ? counts.short : counts.full

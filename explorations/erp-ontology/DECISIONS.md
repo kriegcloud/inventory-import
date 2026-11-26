@@ -13,7 +13,7 @@ of eighty-five: eighty from reports 04 to 12 and the brief, merged where two rep
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
 the catalog questions. Twenty-three were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 26, 32,
-34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 124. No `rat-` record is written, and the thin thread
+34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 124 and 128. No `rat-` record is written, and the thin thread
 uses none: its terms name the decision that accepted them (decisions 107 and 111). The gaps
 in the numbers below are theirs.
 
@@ -777,7 +777,23 @@ access.
   terms a must or should question needs. Decision 1 stands: the model of record is this repository's, and Sutton is
   still a mapping onto it. Decision 87's ranking of the questions stands. The records report 16 section 3 lists are
   in scope.
-- Not decided ([report 17](research/17-sutton-whole-model-plan.md), question P20, which sizes every slice; no open
-  row yet): which slice takes which records, and whether "all" means every one of the 199 record types or the
-  business records without the document layouts, settings and integrations.
+- What "all" covers was decided after: decision 128. Which slice takes which records is
+  [report 17](research/17-sutton-whole-model-plan.md)'s plan and is not ruled on.
 - Reverse: restore the brief's rule; terms already added for Sutton alone stay or go one by one.
+
+### 128. What "all" of Sutton includes (2026-11-26)
+
+Decision 124 chose to model Sutton whole and left open what that covers.
+[Report 17](research/17-sutton-whole-model-plan.md) counts 200 record types: 122 that describe business things, 11
+settings that hold a tenant's rules, and 64 layouts, generated documents, navigation and helper types (its question
+P20).
+
+I chose the business things; the agent recommended the same. The 122 get terms or are parts and views of a term,
+with `RutterConnection` and the integration links. The settings and the layouts get no term. A setting that is a
+business rule is written down as a rule of the term it governs.
+
+- Rationale: a term for a packing-slip section or a sidebar layout answers no question the packet asks.
+- What it gives up: a tenant's rules (an approval threshold, whether over-receiving is refused, how lot numbers are
+  made) cannot be queried as data.
+- Reverse: give the 11 settings types terms, in the slices that hold what they govern (4, 6 and 7).
+

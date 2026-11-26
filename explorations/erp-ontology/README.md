@@ -96,4 +96,4 @@ first class list, a decision log and a product model read from public sources).
   127 are open.
 - 2026-11-26: six readers placed every Sutton record type against the packet and
   [report 17](research/17-sutton-whole-model-plan.md) plans the whole model in eight slices; four reviewers tried to refute it and their corrections are in it.
-  Nothing is built from it.
+  Decision 128: the business things get terms, the settings and layouts do not. Nothing is built from it.

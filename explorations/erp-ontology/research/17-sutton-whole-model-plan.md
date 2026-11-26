@@ -52,7 +52,7 @@ The readers' verdicts, with one change from the review: seven helper types that 
 
 So 122 of the 199 types read carry something to model, and 77 were given no term. Of those 77, 64 are print and
 label layouts, generated PDFs, navigation, pictures of a record, bulk-operation results and helper types, and 11
-are settings that hold a tenant's business rules (Appendix B lists them apart; P20 decides whether they get terms).
+are settings that hold a tenant's business rules (Appendix B lists them apart; decision 128 gives them no term).
 Six of the "part of another record" verdicts are disputed (section 5).
 
 The 38 types marked "new term" come to 18 new terms, because 19 custom-field value types are one term, two
@@ -99,7 +99,7 @@ slice covers is part of done once the alignment file exists, which waits on open
 
 | # | Slice | Sutton records it covers | Needs first | Open decisions it waits on |
 | --- | --- | --- | --- | --- |
-| 0 | Scope | none | nothing | P20: what "all" includes. It sizes every slice below |
+| 0 | Scope | none | nothing | None: P20 was answered on 2026-11-26 (decision 128): the business things get terms, the settings and layouts do not |
 | 1 | Party | `Company`, `Contact`, `Address` on a company or contact, the tenant `Organization`, `OrganizationMember` with `UserProfile`, `User` | Report 04's `SourceRecord`; the thin thread | The brief's slice 1 list (12, 17 to 19, 27, 33, 35 to 37, 44, 45, 47, 87, 89, 125, 126); 28 to 31 for its alignment rows; P1, P2 |
 | 2 | Tenant lists and values | `DynamicField` and its options (20 lists a tenant fills, and the packaging-type list: categories, tags, payment terms, carriers, reasons), `UoM`, `CurrencyDetails`, `Cost`, `Measurement` | Slice 1's tenant | 59, 61, 62, 88; P21 |
 | 3 | Items and offers | `Item`, `ItemVendor`, `ItemCustomer`, `PriceList` with its items and customers, `VariantTemplate` | Slices 1 and 2 | The brief's slice 2 list less 59, 61, 62 and 88, which slice 2 takes (48 to 51, 54, 55, 60, 63 to 66, 74, 76, 90, 92), and 73; P7 |
@@ -297,7 +297,7 @@ concrete record to be asked with: 125, 126 and 127 (report 16), 65 (item kind an
 work center), 79 (a pick that names no destination), 82 (an order's seven status fields), 84 (over-receipt and
 over-billing as a setting), 85 (consumption and output recorded apart) and 89 (the carrier, which P23 also asks).
 
-P20 decides the size of everything else and is the one question to answer before any slice is specified.
+P20 decided the size of everything else and is answered: decision 128.
 
 ## 7. What is proposed beside the slices
 
@@ -307,7 +307,7 @@ Not built, and Benjamin's to accept or refuse:
   A test fails when a slice claims to be done while a type it covers has no alignment row. Appendices A and B
   together hold that list as it stands today, without the family.
 - **One goal per slice.** The thin thread was one goal (`goals/erp-vocabulary`). Each slice above is the size of a
-  goal, and slice 1 can be specified once P20 and its own decisions are answered.
+  goal, and slice 1 can be specified once its own decisions are answered.
 - **The schema re-read before each slice.** Sutton changes its API. The reading here is of 2026-11-26.
 
 ## 8. Not checked
@@ -457,7 +457,8 @@ Two in the catalog family: `ItemImage` and `ToolImage`.
 
 Eleven that hold a tenant's business rules or the settings of a connection, such as whether orders need approval
 and above what amount, whether over-receiving is refused, how lot numbers are made and which document numbers are
-issued: `OrganizationAccountsSettings`, `OrganizationDocumentNumberPrefix`, `OrganizationLocationSettings`, `OrganizationModuleSettings`, `OrganizationProductionSettings`, `OrganizationPurchaseOrderSettings`, `OrganizationReceivingSettings`, `OrganizationSalesOrderSettings`, `OrganizationShippingSettings`, `RutterAccountingProperties`, `RutterCommerceProperties`. They describe no thing, but they are rules, and P20 decides whether they get terms.
+issued: `OrganizationAccountsSettings`, `OrganizationDocumentNumberPrefix`, `OrganizationLocationSettings`, `OrganizationModuleSettings`, `OrganizationProductionSettings`, `OrganizationPurchaseOrderSettings`, `OrganizationReceivingSettings`, `OrganizationSalesOrderSettings`, `OrganizationShippingSettings`, `RutterAccountingProperties`, `RutterCommerceProperties`. They describe no thing, but they are rules; under decision 128 each is written down as a rule of the term it
+governs.
 
 Sixty-four layouts, generated documents, navigation, results of bulk operations and helper types. The document and
 label configurations among them also hold a few trading terms and barcode choices: `BillOfLadingBillTo`, `BillOfLadingConsignee`, `BillOfLadingDocumentsConfiguration`, `BillOfLadingOption`, `BillOfLadingPdf`, `BillOfLadingSection`, `BillOfLadingShipper`, `BomDeletionBlockingLinkedRecords`, `BulkItemMutationError`, `CreateItemsResultItem`, `CustomDocumentConfigurationDetails`, `CustomLabelAddressConfig`, `CustomLabelConfigurationDetails`, `CustomLabelConfigurations`, `CustomLabelOption`, `DeleteItemsResultItem`, `DeleteJobsResultItem`, `DeleteQuotesResultItem`, `DeleteSalesOrdersResultItem`, `DeleteSerializedInventoriesResultItem`, `FileUploadLink`, `FileUploadLinkField`, `InventoryDeletionBlockingLinkedRecords`, `InventoryLinkedRecord`, `ItemDeletionBlockingLinkedRecords`, `ItemLinkedRecord`, `JobDeletionBlockingLinkedRecords`, `JobTravelerPdf`, `LabelDetails`, `OperationIDOnly`, `OrderDeletionBlockingLinkedRecords`, `OrderIDOnly`, `OrganizationDynamicFieldOptionIdOnly`, `OrganizationDynamicFields`, `OrganizationFeature`, `OrganizationMemberSettings`, `PackingSlipBillTo`, `PackingSlipDocumentsConfiguration`, `PackingSlipOption`, `PackingSlipOrganization`, `PackingSlipPdf`, `PackingSlipSection`, `PackingSlipShipFrom`, `PackingSlipShipTo`, `PurchaseOrderDeletionBlockingLinkedRecords`, `PurchaseOrderPdf`, `QuotePdf`, `ReceivingTicketDeletionBlockingLinkedRecords`, `ReceivingTicketDocumentsConfiguration`, `ReceivingTicketOption`, `ReceivingTicketOrganization`, `ReceivingTicketReceivingLocationInfo`, `ReceivingTicketSection`, `ReceivingTicketSupplierInfo`, `RemovePurchaseOrdersResultItem`, `SalesOrderPdf`, `SharedSidebarNavLayout`, `SidebarNavSection`, `SignupHeardAboutUsOption`, `Skill`, `SkillFile`, `SkillVersion`, `UnionDynamicFieldOption`, `UpdateItemsResultItem`.

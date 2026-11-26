@@ -47,6 +47,12 @@ const held = "packages/a/src/held.ts"
 const twoFallbacks = `export const a = (x?: number, y?: number) => (x ?? 0) + (y ?? 0)\n`
 
 describe("what the reader takes for a place", () => {
+  it("counts an Option's valueOrUndefined as the unwrap it is", () => {
+    deepStrictEqual(places(`export const f = (o: O.Option<string>) => Result.getSuccess(o).valueOrUndefined`), [
+      "1 unwrap Result.getSuccess(o).valueOrUndefined"
+    ])
+  })
+
   it("finds each kind by how it is written", () => {
     deepStrictEqual(
       places(`export const f = (o: unknown, x?: string | null) => {

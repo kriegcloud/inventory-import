@@ -75,7 +75,8 @@ const comparisons = ["===", "!==", "==", "!="]
 // `x || ""` is `x ?? ""` in older words. Told from a condition (`a || b`) by its right side being a value written out.
 const writtenOut = ["Literal", "TemplateLiteral", "ArrayExpression", "ObjectExpression"]
 const fallbacks = ["getOrElse"]
-const unwraps = ["getOrUndefined", "getOrNull"]
+// `option.valueOrUndefined` is `O.getOrUndefined(option)` read as a property.
+const unwraps = ["getOrUndefined", "getOrNull", "valueOrUndefined"]
 const cleanUps = ["trim", "trimStart", "trimEnd", "toLowerCase", "toUpperCase"]
 // A schema's own clean-up is where the rule wants it.
 const schemaModules = ["SchemaGetter", "SchemaTransformation"]

@@ -39,7 +39,7 @@ import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { UploadNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
-import { requiredFields, type StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
+import { requiredFields, StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 import { savedRows } from "@inventory/catalog-model/Upload"
 import { rowsOf, UploadState } from "./Upload.machine.ts"
@@ -211,6 +211,8 @@ const reader = (request: ReadRequest) =>
     )
   )
 
+// The head is internal wire data; parse its structure/Options here, leaving bounds to the existing server read.
+const decodeHead = S.decodeEffect(StagedHead, { disableChecks: true })
 const decodeChunk = S.decodeEffect(S.Array(StagedRow))
 
 /** Reads `file` in the worker, sends it in chunks as they arrive, and finishes it. Reports each step to the store. */
@@ -244,8 +246,8 @@ const program = Effect.fn("upload.program")(function* (
           )
         ),
       Head: Effect.fn("Upload.head")(function* (message) {
-        // The sheet crossed the threads as its name or null: the Option is made again here.
-        const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
+        // The head crossed in its schema's encoded form; decode once after structured clone, as for chunks.
+        const read = yield* decodeHead(message.head).pipe(Effect.orDie)
         head = read
         workbook = message.workbook
         const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)

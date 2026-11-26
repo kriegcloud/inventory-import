@@ -1,6 +1,7 @@
 // The person's decisions in words: the lines above the review that ask about a row and what each offers, what a match
 // took back, and the decisions named because they were not part of an import.
 import * as A from "effect/Array"
+import { identity } from "effect/Function"
 import * as Eq from "effect/Equal"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
@@ -423,7 +424,7 @@ export const leftOverLines = (named: Named): ReadonlyArray<NamedLine> =>
       onNone: () => "",
       onSome: (theirs) => ` (saved instead: ${decisionWords(theirs)})`
     })
-    const beside = O.getOrElse(R.get(named.beside, id), (): Named["beside"][string] => [])
+    const beside = O.match(R.get(named.beside, id), { onNone: A.empty, onSome: identity })
     return [
       { id, row: rowLabel(id), decided: `${mineWords(change)}${instead}` },
       ...A.map(beside, (other, at) => ({

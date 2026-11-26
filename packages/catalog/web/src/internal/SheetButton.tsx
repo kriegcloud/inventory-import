@@ -5,6 +5,7 @@ import { SheetChooser } from "./SheetChooser.tsx"
 import { Button } from "@inventory/ui/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { openWorkbook } from "../Imports.atoms.ts"
+import * as A from "effect/Array"
 import * as O from "effect/Option"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./route.ts"
@@ -19,27 +20,31 @@ import { startUpload } from "../Upload.controller.ts"
 export function SheetButton(props: { importId: ImportId }) {
   const start = useAtomSet(startUpload)
   const opened = useAtomValue(openWorkbook(props.importId))
-  const workbook = O.getOrUndefined(opened)
-  if (workbook === undefined || workbook.sheets.filter((sheet) => sheet.rowCount > 0).length < 2) return null
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
-          <SheetIcon aria-hidden />
-          <span className="sr-only">Sheet: </span>
-          {workbook.chosen.name}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-96">
-        <SheetChooser
-          sheets={workbook.sheets}
-          chosen={workbook.chosen}
-          onChoose={(sheet) => {
-            start({ file: workbook.file, sheet })
-            navigate(importAddress(props.importId, "upload"))
-          }}
-        />
-      </PopoverContent>
-    </Popover>
+  return O.match(
+    O.filter(opened, (workbook) => A.filter(workbook.sheets, (sheet) => sheet.rowCount > 0).length >= 2),
+    {
+      onNone: () => null,
+      onSome: (workbook) => (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              <SheetIcon aria-hidden />
+              <span className="sr-only">Sheet: </span>
+              {workbook.chosen.name}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-96">
+            <SheetChooser
+              sheets={workbook.sheets}
+              chosen={workbook.chosen}
+              onChoose={(sheet) => {
+                start({ file: workbook.file, sheet })
+                navigate(importAddress(props.importId, "upload"))
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      )
+    }
   )
 }

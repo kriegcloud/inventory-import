@@ -9,7 +9,7 @@ import * as Data from "effect/Data"
 export type ReadRequest = { readonly file: File; readonly sheet: string | null }
 
 /** A staged head as the copy between threads carries it: `sheet` as its name, or null for a CSV. */
-export type PlainHead = Omit<StagedHead, "sheet"> & { readonly sheet: string | null }
+export type PlainHead = typeof StagedHead.Encoded
 
 /**
  * What the reader tells the page, in this order: `Progress` any number of times, then either `Refused` (the file

@@ -20,7 +20,7 @@ import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { settledBeforeOwnSwitch } from "@inventory/client/MemberAtoms"
 import type * as Fiber from "effect/Fiber"
 import { type CatalogApiClient, CatalogClient, configureCatalog } from "../src/Catalog.runtime.ts"
-import { ReadMessage } from "../src/internal/protocol.ts"
+import { ReadMessage, type PlainHead } from "../src/internal/protocol.ts"
 import { UploadState } from "../src/Upload.machine.ts"
 import { startUpload, UploadEnd, uploadState } from "../src/Upload.controller.ts"
 import { importId, registryFor, viewAt } from "./support/catalog.ts"
@@ -69,7 +69,14 @@ vi.mock("../src/ReviewStep.screen.tsx", () => ({ ReviewStep: () => null }))
 
 const settle = Effect.sleep("20 millis")
 const uploadId = importId as ImportId
-const head = { fileName: "items.csv", sheet: null, columns: [], notes: [] }
+const head = {
+  fileName: "items.csv",
+  kind: "csv",
+  headerRowNumber: 1,
+  sheet: null,
+  columns: [{ index: 0, letter: "A", label: "SKU" }],
+  notes: []
+} satisfies PlainHead
 
 /** A page on which Dana has chosen a file: the server takes each step, or not until the test says. */
 const world = () => {

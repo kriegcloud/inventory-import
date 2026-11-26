@@ -496,3 +496,141 @@ Row 8 remains incomplete with the 123 named places above.
 
 Needs the person: nothing to approve for these edits. Row 8 still needs work on the 123 named sites; any
 exemptions proposed later require Benjamin's explicit decision. No new product behavior was chosen in this lane.
+
+
+## Catalog web internals (PLAN row 11)
+
+Written before code changes on 2026-11-26. This lane owns only `packages/catalog/web/src/internal` and any
+minimal callers forced by an owned signature. The initial explicit 20-file law run counts 100 places:
+49 fallback, 23 absence, 8 unwrap and 20 normalise. The lane is doing, not done.
+
+| Schema or boundary | Field | Verdict | Reason |
+| --- | --- | --- | --- |
+| `StoredSide` | decision, madeOn, seen, here, overtaken, refused | Required / existing Option, as is | A stored side preserves its decision and attribution; refusal and the decision already use null Options. |
+| `StoredSide` | dates | Empty record when omitted | An older side kept no per-field dates; the writer already omits an empty record. `emptyWhenLeftOut` preserves that form. |
+| `StoredLine` | sides, theirs | Required sides; Absent outer Option for theirs | An omitted key means no server comparison; explicit null means the server holds no decision. Both meanings must survive a reload. |
+| `OlderClosed`, `OlderHold`, `OlderHeld` | decision, madeOn, seen, refused; kind/reason/theirs/thisTab; mine/madeOn/why/closed | Required / State / existing Options; thisTab and closed become outer Options | Old generations still read. Omitted thisTab differs from explicit null. An absent closed list contributes no sides. |
+| `StoredWaiting` | waits, lines, confirms, leftOver, rows, beside, theirs, madeOn, seen, held, fileName | Existing forms retained; fileName Absent Option | Optional collection keys and legacy revision/seen compatibility values stay until their exact encodings can be preserved honestly. The current writer's keys and omission behavior do not change. |
+| `Notice`, `NoticesKept` | kind, importId, fileName, rows, named, beside, theirs, at | State / Required / existing Options, retained | Legacy omitted named/theirs fields and final screen wording remain compatible. |
+| `Patch` | sorting, column, columnFilters, filters, visibility, search | Independent optional patch data, retained | A patch remembers only the parts one action changed. A union migration needs to preserve older saved conversations and their exact stored form; no fallback-only decode is introduced. |
+| `Sort`, `FilterItem`, `ViewState`, `ViewFilter`, `Kept` | all existing fields | Required, as is | Table state is supplied by the installed table; its optional column lookup and visibility dictionary semantics remain explicit residuals. |
+| Worker protocol | request file/sheet; progress rowsRead/rowsAbout/exact; head/chunkSizes/workbook; chunk seq/rows; problem/message | Required wire data / State, retained | Payloads cross in encoded form. A staged cell's Option is encoded before postMessage and decoded on receipt; a structured clone cannot preserve its prototype. |
+| Spreadsheet readers | file/bytes, sheet, notes, progress callback, piece size; Sniffed cases and read progress | Existing Required / State / optional callback contracts, retained | Native file bytes and library output enter here. Reader compatibility and clean-ups are inventoried, not silently changed. |
+| Cell drafts and item text | dimensions, vendor fields, regex groups, parsed JSON | Existing reader behavior, retained | These are permissive presentations of possibly truncated or invalid file cells. Defaults and clean-ups need a complete reader boundary, not a schema made only to hide a fallback. |
+| `Drawn`, `Opened`, route address reader | data/error/refused/gone/behind; import id/malformed | Existing screen adapter shapes, retained | Changing these requires the next screen/controller lane. DOM nullable address values are named residual edges. |
+| Sheet controls | open workbook, disabled | Workbook Option rendered as whole cases; optional disabled with destructuring default | No workbook renders no control. The component keeps `disabled?: boolean` and its default is in destructuring, as requested; vendor optional props keep their documented form. |
+| Decision line rendering and flagged rows | optional beside list, lookup results, proposal labels, counts | Absence list folds; existing data-dependent labels retained | A missing beside list contributes no lines. Counts group problem kinds once and read each group length, without copying a tally per row. Final screen words remain exact. |
+| `CellForms`, `answeredBy` | draft form/error, actor display | Existing form state / final rendering, retained | No new atom or hook is needed. Typed drafts, validation and attribution keep their current behavior. |
+
+No new undecided fallback is moved to a schema by this lane. The existing older draft's missing revision 0,
+missing seen `[None]`, default false flags, and reader/display fallback values remain visible until their own
+boundaries are settled. No new exemption or baseline is written.
+
+### Remaining places in catalog web internals
+
+The final internal inventory retains **88** places: **43 fallback, 19 absence, 6 unwrap, 20 normalise**.
+Twelve places were removed from the initial 100. These are incomplete work, not approved exemptions. Every
+remaining counted place is named by kind and line below; the exact expressions are also in
+`/tmp/catalog-internal-residual.txt` and `/tmp/catalog-internal-residual.json`. Paths start at
+`packages/catalog/web/src/internal/`; counts are fallback / absence / unwrap / normalise.
+
+| File | Counts | Every retained line by kind | Why it remains and example |
+| --- | --- | --- | --- |
+| `CellForms.tsx` | 2 / 2 / 0 / 6 | fallback: 62, 142; absence: 105, 226; normalise: 80, 122, 123, 123, 124, 125 | Draft derivation remains a fallback from typed state to the file reader (62, 142); optional error presentation and six form-text clean-ups remain. Moving these needs the form-state boundary; no local default schema was introduced. |
+| `WhyFlagged.tsx` | 3 / 1 / 0 / 2 | fallback: 15, 19, 79; absence: 38; normalise: 69, 70 | Unknown kind labels and sparse proposal labels retain their existing text; model Problem.field remains nullable. File-name/SKU trim only controls final display. Example: `proposal.labels[at] ?? value`. |
+| `cellDrafts.ts` | 2 / 2 / 1 / 1 | fallback: 33, 80; absence: 11, 55; unwrap: 8; normalise: 18 | Permissive truncated-JSON reader and optional regex captures remain together. Example: `parsed(piece) ?? vendorFound(piece)`. A full schema needs to preserve partial cell content; no fallback-only parser was added. |
+| `format.tsx` | 1 / 0 / 0 / 1 | fallback: 84; normalise: 8 | ValuePill uses trim to decide whether to draw the empty label; older take-back records with no kind still say accept. Example: `taken.kind ?? "accept"`. |
+| `itemText.ts` | 5 / 3 / 1 / 6 | fallback: 19, 20, 58, 59, 131; absence: 18, 57, 104; unwrap: 101; normalise: 17, 42, 43, 56, 132, 150 | Money regex match/captures and permissive JSON presentation preserve invalid text; tags and money display still trim. Example: `parts[2] ?? ""`. A failed presentation must keep the original cell, not invent a valid item. |
+| `leftOver.ts` | 3 / 0 / 0 / 0 | fallback: 30, 104, 354 | Unknown field names show the field itself; refused lines retain empty text only if their refusal is unexpectedly absent; multi-row list final indexing retains its defensive empty text. Example: `numbers[numbers.length - 1] ?? ""`. |
+| `notices.ts` | 3 / 1 / 0 / 0 | fallback: 66, 70, 71; absence: 49 | DOM storage null remains at entry; legacy optional theirs and final import-name wording remain. Example: `gone.theirs ?? {}`. No change to stored notices or screen wording. |
+| `reader.worker.ts` | 0 / 1 / 0 / 0 | absence: 51 | Wire request sheet is null for CSV/first read, compared at the platform boundary before building the reader input. Example: `sheet === null`. Head and chunks now cross fully encoded. |
+| `result.ts` | 0 / 1 / 2 / 0 | absence: 24; unwrap: 22, 55 | The existing screen adapter returns undefined data and nullable error, and callers in the screen lane depend on them. Example: `AsyncResult.value` to `O.getOrUndefined`. This lane does not conceal it in a codec. |
+| `route.ts` | 0 / 2 / 1 / 0 | absence: 13, 15; unwrap: 14 | URLSearchParams.get returns null; the existing controller-facing id remains undefined for absent/invalid input. Example: `id === undefined`. A decoded Option return needs the screen/controller lane. |
+| `spreadsheet/csv.ts` | 1 / 0 / 0 / 0 | fallback: 33 | Owned optional progress and piece size remain part of direct reader/test API, including callback omission. Example: `input.pieceChars ?? pieceChars`. Required explicit arguments would force reader-test callers and need their own focused migration. |
+| `spreadsheet/read.ts` | 4 / 1 / 0 / 4 | fallback: 51, 53, 131, 190; absence: 73; normalise: 83, 83, 131, 142 | Owned optional input/callback contracts, archive instruction override, ASCII scan index, extension regex and format sniff/display clean-ups remain. Example: `input.onProgress ?? (() => {})`. Native File bytes and regex results are boundary data. |
+| `spreadsheet/xlsx.ts` | 2 / 2 / 0 / 0 | fallback: 100, 172; absence: 127, 138 | Owned optional callback and listed limit remain; indexed package sheet/last cell, unreadable display checks and format-frequency start value remain. Example: `MutableHashMap.get(notShown, code)` with zero. Missing sheet still defects; no throwing unwrap replaces it. |
+| `storedWaiting.ts` | 8 / 1 / 1 / 0 | fallback: 114, 163, 163, 167, 171, 178, 181, 186; absence: 232; unwrap: 203 | Legacy maps and revision/seen compatibility remain, and confirms still writes explicit null. Example: `entry.waits ?? {}`. Using emptyWhenLeftOut for every map would omit empty keys that the current writer writes, so it was not used there. |
+| `view.ts` | 9 / 2 / 0 / 0 | fallback: 60, 65, 118, 127, 131, 166, 168, 171, 173; absence: 169, 172 | Installed table dictionaries and column lookup semantics plus independently optional stored patches remain. Example: `patch.search ?? state.search`. A state union migration must also preserve saved assistant conversations; no fallback-only decode was added. |
+
+`answeredBy.ts`, `SheetButton.tsx`, `SheetChooser.tsx`, `protocol.ts` and `spreadsheet/index.ts` have no counted
+places. `SheetChooser.disabled` remains a component optional prop with its default in destructuring, as requested.
+The remaining owned reader optional arguments and optional keys are unresolved work too, even where this web-law
+reader does not count their declarations. No new optional owned input was added. The real nullable platform edges
+still include localStorage text, URLSearchParams, RegExp captures, File/worker request payloads and package/table
+indexed lookup results. None was added to exemptions.
+
+Literal empty-return cases added by this lane are final JSX output (`SheetButton` renders null), not data stand-ins.
+The two absent-list folds use `O.match` with `A.empty` and `identity`. No optional-value sort was changed. The
+flagged-row counts group kinds and read group lengths, avoiding the prior copied record for every problem. No
+performance claim is made without a benchmark.
+
+Forced files outside internal: `Upload.controller.ts` decodes the encoded head once on receipt, beside the existing
+chunk decoder; `test/UploadOwner.test.ts` supplies the valid encoded head the new receipt decoder requires (kind,
+headerRowNumber and one column) while keeping its pre-existing assertion and test logic;
+`strict-ceiling.json` falls from 225 to the measured 216 because native collection calls fell. There are no other
+forced callers. No .dev.vars, defaults baseline, exemptions, Verify lock, vendor, UI component or hook was changed.
+The forced caller/test law counts are unchanged: Upload.controller 3 fallback / 6 absence / 2 unwrap;
+UploadOwner.test 2 fallback / 1 absence. Their existing places belong to later lanes.
+Receipt: `/tmp/catalog-internal-3238a079-forced-law.jsonl`.
+
+
+### Validation for catalog web internals
+
+- The explicit 20-internal-file `bun run beep laws defaults <files>` passed with 43 fallback, 19 absence,
+  6 unwrap and 20 normalise remaining. The 22-file run including forced caller/test passed with 48 fallback,
+  26 absence, 8 unwrap and 20 normalise. Receipts:
+  `/tmp/catalog-internal-3238a079-internal-law.log`, `/tmp/catalog-internal-3238a079-defaults-final.log`.
+  No baseline was rewritten.
+- A local scratch comparison against HEAD's old StoredWaiting implementation passed six cases, comparing both
+  reconstructed Waiting values and the encoded output of toStored: omitted/null line.theirs and thisTab,
+  per-field dates, named left-over rows, confirms and optional file name. Receipt:
+  `/tmp/catalog-internal-3238a079-stored-proof.log`. This is focused synthetic compatibility proof.
+- A local scratch run of the actual reader worker module passed: 201 columns still gives exactly the existing
+  stagingProblem refusal; a 40,000-character heading still reaches the original server validation path; encoded
+  heads for both None/Some sheet survive structuredClone and schema decode. Receipt:
+  `/tmp/catalog-internal-3238a079-worker-proof.log`. The complete-head encode/decode uses disableChecks only for
+  same-build wire refinements, preserving where existing bounds are refused; Option transformations still run.
+  Effect 4.1.5 SchemaAST.ts documents this at ParseOptions.disableChecks and the runtime proof checks it.
+- The first full check exposed the fake worker's incomplete UploadOwner head. Its one fixture was corrected as
+  listed above. Follow-up attempts stopped on the assertion count during an intermediate fixture edit (the
+  pre-existing assertion is retained in the final code, ledger unchanged), then Bun temporary/cache and Wrangler
+  registry/log EROFS restrictions. The final run redirects BUN_TMPDIR, BUN_INSTALL_CACHE_DIR, TMPDIR,
+  TURBO_CACHE_DIR, XDG_CONFIG_HOME and MINIFLARE_CACHE_DIR into `/tmp/catalog-internal-3238a079-*`.
+- Effect 4.1.5 source was checked for the added Array/Option/Record/Schema/Function calls and the existing
+  emptyWhenLeftOut implementation was read. No local schema, synchronous decoder/encoder, throwing unwrap,
+  runSync, function declaration schema, Option-to-undefined codec or new React state/effect hook was added.
+
+No browser was opened. Upload, Match, Review, Result and Items were **not seen on screen**. A fresh Confirm storing
+155 rows, the stored/result/Items agreement, check:full, hosted behavior and a dedicated performance benchmark
+were not checked by this lane. The sample's local pure review and clone-wire tests do not establish those gates.
+
+Final validation: `bun run check` exited 0 with the temporary environment above: **105/105 tasks successful**,
+64 cached, 2m42.014s. Log: `/tmp/catalog-internal-3238a079-final5-check.log`. Catalog web passed **401 tests in
+38 files** with no retry; these include ItemImport (6 tests, messy sample 155 Ready / 200), ChunkCrossing (2),
+DraftLines (29), DraftPicks (14), DraftServer (5), UploadOwner (9), reader parity and the draft scenarios.
+
+- `bun run beep laws defaults <all 20 internal files>` passed with 43 / 19 / 6 / 20, log
+  `/tmp/catalog-internal-3238a079-internal-law.log`. Adding the forced controller and test passed 22 files,
+  48 / 26 / 8 / 20, log `/tmp/catalog-internal-3238a079-defaults-final.log`. The forced controller's own counts
+  remain 3 / 6 / 2 / 0 and the forced test's 2 / 1 / 0 / 0, exactly as at HEAD; their exact sites are in
+  `/tmp/catalog-internal-3238a079-forced-law.jsonl`.
+- The six-case local saved-waiting comparison against HEAD passed equal Waiting values and equal encoded
+  `toStored` forms, covering omitted/null `theirs` and `thisTab`, per-field dates, left-over rows and confirms.
+  Receipt: `/tmp/catalog-internal-3238a079-stored-proof.log`.
+- A local proof importing the actual worker module passed: 201 columns keeps the exact staging refusal;
+  a 40,000-character heading keeps the existing server-validation path; both sheet Option cases preserve
+  their value through encoded head, structured clone and decoding. Receipt:
+  `/tmp/catalog-internal-3238a079-worker-proof.log`. Head encoding/receipt disable only schema checks, retaining
+  structure and transformations (`SchemaAST.ParseOptions`, Effect 4.1.5), so the server keeps the previous
+  bounds-validation responsibility and wording. Chunk validation is unchanged.
+- Formatting the changed files, `bun run docs:check`, and `git diff --check` passed. Docs retains the existing
+  goal-status warnings. No baseline rewrite was run. Frozen-file diffs are empty; baseline SHA-256 is
+  `df503235c0673f190db92339592c05c686721888b6c595113de7214108727894`, Verify lock
+  `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`.
+
+Not run: `check:full`, fresh on-screen upload/Confirm/Result/Items proof, hosted deployment or dedicated performance
+benchmark. The sample assertion proves local review counts, not 155 newly stored rows or what the screen draws.
+The UI was **not seen on screen**. No commit or push was made.
+
+Needs the person: nothing to approve for these edits. The 88 named internal places and the rest of catalog web
+remain sweep work; this lane proposes no exemption or new product decision.

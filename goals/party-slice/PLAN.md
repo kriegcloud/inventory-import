@@ -214,6 +214,10 @@ Choices the SPEC left open, each the agent's:
   field names the same class and adds no finding); a scheme a union points at, as an entry or on a field; a field's
   property; and each class, property and concept a path's steps and fixed concepts name. A concept counts as retired
   when it is retired itself; a live concept of a retired scheme is not refused, since V14 names the term pointed at.
+  Each of a path's four places has its own plant, seen to fail with its branch taken out: a retired relation as a node
+  step, a retired attribute as the value step, a retired class as the node (with P7, since no live relation may range
+  over a retired class), and a retired relation and a retired concept as what a step fixes. The relation that fixes a
+  scope and the live concept of a retired scheme are on copies of the test's own (`retiring`, `lapsedScheme`).
 - **P11 leaves a retired property out.** P11 asks a mark or fixture evidence of every property, and P14 refuses every
   mark that names a retired one, so P11 would refuse each retirement that no fixture shows (V14: "No pointer names a
   deprecated term"). The test on step 2's copy, whose two retired properties no record names, fails without it.
@@ -224,6 +228,17 @@ Choices the SPEC left open, each the agent's:
   own and on `evidence: "fixture"`. The planted records point at them through `pointerFor` and `pathFor` bound to the
   copy's keys in the test file, since the kernel's helpers know no `Party` and rule 6 of gate 7 refuses a mark written
   by hand. No record of the kernel or the contracts is pointed at `Party`.
+
+Needs Benjamin:
+
+- **Does a scheme's retirement cover its live concepts?** P14 refuses a fixed concept only when the concept is
+  retired itself; one that is live in a retired scheme passes, a reading of decision 33 and V14 that he has not ruled
+  on. A near miss in `Pointers.test.ts` holds the reading as built and fails if P14 starts refusing it. In a vocabulary
+  gate 4 passes, the case cannot reach P14 alone: a path fixes a concept through a relation whose range is the
+  concept's scheme (P7), and C15 refuses a live relation whose range is retired, so the relation is retired too and P14
+  already refuses it. The near miss therefore runs on a copy that breaks C15 on purpose. If he answers that the
+  scheme's retirement covers its concepts, `retiredConcept` also reads the scheme's `deprecation` and the near miss
+  becomes a planted mistake.
 
 ## Closing note
 

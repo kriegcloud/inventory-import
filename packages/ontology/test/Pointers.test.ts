@@ -16,7 +16,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import type { Curie } from "@beep/identity/Vocab"
 import { Vocabulary } from "@beep/vocabulary/Model"
-import { noTermFor, pathFor, pointerFor, readKeyMark } from "@beep/vocabulary/Pointer"
+import { noTermFor, pathFor, pointerFor, readKeyMark, type LiftPath, type PathMark } from "@beep/vocabulary/Pointer"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
@@ -444,7 +444,61 @@ const partied = {
   }
 } as const satisfies typeof Vocabulary.Encoded
 
-type Planted = typeof partied
+/**
+ * That copy with `scopeKind`, a retired relation of this test's own from a grant to a scheme, as `grantScope` is: a
+ * path can fix a grant's scope through it and break P14 alone. Nothing in step 2's copy fits there, since its retired
+ * relation ranges over a class and a fixed property must range over the concept's scheme (P7).
+ */
+const retiring = {
+  ...partied,
+  objectProperties: {
+    ...partied.objectProperties,
+    scopeKind: {
+      prefLabel: "scope kind",
+      definition:
+        "Linked a grant to the kind of its scope, before grant scope replaced it, a relation of this test's own.",
+      domain: "Grant",
+      range: { kind: "scheme", key: "GrantScopeKindScheme" },
+      deprecation: { kind: "replaced", replacedBy: "grantScope", since: partied.version },
+      ratification: { decision: 33 }
+    }
+  }
+} as const satisfies typeof Vocabulary.Encoded
+
+/**
+ * That copy with a live concept, `basic`, in the retired `AccessLevelScheme`, and `accessLevel`, a live relation from a
+ * grant to that scheme. Gate 4's C15 refuses a live property whose range is retired (V14), so this copy is incoherent
+ * on purpose: it is the one way a path fixes a live concept of a retired scheme without also naming a retired property.
+ */
+const lapsedScheme = {
+  ...retiring,
+  objectProperties: {
+    ...retiring.objectProperties,
+    accessLevel: {
+      prefLabel: "access level",
+      definition: "Links a grant to the access level it gives, a relation of this test's own.",
+      domain: "Grant",
+      range: { kind: "scheme", key: "AccessLevelScheme" },
+      ratification: { decision: 33 }
+    }
+  },
+  schemes: {
+    ...retiring.schemes,
+    AccessLevelScheme: {
+      ...retiring.schemes.AccessLevelScheme,
+      concepts: {
+        ...retiring.schemes.AccessLevelScheme.concepts,
+        basic: {
+          prefLabel: "Basic access",
+          definition: "An access level whose holder could read every record, a concept of this test's own.",
+          ratification: { decision: 33 }
+        }
+      }
+    }
+  }
+} as const satisfies typeof Vocabulary.Encoded
+
+type Planted = typeof lapsedScheme
 type PlantedRegistry<K extends string> = {
   readonly inv: { readonly iri: Planted["namespace"]; readonly terms: ReadonlyArray<K> }
 }
@@ -507,8 +561,28 @@ const partyGrantRecord = (cls: "inv:Person" | "inv:Member") => {
   return withRecord("PartyGrant", schema, marks)
 }
 
+/** A Member record whose one other field, `reached`, a string, is marked with `path`. */
+const memberPathRecord = (path: S.Annotations.Key<string>) => {
+  const marks = [
+    ["id", plantedClass("inv:Member")],
+    ["reached", path]
+  ] as const
+  const schema = S.Struct({
+    id: S.String.pipe(S.annotateKey(marks[0][1])),
+    reached: S.String.pipe(S.annotateKey(path))
+  }).pipe(S.annotate(plantedClass("inv:Member")))
+  return withRecord("Reached", schema, marks)
+}
+
+/** `Member` with its role path replaced by `mark`, and P13's table holding the plant's mark. */
+const memberRoleAs = (mark: PathMark<LiftPath<string, string, string>>): Partial<PointerInput> => ({
+  enrolled: { ...enrolled, [member]: memberWith({ role: Member.fields.role.annotateKey(mark) }) },
+  placements: placedAs(member, "role", mark)
+})
+
 const knownAs = `${plantedFile}#KnownAs`
 const partyGrant = `${plantedFile}#PartyGrant`
+const reached = `${plantedFile}#Reached`
 
 describe("gate 5 on the party slice's constructs", () => {
   it.effect("the real records on step 2's copy: only Activity's action, an attribute the copy withdraws (P14)", () =>
@@ -639,6 +713,104 @@ describe("gate 5 on the party slice's constructs", () => {
         placements: placedAs(member, "role", mark)
       })
       expect(found).toEqual([["P14", member, "role"]])
+    })
+  )
+
+  it.effect("P14: a Member record's path takes a node step along workspaceMembership, a retired relation", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* memberPathRecord(
+        plantedPath([{ property: "inv:workspaceMembership", node: "inv:Tenant" }, { property: "inv:knownAs" }])
+      )
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P14", reached, "reached"]])
+    })
+  )
+
+  it.effect("the same path along membershipIn, the live relation, passes", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* memberPathRecord(
+        plantedPath([{ property: "inv:membershipIn", node: "inv:Tenant" }, { property: "inv:knownAs" }])
+      )
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P14: a Member record's path ends in loggedAt, a retired attribute, on its audit entry", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* memberPathRecord(
+        plantedPath([
+          { property: "inv:recordedActor", reverse: true, node: "inv:AuditEntry" },
+          { property: "inv:loggedAt" }
+        ])
+      )
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([["P14", reached, "reached"]])
+    })
+  )
+
+  it.effect("the same path ending in recordedAt, the live attribute, passes", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* memberPathRecord(
+        plantedPath([
+          { property: "inv:recordedActor", reverse: true, node: "inv:AuditEntry" },
+          { property: "inv:recordedAt" }
+        ])
+      )
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("P14 and P7: a path's node is Workspace, a retired class, which no live relation ranges over (V14)", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(partied)
+      const planted = yield* memberPathRecord(
+        plantedPath([{ property: "inv:membershipIn", node: "inv:Workspace" }, { property: "inv:knownAs" }])
+      )
+      const found = yield* gate({ vocabulary: decoded, ...planted })
+      expect(found).toEqual([
+        ["P7", reached, "reached"],
+        ["P14", reached, "reached"]
+      ])
+    })
+  )
+
+  it.effect("P14: Member's role path fixes the grant's scope through scopeKind, a retired relation", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(retiring)
+      const mark = plantedPath([
+        {
+          property: "inv:grantedTo",
+          reverse: true,
+          node: "inv:Grant",
+          fixed: [{ property: "inv:scopeKind", concept: "inv:GrantScopeKindScheme-organization" }]
+        },
+        { property: "inv:grantsRole" }
+      ])
+      const found = yield* gate({ vocabulary: decoded, ...memberRoleAs(mark) })
+      expect(found).toEqual([["P14", member, "role"]])
+    })
+  )
+
+  it.effect("a live concept of a retired scheme, fixed through a live relation, is not refused (Needs Benjamin)", () =>
+    Effect.gen(function* () {
+      const decoded = yield* decodeVocabulary(lapsedScheme)
+      const mark = plantedPath([
+        {
+          property: "inv:grantedTo",
+          reverse: true,
+          node: "inv:Grant",
+          fixed: [{ property: "inv:accessLevel", concept: "inv:AccessLevelScheme-basic" }]
+        },
+        { property: "inv:grantsRole" }
+      ])
+      const found = yield* gate({ vocabulary: decoded, ...memberRoleAs(mark) })
+      expect(found).toEqual([])
     })
   )
 })

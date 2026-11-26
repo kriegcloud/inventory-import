@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Answer the party slice's open rows O1 to O19 (goals/party-slice/SPEC.md); its first five steps wait on none. The thin thread is built (goals/erp-vocabulary).
+next: Build step 7 of goals/party-slice, then write report 18, the design of the party slice's terms, for one accepting decision (129).
 goals: [erp-vocabulary, party-slice]
 ---
 
@@ -30,7 +30,7 @@ is pinned by major version (113); Java 27 was never tried and is not the pin. CI
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
 Slice 1, the party slice, follows the thread and is specified as [goals/party-slice](../../goals/party-slice/SPEC.md),
-which raises nineteen questions of its own (O1 to O19) that no decision answers. Benjamin will take each of the 47 open decisions with a concrete record
+whose nineteen questions (O1 to O19) I answered on 2026-11-26 as decisions 129 to 147, with 148 to 153. Benjamin will take each of the 47 open decisions with a concrete record
 when the slice that needs it is specified; slice 1's were answered on 2026-11-26. Decision 116 asks how a grant names the location or field it covers;
 organization scope remains enough for the thread (115). Gate 10 is not built (decision 27, answered (a)).
 
@@ -103,3 +103,6 @@ first class list, a decision log and a product model read from public sources).
   Sutton workspace is an empty trial (decision 36). Forty-seven are open; slice 1 waits on none but 47, which is deferred.
 - 2026-11-26: slice 1 specified as the goal [party-slice](../../goals/party-slice/SPEC.md): six readers, a draft, two
   rounds of review. Nothing is built. Its rows O1 to O19 are open and not yet in this packet's Open table (its PLAN, step 6).
+- 2026-11-26: steps 1 to 6 of `goals/party-slice` done. The metamodel, projector, gates 3 to 5, the lift and gate 8's
+  groundwork are built with no term added; O1 to O19 and five readings are decisions 129 to 152, each answered as
+  recommended, and 153 rules gist's `rangeIncludes` note a hint.

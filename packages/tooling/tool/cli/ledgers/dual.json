@@ -1,14 +1,4 @@
 {
-  "packages/catalog/model/src/Import/Waited.rules.ts": 4,
-  "packages/catalog/model/test/Review.story.test.ts": 1,
-  "packages/catalog/web/src/internal/spreadsheet/xlsx.ts": 1,
-  "packages/client/src/SayError.controller.ts": 3,
-  "packages/foundation/modeling/csv/src/Csv.codec.ts": 2,
-  "packages/foundation/modeling/xlsx/src/Xlsx.codec.ts": 1,
-  "packages/review/src/ReviewDraft.rules.ts": 1,
-  "packages/review/src/ReviewRegion.atoms.ts": 2,
-  "packages/review/src/internal/ReviewGrid.tsx": 1,
-  "packages/ui/src/TableSearch.component.tsx": 1,
   "packages/ui/src/components/data-table/data-table-config.ts": 1,
   "packages/ui/src/components/file-upload.tsx": 1
 }

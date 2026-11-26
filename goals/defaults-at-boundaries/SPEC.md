@@ -74,6 +74,25 @@ packages' boundaries are listed at the start of each lane (PLAN.md), as part of 
 
 ## Defaults nobody decided
 
+**Ruled 2026-11-26** (Benjamin, by dialog; each is in the root `DECISIONS.md`). The tables below stay as the record
+of what was put to him.
+
+| Rows | Ruling | State |
+| --- | --- | --- |
+| `ItemEdit.rules.ts`, an empty Quantity on hand box | Refused: a number is asked for, nothing stored until one is typed | to build |
+| `Confirm.rules.ts`, who decided a row nobody is recorded for | "Not recorded", never the confirming person | to build |
+| `ProposalSource.words.ts` `ProposalLead` and `Change.read.ts` `confidence` | No confidence word; a stored proposal with none is asked, never applied | to build |
+| `ReviewRegion.types.ts`, kind `fixable` | Required on every kind, no default | to build |
+| Data saved before a field was kept: `Change.read.ts` `basis`, `Import.read.ts` `MatchTakeBack`, `Mapping.read.ts` `knownFrom`, `Rematch.rules.ts` `savedAtOf`, `Draft.machine.ts` `Named` and `Side`, `storedWaiting.ts` `LegacySide`, `Conversation.machine.ts` `LegacyRules` | Kept, each value on its schema | decided as it stands |
+| `CellReading.rules.ts` `readDimensions`, no unit | cm (decided 2026-11-23, root `DECISIONS.md`) | decided as it stands |
+| Every other row of both tables | Kept as it is | decided as it stands |
+
+Outside the tables, the same round: `ImportStore.listOpen` and `listPast` take one options argument
+(`{ organizationId, limit }`) and are not dual (to build); the three behaviours the sweep changed (the `SameOrigin`
+refusal log leaves out a header that was not sent, a saved assistant view leaves out a filter value it cannot read,
+rows from the reader worker are rebuilt with `disableChecks`) are kept. The session hook in
+`access/host/src/internal/authOptions.ts` needs no exemption: it holds none of the law's places now.
+
 A fallback that no recorded decision backs. Its value moves onto the schema unchanged and is listed here, with how
 many rows of `public/samples/items_messy.csv` it touches and one example. Benjamin rules on the list in one round
 once the pilot's places have moved. The table grows as each package moves; "rows" is counted from the sample when

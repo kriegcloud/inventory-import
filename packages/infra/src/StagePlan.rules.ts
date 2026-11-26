@@ -16,6 +16,7 @@ import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import {
   AccessEmails,
+  CollectorAddress,
   NotGiven,
   OnWorkersDev,
   PersonalPlan,
@@ -78,6 +79,13 @@ export const kindOf = (stage: string): Result.Result<StageKind, UnknownStage> =>
 
 const nowhere = NotGiven.make({})
 
+// Decision of 2026-11-26: staging and production read a collector from their environment; unset, nothing is sent.
+const collector = {
+  to: "collector",
+  address: "TELEMETRY_COLLECTOR_URL",
+  authorization: "TELEMETRY_COLLECTOR_AUTHORIZATION"
+} as const
+
 /**
  * The plan of a stage.
  *
@@ -93,7 +101,8 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
       seeds: ["organizations", "accounts"] as const,
       modelKey: nowhere,
       signUp: nowhere,
-      access: nowhere
+      access: nowhere,
+      telemetry: { to: "nowhere" } as const
     }
     return StageKind.match(kind, {
       production: () =>
@@ -102,13 +111,19 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           seeds: [],
           modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
           signUp: { from: "environment", variable: "SIGN_UP" },
-          access: nowhere
+          access: nowhere,
+          telemetry: collector
         }),
       // Decision of 2026-11-26: a preview answers only the emails its environment names, behind Cloudflare Access.
       preview: () =>
         PreviewPlan.make({ ...rehearsal, access: { from: "environment", variable: previewAccessVariable } }),
       staging: () =>
-        StagingPlan.make({ ...rehearsal, stage: "staging", signUp: { from: "environment", variable: "SIGN_UP" } }),
+        StagingPlan.make({
+          ...rehearsal,
+          stage: "staging",
+          signUp: { from: "environment", variable: "SIGN_UP" },
+          telemetry: collector
+        }),
       test: () => TestPlan.make(rehearsal),
       personal: () => PersonalPlan.make(rehearsal)
     })
@@ -246,6 +261,63 @@ export const accessEmailsFor = (input: {
         onNone: () => stopped(true),
         onSome: (emails) => Result.succeed(O.some(emails))
       })
+  })
+}
+
+/**
+ * A stage's collector address that is not an `https` address. Stopped: Cloudflare would refuse it at the deploy, or
+ * send a stage's traces somewhere a typing mistake names.
+ *
+ * @category errors
+ */
+export class UnreadableCollector extends S.TaggedError<UnreadableCollector, { readonly brand: unique symbol }>(
+  $I`UnreadableCollector`
+)(
+  "UnreadableCollector",
+  {
+    stage: S.String.pipe(S.annotateKey({ description: "The stage being deployed" })),
+    variable: S.String.pipe(S.annotateKey({ description: "The variable that holds the address" }))
+  },
+  $I.annoteError<UnreadableCollector>("UnreadableCollector", {
+    description: "A collector address that is not an https address"
+  })
+) {
+  override get message(): string {
+    return (
+      `Stage "${this.stage}" names a telemetry collector that cannot be used: ${this.variable} is not an https ` +
+      `address without a query (for example https://otel.example.com/otlp). Correct the variable in the stage's ` +
+      `environment, or remove it to send nothing.`
+    )
+  }
+}
+
+/**
+ * Where Cloudflare sends a stage's traces and logs: nowhere for a stage whose plan names no collector, nowhere when
+ * the address is unset, and otherwise the collector's two OTLP paths with the header it asks for, when one is given.
+ *
+ * @example
+ * telemetryFor({ stage: "staging", source: plan.telemetry, address: O.some("https://otel.example.test/"), authorization: O.none() })
+ * // Success(Some({ traces: "https://otel.example.test/v1/traces", logs: "https://otel.example.test/v1/logs", ... }))
+ *
+ * @category rules
+ */
+export const telemetryFor = <Secret>(input: {
+  readonly stage: string
+  readonly source: StagePlan["telemetry"]
+  readonly address: O.Option<string>
+  readonly authorization: O.Option<Secret>
+}): Result.Result<
+  O.Option<{ readonly traces: string; readonly logs: string; readonly authorization: O.Option<Secret> }>,
+  UnreadableCollector
+> => {
+  if (input.source.to === "nowhere" || O.isNone(input.address)) return Result.succeed(O.none())
+  const { address: variable } = input.source
+  return O.match(S.decodeOption(CollectorAddress)(input.address.value), {
+    onNone: () => Result.fail(UnreadableCollector.make({ stage: input.stage, variable })),
+    onSome: (address) =>
+      Result.succeed(
+        O.some({ traces: `${address}/v1/traces`, logs: `${address}/v1/logs`, authorization: input.authorization })
+      )
   })
 }
 

@@ -145,6 +145,10 @@ jobs:
       # The emails that may make a real account on staging, from the staging environment's secret; unset, none. A
       # secret, not a variable: this repository's logs are public, and a variable's value is printed in them.
       SIGN_UP: ${{ secrets.SIGN_UP }}
+      # Where Cloudflare's own traces and logs of the Worker are sent: a collector's https address (a variable) and
+      # the authorization header it asks for (a secret). Both unset, the stack declares no destination.
+      TELEMETRY_COLLECTOR_URL: ${{ vars.TELEMETRY_COLLECTOR_URL }}
+      TELEMETRY_COLLECTOR_AUTHORIZATION: ${{ secrets.TELEMETRY_COLLECTOR_AUTHORIZATION }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -256,6 +260,10 @@ jobs:
       # The emails that may make an account, from the production environment's secret; unset, sign-up is closed. A
       # secret, not a variable, as on staging: this repository's logs are public, and a variable's value is printed.
       SIGN_UP: ${{ secrets.SIGN_UP }}
+      # Where Cloudflare's own traces and logs of the Worker are sent: a collector's https address (a variable) and
+      # the authorization header it asks for (a secret). Both unset, the stack declares no destination.
+      TELEMETRY_COLLECTOR_URL: ${{ vars.TELEMETRY_COLLECTOR_URL }}
+      TELEMETRY_COLLECTOR_AUTHORIZATION: ${{ secrets.TELEMETRY_COLLECTOR_AUTHORIZATION }}
     steps:
       # The release commit: the one CI checked and the guard passed.
       - uses: actions/checkout@v4

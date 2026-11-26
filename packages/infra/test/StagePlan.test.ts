@@ -11,12 +11,19 @@ import { StagePlan } from "@beep/infra/Stage"
 import {
   accessEmailsFor,
   givenPreviewToken,
+  telemetryFor,
   givenTestPassword,
   kindOf,
   modelKeyFor,
   planFor,
   testPasswordOf
 } from "@beep/infra/StagePlan"
+
+const collector = {
+  to: "collector",
+  address: "TELEMETRY_COLLECTOR_URL",
+  authorization: "TELEMETRY_COLLECTOR_AUTHORIZATION"
+}
 
 const plan = (stage: string) => {
   const result = planFor(stage)
@@ -34,7 +41,82 @@ describe("the plan of a stage", () => {
       modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
       signUp: { from: "environment", variable: "SIGN_UP" },
       access: { from: "nowhere" },
+      telemetry: collector,
       deployed: true
+    })
+  })
+
+  it("only staging and production name a collector for Cloudflare's telemetry", () => {
+    expect(
+      A.map(["prod", "pr-42", "staging", "test_ben", "dev_ben"], (stage) => [stage, plan(stage).telemetry])
+    ).toEqual([
+      ["prod", collector],
+      ["pr-42", { to: "nowhere" }],
+      ["staging", collector],
+      ["test_ben", { to: "nowhere" }],
+      ["dev_ben", { to: "nowhere" }]
+    ])
+  })
+
+  describe("where a stage's telemetry goes", () => {
+    const staging = { stage: "staging", source: plan("staging").telemetry }
+
+    it("is the collector's two paths, with the header it was given", () => {
+      expect(
+        telemetryFor({
+          ...staging,
+          address: O.some(" https://otel.example.test/otlp/ "),
+          authorization: O.some("Basic abc")
+        })
+      ).toEqual(
+        Result.succeed(
+          O.some({
+            traces: "https://otel.example.test/otlp/v1/traces",
+            logs: "https://otel.example.test/otlp/v1/logs",
+            authorization: O.some("Basic abc")
+          })
+        )
+      )
+    })
+
+    it("is nowhere while no address is named, with or without a header", () => {
+      expect(telemetryFor({ ...staging, address: O.none(), authorization: O.some("Basic abc") })).toEqual(
+        Result.succeed(O.none())
+      )
+      expect(
+        telemetryFor({
+          stage: "prod",
+          source: plan("prod").telemetry,
+          address: O.none(),
+          authorization: O.none<string>()
+        })
+      ).toEqual(Result.succeed(O.none()))
+    })
+
+    it("is nowhere for a preview, a test stage and a personal one, whatever the variables hold", () => {
+      expect(
+        A.map(["pr-42", "test_ben", "dev_ben"], (stage) =>
+          telemetryFor({
+            stage,
+            source: plan(stage).telemetry,
+            address: O.some("https://otel.example.test"),
+            authorization: O.some("Basic abc")
+          })
+        )
+      ).toEqual([Result.succeed(O.none()), Result.succeed(O.none()), Result.succeed(O.none())])
+    })
+
+    it("stops on an address that is not https, has a query, or is no address", () => {
+      for (const address of [
+        "http://otel.example.test",
+        "https://otel.example.test/v1?key=abc",
+        "otel.example.test",
+        "https://"
+      ]) {
+        const stopped = telemetryFor({ ...staging, address: O.some(address), authorization: O.none<string>() })
+        assertTrue(Result.isFailure(stopped), `Expected "${address}" to be refused`)
+        expect(stopped.failure.message).toContain("TELEMETRY_COLLECTOR_URL is not an https address without a query")
+      }
     })
   })
 

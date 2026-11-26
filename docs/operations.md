@@ -104,6 +104,33 @@ Each preview takes the new list at its next deploy (a push to its pull request).
 email stops the deploy with `MissingPreviewAccess`, which says so without repeating the list. In a preview's plan
 the gate is the line `[Website/Access]`.
 
+## Where a stage's telemetry goes
+
+Cloudflare keeps its own traces and logs of the Worker for every stage (`observability`, read with `alchemy logs`
+and in the dashboard). Staging and production can also send them to a collector that speaks OpenTelemetry over
+HTTPS; a preview, a test stage and a personal one never do. Neither names a collector today, so nothing is sent.
+
+A stage sends when its GitHub environment holds the collector's address, and the header the collector asks for if
+it asks for one:
+
+```bash
+gh variable set TELEMETRY_COLLECTOR_URL --env staging --repo kriegcloud/inventory-import
+```
+
+```bash
+gh secret set TELEMETRY_COLLECTOR_AUTHORIZATION --env staging --repo kriegcloud/inventory-import
+```
+
+The address is the collector's base, `https://` and no query (`https://otlp.example.test/otlp`): the stack adds
+`/v1/traces` and `/v1/logs`. Anything else stops the deploy with `UnreadableCollector`, which repeats nothing it
+was given. The header's value is the whole `authorization` line (`Basic …` or `Bearer …`), typed at the prompt.
+At the next deploy the plan reads `[TelemetryTraces] create` and `[TelemetryLogs] create`; Cloudflare first sends
+the collector one test request and refuses a destination that does not answer it. Taking the variable away removes
+both destinations at the next deploy.
+
+These are Cloudflare's records of each request (its time, its status, the Worker's log lines). The app's own
+spans, the ones `bun run telemetry` shows locally, are not joined to them.
+
 ## Drift
 
 `alchemy drift` reads each resource back from the account and compares it with what the state says was deployed:

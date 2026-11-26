@@ -257,6 +257,74 @@ const rehearsalSeeds = S.Tuple([S.Literal("organizations"), S.Literal("accounts"
   S.annotateKey({ description: "The seed files applied after the migrations, in order" })
 )
 
+/**
+ * Cloudflare's own telemetry of a stage (its traces and logs of the Worker) leaves the account for nowhere.
+ *
+ * @category models
+ */
+export class SendsNothing extends S.Opaque<SendsNothing, { readonly brand: unique symbol }>()(
+  S.Struct({ to: S.tag("nowhere") }).pipe(
+    $I.annoteSchema("SendsNothing", { description: "No destination: the telemetry stays in Cloudflare's dashboard" })
+  )
+) {}
+
+/**
+ * Cloudflare's own telemetry of a stage goes to the collector two variables of the deploy name: its address, and the
+ * `authorization` header it asks for. With the address unset the stack declares no destination.
+ *
+ * @category models
+ */
+export class ToCollector extends S.Opaque<ToCollector, { readonly brand: unique symbol }>()(
+  S.Struct({
+    to: S.tag("collector"),
+    address: S.tag("TELEMETRY_COLLECTOR_URL").pipe(
+      S.annotateKey({ description: "The variable that holds the collector's https address; unset, nothing is sent" })
+    ),
+    authorization: S.tag("TELEMETRY_COLLECTOR_AUTHORIZATION").pipe(
+      S.annotateKey({ description: "The variable that holds the collector's authorization header, a secret" })
+    )
+  }).pipe($I.annoteSchema("ToCollector", { description: "A collector named by the deploy's environment" }))
+) {}
+
+/**
+ * Where Cloudflare's telemetry of a stage is sent. Branch on `to`.
+ *
+ * @category schemas
+ */
+export const TelemetrySource = LiteralKit(["nowhere", "collector"])
+  .mapMembers(() => Tuple.make(SendsNothing, ToCollector))
+  .pipe(
+    S.toTaggedUnion("to"),
+    $I.annoteSchema("TelemetrySource", { description: "Where Cloudflare's telemetry of a stage is sent" })
+  )
+
+/**
+ * The decoded value of `TelemetrySource`.
+ *
+ * @category models
+ */
+export type TelemetrySource = typeof TelemetrySource.Type
+
+/**
+ * A collector's address as a person typed it into a variable: surrounding spaces dropped, `https` only, no query,
+ * and without the slashes at its end, so `/v1/traces` and `/v1/logs` are added to it once.
+ *
+ * @example
+ * S.decodeOption(CollectorAddress)(" https://otel.example.test/otlp/ ") // Some("https://otel.example.test/otlp")
+ *
+ * @category schemas
+ */
+export const CollectorAddress = S.Trim.pipe(
+  S.decodeTo(
+    S.String.check(S.isMaxLength(2000), S.isPattern(/^https:\/\/[^\s/?#]+(\/[^\s?#]*)?$/)),
+    SchemaTransformation.transform({
+      decode: (text: string) => Str.replace(/\/+$/, "")(text),
+      encode: (address: string) => address
+    })
+  ),
+  $I.annoteSchema("CollectorAddress", { description: "An OTLP collector's https address, without a trailing slash" })
+)
+
 /** No Access policy: the address answers anyone, and the app's own sign-in is the lock. Every stage but a preview. */
 const openToAnyone = NotGiven.pipe(
   S.annotateKey({ description: "No Access policy: anyone may open the address, and sign-in is the lock" })
@@ -310,7 +378,10 @@ const rehearsal = {
   seeds: rehearsalSeeds,
   modelKey: NotGiven.pipe(S.annotateKey({ description: "No model key: the rules answer" })),
   signUp: NotGiven.pipe(S.annotateKey({ description: "Sign-up is closed to everyone" })),
-  access: openToAnyone
+  access: openToAnyone,
+  telemetry: SendsNothing.pipe(
+    S.annotateKey({ description: "Cloudflare's telemetry of this stage is sent nowhere: it stays in the dashboard" })
+  )
 }
 
 /**
@@ -327,6 +398,9 @@ export class ProductionPlan extends S.Opaque<ProductionPlan, { readonly brand: u
     modelKey: fromVariable("OPENROUTER_API_KEY", "The model's key, read from this variable at deploy"),
     signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy; unset, closed"),
     access: openToAnyone,
+    telemetry: ToCollector.pipe(
+      S.annotateKey({ description: "Cloudflare's telemetry goes to the collector the deploy's environment names" })
+    ),
     deployed: S.tag(true)
   }).pipe($I.annoteSchema("ProductionPlan", { description: "What production gets" }))
 ) {}
@@ -344,6 +418,9 @@ export class StagingPlan extends S.Opaque<StagingPlan, { readonly brand: unique 
     stage: S.tag("staging").pipe(S.annotateKey({ description: "The stage's name" })),
     ...rehearsal,
     signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy; unset, none"),
+    telemetry: ToCollector.pipe(
+      S.annotateKey({ description: "Cloudflare's telemetry goes to the collector the deploy's environment names" })
+    ),
     deployed: S.tag(true)
   }).pipe($I.annoteSchema("StagingPlan", { description: "What staging gets" }))
 ) {}

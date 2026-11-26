@@ -22,7 +22,7 @@ closes the step with what was seen; it does not get worked around.
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
 | 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
 | 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
-| 8 | Telemetry export: a destination per stage that names a collector | answered 2026-11-26: staging and prod read a collector from their environment; none is named yet | todo |
+| 8 | Telemetry export: a destination per stage that names a collector | answered 2026-11-26: staging and prod read a collector from their environment; none is named yet | built; sends nothing until he names a collector ("What Benjamin does by hand"). Not seen against an account |
 
 The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 needs one command of his; 2, 3, 6,
 7 and 8 each wait for one answer or one measurement.
@@ -83,8 +83,43 @@ Once this is on `main`, **every preview's deploy stops until `PREVIEW_ACCESS` is
 To take the gate off again: revert the `access` line of `PreviewPlan` and of `planFor`; the next deploy of each
 preview removes its Access application.
 
+### When there is a collector: where staging and production send telemetry (step 8)
+
+Nothing is sent until this is done, and nothing breaks while it is not.
+
+1. Have a collector that takes OpenTelemetry over HTTPS (Grafana Cloud, Honeycomb, one of your own). Cloudflare
+   sends it a test request when the destination is made and refuses one that does not answer.
+2. Give the deploying token the permission to write Workers Observability destinations. For staging that is the
+   token you made by hand; for production it is the token the repository's stack mints (`account(...)` in
+   `packages/infra/src/GitHub.stack.ts`, five permission groups today): the group is added there and that stack
+   deployed. **Not verified which group it is** ("Workers Observability Write" is my reading of the dashboard's
+   names): the first deploy's refused call names it.
+3. For each of `staging` and `production`, the address as a variable and the header as a secret, both typed at the
+   prompt:
+
+   ```bash
+   gh variable set TELEMETRY_COLLECTOR_URL --env staging --repo kriegcloud/inventory-import
+   ```
+
+   ```bash
+   gh secret set TELEMETRY_COLLECTOR_AUTHORIZATION --env staging --repo kriegcloud/inventory-import
+   ```
+
+4. The next deploy's plan should read `[TelemetryTraces] create`, `[TelemetryLogs] create` and `[Website] update`,
+   and the collector should then show the Worker's requests.
+
 ## What was proved on this machine
 
+- **Step 8** (2026-11-26). `StagePlan.test.ts`: of `prod`, `pr-42`, `staging`, `test_ben` and `dev_ben` only
+  staging's and production's plans name a collector (`TELEMETRY_COLLECTOR_URL`, `TELEMETRY_COLLECTOR_AUTHORIZATION`);
+  " https://otel.example.test/otlp/ " with a header becomes `…/otlp/v1/traces` and `…/otlp/v1/logs` with that
+  header; with no address there is no destination, header or not; a preview, a test stage and a personal one get
+  none whatever the variables hold; an `http:` address, one with a query, a bare host and `https://` stop the deploy
+  (`UnreadableCollector`). `DeployWorkflow.test.ts` holds the two names in the staging and production jobs and in
+  no other. The stack type-checks against the pinned library: two `Cloudflare.Workers.ObservabilityDestination`
+  (`opentelemetry-traces`, `opentelemetry-logs`) named in the Worker's `observability.traces` and `.logs`.
+  **Not seen:** a destination made anywhere, a plan that names one, or a record arriving at a collector. No
+  collector exists to try, and the local providers were not asked to make one (a personal stage sends nowhere).
 - **Step 7** (2026-11-26). `StagePlan.test.ts`: of `prod`, `pr-42`, `staging`, `test_ben` and `dev_ben` only
   `pr-42`'s plan names an Access policy, read from `PREVIEW_ACCESS`; "Ben@Example.test, qa@example.test" becomes
   the two emails in lower case; with nothing given, and with a list that has a piece that is no email (a trailing
@@ -206,8 +241,20 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
   `alchemy destroy` in "Remove the preview" runs without `PREVIEW_ACCESS` as it is believed to without the
   preview's password (`goals/infra/PLAN.md`, unknown 14); if it stops, the cleanup job needs both secrets.
 
+- **Step 8.** Everything past the type-check: the two destinations made, Cloudflare's test request answered, and
+  the Worker's requests at the collector. Unknown until then: the token's permission group, and whether a
+  destination's name (Alchemy's physical name for it) is accepted as the Worker's `destinations` entry on the
+  first deploy, when both are made together.
+
 ## Choices made
 
+- **The address is a variable and the header a secret** (step 8): his answer. The address shows in the workflow's
+  log as any variable does; an address with a query is refused, since a key in the address would be printed there.
+- **Traces and logs both, to one collector** (step 8), at `/v1/traces` and `/v1/logs` under the address given.
+  Sending logs turns on `invocationLogs` for that stage: Cloudflare's line for each request, which the stage did
+  not keep before. Reverse by dropping the `logs` half in `Inventory.stack.ts`.
+- **A bad address stops the deploy; no address sends nothing** (step 8). An unset variable is the ordinary state
+  today, and a typo in a set one would otherwise send nothing with nobody told.
 - **`deploy --dry-run --yes`, not `plan`, in the workflow** (step 1). `alchemy plan` has no `--yes`, and without it
   a job stops when the state store is missing or a version behind (`State/Provisioning.ts`: "Run 'alchemy state
   bootstrap' first, or pass --yes"). Every deploy job passes `--yes` today and brings the store up to date without

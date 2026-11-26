@@ -201,15 +201,19 @@ layer(here)("the deploy workflow", (it) => {
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.PREVIEW_TEST_ACCOUNT_PASSWORD",
             "secrets.SIGN_UP",
-            "vars.CLOUDFLARE_ACCOUNT_ID"
+            "secrets.TELEMETRY_COLLECTOR_AUTHORIZATION",
+            "vars.CLOUDFLARE_ACCOUNT_ID",
+            "vars.TELEMETRY_COLLECTOR_URL"
           ],
           "release-tag": [],
           production: [
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.OPENROUTER_API_KEY",
             "secrets.SIGN_UP",
+            "secrets.TELEMETRY_COLLECTOR_AUTHORIZATION",
             "vars.CLOUDFLARE_ACCOUNT_ID",
-            "vars.DEPLOY_WITHOUT_MODEL_KEY"
+            "vars.DEPLOY_WITHOUT_MODEL_KEY",
+            "vars.TELEMETRY_COLLECTOR_URL"
           ]
         })
         // No secret is read anywhere else in the file: not in a command, not in a step's `with`.
@@ -448,16 +452,21 @@ layer(here)("the deploy workflow", (it) => {
         }
         const password = { PREVIEW_TEST_ACCOUNT_PASSWORD: "${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}" }
         const stage = { STAGE: "pr-${{ github.event.pull_request.number }}" }
+        const telemetry = {
+          TELEMETRY_COLLECTOR_URL: "${{ vars.TELEMETRY_COLLECTOR_URL }}",
+          TELEMETRY_COLLECTOR_AUTHORIZATION: "${{ secrets.TELEMETRY_COLLECTOR_AUTHORIZATION }}"
+        }
         expect(each(jobs, (job) => job.env ?? {})).toEqual({
           preview: { ...account, ...password, PREVIEW_ACCESS: "${{ secrets.PREVIEW_ACCESS }}", ...stage },
           cleanup: { ...account, ...stage },
-          staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}" },
+          staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}", ...telemetry },
           "release-tag": {},
           production: {
             ...account,
             OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}",
             DEPLOY_WITHOUT_MODEL_KEY: "${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}",
-            SIGN_UP: "${{ secrets.SIGN_UP }}"
+            SIGN_UP: "${{ secrets.SIGN_UP }}",
+            ...telemetry
           }
         })
       })

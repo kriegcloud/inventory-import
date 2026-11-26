@@ -280,3 +280,26 @@ all 133 tests in 24 files in 61.07 seconds, with no individual test retries. For
 files; the formatter excludes Markdown, and the repository documentation check passed. No browser or production
 deployment was inspected. No commit or push was made; the held baseline, `Catalog.lock.json`, vendor files and
 `.dev.vars` were untouched.
+
+## Infra (PLAN row 14)
+
+Written on 2026-11-26 before changing infra code. All paths below are under `packages/infra`. The stage plan,
+resource declarations, variable names, reference precedence and secret bytes must stay unchanged.
+
+| Schema or boundary | Field | Verdict | Reason |
+| --- | --- | --- | --- |
+| Stage names, kinds, addresses, seeds, setting sources and five plan cases | all | Required / State, as is | Each case fixes its address, seeds, deployment policy and setting sources; no stage or deployment choice is added |
+| `UnknownStage`, `StageNotDeployed`, missing password/token/model-key errors | all | Required, as is | Refusals retain their stage, variable and complete action sentence |
+| Stack secret configuration | model key, preview token, preview password | Absent when missing or whitespace-only; otherwise exact original bytes | A module-level nonblank schema supplies the presence predicate; no secret is trimmed or rewritten |
+| Reference-file line boundary | line text | Normalised (`S.Trim`) | Surrounding line whitespace is ignored before finding the last matching assignment; quoted spaces inside a reference remain intact |
+| Reference parser | invalid/missing assignment | Absent | Invalid, commented, template and unrequested references produce no dictionary entry |
+| Process environment | CI | Derived predicate | None, empty, `false` and `0` mean a workstation; every other nonempty value means workflow, with no manufactured empty string |
+| Process environment and file reads | missing/error | Absent / existing empty-file recovery, as is | Preserve environment precedence and the existing failure policy; no file is written |
+| Alchemy secret-provider wrapper | layer / names callback | Required, as is | Runtime service and callback remain ordinary code, with no function schema |
+| Third-party Worker environment | model key, minted/given test password, sign-up | Absent keys omitted | Spread `R.getSomes` over the existing Options, preserving keys and values |
+| Test stage-plan and layer results | success/failure | Required asserted branch | Narrow with `assertTrue` from `@effect/vitest/utils`; a wrong branch fails before reading its contents |
+| Reference test fixture | own-file text | Required argument | Every caller explicitly supplies its own file, including an empty file |
+
+No stored encoding changes, new deployment defaults or exemption requests are intended. Literal failure branches
+in the stack secret-name callbacks are held as written unless they can be removed without changing behavior for
+an invalid stage. The scoped law now reports zero; PLAN.md records validation and the two unchanged, uncounted failure branches.

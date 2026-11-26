@@ -46,8 +46,7 @@ const ofProcess = (name: string) =>
  */
 export const referencesWanted = Effect.fn("OpReferences.referencesWanted")(function* (names: ReadonlyArray<string>) {
   const workflow = yield* ofProcess("CI")
-  const ci = O.getOrElse(workflow, () => "")
-  if (ci !== "" && ci !== "false" && ci !== "0") return R.empty<string, string>()
+  if (O.exists(workflow, (ci) => ci !== "" && ci !== "false" && ci !== "0")) return R.empty<string, string>()
   // A variable set in the shell wins over this entry anyway, so 1Password is not asked for it: a stage run by hand
   // with its secret exported needs no 1Password in its profile. Set and empty counts as set: Alchemy keeps an empty
   // variable of the process and ranks it over what 1Password answers, so asking would only be thrown away.

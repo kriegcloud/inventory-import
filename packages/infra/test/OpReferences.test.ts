@@ -2,6 +2,7 @@
 // stage's plan reads as secrets, and none at all in a workflow. 1Password itself is never contacted here: the tests
 // stop at the references that would be handed to Alchemy's provider.
 import { describe, expect, it, layer } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import { vi } from "vitest"
 import * as A from "effect/Array"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -18,14 +19,18 @@ import { planFor } from "@beep/infra/StagePlan"
 /** A value that must reach nothing. */
 const secret = "sk-live-do-not-hand-on"
 
-const names = (stage: string) => planFor(stage).pipe(Result.getOrThrow, secretNamesOf)
+const names = (stage: string) => {
+  const plan = planFor(stage)
+  assertTrue(Result.isSuccess(plan), "Expected plan to be a success")
+  return secretNamesOf(plan.success)
+}
 
 /**
  * `referencesWanted` with this text in place of `env/op.env` and this one in place of the owner's own `op.env.local`.
  * The configuration it is handed holds nothing, as the one Alchemy hands a `secrets` entry holds nothing of the
  * process's environment: what a workflow sets is set where a workflow sets it, in the process.
  */
-const wanted = (text: string, own = "") =>
+const wanted = (text: string, own: string) =>
   referencesWanted(["OPENROUTER_API_KEY", "PREVIEW_TEST_ACCOUNT_PASSWORD", "PREVIEW_CLOUDFLARE_API_TOKEN"]).pipe(
     Effect.provideService(
       FileSystem.FileSystem,
@@ -71,6 +76,15 @@ describe("the references a stack asks 1Password for", () => {
     })
   })
 
+  it("keeps quoted reference bytes, ignores CRLF and Unicode edge whitespace, and lets an invalid last line win", () => {
+    expect(
+      referencesIn({
+        text: '\u00a0A="op://A Vault/An Item/ field "\ufeff\r\nB=op://v/i/first\r\nB=not-a-reference\r\n',
+        names: ["A", "B"]
+      })
+    ).toEqual({ A: "op://A Vault/An Item/ field " })
+  })
+
   it("a stage is asked only for what its plan reads: a test stage for nothing, production for its model key", () => {
     expect(names("prod")).toEqual(["OPENROUTER_API_KEY"])
     expect(names("pr-42")).toEqual(["PREVIEW_TEST_ACCOUNT_PASSWORD"])
@@ -89,8 +103,8 @@ layer(Path.layer)("the references a stack asks 1Password for, read from the file
 
   it.effect("on a workstation the file's references are wanted; with nothing filled in, none", () =>
     Effect.gen(function* () {
-      const atDesk = yield* inProcess({}, wanted(text))
-      const unfilled = yield* inProcess({}, wanted("# nothing filled in yet\n"))
+      const atDesk = yield* inProcess({}, wanted(text, ""))
+      const unfilled = yield* inProcess({}, wanted("# nothing filled in yet\n", ""))
       expect(atDesk).toEqual(both)
       expect(unfilled).toEqual({})
     })
@@ -101,22 +115,28 @@ layer(Path.layer)("the references a stack asks 1Password for, read from the file
     () =>
       Effect.gen(function* () {
         const inWorkflow = yield* inProcess({ CI: "true" }, wanted(text, "PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/f\n"))
-        const notOne = yield* inProcess({ CI: "false" }, wanted(text))
+        const notOne = yield* inProcess({ CI: "false" }, wanted(text, ""))
+        const zero = yield* inProcess({ CI: "0" }, wanted(text, ""))
+        const empty = yield* inProcess({ CI: "" }, wanted(text, ""))
+        const spaces = yield* inProcess({ CI: " " }, wanted(text, ""))
         expect(inWorkflow).toEqual({})
         expect(notOne).toEqual(both)
+        expect(zero).toEqual(both)
+        expect(empty).toEqual(both)
+        expect(spaces).toEqual({})
       })
   )
 
   it.effect("a variable the process already holds is not asked of 1Password", () =>
     Effect.gen(function* () {
-      const exported = yield* inProcess({ PREVIEW_TEST_ACCOUNT_PASSWORD: "given in the shell" }, wanted(text))
+      const exported = yield* inProcess({ PREVIEW_TEST_ACCOUNT_PASSWORD: "given in the shell" }, wanted(text, ""))
       expect(exported).toEqual({ OPENROUTER_API_KEY: "op://vault/model/credential" })
     })
   )
 
   it.effect("a variable exported empty is held too: Alchemy would rank the empty one over 1Password's answer", () =>
     Effect.gen(function* () {
-      const empty = yield* inProcess({ OPENROUTER_API_KEY: "" }, wanted(text))
+      const empty = yield* inProcess({ OPENROUTER_API_KEY: "" }, wanted(text, ""))
       expect(empty).toEqual({ PREVIEW_TEST_ACCOUNT_PASSWORD: "op://vault/preview/password" })
     })
   )

@@ -871,8 +871,17 @@ export const linesShown = (draft: Draft): Readonly<Record<string, LineShown>> =>
         O.isSome(draft.held) &&
         rowSaidAt(draft, rowId) <= heldAt(draft) &&
         A.isReadonlyArrayNonEmpty(own) &&
-        !A.some(own, (side) => ownEarlier(draft, rowId, side, theirs)) &&
-        !hasDecision(O.match(R.get(draft.sentBefore, rowId), { onNone: A.empty, onSome: identity }), theirs)
+        !A.some(own, (side) =>
+          ownEarlier(
+            draft,
+            rowId,
+            {
+              ...side,
+              seen: [...side.seen, ...O.match(R.get(draft.sentBefore, rowId), { onNone: A.empty, onSome: identity })]
+            },
+            theirs
+          )
+        )
       )
     })
   }))
@@ -1768,8 +1777,29 @@ const arriving = (draft: Draft, event: Data.TaggedEnum.Value<DraftEvent, "ViewAr
     ? againstImport(decisionsIn({ rows, lines, confirms: O.none(), leftOver: O.none() }), decisions)
     : O.none<Named>()
   const isAnswer = event.waiting !== true
+  // Naming decisions after a confirm lets them go, but an earlier send may still have stored them after that
+  // confirm. Keep what those sends may have written, so the next decision never calls this tab's own write theirs.
+  const remembered = confirmedSince
+    ? editing(reopened, (book) => {
+        for (const [rowId, side] of [
+          ...R.toEntries(rows),
+          ...A.flatMap(R.toEntries(lines), ([rowId, line]) =>
+            A.map(line.sides, (side): readonly [string, Side] => [rowId, side])
+          )
+        ]) {
+          if (!side.here) continue
+          book.sentBefore[rowId] = A.takeRight(
+            eachDecision([
+              ...O.match(R.get(book.sentBefore, rowId), { onNone: A.empty, onSome: identity }),
+              ...side.seen
+            ]),
+            overBound
+          )
+        }
+      })
+    : reopened
   const followed: Draft = {
-    ...reopened,
+    ...remembered,
     ...(confirmedSince ? { unsent: {}, lines: {} } : {}),
     confirms: O.some(confirms),
     matches: A.dedupe([...reopened.matches, ...event.matches]),

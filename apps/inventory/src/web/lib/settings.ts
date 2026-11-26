@@ -1,4 +1,6 @@
 // The browser's settings: the public `VITE_*` flags, decoded once, here and nowhere else.
+import * as Context from "effect/Context"
+import * as Layer from "effect/Layer"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
@@ -18,13 +20,19 @@ const PublicSettings = Config.all({
 })
 
 /** The decoded public flags. A flag with a value that is not valid is reported in the console and left at its default. */
-export const publicSettings = Effect.runSync(
-  PublicSettings.parse(ConfigProvider.fromUnknown(import.meta.env)).pipe(
-    Effect.catch((error) =>
-      Effect.as(Effect.logWarning("A VITE_* flag is not valid; using the default.", String(error)), {
-        effectDevTools: false,
-        effectDevToolsUrl: ""
-      })
-    )
+const readPublicSettings = PublicSettings.parse(ConfigProvider.fromUnknown(import.meta.env)).pipe(
+  Effect.catch((error) =>
+    Effect.as(Effect.logWarning("A VITE_* flag is not valid; using the default.", String(error)), {
+      effectDevTools: false,
+      effectDevToolsUrl: ""
+    })
   )
 )
+
+/** Public flags shared by the browser layers in one layer build. */
+export class BrowserSettings extends Context.Service<BrowserSettings, Effect.Success<typeof readPublicSettings>>()(
+  "@inventory/app/web/lib/settings/BrowserSettings"
+) {}
+
+/** Reads and reports public flags once for the layers built together by the browser runtime. */
+export const publicSettings = Layer.effect(BrowserSettings, readPublicSettings)

@@ -2615,3 +2615,125 @@ deployment was run in this lane. No contract field or persisted wire shape chang
 
 Needs the person: nothing. The incomplete sites are implementation/performance follow-up, not a request for a new
 product decision or exemption.
+
+## Row 10, final UI/client lane: field verdicts (2026-11-26)
+
+These verdicts precede implementation. The lane owns UI source outside components/hooks, client source and public
+settings, plus callers forced by signature changes. Stored rows, serialized files, screen words and the four async
+screen states retain their meanings. Own optional React props stay optional and counted. No exemption is approved.
+
+| Entry or field | Verdict | Intended representation |
+| --- | --- | --- |
+| RunStep input, output, tag | Optional run data belongs to the step, not to AgentRun's own props. | Required Option fields; callers state Some or None and drawing matches the whole case. |
+| JSON codec | Serialization preserves key order and omitted values; synchronous vendored callers are immutable in this lane. | Expose Effect codecs where possible; retain and name any sync serialization bridge that cannot migrate without editing vendored callers. No Formatter substitution with different JSON semantics. |
+| API answer | No answer yet is distinct from an empty successful answer. Refreshes with the same answer retain identity. | Option to every answerOf consumer; existing AsyncResult loading/error branches remain authoritative. |
+| API reactivity | One tab-wide invalidation service is shared across registries. | Remove the runner only if the same synchronous invalidation/registration semantics can be kept honestly; otherwise name the hold. |
+| List columns | Width and accessor absence are column data. Facets count rows that share a value. | Required Options for width/accessor; count groups rather than a missing counter. One module-level comparison schema for search case. |
+| Proposal source/confidence | Unknown source remains Suggested; an omitted confidence is not evidence of medium confidence. | Source/confidence Options; retain the existing medium lead default on a schema field and list it in SPEC as undecided. |
+| Skeleton columns | A label may be unknown, and an unspecified width is flexible. | Required Option data, spread optional third-party fields with Record.getSomes; whole placeholder rendering for missing labels. |
+| Table search | Keep typed spelling in the field, compare and submit trimmed text, case-insensitive command key. | Module-level text/key transformations at entry; carry raw and normalized text together where both are needed. |
+| CSS font reads | Empty CSS is a real case; preserve browser sans/mono choices. | Nonempty Option read, with both cases stated by Option.match. |
+| Error sentences | Preserve field wording, installed model sentences and console logging once per object failure. | Module-level wording transformations; whole sentence matches; logging as an Effect run at the browser caller boundary. |
+| Public settings | Invalid flags retain the current whole-settings default and warning. | Caller-run Effect if consumers can compose it without changing startup behavior. |
+
+Unresolved implementation sites will stay visible and be enumerated with counts and examples in the hand-back.
+
+### Final lane: retained changes and unresolved work
+
+All ten named files have fewer scanner places. Their before/after counts are AgentRun 5/0, Json 3/1, Api 2/1,
+ListTable 11/1, ProposalSource 3/0, Skeletons 9/8 (seven own optional-prop checks), TableSearch 6/0, TextWidth 2/0,
+SayError 6/1 and settings 1/0: 48 to 12. Across all owned UI/client source, including unchanged own-prop checks,
+53 places become 18. The inventory is a syntax-tree read of every source file outside components/hooks, not a
+claim based on directory arguments to the law (the law requires individual files).
+
+RunStep input/output/tag and ListColumn width/value/cell/title are required Options. The final drawing and HTML
+boundary consume them; no function schema or Option-to-undefined codec was introduced. Skeleton labels are Options;
+its grid width remains unresolved below. JSON stringify now requires object-or-null input: every actual caller,
+including the immutable vendored callers, already supplies that domain. Its unused parser exposes an Effect.
+
+answerOf exposes Option and compares its contained answer by reference. None, a successful empty collection and a
+failure remain distinct in the underlying AsyncResult; the existing loading/error screen branches are unchanged.
+The answer identity test still verifies no column rebuild for an unchanged answer. Public settings are read by a
+shared Layer.effect at the browser runtime's layer build, retaining the invalid-settings warning and values.
+ProposalLead's medium constructor default is listed in SPEC, with its display invocation count explicitly unmeasured.
+
+The A.groupBy facet rewrite was rejected: unlike the original object counter it gives __proto__ an own group and
+therefore displays a facet that was previously omitted. No decision to change that behavior was made. The original
+counter remains, rather than inventing an exclusion or hiding it behind a different missing-count expression.
+
+A first 200-row SSR harness exposed per-cell Option dispatch overhead. Selecting the value-renderer once per
+column removed that dispatch. The accepted final run, including the Option cell/title fields, measured medians
+0.676543 ms before and 0.697870 ms after (3.15%, 10 of 21 paired batches slower). Markup is identical. This is a
+local production SSR proxy: two columns over 200 raw CSV lines from items_messy.csv, not parsed review rows or a
+browser paint. It is not evidence of a slowdown above 10% on a waiting path. Receipts:
+`/tmp/ui-lane-final-render-options.txt`, `/tmp/defaults-ui-bench/proof.tsx`.
+
+The earlier search parity harness compared unchanged draft spelling, trimming on Enter, Clear, external search
+changes and case-insensitive word search over 200 sample lines. AgentRun SSR matched for absent details, read data,
+result/tag data, and null/zero/empty-tag renderings. Receipt: `/tmp/ui-lane-parity.txt`. No browser was opened.
+
+### Every remaining UI/client source place
+
+This table covers all 18 places; it does not grant exemptions. Lines are supplied to distinguish repeated own-prop
+checks. Vendored components/hooks and other packages are outside this inventory.
+
+| File | Kind | Count | Example | Why left / work still needed |
+| --- | --- | ---: | --- | --- |
+| `packages/ui/src/Json.codec.ts` | fallback / synchronous runner | 1 | `Effect.runSync(S.encodeEffect(codec)(value))` | The immutable vendored use-data-table and data-table-state call the serializer synchronously. Migrating those callers is outside the authorized lane; native JSON or Formatter would bypass/change codec semantics. |
+| `packages/ui/src/ListTable.component.tsx` | fallback / facet counter | 1 | `counts[text] ?? 0` | The grouping attempt changed the reserved-key case and was reverted. A same-behavior fold remains unimplemented; no omission policy was invented. |
+| `packages/ui/src/PageHeader.component.tsx` | absence / own optional React props | 2 | `props.line === undefined` | Both own optional props, line and actions (lines 24, 30), must remain optional and counted. |
+| `packages/ui/src/ProposedValue.component.tsx` | absence / own optional React props | 4 | `props.source === undefined` | Own optional source/state checks at lines 75, 87 and twice at 111 stay counted under the task's explicit rule. |
+| `packages/ui/src/Skeletons.component.tsx` | absence / own optional React props | 7 | `props.title === undefined` | Own title, rows, line, action and views checks at lines 46, 98, 171, 172, 173, 175, 207 remain counted. |
+| `packages/ui/src/Skeletons.component.tsx` | fallback / column data | 1 | `column.width ?? 240` | Flexible width and the grid's minimum width still share one optional input; their separate required layout representation is unimplemented. Label absence was migrated honestly. |
+| `packages/client/src/Api.atoms.ts` | fallback / synchronous runner | 1 | `Effect.runSync(Reactivity.make)` | Requires caller-run initialization with a readiness contract for synchronous register/invalidate across registries. No synchronous constructor exists in the installed Reactivity module; that initialization migration was not built. |
+| `packages/client/src/SayError.controller.ts` | absence / unknown-error browser edge | 1 | `error !== null` | The once-only WeakSet logger must admit object failures and exclude null/primitives; a complete owned error-entry representation has not replaced this raw guard. It is not an own optional-prop check. |
+
+Forced callers changed: access/web AuditEvents and People; catalog/web ImportDecisions, ItemsPage, PastImports,
+ResultStep and reviewHonesty.test; review ReviewRegion.component, internal/ReviewGrid and internal/parts; app
+ActivityPage, lib/devtools and lib/traceContext. Signatures carried through these callers: answerOf's Option answer,
+RunStep's three Options, ListColumn's four Options, skeleton's label Option, ProposalAttribution's two Options,
+sourceWordsFor's Option and the public-settings layer/service. No stored contract shape changed.
+
+### Final verification and limits
+
+The final `bun run check --continue=always --env-mode=loose` completed **102/105 tasks successfully in 3m1.523s**.
+Its only failures are decreases in untouched ledgers:
+
+- `packages/ui/strict-ceiling.json`: 39 to 31.
+- `packages/client/strict-ceiling.json`: 15 to 10.
+- `packages/tooling/tool/cli/ledgers/readonly.json`: ProposalSource.words.ts 7 to 3.
+
+Both source and test TypeScript checks pass. Catalog web passed 401 tests in 38 files, client 59 in 12, review 115
+in 7, app 70 in 19, and D1 12 in 3. The packages that report retries all report none. The new answer test explicitly
+asserts None for loading/error and Some([]) for a successful empty answer. The existing identity test still passes.
+
+Initial full runs hit read-only Bun and Wrangler paths. The final command set BUN_INSTALL,
+BUN_INSTALL_CACHE_DIR, BUN_TMPDIR, TMPDIR and XDG_CONFIG_HOME under `/tmp/defaults-ui-client-3` (TMPDIR `/tmp`).
+Both lockfile and D1 checks then pass. No lockfile diff resulted. Receipt: `/tmp/ui-lane-check-accepted.txt`.
+
+`bun run beep laws defaults <the 25 changed source/test files>` passes: 34 fallback, 47 absence, 1 unwrap,
+5 normalise across that explicit cross-package file set; ten files decreased. These counts include forced review
+callers and are separate from the complete 18-place UI/client-only inventory. No write mode was used.
+`bun run format -- <the 27 changed files>`, docs validation (existing status vocabulary warnings only), and
+`git diff --check` pass. Receipts: `/tmp/ui-lane-law-final.txt`, `/tmp/ui-lane-format-final.txt`,
+`/tmp/ui-lane-docs-final.txt`, `/tmp/ui-lane-inventory-final.txt`.
+
+The final search parity check additionally passed the real 300 ms debounce, external cancellation, Enter without
+a second request, Ctrl+K, Meta+K, slash focus, typing-in-input exclusion and Alt exclusion. All 16 combinations of
+known/unknown source and confidence also matched the original source words, lead and card text. Receipts:
+`/tmp/ui-lane-search-proof.txt`, `/tmp/ui-lane-proposal-proof.txt`. These are bounded local harnesses, not browser QA.
+Effect APIs were checked in the installed 4.1.5 sources, including Schema decode/encode/Option/default constructors,
+SchemaTransformation case/trim/transform, Option match/makeEquivalence/liftPredicate, Record.getSomes, Atom equality,
+AsyncResult constructors/value, Layer.effect/unwrap/provide and Reactivity.make.
+
+Not run: check:full, slow/Verify/fold gates, a browser/on-screen workflow, actual sample Confirm/storage acceptance,
+hosted execution or deployment. Not seen on screen. This lane does not establish the end-to-end 155-item gate or
+claim the entire goal is complete. No source schema generator property suite was added for these in-file schemas.
+
+The 27 changed files comprise the two goal documents, eight UI sources, two client sources and its answer test,
+two access web sources, four catalog web sources and its honesty test, three forced review sources, and four app
+sources (settings, two settings consumers and ActivityPage). PLAN, baselines, all ledgers/locks, exemptions and vendored files
+are unchanged. No .dev.vars was read, UPDATE_VERIFY_LOCK was not set, and no commit or push was made.
+
+Needs the person: rule on the existing unstated-medium-confidence presentation default listed in SPEC. No changed
+behavior or exemption has been approved; the five non-prop places above remain implementation follow-up.

@@ -247,7 +247,7 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
 }
 
 /**
- * Only a read's answer: undefined until there is one, and the same object for as long as the server answers the same.
+ * Only a read's answer: None until there is one, and the same object for as long as the server answers the same.
  * What is built from a read's data (a table's columns, a review of every row) is built from this, never from the read
  * itself: the read's `AsyncResult` is a new object every time it is asked again (waiting, then answered), and
  * everything built on it would be built again, twice per refresh, for an answer that did not change.
@@ -256,8 +256,11 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
  *
  * @example const facetValues = answerOf(itemFacets) // then: Atom.readable((get) => buildColumns(get(facetValues)))
  */
-export const answerOf = <A, E>(read: Atom.Atom<AsyncResult.AsyncResult<A, E>>): Atom.Atom<A | undefined> =>
-  Atom.readable((get) => get(read).pipe(AsyncResult.value, O.getOrUndefined))
+export const answerOf = <A, E>(read: Atom.Atom<AsyncResult.AsyncResult<A, E>>): Atom.Atom<O.Option<A>> =>
+  Atom.withEquality(
+    Atom.readable((get) => AsyncResult.value(get(read))),
+    O.makeEquivalence((a, b) => a === b)
+  )
 
 /**
  * One atom per key, made on first use and held with an ordinary reference (`Atom.family` holds them weakly, and a

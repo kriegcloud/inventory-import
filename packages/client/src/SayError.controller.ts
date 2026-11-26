@@ -1,3 +1,4 @@
+import * as SchemaTransformation from "effect/SchemaTransformation"
 // The one place a failure becomes words for the person: what went wrong and what to do next. The rule this file
 // protects: the screen never shows a status code, a stack, a URL or a provider's own text. Those go to the console,
 // once per failure, for whoever is debugging; the person reads a sentence. Every screen calls `sayError`, so a new
@@ -33,8 +34,13 @@ export const installTroubleSentences = (sentences: Readonly<Record<string, strin
 }
 
 const troubleSentence = (kind: string): string =>
-  (Object.hasOwn(troubles, kind) ? troubles[kind] : troubles["down"]) ??
-  "The model is not answering right now. Try again later."
+  O.match(
+    O.orElse(R.get(troubles, kind), () => R.get(troubles, "down")),
+    {
+      onNone: () => "The model is not answering right now. Try again later.",
+      onSome: (sentence) => sentence
+    }
+  )
 
 // The failures of other packages said here by their shape: this package holds no contract, so each is its schema's
 // shape, checked whole (its tag and every field read from it), never a tag looked at alone. The API's own problem
@@ -59,12 +65,29 @@ const reasonOf = (error: unknown): O.Option<string> =>
 const statusOf = (error: HttpClientError.HttpClientError): O.Option<number> =>
   "response" in error.reason ? O.some(error.reason.response.status) : O.none()
 
+const FieldWords = S.String.pipe(
+  S.decode(
+    SchemaTransformation.transform({ decode: (key) => key.replace(/([a-z])([A-Z])/g, "$1 $2"), encode: (key) => key })
+  ),
+  S.decode(SchemaTransformation.toLowerCase())
+).annotate({ description: "A request field key in readable words." })
+const ProblemSentence = S.String.pipe(
+  S.decode(SchemaTransformation.capitalize()),
+  S.decode(
+    SchemaTransformation.transform({
+      decode: (label) => `${label} was not accepted. Check it and try again.`,
+      encode: (sentence) => sentence
+    })
+  )
+).annotate({
+  description: "The complete refused-field sentence, preserving the label's spelling after its first character."
+})
+const readFieldWords = S.decodeOption(FieldWords)
+const readProblemSentence = S.decodeOption(ProblemSentence)
+
 /** A request field's last path segment, made readable. */
-const fieldWords = (path: ReadonlyArray<string | number>): string =>
-  O.match(A.findLast(path, P.isString), {
-    onNone: () => "a value",
-    onSome: (last) => last.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
-  })
+const fieldWords = (path: ReadonlyArray<string | number>): O.Option<string> =>
+  O.flatMap(A.findLast(path, P.isString), readFieldWords)
 
 /**
  * Every problem of a refused request, one sentence each, all at once. `fields` names the screen's fields in its own
@@ -77,11 +100,13 @@ const requestProblems = (error: unknown, fields: Readonly<Record<string, string>
     if (!P.hasProperty(issue, "path") || !Array.isArray(issue.path)) continue
     const path = issue.path.filter((segment): segment is string | number => typeof segment !== "object")
     const key = A.findLast(path, P.isString)
-    const label = O.match(O.match(key, { onNone: () => R.get(fields, ""), onSome: (key) => R.get(fields, key) }), {
-      onNone: () => fieldWords(path),
-      onSome: (label) => label
+    const label = O.orElse(O.match(key, { onNone: () => R.get(fields, ""), onSome: (key) => R.get(fields, key) }), () =>
+      fieldWords(path)
+    )
+    const sentence = O.match(O.flatMap(label, readProblemSentence), {
+      onNone: () => "A value was not accepted. Check it and try again.",
+      onSome: (sentence) => sentence
     })
-    const sentence = `${label.charAt(0).toUpperCase()}${label.slice(1)} was not accepted. Check it and try again.`
     if (!seen.includes(sentence)) seen.push(sentence)
   }
   return seen
@@ -92,10 +117,11 @@ const logged = new WeakSet<object>()
 
 /** The raw failure, for whoever is debugging: in the console once, never on the screen. */
 const logOnce = (error: unknown) => {
-  if (typeof error !== "object" || error === null) return Effect.runSync(Effect.logError("[failure]", error))
-  if (logged.has(error)) return
-  logged.add(error)
-  Effect.runSync(Effect.logError("[failure]", error))
+  if (typeof error === "object" && error !== null) {
+    if (logged.has(error)) return Effect.void
+    logged.add(error)
+  }
+  return Effect.logError("[failure]", error)
 }
 
 /**
@@ -106,7 +132,7 @@ const logOnce = (error: unknown) => {
  * @example sayError(networkFailure).sentence // "The server could not be reached. Check the connection and try again."
  */
 export const sayError = (error: unknown, options: { readonly fields: Readonly<Record<string, string>> }): Said => {
-  logOnce(error)
+  Effect.runFork(logOnce(error))
   const said = (title: string, sentence: string): Said => ({ title, sentence, problems: [] })
   const known = Match.value(error).pipe(
     // Its reason names what was sent; the person needs only what to do.

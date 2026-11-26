@@ -261,12 +261,13 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
   const removePerson = (person: Person) => registry.set(remove, person)
   return [
     {
+      title: O.none(),
       id: "name",
       label: "Name",
-      width: 280,
-      value: (person) => person.name,
+      width: O.some(280),
+      value: O.some((person) => person.name),
       // The signed-in person's own row says so: the role and Remove beside it act on themself.
-      cell: (person) =>
+      cell: O.some((person) =>
         O.exists(actor, (member) => person.memberId === member.id) ? (
           <>
             {person.name} <span className="font-normal text-muted-foreground">(you)</span>
@@ -274,23 +275,28 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
         ) : (
           person.name
         )
+      )
     },
     {
+      width: O.none(),
       id: "email",
       label: "Email",
-      value: (person) => O.match(person.email, { onNone: () => "", onSome: identity }),
-      cell: (person) => O.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email }),
-      title: (person) => O.match(person.email, { onNone: () => "Not set", onSome: identity }),
+      value: O.some((person) => O.match(person.email, { onNone: () => "", onSome: identity })),
+      cell: O.some((person) =>
+        O.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email })
+      ),
+      title: O.some((person) => O.match(person.email, { onNone: () => "Not set", onSome: identity })),
       blank: (person) => O.isNone(person.email)
     },
     {
+      title: O.none(),
       id: "role",
       label: "Role",
-      width: 260,
+      width: O.some(260),
       // Admin, Editor, Viewer: in the order of what each may do, and alphabetical too.
-      value: (person) => roleWords[person.role],
+      value: O.some((person) => roleWords[person.role]),
       facet: true,
-      cell: (person) =>
+      cell: O.some((person) =>
         admin && O.isSome(person.email) ? (
           <NativeSelect
             size="sm"
@@ -309,26 +315,29 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
         ) : (
           roleWords[person.role]
         )
+      )
     },
     {
       id: "joined",
       label: "Joined",
-      width: 190,
+      width: O.some(190),
       // Sorted by the moment itself, as ISO text.
-      value: (person) => O.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso }),
+      value: O.some((person) => O.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso })),
       searchable: false,
-      cell: (person) => O.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when }),
-      title: (person) => O.match(person.joinedAt, { onNone: () => "Not set", onSome: when }),
+      cell: O.some((person) => O.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when })),
+      title: O.some((person) => O.match(person.joinedAt, { onNone: () => "Not set", onSome: when })),
       blank: (person) => O.isNone(person.joinedAt)
     },
     ...(admin
       ? [
           {
+            title: O.none(),
+            value: O.none(),
             id: "actions",
             label: "Remove",
-            width: 120,
+            width: O.some(120),
             end: true,
-            cell: (person: PersonRow) => (
+            cell: O.some((person: PersonRow) => (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="ghost" size="xs">
@@ -350,7 +359,7 @@ const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> 
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            )
+            ))
           }
         ]
       : [])
@@ -401,7 +410,15 @@ export function PeoplePage() {
         ),
         onNone: () =>
           O.match(data, {
-            onNone: () => <TableSkeleton caption="People in the organization" columns={columns} />,
+            onNone: () => (
+              <TableSkeleton
+                caption="People in the organization"
+                columns={A.map(columns, (column) => ({
+                  label: O.some(column.label),
+                  ...R.getSomes({ width: column.width })
+                }))}
+              />
+            ),
             onSome: () => (
               <ListTable
                 caption="People in the organization"

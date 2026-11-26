@@ -28,8 +28,20 @@ const fontFamilies = (): FontFamilies =>
     onNone: () => {
       const style = getComputedStyle(document.documentElement)
       const read = {
-        sans: style.getPropertyValue("--font-sans") || "sans-serif",
-        mono: style.getPropertyValue("--font-mono") || "monospace"
+        sans: O.match(
+          O.liftPredicate(style.getPropertyValue("--font-sans"), (value) => value.length > 0),
+          {
+            onNone: () => "sans-serif",
+            onSome: (value) => value
+          }
+        ),
+        mono: O.match(
+          O.liftPredicate(style.getPropertyValue("--font-mono"), (value) => value.length > 0),
+          {
+            onNone: () => "monospace",
+            onSome: (value) => value
+          }
+        )
       }
       families = O.some(read)
       return read

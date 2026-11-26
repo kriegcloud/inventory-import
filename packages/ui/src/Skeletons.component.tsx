@@ -1,3 +1,5 @@
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as A from "effect/Array"
 import { LineSkeleton } from "@inventory/ui/PageHeader"
 import { DataTableFrameSkeleton } from "@inventory/ui/components/data-table/data-table-frame-skeleton"
@@ -31,7 +33,7 @@ function Bar(props: { seed: number; right?: boolean | undefined }) {
 }
 
 /** A column of a skeleton table: its heading when the page knows it, and its width as the real table has it. */
-export type SkeletonColumn = { readonly label?: string; readonly width?: number; readonly align?: "right" }
+export type SkeletonColumn = { readonly label: O.Option<string>; readonly width?: number; readonly align?: "right" }
 
 /**
  * A page's top while the page's code is on its way: its title (a bar when even that depends on data), the grey line
@@ -92,7 +94,7 @@ export function TableSkeleton(props: { caption: string; columns: ReadonlyArray<S
   return (
     <DataTableFrameSkeleton
       caption={props.caption}
-      columns={props.columns}
+      columns={props.columns.map(({ label, ...column }) => ({ ...column, ...R.getSomes({ label }) }))}
       {...(props.rows === undefined ? {} : { rows: props.rows })}
     />
   )
@@ -124,7 +126,10 @@ function GridSkeleton({
           <StickyTableRow>
             {A.map(columns, (column, index) => (
               <StickyTableColumn key={index} pin={index === 0 ? "start" : undefined} align={column.align}>
-                {column.label ?? <Skeleton className={column.align === "right" ? "ml-auto h-3 w-16" : "h-3 w-16"} />}
+                {O.match(column.label, {
+                  onNone: () => <Skeleton className={column.align === "right" ? "ml-auto h-3 w-16" : "h-3 w-16"} />,
+                  onSome: (label) => label
+                })}
               </StickyTableColumn>
             ))}
           </StickyTableRow>
@@ -186,7 +191,10 @@ export function ViewsSkeleton(props: { count: number }) {
 
 /** Columns for a table whose page has not loaded yet: widths only, as many as such a table usually has. */
 export const someColumns = (count: number): ReadonlyArray<SkeletonColumn> =>
-  Array.from({ length: count }, (_, index) => (index === count - 1 ? {} : { width: index === 0 ? 240 : 120 }))
+  Array.from({ length: count }, (_, index) => ({
+    label: O.none(),
+    ...(index === count - 1 ? {} : { width: index === 0 ? 240 : 120 })
+  }))
 
 /**
  * The review while its code or its rows are on their way, in the review's own bands: the title row, the filter row,

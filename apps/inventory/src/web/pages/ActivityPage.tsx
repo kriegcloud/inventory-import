@@ -1,3 +1,5 @@
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as O from "effect/Option"
@@ -88,16 +90,33 @@ export function ActivityPage() {
         onNone: () =>
           loading ? (
             view === "imports" ? (
-              <TableSkeleton caption={pastImportsCaption} columns={pastImportColumns} />
+              <TableSkeleton
+                caption={pastImportsCaption}
+                columns={A.map(pastImportColumns, (column) => ({
+                  label: O.some(column.label),
+                  ...R.getSomes({ width: column.width })
+                }))}
+              />
             ) : (
               <TableSkeleton
                 caption={view === "decisions" ? importDecisionsCaption : auditEventsCaption}
-                columns={view === "decisions" ? importDecisionColumns : auditEventColumns}
+                columns={A.map(view === "decisions" ? importDecisionColumns : auditEventColumns, (column) => ({
+                  label: O.some(column.label),
+                  ...R.getSomes({ width: column.width })
+                }))}
               />
             )
           ) : view === "imports" ? (
             O.match(past.data, {
-              onNone: () => <TableSkeleton caption={pastImportsCaption} columns={pastImportColumns} />,
+              onNone: () => (
+                <TableSkeleton
+                  caption={pastImportsCaption}
+                  columns={A.map(pastImportColumns, (column) => ({
+                    label: O.some(column.label),
+                    ...R.getSomes({ width: column.width })
+                  }))}
+                />
+              ),
               onSome: (page) => <PastImportsList older={page.older} />
             })
           ) : view === "decisions" ? (

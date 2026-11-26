@@ -273,7 +273,7 @@ const labels: Record<ColumnId, string> = {
 
 const skeletonColumns = columnIds
   .filter((id) => O.isNone(widths[id][1]) || id === "reorderPoint" || id === "isActive" || id === "vendors")
-  .map((id) => ({ id, label: labels[id], width: widths[id][0] }))
+  .map((id) => ({ id, label: O.some(labels[id]), width: widths[id][0] }))
 
 const yesNo = (value: boolean) => (value ? "Yes" : "No")
 /** A number of a range filter's ends, from the lowest and highest value there is. */
@@ -580,7 +580,7 @@ type Found = O.Option<Atom.Success<typeof itemFacets>>
  * The filters' values alone: the same object while the server answers the same, however often it is asked. The
  * columns are built from this and not from the read, which changes twice every time it is asked again.
  */
-const itemFacetValues = Atom.map(answerOf(itemFacets), O.fromUndefinedOr)
+const itemFacetValues = answerOf(itemFacets)
 
 type Counted = O.Option<ReadonlyArray<{ readonly value: string; readonly count: number }>>
 const options = (listed: Counted) =>

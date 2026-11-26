@@ -29,9 +29,9 @@ passed a small test ontology, HermiT found it consistent with exit 0, and an inc
 is pinned by major version (113); Java 27 was never tried and is not the pin. CI runs gate 9 in its own job (written, not yet run on GitHub), with
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
-Slice 1, the party slice, follows the thread. Benjamin will take each of the 66 open decisions with a concrete record
-when the slice that needs it is specified. Decision 116 asks how a grant names the location or field it covers;
-organization scope remains enough for the thread (115). Gate 10 remains open (pending Q27).
+Slice 1, the party slice, follows the thread. Benjamin will take each of the 47 open decisions with a concrete record
+when the slice that needs it is specified; slice 1's were answered on 2026-11-26. Decision 116 asks how a grant names the location or field it covers;
+organization scope remains enough for the thread (115). Gate 10 is not built (decision 27, answered (a)).
 
 | Report | Headline |
 | --- | --- |
@@ -97,3 +97,6 @@ first class list, a decision log and a product model read from public sources).
 - 2026-11-26: six readers placed every Sutton record type against the packet and
   [report 17](research/17-sutton-whole-model-plan.md) plans the whole model in eight slices; four reviewers tried to refute it and their corrections are in it.
   Decision 128: the business things get terms, the settings and layouts do not. Nothing is built from it.
+- 2026-11-26: Benjamin answered slice 1's open decisions and the alignment file's (12, 17 to 19, 27 to 31, 33, 35 to
+  37, 44, 45, 87, 89, 125, 126) and report 17's P1 and P2, each on a `test_` fixture where it is about a record: his
+  Sutton workspace is an empty trial (decision 36). Forty-seven are open; slice 1 waits on none but 47, which is deferred.

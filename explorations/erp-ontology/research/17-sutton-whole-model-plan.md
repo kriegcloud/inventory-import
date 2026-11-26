@@ -260,6 +260,10 @@ Between the review and a reader's verdict. The verdicts stand in Appendix A, mar
 
 ## 6. The questions the plan raises
 
+P1 and P2 were answered on 2026-11-26, both as the reader recommended; they are in
+[DECISIONS.md](../DECISIONS.md) under their own numbers. Slice 1's other open decisions were answered the same day,
+all but 47, which is deferred.
+
 Twenty-four questions that the readers held no open decision asks. None has a row in the packet's Open table
 (decision 124 names P20): each is moved there when the slice that needs it is specified, as the brief's rule has
 it, and is then put to Benjamin with a record from the demo in front of him. The recommendation and the reason
@@ -315,7 +319,9 @@ Not built, and Benjamin's to accept or refuse:
 - No reader's finding was checked by a second reader. The review read section 4 against the schema and the packet
   and sampled the verdicts; it did not re-read the 56 "term in the packet" verdicts one by one.
 - The inputs and mutations: what a caller may change says which fields identify a record.
-- Any record. Whether a field is filled in practice, what `requested` or `gap` mean, the sign of a payment
+- Any record that carries business data: the demo workspace, read on 2026-11-26, is an empty trial (no company,
+  contact or item, two members, one address). The one thing it settled is that a `UserProfile`'s id equals its
+  `OrganizationMember`'s id. Whether a field is filled in practice, what `requested` or `gap` mean, the sign of a payment
   adjustment and whether picking status is stored or derived are all unread.
 - The 66 enums no record field uses.
 - The app's screens, and Sutton's MCP server.

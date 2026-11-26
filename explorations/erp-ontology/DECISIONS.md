@@ -8,12 +8,12 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Sixty-six questions are open: 12, 17 to 19, 27 to 31, 33, 35 to 37, 42, 44, 45, 47 to 92, 116 and 125 to 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). They are what is left
+Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
 the catalog questions. Twenty-three were answered on 2026-11-22 and left this table: 8 to 11, 13 to 16, 20 to 26, 32,
-34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 124 and 128. No `rat-` record is written, and the thin thread
+34, 38 to 41, 43 and 46. They are under Answered with nine new ones, 93 to 101, and those answered since, to 124 and 128, with the nineteen of 2026-11-26 and report 17's P1 and P2, which keep their own numbers. No `rat-` record is written, and the thin thread
 uses none: its terms name the decision that accepted them (decisions 107 and 111). The gaps
 in the numbers below are theirs.
 
@@ -33,22 +33,7 @@ none of these rows; slice 1, the party slice, follows it.
 
 | # | Question | Options | Recommended | Why | What it changes | From |
 | --- | --- | --- | --- | --- | --- | --- |
-| 12 | May a class have more than one parent, and is `Party` a class? | (a) One identity-bearing parent (a gist class or a local class) plus any number of local category parents; `Party` is a category over `Person` and `Organization`, which keep their gist parents; (b) one parent only, no `Party`, and a "person or organization" range declared as none; (c) any number of parents | (a) | One parent guards against inheriting two identity criteria (foundational analysis, subkind); a category supplies none, so (a) keeps the guard and gives `performedBy`, `decidesOn` and `name` one range, which (b) loses | 05's `categoryParents` and rule V21; 06's `Party`; the item kinds' parent is decision 92, which this row's answer does not select | 05 Q8, 06 Q2 |
-| 17 | Are concept schemes and concepts also typed by gist? | (a) SKOS only, no `gist:ControlledVocabulary` or `gist:Category` typing; the classification properties still sit under `gist:isCategorizedBy` (decision 16); a concept that is also a unit or a dimension is typed by its class (decision 61); (b) all three typings (10's first answer); (c) units and dimensions only | (a) | 05 projects a scheme to `skos:ConceptScheme` only and 11 takes neither gist class; the typing answers no question and would put every concept under gist's `Category` disjointness | The gist parent column of 10's scheme rows | 10 Q3, 11 table A, 05 section 2 |
-| 18 | Which values does the kind tag take? | (a) kind, subkind, role, phase, relator, event, information, category, value, on classes only; (b) with role mixin; (c) also on properties | (a) | Decision 3 makes the account roles flags, and decision 34 has since put them on the tenant's `SourceRecord`, not on the organization; either way nothing bears a role mixin yet; a property's category is its domain and range | 05's `KindTag`, V16, V17 | 05 Q12 |
-| 19 | Do the metamodel's facts (kind tag, identity criterion, scope, ratification) reach the Turtle? | (a) No: they stay in the module, gate 4 reads them, and no metamodel IRI is minted; (b) the tag only, as `inv:termCategory` with a concept of a `TermCategoryScheme` (12's first answer); (c) all, under a second placeholder namespace | (a) | Nothing outside the repository reads them; gate 4 checks tags against axioms in TypeScript; (b) can be added later as a minor version | 12's `termCategory` row, not minted under (a) | 05 Q1, 12 Q5 |
-| 27 | How does a competency question reach an inferred type? | (a) Each query walks `rdf:type/rdfs:subClassOf*` itself and runs in `check` with no reasoner; the reasoner is its own gate; (b) each runs over a reasoned copy merged with its fixture | (a) | Decision 6 runs the reasoner in `check:full` only; (a) keeps the suite in the fast loop | Every drafted query; 12's gates 8 and 10; under the recommended (a) gate 10 has no question to run | 04 Q5 |
-| 28 | How do the alignment triples sit beside the OWL the reasoner reads? | (a) A separate generated alignment file that declares the five `skos:*Match` predicates annotation properties and is never in the reasoner's closure, which holds the OWL file and each fixture only (no SKOS, no alignments); (b) the same declarations inside the OWL file (11's first answer); (c) SKOS semantics, `exactMatch` transitive | (a) | Both seeds isolate alignments, so no target's meaning reaches the reasoner; SKOS concepts would be punned individuals in the closure | 12's four files and gate 9's inputs; 11's rule text | 11 Q8, 12 Q15 |
-| 29 | How is a term of a standard with no RDF namespace (Sutton, ISA-95, B2MML) cited? | (a) A named external term (the standard, the term's name as written, a public document), emitted only as an SSSOM row and a header note, never as a `skos:*Match` triple; (b) a local IRI per external term; (c) the documentation URL as the object | (a) | Decision 7 forbids minting under Sutton's name, and (b) is that under another host; (c) makes a web page stand for a concept | 05's `NamedExternalTerm`; 44 rows of 11 | 05 Q11, 11 Q6 |
-| 30 | Which schema.org namespace? | (a) `https://schema.org/`; (b) `http://schema.org/`, as `namespaces.json` has | (a) | The release file 11 read uses https; the vendored `CoreVocab` already writes https | `namespaces.json`; 23 rows of 11 | 11 Q7, 05 section 4.7 |
-| 31 | What is an alignment's confidence? | (a) A number from 0 to 1, as SSSOM writes it; (b) high, medium, low; (c) none | (a) | The generated SSSOM needs a number; the architecture seed asks for confidence with the evidence | 05's `Confidence` | 05 Q9 |
-| 33 | How is a deprecated term written, and does a retired code still decode? | (a) `owl:deprecated true`, `dcterms:isReplacedBy`, the version as `skos:historyNote`, logical axioms dropped; the replacement names the successor at that retirement and is not a pointer kept at today's last term, so A replaced by B stays valid when B is later replaced by C; a deprecated concept's notation stays in the record's `Literals`, so a stored row still decodes and lifts and an edit that leaves the value as it was keeps it; screens offer only live concepts; a command that assigns the value anew, from any client, refuses a retired one (this last policy is not answered: reads and commands share one `Literals` schema today, so hiding a choice does not narrow a command); (b) as (a) with IAO's replacement property; (c) no replacement property, and a retired notation leaves the `Literals` | (a) | `owl:deprecated` and `dcterms:isReplacedBy` are in `CoreVocab`; IAO is OBO practice unused here; (c) makes rows a person can no longer open | The deprecation triples; 05's V12 and V14, which must not fail an earlier replacement when its successor retires; the command schemas that assign a classified value | 05 Q4, 05 Q13, 12 Q14 |
-| 35 | Is every role flag and classified field always stated? | (a) Closed in every stored record: each flag true or false, each classified field a concept; a source that says nothing leaves the record waiting as Needs a decision, so an unmapped Sutton field is never stored as false; (b) absent means unknown; (c) closed for repository fields, open for Sutton-mapped ones (10's first answer) | (a) | CQ-P02 and "which organizations are not vendors" need a declared closure; (a) keeps 10's point (nothing unmapped is stored as false) with no per-field open-world reading | The flags' record schema (`sh:minCount 1`), which since decision 34 is the tenant's `SourceRecord`; 12's closure contracts | 04 Q2, 06 Q8, 10 Q14, project profile |
-| 36 | What data proves the party model? | (a) Named `test_` fixtures in the packet; (b) a party sample file in `public/samples/`; (c) wait for a party record | (a) | The messy sample stores items only, vendors as names (project profile); (b) is a product change; (c) blocks the must questions | Every CQ-P answer and CQ-C04 | 04 Q4, project profile |
-| 37 | Which context's contract package owns records for terms that have none yet? | (a) Party records (organizations, contacts, addresses, identifiers, identity decisions) in a new party context, access keeping members, grants, agents and the audit trail; every other term with no record gets its context when its first record is built; (b) access owns the party records; (c) catalog holds bills, routings and price lists meanwhile (07's first answer) | (a) | Party records are neither permissions nor items, and catalog and 09's orders both point at them; for the rest no record exists and the ideal-architecture exploration decides contexts | Where each record schema and its pointers live | 06 Q10, 07 Q11, 09 Q6, project profile |
 | 42 | Does a grant at a location cover the locations beneath it? | (a) Yes: a site grant covers its warehouses and bins, never the other way; (b) a grant names each location | (a) | Sutton's location permissions (public, details not published) and the site hierarchy; (b) needs a grant per bin | CQ-P08; `Grant` with 08's `atLocation` | 04 Q8 |
-| 44 | Who is the actor of a request made through a portal link? | (a) The account organization, through its `PortalAccess`; (b) a named contact, which needs portal sign-in; (c) not recorded | (a) | Sutton describes no sign-in for portals; today every audit entry names a member, so (a) needs an entry to name a portal access instead | `recordedActor`'s range; the `activity` table later | 06 Q11 |
-| 45 | Is a software agent a class of its own now? | (a) Not yet: an agent run carries the agent's name; (b) a `SoftwareAgent` class, needed once outside agents call the API with their own credential | (a) | The repository names agents inside the app only, by name, capped by role | `AgentRun`, `agentName` | 06 Q12 |
 | 47 | Are the party role flags also a scheme? | Deferred, not an open choice: flags only, on the tenant's `SourceRecord` since decision 34, their labels on 06's flag properties. A `PartyRole` scheme beside the flags is not offered | None to choose | Decisions 2 and 3 already forbid a `PartyRole` scheme: decision 3 chose flags, and report 10 section 4.8 says a second home for customer and vendor would break decision 2. The flags the first module ships are the two decision 3 names | No `PartyRole` scheme is emitted; this row blocks no slice | 10 Q7 |
 | 48 | When several records point at one class, which targets it in SHACL? | (a) The one annotated as the stored form; two such refuse; (b) all; (c) none | (a) | Stored rows are encoded by `StoredItem` (decision 49), and under (b) two shapes, `ItemFields` and `StoredItem`, would target one class; both have a SKU, and `ItemEdit` is a request, not a description of an item; (c) validates nothing alone | One annotation key on records, `TermPointer.storedForm`, shown on `StoredItem` only, pending this decision | 12 Q10 |
 | 49 | What does the SHACL slow test validate? | (a) Stored rows read through the item store, encoded by `StoredItem`, lifted; `StoredItem` holds no organization and no confirmation, so the slow test supplies the organization's id and the creating confirmation beside the encoded row (12, "The lift"); (b) the raw D1 columns | (a) | The columns are a storage layout with no term; it gives up catching a column a migration wrote wrongly | The lift's input (the organization's id, the creating confirmation and the encoded row); the slow test | 12 Q11 |
@@ -90,14 +75,10 @@ none of these rows; slice 1, the party slice, follows it.
 | 84 | May a line be met by more than it promised? | (a) Yes, the fulfilment view shows it as over; (b) no, refused | (a), as a product rule to confirm | Goods arrive in more than ordered; Sutton's public three-way matching refuses billing beyond receipt, not receiving beyond order | A record rule and a rejection only | 09 Q9 |
 | 85 | What does a genealogy answer mean with no composition evidence? | (a) Every input may have contributed to every output, said as "possible contribution"; (b) only stated-quantity allocations; (c) proportional shares | (a) | The architecture seed 7.1; a recall that misses a lot is worse than one that names too many | CQ-E01, E02, W07 | 04 Q7 |
 | 86 | Which states does an accounting sync have? | (a) Waiting to send, sent, refused, changed since sent, in `AccountingSyncStateScheme`, read by 09's `syncOutcome`; (b) sent or not; (c) wait for a real connection | (a) | No public source names them; these are the ones a person acts on differently | 10's concepts, all NEW | 10 Q12, 09 |
-| 87 | How are the competency questions ranked? | (a) Must: what the repository records today and the party model; should: stock, locations, traceability; could: commitments; will-not: telemetry, FSMA, planning; (b) Sutton's contexts as must too | (a) | Decision 1: the model of record is this repository's contexts, Sutton a mapping | The Priority column of every question | 04 Q9 |
 | 88 | What currency is a stored unit cost in? | (a) US dollars for every stored cost, stated once as a rule of the item record that the projector reads (05's fixed individual on a lift step, V23; 12's lift table), never taken from a field's description text; (b) no currency until a record states one, so no cost is projected and CQ-V01 waits; (c) a tenant's currency setting, which does not exist | (a) | `Item.read.ts` describes the cost as "in US dollars" and stores no currency; a `MoneyAmount` with no currency fails a check (07); a description string is documentation, not a fact a projector may read | 07 section 5; the lift of `unitCost`; CQ-V01, V02 | NEW, sceptic review 2026-11-22 (07) |
-| 89 | Are carrier and contract manufacturer role flags of an organization? | (a) Not yet: only `isCustomer` and `isVendor`, the two decision 3 names and Sutton shows ("a customer, a vendor, or both"); the other two are added when a source or a competency question of rank must or should needs them; (b) four flags, as report 01 and the project profile wrote them; (c) never flags: a carrier is read from `carriedBy`, a contract manufacturer from `operatedBy` | (a) | Decision 3's recorded answer names customer and vendor only, and Benjamin's words were "Organization with role flags"; report 01 added the other two and the project profile then listed four as decided; no public Sutton page shows either | 06's `isCarrier` and `isContractManufacturer` held back as notes; a flag added later sits on the tenant's `SourceRecord`, where decision 34 put the two there are; CQ-P02 reads the flags there are; 09's `carriedBy` and 08's `operatedBy` keep their range | NEW, sceptic review 2026-11-22 (06, the project profile) |
 | 90 | Does the SKU match key drop punctuation? | (a) No: the key is the SKU without spaces, in upper case, as `skuKey` computes it, and `CLAUDE.md`'s "case, spaces, punctuation" is corrected to "case and spaces"; (b) yes: `skuKey` also drops punctuation, so "SHH-9574" and "SHH9574" are one key (a product rule, written in the product `DECISIONS.md`) | (a) | The code and the stored unique index compare `skuKey`, which keeps the hyphen (`Item.read.ts`); 07's `identifierKey` and CQ-I03 follow the code; (b) changes which rows count as "Already there" | 07's `identifierKey` definition; CQ-I03's fixture; one `CLAUDE.md` sentence, or `skuKey` | NEW, sceptic review 2026-11-22 (04 CQ-I03) |
 | 91 | What does `performedBy` point at? | (a) No range declared: a member for an act in the app (CQ-I01, I04, P10), an organization or a person for an act outside it (a vendor's shipment), each record's SHACL saying which; (b) `Member` only, with a separate `Party`-ranged property for outside actors; (c) `Party`, as 09 first wrote | (a) | Under (c) a reasoner types every member a party and "who confirmed" loses the membership the audit trail keeps; 06's `decidedBy`, `calledFor` and `actsFor` point at `Member`, and `recordedActor` does in the index, pending decision 44, which does not change this row while `PortalAccess` is not proposed; (a) keeps one key, as anti-pattern 10 advises, and (b) is its narrower form | 09's `performedBy` row; CQ-I01, I04, P10 | NEW, sceptic review 2026-11-22 (09) |
 | 116 | When a grant covers one location or one field, how does it say which? | (a) A property from the grant to the thing it covers, beside `grantScope`, which keeps the kind; (b) one concept per location or field in `GrantScopeKindScheme`; (c) the kind only, the thing covered read from another record | (a) | With the kind alone two grants at two sites look the same (the blinded seat, report 15); a concept per site turns data into vocabulary | One property; CQ-P11's answer once a second kind exists; no change while organization is the only kind (decision 115) | NEW, audit 2026-11-23 (15 section 5) |
-| 125 | What is a Sutton `Company` whose `kind` is `individual`? | (a) A `Person` with the tenant's `SourceRecord`: `recordOf` points at a person or an organization by `kind`; (b) an `Organization` all the same, as decision 3 wrote; (c) left out of the party slice | (a) | Sutton says it is "a person modelled as a company — a sole trader or a retail customer"; decision 34 already names `Person` for the human; (b) types a retail customer an organization | The `inv:Organization` row for Sutton "Account" is split by `kind`; decision 3's "a person cannot be an Account" is struck, and decision 34's "the Sutton Account is the organization" is narrowed to `kind: company` | NEW, Sutton schema 2026-11-26 (16 finding A) |
-| 126 | Where does billing or shipping purpose sit for a record imported from Sutton? | (a) On the address, as Sutton has it (`Address.type` and its default flags); no `ContactAssignment` is made up; (b) an assignment is derived for each contact of the company at each address | (a) | Sutton's contact has one company and a type of customer, marketing, sales or vendor, never a purpose at a point; (b) states pairs nobody recorded | One alignment row, purpose to `AddressType`; a property for an address's purpose is added; the contact's purpose stays on `ContactAssignment` for sources that record one, so decisions 39 and 43 stand and are not used for Sutton records | NEW, Sutton schema 2026-11-26 (16 finding C) |
 | 127 | What is a lot when the source is Sutton? | (a) The lot number is a property of the label record and no lot is minted; (b) `MaterialLot` individuals are minted from tenant, item and lot number | (a) | Sutton keeps the lot as text on `Inventory` and finds labels by that text; two receipts with one lot number from two vendors would become one lot under (b), which nobody decided | `inv:MaterialLot` keeps no Sutton alignment row; CQs on lots read the label's lot number for Sutton data | NEW, Sutton schema 2026-11-26 (16 finding E) |
 
 ## Answered
@@ -797,3 +778,188 @@ business rule is written down as a rule of the term it governs.
   made) cannot be queried as data.
 - Reverse: give the 11 settings types terms, in the slices that hold what they govern (4, 6 and 7).
 
+### 36. What data proves the party model (2026-11-26)
+
+The messy sample stores items only, and my Sutton workspace is an empty trial: no company, no contact and no item, two members and one address (read on 2026-11-26).
+
+I chose named `test_` fixtures in the packet; the agent recommended the same.
+
+- Rationale: nothing is written to Sutton and nothing is added to the app, and the must questions are not blocked.
+- What it gives up: no party answer is checked against a record a person entered.
+- Reverse: add a party sample file to `public/samples/`, or read records once the workspace has some; the fixtures stay as the must-fail cases.
+
+### 37. Which context owns the party records (2026-11-26)
+
+I chose a new party context; the agent recommended the same. Organizations, contacts, addresses, identifiers and identity decisions get their contract there when their first record is built. Access keeps members, grants, agents and the audit trail. Every other term with no record gets its context when its first record is built.
+
+- Rationale: party records are neither permissions nor items, and catalog and the later orders both point at them.
+- Reverse: move the contract into the access context; the term pointers move with the schemas and no term changes.
+
+### 12. Whether a class may have more than one parent, and whether Party is a class (2026-11-26)
+
+I chose one identity-bearing parent (a gist class or a local class) plus any number of local category parents, with `Party` a category over `Person` and `Organization`, which keep their gist parents. The agent recommended the same.
+
+- Rationale: one parent guards against inheriting two identity criteria, and a category supplies none. A Sutton `Company` of kind `individual` is a person, so the customer of an order needs a range that takes either.
+- What it does not decide: the item kinds' parent, which is decision 92.
+- Reverse: drop `Party` and declare no range on the properties that used it; each record's SHACL then says which class it takes.
+
+### 87. How the competency questions are ranked (2026-11-26)
+
+I chose to keep the ranking after decision 124: must is what the repository records today and the party model; should is stock, locations and traceability; could is commitments; will-not is telemetry, FSMA and planning. The agent recommended the same.
+
+- Rationale: decision 1 stands. Sutton is modelled whole (decisions 124 and 128), but a question only Sutton's data can answer does not block a slice.
+- Reverse: rank Sutton's areas must; slices 6 to 8 then need fixtures and passing queries for them before they are done.
+
+### 125. What a Sutton `Company` of kind `individual` is (2026-11-26)
+
+Put to me on a fixture: a `Company` named "test_Ana Ruiz", `kind: individual`, `type: [customer]`.
+
+I chose a `Person` with the tenant's `SourceRecord`: `recordOf` points at a person when `kind` is `individual` and at an organization when it is `company`. The agent recommended the same.
+
+- Rationale: Sutton says an individual is "a person modelled as a company — a sole trader or a retail customer", and decision 34 already names `Person` for the human. Typing a retail customer an organization would make "people who are customers" return nothing.
+- What changes: decision 3's "a person cannot be an Account" is struck; decision 34's "the Sutton Account is the organization" is narrowed to `kind: company`; the alignment row for Sutton's company is split by `kind`.
+- Reverse: type every `Company` an `Organization`; the flags and the source record stay where they are.
+
+### 126. Where billing or shipping purpose sits for a Sutton record (2026-11-26)
+
+Put to me on a fixture: company "test_Northwind Foods" with addresses "HQ" typed `billing` and "Dock 4" typed `shipping`, and one contact "test_Lee Park" (type `vendor`) with no address of their own.
+
+I chose the address: purpose is read from `Address.type` and its default flags, and no `ContactAssignment` is made up. Where a contact has a typed address of their own, that one is read as the contact's. The agent recommended the same.
+
+- Rationale: Sutton never says which contact is the billing contact; deriving one for each contact at each address states pairs nobody recorded.
+- What changes: one alignment row, purpose to `AddressType`, and a property for an address's purpose. Decisions 39 and 43 stand for sources that record a contact's purpose, and are not used for Sutton records.
+- Reverse: derive assignments at import; the address's purpose stays.
+
+### P1. Whether a Sutton `Organization` is the Tenant (2026-11-26)
+
+A question of report 17 (P1), put to me on my own workspace: an `Organization` with `accountType: trial`; the other account types are `customer`, `internal`, `sandbox` and `unassigned`.
+
+I chose a record of the body: a Sutton `Organization` is a `SourceRecord` whose `recordOf` is the tenant's organization, and `inTenant` stays this repository's tenant. A trial or sandbox workspace of the same company is a second record of one body, never a second Tenant. The agent recommended the same.
+
+- Rationale: decision 103 makes an organization the legal entity, and no thread term changes.
+- What it does not decide: the schema links no two workspaces, so that two of them are one body is a person's identity decision, never inferred. That one company has several workspaces is read from the account types, not seen.
+- Reverse: mint one Tenant per Sutton `Organization`.
+
+### 35. Whether every role flag and classified field is always stated (2026-11-26)
+
+Put to me on a fixture: Sutton company "test_Kessler Steel" with `type: [vendor]` only.
+
+I chose closed in every stored record: each flag is true or false and each classified field holds a concept, so the fixture stores `isVendor` true and `isCustomer` false. A source that says nothing about a flag leaves the record waiting as Needs a decision, so an unmapped field is never stored as false. The agent recommended the same.
+
+- Rationale: CQ-P02 and "which organizations are not vendors" need a declared closure, and one reading of a field is kept whatever the record's source.
+- What changes: the flags' record schema (`sh:minCount 1`) on the tenant's `SourceRecord` (decision 34); report 12's closure contracts.
+- Reverse: store only true flags and drop the questions that read a missing flag as false.
+
+### P2. Whether an invited or revoked Sutton member is a Member (2026-11-26)
+
+A question of report 17 (P2), put to me on a fixture: member "test_Sam Ortiz", status pending, role `MANAGER`, `assignedLocations` ["test_Plant 1"].
+
+I chose yes, with a stage: a Member exists from the invitation, its stage a concept of a membership status scheme (pending, active, revoked), and the role and locations Sutton states for an invitee are kept. The agent recommended the same.
+
+- Rationale: Sutton gives a pending member an id, a role and locations, and its role counts include invited members; dropping them loses grants the source states.
+- What changes: the thread's Member definition, "lets the person act in the tenant's workspace", is widened to cover the invited and revoked stages. That is a breaking change to an accepted term under decision 24 and is recorded as one when the vocabulary changes.
+- Reverse: import a member only once active and restore the definition.
+
+### 89. Whether carrier and contract manufacturer are role flags (2026-11-26)
+
+Put to me on fixtures: "test_Rapid Freight", named as the carrier on a shipment, and "test_Coastal Co-Pack", which runs an outsourced job.
+
+I chose two flags only, `isCustomer` and `isVendor`; the agent recommended the same. A carrier is known from the shipment that names it. The other two flags are added when a source or a competency question of rank must or should needs them.
+
+- Rationale: decision 3 names customer and vendor only, and Sutton's company `type` has only those two. With decision 35 closed, four flags would leave every Sutton company waiting on two flags its source never states.
+- What changes: report 06's `isCarrier` and `isContractManufacturer` stay held back as notes; report 01 and the project profile, which list four, are corrected when next touched.
+- Reverse: add the two flags on the tenant's `SourceRecord`, where decision 34 put the two there are.
+
+### 44. Who the actor of a portal request is (2026-11-26)
+
+Put to me on a fixture: "test_Northwind Foods" opens its customer portal link and approves a quote.
+
+I chose the account organization, through its `PortalAccess`; the agent recommended the same.
+
+- Rationale: Sutton's portal has no sign-in, so all that is known is that someone holding the company's link acted. Naming a contact would state more than that.
+- What changes: `recordedActor`'s range takes a portal access; an audit entry, which today always names a member, must be able to name one when portals are built.
+- Reverse: add portal sign-in and name the contact.
+
+### 33. How a deprecated term is written, and whether a retired code still decodes (2026-11-26)
+
+Put to me on a fixture: unit concept "test_PCS" retired and replaced by "EA", with 40 stored items still saying PCS.
+
+I chose: `owl:deprecated true`, `dcterms:isReplacedBy` naming the successor at that retirement (not a pointer kept at today's last term), the version as `skos:historyNote`, and the logical axioms dropped. A retired concept's notation stays in the record's `Literals`, so a stored row still decodes and lifts, and an edit that leaves the value alone keeps it. Screens offer only live concepts, and a command that assigns the value anew refuses a retired one. The agent recommended the same.
+
+- Rationale: both properties are already in `CoreVocab`; a row a person can no longer open is worse than an old code on screen.
+- Not built: the refusal of a new assignment. Reads and commands share one `Literals` schema today, so hiding a choice does not narrow a command.
+- What changes: the deprecation triples; report 05's V12 and V14, which must not fail an earlier replacement when its successor retires; the command schemas that assign a classified value.
+- Reverse: drop a retired notation from `Literals` after every stored row has been changed.
+
+### 29. How a term of a standard with no RDF namespace is cited (2026-11-26)
+
+I chose a named external term: the standard, the term's name as written (Sutton's "Company"), and a public document. It is emitted only as a row of the generated SSSOM file and a header note, never as a `skos:*Match` triple. The agent recommended the same.
+
+- Rationale: decision 7 forbids minting under Sutton's name, and a local IRI per external term is that under another host; a documentation URL makes a web page stand for a concept. Sutton's API documentation is behind a sign-in, so a Sutton row's document is a public page where one exists and the schema's type name where none does (decision 123: names only).
+- What changes: report 05's `NamedExternalTerm`; 44 rows of report 11 and every Sutton row of the whole model.
+- Reverse: mint local IRIs for external terms and emit the triples.
+
+### 28. How the alignment triples sit beside the OWL the reasoner reads (2026-11-26)
+
+I chose a separate generated alignment file that declares the five `skos:*Match` predicates annotation properties and is never in the reasoner's closure, which holds the OWL file and each fixture only. The agent recommended the same.
+
+- Rationale: no target's meaning reaches the reasoner, and an alignment change never touches the file the reasoner gate reads.
+- What changes: report 12's four files and gate 9's inputs; report 11's rule text.
+- Reverse: move the declarations into the OWL file.
+
+### 27. How a competency question reaches an inferred type (2026-11-26)
+
+I chose that each query walks `rdf:type/rdfs:subClassOf*` itself and runs in `check` with no reasoner; the reasoner stays its own gate. The agent recommended the same.
+
+- Rationale: decision 6 runs the reasoner in `check:full` only, and this keeps the suite in the fast loop. With decision 12 a question about parties finds a `Person` through the category parent.
+- What it gives up: a fact only a reasoner could derive is not found by a question.
+- What changes: every drafted query; report 12's gates 8 and 10, where gate 10 has no question to run.
+- Reverse: run the suite over a reasoned copy merged with each fixture.
+
+### 45. Whether a software agent is a class of its own (2026-11-26)
+
+I chose not yet: an agent run carries the agent's name. The agent recommended the same.
+
+- Rationale: the repository names agents inside the app only, by name, acting for a signed-in person and capped by that person's role; a class would have no record behind it.
+- Reverse: add a `SoftwareAgent` class once an outside agent calls the API with its own credential; `agentName` then becomes a pointer.
+
+### 17. Whether concept schemes and concepts are also typed by gist (2026-11-26)
+
+I chose SKOS only: no `gist:ControlledVocabulary` or `gist:Category` typing. The classification properties still sit under `gist:isCategorizedBy` (decision 16), and a concept that is also a unit or a dimension is typed by its class (decision 61). The agent recommended the same.
+
+- Rationale: report 05 projects a scheme to `skos:ConceptScheme` only and report 11 takes neither gist class; the typing answers no question and would put every concept under gist's `Category` disjointness.
+- What changes: the gist parent column of report 10's scheme rows.
+- Reverse: add the two typings in the projector; no term changes.
+
+### 18. Which values the kind tag takes (2026-11-26)
+
+I chose nine values, on classes only: kind, subkind, role, phase, relator, event, information, category, value. The agent recommended the same.
+
+- Rationale: customer and vendor are flags on the tenant's `SourceRecord` (decisions 3 and 34), so nothing bears a role mixin yet; `Party` takes category (decision 12); a property's category is its domain and range.
+- What changes: report 05's `KindTag`, V16 and V17.
+- Reverse: add a role mixin value when a role that people and organizations both play becomes a class.
+
+### 19. Whether the metamodel's facts reach the Turtle (2026-11-26)
+
+I chose no: the kind tag, identity criterion, scope and ratification stay in the module, gate 4 reads them there, and no metamodel IRI is minted. The agent recommended the same.
+
+- Rationale: nothing outside the repository reads them, and gate 4 checks tags against axioms in TypeScript.
+- What changes: report 12's `termCategory` row is not minted.
+- Reverse: publish the tag as `inv:termCategory` with a `TermCategoryScheme`, a minor version.
+
+### 31. What an alignment's confidence is (2026-11-26)
+
+I chose a number from 0 to 1, as SSSOM writes it; the agent recommended the same.
+
+- Rationale: the generated SSSOM needs a number, and the architecture seed asks for confidence with the evidence.
+- What it gives up: a number can look more exact than the judgement behind it; the evidence beside it says what it rests on.
+- What changes: report 05's `Confidence`.
+- Reverse: three words turned into numbers by a fixed table.
+
+### 30. Which schema.org namespace (2026-11-26)
+
+I chose `https://schema.org/`; the agent recommended the same.
+
+- Rationale: the release file report 11 read uses https, and the vendored `CoreVocab` already writes https and may not be edited.
+- What changes: the skills' `namespaces.json`, which said http, now says https; 23 rows of report 11 stand as written.
+- Reverse: rewrite the rows and the entry to http.

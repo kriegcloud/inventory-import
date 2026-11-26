@@ -1,7 +1,6 @@
 import { identity } from "effect/Function"
 import { CellMark } from "@inventory/review/ReviewTypes"
 import * as O from "effect/Option"
-import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { $ReviewId } from "./identity.ts"
 import {
@@ -585,8 +584,8 @@ export function Reason(props: {
     <span className={cn("text-muted-foreground", props.className)}>
       <span className="font-medium text-foreground">
         {sourceAndConfidence({
-          ...R.getSomes({ by: props.fix.by }),
-          ...R.getSomes({ confidence: props.fix.confidence })
+          by: props.fix.by,
+          confidence: props.fix.confidence
         })}
         .
       </span>{" "}

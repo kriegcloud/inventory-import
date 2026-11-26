@@ -146,7 +146,7 @@ const filterOf = (input: {
  * again and another when it has answered (every return to the tab asks again), and the rows would be filtered, and
  * the table worked out, for each. From the answer they are worked out once per answer.
  */
-const viewAnswer = perKey((id: ImportId) => Atom.map(answerOf(importView(id)), O.fromUndefinedOr))
+const viewAnswer = perKey((id: ImportId) => answerOf(importView(id)))
 
 /** The rows the view on screen shows: the same rows while the result and the view are the same, so the table keeps its state. */
 export const shownRows = perKey((id: ImportId) =>

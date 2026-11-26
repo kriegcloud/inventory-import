@@ -1,3 +1,7 @@
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as S from "effect/Schema"
 // Who is behind a proposed value, in words the person reads. The one thing a reader must not break: nothing here says
 // "model" unless the caller said a model made the suggestion. A suggestion whose source the caller did not name is
 // called a suggestion, never a guess by anyone in particular.
@@ -32,49 +36,47 @@ export const unknownSource: SourceWords = {
   tip: "A suggestion. Check it before you accept"
 }
 
-/**
- * The words for a suggestion's source.
- *
- * @example sourceWordsFor("rule").tag // "Rule"
- * @example sourceWordsFor(undefined).tip // "A suggestion. Check it before you accept"
- */
-export const sourceWordsFor = (source: ProposalSource | undefined): SourceWords =>
-  source === undefined ? unknownSource : known[source]
+/** The source and confidence carried by a suggestion's presentation. */
+export const ProposalAttribution = S.Struct({
+  by: S.Literals(["rule", "model", "person"]).pipe(
+    S.annotateKey({ description: "Who made the suggestion" }),
+    S.OptionFromOptionalKey
+  ),
+  confidence: S.Literals(["high", "medium", "low"]).pipe(
+    S.annotateKey({ description: "How sure its source is" }),
+    S.OptionFromOptionalKey
+  )
+}).annotate({ description: "Attribution without inventing a source or confidence." })
+export type ProposalAttribution = typeof ProposalAttribution.Type
+
+const ProposalLead = S.Struct({
+  by: ProposalAttribution.fields.by,
+  confidence: S.Literals(["high", "medium", "low"]).pipe(
+    S.annotateKey({ description: "Confidence said in the lead; medium when unstated, awaiting a decision" }),
+    S.withConstructorDefault(Effect.succeed("medium" as const))
+  )
+}).annotate({ description: "The existing confidence policy for the lead sentence." })
+
+/** Words for an explicitly known or unknown source. */
+export const sourceWordsFor = (source: O.Option<ProposalSource>): SourceWords =>
+  O.match(source, { onNone: () => unknownSource, onSome: (source) => known[source] })
 
 const confidenceWords = { high: "High", medium: "Medium", low: "Low" } as const
 
-/**
- * The lead of a "Why?" answer: who is behind the change and, for anything but a fixed rule's sure reading, how sure.
- * Never a percentage.
- *
- * @example sourceLead({ by: "rule" }) // "Rule"
- * @example sourceLead({ by: "rule", confidence: "low" }) // "Rule, low confidence"
- * @example sourceLead({ by: "model", confidence: "medium" }) // "Model's suggestion, medium confidence"
- * @example sourceLead({}) // "Suggestion, medium confidence"
- */
-/**
- * Who made a proposal and how sure it is, as the "Why?" card opens: the source's word, a dot, the confidence word.
- * Never a percentage; with no confidence given, the source alone.
- *
- * @example sourceAndConfidence({ by: "rule", confidence: "high" }) // "Rule · High"
- * @example sourceAndConfidence({ by: "model", confidence: "medium" }) // "Model · Medium"
- * @example sourceAndConfidence({}) // "Suggested"
- */
-export const sourceAndConfidence = (fix: {
-  by?: ProposalSource | undefined
-  confidence?: "high" | "medium" | "low" | undefined
-}): string => {
+/** Source and confidence on the Why card; without confidence, the source alone. */
+export const sourceAndConfidence = (fix: ProposalAttribution): string => {
   const who = sourceWordsFor(fix.by).tag
-  if (fix.confidence === undefined) return who
-  return `${who} · ${confidenceWords[fix.confidence]}`
+  return O.match(fix.confidence, {
+    onNone: () => who,
+    onSome: (confidence) => `${who} · ${confidenceWords[confidence]}`
+  })
 }
 
-export const sourceLead = (fix: {
-  by?: ProposalSource | undefined
-  confidence?: "high" | "medium" | "low" | undefined
-}): string => {
-  if (fix.by === "rule") return fix.confidence === "low" ? "Rule, low confidence" : "Rule"
-  if (fix.by === "person") return "You"
-  const who = fix.by === "model" ? "Model's suggestion" : "Suggestion"
-  return `${who}, ${fix.confidence ?? "medium"} confidence`
+/** The lead of a Why answer, retaining the existing unstated-confidence policy. */
+export const sourceLead = (fix: ProposalAttribution): string => {
+  const lead = ProposalLead.make({ by: fix.by, ...R.getSomes({ confidence: fix.confidence }) })
+  if (O.contains(lead.by, "rule")) return lead.confidence === "low" ? "Rule, low confidence" : "Rule"
+  if (O.contains(lead.by, "person")) return "You"
+  const who = O.contains(lead.by, "model") ? "Model's suggestion" : "Suggestion"
+  return `${who}, ${lead.confidence} confidence`
 }

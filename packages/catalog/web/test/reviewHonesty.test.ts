@@ -67,13 +67,13 @@ const sampleRows = (name: string, storedItems: ReadonlyArray<ItemFields>) =>
 
 describe("who is behind a suggestion", () => {
   it("names the model only when the caller says a model made it", () => {
-    expect(sourceWordsFor("model").tip).toContain("model")
+    expect(sourceWordsFor(O.some("model")).tip).toContain("model")
     for (const source of ["rule", "person", undefined] as const) {
-      const words = sourceWordsFor(source)
+      const words = sourceWordsFor(O.fromUndefinedOr(source))
       expect(`${words.tag} ${words.hidden} ${words.tip}`).not.toMatch(/model/i)
     }
-    expect(sourceLead({ by: "rule", confidence: "low" })).toBe("Rule, low confidence")
-    expect(sourceLead({ confidence: "low" })).toBe("Suggestion, low confidence")
+    expect(sourceLead({ by: O.some("rule"), confidence: O.some("low") })).toBe("Rule, low confidence")
+    expect(sourceLead({ by: O.none(), confidence: O.some("low") })).toBe("Suggestion, low confidence")
   })
 
   it.effect("calls the sample's low-confidence date reading a rule's, never a model's", () =>
@@ -85,10 +85,7 @@ describe("who is behind a suggestion", () => {
       const questions = A.filter(fixes, (fix) => O.contains(fix.confidence, "low"))
       expect(questions.length).toBeGreaterThan(0)
       for (const fix of fixes) expect(fix.by).toEqual(O.some("rule"))
-      for (const fix of questions)
-        expect(
-          sourceLead({ ...R.getSomes({ by: fix.by }), ...R.getSomes({ confidence: fix.confidence }) })
-        ).not.toMatch(/model/i)
+      for (const fix of questions) expect(sourceLead({ by: fix.by, confidence: fix.confidence })).not.toMatch(/model/i)
     })
   )
 })

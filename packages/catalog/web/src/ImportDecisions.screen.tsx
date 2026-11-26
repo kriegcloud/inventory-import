@@ -38,55 +38,61 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
   {
     id: "sku",
     label: "Item",
-    width: 112,
+    width: O.some(112),
     // A value whose import was taken back is kept still; the item it went into is gone.
-    cell: (change) =>
+    cell: O.some((change) =>
       change.takenBack ? (
         <>
           <Code>{change.sku}</Code> <span className="font-normal text-muted-foreground">taken back</span>
         </>
       ) : (
         <Code>{change.sku}</Code>
-      ),
-    title: (change) => (change.takenBack ? `${change.sku}, taken back with its import` : change.sku),
-    value: (change) => change.sku
+      )
+    ),
+    title: O.some((change) => (change.takenBack ? `${change.sku}, taken back with its import` : change.sku)),
+    value: O.some((change) => change.sku)
   },
   {
+    title: O.none(),
     id: "row",
     label: "Row",
-    width: 64,
+    width: O.some(64),
     align: "right",
-    cell: (change) =>
+    cell: O.some((change) =>
       O.match(change.part, {
         onNone: () => `${change.rowNumber}`,
         onSome: (part) => `${change.rowNumber} · ${part}`
-      }),
-    value: (change) => change.rowNumber,
+      })
+    ),
+    value: O.some((change) => change.rowNumber),
     searchable: false
   },
   {
+    title: O.none(),
+    cell: O.none(),
     id: "field",
     label: "Field",
-    width: 124,
-    value: (record) => fieldLabels[record.change.field],
+    width: O.some(124),
+    value: O.some((record) => fieldLabels[record.change.field]),
     facet: true
   },
   {
+    title: O.none(),
     id: "change",
     label: "Was, now",
-    width: 150,
-    cell: ({ change }) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />,
+    width: O.some(150),
+    cell: O.some(({ change }) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />),
     // Searched by both values; a pair has no one order to sort by.
-    value: ({ change }) => `${change.from} ${change.to}`,
+    value: O.some(({ change }) => `${change.from} ${change.to}`),
     sortable: false
   },
   {
     id: "source",
     label: "Proposed by",
-    width: 112,
+    width: O.some(112),
     // Who proposed it and how sure they were, in one column: beside the sidebar ten columns did not fit, and the
     // table ran past its frame with the file and the time out of sight.
-    cell: (change) => (
+    cell: O.some((change) => (
       <>
         {proposedBy(change)}
         {O.match(confidenceOf(change), {
@@ -94,52 +100,59 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
           onSome: (confidence) => <span className="text-muted-foreground"> · {confidence}</span>
         })}
       </>
-    ),
-    title: (change) =>
+    )),
+    title: O.some((change) =>
       O.match(confidenceOf(change), {
         onNone: () => proposedBy(change),
         onSome: (confidence) => `${proposedBy(change)}, confidence ${confidence}`
-      }),
-    value: proposedBy,
+      })
+    ),
+    value: O.some(proposedBy),
     facet: true
   },
   {
+    title: O.none(),
+    cell: O.none(),
     id: "decided",
     label: "Decided by",
-    width: 112,
-    value: decidedBy,
+    width: O.some(112),
+    value: O.some(decidedBy),
     facet: true
   },
   {
+    title: O.none(),
+    cell: O.none(),
+    width: O.none(),
     id: "basis",
     label: "Basis",
     // What the proposal rested on; for a value the person typed, the words that say so.
-    value: ({ change }) =>
-      O.match(changeBasis(change), { onNone: () => changeHowWords[change.how], onSome: (basis) => basis }),
+    value: O.some(({ change }) =>
+      O.match(changeBasis(change), { onNone: () => changeHowWords[change.how], onSome: (basis) => basis })
+    ),
     sortable: false,
     wrap: true
   },
   {
     id: "file",
     label: "File",
-    width: 100,
+    width: O.some(100),
     // The way back to a confirmed import: its result, with the rows not imported and the take-back.
-    cell: (change) => (
+    cell: O.some((change) => (
       <a className="underline underline-offset-4" href={importAddress(change.importId, "result")}>
         {change.fileName}
       </a>
-    ),
-    title: (change) => change.fileName,
-    value: (change) => change.fileName,
+    )),
+    title: O.some((change) => change.fileName),
+    value: O.some((change) => change.fileName),
     facet: true
   },
   {
     id: "when",
     label: "When",
-    width: 124,
-    cell: (change) => whenShort(change.createdAt),
-    title: (change) => when(change.createdAt),
-    value: (change) => DateTime.formatIso(change.createdAt),
+    width: O.some(124),
+    cell: O.some((change) => whenShort(change.createdAt)),
+    title: O.some((change) => when(change.createdAt)),
+    value: O.some((change) => DateTime.formatIso(change.createdAt)),
     searchable: false
   }
 ]
@@ -156,7 +169,7 @@ export const importDecisions = catalogApi.query((api) => api.imports.changes(), 
 const importDecisionAnswer = answerOf(importDecisions)
 /** The decisions' rows and columns as the list follows them: empty until the decisions have been read. */
 const importDecisionRows = Atom.map(importDecisionAnswer, (answer) =>
-  O.match(O.fromUndefinedOr(answer), { onNone: A.empty, onSome: (answer) => answer })
+  O.match(answer, { onNone: A.empty, onSome: (answer) => answer })
 )
 const importDecisionColumnsAtom = Atom.make(importDecisionColumns)
 

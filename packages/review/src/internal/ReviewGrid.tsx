@@ -1358,7 +1358,7 @@ function GroupRow(props: {
         </span>
         <span className="flex min-w-0 items-start gap-2 text-sm">
           <Badge variant="outline" className="mt-0.5 flex-none">
-            {O.match(group.by, { onNone: () => sourceWordsFor(undefined).tag, onSome: (by) => sourceWordsFor(by).tag })}
+            {sourceWordsFor(group.by).tag}
           </Badge>
           <span className="min-w-0 text-muted-foreground">
             {group.why.basis}

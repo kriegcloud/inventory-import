@@ -16,7 +16,6 @@ import {
 import * as HashSet from "effect/HashSet"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
-import * as R from "effect/Record"
 import { useAtomMount, useAtomSet, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as Atom from "effect/reactivity/Atom"
 import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
@@ -102,8 +101,9 @@ function ActivityPanel(props: {
           id: step.id,
           label: step.label,
           status: "done" as const,
-          tag: stepTag[step.by],
-          ...R.getSomes({ output: step.detail })
+          tag: O.some(stepTag[step.by]),
+          input: O.none(),
+          output: step.detail
         }))}
       />
       <section aria-label="Allowed to" className="flex flex-col gap-2">

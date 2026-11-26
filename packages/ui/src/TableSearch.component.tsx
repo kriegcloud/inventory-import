@@ -1,3 +1,6 @@
+import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as Eq from "effect/Equal"
 import { closest } from "./internal/browser.ts"
 import { Search, X } from "lucide-react"
 import type { RowData, Table } from "@tanstack/react-table"
@@ -12,6 +15,17 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { Kbd } from "@inventory/ui/components/kbd"
 import { Spinner } from "@inventory/ui/components/spinner"
 
+const SearchText = S.Struct({
+  text: S.String.pipe(S.annotateKey({ description: "The unchanged field spelling" })),
+  search: S.Trim.pipe(S.annotateKey({ description: "The trimmed text asked of the table" }))
+}).annotate({ description: "Both the displayed spelling and the search read at text entry." })
+const readSearchText = S.decodeOption(SearchText)
+const CommandKey = S.String.pipe(S.decode(SchemaTransformation.toLowerCase())).annotate({
+  description: "Case-insensitive search shortcut key."
+})
+const readCommandKey = S.decodeOption(CommandKey)
+const commandK = readCommandKey("k")
+
 /** How long a typed search waits for the next keystroke before it is asked for, as the column filters wait. */
 const typingPause = 300
 
@@ -23,6 +37,7 @@ const typingIn = (target: EventTarget | null) =>
 /** What the person typed, and the search the table held when they typed it. */
 interface Typed {
   readonly text: string
+  readonly search: string
   readonly over: string
 }
 
@@ -37,6 +52,8 @@ interface Box {
 interface Shown {
   readonly draft: string
   readonly asked: string
+  readonly search: O.Option<string>
+  readonly askedSearch: O.Option<string>
   readonly waiting: boolean
 }
 
@@ -81,17 +98,47 @@ const makeBox = (
     const now = get(box)
     const value = get(held)
     return O.match(now.typed, {
-      onNone: () => ({ draft: value, asked: value, waiting: false }),
+      onNone: () => ({
+        draft: value,
+        asked: value,
+        search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+        askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+        waiting: false
+      }),
       onSome: (typed) =>
         O.match(now.asked, {
           onNone: () =>
             typed.over === value
-              ? { draft: typed.text, asked: value, waiting: now.waiting }
-              : { draft: value, asked: value, waiting: false },
+              ? {
+                  draft: typed.text,
+                  asked: value,
+                  search: O.some(typed.search),
+                  askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                  waiting: now.waiting
+                }
+              : {
+                  draft: value,
+                  asked: value,
+                  search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                  askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                  waiting: false
+                },
           onSome: (asked) =>
             asked === value
-              ? { draft: typed.text, asked, waiting: now.waiting }
-              : { draft: value, asked: value, waiting: false }
+              ? {
+                  draft: typed.text,
+                  asked,
+                  search: O.some(typed.search),
+                  askedSearch: O.map(readSearchText({ text: asked, search: asked }), (text) => text.search),
+                  waiting: now.waiting
+                }
+              : {
+                  draft: value,
+                  asked: value,
+                  search: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                  askedSearch: O.map(readSearchText({ text: value, search: value }), (text) => text.search),
+                  waiting: false
+                }
         })
     })
   })
@@ -113,7 +160,7 @@ const makeBox = (
           // Asked after the pause, unless it was asked already (Enter, the cross), the person typed on, or the search
           // was changed from elsewhere meanwhile.
           if (O.isNone(after) || !now.waiting || now.typed !== after || after.value.over !== heldNow()) return
-          ask(after.value.text.trim())
+          ask(after.value.search)
         })
       }),
       0
@@ -123,7 +170,8 @@ const makeBox = (
         const onKey = (event: KeyboardEvent) => {
           const slash =
             event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingIn(event.target)
-          const command = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey) && !event.altKey
+          const command =
+            Eq.equals(readCommandKey(event.key), commandK) && (event.ctrlKey || event.metaKey) && !event.altKey
           // A dialog open over the table keeps its keys.
           const inDialog = event.target instanceof Element && O.isSome(closest("[role=dialog]")(event.target))
           const node = field()
@@ -138,23 +186,31 @@ const makeBox = (
       0
     ),
     type: (text) => {
-      const same = text.trim() === registry.get(shown).asked.trim()
+      const read = readSearchText({ text, search: text })
+      if (O.isNone(read)) return
+      const same = O.contains(registry.get(shown).askedSearch, read.value.search)
       // Typing starts again from the search the table holds now: the last ask is behind it.
       registry.update(box, (now) => ({
         ...now,
-        typed: O.some({ text, over: heldNow() }),
+        typed: O.some({ ...read.value, over: heldNow() }),
         asked: O.none(),
         waiting: !same
       }))
     },
     askNow: () => {
       const now = registry.get(shown)
-      if (now.draft.trim() !== now.asked) ask(now.draft.trim())
-      else registry.update(box, (before) => ({ ...before, waiting: false }))
+      O.map(now.search, (search) => {
+        if (search !== now.asked) ask(search)
+        else registry.update(box, (before) => ({ ...before, waiting: false }))
+      })
     },
     clear: () => {
       const { asked } = registry.get(shown)
-      registry.update(box, (now) => ({ ...now, typed: O.some({ text: "", over: heldNow() }), asked: O.none() }))
+      registry.update(box, (now) => ({
+        ...now,
+        typed: O.some({ text: "", search: "", over: heldNow() }),
+        asked: O.none()
+      }))
       if (asked !== "") ask("")
       else registry.update(box, (now) => ({ ...now, waiting: false }))
       field()?.focus()

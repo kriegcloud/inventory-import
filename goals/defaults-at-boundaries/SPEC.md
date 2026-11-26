@@ -81,6 +81,7 @@ the value moves.
 
 | File | Field | Value | Rows of the messy sample | Example |
 | --- | --- | --- | --- | --- |
+| `ui/src/ProposalSource.words.ts` `ProposalLead` | unstated confidence in a lead sentence | `medium`, unchanged, on the constructor field | presentation only; no stored item value changes; missing-confidence display count not measured | a suggestion with no source or confidence reads "Suggestion, medium confidence" |
 | `contract/src/Import/Change.read.ts` | `basis` of a stored proposal with no basis | `""` | 0 (only rows written before the column was kept) | none in the sample |
 | `contract/src/Import/Change.read.ts` | `confidence` of a stored proposal with none | `"low"` | 0 (as above) | none in the sample |
 | `contract/src/Import/Import.read.ts` | `MatchTakeBack.matched`, `reads`, `saved` on an entry stored before each was kept | to be read from their readers when moved | 0 | none in the sample |

@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { ArrowRightIcon, CheckIcon, CircleHelpIcon, SparklesIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { cn } from "cn"
@@ -12,7 +13,7 @@ export type { ProposalSource } from "@inventory/ui/ProposalSource"
  * fixed rule (its words are still read out). The words come from the source the caller passes, never assumed.
  */
 export function SourceMark(props: { source: ProposalSource | undefined }) {
-  const words = sourceWordsFor(props.source)
+  const words = sourceWordsFor(O.fromUndefinedOr(props.source))
   if (props.source === "rule" || props.source === "person") return <span className="sr-only"> ({words.hidden})</span>
   return (
     <Tooltip>
@@ -108,7 +109,7 @@ export function ProposedValue(props: {
         </>
       )}
       {props.source === undefined || props.state !== undefined ? null : (
-        <span className="text-xs text-muted-foreground">{sourceWordsFor(props.source).tag}</span>
+        <span className="text-xs text-muted-foreground">{sourceWordsFor(O.fromUndefinedOr(props.source)).tag}</span>
       )}
     </span>
   )

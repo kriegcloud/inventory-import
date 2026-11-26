@@ -13,17 +13,42 @@ type AuditEvent = (typeof Activity.json)["Type"]
 
 /** The columns of the audit trail's list: what was done, who did it, the sentence, and when. */
 export const auditEventColumns: ReadonlyArray<ListColumn<AuditEvent>> = [
-  { id: "action", label: "What", width: 220, value: (event) => event.action, facet: true },
-  { id: "who", label: "Who", width: 200, value: (event) => event.actorName, facet: true },
-  { id: "detail", label: "Detail", value: (event) => event.detail, sortable: false, wrap: true },
+  {
+    title: O.none(),
+    cell: O.none(),
+    id: "action",
+    label: "What",
+    width: O.some(220),
+    value: O.some((event) => event.action),
+    facet: true
+  },
+  {
+    title: O.none(),
+    cell: O.none(),
+    id: "who",
+    label: "Who",
+    width: O.some(200),
+    value: O.some((event) => event.actorName),
+    facet: true
+  },
+  {
+    title: O.none(),
+    cell: O.none(),
+    width: O.none(),
+    id: "detail",
+    label: "Detail",
+    value: O.some((event) => event.detail),
+    sortable: false,
+    wrap: true
+  },
   // The same short form as the decisions' column, so the lists on the Activity page read alike.
   {
     id: "when",
     label: "When",
-    width: 150,
-    cell: (event) => whenShort(event.createdAt),
-    title: (event) => when(event.createdAt),
-    value: (event) => DateTime.formatIso(event.createdAt),
+    width: O.some(150),
+    cell: O.some((event) => whenShort(event.createdAt)),
+    title: O.some((event) => when(event.createdAt)),
+    value: O.some((event) => DateTime.formatIso(event.createdAt)),
     searchable: false
   }
 ]
@@ -43,7 +68,7 @@ export const auditEvents = accessApi.query((api) => api.activity.recent(), {
 const auditEventAnswer = answerOf(auditEvents)
 /** The audit trail's rows and columns as the list follows them: empty until the trail has been read. */
 const auditEventRows = Atom.map(auditEventAnswer, (answer) =>
-  O.match(O.fromNullishOr(answer), { onNone: A.empty<AuditEvent>, onSome: identity })
+  O.match(answer, { onNone: A.empty<AuditEvent>, onSome: identity })
 )
 const auditEventColumnsAtom = Atom.make(auditEventColumns)
 

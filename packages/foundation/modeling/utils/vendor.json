@@ -284,9 +284,15 @@
     {
       "path": "test/Option.test.ts",
       "sourceSha256": "517a5b74b44db1a61da24a3e5f14bdd44f62064dadfc9315326defc9909b5d7b",
-      "sha256": "3410a84685a7d1b391153692a220d067466a3b2a5012d08fe2029ae2d5395229",
+      "sha256": "64cf3108015f556fccd7155b121d04b0fbd4069aa1270ad64511731d382802a9",
       "rewrites": [
         "@beep/test-runner -> @effect/vitest"
+      ],
+      "patches": [
+        {
+          "change": "    expectTypeOf(O.getOrElseFalse(O.none())).toEqualTypeOf<false>();\n    expectTypeOf(O.getOrElseTrue(O.none())).toEqualTypeOf<true>();\n    expectTypeOf(O.getOrElse0(O.none())).toEqualTypeOf<0>();\n    expectTypeOf(O.getOrElseEmptyStr(O.none())).toEqualTypeOf<\"\">();\n\n    const value = O.some<\"present\">(\"present\");\n    expectTypeOf(O.getOrElseFalse(value)).toEqualTypeOf<\"present\" | false>();\n    expectTypeOf(O.getOrElseTrue(value)).toEqualTypeOf<\"present\" | true>();\n    expectTypeOf(O.getOrElse0(value)).toEqualTypeOf<\"present\" | 0>();\n    expectTypeOf(O.getOrElseEmptyStr(value)).toEqualTypeOf<\"present\" | \"\">();\n\n    expect(O.getOrElseFalse(O.none())).toBe(false);\n    expect(O.getOrElseTrue(O.none())).toBe(true);\n    expect(O.getOrElse0(O.none())).toBe(0);\n    expect(O.getOrElseEmptyStr(O.none())).toBe(\"\");\n    expect(O.getOrElseFalse(value)).toBe(\"present\");\n    expect(O.getOrElseTrue(value)).toBe(\"present\");\n    expect(O.getOrElse0(value)).toBe(\"present\");\n    expect(O.getOrElseEmptyStr(value)).toBe(\"present\"); ->     const none = O.none();\n    const value = O.some<\"present\">(\"present\");\n    const fallbackFalse = O.getOrElseFalse(none);\n    const fallbackTrue = O.getOrElseTrue(none);\n    const fallbackZero = O.getOrElse0(none);\n    const fallbackEmpty = O.getOrElseEmptyStr(none);\n    const valueOrFalse = O.getOrElseFalse(value);\n    const valueOrTrue = O.getOrElseTrue(value);\n    const valueOrZero = O.getOrElse0(value);\n    const valueOrEmpty = O.getOrElseEmptyStr(value);\n\n    expectTypeOf(fallbackFalse).toEqualTypeOf<false>();\n    expectTypeOf(fallbackTrue).toEqualTypeOf<true>();\n    expectTypeOf(fallbackZero).toEqualTypeOf<0>();\n    expectTypeOf(fallbackEmpty).toEqualTypeOf<\"\">();\n    expectTypeOf(valueOrFalse).toEqualTypeOf<\"present\" | false>();\n    expectTypeOf(valueOrTrue).toEqualTypeOf<\"present\" | true>();\n    expectTypeOf(valueOrZero).toEqualTypeOf<\"present\" | 0>();\n    expectTypeOf(valueOrEmpty).toEqualTypeOf<\"present\" | \"\">();\n\n    expect(fallbackFalse).toBe(false);\n    expect(fallbackTrue).toBe(true);\n    expect(fallbackZero).toBe(0);\n    expect(fallbackEmpty).toBe(\"\");\n    expect(valueOrFalse).toBe(\"present\");\n    expect(valueOrTrue).toBe(\"present\");\n    expect(valueOrZero).toBe(\"present\");\n    expect(valueOrEmpty).toBe(\"present\");",
+          "reason": "@effect/tsgo 0.73.4 reports each nested `O.getOrElse*(O.none())` inside `expectTypeOf(...)` as a missed pipeable form (missedPipeableOpportunity), an error in this repository's profile. The patch is beep-effect's own change to this test at 6f88be88e92 (#3549, the same tsgo move): each value is bound once, then checked. Unnecessary once the kit is synced at that commit or later."
+        }
       ]
     },
     {

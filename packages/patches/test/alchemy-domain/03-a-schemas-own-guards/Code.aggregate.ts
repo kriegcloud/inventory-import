@@ -1,5 +1,5 @@
 // A code kept only when a pattern allows it. The prover does not read a pattern, so it cannot say what `Schema.is`
-// answers here, and has to say so: a rule that rests on the answer is "not read", never proved.
+// answers here, and has to say so: a rule that rests on the answer is "not supported", never proved.
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"
 

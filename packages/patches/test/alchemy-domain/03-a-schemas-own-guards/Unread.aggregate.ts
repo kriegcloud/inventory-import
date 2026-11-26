@@ -1,5 +1,5 @@
 // Five guards the prover cannot answer exactly, each asked by its own command. It has to say so of each: a rule that
-// rests on the answer is "not read", never proved. Each was once read wrongly, and a false rule proved by it.
+// rests on the answer is "not supported", never proved. Each was once read wrongly, and a false rule proved by it.
 import * as Domain from "@alchemy.run/domain"
 import { constFalse, constTrue } from "effect/Function"
 import * as S from "effect/Schema"

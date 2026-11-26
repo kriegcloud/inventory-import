@@ -276,7 +276,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
   const rootPackage = yield* repo.text(repo.join(repo.root, "package.json"))
   const asked = vendoredSpec(cataloguedIn(rootPackage))
   const asking = (entries: Record<string, string>) => R.map(entries, (version, name) => asked(name, version))
-  const versionOf = (name: string): string => (name === "type-fest" ? "^6.0.1" : "workspace:*")
+  const versionOf = (name: string): string => (name === "type-fest" ? "^6.0.3" : "workspace:*")
   const versioned = (names: ReadonlyArray<string>) => A.map(names, (name) => [name, versionOf(name)] as const)
 
   /** Writes package.json, the tsconfigs, the vitest config, the README and test support; returns the local files. */
@@ -290,7 +290,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     const testFiles = A.map(tests[pkg.name] ?? [], (name) => `test/${name}`)
     const sourceDependencies = yield* dependenciesOf(pkg, sources)
     const dependencies = R.fromEntries(
-      A.sort(A.append(versioned(sourceDependencies), ["effect", "4.1.5"] as const), byLocale)
+      A.sort(A.append(versioned(sourceDependencies), ["effect", "4.1.6"] as const), byLocale)
     )
     const testDependencies = yield* dependenciesOf(pkg, testFiles)
     const testTexts = yield* Effect.forEach(testFiles, (file) => repo.text(repo.join(target, file)), { concurrency: 1 })
@@ -298,10 +298,10 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
       A.sort(
         A.flatten<ReadonlyArray<ReadonlyArray<readonly [string, string]>>>([
           versioned(A.filter(testDependencies, (name) => !R.has(dependencies, name))),
-          [["@effect/vitest", "4.1.5"]],
-          A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.5"]] : [],
-          [["@types/node", "^22.20.5"]],
-          [["vitest", "^5.1.0"]]
+          [["@effect/vitest", "4.1.6"]],
+          A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.6"]] : [],
+          [["@types/node", "^22.20.7"]],
+          [["vitest", "^5.1.2"]]
         ]),
         byLocale
       )

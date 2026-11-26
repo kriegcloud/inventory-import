@@ -3,7 +3,8 @@
  * `staging` and `production`), a Cloudflare token it makes for production's account and the owner's own token for
  * the previews' (staging runs there too, decision I4), production's model key and sign-up list (I5, I8), the rule that `main` takes a change only
  * through a pull request whose check passed, with an admin bypass (I7), and the release rules (decision "releases and
- * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten.
+ * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten. And one
+ * setting of the repository itself: a pull request's branch is deleted once it merges.
  *
  * Deployed from a workstation only, by the repository's owner: `bunx alchemy deploy
  * packages/infra/src/GitHub.stack.ts --stage prod`. The model key, the previews' password and the previews'
@@ -255,6 +256,16 @@ export default Alchemy.Stack(
       environment: staging,
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: previewAccount
+    })
+
+    // Benjamin's ask of 2026-11-25: a pull request's branch is deleted once it merges. Only that one setting is
+    // given, so every other one (visibility, description, merge methods) stays as GitHub holds it: a setting left out
+    // is not sent. The repository is retained on removal, so taking this out of the stack never deletes it. A
+    // `release/*` branch is never deleted this way: its ruleset refuses the deletion.
+    yield* GitHub.Repository("Repository", {
+      owner: repository.owner,
+      name: repository.repository,
+      deleteBranchOnMerge: true
     })
 
     // Decision I7: the rule on main, as code, with the admin bypass that is the way out of a check that never ran.

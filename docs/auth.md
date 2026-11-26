@@ -8,7 +8,7 @@ status: draft
 
 # Sign-in
 
-Better Auth 1.7.22 (pinned) handles sign-up, sign-in, sign-out, sessions and organizations. Handlers do not know it
+Better Auth 1.7.28 (pinned) handles sign-up, sign-in, sign-out, sessions and organizations. Handlers do not know it
 exists: they read `CurrentActor` and call `requireRole`, as before. The rules it meets, each with its check, are in
 [the sign-in standard](standards/sign-in.md).
 

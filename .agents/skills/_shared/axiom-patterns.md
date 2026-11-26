@@ -278,7 +278,7 @@ ObjectProperty: partOf
 
 ## 11. HasKey Axiom
 
-> Here: not used for the identity of records: a party's identity is report 01's "tenant and a source id" (`project-profile.md`: open as criterion or key, for Benjamin). HasKey entails `owl:sameAs`; put any proposed key to Benjamin as a question.
+> Here: not used for the identity of records: the tenant's `SourceRecord` is reidentified by tenant, source system, source type and source id (decision 34), a party's identity criterion is report 18's as decision 176 accepts it, and `Party`, a category, has none (decision 12). HasKey entails `owl:sameAs`; put any proposed key to Benjamin as a question.
 
 **When**: Stating that individuals of a class that share values for the key
 properties are the same individual.

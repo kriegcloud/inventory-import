@@ -9,7 +9,7 @@
 // planted structs give an absent and a present `Option`, and a boolean on step 2's copy, since no record of the kernel
 // has a boolean field; each value its datatype does not write is planted and refused. The People page's `Person`
 // names no tenant, so its caller gives one beside the rows, and a tenant given to a record that names its own is
-// refused (PLAN, "Choices made").
+// refused (decision 149), as is a record that names its tenant in two fields.
 //
 // A path that ends in an attribute (party slice, step 11; decisions 155 and 161): it states nothing, and the record still
 // lifts, unless its node step is a relation another field fills, whose object then carries the literal, untyped. Each
@@ -461,6 +461,35 @@ describe("the tenant given beside the rows", () => {
         O.map(tenant, (triple) => triple.object),
         IriNode.make({ kind: "iri", iri: `${context.vocabulary.base}/data/test_ExampleWorks/Tenant/test_ExampleWorks` })
       )
+    })
+  )
+
+  // Both fields hold an id, so only the count of tenant fields refuses: taking the first would write the member under
+  // one organization and say nothing of the other.
+  const twoTenants = (mark: S.Annotations.Key<OrganizationId>) =>
+    S.Struct({ ...Member.fields, workspaceId: OrganizationId.pipe(S.annotateKey(mark)) }).pipe(
+      S.annotate(aboutClass("inv:Member"))
+    )
+
+  it.effect("refuses a record that names its tenant in two fields, naming no field", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const record = twoTenants(aboutProperty("inv:inTenant"))
+      const row = yield* S.decodeUnknownEffect(record)({ ...raviRow, workspaceId: "test_SecondOrg" })
+      const refusal = yield* Effect.flip(lift(context, record, row))
+      expect(refusal.field).toStrictEqual(O.none())
+      expect(refusal.reason).toBe("2 fields name a property ranging over the tenant; the lift needs one")
+    })
+  )
+
+  it.effect("near miss: the same record with the second field marked as no term lifts Member's seven triples", () =>
+    Effect.gen(function* () {
+      const context = yield* threadContext
+      const { lifted } = yield* names
+      const record = twoTenants(noTerm("screen"))
+      const row = yield* S.decodeUnknownEffect(record)({ ...raviRow, workspaceId: "test_SecondOrg" })
+      const triples = yield* lift(context, record, row)
+      expect(linesOf(triples)).toStrictEqual(linesOf(lifted("test_ExampleWorks", "test_RaviWorks", "admin")))
     })
   )
 })

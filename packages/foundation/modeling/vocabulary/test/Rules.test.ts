@@ -747,6 +747,17 @@ describe("a retired term", () => {
     })
   )
 
+  it.effect("C15: live object properties whose domain is a retired class", () =>
+    Effect.gen(function* () {
+      // Loan is the domain of loanOf and loanStatus and the range of nothing, so only the domain link is found.
+      const found = yield* findingsOf(withClasses({ Loan: { ...loan, deprecation: withdrawn } }))
+      expect(found).toEqual([
+        ["C15", "objectProperty", "loanOf"],
+        ["C15", "objectProperty", "loanStatus"]
+      ])
+    })
+  )
+
   it.effect("C15: a live class whose parent or category parent is retired", () =>
     Effect.gen(function* () {
       const parent = yield* findingsOf(withClasses({ Library: { ...library, deprecation: withdrawn } }))
@@ -871,13 +882,16 @@ describe("a property under a gist property", () => {
     Effect.gen(function* () {
       const properties = {
         ...gistWithProperties.properties,
-        heldBy: { kind: "object", domain: "Agent", range: "Place" },
+        // One fault each, so a finding is told by its term: the domain alone, the class range alone, the domain of
+        // a datatype property.
+        heldBy: { kind: "object", domain: "Agent", range: "Content" },
+        heldIn: { kind: "object", domain: "Thing", range: "Place" },
         issuedAt: { kind: "datatype", domain: "Event", range: "xsd:dateTime" }
       }
       const found = yield* findingsOf({ ...valid, gist: { ...gistWithProperties, properties } })
       expect(found).toEqual([
         ["C9", "gist", "heldBy"],
-        ["C9", "gist", "heldBy"],
+        ["C9", "gist", "heldIn"],
         ["C9", "gist", "issuedAt"]
       ])
     })

@@ -87,6 +87,11 @@ Proposed classes, in OntoClean terms (rigid kinds carry identity; roles do not):
 | `IdentityDecision` | record of a person's decision | its own id | two party records are the same party: evidence, who decided, when. Never `owl:sameAs` |
 | `Grant` | relator: a party in a role at a scope | member, role, scope (tenant, site, field) | authorization; a role label alone authorizes nothing |
 
+Later decisions changed the first three rows, which stand here as first drafted: decision 12 made `Party` a category
+over `Person` and `Organization`, which supplies no identity; decision 34 put "tenant and a source id" on the
+tenant's `SourceRecord` (with source system and source type), not on the party; decision 103 made an organization the
+same organization when it is the same legal entity; and decision 161 has `Person` store no id.
+
 Decision 3 (2026-11-22) replaced the first draft's `TradingRelationship` relator and role classes with flags on
 `Organization`. What that gives up, so it is known: a role has no dates of its own, terms and portal access sit on the
 organization, and a person cannot be an Account. Reversing it is conditional: each flag set to true becomes one

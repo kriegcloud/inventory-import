@@ -157,6 +157,13 @@ const partyNames = Effect.gen(function* () {
 const dropped = (graph: ReadonlyArray<Triple>, subject: string, predicate: string) =>
   A.filter(graph, (triple) => !(triple.subject === subject && triple.predicate === predicate))
 
+/** The classes `graph` states `subject` is, with no walk: what a must-fail case reads before it trusts its node. */
+const typesOf = (graph: ReadonlyArray<Triple>, subject: string) =>
+  A.map(
+    A.filter(graph, (triple) => triple.subject === subject && triple.predicate === type),
+    iriOf
+  )
+
 describe("gate 8, the questions", () => {
   it.effect("CQ-P06: the two members of the two organizations, each with the role its grant gives", () =>
     Effect.gen(function* () {
@@ -1201,6 +1208,8 @@ describe("gate 8, CQ-P01: the organizations a tenant both buys from and sells to
       const n = yield* partyNames
       const graph = yield* fixtureGraph(trading.fixture)
       const trader = n.individual("test_SoleTrader")
+      // The node is a person and no organization, so its absence is the type step's work, not an untyped node's.
+      expect(typesOf(graph, trader)).toStrictEqual([n.inv("Person")])
       const rows = yield* asked(graph, trading.query, tradingVariables)
       expect(A.filter(rows, ([, organization]) => organization === trader)).toStrictEqual([])
       // Planted: without the organization type step, the person is listed beside the co-packer.
@@ -1300,6 +1309,8 @@ describe("gate 8, CQ-P02: the organizations a tenant's record says hold no tradi
       const n = yield* partyNames
       const graph = yield* fixtureGraph(roleless.fixture)
       const retiree = n.individual("test_Retiree")
+      // The node is a person and no organization, so its absence is the type step's work, not an untyped node's.
+      expect(typesOf(graph, retiree)).toStrictEqual([n.inv("Person")])
       const rows = yield* asked(graph, roleless.query, tradingVariables)
       expect(A.filter(rows, ([, organization]) => organization === retiree)).toStrictEqual([])
       // Planted: without the organization type step, the retired person is listed beside the dormant company.

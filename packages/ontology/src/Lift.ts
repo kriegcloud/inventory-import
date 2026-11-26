@@ -60,7 +60,7 @@ export class LiftRefused extends S.TaggedError<LiftRefused, { readonly brand: un
  *
  * `organization` is none for a record that names its own tenant, and the lift refuses one given for it: two sources of
  * the organization could disagree. The People page's `Person` names none, since the page lists one organization's
- * members, so its caller gives it (PLAN, "Choices made"; reversing that choice changes this field alone).
+ * members, so its caller gives it (decision 149; reversing that decision changes this field alone).
  */
 export type LiftContext = {
   readonly vocabulary: Vocabulary

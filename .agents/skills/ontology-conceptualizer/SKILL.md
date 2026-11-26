@@ -47,8 +47,9 @@ and 129), and are already in the module. There is no `ontologies/{name}/`.
 
 The thin thread and the party slice are built: the vocabulary module, the projector, the generated Turtle, CQ-P06 and
 CQ-P11, the party questions, and the reasoner step. Not built, so never run or report as run: SHACL over the stored
-rows, alignments, any term beyond the module's, the slices after the party slice. A party's identity is "tenant and
-a source id, never a name" (report 01), open as criterion or key (profile); a Sutton Account is an `Organization`
+rows, alignments, any term beyond the module's, the slices after the party slice. The tenant's `SourceRecord` is
+reidentified by tenant, source system, source type and source id (decision 34), never a name; a party's identity
+criterion is report 18's as decision 176 accepts it, and `Party`, a category, has none (12); a Sutton Account is an `Organization`
 (a `Person` when its kind is `individual`), its role flags on the tenant's `SourceRecord` (profile, decision 3);
 IRIs stay under the `example.org` placeholder.
 

@@ -20,7 +20,7 @@ owed from Benjamin for the thread now. Benjamin said the brief matches (119), an
 [erp-vocabulary](../../goals/erp-vocabulary/SPEC.md). Its SPEC carries the five forbidden conclusions he signed (117,
 121), and the thread's gate 8 runs CQ-P11 beside CQ-P06 (120). A commit that changes an
 expected-rows file says so, and the release notes name the question with its old and new answer (118). The
-thread is built, on branch `docs/erp-ontology-packet`, its commits not pushed: the goal's
+thread is built and merged to `main` as pull request 8: the goal's
 [PLAN](../../goals/erp-vocabulary/PLAN.md) says what was built and checked. Slice 1 is built too, on branch
 `goal/party-slice`, its commits not pushed: its [PLAN](../../goals/party-slice/PLAN.md) says what was built and
 checked. No slice after it is.
@@ -32,7 +32,7 @@ is pinned by major version (113); Java 27 was never tried and is not the pin. CI
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
 Slice 1, the party slice, follows the thread and is specified as [goals/party-slice](../../goals/party-slice/SPEC.md),
-whose nineteen questions (O1 to O19) I answered on 2026-11-26 as decisions 129 to 147, with 148 to 153; 154 to 175
+whose nineteen questions (O1 to O19) Benjamin answered on 2026-11-26 as decisions 129 to 147, with 148 to 153; 154 to 175
 answer report 18's questions, 176 accepts it as the text of the slice's terms, and 177 to 179 answer what the steps
 that built them set aside. Benjamin will take each of the 47 open decisions with a concrete record
 when the slice that needs it is specified; slice 1's were answered on 2026-11-26. Decision 116 asks how a grant names the location or field it covers;
@@ -121,7 +121,7 @@ first class list, a decision log and a product model read from public sources).
   questions 2 to 10, each as recommended. The report is final to them: `membershipIn` reworded, `Party` stores no id,
   the flags only on a trading account's record, `memberContactPoint` under `gist:hasAddress`, and no count of terms
   moved. One question remains, the accepting decision's number (recommended: 176).
-- 2026-11-26: I accepted report 18 as decision 176. Decisions 154 to 175 answered its questions; no term is in the
+- 2026-11-26: Benjamin accepted report 18 as decision 176. Decisions 154 to 175 answered its questions; no term is in the
   module yet (steps 9 to 12 of `goals/party-slice`).
 - 2026-11-26: steps 9 to 14 of `goals/party-slice` built the slice: report 18's terms in the module (17 classes, 62
   properties, 9 schemes, 28 concepts), the access records enrolled, CQ-P01 to CQ-P05, CQ-P07 and CQ-P09's party half

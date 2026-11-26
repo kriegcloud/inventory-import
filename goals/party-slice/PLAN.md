@@ -1089,6 +1089,18 @@ Needs Benjamin: nothing open.
   ticked: the enrolment line, whose JSON Schema before and after each step was measured in step 11 and not again; and
   "each new planted mistake fails its own gate and no other", step 14's walk, not repeated. The quality review may
   tick both.
+- Review, 2026-11-26: the closing panel's findings, each checked against the code before it was fixed (Closing note,
+  "The quality review"). Both lines left open are ticked: the JSON Schema of every schema the enrolled exports'
+  eight modules hold (28, `Activity`'s six variants among them) was written by `S.toJsonSchemaDocument` from copies
+  of `packages/kernel` and `packages/access/contract` at `16eb597d` and at the head, made outside the repository with
+  `git archive`, the rest of the workspace the head's; the two outputs are 81,821 bytes each and `cmp` finds them the
+  same. Every mark change is in step 11 (`eb6135ad`), so that is each step's before and after; the API's OpenAPI
+  document rests on step 11's measure. `bun run beep laws ontology-terms`, `Pointers.test.ts` and the app's tests
+  passed in `bun run check`, and no app test changed since `16eb597d`. Step 14's walk: its named tests passed in
+  `bun run check`, and `bun run --cwd packages/ontology reason` (the cached jar, its sha256 the lock's, Java 17,
+  nothing fetched) found the ten packet fixtures consistent and `record-is-organization.ttl` inconsistent. Each test
+  this review added was run with its rule removed and failed alone: the two-tenant check of `organizationOf`, C15's
+  object-property domain link, and the person type in CQ-P01's and CQ-P02's fixtures.
 
 What was corrected, and by which decision:
 
@@ -1131,8 +1143,8 @@ What was corrected, and by which decision:
 
 ## Closing note
 
-Written on 2026-11-26, in step 15, before its quality review. The goal is not done: `/quality-review-fix-loop` has not
-run, SPEC's status stays `active`, and what the review finds is added here when it has.
+Written on 2026-11-26, in step 15, before its quality review, and amended after the review's first panel (below). SPEC's
+20 acceptance lines are ticked; its status stays `active` until the review's loop closes with no required finding.
 
 **What was built.** The module holds report 18's terms beside the thread's, as decision 176 accepted them: 17 classes,
 34 object and 28 datatype properties, 9 schemes and 28 concepts, on 12 gist classes with 4 disjoint pairs and 5 gist
@@ -1188,6 +1200,26 @@ did not need):
 - The party context's contract package (decision 37): when its first record is built. No party record is stored.
 - Decision 47 stays a deferred row of the Open table, and decision 116 (a grant at one location or field) open.
 
+**The quality review.** The closing panel's findings, each read against the code first; none was rejected, and none
+needs Benjamin.
+
+- Fixed in tests: `organizationOf`'s refusal of a record naming its tenant in two fields, planted in `Lift.test.ts`
+  with the near miss that marks the second field `noTerm`; C15's link from a live object property to a retired domain,
+  planted in `Rules.test.ts` (Loan withdrawn); CQ-P01's and CQ-P02's must-fail cases on a person now assert the node is
+  typed `inv:Person` and nothing else, so an untyped node no longer passes for one; `NoTermEntry` in the ontology
+  package's SF-7 property test; C9's case of a domain and a range off the gist list split so each finding names its own
+  term.
+- Fixed in documents: SPEC's lines on the walk's unchanged rows (CQ-P06's columns changed in step 11), on the Open
+  table's rows (now answered), and on the coverage proof (names, classes and left fields; placement by
+  `placementFaults`); the profile's row 35 under decision 168; the conceptualizer skill and `axiom-patterns.md` on a
+  party's identity (34, 176, 12); the packet README's thread (merged, pull request 8) and its two lines that said "I"
+  for Benjamin; the brief's later Map rows (their goal names predate 147); report 01's first three class rows (12, 34,
+  103, 161); the lift's `LiftContext` cites decision 149.
+- No change needed: the module's text against report 18 (ModelCall's criterion writes the report's code span
+  `modelCall` as plain text, as the thread did); the tests added since `16eb597d` narrow no expectation with an `if`.
+
+Needs Benjamin: nothing open.
+
 **Left, and said.**
 
 - The shared skill files whose "not built" lines date from before the thread (`methodology-backbone.md`,
@@ -1196,12 +1228,18 @@ did not need):
 - No Sutton record was read (Choices made): every party answer rests on `test_` fixtures, which is what decision 36
   gives up.
 - Nothing is pushed, so the CI job `reason` has not run the slice's ten fixtures on GitHub.
+- `noTerm`'s deferral is still bound to the slice `party`, and gate 5's known slices still name it, so a record
+  enrolled later could defer a field to the built slice. No field defers today (P13's rows and a search). The next
+  slice's goal moves the deferral to its own slice, or empties the list.
+- Decision 176 names report 18 as committed at `8363bfb1`; the one line added since is the note under its section 13
+  that it was accepted, and no term's text changed after that commit.
+- The `@category schemas` tags on the access contract's `Membership`, `OrganizationChoice` and `ModelCallPurpose`,
+  older than the goal, which `CLAUDE.md` bans: removed when that contract is next cleaned up.
 
 **Not verified.**
 
-- The quality review of step 15, not yet run.
-- That each changed record's JSON Schema is the same before and after its step was measured in step 11, the one step
-  that changed a mark (step 12 changed none), and not again here; the walk of each planted mistake through the nine gates was step 14's and was not repeated.
+- The API's OpenAPI document before and after step 11 was measured in step 11 and not again in the review.
+- The review handed no planted mistake to a gate that does not read it, as step 14's walk did not.
 - gist's own axioms beside the generated file: decision 28 keeps them out of gate 9's closure, so they were never
   reasoned over.
 - The Sutton field names read from its schema and in no report (SPEC, "Sutton's party records"), whether

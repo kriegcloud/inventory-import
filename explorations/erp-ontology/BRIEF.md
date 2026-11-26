@@ -24,7 +24,9 @@ Slice 1 has since been built, on 2026-11-26, as the goal [party-slice](../../goa
 147), its terms the text of report 18 as decision 176 accepted it. Where the text below speaks of slice 1, and in the
 Map's goal, Decided and Open cells, it is corrected to the decisions answered since it was signed, each named where
 its sentence changed: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 124, 126 and P2, and the goal's 130, 133,
-134, 137 to 139, 141, 143, 145, 146 and 148. The later slices are untouched.
+134, 137 to 139, 141, 143, 145, 146 and 148. The later slices are untouched: their rows still name their goal
+"`erp-vocabulary`, slice 2" and "slice 3", names that predate decision 147 (one goal per slice, `erp-vocabulary`
+closed), and each takes a goal of its own when it is specified.
 
 Decisions 1 to 7 of [DECISIONS.md](DECISIONS.md) fixed the shape: the ontology is the model of record for this
 repository's contexts, with Sutton a mapping (1); one TypeScript vocabulary module owns every term fact and all Turtle

@@ -83,7 +83,7 @@
   "packages/ui/src/AgentRun.component.tsx": 3,
   "packages/ui/src/Code.component.tsx": 1,
   "packages/ui/src/PageHeader.component.tsx": 5,
-  "packages/ui/src/ProposalSource.words.ts": 7,
+  "packages/ui/src/ProposalSource.words.ts": 3,
   "packages/ui/src/ProposedValue.component.tsx": 8,
   "packages/ui/src/Route.atoms.ts": 5,
   "packages/ui/src/Skeletons.component.tsx": 20,

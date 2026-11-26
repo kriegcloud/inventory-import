@@ -3,8 +3,7 @@ import { identity } from "effect/Function"
 // built from this starter: a rule's suggestion called "a guess by the model", a row with no fix that said nothing
 // about why, rows nothing here can fix counted as decisions, an enabled import button that could do nothing, a table
 // wider than the screen, money shown as "31.4", and the same status word kept in two places.
-// @effect-diagnostics nodeBuiltinImport:off
-import { readFileSync } from "node:fs"
+import { readBytes } from "./support/fixture.ts"
 import { describe, expect, it } from "@effect/vitest"
 import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
@@ -50,7 +49,7 @@ import {
 import { stageTable } from "@inventory/catalog-model/Staging"
 
 const sample = (name: string): File =>
-  new File([new Uint8Array(readFileSync(new URL(`./fixtures/samples/${name}`, import.meta.url)))], name)
+  new File([readBytes(new URL(`./fixtures/samples/${name}`, import.meta.url))], name)
 
 const stage = (file: File): Effect.Effect<StagedTable> =>
   Effect.orDie(

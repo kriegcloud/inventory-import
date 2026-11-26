@@ -6,8 +6,7 @@ import { assertDefined, assertTrue } from "@effect/vitest/utils"
 // region's own logic (src/web/components/review). These must agree, or the button would say "Import 9 items" and
 // the server would write a different number. This test drives the region's logic the way the screen does, through
 // the same adapter, and compares the two after every step.
-// @effect-diagnostics nodeBuiltinImport:off
-import { readFileSync } from "node:fs"
+import { readBytes } from "./support/fixture.ts"
 import { cost } from "./support/cost.ts"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
@@ -48,7 +47,7 @@ const reviewColumns: ReadonlyArray<ReviewColumn> = []
 
 /** A file from `public/samples/`, as the browser would hold it after the person chose it. */
 const sample = (name: string): File =>
-  new File([new Uint8Array(readFileSync(new URL(`./fixtures/samples/${name}`, import.meta.url)))], name)
+  new File([readBytes(new URL(`./fixtures/samples/${name}`, import.meta.url))], name)
 
 /** Reads and stages a file exactly as the upload screen does. */
 const stage = (file: File): Effect.Effect<StagedTable> =>

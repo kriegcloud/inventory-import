@@ -1,4 +1,4 @@
-// The ban on `@effect-diagnostics` directives: each is refused where it stands, and each listed file is held at its
+// The ban on Effect diagnostic suppression directives: each is refused where it stands, and each listed file is held at its
 // number of directives against its ledger and against main's. A directive is put together here, never written out,
 // since the checker reads one in a string too.
 import { describe, expect, it } from "@effect/vitest"
@@ -54,7 +54,7 @@ describe("laws diagnostics", () => {
     Effect.gen(function* () {
       const said = yield* inTree({ ...ledger({}), "packages/x/src/a.ts": off }, inRepository())
       expect(said).toContain(
-        "err: packages/x/src/a.ts:3  an @effect-diagnostics directive: remove it and write the code the rule asks for"
+        `err: packages/x/src/a.ts:3  an ${diagnosticDirective} directive: remove it and write the code the rule asks for`
       )
       const elsewhere = yield* inTree(
         { ...ledger({}), "docs/a.ts": off, "scratchpad/experiments/x/a.ts": off },
@@ -76,7 +76,7 @@ describe("laws diagnostics", () => {
       // A number that rose is code that breaks the rule; one that fell is the ledger's alone.
       expect(A.head(more)).toEqual(
         O.some(
-          expect.stringContaining("err: diagnostics:check FAIL  an @effect-diagnostics directive turns a rule off")
+          expect.stringContaining(`err: diagnostics:check FAIL  an ${diagnosticDirective} directive turns a rule off`)
         )
       )
       const fewer = yield* inTree(held, inRepository({ [listed]: directives(1) }))

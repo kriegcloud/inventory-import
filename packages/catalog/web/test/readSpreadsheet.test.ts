@@ -1,8 +1,7 @@
 import { assertDefined } from "@effect/vitest/utils"
-// @effect-diagnostics nodeBuiltinImport:off
 // Reads real files from test/fixtures/spreadsheet (generated outside the repo; invented fabrication-shop stock) and
 // public/samples through the same entry point the browser uses. Each case is listed in docs/patterns.md section 7.
-import { readFileSync } from "node:fs"
+import { readBytes } from "./support/fixture.ts"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -20,8 +19,7 @@ import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 
-const bytesOf = (path: string): Uint8Array<ArrayBuffer> =>
-  new Uint8Array(readFileSync(new URL(`./${path}`, import.meta.url)))
+const bytesOf = (path: string): Uint8Array<ArrayBuffer> => readBytes(new URL(`./${path}`, import.meta.url))
 const fixture = (name: string, as: string): File => new File([bytesOf(`fixtures/spreadsheet/${name}`)], as)
 const textFile = (text: string, name: string): File => new File([text], name)
 

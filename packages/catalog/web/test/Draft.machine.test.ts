@@ -105,6 +105,46 @@ describe("the review's draft, whatever order things happen in", () => {
 })
 
 describe("the orderings that lost or hid a decision", () => {
+  it("an earlier save that landed after somebody confirmed is still this tab's when the reopened import is read", () => {
+    const C = Command.cases
+    expect(
+      broken([
+        C.SomeoneConfirms.make({}),
+        C.Decide.make({ row: "a", to: "empty" }),
+        C.SaveRefused.make({ which: "last" }),
+        C.Decide.make({ row: "b", to: "out" }),
+        C.SomeoneReopens.make({}),
+        C.ServerTakesRead.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.SaveFails.make({ which: "last" }),
+        C.ReadArrives.make({}),
+        C.PressConfirm.make({}),
+        C.Decide.make({ row: "b", to: "kept" })
+      ])
+    ).toEqual(O.none())
+  })
+
+  it("a match's remainder of a sent decision kept from a line is still this tab's", () => {
+    const C = Command.cases
+    expect(
+      broken([
+        C.Reload.make({}),
+        C.TakeUp.make({ row: "c", to: "acceptedOut", beside: "refused", as: "waiting" }),
+        C.OtherAnswerSent.make({}),
+        C.OtherAnswerArrives.make({}),
+        C.SettleAll.make({ which: "first" }),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.Decide.make({ row: "a", to: "kept" }),
+        C.SaveFails.make({ which: "last" }),
+        C.Decide.make({ row: "a", to: "nothing" }),
+        C.SaveRefused.make({ which: "last" }),
+        C.Match.make({}),
+        C.Decide.make({ row: "b", to: "acceptedOut" }),
+        C.Decide.make({ row: "c", to: "accepted" })
+      ])
+    ).toEqual(O.none())
+  })
+
   it("a row decided otherwise since, while an earlier decision of it was on its way, comes back after a reload on a line, and its earlier copy is not sent", () => {
     const world = opened({})
     for (const command of [
@@ -1710,6 +1750,16 @@ describe("what this tab sent whose answer never came back, as the properties' wo
 
 describe("seeds the properties were falsified by, played again", () => {
   const seeds = [
+    {
+      name: "with reloads, sign-outs and closed tabs taken up",
+      seed: -876652368938065,
+      may: { confirms: false, elsewhere: false, tabs: true }
+    },
+    {
+      name: "with somebody else confirming, reopening or removing the import",
+      seed: -5255366521312007,
+      may: { confirms: true, elsewhere: true, tabs: true }
+    },
     {
       name: "with the person confirming",
       seed: 369148268449177,

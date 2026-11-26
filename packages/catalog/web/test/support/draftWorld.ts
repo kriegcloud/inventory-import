@@ -4,6 +4,7 @@
 // wrong result would break are checked (`holds`): each decision the person made is on the server, waiting, a side of a
 // line, or named; and nothing somebody else decided is ever overwritten unasked.
 import { expect } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Eq from "effect/Equal"
 import * as Formatter from "effect/Formatter"
@@ -58,11 +59,11 @@ export const Command = S.TaggedUnion({
   SomeoneElse: { row: Row, to: To },
   /** Somebody matches the column the accepts rest on: the stored ones are taken back. */
   Match: {},
-  ServerTakesSave: { which: S.optionalKey(Which) },
-  SaveAnswers: { which: S.optionalKey(Which) },
-  SaveFails: { which: S.optionalKey(Which) },
-  SaveSignedOut: { which: S.optionalKey(Which) },
-  SaveRefused: { which: S.optionalKey(Which) },
+  ServerTakesSave: { which: Which },
+  SaveAnswers: { which: Which },
+  SaveFails: { which: Which },
+  SaveSignedOut: { which: Which },
+  SaveRefused: { which: Which },
   SaveAgain: {},
   ReturnToTab: {},
   ServerTakesRead: {},
@@ -243,7 +244,7 @@ const start = (decisions: SavedDecisions): World => {
     draft: emptyDraft,
     server,
     history: { 1: server },
-    everHeld: R.map(decisions, (one) => [O.some(one)]),
+    everHeld: { a: [R.get(decisions, "a")], b: [R.get(decisions, "b")], c: [R.get(decisions, "c")] },
     byElse: {},
     decidedByHer: {},
     writes: {},
@@ -301,7 +302,9 @@ type Writer = "this tab" | "another tab" | "somebody else"
 const stores = (world: World, row: string, value: Value, by: Writer): void => {
   const byElse = by === "somebody else"
   if (!sameDecision(R.get(world.server.decisions, row), value)) world.decidedByHer[row] = !byElse
-  world.everHeld[row] = [...(world.everHeld[row] ?? [O.none()]), value]
+  const history = R.get(world.everHeld, row)
+  assertTrue(O.isSome(history), `history exists for fixture row ${row}`)
+  world.everHeld = R.set(world.everHeld, row, [...history.value, value])
   world.writes[row] = [...O.match(R.get(world.writes, row), { onNone: A.empty, onSome: identity }), { value, by }]
   world.byElse[row] = byElse
   // What the person picked to stay is moot once somebody else writes the row again.
@@ -390,7 +393,10 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
   for (const [row, value] of R.toEntries(rowsOf(save.delta))) {
     const stored = R.get(world.server.decisions, row)
     const names = R.get(save.over, row)
-    const matchedSince = (save.madeOn[row] ?? 0) < world.server.matchedAt
+    const matchedSince = O.match(R.get(save.madeOn, row), {
+      onNone: () => world.server.matchedAt > 0,
+      onSome: (revision) => revision < world.server.matchedAt
+    })
     const stale = hasAccept(value) && matchedSince
     const written = stale ? withoutAccept(value) : value
     // What a match took from a decision a tab of hers decided and last saved, as the server credits both: `before` holds
@@ -421,8 +427,14 @@ const takes = (world: World, save: Pick<Save, "delta" | "madeOn" | "over" | "liv
       continue
     }
     stores(world, row, written, by)
-    if (O.isSome(written)) decisions[row] = written.value
-    else delete decisions[row]
+    O.match(written, {
+      onNone: () => {
+        delete decisions[row]
+      },
+      onSome: (written) => {
+        decisions[row] = written
+      }
+    })
   }
   const changed = !Eq.equals(decisions, world.server.decisions)
   if (changed) moves(world, { decisions })
@@ -476,7 +488,7 @@ const put = (world: World, view: Snapshot): void => {
   if (O.exists(world.view, (held) => held.revision > view.revision)) return
   world.view = O.some(view)
   world.told = Math.max(world.told, view.revision)
-  if (O.isSome(world.read)) world.read = O.some(O.none())
+  world.read = O.map(world.read, () => O.none())
   if (world.draft.onScreen) arrive(world, view, O.isSome(world.read))
 }
 
@@ -531,7 +543,10 @@ const perform = (world: World, effect: DraftEffect): void =>
       ownRows(world, rows)
       for (const row of R.keys(rows)) {
         expect(hasWaited(world, row) && !R.has(names, row), `row ${row} waited and goes as a live press`).toBe(false)
-        expect(names[row]?.length ?? 0, "more decisions named than the contract takes").toBeLessThanOrEqual(50)
+        expect(
+          O.match(R.get(names, row), { onNone: () => true, onSome: (names) => names.length <= 50 }),
+          "more decisions named than the contract takes"
+        ).toBe(true)
       }
       // What it names of each row the person knew of: she saw it, or a tab of hers sent it.
       for (const [row, named] of R.toEntries(names)) {
@@ -691,7 +706,7 @@ const dispatchIn = (world: World, event: DraftEvent): void => {
 /** The rows of the person's that wait, or are on their way. */
 const pending = (draft: Draft): ReadonlyArray<string> => [
   ...R.keys(draft.unsent),
-  ...O.match(draft.flight, { onNone: () => [], onSome: (flight) => R.keys(flight.rows) })
+  ...O.match(draft.flight, { onNone: A.empty, onSome: (flight) => R.keys(flight.rows) })
 ]
 
 /** True when what goes of a row is no live press: it waited, or a closed tab's decision beside it did. */
@@ -721,14 +736,14 @@ const placed = (draft: Draft): ReadonlyArray<{ readonly row: string; readonly va
   const inRows = (rows: Readonly<Record<string, Side>>) =>
     A.map(R.toEntries(rows), ([row, side]) => ({ row, value: side.decision }))
   const leftOver = O.match(draft.leftOver, {
-    onNone: () => [],
+    onNone: A.empty,
     onSome: (named) => [
       ...A.map(R.toEntries(named.rows), ([row, value]) => ({ row, value })),
       ...A.flatMap(R.toEntries(named.beside), ([row, values]) => A.map(values, (value) => ({ row, value })))
     ]
   })
   return [
-    ...O.match(draft.flight, { onNone: () => [], onSome: (flight) => inRows(flight.rows) }),
+    ...O.match(draft.flight, { onNone: A.empty, onSome: (flight) => inRows(flight.rows) }),
     ...inRows(draft.unsent),
     ...A.flatMap(R.toEntries(draft.lines), ([row, line]) =>
       A.map(line.sides, (side) => ({ row, value: side.decision }))
@@ -805,7 +820,7 @@ const settles = (world: World, picks: ReadonlyArray<LinePick>): void => {
           (fact) => (fact.row === rowId && isPartOf(fact.value, decision) ? { ...fact, here: true } : fact)
         )
         // What the line shows the server to hold is what the pick stands over.
-        const theirs = [R.get(shownOfServer(world), rowId), ...O.match(line.theirs, { onNone: () => [], onSome: A.of })]
+        const theirs = [R.get(shownOfServer(world), rowId), ...O.match(line.theirs, { onNone: A.empty, onSome: A.of })]
         // A refused decision is never sent by a pick: nothing of hers waits for it.
         if (O.isNone(side.value.refused)) {
           presses(world, rowId, decision, theirs)
@@ -837,11 +852,11 @@ const shownOfServer = (world: World): SavedDecisions =>
  */
 const pickOn = (world: World, row: string, which: "theirs" | "first" | "second"): ReadonlyArray<LinePick> =>
   O.match(R.get(linesShown(world.draft), row), {
-    onNone: () => [],
+    onNone: A.empty,
     onSome: (line) => {
       const { actions } = lineWords({ rowId: row, line, canDecide: true })
       const action = which === "theirs" ? A.last(actions) : A.get(actions, which === "first" ? 0 : 1)
-      return O.match(action, { onNone: () => [], onSome: (one) => [{ rowId: row, keep: one.keep }] })
+      return O.match(action, { onNone: A.empty, onSome: (one) => [{ rowId: row, keep: one.keep }] })
     }
   })
 
@@ -872,7 +887,17 @@ const runIn = (world: World, command: Command): void => {
           return
         }
         const rows = rowsOf(confirm.delta)
-        if (R.some(rows, (value, row) => hasAccept(value) && (confirm.madeOn[row] ?? 0) < world.server.matchedAt)) {
+        if (
+          R.some(
+            rows,
+            (value, row) =>
+              hasAccept(value) &&
+              O.match(R.get(confirm.madeOn, row), {
+                onNone: () => world.server.matchedAt > 0,
+                onSome: (revision) => revision < world.server.matchedAt
+              })
+          )
+        ) {
           world.confirm = O.some({ ...confirm, answer: O.some("stale") })
           return
         }
@@ -906,7 +931,12 @@ const runIn = (world: World, command: Command): void => {
         const accepts = A.map(
           A.filter(
             R.toEntries(rowsOf(confirm.delta)),
-            ([row, value]) => hasAccept(value) && (confirm.madeOn[row] ?? 0) < world.server.matchedAt
+            ([row, value]) =>
+              hasAccept(value) &&
+              O.match(R.get(confirm.madeOn, row), {
+                onNone: () => world.server.matchedAt > 0,
+                onSome: (revision) => revision < world.server.matchedAt
+              })
           ),
           ([row]) => ({ rowId: row, field: "unitCost", kind: "accept" as const })
         )
@@ -1010,7 +1040,9 @@ const runIn = (world: World, command: Command): void => {
           { value: left, by }
         ]
         delete world.confirmed[row]
-        if (O.isSome(left)) decisions[row] = left.value
+        O.map(left, (left) => {
+          decisions[row] = left
+        })
       }
       const revision = world.server.revision + 1
       moves(world, {
@@ -1049,13 +1081,13 @@ const runIn = (world: World, command: Command): void => {
       world.read = O.some(O.none())
     },
     ServerTakesSave: ({ which }) =>
-      void O.map(saveOf(world, which ?? "last"), (save) => {
+      void O.map(saveOf(world, which), (save) => {
         // A closed import takes no save: it refuses it (`SaveRefused`).
         if (O.isSome(save.answer) || !world.server.open) return
         replaceSave(world, { ...save, answer: takes(world, save) })
       }),
     SaveAnswers: ({ which }) =>
-      void O.map(saveOf(world, which ?? "last"), (save) => {
+      void O.map(saveOf(world, which), (save) => {
         if (O.isNone(save.answer)) return
         const answer = save.answer.value
         const current = isCurrent(world, save)
@@ -1085,13 +1117,13 @@ const runIn = (world: World, command: Command): void => {
         dispatchIn(world, DraftEvent.SaveAnswered({ id: save.id, ...answer }))
       }),
     SaveFails: ({ which }) =>
-      void O.map(saveOf(world, which ?? "last"), (save) => {
+      void O.map(saveOf(world, which), (save) => {
         if (isCurrent(world, save)) allWaited(world)
         dropSave(world, save)
         dispatchIn(world, DraftEvent.SaveFailed({ id: save.id }))
       }),
     SaveSignedOut: ({ which }) =>
-      void O.map(saveOf(world, which ?? "last"), (save) => {
+      void O.map(saveOf(world, which), (save) => {
         if (O.isSome(save.answer)) return
         if (isCurrent(world, save)) allWaited(world)
         lost(world, save)
@@ -1099,7 +1131,7 @@ const runIn = (world: World, command: Command): void => {
         dispatchIn(world, DraftEvent.SaveSignedOut({ id: save.id }))
       }),
     SaveRefused: ({ which }) =>
-      void O.map(saveOf(world, which ?? "last"), (save) => {
+      void O.map(saveOf(world, which), (save) => {
         if (O.isSome(save.answer)) return
         // Refused: what it carried is no unanswered send of this tab's any more.
         const carried = rowsOf(save.delta)
@@ -1132,8 +1164,7 @@ const runIn = (world: World, command: Command): void => {
       world.late.push(world.server)
     },
     OtherAnswerArrives: () => {
-      const view = world.late.shift()
-      if (view !== undefined) put(world, view)
+      O.map(O.fromUndefinedOr(world.late.shift()), (view) => put(world, view))
     },
     Leave: () => {
       if (world.draft.onScreen) dispatchIn(world, DraftEvent.Left())
@@ -1227,7 +1258,9 @@ const runIn = (world: World, command: Command): void => {
           (mine) => sameDecision(mine.decision, one.value)
         )
       world.refused = A.filter(world.refused, (one) => !isOwn(one))
-      dispatchIn(world, DraftEvent.TakenUp({ here: false, kept: O.some(entry).pipe(keptForm, O.getOrThrow) }))
+      const expectedSome1 = O.some(entry).pipe(keptForm)
+      assertTrue(O.isSome(expectedSome1), "expected O.some(entry).pipe(keptForm)")
+      dispatchIn(world, DraftEvent.TakenUp({ here: false, kept: expectedSome1.value }))
       // What it added to the row waited: it is sent over what it names, never as a live press.
       // (A refused one beside is a notice: this tab's own press is as it was.) Added only beside this tab's own, waiting
       // or on its way, as a side of the row's line, that press is as it was too: what waited is the side
@@ -1299,7 +1332,8 @@ const toldClosed = (world: World): boolean =>
   O.exists(
     world.view,
     (view) =>
-      !view.open && view.revision >= O.match(world.draft.landed, { onNone: () => 0, onSome: (landed) => landed.at })
+      !view.open &&
+      O.match(world.draft.landed, { onNone: () => view.revision >= 0, onSome: (landed) => view.revision >= landed.at })
   )
 
 /** Holds after every step, whatever happened before it. */
@@ -1311,7 +1345,7 @@ export const holds = (world: World): void => {
   for (const fact of world.facts) {
     const somewhere =
       A.some(now, (one) => one.row === fact.row && isPartOf(fact.value, one.value)) ||
-      A.some(world.everHeld[fact.row] ?? [O.none()], (held) => isPartOf(fact.value, held))
+      O.exists(R.get(world.everHeld, fact.row), (history) => A.some(history, (held) => isPartOf(fact.value, held)))
     expect(somewhere, `${Formatter.format(fact)} is not on the server, waiting, on a line or named`).toBe(true)
   }
   // What was named has been: it is not expected anywhere else any more.
@@ -1595,14 +1629,18 @@ const playIn = (choices: typeof Choices.Type, may: Play): void => {
     // The world moves on so the next draw is from what is enabled then; what must hold is checked by `broken`.
     if (O.isNone(O.liftThrowable(runIn)(world, command))) break
   }
-  if (O.isNone(broken(commands))) return
-  const ordering = shortest(commands)
-  throw new Error(
-    `${A.join(
-      A.map(ordering, (command) => Formatter.format(command)),
-      ", "
-    )}\n${O.getOrElse(broken(ordering), () => "")}`
-  )
+  const failure = broken(commands)
+  O.map(failure, () => {
+    const ordering = shortest(commands)
+    const reason = broken(ordering)
+    assertTrue(O.isSome(reason), "the minimized failing ordering still fails")
+    throw new Error(
+      `${A.join(
+        A.map(ordering, (command) => Formatter.format(command)),
+        ", "
+      )}\n${reason.value}`
+    )
+  })
 }
 
 /** What one event does to the world: the draft steps, and the world does what it asks. */

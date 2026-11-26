@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The review of a file of inventory items: the clean sample loads as it is, each kind of mess in the messy sample
 // lands in the outcome DECISIONS.md gives it, the counts add up to the rows, the form-only fixes are in force, listed
 // and undoable while everything else waits for the person, and a stored item is never changed without a choice.
@@ -24,8 +25,11 @@ const reviewOf = (
   storedItems: ReadonlyArray<ItemFields>
 ) => review({ ...noHistory, table, choices: [], decisions: R.map(decisions, decisionFromFlags), storedItems })
 
-const rowOf = (result: Review, rowNumber: number) =>
-  O.getOrThrow(A.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
+const rowOf = (result: Review, rowNumber: number) => {
+  const expectedSome1 = A.findFirst(result.rows, (row) => row.rowNumber === rowNumber)
+  assertTrue(O.isSome(expectedSome1), "expected A.findFirst(result.rows, (row) => row.rowNumber === rowNumber)")
+  return expectedSome1.value
+}
 
 const numbers = (result: Review, outcome: string) =>
   A.map(
@@ -45,7 +49,9 @@ describe("items_clean.csv", () => {
       expect(result.fixed).toEqual({ rows: 0, cells: 0 })
       expect(A.flatMap(result.rows, (row) => row.proposals)).toEqual([])
       // Row 2 of the file: SHH-9574, 12.33 a unit, 3845 on hand, two vendors, dimensions in cm.
-      const first = O.getOrThrow(rowOf(result, 2).item)
+      const expectedSome2 = rowOf(result, 2).item
+      assertTrue(O.isSome(expectedSome2), "expected rowOf(result, 2).item")
+      const first = expectedSome2.value
       expect(first).toMatchObject({
         sku: "SHH-9574",
         unitCost: cost("12.33"),
@@ -62,7 +68,9 @@ describe("items_clean.csv", () => {
         isPreferred: false
       })
       // An empty quantity is the brief's default, 0, not a problem.
-      expect(O.getOrThrow(rowOf(result, 6).item)).toMatchObject({
+      const expectedSome3 = rowOf(result, 6).item
+      assertTrue(O.isSome(expectedSome3), "expected rowOf(result, 6).item")
+      expect(expectedSome3.value).toMatchObject({
         sku: "UZS-4663",
         quantityOnHand: 0,
         reorderPoint: O.none()
@@ -90,7 +98,11 @@ describe("items_messy.csv", () => {
         4, 10, 15, 43, 44, 45, 52, 55, 56, 85, 89, 102, 108, 130, 135, 148, 151, 164, 171, 172, 175, 186, 191, 195
       ])
       const head = (n: number) => rowOf(result, n).problems[0]
-      const proposalOf = (n: number) => O.getOrThrow(O.flatMap(A.head(rowOf(result, n).problems), (p) => p.proposal))
+      const proposalOf = (n: number) => {
+        const expectedSome4 = O.flatMap(A.head(rowOf(result, n).problems), (p) => p.proposal)
+        assertTrue(O.isSome(expectedSome4), "expected O.flatMap(A.head(rowOf(result, n).problems), (p) => p.proposal)")
+        return expectedSome4.value
+      }
       expect(head(49)).toMatchObject({ kind: "missing", field: "sku", tone: "blocker", proposal: O.none() })
       expect(head(25)?.message).toBe('Unit cost "-2.44" is below zero. A cost is 0 or more.')
       expect(head(91)?.message).toContain("Dimensions has no height")
@@ -142,8 +154,12 @@ describe("items_messy.csv", () => {
           confidence: "high"
         }
       ])
-      expect(digits(O.getOrThrow(rowOf(result, 173).item).unitCost)).toBe("26.41")
-      expect(O.getOrThrow(rowOf(result, 198).item).tags).toEqual(["metal"])
+      const expectedSome5 = rowOf(result, 173).item
+      assertTrue(O.isSome(expectedSome5), "expected rowOf(result, 173).item")
+      expect(digits(expectedSome5.value.unitCost)).toBe("26.41")
+      const expectedSome6 = rowOf(result, 198).item
+      assertTrue(O.isSome(expectedSome6), "expected rowOf(result, 198).item")
+      expect(expectedSome6.value.tags).toEqual(["metal"])
       // Rejected: the file's value comes back and the row waits, with the same fix offered.
       const undone = reviewOf(table, { "row-18": { reverted: ["uom"] } }, [])
       expect([rowOf(undone, 18).values.uom, rowOf(undone, 18).outcome, undone.fixed.rows]).toEqual([
@@ -151,7 +167,9 @@ describe("items_messy.csv", () => {
         "decision",
         16
       ])
-      expect(O.getOrThrow(O.flatMap(A.head(rowOf(undone, 18).problems), (p) => p.proposal))).toMatchObject({
+      const expectedSome7 = O.flatMap(A.head(rowOf(undone, 18).problems), (p) => p.proposal)
+      assertTrue(O.isSome(expectedSome7), "expected O.flatMap(A.head(rowOf(undone, 18).problems), (p) => p.proposal)")
+      expect(expectedSome7.value).toMatchObject({
         to: "BX",
         lossless: true
       })
@@ -174,14 +192,24 @@ describe("items_messy.csv", () => {
         },
         []
       )
-      expect(digits(O.getOrThrow(rowOf(result, 55).item).unitCost)).toBe("35.82")
-      expect(O.getOrThrow(rowOf(result, 85).item).quantityOnHand).toBe(1200)
-      expect(O.getOrThrow(rowOf(result, 44).item).firstReceivedOn).toEqual(O.some("2024-06-04"))
+      const expectedSome8 = rowOf(result, 55).item
+      assertTrue(O.isSome(expectedSome8), "expected rowOf(result, 55).item")
+      expect(digits(expectedSome8.value.unitCost)).toBe("35.82")
+      const expectedSome9 = rowOf(result, 85).item
+      assertTrue(O.isSome(expectedSome9), "expected rowOf(result, 85).item")
+      expect(expectedSome9.value.quantityOnHand).toBe(1200)
+      const expectedSome10 = rowOf(result, 44).item
+      assertTrue(O.isSome(expectedSome10), "expected rowOf(result, 44).item")
+      expect(expectedSome10.value.firstReceivedOn).toEqual(O.some("2024-06-04"))
       expect([rowOf(result, 4).status, rowOf(result, 10).status]).toEqual(["ready", "out"])
-      expect(O.getOrThrow(rowOf(result, 45).item)).toMatchObject({
+      const expectedSome11 = rowOf(result, 45).item
+      assertTrue(O.isSome(expectedSome11), "expected rowOf(result, 45).item")
+      expect(expectedSome11.value).toMatchObject({
         stocking: { kind: "discontinued", on: "2025-06-30" }
       })
-      expect(digits(O.getOrThrow(rowOf(result, 184).item).unitCost)).toBe("12.5")
+      const expectedSome12 = rowOf(result, 184).item
+      assertTrue(O.isSome(expectedSome12), "expected rowOf(result, 184).item")
+      expect(digits(expectedSome12.value.unitCost)).toBe("12.5")
       expect(result.counts.ready + result.counts.needs + result.counts.out).toBe(200)
     })
   )
@@ -195,7 +223,9 @@ describe("a row discontinued yet active", () => {
         const asked = rowOf(reviewOf(table, {}, []), line)
         const about = A.filter(asked.problems, (problem) => problem.kind === "discontinued")
         expect(about.length, `row ${line}`).toBe(1)
-        expect(O.getOrThrow(O.flatMap(A.head(about), (p) => p.proposal)), `row ${line}`).toMatchObject({
+        const expectedSome13 = O.flatMap(A.head(about), (p) => p.proposal)
+        assertTrue(O.isSome(expectedSome13), "expected O.flatMap(A.head(about), (p) => p.proposal)")
+        expect(expectedSome13.value, `row ${line}`).toMatchObject({
           field: "isActive",
           confidence: "low",
           lossless: false,
@@ -217,12 +247,16 @@ describe("a row discontinued yet active", () => {
       const before = rowOf(reviewOf(table, {}, []), 45)
       expect(before.outcome).toBe("decision")
       const notActive = rowOf(reviewOf(table, { "row-45": { accepted: ["isActive"] } }, []), 45)
-      expect([notActive.status, O.getOrThrow(notActive.item).stocking]).toEqual([
+      const expectedSome14 = notActive.item
+      assertTrue(O.isSome(expectedSome14), "expected notActive.item")
+      expect([notActive.status, expectedSome14.value.stocking]).toEqual([
         "ready",
         { kind: "discontinued", on: "2025-06-30" }
       ])
       const noDate = rowOf(reviewOf(table, { "row-45": { edits: { discontinuedOn: "" } } }, []), 45)
-      expect([noDate.status, O.getOrThrow(noDate.item).stocking]).toEqual(["ready", { kind: "active" }])
+      const expectedSome15 = noDate.item
+      assertTrue(O.isSome(expectedSome15), "expected noDate.item")
+      expect([noDate.status, expectedSome15.value.stocking]).toEqual(["ready", { kind: "active" }])
       expect(noDate.changes).toContainEqual(expect.objectContaining({ how: "typed", field: "discontinuedOn", to: "" }))
     })
   )

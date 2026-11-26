@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // An answer put into the import's view (suggestions, a match) must change only its own part of what the view holds
 // when the answer arrives. Built from the view as it was at the press, it took back the decisions saved, or the match
 // made, while the request was out: the screen then showed less than the server holds.
@@ -31,7 +32,9 @@ describe("an answer put into the import's view", () => {
       registry.set(read, viewAt({ revision: 13, decisions }))
       yield* Deferred.succeed(answer, { suggestions: [suggestion] })
       yield* settle
-      const held = registry.get(read).pipe(AsyncResult.value, O.getOrThrow)
+      const expectedSome1 = registry.get(read).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome1), "expected registry.get(read).pipe(AsyncResult.value)")
+      const held = expectedSome1.value
       expect([held.revision, held.decisions, held.suggestions]).toEqual([13, decisions, [suggestion]])
     })
   )
@@ -60,7 +63,9 @@ describe("an answer put into the import's view", () => {
       yield* settle
       yield* Deferred.succeed(answers[0]!, viewAt({ revision: 11 }))
       yield* settle
-      expect(registry.get(read).pipe(AsyncResult.value, O.getOrThrow).revision).toBe(12)
+      const expectedSome2 = registry.get(read).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome2), "expected registry.get(read).pipe(AsyncResult.value)")
+      expect(expectedSome2.value.revision).toBe(12)
     })
   )
 })

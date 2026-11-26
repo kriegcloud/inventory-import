@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // Who is signed in, as a test's page has it: one session atom that everything derives from, by the app's own rules
 // (`@inventory/client/MemberAtoms`), so a test is never on a page the app cannot be on. Asked again, the member stays
 // and nobody is certain until the test answers; the same member goes on; anybody else, another organization or nobody
@@ -89,7 +90,11 @@ export const sessionStandIn = (first: Who) => {
     })
   }).pipe(Atom.keepAlive)
   /** The question that is out: the last one asked. */
-  const question = () => O.getOrThrow(O.fromUndefinedOr(out[out.length - 1]))
+  const question = () => {
+    const expectedSome1 = O.fromUndefinedOr(out[out.length - 1])
+    assertTrue(O.isSome(expectedSome1), "expected O.fromUndefinedOr(out[out.length - 1])")
+    return expectedSome1.value
+  }
   return {
     signedIn: Atom.readable(
       (get) => memberOfAnswer({ session: get(session), memberOf: identity<Who> }),

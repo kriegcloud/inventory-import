@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // Rules of the review where a wrong result hides a row or stores a wrong value: a stored SKU on a row that does not
 // read yet, an item named "Total", a year written with two digits, a tags cell of separators only, a vendor cost in
 // quotes, and what an edit of one item may not say.
@@ -51,8 +52,11 @@ const reviewed = (rows: ReadonlyArray<string>, storedItems: ReadonlyArray<ItemFi
     review({ ...noHistory, table, choices: [], decisions: {}, storedItems })
   )
 
-const rowOf = (result: Review, rowNumber: number) =>
-  O.getOrThrow(A.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
+const rowOf = (result: Review, rowNumber: number) => {
+  const expectedSome1 = A.findFirst(result.rows, (row) => row.rowNumber === rowNumber)
+  assertTrue(O.isSome(expectedSome1), "expected A.findFirst(result.rows, (row) => row.rowNumber === rowNumber)")
+  return expectedSome1.value
+}
 
 describe("a second import", () => {
   it.effect(
@@ -71,7 +75,9 @@ describe("a second import", () => {
           stored
         )
         expect([again.counts.already, again.counts.decision, again.counts.cannot]).toEqual([1, 1, 0])
-        expect(O.getOrThrow(rowOf(again, 2).reason)).toContain("awp-1853")
+        const expectedSome2 = rowOf(again, 2).reason
+        assertTrue(O.isSome(expectedSome2), "expected rowOf(again, 2).reason")
+        expect(expectedSome2.value).toContain("awp-1853")
         // The item is stored: the row adds nothing, and its unread cost is not asked for.
         expect([rowOf(again, 3).status, rowOf(again, 3).reason, rowOf(again, 3).item]).toEqual([
           "already",
@@ -90,7 +96,9 @@ describe("a total row", () => {
         []
       )
       expect([result.counts.rows, result.counts.ready, result.totalRows]).toEqual([1, 1, [3]])
-      expect(O.getOrThrow(rowOf(result, 2).item).name).toBe("Total")
+      const expectedSome3 = rowOf(result, 2).item
+      assertTrue(O.isSome(expectedSome3), "expected rowOf(result, 2).item")
+      expect(expectedSome3.value.name).toBe("Total")
     })
   )
 })
@@ -102,9 +110,9 @@ describe("a date whose year has two digits", () => {
       const row = rowOf(result, 2)
       expect([row.outcome, row.values.firstReceivedOn, row.changes]).toEqual(["cannot", "13/04/98", []])
       expect([row.problems[0]?.proposal, row.proposals]).toEqual([O.none(), []])
-      expect(O.getOrThrow(row.reason)).toBe(
-        "First received “13/04/98” has a two-digit year; type it as year-month-day."
-      )
+      const expectedSome4 = row.reason
+      assertTrue(O.isSome(expectedSome4), "expected row.reason")
+      expect(expectedSome4.value).toBe("First received “13/04/98” has a two-digit year; type it as year-month-day.")
     })
   )
 })
@@ -117,11 +125,14 @@ describe("reasons", () => {
         [line({ ...lineStart, tags: "|" }), line({ ...lineStart, sku: "ABC-0002", vendors })],
         []
       )
-      expect([rowOf(result, 2).status, O.getOrThrow(rowOf(result, 2).item).tags]).toEqual(["ready", []])
-      expect([rowOf(result, 3).status, digits(O.getOrThrow(rowOf(result, 3).item).vendors[0]?.unitCost)]).toEqual([
-        "ready",
-        "7.5"
-      ])
+      const expectedSome5 = rowOf(result, 2).item
+      assertTrue(O.isSome(expectedSome5), "expected rowOf(result, 2).item")
+      expect([rowOf(result, 2).status, expectedSome5.value.tags]).toEqual(["ready", []])
+      const expectedSome6 = rowOf(result, 3).item
+      assertTrue(O.isSome(expectedSome6), "expected rowOf(result, 3).item")
+      const vendor = A.head(expectedSome6.value.vendors)
+      assertTrue(O.isSome(vendor), "the reviewed row has its expected vendor")
+      expect([rowOf(result, 3).status, digits(vendor.value.unitCost)]).toEqual(["ready", "7.5"])
     })
   )
 })

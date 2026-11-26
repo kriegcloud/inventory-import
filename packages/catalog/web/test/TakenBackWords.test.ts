@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // A Replace or a Keep-stored the server took back on an import matched before moves were kept (Benjamin, 2026-11-21,
 // "Take it back, say so"): the screen names it with the field that was matched again, which is not the SKU, in each place
 // it can learn of it: a save's answer, a confirm's refusal, and the import's view. The words are read here as the person
@@ -47,7 +48,12 @@ const page = vi.hoisted(() => {
 })
 vi.mock("sonner", () => {
   const say = (title: string, more?: { readonly description?: string }) =>
-    page.said.push(`${title}: ${more?.description ?? ""}`)
+    page.said.push(
+      O.match(O.fromUndefinedOr(more?.description), {
+        onNone: () => `${title}: `,
+        onSome: (description) => `${title}: ${description}`
+      })
+    )
   return { toast: Object.assign(say, { dismiss: () => undefined, success: () => 0, loading: () => 0, error: say }) }
 })
 
@@ -92,7 +98,11 @@ const world = (id: ImportId, parts: Partial<ImportView>) => {
   registry.mount(reviewLocal(id))
   registry.mount(followDraft(id))
   const happened = (event: DraftEvent) => registry.set(draftEvents(id), event)
-  const shownHere = (): SavedDecisions => O.getOrThrow(registry.get(shownDecisions(id)))
+  const shownHere = (): SavedDecisions => {
+    const expectedSome1 = registry.get(shownDecisions(id))
+    assertTrue(O.isSome(expectedSome1), "expected registry.get(shownDecisions(id))")
+    return expectedSome1.value
+  }
   return { registry, saves, confirms, happened, shownHere }
 }
 
@@ -143,7 +153,9 @@ describe("a Replace and a Keep-stored taken back because another column than the
       expect(page.said).toEqual([
         "2 decisions were taken back: A column was matched again after you decided: the keep-or-replace on row 7 (Unit cost matched again); the keep-or-replace on row 9 (Unit cost matched again). Each row shows what it reads now, to decide again."
       ])
-      const why = O.getOrThrow(t.registry.get(confirmHeldBack(id)))
+      const expectedSome2 = t.registry.get(confirmHeldBack(id))
+      assertTrue(O.isSome(expectedSome2), "expected t.registry.get(confirmHeldBack(id))")
+      const why = expectedSome2.value
       expect(heldBackSentence({ why, accepts: acceptsWords(why.accepts) })).toBe(
         "Nothing was imported: the import changed while you were reviewing. A column was matched again after you decided, so those decisions were taken back: the keep-or-replace on row 7 (Unit cost matched again); the keep-or-replace on row 9 (Unit cost matched again). The review and its totals below show the import as it is now. Check them, then import again."
       )

@@ -5,7 +5,7 @@
 // And once a save has answered, the next edit is made on the revision it answered with, even while the table, read
 // again only after it, still shows the saved values on the old one.
 import { describe, expect, it } from "@effect/vitest"
-import { assertTrue } from "@effect/vitest/utils"
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { EditorState } from "../src/ItemEditor.state.ts"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
@@ -24,7 +24,7 @@ import { Forbidden } from "@inventory/kernel/AccessError"
 import type { ItemForm } from "@inventory/catalog-model/ItemEdit"
 import { editItem, itemEditor, saveOut } from "../src/ItemEditor.screen.tsx"
 import { itemsPage } from "../src/ItemsPage.screen.tsx"
-import { registryFor } from "./support/catalog.ts"
+import { registryFor, registryStart } from "./support/catalog.ts"
 
 // A desk-wide page on another screen than Items, with no row of any item drawn unless the test says so; where the
 // page is taken to is kept, and so is every toast, so the test can press the button a failed save offers.
@@ -32,7 +32,7 @@ const page = vi.hoisted(() => {
   const state = {
     drawn: false,
     went: [] as Array<string>,
-    toasts: [] as Array<{ title: string; description: string; again: (() => void) | undefined }>
+    toasts: [] as Array<{ title: string; description: O.Option<string>; again: O.Option<() => void> }>
   }
   Object.assign(globalThis, {
     document: { cookie: "", querySelector: () => (state.drawn ? {} : null) },
@@ -55,7 +55,11 @@ vi.mock("sonner", () => ({
     dismiss: () => undefined,
     success: () => 0,
     error: (title: string, options?: { description?: string; action?: { onClick: () => void } }) => {
-      page.toasts.push({ title, description: options?.description ?? "", again: options?.action?.onClick })
+      page.toasts.push({
+        title,
+        description: O.fromUndefinedOr(options?.description),
+        again: O.fromUndefinedOr(options?.action?.onClick)
+      })
       return 0
     }
   })
@@ -108,6 +112,7 @@ type Refusal = Forbidden | ItemChanged
 const world = () => {
   const answers: Array<Deferred.Deferred<StoredItem, Refusal>> = []
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       items: {
         edit: () => {
@@ -119,10 +124,14 @@ const world = () => {
         facets: () => Effect.succeed({})
       }
     },
-    idleTTL: 20
+    idleTTL: O.some(20)
   })
   /** The save that is out. */
-  const out = () => O.getOrThrow(O.fromUndefinedOr(answers[answers.length - 1]))
+  const out = () => {
+    const expectedSome1 = O.fromUndefinedOr(answers[answers.length - 1])
+    assertTrue(O.isSome(expectedSome1), "expected O.fromUndefinedOr(answers[answers.length - 1])")
+    return expectedSome1.value
+  }
   return { registry, out }
 }
 
@@ -166,11 +175,14 @@ describe("a save of an item whose row has left the screen", () => {
       )
       yield* Effect.sleep("40 millis")
       const said = page.toasts[page.toasts.length - 1]
-      expect(said?.description).toContain("Hex bolt M6 was not saved.")
+      assertDefined(said)
+      assertTrue(O.isSome(said.description), "the failed item save has its description")
+      expect(said.description.value).toContain("Hex bolt M6 was not saved.")
       expect(t.registry.get(saveOut(itemId))).toBe(false)
 
       page.went.length = 0
-      said?.again?.()
+      assertTrue(O.isSome(said.again), "the refusal toast offers Edit again")
+      said.again.value()
       // No row of the item is on screen: the person is taken to it, the Items table searched for its SKU.
       expect(page.went).toEqual(["/items?search=HXB-0616"])
       // And the editor is open on what they typed, for as long as it takes the row to be drawn.
@@ -195,10 +207,12 @@ describe("a save of an item whose row has left the screen", () => {
       )
       yield* Effect.sleep("40 millis")
       const said = page.toasts[page.toasts.length - 1]
-      expect(said?.title).toBe("Changed by someone else")
+      assertDefined(said)
+      expect(said.title).toBe("Changed by someone else")
       page.drawn = true
       page.went.length = 0
-      said?.again?.()
+      assertTrue(O.isSome(said.again), "the refusal toast offers Edit again")
+      said.again.value()
       page.drawn = false
       expect(page.went).toEqual([])
       const editor = t.registry.get(itemEditor(itemId))
@@ -223,6 +237,7 @@ describe("an item edited again after its save has answered, before the table is 
       const late = Deferred.makeUnsafe<void>()
       const pageOf = (row: StoredItem) => ({ data: [row], total: 1, pageCount: 1 })
       const registry = registryFor({
+        ...registryStart,
         endpoints: {
           items: {
             edit: (request: { readonly payload: ItemEdit }) =>
@@ -252,12 +267,17 @@ describe("an item edited again after its save has answered, before the table is 
           }
         }
       })
-      const rowShown = () =>
-        registry.get(itemsPage).pipe(
+      const rowShown = () => {
+        const expectedSome2 = registry.get(itemsPage).pipe(
           AsyncResult.value,
-          O.flatMap((shown) => A.head(shown.data)),
-          O.getOrThrow
+          O.flatMap((shown) => A.head(shown.data))
         )
+        assertTrue(
+          O.isSome(expectedSome2),
+          "expected registry.get(itemsPage).pipe(AsyncResult.value, O.flatMap((shown) => A.head(shown.data)))"
+        )
+        return expectedSome2.value
+      }
       registry.mount(itemsPage)
       registry.mount(editItem(itemId))
       yield* Effect.sleep("10 millis")
@@ -317,6 +337,7 @@ describe("an open editor and the server's answers to the item saves", () => {
           )
         const who = Atom.make(member("mem_dana", "org_prairie"))
         const registry = registryFor({
+          ...registryStart,
           endpoints: {
             items: {
               edit: () => Effect.succeed({ ...item, revision: 4 }),
@@ -324,7 +345,7 @@ describe("an open editor and the server's answers to the item saves", () => {
               facets: () => Effect.succeed({})
             }
           },
-          signedIn: who
+          signedIn: O.some(who)
         })
         registry.mount(editItem(itemId))
         registry.mount(itemEditor(itemId))
@@ -372,6 +393,7 @@ describe("an open editor and the server's answers to the item saves", () => {
         )
       const who = Atom.make(member("mem_dana", "org_prairie"))
       const registry = registryFor({
+        ...registryStart,
         endpoints: {
           items: {
             edit: () =>
@@ -382,15 +404,18 @@ describe("an open editor and the server's answers to the item saves", () => {
             facets: () => Effect.succeed({})
           }
         },
-        signedIn: who
+        signedIn: O.some(who)
       })
       registry.mount(editItem(itemId))
       registry.set(editItem(itemId), save)
       yield* Effect.sleep("20 millis")
-      const again = page.toasts[page.toasts.length - 1]?.again
+      const said = A.last(page.toasts)
+      assertTrue(O.isSome(said), "the failed save recorded a toast")
+      const again = said.value.again
+      assertTrue(O.isSome(again), "the failed save offers Edit again")
       registry.set(who, member("mem_dana_northline", "org_northline"))
       page.went.length = 0
-      again?.()
+      again.value()
       expect([
         EditorState.guards.Open(registry.get(itemEditor(itemId))),
         page.went,
@@ -415,6 +440,7 @@ describe("the answer of an item's last save", () => {
         )
       const who = Atom.make(member("mem_dana", "org_prairie"))
       const registry = registryFor({
+        ...registryStart,
         endpoints: {
           items: {
             edit: () => Effect.succeed({ ...item, revision: 4 }),
@@ -422,8 +448,8 @@ describe("the answer of an item's last save", () => {
             facets: () => Effect.succeed({})
           }
         },
-        signedIn: who,
-        idleTTL: 20
+        signedIn: O.some(who),
+        idleTTL: O.some(20)
       })
       registry.mount(editItem(itemId))
       registry.set(editItem(itemId), save)

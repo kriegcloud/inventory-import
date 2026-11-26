@@ -1976,3 +1976,162 @@ exemptions, Verify lock, vendored code and .dev.vars are unchanged. No commit or
 Needs the person: the narrow debt-ledger scope extension is pending; unchanged undecided defaults remain
 listed in SPEC. The saved-progress hook's one owned unwrap needs its producer's later Option API migration;
 this lane does not declare row 11 fully cleared or propose an exemption for it.
+
+## Catalog web tests second lane, PLAN row 11, 2026-11-26
+
+Scope: `packages/catalog/web/test` including support modules. The initial explicit 46-file law run holds
+84 places: 50 fallback, 34 absence, zero unwrap and zero normalization. Source, PLAN, baseline, exemptions,
+stored fixture bytes and the Verify lock are outside this lane. These verdicts are written before test edits.
+
+| Fields / owner | Verdict | Reason and intended form |
+| --- | --- | --- |
+| Review row problem; problem fix, rivals, choices, column; column metadata | Already canonical Options | Read the producer's Option directly. Expected presence narrows with vitest assertions; a real absent case stays whole in an Option match. No nullish wrapper around an Option or conversion to undefined. |
+| Expected rows, proposals, deferred requests, atom answers and tab identities | Required test prerequisites | Assert presence before reading. A missing expected value fails the test rather than skipping an assertion or supplying empty data. |
+| Registry stand-in member, asked and idle TTL configuration | Explicit optional configuration | Callers state Options, with named starting configuration; optional library properties use Record.getSomes. No function declaration schema. |
+| Toast stand-in description and action | Dependency optional observations | Preserve exact recorded values and action presence. An unresolved empty-description policy stays visible rather than being relabeled as a decode. |
+| Browser Storage getItem and lock options | Platform contract | Preserve null-on-missing and exclusive-by-default behavior; retain and name any conversion which cannot honestly clear under the no-unwrap rule. |
+| Independent fold model counters, histories, sentinels and attribution | Independent oracle policy | Remove absence questions only where construction or whole cases eliminate them. Do not copy production decisions into the independent model or rename a fallback constant. Remaining policy sites stay unchanged and individually named. |
+| Draft-world command selection and sparse histories | Real generated states | Required command arguments become explicit at callers. Sparse selections fold their complete cases; do not assert existence where generated absence is valid. |
+| Cost digits | Required where an expectation expects a cost | Narrow the vendor/row at the assertion, then compare its required cost directly. Do not convert an Option back to undefined. |
+
+No new product default, exemption, screen wording or stored representation is chosen. The final per-place
+inventory and validation receipts will be appended to this section after implementation.
+
+### Second test lane: final changes and retained places
+
+The final 46-file reader holds **46 places: 27 fallback and 19 absence**, down from 84. The 38 removed
+places are not a baseline edit. Each retained scanner occurrence follows below; none is an exemption or a claim
+that the test lane reached zero. Files are relative to `packages/catalog/web/test/`.
+
+Registry configuration now requires Options and an explicit retry flag; callers spread registryStart. The
+server fixture states its organization and optional view, and the session mock carries its optional subscription.
+All test getOrThrow reads now assert Some before reading the value at the original use site. Toast descriptions,
+retry actions and request methods are observed as Options rather than invented empty text. The same supplied
+text and action results remain asserted. Cost digits require a cost, with the expected vendor narrowed first.
+
+The five save commands require which; every former omission now states last. Draft history starts with the
+three fixture rows, each holding the actual initial decision. Absent revisions are compared in complete Boolean
+cases; the 50-name limit still fails exactly when a present list exceeds 50. The minimized failing ordering must
+still have a reason and now asserts that invariant. The original expectation predicates were reviewed in the diff;
+no expectation was removed. Nullable conversions that remain wrap actual dictionary/array/library reads, not
+already-Option review fields.
+
+| File | Line | Kind | Example | Why retained / work still needed |
+| --- | ---: | --- | --- | --- |
+| `Conversation.test.ts` | 48 | fallback | `kept[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `KeptRows.test.ts` | 59 | fallback | `kept[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `KeptRows.test.ts` | 81 | fallback | `tab[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `ReviewHistory.test.ts` | 40 | fallback | `kept[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `ReviewHistory.test.ts` | 49 | fallback | `tab[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `ReviewModelFold.fold.test.ts` | 118 | fallback | `O.getOrElse` | An absent decision supplies the independent oracle’s undecided record before a patch. Needs an explicit initial row-state contract; a fallback-only decode would rename it. |
+| `ReviewModelFold.fold.test.ts` | 367 | fallback | `O.getOrElse` | A sparse decision-text map supplies NO_DECISION. Needs a total text-state model or an Option through all oracle comparisons. |
+| `ReviewModelFold.fold.test.ts` | 530 | fallback | `O.getOrElse` | The first answer for a sparse counter starts at zero. Needs counter initialization with the set of answer keys. |
+| `ReviewModelFold.fold.test.ts` | 600 | fallback | `O.getOrElse` | No prior undo supplies change 0 and an empty writer. Needs an explicit not-yet-undone variant, not invented provenance. |
+| `ReviewModelFold.fold.test.ts` | 657 | fallback | `O.getOrElse` | A stale screen with no recorded top change supplies zero. Needs the stale-screen comparison fields made total. |
+| `ReviewModelFold.fold.test.ts` | 658 | fallback | `O.getOrElse` | A stale screen with no recorded undo change supplies zero. Needs the stale-screen comparison fields made total. |
+| `ReviewModelFold.fold.test.ts` | 729 | fallback | `O.getOrElse` | A sealed stack without a third-last level supplies noLevel. Needs a stack-level union carried through undo bookkeeping. |
+| `ReviewModelFold.fold.test.ts` | 762 | fallback | `O.getOrElse` | A stale screen with no recorded undo supplies zero. Needs an explicit absent undo comparison state. |
+| `ReviewModelFold.fold.test.ts` | 765 | fallback | `O.getOrElse` | A row with no previous undo supplies change 0 and an empty writer. Needs an explicit undo-history case. |
+| `ReviewModelFold.fold.test.ts` | 780 | fallback | `O.getOrElse` | An absent historical level supplies noLevel during stale undo. Needs the stack-level state carried through this path. |
+| `ReviewModelFold.fold.test.ts` | 1018 | fallback | `O.getOrElse` | An unobserved answer category is counted as zero in coverage. Needs total category counters at construction. |
+| `ReviewModelFold.fold.test.ts` | 1168 | fallback | `O.getOrElse` | An unseen actor supplies nobody and empty histories. Needs an explicit actor-state construction contract. |
+| `ReviewModelFold.fold.test.ts` | 1169 | fallback | `O.getOrElse` | An untouched row starts at touch 0. Needs total row-touch initialization or optional touch comparisons throughout. |
+| `ReviewModelFold.fold.test.ts` | 1186 | fallback | `O.getOrElse` | A missing decision supplies undecided to compare a touch. Needs both decision cases expressed through the independent oracle. |
+| `ReviewModelFold.fold.test.ts` | 1323 | fallback | `O.getOrElse` | Redo with no produced undo uses its mirror. Needs the redo result contract to distinguish an unchanged/no-step result. |
+| `ReviewModelFold.fold.test.ts` | 1328 | fallback | `O.getOrElse` | A redo without expected touches supplies an empty record. Needs the no-expectation case through Done bookkeeping. |
+| `ReviewModelFold.fold.test.ts` | 1747 | absence | `O.isNone(press)` | No enabled generated press means skip this pick. This is real command selection; asserting presence would reject valid generated runs. Loop construction has not been redesigned. |
+| `SessionAsked.test.ts` | 35 | fallback | `of[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `TabRows.test.ts` | 47 | fallback | `of()[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `TabRows.test.ts` | 96 | fallback | `options.mode ?? "exclusive"` | The LockManager stand-in implements the dependency’s exclusive mode on omission. Needs an explicit boundary/default judgment; a new fallback-only codec is not a clearing. |
+| `TabRows.test.ts` | 134 | absence | `wait === undefined` | The optional browser-query gate returns immediately or waits for its held promise. Needs an Option gate throughout the stand-in; no new Promise code was introduced. |
+| `TabRows.test.ts` | 219 | fallback | `O.getOrElse` | The test deliberately observes the pending tab identity as an empty string. Needs Option through every identity consumer and this pending-state expectation; a presence assertion was incorrect and was removed. |
+| `TableAssistant.test.ts` | 23 | fallback | `kept[key] ?? null` | Storage.getItem must return null for a missing key. Moving this into Option-to-null or a fallback-only schema retains the same unresolved platform conversion; no exemption was granted. |
+| `reviewParity.test.ts` | 116 | absence | `O.isNone(group)` | No eligible group ends the accept-all loop. A presence assertion would reject its intended terminal state; loop construction has not been redesigned. |
+| `support/draftWorld.ts` | 798 | absence | `O.isNone(world.draft.held)` | Before a picture is held the settle command only dispatches. The oracle accepts this generated state; it cannot assert a held picture. |
+| `support/draftWorld.ts` | 801 | absence | `line === undefined` | A requested row may have no line. The command skips that row; needs a selection model carrying only existing lines. |
+| `support/draftWorld.ts` | 816 | absence | `O.isNone(side)` | A side requested by a generated pick may no longer exist. Needs a selected-side command variant, not an assertion on valid absence. |
+| `support/draftWorld.ts` | 825 | absence | `O.isNone(side.value.refused)` | Refused and sendable sides execute different whole workflows. Needs the refusal case carried into the command model. |
+| `support/draftWorld.ts` | 879 | absence | `O.isSome(world.draft.held)` | PressConfirm is valid only with a held picture and an open server. Needs an enabled confirm-command variant. |
+| `support/draftWorld.ts` | 883 | absence | `O.isSome(confirm.answer)` | An answered confirm is ignored on a second server-take. Needs separate unanswered/answered confirm states. |
+| `support/draftWorld.ts` | 917 | absence | `O.isNone(confirm.answer)` | A confirm whose answer has not arrived does nothing. Needs separate pending/answered confirm commands. |
+| `support/draftWorld.ts` | 959 | absence | `O.isNone(world.draft.held)` | A Decide command before a held picture does nothing. Needs the command precondition represented in its state. |
+| `support/draftWorld.ts` | 1034 | fallback | `O.getOrElse` | A match on a row with no recorded writer credits somebody else. Needs explicit initial writer provenance; a renamed sentence/default would hide the same policy. |
+| `support/draftWorld.ts` | 1086 | absence | `O.isSome(save.answer)` | An answered save is ignored by another server-take. Needs separate pending/answered save states. |
+| `support/draftWorld.ts` | 1091 | absence | `O.isNone(save.answer)` | An unanswered save has no answer to deliver. Needs the command to carry a delivered answer only in that case. |
+| `support/draftWorld.ts` | 1103 | absence | `O.isSome(world.draft.landed)` | A landed draft changes which rows count as still live. This is a real compound oracle precondition; no Boolean alias was introduced. |
+| `support/draftWorld.ts` | 1127 | absence | `O.isSome(save.answer)` | A signed-out refusal cannot replace an answer already recorded. Needs the unanswered save state in this command. |
+| `support/draftWorld.ts` | 1135 | absence | `O.isSome(save.answer)` | An already answered save is not refused. Needs the unanswered save state in this command. |
+| `support/draftWorld.ts` | 1230 | absence | `O.isSome(one.refused)` | A refused taken-up side must be recorded as refused. Needs the side’s refusal case carried through take-up construction. |
+| `support/draftWorld.ts` | 1627 | absence | `command === undefined` | A generated kind may contain no command. The run ends there; needs nonempty command selection, not a required-value assertion. |
+| `support/draftWorld.ts` | 1630 | absence | `O.isNone(O.liftThrowable(runIn)(world, command))` | A command that throws stops further generation so broken can report its failure. Needs an explicit command-result loop; it must not assert success and lose the minimized failure. |
+
+The current reader additionally does not count these pre-existing forms in test files. They are explicitly
+retained, not declared cleared: four numeric onNone policies in ReviewModelFold.fold.test.ts (lines 169, 501,
+503, 1011: row/group change and part-count zero), two empty-record onNone policies in support/draftWorld.ts
+(lines 845–846: no held server decisions/no landed changes), and four existing synchronous fixture decodes
+(ItemEditor.test.ts item, DraftPicks.test.ts taken, KeptRows.test.ts taken, TakenBackWords.test.ts takenBack).
+The numeric/record cases need total oracle state contracts. The fixture decodes and their pre-existing
+schemaSync comments remain unchanged; no new synchronous codec, runner or diagnostics comment was introduced.
+List folds use A.empty, and statement-bodied no-op branches supply no data.
+
+### Second test lane: changed files
+
+- `packages/catalog/web/test/ConfirmDraft.test.ts`
+- `packages/catalog/web/test/Draft.machine.test.ts`
+- `packages/catalog/web/test/DraftPicks.test.ts`
+- `packages/catalog/web/test/DraftRegion.test.ts`
+- `packages/catalog/web/test/DraftServer.test.ts`
+- `packages/catalog/web/test/ImportPage.test.ts`
+- `packages/catalog/web/test/ImportViewAnswers.test.ts`
+- `packages/catalog/web/test/ItemColumns.test.ts`
+- `packages/catalog/web/test/ItemEditor.test.ts`
+- `packages/catalog/web/test/ItemImport.test.ts`
+- `packages/catalog/web/test/KeptRows.test.ts`
+- `packages/catalog/web/test/RefusedStorage.test.ts`
+- `packages/catalog/web/test/ReviewDraft.test.ts`
+- `packages/catalog/web/test/ReviewHistory.test.ts`
+- `packages/catalog/web/test/ReviewRules.test.ts`
+- `packages/catalog/web/test/SessionAsked.test.ts`
+- `packages/catalog/web/test/SessionStandIn.test.ts`
+- `packages/catalog/web/test/TabRows.test.ts`
+- `packages/catalog/web/test/TakenBackWords.test.ts`
+- `packages/catalog/web/test/UploadOwner.test.ts`
+- `packages/catalog/web/test/reviewHonesty.test.ts`
+- `packages/catalog/web/test/support/catalog.ts`
+- `packages/catalog/web/test/support/cost.ts`
+- `packages/catalog/web/test/support/draftWorld.ts`
+- `packages/catalog/web/test/support/session.ts`
+
+The only documentation edit is this appended section. No caller outside the test package was edited.
+
+### Second test lane: verification and limits
+
+- Final `bun run check` passed **105/105 tasks**, 80 cached, in **3m15.334s**. Catalog web passed
+  **401 tests in 38 files**, with no retry. Receipt: `/tmp/catalog-tests-check-final.log`.
+- The latest observation/cost adaptations also passed **29 tests in five files**, no retry:
+  `/tmp/catalog-tests-observations.log`. The four independent generated draft properties passed a focused run
+  (4,000 generated orderings, 56.02s), and the eight historical ordering regressions passed independently.
+  Receipts: `/tmp/catalog-draft-props.log`, `/tmp/catalog-draft-orderings.log`.
+- `bun run beep laws defaults` with all 46 explicit test/support filenames passed at **27 fallback, 19 absence,
+  zero unwrap, zero normalization**. The separate changed-file run passed for all 25 changed TypeScript files.
+  No write mode was used. Receipts: `/tmp/catalog-tests-law.log`, `/tmp/catalog-tests-changed-law.log`.
+- `bun run format -- <all changed files>`, `bun run docs:check`, and `git diff --check` passed. The formatter
+  reads the 25 TypeScript files and excludes Markdown; docs retains the existing status-vocabulary warnings.
+- Newly used Option, Record and Array APIs were checked in Effect 4.1.5 under `node_modules/effect/src`, including
+  lazy orElse, actual undefined-to-Option conversion, match, map, toArray, getSomes, dictionary lookup/update,
+  and safe list lookup. The narrowing assertion signature was read in `@effect/vitest/src/utils.ts`.
+- No getOrThrow, runSync, Option-to-undefined conversion, synchronous codec, Promise code, node:fs import or
+  diagnostics comment was added. Existing synchronous fixture decodes are explicitly named above.
+- The pending tab identity is a genuine optional state, not a required prerequisite. An initial attempt to assert
+  presence in its general getter was removed; the unchanged pending-identity observation is retained and named.
+  The final tab suite and full suite pass without retry. Intermediate fixture-typing/ledger failures were corrected
+  within the authorized files. The readonly ledger stayed unchanged; the earlier ledger scope question is superseded.
+- Read-only Git comparisons confirm no changes to source, PLAN, SPEC, defaults-baseline.json, tooling ledgers,
+  exemptions, bun.lock, fixture snapshots or the Verify lock. No `.dev.vars` was read, UPDATE_VERIFY_LOCK was not
+  set, and no commit or push was made. The tree remains dirty for the orchestrator.
+
+Not run: `check:full`, the separate review-model fold project, slow D1 tests, Verify, a browser/on-screen import,
+a real browser Worker, hosted behavior or deployment. The fold test file and its imported support were not changed.
+No claim of zero test debt, approved edge exemptions, changed screen words or changed stored data is made.
+
+Needs the person: nothing. The retained places are named follow-up work; no exemption or new product rule was chosen.

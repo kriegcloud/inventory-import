@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The review's draft while its screen is open, without the screen: the machine (`Draft.machine.ts`, tested on its own
 // against every ordering) wired to the import's read and to the server. What is held here is the wiring: that a save
 // sends the rows the person changed and nothing else, that its answer goes into the view held, that the server is
@@ -39,7 +40,7 @@ import {
   shownDecisions,
   whileCurrent
 } from "../src/ReviewDraft.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 
 // What is said to the person.
 const page = vi.hoisted(() => ({ said: [] as Array<string> }))
@@ -76,6 +77,7 @@ const world = (id: ImportId) => {
     readonly answer: Deferred.Deferred<Saved, Refusal>
   }> = []
   const registry = registryFor({
+    ...registryStart,
     writesRetried: true,
     endpoints: {
       imports: {
@@ -126,9 +128,17 @@ const world = (id: ImportId) => {
     /** The server fails the save itself: the client sends it again, later. */
     failSave: (n: number) => Deferred.fail(saves[n]!.answer, HttpApiError.InternalServerErrorProblem.make({})),
     gets: () => gets.length,
-    held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
+    held: () => {
+      const expectedSome1 = registry.get(importView(id)).pipe(AsyncResult.value)
+      assertTrue(O.isSome(expectedSome1), "expected registry.get(importView(id)).pipe(AsyncResult.value)")
+      return expectedSome1.value
+    },
     draft: () => registry.get(draftOf(id)),
-    shown: () => O.getOrThrow(registry.get(shownDecisions(id))),
+    shown: () => {
+      const expectedSome2 = registry.get(shownDecisions(id))
+      assertTrue(O.isSome(expectedSome2), "expected registry.get(shownDecisions(id))")
+      return expectedSome2.value
+    },
     epoch: () => registry.get(regionEpoch(id))
   }
 }

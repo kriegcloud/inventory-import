@@ -1,10 +1,11 @@
+import * as O from "effect/Option"
 // The tests' page of who is signed in leaves the page where the app would: the person's own switch is their own account
 // in the organization they chose, and the choice is over with the next answer, whatever it is. Anything else that is
 // not the member the page has leaves it.
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { memberKey } from "@inventory/client/MemberAtoms"
-import { registryFor } from "./support/catalog.ts"
+import { registryFor, registryStart } from "./support/catalog.ts"
 import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 const settle = Effect.sleep("10 millis")
@@ -12,7 +13,12 @@ const settle = Effect.sleep("10 millis")
 /** Dana's page, in Prairie, and how to ask who is signed in again. */
 const page = Effect.fnUntraced(function* () {
   const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
-  const registry = registryFor({ endpoints: {}, signedIn: session.signedIn, asked: session.asked })
+  const registry = registryFor({
+    ...registryStart,
+    endpoints: {},
+    signedIn: O.some(session.signedIn),
+    asked: O.some(session.asked)
+  })
   registry.mount(memberKey)
   yield* settle
   const ask = () => registry.refresh(session.signedIn)

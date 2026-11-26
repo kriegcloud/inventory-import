@@ -3,6 +3,7 @@ import { identity } from "effect/Function"
 // signed in when the server answers; read for nobody else; erased with a removed import; named, then dropped, when
 // the import turns out to be closed; and the question before the page is left, asked wherever the person is while
 // rows wait to be sent, never for rows that are only to be named, never once the app itself leaves.
+import { assertDefined } from "@effect/vitest/utils"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
@@ -41,7 +42,7 @@ import {
 } from "../src/ReviewDraft.atoms.ts"
 import { noticeWords } from "../src/internal/notices.ts"
 import { dismissNotice, notices } from "../src/Notices.atoms.ts"
-import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt, registryStart } from "./support/catalog.ts"
 import { memberStart, memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its storage, which outlives a page, the tab's own storage (every page here is one tab, loaded again),
@@ -143,8 +144,11 @@ const person = (id: string, organizationId: string) =>
 const dana = person("mem_dana", "org_prairie")
 
 /** Where one member's waiting rows of one import are kept, by this tab (its id is in the tab's own storage). */
-const keyOf = (id: ImportId, memberId: string, organizationId: string) =>
-  progressKey({ organizationId, memberId, screen: `import:${id}:waiting:${browser.tab["inventory:tab"] ?? ""}` })
+const keyOf = (id: ImportId, memberId: string, organizationId: string) => {
+  const tab = browser.tab["inventory:tab"]
+  assertDefined(tab)
+  return progressKey({ organizationId, memberId, screen: `import:${id}:waiting:${tab}` })
+}
 
 /**
  * One page of the app, on the shared storage: the server answers each save only when the test says, and refuses it as
@@ -153,7 +157,7 @@ const keyOf = (id: ImportId, memberId: string, organizationId: string) =>
  * (`asking` true) until the test answers it. With `session`, who is signed in is the app's own session stand-in
  * (`support/session.ts`), asked and answered by its rules.
  */
-const serverStart = { signedOut: false, removed: false }
+const serverStart = { signedOut: false, removed: false, in: "org_prairie", view: O.none<ImportView>() }
 const page = (
   id: ImportId,
   signedIn: typeof dana,
@@ -161,11 +165,11 @@ const page = (
     signedOut: boolean
     removed: boolean
     /** The organization a read that answers not found looked in: the session's, which another tab may have switched. */
-    in?: string
-    view?: ImportView
+    in: string
+    view: O.Option<ImportView>
     askHangs?: boolean
   },
-  session: ReturnType<typeof sessionStandIn> | undefined
+  session: O.Option<ReturnType<typeof sessionStandIn>>
 ) => {
   const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
   // The confirms sent; the server never answers one.
@@ -175,6 +179,7 @@ const page = (
   const asked = { times: 0 }
   const held: { registry: AtomRegistry.AtomRegistry | undefined } = { registry: undefined }
   const registry = registryFor({
+    ...registryStart,
     endpoints: {
       imports: {
         get: () =>
@@ -182,12 +187,13 @@ const page = (
             ? Effect.fail(
                 ImportNotFound.make({
                   reason: "It is gone.",
-                  organizationId: OrganizationId.make(server.in ?? "org_prairie")
+                  organizationId: OrganizationId.make(server.in)
                 })
               )
-            : server.view === undefined
-              ? Deferred.await(Deferred.makeUnsafe<ImportView>())
-              : Effect.succeed(server.view),
+            : O.match(server.view, {
+                onNone: () => Deferred.await(Deferred.makeUnsafe<ImportView>()),
+                onSome: Effect.succeed
+              }),
         decide: (request: { readonly payload: SaveRequest }) =>
           Effect.suspend((): Effect.Effect<unknown, SaveFailure | NotSignedIn> => {
             const answer = Deferred.makeUnsafe<unknown, SaveFailure>()
@@ -204,17 +210,21 @@ const page = (
         remove: () => Effect.void
       }
     },
-    signedIn:
-      session === undefined
-        ? Atom.readable(
+    ...O.match(session, {
+      onNone: () => ({
+        signedIn: O.some(
+          Atom.readable(
             (get) => get(who),
             () => {
               asked.times += 1
               if (server.askHangs === true) held.registry?.set(asking, true)
             }
           )
-        : session.signedIn,
-    asked: session === undefined ? asking : session.asked
+        ),
+        asked: O.some(asking)
+      }),
+      onSome: (session) => ({ signedIn: O.some(session.signedIn), asked: O.some(session.asked) })
+    })
   })
   held.registry = registry
   return {
@@ -241,7 +251,7 @@ describe("the waiting rows this browser keeps", () => {
   it.live("are cleared under the member who decided them when the save answers after a switch of organization", () =>
     Effect.gen(function* () {
       const id = importNo(61)
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       t.open(viewAt({ id, revision: 12 }))
       yield* settle
       t.decide("row-31")
@@ -262,7 +272,7 @@ describe("the waiting rows this browser keeps", () => {
   it.live("are one member's: another member opening the same import in this browser sends none and shows none", () =>
     Effect.gen(function* () {
       const id = importNo(62)
-      const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       first.open(viewAt({ id, revision: 4 }))
       yield* settle
       first.decide("row-2")
@@ -273,7 +283,7 @@ describe("the waiting rows this browser keeps", () => {
         id,
         person("mem_lee", "org_prairie"),
         { ...serverStart, signedOut: false, removed: false },
-        undefined
+        O.none()
       )
       other.open(viewAt({ id, revision: 4 }))
       yield* settle
@@ -284,7 +294,7 @@ describe("the waiting rows this browser keeps", () => {
   it.live("are erased with the import when it is removed", () =>
     Effect.gen(function* () {
       const id = importNo(63)
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       const view = viewAt({ id, revision: 4, fileName: "a.csv" })
       const leave = t.open(view)
       yield* settle
@@ -302,7 +312,7 @@ describe("the waiting rows this browser keeps", () => {
   it.live("of an import found closed are sent nowhere, named by the result, and dropped once it has named them", () =>
     Effect.gen(function* () {
       const id = importNo(64)
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
@@ -336,7 +346,7 @@ describe("the question before the page is left", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(65)
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       t.registry.mount(askBeforeLeaving)
       const leave = t.open(viewAt({ id, revision: 4 }))
       yield* settle
@@ -359,7 +369,7 @@ describe("the question before the page is left", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(66)
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       t.registry.mount(askBeforeLeaving)
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
@@ -377,7 +387,7 @@ describe("the question before the page is left", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(67)
-      const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       first.open(viewAt({ id, revision: 4 }))
       yield* settle
       first.decide("row-2")
@@ -385,7 +395,7 @@ describe("the question before the page is left", () => {
       expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
       // A colleague removes the import; the page is loaded again.
       browser.listeners["beforeunload"] = []
-      const again = page(id, dana, { ...serverStart, signedOut: false, removed: true }, undefined)
+      const again = page(id, dana, { ...serverStart, signedOut: false, removed: true }, O.none())
       again.registry.mount(askBeforeLeaving)
       yield* settle
       expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))]).toEqual([false, false])
@@ -400,12 +410,13 @@ describe("rows that wait after a save refused for nobody signed in (G3)", () => 
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(68)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+          ...serverStart,
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 })
+          view: O.some(viewAt({ id, revision: 4 }))
         }
-        const t = page(id, dana, server, undefined)
+        const t = page(id, dana, server, O.none())
         const leave = t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -460,7 +471,7 @@ describe("what a match took back from saved decisions", () => {
         emptyStorage()
         const id = importNo(70)
         const view = viewAt({ id, revision: 5, takenBack: taken })
-        const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+        const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
         t.open(view)
         t.registry.mount(takeBacksNamed(id))
         yield* settle
@@ -468,14 +479,14 @@ describe("what a match took back from saved decisions", () => {
         t.registry.set(dismissTakeBack(id), taken[0]!)
         expect(t.registry.get(takeBacksNamed(id))).toEqual([taken[1]])
         // The page loaded again: still dismissed for Dana; named to Lee, who has not dismissed it.
-        const again = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+        const again = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
         again.open(view)
         again.registry.mount(takeBacksNamed(id))
         const lee = page(
           id,
           person("mem_lee", "org_prairie"),
           { ...serverStart, signedOut: false, removed: false },
-          undefined
+          O.none()
         )
         lee.open(view)
         lee.registry.mount(takeBacksNamed(id))
@@ -495,7 +506,7 @@ describe("rows on hold and the values seen, through the browser's storage", () =
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(69)
-        const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+        const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
         first.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Row 3's save is refused; row 2's then fails on the network.
@@ -515,7 +526,12 @@ describe("rows on hold and the values seen, through the browser's storage", () =
         // The page is loaded again; Lee has kept row 2 meanwhile (revision 5).
         const kept = decisionFromFlags({ kept: true })
         const later = viewAt({ id, revision: 5, decisions: { "row-2": kept } })
-        const again = page(id, dana, { ...serverStart, signedOut: false, removed: false, view: later }, undefined)
+        const again = page(
+          id,
+          dana,
+          { ...serverStart, signedOut: false, removed: false, view: O.some(later) },
+          O.none()
+        )
         again.open(later)
         yield* settle
         const lines = again.registry.get(reviewLines(id))
@@ -538,12 +554,13 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(71)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+          ...serverStart,
           signedOut: false,
           removed: false,
-          view: viewAt({ id, revision: 4 })
+          view: O.some(viewAt({ id, revision: 4 }))
         }
-        const t = page(id, dana, server, undefined)
+        const t = page(id, dana, server, O.none())
         const leave = t.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Row 2 left out; its save fails on the server: it waits, at revision 4.
@@ -555,7 +572,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         leave()
         yield* settle
         // Lee keeps row 2 meanwhile (revision 5).
-        server.view = viewAt({ id, revision: 5, decisions: { "row-2": keptDecision } })
+        server.view = O.some(viewAt({ id, revision: 5, decisions: { "row-2": keptDecision } }))
         // Back to Review: the step is drawn again over the view the tab held. Nothing is judged before it goes: the row
         // goes, written only over what the server may hold of it (nothing, when it was decided, or the save that failed).
         t.registry.mount(followDraft(id))
@@ -586,8 +603,8 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         const t = page(
           id,
           dana,
-          { ...serverStart, signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) },
-          undefined
+          { ...serverStart, signedOut: false, removed: false, view: O.some(viewAt({ id, revision: 4 })) },
+          O.none()
         )
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
@@ -626,8 +643,8 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         const t = page(
           id,
           dana,
-          { ...serverStart, signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) },
-          undefined
+          { ...serverStart, signedOut: false, removed: false, view: O.some(viewAt({ id, revision: 4 })) },
+          O.none()
         )
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
@@ -650,8 +667,8 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(74)
-        const server = { signedOut: false, removed: false, in: "org_northline" }
-        const t = page(id, dana, server, undefined)
+        const server = { ...serverStart, signedOut: false, removed: false, in: "org_northline" }
+        const t = page(id, dana, server, O.none())
         t.open(viewAt({ id, revision: 4 }))
         t.registry.mount(notices)
         yield* settle
@@ -676,7 +693,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(75)
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
@@ -694,8 +711,12 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         emptyStorage()
         browser.said.length = 0
         const id = importNo(76)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
-        const t = page(id, dana, server, undefined)
+        const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+          ...serverStart,
+          signedOut: false,
+          removed: false
+        }
+        const t = page(id, dana, server, O.none())
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -703,7 +724,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // Marcus signs in on this page; the import read for him finds Dana's row waiting.
-        server.view = viewAt({ id, revision: 4 })
+        server.view = O.some(viewAt({ id, revision: 4 }))
         t.registry.set(t.who, marcus)
         yield* settle
         expect(A.length(t.saves)).toBe(1)
@@ -719,7 +740,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       emptyStorage()
       const id = importNo(77)
       const view = viewAt({ id, revision: 5, takenBack: taken })
-      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const t = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       const leave = t.open(view)
       t.registry.mount(takeBacksNamed(id))
       yield* settle
@@ -741,13 +762,14 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(78)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+          ...serverStart,
           signedOut: false,
           removed: false,
-          view: viewAt({ id, revision: 4 })
+          view: O.some(viewAt({ id, revision: 4 }))
         }
         // Marcus left row 5 out on this tab earlier; its save failed, and it is kept for him.
-        const before = page(id, marcus, server, undefined)
+        const before = page(id, marcus, server, O.none())
         before.open(viewAt({ id, revision: 4 }))
         yield* settle
         before.decide("row-5")
@@ -755,7 +777,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* Deferred.fail(before.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         // The page is loaded again: Dana opens the Review step, with nothing of hers pending.
-        const t = page(id, dana, server, undefined)
+        const t = page(id, dana, server, O.none())
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         // Marcus signs in on the page and leaves row 3 out; its save fails.
@@ -763,14 +785,16 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         t.decide("row-3")
         yield* settle
-        const rowsKept = () => Str.includes('"row-3"')(browser.kept[keyOf(id, "mem_marcus", "org_prairie")] ?? "")
-        const fiveKept = () => Str.includes('"row-5"')(browser.kept[keyOf(id, "mem_marcus", "org_prairie")] ?? "")
+        const rowsKept = () =>
+          O.exists(R.get(browser.kept, keyOf(id, "mem_marcus", "org_prairie")), Str.includes('"row-3"'))
+        const fiveKept = () =>
+          O.exists(R.get(browser.kept, keyOf(id, "mem_marcus", "org_prairie")), Str.includes('"row-5"'))
         expect([rowsKept(), fiveKept()]).toEqual([true, true])
         for (const save of t.saves) yield* Deferred.fail(save.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         expect([rowsKept(), fiveKept()]).toEqual([true, true])
         // A reload, as Marcus: both rows come back, and are sent once the import's picture has checked them.
-        const again = page(id, marcus, server, undefined)
+        const again = page(id, marcus, server, O.none())
         again.open(viewAt({ id, revision: 4 }))
         yield* settle
         expect(A.map(again.saves, (save) => A.sort(R.keys(save.payload.set), Str.Order))).toEqual([["row-3", "row-5"]])
@@ -787,8 +811,8 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         const t = page(
           id,
           dana,
-          { ...serverStart, signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) },
-          undefined
+          { ...serverStart, signedOut: false, removed: false, view: O.some(viewAt({ id, revision: 4 })) },
+          O.none()
         )
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
@@ -812,13 +836,14 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(80)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+          ...serverStart,
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 })
+          view: O.some(viewAt({ id, revision: 4 }))
         }
         const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
-        const t = page(id, dana, server, session)
+        const t = page(id, dana, server, O.some(session))
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -845,13 +870,14 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(81)
-      const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+      const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+        ...serverStart,
         signedOut: true,
         removed: false,
-        view: viewAt({ id, revision: 4 })
+        view: O.some(viewAt({ id, revision: 4 }))
       }
       const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
-      const t = page(id, dana, server, session)
+      const t = page(id, dana, server, O.some(session))
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
@@ -873,13 +899,14 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(82)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+        const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+          ...serverStart,
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 })
+          view: O.some(viewAt({ id, revision: 4 }))
         }
         const session = sessionStandIn(memberOf({ ...memberStart, account: "mem_dana", id: "mem_dana" }))
-        const t = page(id, dana, server, session)
+        const t = page(id, dana, server, O.some(session))
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -905,7 +932,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(83)
-        const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+        const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
         first.open(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
         yield* settle
         first.decide("row-31")
@@ -913,8 +940,8 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         yield* settle
         // A colleague removes the import; the page is loaded again.
         browser.listeners["beforeunload"] = []
-        const gone = { signedOut: false, removed: true }
-        const again = page(id, dana, gone, undefined)
+        const gone = { ...serverStart, signedOut: false, removed: true }
+        const again = page(id, dana, gone, O.none())
         again.registry.mount(askBeforeLeaving)
         again.registry.mount(notices)
         yield* settle
@@ -930,14 +957,14 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
           said
         ])
         // Not to Marcus, on the same tab; and to Dana again after a reload, until she dismisses it.
-        const other = page(id, marcus, gone, undefined)
+        const other = page(id, marcus, gone, O.none())
         other.registry.mount(notices)
-        const reloaded = page(id, dana, gone, undefined)
+        const reloaded = page(id, dana, gone, O.none())
         reloaded.registry.mount(notices)
         yield* settle
         expect([says(other), says(reloaded)]).toEqual([[], said])
         reloaded.registry.set(dismissNotice, reloaded.registry.get(notices)[0]!)
-        const after = page(id, dana, gone, undefined)
+        const after = page(id, dana, gone, O.none())
         after.registry.mount(notices)
         yield* settle
         expect([says(reloaded), says(after)]).toEqual([[], []])
@@ -950,19 +977,14 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(84)
-        const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+        const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
         first.open(viewAt({ id, revision: 4 }))
         yield* settle
         first.decide("row-2")
         yield* settle
         browser.listeners["beforeunload"] = []
         // Another tab switched the session to Northline after this page's session had answered Prairie.
-        const again = page(
-          id,
-          dana,
-          { ...serverStart, signedOut: false, removed: true, in: "org_northline" },
-          undefined
-        )
+        const again = page(id, dana, { ...serverStart, signedOut: false, removed: true, in: "org_northline" }, O.none())
         again.registry.mount(askBeforeLeaving)
         again.registry.mount(notices)
         yield* settle
@@ -982,11 +1004,12 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         browser.listeners["beforeunload"] = []
         const id = importNo(85)
         const server = {
+          ...serverStart,
           signedOut: false,
           removed: false,
-          view: viewAt({ id, revision: 4, fileName: "items_messy.csv" })
+          view: O.some(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
         }
-        const t = page(id, dana, server, undefined)
+        const t = page(id, dana, server, O.none())
         t.registry.mount(askBeforeLeaving)
         t.registry.mount(notices)
         t.open(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
@@ -1034,8 +1057,12 @@ describe("what the runner asks for while nobody looks", () => {
       emptyStorage()
       const id = importNo(91)
       // The import is not read yet: the step is drawn, and the person's row waits with no picture under it.
-      const server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
-      const t = page(id, dana, server, undefined)
+      const server: { signedOut: boolean; removed: boolean; view: O.Option<ImportView>; readonly in: string } = {
+        ...serverStart,
+        signedOut: false,
+        removed: false
+      }
+      const t = page(id, dana, server, O.none())
       t.registry.mount(importViewShown(id))
       const leave = t.registry.mount(followDraft(id))
       yield* settle
@@ -1045,7 +1072,7 @@ describe("what the runner asks for while nobody looks", () => {
       // She goes to another page; the server can be read now; she presses Save again on what was said.
       leave()
       yield* settle
-      server.view = viewAt({ id, revision: 4 })
+      server.view = O.some(viewAt({ id, revision: 4 }))
       t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
       yield* settle
       expect(A.map(t.saves, (save) => save.payload.set)).toEqual([{ "row-2": out }])
@@ -1056,12 +1083,13 @@ describe("what the runner asks for while nobody looks", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(92)
-      const server: { signedOut: boolean; removed: boolean; in?: string } = {
-        signedOut: false,
-        removed: true,
-        in: "org_switched"
-      }
-      const t = page(id, dana, server, undefined)
+      const server: {
+        signedOut: boolean
+        removed: boolean
+        in: string
+        readonly view: O.Option<ImportView>
+      } = { ...serverStart, signedOut: false, removed: true, in: "org_switched" }
+      const t = page(id, dana, server, O.none())
       t.registry.mount(importViewShown(id))
       t.registry.mount(followDraft(id))
       yield* settle
@@ -1082,7 +1110,7 @@ describe("what the runner asks for while nobody looks", () => {
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(93)
-      const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, undefined)
+      const first = page(id, dana, { ...serverStart, signedOut: false, removed: false }, O.none())
       first.open(viewAt({ id, revision: 4 }))
       yield* settle
       first.decide("row-2")
@@ -1093,7 +1121,7 @@ describe("what the runner asks for while nobody looks", () => {
         id,
         person("mem_dana_north", "org_northline"),
         { ...serverStart, signedOut: false, removed: false },
-        undefined
+        O.none()
       )
       again.registry.mount(askBeforeLeaving)
       yield* settle

@@ -229,7 +229,7 @@ must be crossed in a test (`postMessage` drops what makes an Option one: the app
 with every check green). And a rule about what code may write needs its exceptions named by file and reason up
 front, or each lane invents its own.
 
-Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs); SF-3's, SF-4's and SF-5's `rg` lines over every swept
+Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs), and again on pull request 25's branch at `89da8db6`, `main` at `64885a89` with 22's review fix, 114 of 114 with none replayed; SF-3's, SF-4's and SF-5's `rg` lines over every swept
 package; the Verify lock equal to `main`'s throughout; the messy sample on screen after every lane that changed a
 schema the browser sends.
 

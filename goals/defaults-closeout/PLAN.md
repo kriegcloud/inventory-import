@@ -18,7 +18,7 @@ pull request is merged, not when it is opened.
 | 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | done: merged 2026-11-26 |
 | 6, 7 | Outside the review package: 48 places to 36 | 20 | done: merged 2026-11-26 |
 | 7b | What was left, 104 places in 30 files, by Benjamin's rulings of 2026-11-26 (below): the baseline names no file | 22 | done: merged 2026-11-26, seen on screen (below) |
-| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | 25 | done but for the worktrees: `bun run check:full` passes on `main` at `e71f2b5d` (closing note, below). The merged worktrees and branches are local to the workstation and come off on Benjamin's word |
+| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | 25 | done: `bun run check:full` passes on `main` at `e71f2b5d` and on this pull request's branch, which also carries pull request 22's review fix (closing note, below). Six merged worktrees and their local branches removed on Benjamin's word, 2026-11-26; `defaults-last`, where this pull request was made, after it merges |
 
 ## The failing property (step 2)
 
@@ -85,7 +85,8 @@ None.
 
 ## Closing note
 
-2026-11-26. Everything the defaults sweep left open is on `main`, in six pull requests (17 to 22). The baseline
+2026-11-26. Everything the defaults sweep left open is on `main`, in pull requests 17 to 22 and 25, which carries 22's review fix
+(below). The baseline
 names no file: `defaults-baseline.json` holds `files: {}`, and `bun run beep laws defaults` passes on `main` at
 `e71f2b5d`.
 
@@ -99,10 +100,12 @@ starting values the last lane kept are schemas (`CountStart`, `FacetStart`, `Tab
 
 What was learned. The law reading a component's own prop had to learn where a prop's name stops being the prop: a
 static computed key is a prop, a renderer factory is not a component, and a `catch` or loop that binds the same
-name ends it (CodeRabbit found the three on pull request 22; the tests are in `Defaults.test.ts`). And a lane told
+name ends it (CodeRabbit found the three on pull request 22; the tests are in `Defaults.test.ts`). That fix was
+pushed to 22's branch after 22 had merged, so it reached `main` only with pull request 25: a pull request is merged
+at the commit GitHub had when the button was pressed, and a push after that goes nowhere. And a lane told
 not to lower a strict ceiling puts good moves back: seven were, until the ruling let a lane lower one.
 
-Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs); SF-3's, SF-4's and SF-5's `rg` lines over every swept
+Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs), and again on pull request 25's branch at `89da8db6`, `main` at `64885a89` with 22's review fix, 114 of 114 with none replayed; SF-3's, SF-4's and SF-5's `rg` lines over every swept
 package find only schema definitions and files on `exemptions`; the messy sample on screen on the branch of each
 pull request that changed what the browser sends (above). Not checked: "Use items_messy.csv" reading "Stopped before
 it was saved" on a dev server just started (below) was not pressed on a production build.

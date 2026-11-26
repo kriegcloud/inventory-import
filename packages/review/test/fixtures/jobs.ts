@@ -1,4 +1,6 @@
 import { identity } from "effect/Function"
+import * as R from "effect/Record"
+import * as S from "effect/Schema"
 /**
  * Made-up jobs for the same fabrication shop, for the gallery's "Records with a parent" state and its tests: each job
  * (the parent record) lists the material it needs, one line each. Development only: nothing in the app imports this.
@@ -112,16 +114,16 @@ const making = [
 export type Job = { code: string; making: string; due: string; lines: ReadonlyArray<Line> }
 
 /** One line of the file: a material a job needs. `problem` when the person has to answer for it. */
-export type Line = {
-  /** The line in the file, as the person would count it (the header is line 1). */
-  line: number
-  job: string
-  material: string
-  sku: string
-  qty: string
-  unit: string
-  problem?: Problem
-}
+const Line = S.Struct({
+  line: S.Finite.annotateKey({ description: "Line in the file, counting the header" }),
+  job: S.String.annotateKey({ description: "Parent job code" }),
+  material: S.String.annotateKey({ description: "Material name" }),
+  sku: S.String.annotateKey({ description: "Stock code" }),
+  qty: S.String.annotateKey({ description: "Quantity as written" }),
+  unit: S.String.annotateKey({ description: "Unit as written" }),
+  problem: S.OptionFromOptionalKey(Problem).annotateKey({ description: "Question on this line" })
+})
+export type Line = typeof Line.Type
 
 // Which line of which job carries a question, by job index and line index: spread through the file.
 const questions: ReadonlyArray<readonly [job: number, line: number, kind: "unit" | "comma" | "stock"]> = [
@@ -160,7 +162,17 @@ export function makeJobs(): ReadonlyArray<Job> {
       const qty = material.unit === "pcs" ? String(8 + ((index + at) % 5) * 4) : String(2 + ((index * at) % 5))
       // Now and then a bar is counted in cut pieces, not metres: both are on the unit list.
       const unit = material.unit === "m" && (index + at) % 6 === 0 ? "pcs" : material.unit
-      lines.push({ line, job: `J-${2041 + index}`, material: material.name, sku: material.sku, qty, unit })
+      lines.push(
+        Line.make({
+          line,
+          job: `J-${2041 + index}`,
+          material: material.name,
+          sku: material.sku,
+          qty,
+          unit,
+          problem: O.none()
+        })
+      )
       line += 1
     }
     const due = days[(index * 2) % days.length] ?? "Mon 23 Nov"
@@ -181,7 +193,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         material: bar.name,
         sku: bar.sku,
         unit: "length",
-        problem: Problem.make({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
+        problem: Problem.makeOption({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
       }
     }
     if (kind === "comma") {
@@ -194,7 +206,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         sku: material.sku,
         unit: material.unit,
         qty,
-        problem: Problem.make({
+        problem: Problem.makeOption({
           kind: "comma",
           column: O.some("qty"),
           fix: O.some(
@@ -223,18 +235,19 @@ export function makeJobs(): ReadonlyArray<Job> {
         material: material.name,
         sku: material.sku,
         unit: material.unit,
-        problem: Problem.make({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
+        problem: Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
       }
     }
     job.lines = lines
   }
   const all = jobs.flatMap((job) => job.lines)
   for (const job of jobs) {
-    job.lines = job.lines.map((entry) =>
-      entry.problem?.kind === "unit"
-        ? { ...entry, problem: { ...entry.problem, choices: O.some(unitChoices(entry, all)) } }
-        : entry
-    )
+    job.lines = job.lines.map((entry) => ({
+      ...entry,
+      problem: O.map(entry.problem, (problem) =>
+        problem.kind === "unit" ? { ...problem, choices: O.some(unitChoices(entry, all)) } : problem
+      )
+    }))
   }
   return jobs
 }
@@ -266,47 +279,59 @@ export const questionRows = (jobs: ReadonlyArray<Job>, leftOut: ReadonlyArray<st
     .filter((job) => !leftOut.includes(job.code))
     .flatMap((job) => job.lines)
     .flatMap((entry) =>
-      entry.problem === undefined
-        ? []
-        : [
-            ReviewRow.make({
-              id: `line-${entry.line}`,
-              line: entry.line,
-              cells: { material: entry.material, job: entry.job, sku: entry.sku, qty: entry.qty, unit: entry.unit },
-              problem: O.some(entry.problem)
-            })
-          ]
+      O.match(entry.problem, {
+        onNone: A.empty,
+        onSome: (problem) => [
+          ReviewRow.make({
+            id: `line-${entry.line}`,
+            line: entry.line,
+            cells: { material: entry.material, job: entry.job, sku: entry.sku, qty: entry.qty, unit: entry.unit },
+            problem: O.some(problem)
+          })
+        ]
+      })
     )
 
 /** The page's own check of a line after the person typed or picked a value: the same rule the server would run. */
 export function recheckLine(input: { cells: Readonly<Record<string, string>> }): O.Option<Problem> {
   const { cells } = input
-  if (!knownSkus.includes(cells.sku ?? ""))
+  if (!O.exists(R.get(cells, "sku"), (sku) => knownSkus.includes(sku)))
     return Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
-  if (!/^\d+(\.\d+)?$/.test(cells.qty ?? "")) return Problem.makeOption({ kind: "comma", column: O.some("qty") })
-  if (!["m", "pcs", "kg", "L"].includes(cells.unit ?? ""))
+  if (!O.exists(R.get(cells, "qty"), (qty) => /^\d+(\.\d+)?$/.test(qty)))
+    return Problem.makeOption({ kind: "comma", column: O.some("qty") })
+  if (!O.exists(R.get(cells, "unit"), (unit) => ["m", "pcs", "kg", "L"].includes(unit)))
     return Problem.makeOption({ kind: "unit", column: O.some("unit") })
   return O.none()
 }
 
 /** Whether the person's decision settles a line's question, and how: the page counts from this, not the region. */
-const answerOf = (entry: Line, decision: RowDecision | undefined): "open" | "answered" | "out" => {
-  if (entry.problem === undefined) return "answered"
-  if (decision !== undefined && decision.place.kind === "leftOut") return "out"
-  const column = O.match(entry.problem.column, { onNone: () => "", onSome: (column) => column })
-  const typed = decision?.edits?.[column]
-  if (decision?.accepted?.includes(column) === true) return "answered"
-  if (typed === undefined) return "open"
-  const cells = {
-    material: entry.material,
-    job: entry.job,
-    sku: entry.sku,
-    qty: entry.qty,
-    unit: entry.unit,
-    [column]: typed
-  }
-  return O.isNone(recheckLine({ cells })) ? "answered" : "open"
-}
+const answerOf = (entry: Line, decision: O.Option<RowDecision>): "open" | "answered" | "out" =>
+  O.match(entry.problem, {
+    onNone: () => "answered",
+    onSome: (problem) =>
+      O.match(decision, {
+        onNone: () => "open",
+        onSome: (decision) => {
+          if (decision.place.kind === "leftOut") return "out"
+          const column = O.match(problem.column, { onNone: () => "", onSome: identity })
+          if (decision.accepted.includes(column)) return "answered"
+          return O.match(R.get(decision.edits, column), {
+            onNone: () => "open",
+            onSome: (typed) => {
+              const cells = {
+                material: entry.material,
+                job: entry.job,
+                sku: entry.sku,
+                qty: entry.qty,
+                unit: entry.unit,
+                [column]: typed
+              }
+              return O.match(recheckLine({ cells }), { onNone: () => "answered", onSome: () => "open" })
+            }
+          })
+        }
+      })
+  })
 
 export type JobReview = {
   job: Job
@@ -338,30 +363,39 @@ export function reviewJobs(input: {
     }
     const answers = job.lines.map((entry) => ({
       entry,
-      answer: answerOf(entry, input.decisions[`line-${entry.line}`])
+      answer: answerOf(entry, R.get(input.decisions, `line-${entry.line}`))
     }))
     const open = answers.filter((item) => item.answer === "open")
     const out = answers.filter((item) => item.answer === "out").length
     const importing = answers.length - out - open.length
     if (open.length > 0) {
-      const what = open.map(({ entry }) => {
-        const problem = entry.problem
-        if (problem?.kind === "unit") {
-          const hint = O.flatMap(
-            problem.choices,
-            A.findFirst((choice) => choice.suggested)
-          )
-          const why = O.match(hint, {
-            onNone: () => "",
-            onSome: (hint) =>
-              ` (${hint.label}, ${O.match(hint.note, { onNone: () => "suggested", onSome: (note) => note })})`
-          })
-          return `line ${entry.line} says “length” for ${entry.material}: pick m or pcs${why}`
-        }
-        return problem?.kind === "comma"
-          ? `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as ${O.match(problem.fix, { onNone: () => "", onSome: (fix) => fix.to })}`
-          : `line ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`
-      })
+      const what = open.map(({ entry }) =>
+        O.match(entry.problem, {
+          onNone: () =>
+            `line ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`,
+          onSome: (problem) => {
+            if (problem.kind === "unit") {
+              const hint = O.flatMap(
+                problem.choices,
+                A.findFirst((choice) => choice.suggested)
+              )
+              return O.match(hint, {
+                onNone: () => `line ${entry.line} says “length” for ${entry.material}: pick m or pcs`,
+                onSome: (hint) =>
+                  `line ${entry.line} says “length” for ${entry.material}: pick m or pcs (${hint.label}, ${O.match(hint.note, { onNone: () => "suggested", onSome: (note) => note })})`
+              })
+            }
+            if (problem.kind === "comma")
+              return O.match(problem.fix, {
+                onNone: () =>
+                  `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as `,
+                onSome: (fix) =>
+                  `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as ${fix.to}`
+              })
+            return `line ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`
+          }
+        })
+      )
       const reason = `${what.join("; ")}.`
       return {
         job,
@@ -371,7 +405,7 @@ export function reviewJobs(input: {
         waiting: open.length
       }
     }
-    const answered = answers.filter((item) => item.entry.problem !== undefined && item.answer === "answered").length
+    const answered = answers.filter((item) => O.isSome(item.entry.problem) && item.answer === "answered").length
     const reason =
       answered === 0 && out === 0
         ? `All ${lines(job.lines.length)} match an item on your list, in the unit it is stocked in.`

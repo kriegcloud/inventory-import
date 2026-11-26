@@ -1583,3 +1583,112 @@ Final focused receipts: formatting passes all 34 changed code/config files; defa
 TypeScript files (186 fallback, 145 absence, 17 unwrap, 27 normalise across source plus forced callers/tests).
 The separate review-source-only inventory remains 153. `docs:check` passes all three documentation roots with
 existing status-vocabulary warnings, and `git diff --check` passes. The baseline was not lowered.
+
+## Review tests, row 9, 2026-11-26
+
+This lane owns `packages/review/test` only. The source migration's canonical Options are read directly; no schema
+is introduced to manufacture a missing assertion value. The historical draft fixture and all stored formats stay
+unchanged. The baseline is retained for the orchestrator to lower after review.
+
+| Boundary or field | Verdict | Implementation rule |
+| --- | --- | --- |
+| Test lookups of rows, groups, facets, history and changes | Required | Narrow with `assertSome` or `assertDefined`; keep every existing expectation and fail on missing prerequisites |
+| `ReviewRow.problem`, problem fix/rivals/choices/column and column metadata | Absent, as is | Compose the Options directly, without a nullable intermediate |
+| `ReviewState.redo` and decision collections | Required, as is | Read the canonical collections without a fallback |
+| Atom test builder rows/kinds and key modifiers | Required | Callers spread a named starting input and state overrides; builders have no default arguments |
+| Fixture line problems and temporary fabrication problems | Absent | Use Option where the fixture can be migrated within this lane; retain any unresolved site explicitly |
+| Fixture finite lists and dynamic cell lookups | Required where construction proves presence; otherwise Absent | Assert finite fixture prerequisites; preserve real sparse-cell behavior and name unresolved sites |
+| Storage and external table mocks | Platform boundary | Preserve the actual API contract; unresolved null conversions are counted, not granted exemptions |
+| Fixture recheck normalization and derived reason text | Derived | Preserve existing cell-reading rules and words; no fallback-only decode or renamed default |
+
+No new undecided default or exemption is introduced. Final remaining-site inventory and validation are appended
+below after implementation.
+
+### Remaining review-test places
+
+The final reader counts 20 places: 14 fallbacks, two absence checks and four normalizations, down from the saved
+94. The four files `DraftFormat.test.ts`, `Review.test.ts`, `ReviewLayout.test.ts` and `ReviewRegion.atoms.test.ts`
+have zero. The saved baseline is unchanged. Every counted remaining site is listed below; none is an exemption.
+
+Both fixture modules are imported directly by the browser gallery (`ReviewGallery.tsx` and
+`gallery/JobsReview.tsx`). They cannot import `@effect/vitest/utils`: its runtime imports Vitest and `node:assert`.
+The attempted fixture narrowing assertions were removed before the final validation. The remaining finite-list
+lookups need nonempty/bounded construction contracts or separation from those browser consumers; substituting an
+unsafe getter, cast or synchronous runner would only rename the question. The mutable counters need an explicit
+construction policy instead of a missing-key zero. The sparse cell metadata needs its required-key relationship
+carried through `ReviewRow` rather than widened away by that source type. These repairs were not built in this
+lane. The three trims and capitalization need a browser-safe normalization boundary compatible with the callers'
+synchronous API; no fallback-only decode, invented error result or test runtime import was left behind.
+
+| File (under `packages/review/test`) | Line | Kind | Expression | Why left |
+| --- | ---: | --- | --- | --- |
+| `SavedProgress.test.ts` | 37 | fallback | `state.items[key] ?? null` | The Storage mock must return null for an unknown key. An Option-to-null conversion would remain an unwrap; a named API-edge judgment is outside this lane. |
+| `fixtures/fabrication.ts` | 517 | fallback | `pool[position % pool.length] ?? families[0]!` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/fabrication.ts` | 518 | fallback | `O.getOrElse` | Mutable counter selects zero on first use. Explicit counter construction policy not built; no new schema default was chosen. |
+| `fixtures/fabrication.ts` | 520 | fallback | `family.sizes[turn % family.sizes.length] ?? family.sizes[0]!` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/fabrication.ts` | 629 | fallback | `row.cells.category ?? ""` | Source ReviewRow widens generated required cells to a sparse record; required-key contract not carried through. |
+| `fixtures/fabrication.ts` | 631 | fallback | `O.getOrElse` | Mutable counter selects zero on first use. Explicit counter construction policy not built; no new schema default was chosen. |
+| `fixtures/fabrication.ts` | 635 | fallback | `row.cells.unit ?? ""` | Source ReviewRow widens generated required cells to a sparse record; required-key contract not carried through. |
+| `fixtures/fabrication.ts` | 637 | fallback | `row.cells.category ?? ""` | Source ReviewRow widens generated required cells to a sparse record; required-key contract not carried through. |
+| `fixtures/fabrication.ts` | 675 | fallback | `other.cells.sku ?? ""` | Source ReviewRow widens generated required cells to a sparse record; required-key contract not carried through. |
+| `fixtures/fabrication.ts` | 683 | normalise | `name.trim` | Shared browser fixture still reads cells or constructs presentation words synchronously; normalization boundary not built. |
+| `fixtures/fabrication.ts` | 687 | normalise | `cost.trim` | Shared browser fixture still reads cells or constructs presentation words synchronously; normalization boundary not built. |
+| `fixtures/fabrication.ts` | 689 | normalise | `onHand.trim` | Shared browser fixture still reads cells or constructs presentation words synchronously; normalization boundary not built. |
+| `fixtures/jobs.ts` | 161 | fallback | `materials[(index * 3 + at * 7) % materials.length] ?? materials[0]!` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 178 | fallback | `days[(index * 2) % days.length] ?? "Mon 23 Nov"` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 187 | absence | `job === undefined` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 187 | absence | `target === undefined` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 190 | fallback | `materials[(jobAt + lineAt) % 4] ?? materials[0]!` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 200 | fallback | `commas[comma % commas.length] ?? ["1,5", materials[0]!]` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 231 | fallback | `strangers[stranger % strangers.length] ?? strangers[0]!` | Shared browser fixture has unchecked list indices; bounded/nonempty construction contract not built. Vitest assertions would break its browser consumer. |
+| `fixtures/jobs.ts` | 403 | normalise | `reason.charAt(0).toUpperCase` | Shared browser fixture still reads cells or constructs presentation words synchronously; normalization boundary not built. |
+
+The existing `fixtures/jobs.ts` `answerOf` column case also still has `onNone: () => ""` (the current reader does
+not count that test literal). It preserves the empty-key decision lookup for a problem without a column. Making
+that field required or deciding the no-column outcome would change its source contract or behavior; it was left
+explicitly, not moved to a named constant or a fallback-only schema.
+
+### Review-test checks and scope
+
+The test builders now take required inputs. Lookup prerequisites narrow with the test utility assertions; Options
+stay Options in comparisons and projections. The fixture Line schema models its optional problem; generated
+fabrication problems and applied fixes use their canonical Option/list shapes. Fixture consumers remain browser
+safe. No source file, caller outside this package, PLAN, baseline, exemption, lock, stored data or legacy draft
+text was edited. No commit or push was made.
+
+The installed Effect source was checked for the APIs used, including Option composition/getSuccess, Record.get,
+Array lookups, Schema.OptionFromOptionalKey/decodeResult/decodeTo and SchemaTransformation.toLowerCase. The
+search oracle's decode normalizes actual name text; it supplies no fallback and converts no Option to undefined.
+
+Final focused review suite: 115 tests in seven files passed, without retries. The legacy draft exact-byte round
+trip is included. An independent comparison against HEAD passed for 36 fabrication configurations (nine sizes,
+including 0 and 5000, with both clean and withoutUnit flags), canonicalized job data, question rows, job review
+words/status/counts under three decision sets and three left-out sets, and sparse/blank/trimmed rechecks. A final 256-case sparse/blank/padded recheck comparison also matches HEAD. The
+comparison canonicalizes only the intentionally migrated optional Line.problem shape. Temporary original copies
+were removed. Logs: `/tmp/defaults-review-tests-final.log` and `/tmp/defaults-review-parity.log`.
+
+Scoped formatting and defaults checks pass. `bun run check` was run with temporary cache paths; its first failure
+is a mandatory ledger decrease outside this lane. A second run with `--continue` checks the remaining tasks. The
+required ledger edits, deliberately not made, are:
+
+- `packages/tooling/tool/cli/ledgers/assertions.json`: ReviewRegion.atoms.test.ts, 11 to 10.
+- `packages/tooling/tool/cli/ledgers/readonly.json`: ReviewRegion.atoms.test.ts, 17 to 15; fixtures/jobs.ts, 23 to 16.
+
+These are decreases caused by removing the nullable assertion and optional/plain fixture fields. Adding redundant
+assertions or mutable fields to retain the old ledger numbers would disguise the improvement. This lane cannot
+claim a passing full check while the required bookkeeping files are outside its authorized boundary.
+
+No browser session, hosted deployment, full import journey, check:full, slow suite or separate Verify run was
+performed. This hand-back does not establish on-screen acceptance or complete row 9.
+
+Final full-check receipt: `bun run check --continue` finished with 103 of 105 tasks successful in 2m 37.584s;
+only assertions:check and readonly:check failed, for the three decreases listed above. Review typecheck/strict
+ceiling and lint pass independently on the final files, as do all 115 review tests. `docs:check` passes with the
+existing status-vocabulary warnings, and `git diff --check` passes. The final fixture loop uses a whole `O.match`
+case, not a boolean projection in an `if`; its focused tests were rerun after that adjustment. The required
+bookkeeping edits are provided, unapplied, in `/tmp/defaults-review-ledger-decreases.patch`. Full-check logs are
+`/tmp/defaults-review-check.log` and `/tmp/defaults-review-check-continue.log`.
+
+Needs the person: authorize the three ledger decreases outside this lane, or have the orchestrator apply them;
+the 20 named remaining sites and the uncounted no-column fallback still need follow-up, not an exemption inferred
+by this lane.

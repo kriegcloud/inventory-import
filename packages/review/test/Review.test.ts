@@ -1,7 +1,7 @@
+import { identity } from "effect/Function"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { fixableBy } from "@inventory/review/ReviewDraft"
-import { assertTrue } from "@effect/vitest/utils"
-import { identity } from "effect/Function"
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { it as fx } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -64,12 +64,12 @@ const after = (...actions: ReadonlyArray<Action>): ReviewState =>
   A.reduce(actions, emptyState, (state, action) => run(state, action).state)
 const firstOf = (kind: string): ReviewRow => {
   const row = A.findFirst(rows, (candidate) => O.exists(candidate.problem, (problem) => problem.kind === kind))
-  if (O.isNone(row)) throw new Error(`no ${kind} row in the gallery file`)
+  assertTrue(O.isSome(row), `no ${kind} row in the gallery file`)
   return row.value
 }
 const viewOf = (state: ReviewState, rowId: string) => {
   const view = A.findFirst(views(state), (candidate) => candidate.row.id === rowId)
-  if (O.isNone(view)) throw new Error(`no row ${rowId}`)
+  assertTrue(O.isSome(view), `no row ${rowId}`)
   return view.value
 }
 
@@ -139,9 +139,10 @@ describe("a proposal never overwrites the person's decision", () => {
       waitingGroups({ kind: O.none(), views: views(emptyState) }),
       (candidate) => candidate.id === "unit:each"
     )
-    if (O.isNone(group)) throw new Error("no group")
+    assertTrue(O.isSome(group), "no group")
     const [typed, left] = group.value.rowIds
-    if (typed === undefined || left === undefined) throw new Error("group too small")
+    assertDefined(typed)
+    assertDefined(left)
     const state = after(
       { type: "edit" as const, rowId: typed, column: "unit", value: "kg" },
       { type: "leaveOut" as const, rowIds: [left] },
@@ -152,8 +153,12 @@ describe("a proposal never overwrites the person's decision", () => {
     expect(CellMark.guards.applied(typedMark)).toBe(true)
     expect(typedMark).toMatchObject({ by: "you", to: "kg" })
     expect(viewOf(state, left).status).toBe("out")
-    expect(O.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
-    expect(state.undo[state.undo.length - 1]?.label).toBe("7 fixes accepted")
+    const leftDecision = HashMap.get(state.decisions, left)
+    assertTrue(O.isSome(leftDecision), "expected a present test value")
+    expect(leftDecision.value.accepted).toEqual([])
+    const lastStep = A.last(state.undo)
+    assertTrue(O.isSome(lastStep), "expected a present test value")
+    expect(lastStep.value.label).toBe("7 fixes accepted")
   })
 
   it("keeping one copy leaves its twin out, but not a twin the person already gave a new SKU", () => {
@@ -223,7 +228,7 @@ describe("one undo step per accept", () => {
 
   it("an action that fits no row adds no step", () => {
     const ready = A.findFirst(rows, (row) => O.isNone(row.problem))
-    if (O.isNone(ready)) throw new Error("no ready row")
+    assertTrue(O.isSome(ready), "no ready row")
     expect(run(emptyState, { type: "accept" as const, rowIds: [ready.value.id] }).state).toBe(emptyState)
     expect(run(emptyState, { type: "undo" as const }).label).toBe("")
   })
@@ -236,7 +241,9 @@ describe("groups", () => {
       ["unit:each", 9, O.some("rule")],
       ["unit:length", 3, O.some("model")]
     ])
-    expect(groups[0]?.variants).toEqual([
+    const firstGroup = A.head(groups)
+    assertTrue(O.isSome(firstGroup), "expected a present test value")
+    expect(firstGroup.value.variants).toEqual([
       { from: "ea", count: 6 },
       { from: "each", count: 3 }
     ])
@@ -246,7 +253,11 @@ describe("groups", () => {
     const before = views(emptyState)
     const outcome = run(emptyState, { type: "acceptGroup" as const, groupId: "unit:length", except: [] })
     const now = views(outcome.state)
-    const moved = A.filter(now, (view, index) => view.status !== before[index]?.status)
+    const moved = A.filter(now, (view, index) => {
+      const previous = before[index]
+      assertDefined(previous)
+      return view.status !== previous.status
+    })
     expect(
       A.map(moved, (view) =>
         O.flatMap(
@@ -369,22 +380,25 @@ describe("what the table and the phone show", () => {
       waitingGroups({ kind: O.none(), views: views(emptyState) }),
       (candidate) => candidate.id === "unit:length"
     )
-    if (O.isNone(group)) throw new Error("no group")
+    assertTrue(O.isSome(group), "no group")
     expect(choicesOf(group.value)).toEqual(O.some(["m", "pcs"]))
     expect(group.value.why.basis).toMatch(/^\d+ other Bar rows in this file use m; 0 use pcs\.$/)
     const each = A.findFirst(
       waitingGroups({ kind: O.none(), views: views(emptyState) }),
       (candidate) => candidate.id === "unit:each"
     )
-    expect(O.isSome(each) ? choicesOf(each.value) : "missing").toEqual(O.none())
+    assertTrue(O.isSome(each), "expected a present test value")
+    expect(choicesOf(each.value)).toEqual(O.none())
 
     const chosen = run(emptyState, { type: "chooseGroup" as const, groupId: "unit:length", value: "pcs", except: [] })
     expect(chosen.label).toBe("3 rows set to pcs")
     expect(chosen.state.undo).toHaveLength(1)
-    const row = viewOf(chosen.state, group.value.rowIds[0] ?? "")
+    const firstRow = group.value.rowIds[0]
+    assertDefined(firstRow)
+    const row = viewOf(chosen.state, firstRow)
     expect([row.status, row.cells.unit, row.decided]).toEqual(["ready", "pcs", O.some("edited")])
     const proposed = run(emptyState, { type: "chooseGroup" as const, groupId: "unit:length", value: "m", except: [] })
-    expect(viewOf(proposed.state, group.value.rowIds[0] ?? "").decided).toEqual(O.some("accepted"))
+    expect(viewOf(proposed.state, firstRow).decided).toEqual(O.some("accepted"))
   })
 
   it("the phone asks each thing once: a group is one decision until the person splits it", () => {
@@ -420,8 +434,9 @@ describe("the first screen and the confirm step", () => {
       waitingGroups({ kind: O.none(), views: views(emptyState) }),
       (candidate) => candidate.id === "unit:each"
     )
-    if (O.isNone(group)) throw new Error("no group")
-    const unticked = group.value.rowIds[0] ?? ""
+    assertTrue(O.isSome(group), "no group")
+    const unticked = group.value.rowIds[0]
+    assertDefined(unticked)
     const outcome = run(emptyState, { type: "acceptGroup" as const, groupId: "unit:each", except: [unticked] })
     expect(outcome.label).toBe("8 fixes accepted")
     expect(viewOf(outcome.state, unticked).status).toBe("needs")
@@ -438,7 +453,11 @@ describe("the first screen and the confirm step", () => {
     const csv = Str.split(heldCsv({ words: defaultReviewWords, views: views(state), columns, problemKinds }), "\n")
     expect(csv).toHaveLength(1 + 33)
     expect(csv[0]).toBe("Row,Reason,Item,SKU,Category,Unit,On hand,Reorder at,Cost,Supplier,Bin,Lead time")
-    expect(A.every(A.drop(csv, 1), (line) => (Str.split(line, ",")[1] ?? "") !== "")).toBe(true)
+    for (const line of A.drop(csv, 1)) {
+      const reason = Str.split(line, ",")[1]
+      assertDefined(reason)
+      expect(reason).not.toBe("")
+    }
   })
 })
 
@@ -542,8 +561,8 @@ describe("the approved standards", () => {
         A.map(views(given), (view) => [
           view.row.id,
           view.status,
-          O.match(view.decided, { onNone: () => "", onSome: identity }),
-          O.match(view.problem, { onNone: () => "", onSome: (problem) => problem.kind }),
+          view.decided,
+          O.map(view.problem, (problem) => problem.kind),
           view.cells
         ])
       expect(shape(back)).toEqual(shape(state))
@@ -563,12 +582,12 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     act({ fixable: fixableBy([]), rejects: false, rows: lines, state, action, recheck: O.some(recheckLine) })
   const lineOf = (kind: string): ReviewRow => {
     const row = A.findFirst(lines, (candidate) => O.exists(candidate.problem, (problem) => problem.kind === kind))
-    if (O.isNone(row)) throw new Error(`no ${kind} line in the gallery's jobs`)
+    assertTrue(O.isSome(row), `no ${kind} line in the gallery's jobs`)
     return row.value
   }
   const lineView = (state: ReviewState, rowId: string) => {
     const view = A.findFirst(lineViews(state), (candidate) => candidate.row.id === rowId)
-    if (O.isNone(view)) throw new Error(`no line ${rowId}`)
+    assertTrue(O.isSome(view), `no line ${rowId}`)
     return view.value
   }
   const extra = { label: "Leave job J-2045 out", onSelect: () => undefined }
@@ -588,7 +607,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       waitingGroups({ kind: O.none(), views: lineViews(emptyState) }),
       (found) => found.id === "qty:comma"
     )
-    if (O.isNone(group)) throw new Error("no comma group")
+    assertTrue(O.isSome(group), "no comma group")
     expect([group.value.label, group.value.rowIds.length]).toEqual([O.some("a decimal point"), 3])
     expect(groupUse({ group: group.value, n: 3, ticks: true })).toBe("Use a decimal point for the 3 ticked")
     // Where each row keeps its own answers (`rowAction`) there is no tick: the button acts on all of them.
@@ -597,7 +616,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       waitingGroups({ kind: O.none(), views: views(emptyState) }),
       (found) => found.id === "unit:each"
     )
-    if (O.isNone(unit)) throw new Error("no unit group")
+    assertTrue(O.isSome(unit), "no unit group")
     expect(groupUse({ group: unit.value, n: 9, ticks: true })).toBe("Use pcs for the 9 ticked")
 
     const taken = lineRun(emptyState, { type: "acceptGroup" as const, groupId: "qty:comma", except: [] })
@@ -612,7 +631,8 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     expect(
       A.map(group.value.rowIds, (rowId) => {
         const view = lineView(chosen.state, rowId)
-        return `${view.cells.qty} ${O.match(view.decided, { onNone: () => "", onSome: identity })}`
+        assertTrue(O.isSome(view.decided), "a chosen value has a decision")
+        return `${view.cells.qty} ${view.decided.value}`
       })
     ).toEqual(["1.5 accepted", "1.5 edited", "1.5 edited"])
   })
@@ -638,7 +658,8 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       result({ words: defaultReviewWords, views: lineViews(picked.state), problemKinds: lineKinds }).ready,
       (row) => row.id === unit.id
     )
-    expect(O.isSome(change) ? change.value.changes : []).toEqual([
+    assertTrue(O.isSome(change), "expected a present test value")
+    expect(change.value.changes).toEqual([
       {
         column: "unit",
         from: "length",

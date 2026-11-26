@@ -1,3 +1,4 @@
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 // A draft saved before the review region became a package, and before its decision became a tagged union, still
 // restores. The fixture is the exact localStorage text that build wrote, kept as .txt so no formatter touches it. The
@@ -31,14 +32,17 @@ describe("a draft saved by the build before the move", () => {
   it.effect("gives the region the same decisions and the same undo and redo history", () =>
     Effect.gen(function* () {
       const progress = yield* S.decodeEffect(asText)(before)
-      const review = O.getOrThrow(progress.review)
+      assertTrue(O.isSome(progress.review), "expected a present test value")
+      const review = progress.review.value
       const state = restoredReview(review)
       expect(A.sort([...HashMap.keys(state.decisions)], Order.String)).toEqual(["row-148", "row-195"])
       expect(O.map(HashMap.get(state.decisions, "row-148"), (d) => d.accepted)).toEqual(O.some(["sku"]))
       expect(A.map(state.undo, (step) => step.label)).toEqual(["2 fixes accepted"])
       expect(A.map(state.redo, (step) => step.label)).toEqual(["2 rows left out"])
       // The redo step holds the two rows as they were when it was undone: left out, not kept before.
-      const redone = state.redo[0]?.before ?? HashMap.empty()
+      const redo = state.redo[0]
+      assertDefined(redo)
+      const redone = redo.before
       expect(O.map(O.flatten(HashMap.get(redone, "row-55")), (d) => d.place)).toEqual(
         O.some({ kind: "leftOut", wasKept: false })
       )

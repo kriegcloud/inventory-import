@@ -1,3 +1,4 @@
+import { assertDefined } from "@effect/vitest/utils"
 import { fixableBy } from "@inventory/review/ReviewDraft"
 // What a refresh brings back. The rules that would hurt if wrong: progress saved for one person in one organization is
 // never read for anyone else; the decisions and the undo history come back exactly as they were left; a draft that no
@@ -198,7 +199,7 @@ describe("saved progress", () => {
         let state: ReviewState = emptyState
         for (const step of steps) {
           const row = rows[step.row]
-          if (row === undefined) continue
+          assertDefined(row)
           const action = step.leaveOut
             ? { type: "leaveOut" as const, rowIds: [row.id] }
             : { type: "edit" as const, rowId: row.id, column: "qty", value: step.value }
@@ -233,7 +234,7 @@ describe("saved progress", () => {
         expect(plainOf(back.decisions)).toEqual(plainOf(state.decisions))
         expect(history(back)).toEqual(history(state))
         const redoHistory = (of: ReviewState) =>
-          A.map(of.redo ?? [], (step) => [step.label, R.fromEntries(step.before), step.focus])
+          A.map(of.redo, (step) => [step.label, R.fromEntries(step.before), step.focus])
         expect(redoHistory(back)).toEqual(redoHistory(state))
         // Undo after the refresh takes back the same step it would have taken before it.
         if (state.undo.length > 0) {

@@ -2142,3 +2142,26 @@ where a database dump is kept.
 
 Reverse: 1, the goal gains a last step and I1 is reversed; 2, the trial is dropped or `bun run dev` replaced; 3,
 the policy is taken off the preview plan; 4, a workflow job runs the suite against a throwaway stage.
+
+### 2026-11-26 — Alchemy uptake: the four open decisions
+
+Asked as the goal's first two steps finished (the plan before a deploy, and the trial of `alchemy dev`).
+
+1. **The coarse limiter's rule?** I chose; the agent recommended the same. One counter for each visitor address over
+   sign-in, sign-up and the model's endpoints: 30 in 60 seconds, then the app's own 429 sentence. Looser than Better
+   Auth's exact limits (10 sign-ins and 5 sign-ups a minute, in D1), which stay, as does the model's 40 calls a day;
+   when the binding itself fails the request goes on to them. Rejected: refusing when the binding fails; the account
+   as the model's key; no binding.
+2. **Who may open a preview?** I chose; the agent recommended the same. The emails in the preview environment's
+   secret `PREVIEW_ACCESS`, read as `SIGN_UP` is and never written in the repository, which is public. I make the
+   Access login in the previews' account by hand. Rejected: a domain; no gate.
+3. **Where does Cloudflare's own telemetry go?** I chose; the agent recommended the same. `staging` and `prod` read a
+   collector's address and its header from their environment; unset, nothing is declared and nothing is sent.
+   Previews and test stages never send. I name a collector later. Rejected: Grafana Cloud now; leaving it in the
+   dashboard only.
+4. **Where is a database dump kept?** I chose; the agent recommended the same. Only I take one, at my terminal, into
+   a file outside the repository that only I can read; nothing uploads it and nothing deletes it for me. Rejected:
+   an R2 bucket with a 30-day lifecycle; a 1Password document.
+
+Reverse: 1, the check and the binding come out of the Worker and the stack; 2, the policy comes off the preview's
+plan; 3, the two settings come out of the stack; 4, the command writes somewhere else.

@@ -3,6 +3,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { assertTrue } from "@effect/vitest/utils"
 import * as Alchemy from "alchemy"
+import { AlchemyContext } from "alchemy/AlchemyContext"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -10,13 +11,24 @@ import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as S from "effect/Schema"
 import GitHubStack from "../src/GitHub.stack.ts"
-import { InfraStage, StageNotDeployed } from "../src/InfraStage.context.ts"
+import { InfraStage, NotOnThisMachine, StageNotDeployed } from "../src/InfraStage.context.ts"
+import InventoryDevStack from "../src/InventoryDev.stack.ts"
 import InventoryStack from "../src/Inventory.stack.ts"
 import { UnknownStage } from "../src/StagePlan.rules.ts"
 
 /** What building the service gives for a stage of this name: its plan, or how the deploy stops. */
 const built = (stage: string) =>
   InfraStage.layer.pipe(Layer.provide(Layer.succeed(Alchemy.Stage, stage)), Layer.build, Effect.exit)
+
+/** What the local stack's plan is for a stage of this name, started by `alchemy dev` or by another command. */
+const local = (stage: string, dev: boolean) =>
+  InfraStage.personal.pipe(
+    Effect.provideService(Alchemy.Stage, stage),
+    Effect.provideService(AlchemyContext, { dotAlchemy: ".alchemy", dev, adopt: false }),
+    Effect.exit
+  )
+
+const notOnThisMachine = S.is(NotOnThisMachine)
 
 const stoppedBy = <A, E>(exit: Exit.Exit<A, E>): unknown => {
   assertTrue(Exit.isFailure(exit), "Expected exit to be a failure")
@@ -49,7 +61,47 @@ describe("InfraStage", () => {
     })
   )
 
-  it("both stacks load from the repository alone: no account, no login, no network", () => {
-    expect([Effect.isEffect(InventoryStack), Effect.isEffect(GitHubStack)]).toEqual([true, true])
+  it.effect(
+    "gives the local stack a personal stage's plan under `alchemy dev`: the test accounts, no key, no sign-up",
+    () =>
+      Effect.gen(function* () {
+        const exit = yield* local("dev_ben", true)
+        assertTrue(Exit.isSuccess(exit), "Expected exit to be a success")
+        const plan = exit.value
+        expect([plan.kind, plan.deployed, plan.seeds, plan.modelKey.from, plan.signUp.from]).toEqual([
+          "personal",
+          false,
+          ["organizations", "accounts"],
+          "nowhere",
+          "nowhere"
+        ])
+      })
+  )
+
+  it.effect(
+    "stops the local stack for a deploy, a plan or a destroy, and for every stage that is deployed: its state is in memory",
+    () =>
+      Effect.gen(function* () {
+        const stopped = yield* Effect.forEach(
+          [
+            ["dev_ben", false],
+            ["pr-42", true],
+            ["staging", true],
+            ["prod", true],
+            ["test_ben", true]
+          ] as const,
+          ([stage, dev]) => local(stage, dev).pipe(Effect.map(stoppedBy), Effect.map(notOnThisMachine)),
+          { concurrency: 1 }
+        )
+        expect(stopped).toEqual([true, true, true, true, true])
+        const unknown = yield* local("live_ben", true)
+        expect(S.is(UnknownStage)(stoppedBy(unknown))).toBe(true)
+      })
+  )
+
+  it("the three stacks load from the repository alone: no account, no login, no network", () => {
+    expect([Effect.isEffect(InventoryStack), Effect.isEffect(GitHubStack), Effect.isEffect(InventoryDevStack)]).toEqual(
+      [true, true, true]
+    )
   })
 })

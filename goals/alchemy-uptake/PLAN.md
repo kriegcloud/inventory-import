@@ -17,20 +17,21 @@ closes the step with what was seen; it does not get worked around.
 | --- | --- | --- | --- |
 | 1 | CLI inspection: `docs/operations.md` with plan, drift, logs and state for a stage; the plan and its guard before each deploy in `deploy.yml` | nothing | done |
 | 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | todo |
-| 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | "Dumps" answered | todo |
+| 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | todo |
 | 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | his re-pin adding `@alchemy.run/test` | todo |
-| 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | todo |
-| 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | "The limiter's rule" answered | todo |
-| 7 | Access on previews: the policy in `planFor` for `pr-<number>`, the smoke check's way through | "Who may open a preview" answered | todo |
-| 8 | Telemetry export: a destination per stage that names a collector | "Where telemetry goes" answered | todo |
+| 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
+| 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | todo |
+| 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | todo |
+| 8 | Telemetry export: a destination per stage that names a collector | answered 2026-11-26: staging and prod read a collector from their environment; none is named yet | todo |
 
 The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 needs one command of his; 2, 3, 6,
 7 and 8 each wait for one answer or one measurement.
 
 ## Current blocker
 
-None for step 5. Step 4 waits for `bun run alchemy:repin` with `@alchemy.run/test` added to the kept
-packages. The four open decisions in [SPEC](SPEC.md) each block one step.
+Step 4 waits for `bun run alchemy:repin` with `@alchemy.run/test` added to the kept packages. Step 2 waits for a
+deployed stage to measure on. The four decisions were answered on 2026-11-26 (the exploration's DECISIONS.md,
+"Alchemy uptake: the four open decisions"), so steps 3, 6, 7 and 8 can be built.
 
 ## What each proof must show
 
@@ -62,6 +63,10 @@ step 3.
 
 ## What was proved on this machine
 
+- **Step 5** (2026-11-26). The trial above. `InfraStage.test.ts` holds the local stack's guard: under `alchemy dev`
+  a `dev_<user>` stage gets the personal plan; a deploy, plan or destroy of it, and every deployed stage's name, is
+  stopped (`NotOnThisMachine`), because its state is in memory. The move of the stack's program into `inventory` is
+  a move only (`git diff -w` shows the wrapper and nothing inside it).
 - **Step 1** (2026-11-26). `DeployWorkflow.test.ts` holds the two new steps in each of the three deploy jobs word
   for word, in order, with staging's waiting for "only main's head", and runs the plan step's script against a
   stand-in for the tool: what it printed is in the log and in the file, and the step ends as the tool did (0 and 1).
@@ -73,6 +78,69 @@ step 3.
   the database" and ended with 1; on `[Database] noop` it printed "OK" and ended with 0.
   **Not seen:** a plan of a real stage, in a workflow or anywhere. Whether the dry run builds the screens a second
   time in a job (and so nears its 20 minutes) is unknown until the first pull request after this lands.
+
+## The `alchemy dev` trial
+
+Run on 2026-11-26, on this machine, with no Cloudflare account, profile or token. `bun run dev:alchemy` is
+`alchemy dev` on `packages/infra/src/InventoryDev.stack.ts`: the app's own stack program (`inventory` in
+`Inventory.stack.ts`, the same database, minted secret and Worker a deploy declares) given the personal stage's
+plan, with its state in memory.
+
+**What started.** Stage `dev_<user>`; a plan of `3 to create`, each marked `(local)`; ready in 3.5 to 5 seconds at
+`http://localhost:1337` (Alchemy's port, the next free one when taken; not 5173). The local providers applied the
+eight migrations and both seed files, minted the sign-in secret and started Vite with Alchemy's own Cloudflare
+plugin; ours stands down (`servedByAlchemy` in `vite.config.ts`). Three processes: the CLI's supervisor (on Bun when
+it finds one), Vite on Node, and workerd. Ctrl+C ended all three within about eight seconds.
+
+**Seen on screen** (headless browser). On `bun run dev:alchemy`: the page opened signed in as Dana Whitfield, Admin
+of Example Works (test), with the Upload step and both sample buttons; `/api/v1/system/status` read `"database":
+{"ok":true}` and "AI suggestions are off: no AI key is set". On the probe that came before it (the same three
+resources written out by hand): pressed "Use items_messy.csv", Review read "Import 155, skip 45", the dialog
+"Import 155 items?", then the Result step read Imported 155, Not imported 45, Already there 0, All 200, and the
+Items page read "155 items". The full import was not repeated on the committed entry.
+
+**Where its secrets were kept.**
+
+| State | The minted secret | After a restart |
+| --- | --- | --- |
+| In memory (what `dev:alchemy` uses) | In no file: the run log, the runtime's registry file and its cache were searched for 64 hexadecimal characters, none found | A new, empty database and a new secret: the Items page read "0 items" after 155 were stored, and every session ended |
+| A local file, encrypted with a passphrase (`passphraseEncryption`, a throwaway passphrase) | `SignInSecret.json` and the Worker's `props.env` were sealed, but `Website.json` held it as 64 plain characters at `bindings[].data.bindings[].text` | `[Database] noop`, the 25 items of `items_clean.csv` were still there and no new sign-in was asked |
+| A local file, plain (`localState()`) | Not tried: the goal forbids it | |
+
+So keeping what was imported across a restart needs a state file, and a state file holds the sign-in secret in
+plain text at this commit even when encrypted. `bun run dev` keeps its secret in `.dev.vars` in plain text too
+(git-ignored, readable by the owner only), so this is no worse than today; it is also no better, and the passphrase
+would itself need a file or a prompt.
+
+**What of `scripts/` it would delete.** Only `migrate-local.mjs` (74 lines: local migrations, the two seeds, the
+secret written to `.dev.vars`), and only if `bun run dev` were replaced. `dev-accounts.mjs` still writes the seed
+the stack imports; `dev-https.mjs`, `telemetry.mjs` and the rest are untouched. `wrangler.jsonc` stays while the
+build and the tests read it.
+
+**What it could not do.**
+
+- Keep imported items, or a session, across a restart without the state file above.
+- Read `.dev.vars` or `wrangler.jsonc`: Alchemy's plugin leaves both out on purpose (`cloudflare-runtime`'s
+  `vite/PARITY.md`). A developer's own model key, `AI_ENABLED=false` and `OTEL_EXPORTER_OTLP_ENDPOINT` reach the
+  Worker only if the stack declares them, so "Running with AI turned off" and `bun run telemetry` have no
+  counterpart yet.
+- Serve on 5173: every document, `dev:portless`, `dev:https` and the second-server convention name that port.
+- Stay inside the repository: it wrote `~/.local/state/alchemy/registry/*.json` (the runtime's registry) beside
+  `.alchemy/` here. `ALCHEMY_TELEMETRY_DISABLED=1` in the script keeps its telemetry off; the CLI still asks npm
+  once a day whether a newer version exists.
+- One thing seen once: on the first start, pressing "Use items_messy.csv" was followed by Vite reloading the page
+  ("dependency optimized: effect/MutableList"), and the Upload step read "Stopped before it was saved. Continue
+  reads it again from this browser"; Continue went on to Review. It did not happen on later starts. Both commands
+  share `node_modules/.vite`, and switching between them re-optimizes it. Not checked whether a cold `bun run dev`
+  loses a first file the same way: `effect/MutableList` is not in `readerModules`.
+
+Not tried: HTTPS, hot reload of a screen or of the Worker, a second checkout at once, and anything with a model key.
+
+**Recommendation** (the decision is Benjamin's): the infra brief's no-go stands. `bun run dev` keeps what was
+imported across restarts and reads `.dev.vars`; `alchemy dev` does neither without a state file that holds the
+secret in the clear. It is worth another look when Alchemy seals a Worker's binding records in local state.
+`bun run dev:alchemy` stays as the way to try it; removing it is the script, `InventoryDev.stack.ts`,
+`InfraStage.personal` and the one setting in `vite.config.ts`.
 
 ## What waits for a real account
 
@@ -97,3 +165,10 @@ step 3.
 - **`orphaned` is a loss too** (step 1). A database dropped from the state is still in the account, but the next
   deploy makes a new empty one and binds the Worker to it.
 - **Never `--detailed` in a workflow** (step 1): its log is public, and the plain plan names resources only.
+- **The trial's state is in memory** (step 5). The only store that puts the sign-in secret in no file. The other
+  two were measured or forbidden (the table in "The `alchemy dev` trial").
+- **The trial reuses the deployed stack's program** (step 5), so it tries the stack and not a copy of it; the
+  entry that runs it refuses everything but `alchemy dev` for a `dev_<user>` stage.
+- **`node node_modules/alchemy/bin/cli.js`, not `bunx alchemy`, in the script** (step 5): the repository runs its
+  dev server on Node. The CLI still starts its own supervisor on Bun when one is on the path; Vite and workerd run
+  as they do under `bun run dev`.

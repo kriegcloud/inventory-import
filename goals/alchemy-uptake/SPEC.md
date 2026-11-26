@@ -66,7 +66,7 @@ proving the capability here before anything depends on it.
       the database stops the job; a workflow test or a dry run shows both.
 - [x] `docs/operations.md` exists and says, for a stage: how to read its plan, its drift, its logs and its state,
       each with the exact command; listed in `docs/index.md`; `bun run docs:check` passes.
-- [ ] The `alchemy dev` trial is written up in PLAN: what started, whether it opened signed in as Dana Whitfield
+- [x] The `alchemy dev` trial is written up in PLAN: what started, whether it opened signed in as Dana Whitfield
       with no key, where its secrets were kept, what of `scripts/` it would delete, and what it could not do.
 - [ ] `Inventory.stack.ts` declares the Worker's CPU limit and placement, with the measurement that chose them in
       PLAN; `StagePlan` holds them if they differ by stage, with a test.
@@ -86,10 +86,14 @@ proving the capability here before anything depends on it.
 In [the exploration's DECISIONS.md](../../explorations/ideal-architecture/DECISIONS.md): "Alchemy uptake: the
 goal's edges" (2026-11-26), and "infra I1", "infra I4", "infra I8", "infra I9".
 
-Open, and his; each blocks only its own step:
+Answered on 2026-11-26 ("Alchemy uptake: the four open decisions" in the same file):
 
-- **The limiter's rule**: what it counts by (the visitor's address, the account, both), how many in which period
-  (the binding offers 10 or 60 seconds only), and what happens when the binding itself fails.
-- **Who may open a preview**: the emails or the domain the Access policy names.
-- **Where telemetry goes**: the collector's address for a deployed stage, and which stages send.
-- **Dumps**: where a database dump is kept, for how long, and who may take one.
+- **The limiter's rule**: one counter for each visitor address over sign-in, sign-up and the model's endpoints, 30
+  in 60 seconds, then the app's own 429 sentence; when the binding itself fails the request goes on to the exact
+  limits behind it.
+- **Who may open a preview**: the emails in the preview environment's secret `PREVIEW_ACCESS`, never written in
+  the repository. The workflow has no smoke check, so nothing automated passes the gate.
+- **Where telemetry goes**: `staging` and `prod` read a collector's address and its header from their environment;
+  unset, the stack declares no destination. Previews and test stages never send. No collector is named yet.
+- **Dumps**: only Benjamin, at his terminal, to a file outside the repository that only he can read; nothing is
+  uploaded and nothing deletes it for him.

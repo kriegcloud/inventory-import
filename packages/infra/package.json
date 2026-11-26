@@ -13,6 +13,7 @@
     "./OpReferences": "./src/OpReferences.rules.ts",
     "./OpReferencesSecrets": "./src/OpReferences.secrets.ts",
     "./Inventory": "./src/Inventory.stack.ts",
+    "./InventoryDev": "./src/InventoryDev.stack.ts",
     "./Stage": "./src/Stage.schema.ts",
     "./StagePlan": "./src/StagePlan.rules.ts"
   },

@@ -23,13 +23,15 @@ interface BuildSettings {
   readonly httpsKey: string | undefined
   readonly previewCompression: boolean
   readonly bundleReport: boolean
+  readonly servedByAlchemy: boolean
 }
 
 const buildSettings = (mode: string): BuildSettings => {
   const env = loadEnv(mode, fileURLToPath(new URL(".", import.meta.url)), [
     "INVENTORY_HTTPS_",
     "PREVIEW_COMPRESSION",
-    "BUNDLE_REPORT"
+    "BUNDLE_REPORT",
+    "ALCHEMY_CLOUDFLARE_VITE_INJECTED"
   ])
   return {
     // `bun run dev:https` (scripts/dev-https.mjs) sets these to a local certificate and key (PEM text), so the dev
@@ -37,7 +39,11 @@ const buildSettings = (mode: string): BuildSettings => {
     httpsCertificate: env["INVENTORY_HTTPS_CERT_PEM"],
     httpsKey: env["INVENTORY_HTTPS_KEY_PEM"],
     previewCompression: env["PREVIEW_COMPRESSION"] !== "off",
-    bundleReport: env["BUNDLE_REPORT"] === "1"
+    bundleReport: env["BUNDLE_REPORT"] === "1",
+    // `bun run dev:alchemy` (the trial of `alchemy dev`, goals/alchemy-uptake) starts Vite itself and adds its own
+    // Cloudflare plugin, with the stack's bindings; it sets this before the file is read. Two Cloudflare plugins in
+    // one server each start the Worker, so ours stands down. Unset everywhere else.
+    servedByAlchemy: env["ALCHEMY_CLOUDFLARE_VITE_INJECTED"] === "1"
   }
 }
 
@@ -185,7 +191,7 @@ export default defineConfig(({ mode }) => {
       compressPreview(settings),
       react(),
       tailwindcss(),
-      cloudflare()
+      ...(settings.servedByAlchemy ? [] : [cloudflare()])
     ],
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src/web", import.meta.url)) }

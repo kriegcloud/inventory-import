@@ -47,15 +47,23 @@ export interface Recipe {
   readonly extra?: ReadonlyArray<Part>
 }
 
+const recipeStart = {
+  namespace: main,
+  workbookPr: "",
+  stringsFirst: false,
+  extra: A.empty<Part>()
+}
+
 /** The parts of a hand-built workbook. */
-export const partsOf = (recipe: Recipe): ReadonlyArray<Part> => {
-  const ns = recipe.namespace ?? main
+export const partsOf = (input: Recipe): ReadonlyArray<Part> => {
+  const recipe = { ...recipeStart, ...input }
+  const ns = recipe.namespace
   const sheets = A.map(recipe.sheets, (sheet, i): Part => [`xl/worksheets/sheet${i + 1}.xml`, sheet.xml])
   const strings: ReadonlyArray<Part> =
     recipe.sharedStrings === undefined ? [] : [["xl/sharedStrings.xml", recipe.sharedStrings]]
   const styles: ReadonlyArray<Part> = recipe.styles === undefined ? [] : [["xl/styles.xml", recipe.styles]]
   const workbook =
-    `${head}<workbook xmlns="${ns}" xmlns:r="${rel}">${recipe.workbookPr ?? ""}<sheets>` +
+    `${head}<workbook xmlns="${ns}" xmlns:r="${rel}">${recipe.workbookPr}<sheets>` +
     A.join(
       A.map(
         recipe.sheets,
@@ -89,7 +97,7 @@ export const partsOf = (recipe: Recipe): ReadonlyArray<Part> => {
     ...(recipe.stringsFirst === true ? [...strings, ...sheets] : [...sheets, ...strings]),
     ["xl/workbook.xml", workbook],
     ...styles,
-    ...(recipe.extra ?? [])
+    ...recipe.extra
   ]
 }
 
@@ -99,14 +107,13 @@ export const workbook = (recipe: Recipe): Effect.Effect<Uint8Array> => archive(p
 /** A worksheet part around its rows. */
 export const sheet = (rows: string): string => sheetWith({ rows })
 
+const sheetStart = { before: "", after: "", ns: main }
+
 /** A worksheet part around its rows, with what comes before or after the sheet data, or another namespace. */
-export const sheetWith = (input: {
-  readonly rows: string
-  readonly before?: string
-  readonly after?: string
-  readonly ns?: string
-}): string =>
-  `${head}<worksheet xmlns="${input.ns ?? main}">${input.before ?? ""}<sheetData>${input.rows}</sheetData>${input.after ?? ""}</worksheet>`
+export const sheetWith = (input: { readonly rows: string } & Partial<typeof sheetStart>): string => {
+  const value = { ...sheetStart, ...input }
+  return `${head}<worksheet xmlns="${value.ns}">${value.before}<sheetData>${value.rows}</sheetData>${value.after}</worksheet>`
+}
 
 /** A shared text table from its entries, each already XML. */
 export const strings = (entries: ReadonlyArray<string>): string =>

@@ -2,6 +2,7 @@
 // Every workbook read here is also held to its schema, which is what lets the reader build cells without walking
 // each one through `make`.
 import { describe, expect, it } from "@effect/vitest"
+import { assertDefined } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -24,13 +25,13 @@ import {
   type Recipe
 } from "./support/workbooks.ts"
 
-const read = (bytes: Uint8Array, options?: XlsxReadOptions) =>
+const read = (bytes: Uint8Array, options: XlsxReadOptions) =>
   Xlsx.parse(bytes, options).pipe(
     Effect.tap((found) => Effect.sync(() => expect(S.is(XlsxWorkbook)(found.workbook)).toBe(true)))
   )
 
 /** A hand-built workbook, built and read. */
-const readOf = (recipe: Recipe, options?: XlsxReadOptions) =>
+const readOf = (recipe: Recipe, options: XlsxReadOptions) =>
   Effect.flatMap(workbook(recipe), (bytes) => read(bytes, options))
 
 type Sheet = XlsxRead["workbook"]["sheets"][number]
@@ -82,7 +83,7 @@ describe("cells", () => {
           "<t>line_x000D_break and _x005F_x0041_</t>"
         ])
       })
-      const found = yield* read(bytes)
+      const found = yield* read(bytes, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [
           1,
@@ -104,25 +105,29 @@ describe("cells", () => {
         '<c r="D1" t="e"><v>#N/A</v></c><c r="E1" s="1"><v>46085</v></c><c r="F1" s="2"><v>0.75</v></c>' +
         '<c r="G1" s="1"><v>-1</v></c></row>'
       const recipe = { sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["yyyy-mm-dd", "h:mm"]) }
-      const found = yield* readOf(recipe)
+      const found = yield* readOf(recipe, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [1, "0:12.5", "1:-300", "2:true", "3:#N/A", "4:date 46085", "5:date 0.75", "6:-1"]
       ])
-      const cells = first(found).rows[0]?.cells ?? []
-      expect(A.map(cells, (cell) => O.getOrUndefined(XlsxCell.shown(cell, found.workbook.dateSystem)))).toEqual([
-        "12.5",
-        "-300",
-        undefined,
-        undefined,
-        "2026-03-04",
-        "18:00",
-        undefined
+      const row = first(found).rows[0]
+      assertDefined(row)
+      const cells = row.cells
+      expect(A.map(cells, (cell) => XlsxCell.shown(cell, found.workbook.dateSystem))).toEqual([
+        O.some("12.5"),
+        O.some("-300"),
+        O.none(),
+        O.none(),
+        O.some("2026-03-04"),
+        O.some("18:00"),
+        O.none()
       ])
-      const later = yield* readOf({ ...recipe, workbookPr: '<workbookPr date1904="1"/>' })
+      const later = yield* readOf({ ...recipe, workbookPr: '<workbookPr date1904="1"/>' }, XlsxReadOptions.default)
       expect(later.workbook.dateSystem).toBe("1904")
-      expect(O.getOrUndefined(XlsxCell.shown(first(later).rows[0]?.cells[4] ?? XlsxCell.blank(0), "1904"))).toBe(
-        "2030-03-05"
-      )
+      const laterRow = first(later).rows[0]
+      assertDefined(laterRow)
+      const date = laterRow.cells[4]
+      assertDefined(date)
+      expect(XlsxCell.shown(date, "1904")).toEqual(O.some("2030-03-05"))
     })
   )
 
@@ -130,9 +135,14 @@ describe("cells", () => {
     Effect.gen(function* () {
       const rows =
         '<row r="1"><c r="A1" s="1"><v>59</v></c><c r="B1" s="1"><v>60</v></c><c r="C1" s="1"><v>61</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["yyyy-mm-dd"]) })
-      const shown = A.map(first(found).rows[0]?.cells ?? [], (cell) => O.getOrUndefined(XlsxCell.shown(cell, "1900")))
-      expect(shown).toEqual(["1900-02-28", "1900-02-29", "1900-03-01"])
+      const found = yield* readOf(
+        { sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["yyyy-mm-dd"]) },
+        XlsxReadOptions.default
+      )
+      const row = first(found).rows[0]
+      assertDefined(row)
+      const shown = A.map(row.cells, (cell) => XlsxCell.shown(cell, "1900"))
+      expect(shown).toEqual(A.map(["1900-02-28", "1900-02-29", "1900-03-01"], O.some))
       expect(A.map(found.warnings, (warning) => warning.finding)).toMatchObject([
         { kind: "FictitiousLeapDay", sheet: "S", address: { column: 1, row: 1 } }
       ])
@@ -145,7 +155,7 @@ describe("cells", () => {
         '<row r="2"><c r="C2"><f t="shared" ref="C2:C4" si="0">A2*$B$1+B2</f><v>1</v></c></row>' +
         '<row r="3"><c r="C3"><f t="shared" si="0"/><v>2</v></c></row>' +
         '<row r="4"><c r="C4"><f t="shared" si="0"/><v>3</v></c><c r="D4"><f t="shared" si="0"/><v>4</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] })
+      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [2, "2:1 =A2*$B$1+B2"],
         [3, "2:2 =A3*$B$1+B3"],
@@ -156,9 +166,12 @@ describe("cells", () => {
 
   it.effect("keeps a formula with no saved result as blank and says so", () =>
     Effect.gen(function* () {
-      const found = yield* readOf({
-        sheets: [{ name: "S", xml: sheet('<row r="1"><c r="A1"><f>NOW()</f></c><c r="B1" s="0"/></row>') }]
-      })
+      const found = yield* readOf(
+        {
+          sheets: [{ name: "S", xml: sheet('<row r="1"><c r="A1"><f>NOW()</f></c><c r="B1" s="0"/></row>') }]
+        },
+        XlsxReadOptions.default
+      )
       expect(grid(first(found))).toEqual([[1, "0:blank =NOW()"]])
       expect(findings(found)).toEqual(["FormulaWithoutResult"])
     })
@@ -169,7 +182,10 @@ describe("cells", () => {
       const rows =
         '<row r="1"><c r="A1" t="s"><v>7</v></c><c r="B1"><v>twelve</v></c><c r="C1" t="b"><v>maybe</v></c>' +
         '<c r="D1" t="e"><v>#OOPS</v></c><c r="E1" t="d"><v>not a date</v></c><c r="F1" s="9"><v>1</v></c><c r="G1"><v>2</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }], sharedStrings: strings(["<t>a</t>"]) })
+      const found = yield* readOf(
+        { sheets: [{ name: "S", xml: sheet(rows) }], sharedStrings: strings(["<t>a</t>"]) },
+        XlsxReadOptions.default
+      )
       expect(grid(first(found))).toEqual([
         [
           1,
@@ -197,7 +213,10 @@ describe("cells", () => {
     Effect.gen(function* () {
       const rows =
         '<row r="1"><c r="A1" s="1"><v>0.5</v></c><c r="B1" s="1"><v>0.25</v></c><c r="C1" s="2"><v>1.5</v></c><c r="D1" s="1" t="inlineStr"><is><t>x</t></is></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["# ?/?", "[h]:mm:ss"]) })
+      const found = yield* readOf(
+        { sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["# ?/?", "[h]:mm:ss"]) },
+        XlsxReadOptions.default
+      )
       expect(A.map(found.warnings, (warning) => warning.finding)).toMatchObject([
         { kind: "FormatNotShown", code: "# ?/?", cells: 2 },
         { kind: "FormatNotShown", code: "[h]:mm:ss", cells: 1 }
@@ -211,7 +230,7 @@ describe("layout", () => {
     Effect.gen(function* () {
       const rows =
         '<row><c><v>1</v></c><c><v>2</v></c></row><row r="5"><c r="C5"><v>3</v></c><c><v>4</v></c></row><row><c><v>5</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] })
+      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [1, "0:1", "1:2"],
         [5, "2:3", "3:4"],
@@ -224,7 +243,7 @@ describe("layout", () => {
     Effect.gen(function* () {
       const rows =
         '<row r="3"><c r="B3"><v>2</v></c><c r="A3"><v>1</v></c></row><row r="1"><c r="A1"><v>0</v></c></row><row r="3"><c r="A3"><v>9</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] })
+      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [1, "0:0"],
         [3, "0:1", "1:2"]
@@ -241,16 +260,18 @@ describe("layout", () => {
         after: '<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>'
       })
       const bytes = yield* workbook({ sheets: [{ name: "S", xml }] })
-      const whole = yield* read(bytes)
+      const whole = yield* read(bytes, XlsxReadOptions.default)
       const found = first(whole)
       expect(A.map(found.rows, (row) => row.hidden)).toEqual([true, false])
       expect(found.hiddenColumns).toEqual([1, 2])
       expect(found.merges).toEqual([{ first: { column: 0, row: 1 }, last: { column: 1, row: 1 } }])
-      expect(O.getOrUndefined(found.info.declared)).toEqual({
-        first: { column: 0, row: 1 },
-        last: { column: 3, row: 2 }
-      })
-      const layout = yield* Xlsx.sheetLayout(bytes, "s")
+      expect(found.info.declared).toEqual(
+        O.some({
+          first: { column: 0, row: 1 },
+          last: { column: 3, row: 2 }
+        })
+      )
+      const layout = yield* Xlsx.sheetLayout(bytes, "s", XlsxReadOptions.default)
       expect([layout.rows, layout.merges, layout.hiddenColumns]).toEqual([[], found.merges, [1, 2]])
     })
   )
@@ -261,7 +282,7 @@ describe("layout", () => {
         rows: '<row r="1"><c r="A1"><v>1</v></c></row><row r="40"><c r="H40"><v>2</v></c></row>',
         before: '<dimension ref="A1:B2"/>'
       })
-      const found = yield* readOf({ sheets: [{ name: "S", xml }] })
+      const found = yield* readOf({ sheets: [{ name: "S", xml }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [1, "0:1"],
         [40, "7:2"]
@@ -282,8 +303,8 @@ describe("the file's own form", () => {
         ],
         sharedStrings: strings(["<t>zero</t>", "<t>one</t>"])
       }
-      const after = yield* readOf(recipe)
-      const before = yield* readOf({ ...recipe, stringsFirst: true })
+      const after = yield* readOf(recipe, XlsxReadOptions.default)
+      const before = yield* readOf({ ...recipe, stringsFirst: true }, XlsxReadOptions.default)
       expect(grid(first(after))).toEqual([[1, '0:"one"', '1:"zero"']])
       expect(before.workbook).toEqual(after.workbook)
     })
@@ -294,7 +315,7 @@ describe("the file's own form", () => {
       const xml =
         '<?xml version="1.0"?><x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
         '<x:sheetData><x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>prefixed</x:t></x:is></x:c><x:c r="B1"><x:v>2</x:v></x:c></x:row></x:sheetData></x:worksheet>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml }] })
+      const found = yield* readOf({ sheets: [{ name: "S", xml }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([[1, '0:"prefixed"', "1:2"]])
     })
   )
@@ -303,17 +324,24 @@ describe("the file's own form", () => {
     Effect.gen(function* () {
       const rows =
         '<row r="1"><c r="A1" t="d" s="1"><v>2026-03-04</v></c><c r="B1" t="d"><v>2026-03-04T14:30:00Z</v></c></row>'
-      const found = yield* readOf({
-        namespace: strict,
-        sheets: [{ name: "S", xml: sheetWith({ rows, ns: strict }) }],
-        styles: styles(["yyyy-mm-dd"])
-      })
-      const cells = first(found).rows[0]?.cells ?? []
+      const found = yield* readOf(
+        {
+          namespace: strict,
+          sheets: [{ name: "S", xml: sheetWith({ rows, ns: strict }) }],
+          styles: styles(["yyyy-mm-dd"])
+        },
+        XlsxReadOptions.default
+      )
+      const row = first(found).rows[0]
+      assertDefined(row)
+      const cells = row.cells
       expect(A.map(cells, (cell) => [cell.value, cell.format.code])).toMatchObject([
         [{ kind: "Date", serial: 46_085 }, "yyyy-mm-dd"],
         [{ kind: "Date" }, "m/d/yy"]
       ])
-      expect(O.getOrUndefined(XlsxCell.shown(cells[1] ?? XlsxCell.blank(0), "1900"))).toBe("3/4/26")
+      const date = cells[1]
+      assertDefined(date)
+      expect(XlsxCell.shown(date, "1900")).toEqual(O.some("3/4/26"))
     })
   )
 
@@ -334,7 +362,7 @@ describe("the file's own form", () => {
         ]
       })
       expect(Xlsx.container(bytes)).toBe("macroWorkbook")
-      const all = yield* read(bytes)
+      const all = yield* read(bytes, XlsxReadOptions.default)
       expect(A.map(all.workbook.dropped, (part) => part.kind)).toEqual(["theme", "properties", "macros", "comments"])
       expect(A.map(all.workbook.sheets, (s) => [s.info.name, s.info.state, s.rows.length])).toEqual([
         ["One", "visible", 1],
@@ -369,12 +397,10 @@ describe("one sheet at a time", () => {
   it.effect("counts every sheet without keeping it", () =>
     Effect.gen(function* () {
       const bytes = yield* workbook(recipe)
-      const counts = yield* Xlsx.sheets(bytes)
-      expect(
-        A.map(counts, (c) => [c.info.name, c.rows, c.rowsWithValues, c.cellsWithValues, O.getOrUndefined(c.lastRow)])
-      ).toEqual([
-        ["Empty", 0, 0, 0, undefined],
-        ["Data", 301, 300, 300, 300]
+      const counts = yield* Xlsx.sheets(bytes, XlsxReadOptions.default)
+      expect(A.map(counts, (c) => [c.info.name, c.rows, c.rowsWithValues, c.cellsWithValues, c.lastRow])).toEqual([
+        ["Empty", 0, 0, 0, O.none()],
+        ["Data", 301, 300, 300, O.some(300)]
       ])
     })
   )
@@ -382,17 +408,19 @@ describe("one sheet at a time", () => {
   it.effect("streams one sheet's rows, the same rows a whole read gives", () =>
     Effect.gen(function* () {
       const bytes = yield* workbook(recipe)
-      const streamed = yield* Stream.runCollect(Xlsx.rows(bytes, "data"))
-      const whole = yield* read(bytes)
-      expect(streamed).toEqual(whole.workbook.sheets[1]?.rows)
-      const missing = yield* Xlsx.rows(bytes, "Nope").pipe(Stream.runCollect, Effect.flip)
+      const streamed = yield* Stream.runCollect(Xlsx.rows(bytes, "data", XlsxReadOptions.default))
+      const whole = yield* read(bytes, XlsxReadOptions.default)
+      const data = whole.workbook.sheets[1]
+      assertDefined(data)
+      expect(streamed).toEqual(data.rows)
+      const missing = yield* Xlsx.rows(bytes, "Nope", XlsxReadOptions.default).pipe(Stream.runCollect, Effect.flip)
       expect(missing.fatal.finding).toMatchObject({ kind: "MissingPart" })
     })
   )
 })
 
 describe("what a file is", () => {
-  const bytesOf = (head: ReadonlyArray<number>, text: string, wide = false): Uint8Array => {
+  const bytesOf = (head: ReadonlyArray<number>, text: string, wide: boolean): Uint8Array => {
     const letters = new TextEncoder().encode(text)
     const body = A.flatMap(A.fromIterable(letters), (unit) => (wide ? [unit, 0] : [unit]))
     return new Uint8Array([...head, ...body])
@@ -402,15 +430,15 @@ describe("what a file is", () => {
 
   it("is told from the first bytes and the names inside", () => {
     expect([
-      Xlsx.container(bytesOf(zip, "....xl/workbook.xml")),
-      Xlsx.container(bytesOf(zip, "xl/workbook.bin")),
-      Xlsx.container(bytesOf(zip, "mimetypeapplication/vnd.oasis.opendocument.spreadsheet")),
-      Xlsx.container(bytesOf(zip, "word/document.xml")),
-      Xlsx.container(bytesOf(zip, "readme.txt")),
+      Xlsx.container(bytesOf(zip, "....xl/workbook.xml", false)),
+      Xlsx.container(bytesOf(zip, "xl/workbook.bin", false)),
+      Xlsx.container(bytesOf(zip, "mimetypeapplication/vnd.oasis.opendocument.spreadsheet", false)),
+      Xlsx.container(bytesOf(zip, "word/document.xml", false)),
+      Xlsx.container(bytesOf(zip, "readme.txt", false)),
       Xlsx.container(bytesOf(ole, "EncryptedPackage", true)),
       Xlsx.container(bytesOf(ole, "Workbook", true)),
       Xlsx.container(bytesOf(ole, "PowerPoint Document", true)),
-      Xlsx.container(bytesOf([0x53, 0x4b, 0x55], ",Name"))
+      Xlsx.container(bytesOf([0x53, 0x4b, 0x55], ",Name", false))
     ]).toEqual([
       "workbook",
       "binaryWorkbook",
@@ -426,7 +454,8 @@ describe("what a file is", () => {
 
   it.effect("stops at a file that is not a workbook, a workbook with no sheet, and a part that is not there", () =>
     Effect.gen(function* () {
-      const kindOf = (bytes: Uint8Array) => Effect.map(Effect.flip(Xlsx.parse(bytes)), (error) => error.fatal.finding)
+      const kindOf = (bytes: Uint8Array) =>
+        Effect.map(Effect.flip(Xlsx.parse(bytes, XlsxReadOptions.default)), (error) => error.fatal.finding)
       const builtKindOf = (recipe: Recipe) => Effect.flatMap(workbook(recipe), kindOf)
       const old = yield* kindOf(bytesOf(ole, "Workbook", true))
       expect(old).toMatchObject({ kind: "NotAWorkbook", container: "legacyXls" })

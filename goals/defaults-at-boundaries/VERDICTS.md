@@ -372,3 +372,127 @@ No cache overrides were needed; the existing app Vitest cache location was used.
 law was rerun after the final edits, and `git diff --check` passed. A first full check failed only because the
 strict ceiling had fallen; a later intermediate check caught the test narrowing's pipe diagnostic; both were
 corrected before the successful final full check. No browser layout or view arrangement was changed.
+
+## Foundation modeling: CSV, XLSX and vocabulary (PLAN row 8)
+
+Written before code changes on 2026-11-26 from the owned source and test boundaries. These three packages are
+ours; `schema`, `identity` and `utils` have `vendor.json` manifests and are outside this lane. The initial scoped
+law reads 54 files: 107 fallback, 49 absence, 12 unwrap and 29 normalise places (197 total).
+
+| Schema or boundary | Field | Verdict | Reason |
+| --- | --- | --- | --- |
+| CSV options and codec settings | delimiter, quoting, terminator, encoding, limits, BOM and progress | Required choices / existing schema defaults | Existing option schemas already name their usual values; owned calls must state their choice explicitly rather than default arguments |
+| CSV table, records, record slices and positions | cells, quoted flags, record/field/offset/line | Required / State, as is | The machine checks and constructs these values; no per-cell decoding is added |
+| CSV header view | missing trailing cell | Empty text, existing behavior | Short rows still fill a heading's cell with empty text; this policy must stay visible on the boundary schema if moved |
+| CSV diagnostics and parse errors | finding and first diagnostic | Required / State | A parse error has a nonempty diagnostics array, so its first diagnostic is always present |
+| CSV byte scanner | bytes inside checked length bounds | Required | Missing indexed bytes are impossible after the loop's bounds checks; retain a defect if violated, never a fabricated zero |
+| CSV sep hint | delimiter capture | Required | The successful regex guarantees one allowed delimiter |
+| XLSX workbook, sheets, rows and cells | names, coordinates, values, date system, formatting, formula, visibility | Required / State / existing Options, as is | Preserve the public workbook model and its writer; the streaming machine checks fields without decoding or copying each cell |
+| XLSX XML and relationships | absent metadata and attributes | Absent or the existing compatibility value | Platform XML positions and optional relationship attributes enter here; malformed-file behavior must stay the same |
+| XLSX address, formula and escape matches | successful match index and required capture groups | Required | Regex guarantees these captures; missing capture is a defect, not empty text or zero |
+| XLSX writer and number-format scanner | characters inside checked string bounds | Required | Checked loop indices name an actual UTF-16 unit; lookahead and incomplete format syntax need their existing explicit cases |
+| XLSX workbook fixture builder | namespace, surrounding XML, extra parts | Named starting values | A partial recipe is spread over one named starting object; optional part presence continues to decide which XML relationships exist |
+| XLSX hostile test helpers | read limits | Required | Each test states the limit it intends to exercise; the ordinary limit is a named value |
+| XLSX SheetJS oracle | absent library result fields | Absent at the third-party boundary | Compare Options; do not manufacture a workbook, cell or formula when an expected branch is missing |
+| Vocabulary model, RDF registry and pointers | terms, marks, identity, parents, domains and ranges | Required / State / existing Options, as is | These are structural vocabulary checks, not new ontology terms; AST annotations are optional platform metadata |
+| Vocabulary pointer test | unwrapped optional key fixtures | State, retained where testing the schema AST itself | Changing a deliberately optional schema node changes the subject of the pointer test |
+| All owned tests | expected success, failure, row or cell | Required assertion | Narrow with `@effect/vitest/utils`; an absent expected branch must fail, never skip an expectation |
+
+Unresolved compatibility readers and third-party edges remain unchanged until a truthful boundary can be established;
+this lane records their final counts and examples below. No baseline or exemption is changed.
+
+### Coverage of the existing schema fields
+
+All of these schemas and their existing constructor/decoding defaults retain their public shape and encoding.
+No schema was added or changed by this lane.
+
+| Schema group | Field verdicts |
+| --- | --- |
+| CSV position scalars, `CsvTextSpan`, `CsvCell`, `CsvRecord`, `CsvRecordSlice`, `CsvTable` | Required values and bounded indices/text; record cells and spans are required, not defaulted. |
+| `CsvDetectDelimiter`, `CsvFixedDelimiter`, `CsvDelimiterChoice`; `CsvDetectEncoding`, `CsvFixedEncoding`, `CsvEncodingChoice` | State cases; fixed delimiter/encoding required; detect candidates/window keep their existing schema defaults. |
+| `CsvLimits`, `CsvReadOptions`, `CsvWriteOptions`, `CsvCodecOptions` | Existing schema defaults for each cap, dialect/encoding choice, quote/ragged/blank/trim rule, sep hint, writer separator/terminator/quote/BOM/formula guard and nested read/write settings. Internal callers now explicitly pass these schema-owned values. |
+| All CSV diagnostic finding cases, `CsvWarning`, `CsvFatal`, `CsvDiagnostic`, `CsvParseError` | Required finding fields, positions and limits; severity/kind are State. Parse error diagnostics are nonempty, so its message reads index 0 directly. |
+| `CsvDelimiterGiven`, `CsvDelimiterDetected`, `CsvDelimiterFromSepLine`, `CsvDelimiterFallback`, `CsvDelimiterFound`; all four encoding cases and `CsvEncodingFound` | State with required attribution; fallback comma and Windows-1252 are already explicit tagged cases, unchanged. |
+| `CsvFromText`, `CsvFromBytes`, `CsvSource`, `CsvClean`, `CsvNoted`, `CsvOutcome`, `CsvRead`; `Pending`, `BytesPending`, machine state | State cases; source attribution, bytes and records required; clean outcome and the mutable machine's counters/buffers keep their existing starting values. |
+| XLSX address/range/serial/date-system/column/row scalars and `XlsxAddress`, `XlsxRange`, `XlsxNumberFormat` | Required coordinates, bounds and serial interpretation; format id/code keep their existing General starting values. |
+| `XlsxBlank`, `XlsxText`, `XlsxNumber`, `XlsxBoolean`, `XlsxError`, `XlsxDate`, `XlsxUnreadable`, `XlsxValue` | State cases with required case payloads. No new value or format is invented. |
+| `XlsxCell` | column/value Required; formula Absent (Option, starts None); format existing General schema default. |
+| `XlsxRow`, `XlsxSheetInfo`, `XlsxSheetCount` | row number/cells and sheet name/counts Required; hidden starts false; state starts visible; declared extent and last populated row Absent Options. |
+| `XlsxWorksheet`, `XlsxWorkbook`, `XlsxDroppedPart`, dropped-kind/state enums | Required sheet identity and nonempty workbook sheets; rows/merges/hiddenColumns/dropped retain empty starting collections; date system retains 1900; dropped path/kind Required. |
+| `XlsxAllSheets`, `XlsxNamedSheets`, `XlsxFirstSheet`, `XlsxSheetChoice`, `XlsxLimits`, `XlsxReadOptions`, `XlsxWriteOptions`, `XlsxCodecOptions` | State and Required named-sheet list; every existing cap and read-all/deflate/nested option default remains on its schema. |
+| XLSX diagnostic finding cases, warning/fatal/diagnostic unions, `XlsxParseError`, `XlsxRead`, `XlsxSheetOutline`, `XlsxOutline`; `RawFormatKind` | State/Required existing finding/value fields; warnings/outline collections retain their schema starting values. Format variants retain required payloads. |
+| Vocabulary key/IRI/text/ratification/enumeration scalars, RDF registry | Required existing bounds and literal domains; no term, authority or provenance receives a default. |
+| `GistParent`, `LocalParent`, `NoParent`, `ParentLink`; `StatedIdentity`, `InheritedIdentity`, `IdentityCriterion`; `ClassRange`, `SchemeRange`, `RangeTarget` | State cases with Required payloads. NoParent carries its explicit reason. |
+| `ClassTerm`, `ObjectPropertyTerm`, `DatatypePropertyTerm`, `Concept`, `ConceptScheme` | label/definition/ratification and case-specific tag/parent/identity/range/datatype/closed/concepts Required; altLabels Empty []; domain/evidence/alsoInstanceOf Absent Options as declared. |
+| `GistClass`, `GistProjection`, `Vocabulary` | Gist parent Absent; versions/namespaces/IRIs/gist projection and every term table/disjoint-pair list Required. |
+| Pointer mark/read cases, `FieldMark`, `SchemaMarks`, rule findings | State/Required mark payloads; fields Absent for a non-record; missing annotations remain unmarked. Generic annotation-maker input shapes remain unchanged. |
+
+### Remaining counted sites
+
+The final source inventory below is deliberate incomplete work, not exemptions and not a zero claim. All 54 files
+were read. There are **123** retained sites: **60 fallback, 34 absence, 0 unwrap, 29 normalise**. Compared with the
+initial 197, 74 sites were removed. Two normalise sites are configuration-field reads (`options.trim` and
+`this.config.trim`), which this syntax reader counts. Seven counted sites remain in tests; no Option/Result test
+branch still skips an expectation and no `getOrUndefined`/`getOrNull` remains. The two deliberately unwrapped
+`S.optionalKey` pointer-test fixtures also remain unchanged; this law does not count them outside contract/model/host.
+
+Paths below start at `packages/foundation/modeling/`. Counts are fallback / absence / unwrap / normalise. Line lists
+name every remaining counted place in the formatted code; the example is one representative expression.
+
+| File | Counts | Retained lines by kind | Reason and example |
+| --- | --- | --- | --- |
+| `csv/src/Csv.codec.ts` | 4 / 0 / 0 / 1 | fallback: 82, 391, 645, 662; normalise: 107 | Guaranteed delimiter capture and bounded byte access remain; the short-object-row empty-cell policy remains. `recordsFromString` must still accept omitted options from the vendored `TextDecodeTo` composer. `options.trim` is a configuration-field read counted by the syntax reader, not a clean-up call. Example: `match[1] ?? ","`. |
+| `csv/src/CsvOptions.schema.ts` | 0 / 0 / 0 / 2 | normalise: 264, 265 | Dialect-selected trimming deliberately changes the raw CSV cell according to its selected trim rule; moving it to a universal schema would change dialect behavior. Example: `Str.trim`. |
+| `csv/src/internal/encoding.ts` | 2 / 0 / 0 / 0 | fallback: 12, 32 | Bounds-checked UTF-8 scanning: no per-byte schema decode or new access allocation was added merely to lower the counter. Example: `bytes[i] ?? 0`. |
+| `csv/src/internal/header.ts` | 1 / 0 / 0 / 0 | fallback: 36 | A short record fills missing headed cells with empty text. Retained rather than adding a decode or padding copy to every row. Example: `record[index] ?? ""`. |
+| `csv/src/internal/machine.ts` | 0 / 2 / 0 / 1 | absence: 385, 385; normalise: 340 | Mutable parser head/quoted-head state checks remain. `this.config.trim` is a field read counted by the syntax reader. Example: `this.config.trim`. |
+| `csv/src/internal/sniff.ts` | 0 / 1 / 0 / 0 | absence: 62 | An empty preview has no first width; this is delimiter-detection state. Example: `first === undefined`. |
+| `xlsx/src/Xlsx.codec.ts` | 0 / 2 / 0 / 6 | absence: 168, 211; normalise: 130, 131, 362, 362, 391, 391 | Empty/missing sheet-header cases and case-insensitive sheet selection remain. They are not approved exemptions. Example: `Str.toLowerCase`. |
+| `xlsx/src/XlsxAddress.schema.ts` | 2 / 3 / 0 / 1 | fallback: 140, 187; absence: 137, 186, 188; normalise: 102 | Reference regex failure, optional range end and required captures remain together with column-case interpretation; no throwing unwrap substituted. Example: `Str.toUpperCase`. |
+| `xlsx/src/XlsxWorkbook.schema.ts` | 0 / 0 / 0 / 3 | normalise: 322, 393, 393 | Case-insensitive sheet-name uniqueness and lookup remain with the workbook algorithms. Example: `Str.toLowerCase`. |
+| `xlsx/src/internal/container.ts` | 1 / 0 / 0 / 0 | fallback: 36 | A ByteSize too large to represent as number is capped at MAX_SAFE_INTEGER for comparison, unchanged. Example: `O.getOrElse`. |
+| `xlsx/src/internal/formula.ts` | 6 / 0 / 0 / 0 | fallback: 20, 21, 21, 21, 21, 21 | Match index and regex captures remain; no unsafe unwrap or empty-string alias substituted. Example: `found.index ?? 0`. |
+| `xlsx/src/internal/numberFormat.ts` | 13 / 4 / 0 / 7 | fallback: 77, 91, 112, 120, 142, 148, 252, 273, 281, 297, 306, 372, 376; absence: 145, 319, 361, 386; normalise: 59, 93, 137, 183, 274, 292, 306 | Format grammar scanning, optional decimal capture, partial tokens and rendering tables remain. These mix guaranteed indices with deliberately permissive malformed-format handling; a hotloop rewrite needs separate grammar and performance proof. Example: `Str.toLowerCase`. |
+| `xlsx/src/internal/ooxml.ts` | 7 / 2 / 0 / 0 | fallback: 53, 54, 146, 147, 148, 159, 160; absence: 34, 91 | Third-party XML positions, missing attributes/root and Excel escape captures remain. Attribute reads are also used in streaming hotloops. Example: `exact !== undefined`. |
+| `xlsx/src/internal/sheet.ts` | 13 / 8 / 0 / 5 | fallback: 117, 126, 306, 312, 335, 406, 407, 407, 420, 505, 506, 507, 555; absence: 118, 353, 395, 409, 422, 487, 498, 511; normalise: 485, 491, 491, 496, 518 | Streaming mutable row/cell state, absent XML attributes, style lookup, optional ISO time parts and unreadable-cell interpretation remain; no per-cell schema decode or per-row copy introduced. Example: `reference[i] ?? ""`. |
+| `xlsx/src/internal/workbookPart.ts` | 4 / 6 / 0 / 2 | fallback: 95, 115, 237, 290; absence: 73, 92, 114, 120, 276, 281; normalise: 293, 296 | Missing metadata parts, styles, relationships and unnamed-sheet compatibility remain, plus case-insensitive duplicate names. This needs a coherent metadata-boundary change, not decodes for individual fallback expressions. Example: `renderDate({ code: format.code, serial: 1, date1904: false }) === undefined`. |
+| `xlsx/src/internal/writer.ts` | 5 / 1 / 0 / 1 | fallback: 44, 45, 51, 52, 127; absence: 25; normalise: 24 | UTF-16 lookahead and surrogate handling, escaping case and guaranteed registered styles remain; the by-value XML writer was not changed. Example: `Str.toUpperCase`. |
+| `xlsx/test/oracle.property.test.ts` | 2 / 0 / 0 / 0 | fallback: 174, 174 | SheetJS may omit workbook-sheet metadata or a visible-sheet Hidden flag. Existing [] and 0 comparisons are retained third-party boundary candidates. Example: `theirs.Workbook?.Sheets ?? []`. |
+| `xlsx/test/support/workbooks.ts` | 0 / 5 / 0 / 0 | absence: 63, 64, 71, 85, 88 | A missing shared-text/styles part omits both the part and its relationship; a missing state omits its XML attribute. Five existing optional fixture checks remain; the independent starting values now use named object spreads. Example: `recipe.sharedStrings === undefined`. |
+
+The existing `Effect.runSync` in `xlsx/src/Xlsx.codec.ts`'s synchronous `Xlsx.parseResult` is retained unchanged.
+Removing that public synchronous entry point requires a separate API migration; this lane adds no `runSync`,
+`Result.getOrThrow`, synchronous schema decoder/encoder, local default schema, or function `S.declare`. No optional
+sort was rewritten and no new Optional-to-undefined codec was introduced. No owned file outside these packages was
+forced to change: the catalog spreadsheet readers already passed explicit options.
+
+### Validation for row 8
+
+- `bun run beep laws defaults <all 54 owned source/test files>` passed: 60 fallback, 34 absence, 0 unwrap,
+  29 normalise remain. The changed-file run passed 12 files with 6 fallback, 7 absence, 0 unwrap, 7 normalise.
+  Logs: `/tmp/modeling-defaults-final.log`,
+  `/tmp/modeling-residual.txt` and `/tmp/modeling-residual.json` (the final 123-site syntax inventory), and
+  `/tmp/modeling-defaults-changed.log`. The baseline was never rewritten.
+- The CSV suite passed 31 tests, the XLSX suite 92, and vocabulary 96. These include the CSV Effect oracle,
+  SheetJS reading/writing/display properties, hostile files and arbitrary-model checks. Logs:
+  `/tmp/modeling-csv-tests.log`, `/tmp/modeling-xlsx-tests.log`, `/tmp/modeling-vocabulary-tests.log`.
+- The catalog web CSV differential (12), XLSX parity (24), and spreadsheet reader (37) suites passed all 73 tests
+  with no retries: `/tmp/modeling-web-parity.log`. Their historical snapshots were not re-recorded.
+- `bun run check` exited 0: 105/105 tasks successful, 64 cached, 3m24.356s. The log is
+  `/tmp/modeling-full-check.log`. This includes the final fixture-builder changes; catalog web reported no retries.
+  The run had a quiet interval after catalog model finished, then completed normally; it was not cancelled or rerun.
+- `bun run format -- <12 changed TypeScript files>`, each package's targeted typecheck, `bun run docs:check`, and
+  `git diff --check` passed. The docs checker retains the existing goal-status warnings. Effect 4.1.5 source was
+  checked for the used Option/Array/Result APIs; test assertion signatures were read in `@effect/vitest/src/utils.ts`.
+- Frozen paths have no diff. Baseline SHA-256 is
+  `b342c617ccb4211d873737b819bdc1556f7089e52e3673eee45efe8437bb3bcd`; Verify lock is
+  `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`. No lockfile, vendored file,
+  exemption or `.dev.vars` was edited. No commit or push was made.
+
+Not run: `check:full`, a fresh on-screen messy-sample import through Confirm, a hosted deployment, or a dedicated
+performance benchmark. This lane changes no schema sent through the browser and leaves all byte/cell parser
+hotloops and the workbook XML writer untouched; the parity suites establish the local reader boundary only.
+Row 8 remains incomplete with the 123 named places above.
+
+Needs the person: nothing to approve for these edits. Row 8 still needs work on the 123 named sites; any
+exemptions proposed later require Benjamin's explicit decision. No new product behavior was chosen in this lane.

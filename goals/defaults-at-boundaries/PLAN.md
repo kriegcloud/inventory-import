@@ -31,14 +31,14 @@ Places by package on 2026-11-23, from the baseline:
 | 5 | The law's new kinds (SPEC, "What the law should count") | — | a lane in `packages/tooling` | done: items 1 to 3 counted (a test's branch on an Option, Result or Exit; a literal `onNone`; an unwrapped `optionalKey`). The 74 places they named in the pilot packages and the ontology's tests are cleared but for `Cell.shown` and `Cell.formula`. Decided 2026-11-25 and in a second lane: `onNone` narrowed to data stand-ins, `getOrThrow` and `runSync` counted, `Spreadsheet.rules.ts` exempt for absence |
 | 6 | `packages/access/{contract,model,host}` | 37 | Codex lane | done in two rounds: the first cleared the law with `Result.getOrThrow` decodes and was refused. Left as on main: the session hook's null context and `undefined` result in `internal/authOptions.ts` (2 places, Better Auth's own API; an exemption candidate for row 15) |
 | 7 | `packages/kernel`, `packages/drivers/*` | 18 | Codex lane | done in two rounds: a model policy and a script's options are stated by every caller; no line of the baseline names them |
-| 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | partly: 74 places cleared, 81 exempt in eleven files that read bytes and markup (decided 2026-11-26), 31 left in the two codecs, three schema files and two test supports of xlsx, for a second lane |
-| 9 | `packages/review` | 586 | Codex lane | todo |
-| 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | todo |
-| 11 | `packages/catalog/web` | 572 | Codex lane | todo |
+| 8 | `packages/foundation/modeling/{csv,xlsx,vocabulary}` (our own; not the kit) | 186 | Codex lane | partly, in two lanes: 88 places cleared, 81 exempt in eleven files that read bytes and markup (decided 2026-11-26), 17 left in the two codecs and the xlsx schema files (sheet and column names compared without case; a codec's own cell reading) |
+| 9 | `packages/review` | 586 | Codex lane | partly, in three lanes: the region's optional data are Options from `ReviewRow` to the last step of each screen (321 of 474 source places), the tests narrow with asserts (74 of 94), and the browser's reads are in `internal/browser.ts` (exempt for absence, decided 2026-11-26). Left: about 120 in source, most in `internal/ReviewGrid.tsx` (50) and `ReviewRegion.atoms.ts` (19): sparse cell lookups (`view.cells[id] ?? ""`), counters, and a component's own optional props, which stay counted (decided 2026-11-26); 20 in two test fixtures the gallery imports, which cannot use the test asserts |
+| 10 | `packages/client`, `packages/ui` (our own files) | 127 | Codex lane | partly, in three lanes: every caller states its reactivity keys, `keep`, toast lead and `sayError` fields; the browser's reads are in `client/src/Storage.browser.ts` and `ui/src/internal/browser.ts` (exempt for absence). Left: about 55, named in VERDICTS: `Effect.runSync` in `Json.codec.ts` and `Api.atoms.ts`, `ListTable`'s facet counts and search clean-ups, `SayError`'s path wording, and components' own optional props |
+| 11 | `packages/catalog/web` | 572 | Codex lane | done but for the tests' second pass (running) and one place: 292 of 324 source places cleared, the editor is Closed or Open, worker messages cross encoded; five files that show or repair a reviewed cell are exempt for clean-ups and `internal/browser.ts` for absence (decided 2026-11-26). Left in source: the table hook's page count before the first read (`ItemsPage.screen.tsx`) and a ReactNode check in `ImportPage.screen.tsx` |
 | 12 | `packages/access/web` | 37 | Codex lane | done: no line of the baseline names it but the two exempt edges (`Session.atoms.ts`, `internal/authClient.ts`: the browser's and Better Auth's own APIs, decided 2026-11-26). The slug of a new organization is a schema's (`OrganizationSlugStem`), compared with the old helper on five names; not seen on screen, since sign-up is closed in development |
-| 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | todo |
+| 13 | `apps/inventory` (api, server, web, tests) | 142 | Codex lane | partly: tests 95 to 4 (a first round that read `.valueOrUndefined` was refused and redone; the law now counts it), source 51 to 18. Left: the OpenAPI document's JSON (`api/v1/Document.ts`), `SameOrigin`'s header reads, and gallery pages |
 | 14 | `packages/infra` | 7 | Codex lane | done: 15 places under the new reader, all cleared; the stage plan is unchanged and no alchemy command was run. Two `onFailure: () => []` branches stay, which the law does not count |
-| 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | todo |
+| 15 | Edges named in `exemptions`; three files a new feature starts from checked for the boundary shape | — | this session | partly: the edges are on `exemptions` as Benjamin decided each (2026-11-25, 2026-11-26 twice): the byte readers, Better Auth's and the browser's APIs, the reviewed cell's display files, four browser-edge modules. Not done: the three files a new feature starts from, checked for the boundary shape |
 
 ## Where the pilot stands
 
@@ -126,7 +126,26 @@ pressed "Import 155, skip 45", the dialog read "Import 155 items?" with "Fixed b
 "155 items"; People read "Example Works (test) · 3 people" with each person's email. Screenshot
 `.scratch/shots/sweep-1-result.png`.
 
+2026-11-26, after rows 9, 10, 11 and 13 and the browser-edge lane merged: the baseline names 55 files and 333
+places (main: 1,687). `bun run check:full` passed on the tree before the browser-edge lane (112 tasks) and the Verify
+lock equals `main`'s. On port 5174 from a fresh database, signed in as Dana Whitfield: pressed Continue on the open
+`items_messy.csv`; Review read Needs a decision 24, Cannot import 21, Ready 155, All 200; pressed "Leave out 2" on
+the SKU group and "Undo: 2 rows left out", and it read the same; pressed "Import 155, skip 45", the dialog read
+"Import 155 items?" (Fixed by a rule 17, Unchanged from the file 138); pressed "Import 155 items"; Result read Not
+imported 45, Imported 155, Already there 0, All 200; Items read "155 items". Opened "Edit Brass Washer M6", typed
+2456 in Qty on hand, pressed Save: the row reads 2,456 BX. Pressed "Use items_messy.csv" again: Needs a decision 25,
+Cannot import 21, Ready 0, Already there 154, All 200 (the changed item asks keep or replace). After the browser-edge
+lane: pressed "Leave out 2" there, it read Needs a decision 21, Ready 2, Left out 2; reloaded the page, it read the
+same and offered "Undo: 2 rows left out".
+
+
 What the lanes taught, beyond the pilot's list:
+
+- **Two lanes that rewrite the same files conflict on every line both reshaped.** The review lane and the catalog/web
+  lane each changed the tests the other's types forced; the merge took a lane of its own, briefed with what each side
+  did. Cut such lanes one after the other, not side by side.
+- **A lane wraps a value in `O.fromNullishOr` at each use when the owning type is another lane's.** The second pass
+  over a package's tests, after its source carries Options, removes them.
 
 - **A lane clears the law by renaming the question unless it is told not to.** `Result.getOrThrow(S.decodeResult(…))`
   for a fallback, a schema built inside a function to hold a default, an encode to get `undefined` back, a double

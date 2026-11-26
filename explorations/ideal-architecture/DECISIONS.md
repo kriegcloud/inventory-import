@@ -2119,3 +2119,26 @@ Next: 3 and 4 are work for now, schema and contract of the driver's client first
 Reverse: 1, the brief's move 2 names the driver for the session lookup instead; 2, the host imports Alchemy's package
 and the driver is deleted; 3 and 4, the screens and `authOptions.ts` call Better Auth as before and the ledger's
 counts for them stay.
+
+### 2026-11-26 — the defaults law's last edges: own props, one storage twin, an adapter per library
+
+Asked by dialog once two lanes had brought the baseline to 104 places in 30 files and listed what would not move.
+
+1. **A React component checking its own optional prop in its body** (`props.line === undefined`, 34 places)? I
+   chose; the agent recommended the same. The law stops counting it. `??` in a body stays refused. Rejected: each
+   component file on the exemptions list; the props made required Options, which reverses 2026-11-23.
+2. **The tests' stand-in for the browser's storage** (`kept[key] ?? null`, 10 places in 8 test files)? I chose; the
+   agent recommended the same. One shared file that every one of them imports, and that file on the exemptions
+   list. Rejected: the eight files listed as they are; leaving them counted.
+3. **Another library handing back nothing** (the table, the virtual list, an atom's first read of itself, a portal
+   target, the Web Locks default: about 17 places in 5 files)? I chose; the agent recommended the same. Each behind
+   a small adapter file of ours that gives an Option, and only those files exempted, so the grid's own files end at
+   none. Rejected: the five files listed; leaving them counted.
+4. **`ImportStore.listOpen` and `listPast`**? I chose; the agent recommended the same. One named query,
+   `{ organizationId, limit }`, not dual: a list has no value it acts on. Rejected: the organization first and
+   dual; the limit first, as merged.
+
+Next: a lane builds 1 to 3 (`goals/defaults-closeout`, step 7b); 4 is on main.
+
+Reverse: 1, the law counts the checks again and the files go back into the baseline; 2 and 3, the stand-in and the
+adapters are inlined and their files leave the list; 4, the two methods take two arguments again.

@@ -852,19 +852,20 @@ const makeRegionTable: {
       // A step that settled several rows at once can be taken back from where the eye is: a toast with Undo. It takes
       // back that step only, and only while it is still the last one.
       const bulk = !history && outcome.changed.length > 1
-      const step = outcome.state.undo[outcome.state.undo.length - 1]
-      if (bulk && step !== undefined && !narrow) {
-        const shown = toast(outcome.label, {
-          action: {
-            label: "Undo",
-            onClick: () => {
-              const undo = registry.get(region.input.decisions).undo
-              if (undo[undo.length - 1] === step) run({ type: "undo" as const }, O.none())
+      const lastStep = A.last(outcome.state.undo)
+      if (bulk && !narrow)
+        O.map(lastStep, (step) => {
+          const shown = toast(outcome.label, {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                const undo = registry.get(region.input.decisions).undo
+                if (undo[undo.length - 1] === step) run({ type: "undo" as const }, O.none())
+              }
             }
-          }
+          })
+          registry.update(region.toasts, (before) => [...before, shown])
         })
-        registry.update(region.toasts, (before) => [...before, shown])
-      }
     }
 
     const step = (back: boolean) => {

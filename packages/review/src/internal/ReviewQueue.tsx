@@ -1,3 +1,4 @@
+import { $ReviewId } from "./identity.ts"
 import { TotalCells } from "@inventory/review/ReviewDraft"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { CellMark, Entry } from "@inventory/review/ReviewTypes"
@@ -6,6 +7,8 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
+import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import * as A from "effect/Array"
 import { useAtom, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
@@ -63,7 +66,19 @@ const page = 30
 type Place = { readonly at: number; readonly shown: number }
 
 /** The card on screen: what names its decision, and whether it has just taken another card's place. */
-type Card = { readonly key: string; readonly moved: boolean }
+class Card extends S.Opaque<Card, { readonly brand: unique symbol }>()(
+  S.Struct({
+    key: S.String.pipe(S.withConstructorDefault(Effect.succeed("")), S.withDecodingDefaultTypeKey(Effect.succeed(""))),
+    moved: S.Boolean.pipe(
+      S.withConstructorDefault(Effect.succeed(false)),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false))
+    )
+  }).pipe(
+    $ReviewId
+      .create("ReviewQueue")
+      .annoteSchema("Card", { description: "The queue card currently shown, or its empty starting state" })
+  )
+) {}
 
 /** What one queue holds and works out from the region it is in. */
 interface Queue {
@@ -95,10 +110,18 @@ const makeQueue = (region: Region): Queue => {
     ),
     card: Atom.readable((get): Card => {
       const list = get(decisions)
-      const shown = list[Math.min(get(place).at, Math.max(0, list.length - 1))]
-      const now = shown === undefined ? "" : cardKey(shown)
+      const shown = A.get(list, Math.min(get(place).at, Math.max(0, list.length - 1)))
       const before = get.self<Card>()
-      return { key: now, moved: now !== "" && O.exists(before, (was) => was.key !== "" && was.key !== now) }
+      return O.match(shown, {
+        onNone: () => Card.make({}),
+        onSome: (entry) => {
+          const now = cardKey(entry)
+          return Card.make({
+            key: now,
+            moved: now !== "" && O.exists(before, (was) => was.key !== "" && was.key !== now)
+          })
+        }
+      })
     }),
     // The atoms change before the card is drawn: the focus is put there a frame later, when it is on screen.
     focusCard: (now) => {
@@ -129,8 +152,8 @@ export const decided = (progress: {
   return { done, all: done + progress.left }
 }
 
-const nameOf = (view: RowView, first: ReviewColumn | undefined): string => {
-  const name = first === undefined ? "" : TotalCells.text(view.cells, first.id)
+const nameOf = (view: RowView, first: O.Option<ReviewColumn>): string => {
+  const name = O.match(first, { onNone: () => "", onSome: (column) => TotalCells.text(view.cells, column.id) })
   return name === "" ? `Row ${rowName(view.row)}` : name
 }
 
@@ -269,7 +292,7 @@ function GroupCard(props: CardProps & { readonly group: FixGroup }) {
               O.match(actions.peek(rowId), {
                 onNone: () => null,
                 onSome: (view) => {
-                  const name = nameOf(view, props.columns[0])
+                  const name = nameOf(view, A.head(props.columns))
                   return (
                     <li key={rowId} className="min-w-0 text-sm">
                       {/* The whole line is the tick box's label: a 20px box alone is too small to tap. */}
@@ -318,7 +341,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
   const { view, actions, labels } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
   const nameColumn = props.columns[0]
-  const name = nameOf(view, nameColumn)
+  const name = nameOf(view, A.head(props.columns))
   const problem = view.problem
   const subject = O.flatMap(problem, (problem) => problem.column)
   const mark = O.flatMap(subject, (column) => R.get(view.marks, column))
@@ -333,7 +356,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
   )
   const label = O.match(subject, {
     onNone: () => "",
-    onSome: (subject) => O.getOrElse(HashMap.get(labels, subject), () => subject)
+    onSome: (subject) => O.match(HashMap.get(labels, subject), { onNone: () => subject, onSome: (label) => label })
   })
   const extra = O.match(problem, {
     onNone: () => O.none(),
@@ -342,23 +365,25 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
   const others = otherAnswers({ view, extra })
   const picks = O.flatMap(problem, (problem) => problem.choices)
 
-  let main: ReactNode = null
+  let main: O.Option<ReactNode> = O.none()
   if (O.isSome(picks) && O.isSome(subject)) {
     // A pick with no default: every choice is the same outline button; a suggestion says so in words.
-    main = picks.value.map((pick, at) => (
-      <Button
-        key={pick.value}
-        variant="outline"
-        size="touch"
-        className="h-auto min-h-11"
-        {...(at === 0 ? first : {})}
-        onClick={() => actions.edit(view.row.id, subject.value, pick.value)}
-      >
-        <span className="py-2.5 whitespace-normal">{choiceText(pick)}</span>
-      </Button>
-    ))
+    main = O.some(
+      picks.value.map((pick, at) => (
+        <Button
+          key={pick.value}
+          variant="outline"
+          size="touch"
+          className="h-auto min-h-11"
+          {...(at === 0 ? first : {})}
+          onClick={() => actions.edit(view.row.id, subject.value, pick.value)}
+        >
+          <span className="py-2.5 whitespace-normal">{choiceText(pick)}</span>
+        </Button>
+      ))
+    )
   } else if (O.isSome(fix) && O.isSome(choices) && !weakGuess(fix.value)) {
-    main = (
+    main = O.some(
       <ButtonGroup aria-label={`${label} for ${name}`} className="w-full">
         {choices.value.map((choice, at) => (
           <Button
@@ -379,7 +404,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
       </ButtonGroup>
     )
   } else if (O.isSome(fix) && !weakGuess(fix.value)) {
-    main = (
+    main = O.some(
       <Button size="touch" {...first} onClick={() => actions.accept(view.row.id)}>
         Use {valueWords(fix.value, fix.value.to)}
       </Button>
@@ -388,7 +413,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
     const own = O.flatMap(props.cellEditor, (editor) =>
       editor({ row: view.row, column: subject.value, value: TotalCells.text(view.cells, subject.value) })
     )
-    main = (
+    main = O.some(
       <Overlay
         title={O.match(own, { onNone: () => `${label} for ${name}`, onSome: (own) => own.title })}
         about={`Type the ${label} so ${name} can be imported`}
@@ -486,7 +511,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
               onNone: () => null,
               onSome: (present) => (
                 <span className="text-muted-foreground">
-                  also row {rowName(present.row)}, {nameOf(present, nameColumn)}
+                  also row {rowName(present.row)}, {nameOf(present, A.head(props.columns))}
                 </span>
               )
             })}
@@ -507,7 +532,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
       </ItemContent>
       <ItemFooter className="min-w-0">
         <div className="flex w-full min-w-0 flex-col gap-2">
-          {main}
+          {O.match(main, { onNone: () => null, onSome: (main) => main })}
           {O.isNone(fix) || O.isNone(actions.reject) ? null : (
             <Button
               variant="outline"
@@ -521,7 +546,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
             <Button
               variant="outline"
               size="touch"
-              {...(main === null ? first : {})}
+              {...(O.isNone(main) ? first : {})}
               onClick={() => actions.leaveOut(view.row.id)}
             >
               Leave out
@@ -563,7 +588,7 @@ function RowCard(props: CardProps & { readonly view: RowView }) {
                     key="leave-out"
                     variant="outline"
                     size="touch"
-                    {...(main === null ? first : {})}
+                    {...(O.isNone(main) ? first : {})}
                     onClick={() => actions.leaveOut(view.row.id)}
                   >
                     {words}
@@ -632,11 +657,10 @@ function QueueBody(props: QueueProps & { readonly region: Region }) {
   const actions = useAtomValue(region.rejects) ? table.actions : table.plainActions
   const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
-  const entry = decisions[index]
+  const entry = A.get(decisions, index)
   const key = useAtomValue(queueOf.card).key
   // After a decision the next card takes the decided one's place, and focus goes to its first button.
   useAtomSubscribe(queueOf.card, queueOf.focusCard)
-  const nameColumn = columns[0]
 
   if (props.loading) {
     return (
@@ -663,7 +687,7 @@ function QueueBody(props: QueueProps & { readonly region: Region }) {
             {rows.map((view) => (
               <Item key={view.row.id} size="sm" data-row-id={view.row.id}>
                 <ItemContent className="min-w-0">
-                  <ItemTitle>{nameOf(view, nameColumn)}</ItemTitle>
+                  <ItemTitle>{nameOf(view, A.head(columns))}</ItemTitle>
                   <ItemDescription>
                     {view.status === "needs" || view.status === "cannot"
                       ? reasonOf({ view, kinds: kinds, words: words })
@@ -689,7 +713,7 @@ function QueueBody(props: QueueProps & { readonly region: Region }) {
                     }
                   >
                     {view.status === "out" ? "Put back" : "Leave out"}
-                    <span className="sr-only"> {nameOf(view, nameColumn)}</span>
+                    <span className="sr-only"> {nameOf(view, A.head(columns))}</span>
                   </Button>
                 )}
               </Item>
@@ -712,60 +736,61 @@ function QueueBody(props: QueueProps & { readonly region: Region }) {
       data-queue=""
       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain border-y p-4"
     >
-      {entry === undefined ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">{props.empty}</div>
-      ) : (
-        <>
-          <div className="flex items-center gap-1">
-            <p className="flex-1 text-sm font-medium tabular-nums">
-              Decision {decided(props.progress).done + index + 1} of {decided(props.progress).done + decisions.length}
-            </p>
-            {props.undo}
-            <Button
-              variant="ghost"
-              size="icon-touch"
-              aria-label="Previous decision"
-              disabled={index === 0}
-              onClick={() => setAt(index - 1)}
-            >
-              <ChevronLeftIcon aria-hidden />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-touch"
-              aria-label="Skip to the next decision"
-              disabled={index >= decisions.length - 1}
-              onClick={() => setAt(index + 1)}
-            >
-              <ChevronRightIcon aria-hidden />
-            </Button>
-          </div>
-          <Progress
-            aria-label="Decisions made"
-            value={
-              decided(props.progress).all === 0
-                ? 100
-                : (decided(props.progress).done / decided(props.progress).all) * 100
-            }
-            className="h-1"
-          />
-          {/* Keyed by the decision, so the card that takes a decided one's place is a new node. */}
-          <div key={key} data-card={key} className="contents">
-            <Decision
-              entry={entry}
-              columns={columns}
-              labels={labels}
-              kinds={kinds}
-              actions={actions}
-              groupActions={groupActions}
-              excluded={excluded}
-              rowAction={rowAction}
-              cellEditor={props.cellEditor}
-              onSplit={props.onSplit}
+      {O.match(entry, {
+        onNone: () => <div className="py-10 text-center text-sm text-muted-foreground">{props.empty}</div>,
+        onSome: (entry) => (
+          <>
+            <div className="flex items-center gap-1">
+              <p className="flex-1 text-sm font-medium tabular-nums">
+                Decision {decided(props.progress).done + index + 1} of {decided(props.progress).done + decisions.length}
+              </p>
+              {props.undo}
+              <Button
+                variant="ghost"
+                size="icon-touch"
+                aria-label="Previous decision"
+                disabled={index === 0}
+                onClick={() => setAt(index - 1)}
+              >
+                <ChevronLeftIcon aria-hidden />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-touch"
+                aria-label="Skip to the next decision"
+                disabled={index >= decisions.length - 1}
+                onClick={() => setAt(index + 1)}
+              >
+                <ChevronRightIcon aria-hidden />
+              </Button>
+            </div>
+            <Progress
+              aria-label="Decisions made"
+              value={
+                decided(props.progress).all === 0
+                  ? 100
+                  : (decided(props.progress).done / decided(props.progress).all) * 100
+              }
+              className="h-1"
             />
-          </div>
-        </>
-      )}
+            {/* Keyed by the decision, so the card that takes a decided one's place is a new node. */}
+            <div key={key} data-card={key} className="contents">
+              <Decision
+                entry={entry}
+                columns={columns}
+                labels={labels}
+                kinds={kinds}
+                actions={actions}
+                groupActions={groupActions}
+                excluded={excluded}
+                rowAction={rowAction}
+                cellEditor={props.cellEditor}
+                onSplit={props.onSplit}
+              />
+            </div>
+          </>
+        )
+      })}
     </div>
   )
 }

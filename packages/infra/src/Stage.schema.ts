@@ -5,7 +5,10 @@
  * @packageDocumentation
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as A from "effect/Array"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import { $InfraId } from "./internal/identity.ts"
 
@@ -254,13 +257,60 @@ const rehearsalSeeds = S.Tuple([S.Literal("organizations"), S.Literal("accounts"
   S.annotateKey({ description: "The seed files applied after the migrations, in order" })
 )
 
+/** No Access policy: the address answers anyone, and the app's own sign-in is the lock. Every stage but a preview. */
+const openToAnyone = NotGiven.pipe(
+  S.annotateKey({ description: "No Access policy: anyone may open the address, and sign-in is the lock" })
+)
+
+/**
+ * One email of a list a person typed: surrounding spaces dropped, lower case, and shaped like an address. Cloudflare
+ * Access compares the address a visitor proves they own with this one.
+ */
+const AccessEmail = S.Trim.pipe(
+  S.decodeTo(
+    S.String.check(S.isMaxLength(254), S.isPattern(/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/)),
+    SchemaTransformation.toLowerCase()
+  ),
+  $I.annoteSchema("AccessEmail", { description: "One email that may open a preview, lower case" })
+)
+
+/**
+ * The emails that may open a preview, as the preview environment's secret `PREVIEW_ACCESS` holds them: one or more,
+ * separated by commas. A list with a piece that is no email is no list: a typing mistake stops the deploy, and never
+ * gates a preview on fewer people than were meant.
+ *
+ * @example
+ * S.decodeOption(AccessEmails)("Ben@Example.test, qa@example.test")
+ * // Some(["ben@example.test", "qa@example.test"])
+ *
+ * @category schemas
+ */
+export const AccessEmails = S.String.check(S.isMaxLength(4000)).pipe(
+  S.decodeTo(
+    S.NonEmptyArray(AccessEmail),
+    SchemaTransformation.transform({
+      decode: (text: string): A.NonEmptyReadonlyArray<string> => Str.split(",")(text),
+      encode: (emails: A.NonEmptyReadonlyArray<string>) => A.join(emails, ",")
+    })
+  ),
+  $I.annoteSchema("AccessEmails", { description: "The emails that may open a preview, from a comma-separated list" })
+)
+
+/**
+ * The decoded value of `AccessEmails`.
+ *
+ * @category models
+ */
+export type AccessEmails = typeof AccessEmails.Type
+
 /** The fields of a stage that is a rehearsal: on workers.dev, the test accounts, no model key, sign-up closed (staging
  * alone replaces the last with the owner's list). */
 const rehearsal = {
   address: OnWorkersDev.pipe(S.annotateKey({ description: "Where the stage answers" })),
   seeds: rehearsalSeeds,
   modelKey: NotGiven.pipe(S.annotateKey({ description: "No model key: the rules answer" })),
-  signUp: NotGiven.pipe(S.annotateKey({ description: "Sign-up is closed to everyone" }))
+  signUp: NotGiven.pipe(S.annotateKey({ description: "Sign-up is closed to everyone" })),
+  access: openToAnyone
 }
 
 /**
@@ -276,6 +326,7 @@ export class ProductionPlan extends S.Opaque<ProductionPlan, { readonly brand: u
     seeds: S.Tuple([]).pipe(S.annotateKey({ description: "No seed file: production holds people's own data" })),
     modelKey: fromVariable("OPENROUTER_API_KEY", "The model's key, read from this variable at deploy"),
     signUp: fromVariable("SIGN_UP", "The emails that may sign up, read from this variable at deploy; unset, closed"),
+    access: openToAnyone,
     deployed: S.tag(true)
   }).pipe($I.annoteSchema("ProductionPlan", { description: "What production gets" }))
 ) {}
@@ -307,6 +358,10 @@ export class PreviewPlan extends S.Opaque<PreviewPlan, { readonly brand: unique 
     kind: S.tag("preview"),
     stage: PreviewStageName.pipe(S.annotateKey({ description: "The stage's name" })),
     ...rehearsal,
+    access: fromVariable(
+      "PREVIEW_ACCESS",
+      "The emails that may open the preview, behind Cloudflare Access, read from this variable at deploy; unset, the deploy stops"
+    ),
     deployed: S.tag(true)
   }).pipe($I.annoteSchema("PreviewPlan", { description: "What a preview gets" }))
 ) {}

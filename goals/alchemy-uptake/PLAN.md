@@ -21,7 +21,7 @@ closes the step with what was seen; it does not get worked around.
 | 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | his re-pin adding `@alchemy.run/test` | todo |
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
 | 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
-| 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | todo |
+| 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
 | 8 | Telemetry export: a destination per stage that names a collector | answered 2026-11-26: staging and prod read a collector from their environment; none is named yet | todo |
 
 The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 needs one command of his; 2, 3, 6,
@@ -57,12 +57,43 @@ deployed stage to measure on. The four decisions were answered on 2026-11-26 (th
 
 ## What Benjamin does by hand
 
-Filled in as each step is built. Known now: the re-pin for step 4; a deployed stage to measure for step 2; the
-Access application and its service token for step 7; a collector's address for step 8; running an export for
-step 3.
+Each is his alone: it reaches a real account, or moves the pin. In the order they unblock something.
+
+### Before this branch is merged: the previews' gate (step 7)
+
+Once this is on `main`, **every preview's deploy stops until `PREVIEW_ACCESS` is set** (`MissingPreviewAccess`:
+"has no list of who may open it"). Staging, production and test stages are not touched.
+
+1. In the previews' Cloudflare account, open Zero Trust once (it asks for a team name the first time; the free
+   plan is enough) and check Settings, Authentication, Login methods: "One-time PIN" is listed. That is the login
+   a preview will ask for: an email, then a code sent to it.
+2. Give the token previews deploy with (`PREVIEW_CLOUDFLARE_API_TOKEN`, the one you made in that account) the
+   account permission "Access: Apps and Policies, Edit". Not verified which permission the provider's calls need
+   beyond that: a missing one shows as a refused call that names it.
+3. Set the emails, typed at the prompt as one line separated by commas, never on the command line:
+
+   ```bash
+   gh secret set PREVIEW_ACCESS --env preview --repo kriegcloud/inventory-import
+   ```
+
+4. Open or push to a pull request. Its plan should read `[Website/Access] create`. Open the preview's address in
+   a private window: Cloudflare asks for an email and sends a code; one of the named emails then reaches the
+   app's sign-in page, and any other is refused by Cloudflare. That is the first time the gate is seen at all.
+
+To take the gate off again: revert the `access` line of `PreviewPlan` and of `planFor`; the next deploy of each
+preview removes its Access application.
 
 ## What was proved on this machine
 
+- **Step 7** (2026-11-26). `StagePlan.test.ts`: of `prod`, `pr-42`, `staging`, `test_ben` and `dev_ben` only
+  `pr-42`'s plan names an Access policy, read from `PREVIEW_ACCESS`; "Ben@Example.test, qa@example.test" becomes
+  the two emails in lower case; with nothing given, and with a list that has a piece that is no email (a trailing
+  comma, a semicolon, "everyone"), the deploy stops with a sentence that says how to set the secret and repeats
+  nothing it was given; a stage with no policy reads nothing whatever the variable holds. `DeployWorkflow.test.ts`
+  holds `PREVIEW_ACCESS` in the preview job's variables and in no other job's. Read from source, not run:
+  `Website.Vite` hands every property but four to `Worker` (`Website/Vite.ts`, `...props`), so `access` reaches
+  it, and the Worker then owns one Access application (`<Worker>/Access`) made and removed with it.
+  **Not seen:** any of it against an account. Nothing here made an Access application.
 - **Step 6** (2026-11-26). The binding is `ABUSE_LIMIT`, 30 in 60 seconds, declared in the stack and in
   `wrangler.jsonc`; the check is one router middleware in front of every route (`src/server/AddressLimit.ts`).
   `AddressLimit.test.ts`, through the Worker's own `fetch`: a stand-in counter lets two requests of an address to
@@ -166,6 +197,14 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
   line and one line for each of `Database`, `SignInSecret` and `Website`, and "Stop a plan that loses the database"
   should print OK. If the guard says the text is not a plan, the tool prints something else in a workflow than its
   formatter does here, and the guard's pattern is what changes.
+- **Step 6.** The limit on a deployed stage: 31 sign-in attempts in a minute from one address should end in the
+  app's own 429 (`{"_tag":"TooManyRequests"}`), and a preview's plan should read `[Website/ABUSE_LIMIT] create`
+  the first time. Cloudflare counts per location and approximately, so the 31st is "about the 31st".
+- **Step 7.** Everything: the Access application made by a preview's deploy, the login it shows, a named email
+  getting through and another being refused, and the application gone when the pull request closes. Two unknowns
+  the first run settles: whether the previews' token needs more than "Access: Apps and Policies, Edit", and whether
+  `alchemy destroy` in "Remove the preview" runs without `PREVIEW_ACCESS` as it is believed to without the
+  preview's password (`goals/infra/PLAN.md`, unknown 14); if it stops, the cleanup job needs both secrets.
 
 ## Choices made
 
@@ -183,6 +222,15 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
 - **`orphaned` is a loss too** (step 1). A database dropped from the state is still in the account, but the next
   deploy makes a new empty one and binds the Worker to it.
 - **Never `--detailed` in a workflow** (step 1): its log is public, and the plain plan names resources only.
+- **`PREVIEW_ACCESS` is set by hand, like `SIGN_UP`, and the repository's stack does not write it** (step 7): his
+  answer was "read as `SIGN_UP` is". So there is no reference line for it in `env/op.env`, and a preview deployed
+  from a workstation needs the variable in that shell.
+- **A list with one bad piece is no list** (step 7): the deploy stops. Dropping the bad piece would gate a preview
+  on fewer people than were meant, and nobody would be told.
+- **The Worker's own Access application, not one shared by every preview** (step 7): it is made and removed with
+  the preview, so a closed pull request leaves nothing behind in Zero Trust.
+- **No way through for a smoke check** (step 7): the deploy workflow has none, so no service token is made. If one
+  is added later it needs a service token and a second policy.
 - **One middleware in front of every route, not a declared error on each endpoint** (step 6). Sign-in is Better
   Auth's routes, outside the API's contract, so a check declared on the contract would have needed a second one in
   the sign-in route's guard. The cost: `TooManyRequests` is not in the OpenAPI document. The browser reads a 429 by

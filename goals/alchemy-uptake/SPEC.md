@@ -73,8 +73,9 @@ proving the capability here before anything depends on it.
 - [x] The rate-limit binding is declared, checked before `/api/auth/sign-in/*`, `/api/auth/sign-up/*` and the
       model's endpoints, refuses with the app's own 429 sentence, and a test shows a refusal and a pass. Built only
       after "the limiter's rule" below is answered.
-- [ ] A `pr-<number>` stage's plan carries an Access policy and no other stage's does (`planFor`'s test); the
-      deploy workflow's smoke check passes through it. Built only after "who may open a preview" is answered.
+- [x] A `pr-<number>` stage's plan carries an Access policy and no other stage's does (`planFor`'s test). The
+      deploy workflow has no smoke check, so nothing automated has to pass through it (corrected 2026-11-26: this
+      box first asked that one did). The gate itself is unseen until Benjamin's steps in PLAN are done.
 - [ ] The stack declares where Cloudflare's telemetry is sent for a stage that names a collector, and none
       otherwise; `planFor`'s test holds it. Built only after "where telemetry goes" is answered.
 - [ ] `bun run beep infra export --stage <name> --dry-run` prints the steps of a dump; `docs/operations.md` says

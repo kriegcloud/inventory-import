@@ -192,6 +192,7 @@ layer(here)("the deploy workflow", (it) => {
         expect(each(jobs, read)).toEqual({
           preview: [
             "secrets.CLOUDFLARE_API_TOKEN",
+            "secrets.PREVIEW_ACCESS",
             "secrets.PREVIEW_TEST_ACCOUNT_PASSWORD",
             "vars.CLOUDFLARE_ACCOUNT_ID"
           ],
@@ -448,7 +449,7 @@ layer(here)("the deploy workflow", (it) => {
         const password = { PREVIEW_TEST_ACCOUNT_PASSWORD: "${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}" }
         const stage = { STAGE: "pr-${{ github.event.pull_request.number }}" }
         expect(each(jobs, (job) => job.env ?? {})).toEqual({
-          preview: { ...account, ...password, ...stage },
+          preview: { ...account, ...password, PREVIEW_ACCESS: "${{ secrets.PREVIEW_ACCESS }}", ...stage },
           cleanup: { ...account, ...stage },
           staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}" },
           "release-tag": {},

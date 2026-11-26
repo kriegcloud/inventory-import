@@ -9,6 +9,7 @@ import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
 import {
+  accessEmailsFor,
   givenPreviewToken,
   givenTestPassword,
   kindOf,
@@ -32,7 +33,70 @@ describe("the plan of a stage", () => {
       seeds: [],
       modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
       signUp: { from: "environment", variable: "SIGN_UP" },
+      access: { from: "nowhere" },
       deployed: true
+    })
+  })
+
+  it("only a preview is behind Cloudflare Access, and reads who may open it at deploy", () => {
+    expect(A.map(["prod", "pr-42", "staging", "test_ben", "dev_ben"], (stage) => [stage, plan(stage).access])).toEqual([
+      ["prod", { from: "nowhere" }],
+      ["pr-42", { from: "environment", variable: "PREVIEW_ACCESS" }],
+      ["staging", { from: "nowhere" }],
+      ["test_ben", { from: "nowhere" }],
+      ["dev_ben", { from: "nowhere" }]
+    ])
+  })
+
+  describe("who may open a preview", () => {
+    const preview = { stage: "pr-42", source: plan("pr-42").access }
+
+    it("is the emails it is given, lower case, without the spaces around them", () => {
+      expect(accessEmailsFor({ ...preview, given: O.some("Ben@Example.test, qa@example.test") })).toEqual(
+        Result.succeed(O.some(["ben@example.test", "qa@example.test"]))
+      )
+      expect(accessEmailsFor({ ...preview, given: O.some("one@example.test") })).toEqual(
+        Result.succeed(O.some(["one@example.test"]))
+      )
+    })
+
+    it("stops with none, and says how to set it without repeating anything", () => {
+      const stopped = accessEmailsFor({ ...preview, given: O.none() })
+      assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
+      expect(stopped.failure.message).toBe(
+        'Stage "pr-42" has no list of who may open it: PREVIEW_ACCESS is not set, so the preview would answer anyone. ' +
+          "Set it in the preview environment, with the emails typed at the prompt and never on the command line: " +
+          "gh secret set PREVIEW_ACCESS --env preview"
+      )
+    })
+
+    it("stops on a list with a piece that is no email, and never repeats what it was given", () => {
+      for (const given of [
+        "",
+        " ",
+        "ben@example.test,",
+        "ben@example.test; qa@example.test",
+        "everyone",
+        "@example.test"
+      ]) {
+        const stopped = accessEmailsFor({ ...preview, given: O.some(given) })
+        assertTrue(Result.isFailure(stopped), `Expected "${given}" to be refused`)
+        expect(stopped.failure.message).toContain("PREVIEW_ACCESS is not a list of emails separated by commas")
+        expect(stopped.failure.message).not.toContain("example.test")
+      }
+    })
+
+    it("a stage with no policy reads nothing, whatever the variable holds", () => {
+      expect(
+        A.map(["prod", "staging", "test_ben", "dev_ben"], (stage) =>
+          accessEmailsFor({ stage, source: plan(stage).access, given: O.some("ben@example.test") })
+        )
+      ).toEqual([
+        Result.succeed(O.none()),
+        Result.succeed(O.none()),
+        Result.succeed(O.none()),
+        Result.succeed(O.none())
+      ])
     })
   })
 

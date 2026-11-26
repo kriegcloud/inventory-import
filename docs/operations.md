@@ -1,7 +1,7 @@
 ---
 type: Tooling Guide
 title: Looking at a deployed stage
-description: For one stage - how to read its plan, its drift, its logs and its state, each with the exact command; what the deploy workflow's plan step and its guard do; and what none of these commands may be run by.
+description: For one stage - how to read its plan, its drift, its logs and its state, each with the exact command; what the deploy workflow's plan step and its guard do; who may open a preview; and what none of these commands may be run by.
 tags: [tooling, deploy, operations]
 ---
 
@@ -86,6 +86,23 @@ bun run beep infra plan-check plan.txt
 
 The guard knows the database by the stack's name for it, `Database`
 (`packages/infra/src/Inventory.stack.ts`); its test reads that file, so a rename there fails `bun run check`.
+
+## Who may open a preview
+
+A preview (`pr-<number>`) is behind Cloudflare Access: its address asks for an email and a one-time code before
+the app's own sign-in page, and only the emails in the `preview` environment's secret `PREVIEW_ACCESS` pass. No
+other stage has a gate. The emails are in no file of the repository, which is public.
+
+To change who may open one, set the secret again with the whole list, typed at the prompt as one line separated
+by commas:
+
+```bash
+gh secret set PREVIEW_ACCESS --env preview --repo kriegcloud/inventory-import
+```
+
+Each preview takes the new list at its next deploy (a push to its pull request). A list with a piece that is no
+email stops the deploy with `MissingPreviewAccess`, which says so without repeating the list. In a preview's plan
+the gate is the line `[Website/Access]`.
 
 ## Drift
 

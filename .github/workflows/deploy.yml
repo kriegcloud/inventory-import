@@ -52,6 +52,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       # The one password every preview's test accounts take. A secret: never echoed, and the stack never prints it.
       PREVIEW_TEST_ACCOUNT_PASSWORD: ${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}
+      # The emails that may open a preview, behind Cloudflare Access: the preview environment's secret, set by hand.
+      # A secret, not a variable: this repository's logs are public. Without it the preview's deploy stops.
+      PREVIEW_ACCESS: ${{ secrets.PREVIEW_ACCESS }}
       STAGE: pr-${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4

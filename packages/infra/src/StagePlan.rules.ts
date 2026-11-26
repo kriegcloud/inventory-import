@@ -15,6 +15,7 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import {
+  AccessEmails,
   NotGiven,
   OnWorkersDev,
   PersonalPlan,
@@ -91,7 +92,8 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
       address: OnWorkersDev.make({}),
       seeds: ["organizations", "accounts"] as const,
       modelKey: nowhere,
-      signUp: nowhere
+      signUp: nowhere,
+      access: nowhere
     }
     return StageKind.match(kind, {
       production: () =>
@@ -99,9 +101,12 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           address: { at: "hostname", ...production },
           seeds: [],
           modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
-          signUp: { from: "environment", variable: "SIGN_UP" }
+          signUp: { from: "environment", variable: "SIGN_UP" },
+          access: nowhere
         }),
-      preview: () => PreviewPlan.make(rehearsal),
+      // Decision of 2026-11-26: a preview answers only the emails its environment names, behind Cloudflare Access.
+      preview: () =>
+        PreviewPlan.make({ ...rehearsal, access: { from: "environment", variable: previewAccessVariable } }),
       staging: () =>
         StagingPlan.make({ ...rehearsal, stage: "staging", signUp: { from: "environment", variable: "SIGN_UP" } }),
       test: () => TestPlan.make(rehearsal),
@@ -176,6 +181,73 @@ export const givenTestPassword = <Password>(input: {
     onNone: () => Result.fail(MissingPreviewPassword.make({ stage: input.stage, variable: previewPasswordVariable })),
     onSome: Result.succeed
   })
+
+/**
+ * The variable a preview's deploy reads the emails that may open it from: the `preview` environment's secret, set by
+ * hand as `SIGN_UP` is, because the repository and its logs are public.
+ *
+ * @category rules
+ */
+export const previewAccessVariable = "PREVIEW_ACCESS"
+
+/**
+ * A preview deployed with no list of who may open it, or with one that is no list of emails. Stopped: a preview
+ * without its gate would answer anyone with the shared test password.
+ *
+ * @category errors
+ */
+export class MissingPreviewAccess extends S.TaggedError<MissingPreviewAccess, { readonly brand: unique symbol }>(
+  $I`MissingPreviewAccess`
+)(
+  "MissingPreviewAccess",
+  {
+    stage: S.String.pipe(S.annotateKey({ description: "The stage being deployed" })),
+    variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the emails" })),
+    given: S.Boolean.pipe(S.annotateKey({ description: "Whether the variable held anything at all" }))
+  },
+  $I.annoteError<MissingPreviewAccess>("MissingPreviewAccess", {
+    description: "A preview deployed without a readable list of the emails that may open it"
+  })
+) {
+  override get message(): string {
+    const what = this.given
+      ? `${this.variable} is not a list of emails separated by commas`
+      : `${this.variable} is not set`
+    return (
+      `Stage "${this.stage}" has no list of who may open it: ${what}, so the preview would answer anyone. Set it in ` +
+      `the preview environment, with the emails typed at the prompt and never on the command line: ` +
+      `gh secret set ${this.variable} --env preview`
+    )
+  }
+}
+
+/**
+ * The emails a stage's Access policy lets in: none for a stage whose plan names no policy, and for a preview the
+ * list it was given, or the reason the deploy stops. The message never repeats what was given.
+ *
+ * @example
+ * accessEmailsFor({ stage: "pr-42", source: { from: "environment", variable: "PREVIEW_ACCESS" }, given: O.none() })
+ * // Failure(MissingPreviewAccess): "... PREVIEW_ACCESS is not set ..."
+ *
+ * @category rules
+ */
+export const accessEmailsFor = (input: {
+  readonly stage: string
+  readonly source: StagePlan["access"]
+  readonly given: O.Option<string>
+}): Result.Result<O.Option<AccessEmails>, MissingPreviewAccess> => {
+  if (input.source.from === "nowhere") return Result.succeed(O.none())
+  const { variable } = input.source
+  const stopped = (given: boolean) => Result.fail(MissingPreviewAccess.make({ stage: input.stage, variable, given }))
+  return O.match(input.given, {
+    onNone: () => stopped(false),
+    onSome: (text) =>
+      O.match(S.decodeOption(AccessEmails)(text), {
+        onNone: () => stopped(true),
+        onSome: (emails) => Result.succeed(O.some(emails))
+      })
+  })
+}
 
 /**
  * The variable of the Cloudflare token every preview's and staging's deploy job takes: the owner's own account-owned

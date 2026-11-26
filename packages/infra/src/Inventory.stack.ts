@@ -29,6 +29,7 @@ import { secretNamesOf } from "./OpReferences.rules.ts"
 import { opEnvReferences } from "./OpReferences.secrets.ts"
 import type { StagePlan } from "./Stage.schema.ts"
 import {
+  accessEmailsFor,
   givenTestPassword,
   modelKeyFor,
   previewPasswordVariable,
@@ -85,6 +86,13 @@ export const inventory = Effect.gen(function* () {
     { onFailure: Effect.die, onSuccess: Effect.succeed }
   )
   const signUp = yield* textFrom(plan.signUp)
+  // Decision of 2026-11-26: a preview answers only the emails its environment's secret names, behind Cloudflare
+  // Access, and stops without them. Read as a secret, so no log shows an email; no other stage reads the variable.
+  const namedToOpen = plan.access.from === "nowhere" ? O.none() : yield* secretOf(plan.access.variable)
+  const mayOpen = yield* Result.match(
+    accessEmailsFor({ stage: plan.stage, source: plan.access, given: O.map(namedToOpen, Redacted.value) }),
+    { onFailure: Effect.die, onSuccess: Effect.succeed }
+  )
 
   // The test accounts of a deployed stage never take the password written in the repository. A test stage mints
   // its own, kept in state. A preview is given the one every preview shares and stops without it.
@@ -118,6 +126,14 @@ export const inventory = Effect.gen(function* () {
     observability: { enabled: true },
     workersDev: plan.address.at === "workersDev",
     ...(plan.address.at === "hostname" ? { domain: { name: plan.address.hostname, zoneName: plan.address.zone } } : {}),
+    // One Access application of the Worker's own, made and removed with it: the address and its version previews
+    // ask for a login first, and only the named emails pass.
+    ...O.match(mayOpen, {
+      onNone: () => ({}),
+      onSome: (emails) => ({
+        access: { policies: [{ decision: "allow" as const, include: A.map(emails, (email) => ({ email })) }] }
+      })
+    }),
     env: {
       DB: database,
       // The coarse limit in front of sign-in and the model (the app's `AddressLimit.ts`): the same two numbers as
@@ -139,6 +155,7 @@ export const inventory = Effect.gen(function* () {
     url: website.url,
     model: O.isSome(modelKey) ? "a model answers" : "the rules answer",
     signUp: O.isSome(signUp) ? "the named emails" : "closed",
+    opens: O.isSome(mayOpen) ? "for the named emails only, after Cloudflare Access" : "for anyone; sign-in is the lock",
     testAccountPassword: O.match(mintedPassword, {
       onNone: () =>
         O.isSome(givenPassword) ? "the one every preview shares; never shown" : "none: this stage has no test account",

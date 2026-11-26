@@ -14,8 +14,17 @@ import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
+import * as S from "effect/Schema"
+import { $InfraId } from "./internal/identity.ts"
 import type { StagePlan } from "./Stage.schema.ts"
 import { previewPasswordVariable, testPasswordOf } from "./StagePlan.rules.ts"
+
+const $I = $InfraId.create("OpReferences")
+
+/** An env-file line, with only its surrounding whitespace removed. */
+const ReferenceLine = S.Trim.pipe(
+  $I.annoteSchema("ReferenceLine", { description: "An env-file line without surrounding whitespace" })
+)
 
 /** The file of references, from this package's folder. */
 export const opEnvFile = "env/op.env"
@@ -47,15 +56,19 @@ const referenceOf = (value: string): O.Option<string> => {
 export const referencesIn = (input: {
   readonly text: string
   readonly names: ReadonlyArray<string>
-}): Record<string, string> =>
-  R.fromEntries(
-    A.flatMap(input.names, (name) =>
-      A.findLast(A.map(Str.split("\n")(input.text), Str.trim), Str.startsWith(`${name}=`)).pipe(
-        O.flatMap((line) => referenceOf(Str.slice(name.length + 1)(line))),
-        O.match({ onNone: () => [], onSome: (reference): Array<[string, string]> => [[name, reference]] })
-      )
+}): Record<string, string> => {
+  const lines = A.filterMap(Str.split("\n")(input.text), (line) => S.decodeResult(ReferenceLine)(line))
+  return R.getSomes(
+    R.fromEntries(
+      A.map(input.names, (name) => [
+        name,
+        A.findLast(lines, Str.startsWith(`${name}=`)).pipe(
+          O.flatMap((line) => referenceOf(Str.slice(name.length + 1)(line)))
+        )
+      ])
     )
   )
+}
 
 /**
  * The variables a stage's deploy reads as secrets: the model key where the plan names one, and the previews'

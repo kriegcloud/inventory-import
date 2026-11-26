@@ -1,6 +1,7 @@
 // The one service the stacks ask: it hands over the plan of the stage being deployed, and stops a deploy whose
 // stage is none of this app's before any resource is looked at. Also that both stacks load from the repository alone.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import * as Alchemy from "alchemy"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
@@ -17,19 +18,18 @@ import { UnknownStage } from "../src/StagePlan.rules.ts"
 const built = (stage: string) =>
   InfraStage.layer.pipe(Layer.provide(Layer.succeed(Alchemy.Stage, stage)), Layer.build, Effect.exit)
 
-const stoppedBy = <A, E>(exit: Exit.Exit<A, E>): unknown =>
-  Exit.isFailure(exit) ? Cause.squash(exit.cause) : "not stopped"
+const stoppedBy = <A, E>(exit: Exit.Exit<A, E>): unknown => {
+  assertTrue(Exit.isFailure(exit), "Expected exit to be a failure")
+  return Cause.squash(exit.cause)
+}
 
 describe("InfraStage", () => {
   it.effect("gives a stack the plan of the stage being deployed", () =>
     Effect.gen(function* () {
       const exit = yield* built("pr-42")
-      const plan = Exit.isSuccess(exit) ? Context.get(exit.value, InfraStage) : undefined
-      expect([plan?.kind, plan?.address.at, plan?.seeds]).toEqual([
-        "preview",
-        "workersDev",
-        ["organizations", "accounts"]
-      ])
+      assertTrue(Exit.isSuccess(exit), "Expected exit to be a success")
+      const plan = Context.get(exit.value, InfraStage)
+      expect([plan.kind, plan.address.at, plan.seeds]).toEqual(["preview", "workersDev", ["organizations", "accounts"]])
     })
   )
 
@@ -37,8 +37,8 @@ describe("InfraStage", () => {
     Effect.gen(function* () {
       const exit = yield* built("live_ben")
       const stopped = stoppedBy(exit)
-      expect(S.is(UnknownStage)(stopped)).toBe(true)
-      expect(S.is(UnknownStage)(stopped) ? stopped.message : "").toContain("Name one with --stage")
+      assertTrue(S.is(UnknownStage)(stopped))
+      expect(stopped.message).toContain("Name one with --stage")
     })
   )
 

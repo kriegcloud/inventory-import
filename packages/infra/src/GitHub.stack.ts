@@ -39,7 +39,8 @@ import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
-import * as Str from "effect/String"
+import * as S from "effect/Schema"
+import { NonBlankSecret } from "./internal/Secret.ts"
 import { InfraStage } from "./InfraStage.context.ts"
 import { secretNamesOf } from "./OpReferences.rules.ts"
 import { opEnvReferences } from "./OpReferences.secrets.ts"
@@ -125,7 +126,7 @@ export default Alchemy.Stack(
     // reach that account; without the token it stops, as no preview could deploy.
     const givenPreviewTokenValue = yield* Config.Redacted(previewTokenVariable).pipe(
       Config.option,
-      Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
     )
     const previewToken = yield* Result.match(givenPreviewToken(givenPreviewTokenValue), {
       onFailure: Effect.die,
@@ -138,7 +139,7 @@ export default Alchemy.Stack(
     const prod = yield* Result.match(planFor("prod"), { onFailure: Effect.die, onSuccess: Effect.succeed })
     const given = yield* Config.Redacted("OPENROUTER_API_KEY").pipe(
       Config.option,
-      Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
     )
     const onPurpose = yield* Config.String(withoutModelKeyFlag).pipe(Config.withDefault(""))
     const withoutOnPurpose = onPurpose === "true"
@@ -151,7 +152,7 @@ export default Alchemy.Stack(
     // preview could be signed in to, so this stack stops as a preview's own deploy would.
     const givenPreviewPassword = yield* Config.Redacted(previewPasswordVariable).pipe(
       Config.option,
-      Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
     )
     const previewPassword = yield* Result.match(
       givenTestPassword({ stage: "pr-<number>", given: givenPreviewPassword }),

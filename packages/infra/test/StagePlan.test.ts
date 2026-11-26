@@ -1,6 +1,7 @@
 // What each stage gets, held to Benjamin's decisions: production alone has the real address and a model key and is
 // never seeded; a name that is no stage of this app is refused, so a deploy without --stage stops.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
@@ -16,7 +17,11 @@ import {
   testPasswordOf
 } from "@beep/infra/StagePlan"
 
-const plan = (stage: string) => Result.getOrThrow(planFor(stage))
+const plan = (stage: string) => {
+  const result = planFor(stage)
+  assertTrue(Result.isSuccess(result), "Expected result to be a success")
+  return result.success
+}
 
 describe("the plan of a stage", () => {
   it("production answers at the real address, holds no seed, and reads its model key and sign-up list at deploy", () => {
@@ -93,7 +98,8 @@ describe("the plan of a stage", () => {
       expect([name, Result.isFailure(refused)]).toEqual([name, true])
     }
     const refused = kindOf("live_ben")
-    expect(Result.isFailure(refused) ? refused.failure.message : "").toBe(
+    assertTrue(Result.isFailure(refused), "Expected refused to be a failure")
+    expect(refused.failure.message).toBe(
       '"live_ben" is not a stage of this app. Name one with --stage: prod, staging, pr-<number>, test_<user> or dev_<user>.'
     )
   })
@@ -134,17 +140,17 @@ describe("the plan of a stage", () => {
 
     it("staging with none stops too, and says it is the staging environment", () => {
       const stopped = givenTestPassword({ stage: "staging", given: O.none<string>() })
-      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toContain(
+      assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
+      expect(stopped.failure.message).toContain(
         "so nobody could sign in to this stage. Write the reference PREVIEW_TEST_ACCOUNT_PASSWORD="
       )
-      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toContain(
-        "to the staging environment as a secret."
-      )
+      expect(stopped.failure.message).toContain("to the staging environment as a secret.")
     })
 
     it("a preview with none stops, with a sentence naming the reference", () => {
       const stopped = givenTestPassword({ stage: "pr-42", given: O.none<string>() })
-      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
+      assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
+      expect(stopped.failure.message).toBe(
         'Stage "pr-42" has no password for its test accounts: PREVIEW_TEST_ACCOUNT_PASSWORD is not set, so nobody ' +
           "could sign in to this preview. Write the reference " +
           "PREVIEW_TEST_ACCOUNT_PASSWORD=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the " +
@@ -157,7 +163,8 @@ describe("the plan of a stage", () => {
     it("is the one the owner gave; with none the repository's stack stops and says where the references go", () => {
       expect(givenPreviewToken(O.some("his own token"))).toEqual(Result.succeed("his own token"))
       const stopped = givenPreviewToken(O.none<string>())
-      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
+      assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
+      expect(stopped.failure.message).toBe(
         "The repository's stack has no Cloudflare token for previews and staging: PREVIEW_CLOUDFLARE_API_TOKEN is " +
           "not set, so no pull request could get a preview and main could not reach staging. Write the references " +
           'PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>" and ' +
@@ -176,8 +183,8 @@ describe("the plan of a stage", () => {
 
     it("stops a production deploy that has none, with a sentence naming the reference and the flag", () => {
       const stopped = keyFor("prod", O.none(), false)
-      expect(Result.isFailure(stopped)).toBe(true)
-      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
+      assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
+      expect(stopped.failure.message).toBe(
         'Stage "prod" has no model key: OPENROUTER_API_KEY is not set, so every model feature would be answered by ' +
           "rules. Write the reference OPENROUTER_API_KEY=op://<vault>/<item>/<field> in packages/infra/env/op.env " +
           "and deploy the repository's stack, which asks 1Password for it and gives the key to the production environment. To " +

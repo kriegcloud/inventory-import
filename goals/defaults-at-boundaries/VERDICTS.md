@@ -739,3 +739,75 @@ full-check attempt refused non-readonly comparator parameter properties; correct
 No baseline or Verify-lock diff. Not seen on screen; no browser, commit, push or deployment.
 
 Needs the person: nothing.
+
+## Foundation modeling second lane, row 8, 2026-11-26
+
+Scope: CSV facade/options, XLSX facade/address/workbook and the oracle/hand-built fixture support; 32 counted
+sites before edits (9 fallback, 10 absence, 13 normalise). Internal reader/writer files remain untouched.
+
+| Owner / field | Verdict | Boundary and reason |
+| --- | --- | --- |
+| CSV records codec options | Required argument | Callers explicitly select the existing options schema default. The text-codec callback's optional argument belongs to its external helper contract. |
+| XLSX address/range regex groups | Option at regex boundary | An unmatched expression means no parsed value. Required capture groups do not invent empty text; optional second corner uses the parsed first corner. CSV separator handling remains unchanged for the ledger reason below. |
+| CSV UTF-8 trailing bytes | Required within bounded iteration | The loop reads actual bytes; no zero byte is fabricated beyond the input. |
+| CSV header rows | Existing compatibility fallback | Missing keys encode as empty strings, empty records as one empty cell. Keep these until the real header-row representation can express absence without changing bytes. |
+| XLSX workbook sheets | Nonempty invariant | Opening a workbook guarantees a first sheet; absence dies as an invariant failure, not a substitute sheet. |
+| XLSX layout lists and counts | Option layout; required counts | Fold lists to empty arrays; counts remain the same zero compatibility fallback until a coherent missing-layout boundary is modeled. |
+| XLSX address text | Reviewed reference parser | Existing case conversion remains parser behavior, not normalization of a person's inventory cell. |
+| XLSX fixture recipe | Required starting arguments; Option optional own keys at entry | A named recipe start supplies namespace, workbook properties, ordering and extra parts explicitly at callers. Optional strings, styles and sheet state decode once to Option before XML construction. |
+| XLSX fixture sheet wrapper | Required fields | Callers spread the named sheet start before overrides. Preserve exact XML and archive part ordering. |
+| SheetJS oracle workbook metadata | Guaranteed in generated workbook | Assert metadata, sheet list and Hidden values with test narrowing helpers before comparing. No zero/empty fallback weakens the oracle. |
+
+No baseline, exemptions, Verify lock or PLAN change. Remaining counts and validation are appended after implementation.
+
+### Second-lane residual inventory and byte proof
+
+Scoped defaults after edits: **17 counted sites** (3 fallback, 1 absence, 0 unwrap, 13 normalise), down from 32.
+The fixture support, oracle, and the two forced fixture callers hold zero counted sites. These retained sites are
+not approved exemptions; row 8 is still incomplete. Paths below are relative to `packages/foundation/modeling/`.
+
+| File | Kind | Count | Lines | Example | Reason retained |
+| --- | --- | --- | --- | --- | --- |
+| `csv/src/Csv.codec.ts` | fallback | 2 | 82, 661 | `match[1] ?? ","`, `row[name] ?? ""` | The separator capture is guaranteed by its regex, but removing the fallback and cast forces a change to the exact assertion-count ledger outside this lane. The header adapter still represents missing own fields as empty CSV cells; it needs a coherent header-row boundary rather than a fallback-only schema. |
+| `csv/src/Csv.codec.ts` | normalise | 1 | 107 | `options.trim` | A property read carrying the chosen parser mode, not a trim call. The syntax law counts it; this lane does not change the reader configuration. |
+| `csv/src/CsvOptions.schema.ts` | normalise | 2 | 264, 265 | `Str.trim(cell)` | Chosen CSV trim behavior lives beside the mode's schema; moving it into a decode would alter when reviewed cell text changes. No new exemption is granted. |
+| `xlsx/src/Xlsx.codec.ts` | fallback | 1 | 314 | `Effect.runSync` in `parseResult` | Existing synchronous facade API. Replacing it with an Effect changes the public return contract; introducing another runner or throwing decoder would disguise the same issue. |
+| `xlsx/src/Xlsx.codec.ts` | absence | 1 | 213 | `header === undefined` | The records adapter accepts an empty worksheet and returns no records; it still needs a coherent empty/nonempty worksheet case. |
+| `xlsx/src/Xlsx.codec.ts` | normalise | 6 | 130, 131, 364, 364, 393, 393 | `Str.toLowerCase(sheet.name)` | Case-insensitive sheet lookup compares names while preserving their exact written spelling. A schema that normalizes the stored name would change output bytes. |
+| `xlsx/src/XlsxAddress.schema.ts` | normalise | 1 | 103 | `Str.toUpperCase(letters)` | Reference parsing accepts lowercase column letters. Kept in the existing parser; no new exemption. |
+| `xlsx/src/XlsxWorkbook.schema.ts` | normalise | 3 | 322, 393, 393 | `Str.toLowerCase(sheet.info.name)` | Schema uniqueness guard and lookup compare sheet names without changing the names written back. |
+
+Three further **uncounted compatibility defaults** remain in `Xlsx.outline`: missing `SheetLayout` gives `rows`,
+`rowsWithValues` and `cellsWithValues` the value 0. No constructor defaults were added to the required count fields.
+The facade's whole list folds use `A.empty`; no fallback-only schema, hidden literal thunk, throwing decoder or new
+runtime runner was introduced. The optional callback of `makeTextDecodeTo` still belongs to that existing helper's
+contract; it selects a complete records codec with the existing options-schema default.
+
+Fixture builders now require their starting arguments explicitly (`recipeStart`, `sheetStart`); their own optional
+XML parts and state decode once with `OptionFromOptionalKey`. `partsOf` now returns an Effect and the two direct
+callers yield it. The recipe schema has an arbitrary-valid property. Optional XML is emitted through complete tag
+or relationships cases, and absent archive parts remain actual empty part lists.
+
+A temporary comparison against the committed fixture support checked **48 combinations**: visible/hidden/veryHidden,
+shared text present/absent, styles present/absent, strings before/after sheets, and transitional/strict namespaces.
+Every combination had identical XML strings, archive part order and complete ZIP bytes. Reproducer and output:
+`/tmp/defaults-modeling-byte-proof/compare.ts`, `before.ts`, `result.log` in that directory. This bounded proof does
+not claim every possible workbook. Existing two-way SheetJS oracle properties and reader/writer properties cover
+generated workbook values. A direct single-cell range check returned `Some("B2:B2")` for `B2`.
+
+No new undecided fallback moved onto a schema, so SPEC's defaults table is unchanged. The existing CSV compatibility
+fallback and three missing-layout count defaults remain above for a future boundary/API lane. No stored or reviewed
+cell data changed. Not seen on screen; no browser, commit, push or deployment in this lane.
+
+Final validation: `bun run check --env-mode=loose` passed **105/105 tasks**, none cached, in **2m48.671s**;
+log `/tmp/defaults-modeling-second-final-check.log`. The final run used `BUN_TMPDIR`, `BUN_INSTALL_CACHE_DIR`,
+`XDG_CACHE_HOME` and `XDG_CONFIG_HOME` directed into `/tmp` so Bun and Wrangler could write their temporary/cache
+state inside this session's allowed roots. It includes CSV 31 tests, XLSX 93 tests (including the new recipe property),
+Verify five proofs, catalog model 274 tests and catalog web 401 tests with no retry. Both package type checks also
+passed separately. The scoped defaults law, docs check and `git diff --check` pass. The requested formatter was run
+on every changed source/test file; Markdown is excluded by the formatter and was validated by docs:check.
+Baseline, Verify lock, PLAN, exemptions, vendored code and internal reader/writer files have no diff. The sample's
+155-item Confirm path was not exercised in a browser in this lane; the previous packet's acceptance is not new
+end-to-end proof for these edits. No `UPDATE_VERIFY_LOCK` was used.
+
+Needs the person: nothing.

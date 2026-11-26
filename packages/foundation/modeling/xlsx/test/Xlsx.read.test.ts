@@ -3,6 +3,7 @@
 // each one through `make`.
 import { describe, expect, it } from "@effect/vitest"
 import { assertDefined } from "@effect/vitest/utils"
+import * as Arbitrary from "effect/Arbitrary"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -16,13 +17,16 @@ import { XlsxWorkbook } from "@beep/xlsx/XlsxWorkbook"
 import {
   archive,
   partsOf,
+  recipeStart,
+  sheetStart,
   sheet,
   sheetWith,
   strict,
   strings,
   styles,
   workbook,
-  type Recipe
+  Recipe,
+  type RecipeInput
 } from "./support/workbooks.ts"
 
 const read = (bytes: Uint8Array, options: XlsxReadOptions) =>
@@ -31,7 +35,7 @@ const read = (bytes: Uint8Array, options: XlsxReadOptions) =>
   )
 
 /** A hand-built workbook, built and read. */
-const readOf = (recipe: Recipe, options: XlsxReadOptions) =>
+const readOf = (recipe: RecipeInput, options: XlsxReadOptions) =>
   Effect.flatMap(workbook(recipe), (bytes) => read(bytes, options))
 
 type Sheet = XlsxRead["workbook"]["sheets"][number]
@@ -66,6 +70,7 @@ describe("cells", () => {
   it.effect("reads shared, inline and formula text, joins formatted runs and leaves phonetic ones out", () =>
     Effect.gen(function* () {
       const bytes = yield* workbook({
+        ...recipeStart,
         sheets: [
           {
             name: "Items",
@@ -104,7 +109,11 @@ describe("cells", () => {
         '<row r="1"><c r="A1"><v>12.5</v></c><c r="B1" t="n"><v>-3e2</v></c><c r="C1" t="b"><v>1</v></c>' +
         '<c r="D1" t="e"><v>#N/A</v></c><c r="E1" s="1"><v>46085</v></c><c r="F1" s="2"><v>0.75</v></c>' +
         '<c r="G1" s="1"><v>-1</v></c></row>'
-      const recipe = { sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["yyyy-mm-dd", "h:mm"]) }
+      const recipe = {
+        ...recipeStart,
+        sheets: [{ name: "S", xml: sheet(rows) }],
+        styles: styles(["yyyy-mm-dd", "h:mm"])
+      }
       const found = yield* readOf(recipe, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [1, "0:12.5", "1:-300", "2:true", "3:#N/A", "4:date 46085", "5:date 0.75", "6:-1"]
@@ -136,7 +145,7 @@ describe("cells", () => {
       const rows =
         '<row r="1"><c r="A1" s="1"><v>59</v></c><c r="B1" s="1"><v>60</v></c><c r="C1" s="1"><v>61</v></c></row>'
       const found = yield* readOf(
-        { sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["yyyy-mm-dd"]) },
+        { ...recipeStart, sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["yyyy-mm-dd"]) },
         XlsxReadOptions.default
       )
       const row = first(found).rows[0]
@@ -155,7 +164,10 @@ describe("cells", () => {
         '<row r="2"><c r="C2"><f t="shared" ref="C2:C4" si="0">A2*$B$1+B2</f><v>1</v></c></row>' +
         '<row r="3"><c r="C3"><f t="shared" si="0"/><v>2</v></c></row>' +
         '<row r="4"><c r="C4"><f t="shared" si="0"/><v>3</v></c><c r="D4"><f t="shared" si="0"/><v>4</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] }, XlsxReadOptions.default)
+      const found = yield* readOf(
+        { ...recipeStart, sheets: [{ name: "S", xml: sheet(rows) }] },
+        XlsxReadOptions.default
+      )
       expect(grid(first(found))).toEqual([
         [2, "2:1 =A2*$B$1+B2"],
         [3, "2:2 =A3*$B$1+B3"],
@@ -168,6 +180,7 @@ describe("cells", () => {
     Effect.gen(function* () {
       const found = yield* readOf(
         {
+          ...recipeStart,
           sheets: [{ name: "S", xml: sheet('<row r="1"><c r="A1"><f>NOW()</f></c><c r="B1" s="0"/></row>') }]
         },
         XlsxReadOptions.default
@@ -183,7 +196,7 @@ describe("cells", () => {
         '<row r="1"><c r="A1" t="s"><v>7</v></c><c r="B1"><v>twelve</v></c><c r="C1" t="b"><v>maybe</v></c>' +
         '<c r="D1" t="e"><v>#OOPS</v></c><c r="E1" t="d"><v>not a date</v></c><c r="F1" s="9"><v>1</v></c><c r="G1"><v>2</v></c></row>'
       const found = yield* readOf(
-        { sheets: [{ name: "S", xml: sheet(rows) }], sharedStrings: strings(["<t>a</t>"]) },
+        { ...recipeStart, sheets: [{ name: "S", xml: sheet(rows) }], sharedStrings: strings(["<t>a</t>"]) },
         XlsxReadOptions.default
       )
       expect(grid(first(found))).toEqual([
@@ -214,7 +227,7 @@ describe("cells", () => {
       const rows =
         '<row r="1"><c r="A1" s="1"><v>0.5</v></c><c r="B1" s="1"><v>0.25</v></c><c r="C1" s="2"><v>1.5</v></c><c r="D1" s="1" t="inlineStr"><is><t>x</t></is></c></row>'
       const found = yield* readOf(
-        { sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["# ?/?", "[h]:mm:ss"]) },
+        { ...recipeStart, sheets: [{ name: "S", xml: sheet(rows) }], styles: styles(["# ?/?", "[h]:mm:ss"]) },
         XlsxReadOptions.default
       )
       expect(A.map(found.warnings, (warning) => warning.finding)).toMatchObject([
@@ -230,7 +243,10 @@ describe("layout", () => {
     Effect.gen(function* () {
       const rows =
         '<row><c><v>1</v></c><c><v>2</v></c></row><row r="5"><c r="C5"><v>3</v></c><c><v>4</v></c></row><row><c><v>5</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] }, XlsxReadOptions.default)
+      const found = yield* readOf(
+        { ...recipeStart, sheets: [{ name: "S", xml: sheet(rows) }] },
+        XlsxReadOptions.default
+      )
       expect(grid(first(found))).toEqual([
         [1, "0:1", "1:2"],
         [5, "2:3", "3:4"],
@@ -243,7 +259,10 @@ describe("layout", () => {
     Effect.gen(function* () {
       const rows =
         '<row r="3"><c r="B3"><v>2</v></c><c r="A3"><v>1</v></c></row><row r="1"><c r="A1"><v>0</v></c></row><row r="3"><c r="A3"><v>9</v></c></row>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml: sheet(rows) }] }, XlsxReadOptions.default)
+      const found = yield* readOf(
+        { ...recipeStart, sheets: [{ name: "S", xml: sheet(rows) }] },
+        XlsxReadOptions.default
+      )
       expect(grid(first(found))).toEqual([
         [1, "0:0"],
         [3, "0:1", "1:2"]
@@ -255,11 +274,12 @@ describe("layout", () => {
   it.effect("reads merged ranges, hidden rows and columns, and the extent a sheet declares", () =>
     Effect.gen(function* () {
       const xml = sheetWith({
+        ...sheetStart,
         rows: '<row r="1" hidden="1"><c r="A1"><v>1</v></c></row><row r="2"><c r="D2"><v>2</v></c></row>',
         before: '<dimension ref="A1:D2"/><cols><col min="2" max="3" hidden="1"/><col min="5" max="5"/></cols>',
         after: '<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>'
       })
-      const bytes = yield* workbook({ sheets: [{ name: "S", xml }] })
+      const bytes = yield* workbook({ ...recipeStart, sheets: [{ name: "S", xml }] })
       const whole = yield* read(bytes, XlsxReadOptions.default)
       const found = first(whole)
       expect(A.map(found.rows, (row) => row.hidden)).toEqual([true, false])
@@ -279,10 +299,11 @@ describe("layout", () => {
   it.effect("does not trust a declared extent, and says when it misses the cells", () =>
     Effect.gen(function* () {
       const xml = sheetWith({
+        ...sheetStart,
         rows: '<row r="1"><c r="A1"><v>1</v></c></row><row r="40"><c r="H40"><v>2</v></c></row>',
         before: '<dimension ref="A1:B2"/>'
       })
-      const found = yield* readOf({ sheets: [{ name: "S", xml }] }, XlsxReadOptions.default)
+      const found = yield* readOf({ ...recipeStart, sheets: [{ name: "S", xml }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([
         [1, "0:1"],
         [40, "7:2"]
@@ -298,6 +319,7 @@ describe("the file's own form", () => {
   it.effect("reads the same whether the shared text comes before the sheets or after them", () =>
     Effect.gen(function* () {
       const recipe = {
+        ...recipeStart,
         sheets: [
           { name: "S", xml: sheet('<row r="1"><c r="A1" t="s"><v>1</v></c><c r="B1" t="s"><v>0</v></c></row>') }
         ],
@@ -315,7 +337,7 @@ describe("the file's own form", () => {
       const xml =
         '<?xml version="1.0"?><x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
         '<x:sheetData><x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>prefixed</x:t></x:is></x:c><x:c r="B1"><x:v>2</x:v></x:c></x:row></x:sheetData></x:worksheet>'
-      const found = yield* readOf({ sheets: [{ name: "S", xml }] }, XlsxReadOptions.default)
+      const found = yield* readOf({ ...recipeStart, sheets: [{ name: "S", xml }] }, XlsxReadOptions.default)
       expect(grid(first(found))).toEqual([[1, '0:"prefixed"', "1:2"]])
     })
   )
@@ -326,8 +348,9 @@ describe("the file's own form", () => {
         '<row r="1"><c r="A1" t="d" s="1"><v>2026-03-04</v></c><c r="B1" t="d"><v>2026-03-04T14:30:00Z</v></c></row>'
       const found = yield* readOf(
         {
+          ...recipeStart,
           namespace: strict,
-          sheets: [{ name: "S", xml: sheetWith({ rows, ns: strict }) }],
+          sheets: [{ name: "S", xml: sheetWith({ ...sheetStart, rows, ns: strict }) }],
           styles: styles(["yyyy-mm-dd"])
         },
         XlsxReadOptions.default
@@ -349,6 +372,7 @@ describe("the file's own form", () => {
     Effect.gen(function* () {
       const cell = (n: number) => sheet(`<row r="1"><c r="A1"><v>${n}</v></c></row>`)
       const bytes = yield* workbook({
+        ...recipeStart,
         sheets: [
           { name: "One", xml: cell(1) },
           { name: "Two", xml: cell(2), state: "hidden" },
@@ -388,6 +412,7 @@ describe("one sheet at a time", () => {
     ""
   )
   const recipe = {
+    ...recipeStart,
     sheets: [
       { name: "Empty", xml: sheet("") },
       { name: "Data", xml: sheet(`${rows}<row r="400"/>`) }
@@ -456,16 +481,17 @@ describe("what a file is", () => {
     Effect.gen(function* () {
       const kindOf = (bytes: Uint8Array) =>
         Effect.map(Effect.flip(Xlsx.parse(bytes, XlsxReadOptions.default)), (error) => error.fatal.finding)
-      const builtKindOf = (recipe: Recipe) => Effect.flatMap(workbook(recipe), kindOf)
+      const builtKindOf = (recipe: RecipeInput) => Effect.flatMap(workbook(recipe), kindOf)
       const old = yield* kindOf(bytesOf(ole, "Workbook", true))
       expect(old).toMatchObject({ kind: "NotAWorkbook", container: "legacyXls" })
-      const empty = yield* builtKindOf({ sheets: [] })
+      const empty = yield* builtKindOf({ ...recipeStart, sheets: [] })
       expect(empty).toMatchObject({ kind: "NoSheets" })
-      const parts = partsOf({ sheets: [{ name: "S", xml: sheet("") }] })
+      const parts = yield* partsOf({ ...recipeStart, sheets: [{ name: "S", xml: sheet("") }] })
       const without = yield* archive(A.filter(parts, ([path]) => path !== "xl/worksheets/sheet1.xml"))
       const missing = yield* kindOf(without)
       expect(missing).toMatchObject({ kind: "MissingPart", path: "xl/worksheets/sheet1.xml" })
       const twice = yield* builtKindOf({
+        ...recipeStart,
         sheets: [
           { name: "S", xml: sheet("") },
           { name: "s", xml: sheet("") }
@@ -474,4 +500,9 @@ describe("what a file is", () => {
       expect(twice).toMatchObject({ kind: "DamagedXml", path: "xl/workbook.xml" })
     })
   )
+})
+
+// The fixture boundary has the same arbitrary contract as the workbook models it feeds.
+it.prop("Recipe generates only valid values", [Arbitrary.schema(Recipe)], ([value]) => {
+  expect(S.is(Recipe)(value)).toBe(true)
 })

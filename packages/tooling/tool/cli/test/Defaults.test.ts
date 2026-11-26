@@ -8,7 +8,8 @@ import {
   baselineFile,
   defaults,
   type DefaultsExemption,
-  defaultsSentence
+  defaultsSentence,
+  exemptions
 } from "../src/commands/Laws/Defaults.rules.ts"
 import { readDefaults, whatIsCounted } from "../src/commands/Laws/internal/defaultsCode.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -160,14 +161,83 @@ const p = { onNone: async () => 0 }
 const q = { onNone: () => [compute()] }
 const r = { onNone: () => ({ value: compute() }) }
 const s = { onNone: (value) => 0 }
-const t = { onNone: () => [1] }`
+const t = { onNone: () => [1] }
+const u = { onNone: () => "the file" }
+const v = { onNone: () => +2 }
+const w = { onNone: () => 1.5 }
+const x = { onNone: () => 1n }
+const y = { onNone: () => \`\` }
+const z = { onNone: () => ({ value: 1 }) }`
     for (const layer of ["contract", "model", "host"])
-      strictEqual(places(source, `packages/a/${layer}/src/a.ts`).length, 9)
+      deepStrictEqual(places(source, `packages/a/${layer}/src/a.ts`), [
+        "1 fallback onNone: () => 0",
+        '2 fallback onNone: () => ""',
+        '3 fallback "onNone": () => []',
+        "4 fallback onNone: () => ({})",
+        "7 fallback onNone: () => null",
+        "8 fallback onNone: () => undefined",
+        "9 fallback onNone: () => -1",
+        "22 fallback onNone: () => +2",
+        "23 fallback onNone: () => 1.5"
+      ])
     for (const file of [
       "packages/a/web/src/a.ts",
       "packages/a/src/model/a.ts",
       "apps/a/model/a.ts",
       "packages/a/modelish/src/a.ts"
+    ])
+      deepStrictEqual(places(source, file), [])
+  })
+
+  it("counts exact Result.getOrThrow and Effect.runSync member calls only in src outside tests", () => {
+    const source = `const a = Result.getOrThrow(result)
+const b = Effect.runSync(effect)
+const c = result.pipe(Result.getOrThrow)
+const d = effect.pipe(Effect.runSync)
+const e = pipe(result, Result.getOrThrow)
+const f = pipe(effect, Effect.runSync)
+const g = Result.getOrThrow
+const h = Effect.runSync
+Other.getOrThrow(result)
+Other.runSync(effect)
+R.getOrThrow(result)
+E.runSync(effect)
+Result["getOrThrow"](result)
+Effect["runSync"](effect)
+getOrThrow(result)
+runSync(effect)
+// Result.getOrThrow(result), Effect.runSync(effect)
+const text = "Result.getOrThrow(result), Effect.runSync(effect)"
+const i = O.getOrThrow(option)
+const j = option.pipe(O.getOrThrow)`
+    const counted = [
+      "1 fallback Result.getOrThrow(result)",
+      "2 fallback Effect.runSync(effect)",
+      "3 fallback Result.getOrThrow",
+      "4 fallback Effect.runSync",
+      "5 fallback Result.getOrThrow",
+      "6 fallback Effect.runSync",
+      "19 fallback O.getOrThrow(option)",
+      "20 fallback O.getOrThrow"
+    ]
+    for (const file of [
+      "src/a.ts",
+      "apps/a/src/a.tsx",
+      "packages/a/src/a.ts",
+      "packages/a/web/src/a.tsx",
+      "packages/a/contract/src/a.ts",
+      "packages/a/model/src/a.ts",
+      "packages/a/host/src/a.ts"
+    ])
+      deepStrictEqual(places(source, file), counted)
+    for (const file of [
+      "a.ts",
+      "packages/a/test/a.ts",
+      "packages/a/tests/a.ts",
+      "packages/a/src/a.test.ts",
+      "packages/a/src/a.spec.tsx",
+      "packages/a/src/test/helper.ts",
+      "packages/a/src/tests/helper.ts"
     ])
       deepStrictEqual(places(source, file), [])
   })
@@ -336,10 +406,12 @@ describe("new places still only fall", () => {
       const optional = "packages/a/contract/src/Optional.ts"
       const fallback = "packages/a/model/src/Fallback.ts"
       const guard = "packages/a/host/test/Guard.test.ts"
+      const calls = "packages/a/src/Calls.ts"
       const sources = {
         [optional]: "const a = S.optionalKey(S.String)\n",
         [fallback]: "const a = { onNone: () => 0 }\n",
-        [guard]: "if (Exit.isFailure(x)) expect(x).toBe(1)\n"
+        [guard]: "if (Exit.isFailure(x)) expect(x).toBe(1)\n",
+        [calls]: "const a = [Result.getOrThrow(result), effect.pipe(Effect.runSync)]\n"
       }
       const said = yield* inTree(
         { ...sources, [baselineFile]: baseline({}, ["??"]) },
@@ -368,10 +440,10 @@ describe("new places still only fall", () => {
         })
       )
       deepStrictEqual(printed(render(defaultsSentence)(said.wrote)), [
-        "out: defaults:check OK  defaults-baseline.json lowered: it names 3 files"
+        "out: defaults:check OK  defaults-baseline.json lowered: it names 4 files"
       ])
       deepStrictEqual(printed(render(defaultsSentence)(said.initial)), [
-        "out: defaults:check OK  3 files hold to the baseline (still held: 1 fallback, 2 absence, 0 unwrap, 0 normalise)"
+        "out: defaults:check OK  4 files hold to the baseline (still held: 3 fallback, 2 absence, 0 unwrap, 0 normalise)"
       ])
       for (const refused of said.grew)
         strictEqual(
@@ -382,13 +454,52 @@ describe("new places still only fall", () => {
         "out: defaults:check OK  defaults-baseline.json lowered: it names 0 files"
       ])
       deepStrictEqual(printed(render(defaultsSentence)(said.final)), [
-        "out: defaults:check OK  3 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"
+        "out: defaults:check OK  4 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"
       ])
     })
   )
 })
 
 describe("the exemptions", () => {
+  it.effect("exempts only Spreadsheet absence, keeping its other kinds and other files counted", () =>
+    Effect.gen(function* () {
+      const spreadsheet = "packages/catalog/model/src/Reading/Spreadsheet.rules.ts"
+      const sibling = "packages/catalog/model/src/Reading/Other.rules.ts"
+      const absence = `export const Cell = S.Struct({ shown: S.optionalKey(S.String), formula: S.optionalKey(S.String) })\n`
+      const exempt = A.filter(exemptions, (one) => one.file === spreadsheet)
+      strictEqual(exempt.length, 1)
+      deepStrictEqual(
+        A.flatMap(exempt, (one) => one.kinds),
+        ["absence"]
+      )
+      const clean = yield* inTree({ [spreadsheet]: absence, [baselineFile]: baseline({}) }, run(false, [], {}, exempt))
+      deepStrictEqual(clean, [
+        "out: defaults:check OK  1 files hold to the baseline (still held: 0 fallback, 0 absence, 0 unwrap, 0 normalise)"
+      ])
+      const said = yield* inTree(
+        { [spreadsheet]: absence, [baselineFile]: baseline({}) },
+        run(
+          false,
+          [],
+          {
+            [spreadsheet]: absence + `export const read = (x) => [x ?? "", O.getOrNull(x), x.trim()]\n`,
+            [sibling]: absence
+          },
+          exempt
+        )
+      )
+      for (const kind of ["fallback", "unwrap", "normalise"])
+        strictEqual(
+          A.some(said, (line) => Str.startsWith(`err: ${spreadsheet}  holds 1 ${kind}, and may hold 0`)(line)),
+          true
+        )
+      strictEqual(
+        A.some(said, (line) => Str.startsWith(`err: ${sibling}  holds 2 absence, and may hold 0`)(line)),
+        true
+      )
+    })
+  )
+
   const reader = "packages/a/src/CellReading.rules.ts"
   const tree = {
     [reader]: `export const read = (cell: string) => cell.trim() ?? ""\n`,

@@ -5,7 +5,9 @@
  *
  * What is counted, each by how it is written and by nothing else (`internal/defaultsCode.ts`): a fallback (`??`, `??=`,
  * `||` and `||=` before a value written out, `getOrElse`, and outside a `.tsx` file a default given to a parameter or
- * a destructured name, and a literal `onNone` arrow in contract/model/host), a comparison with `null` or `undefined`,
+ * a destructured name, an `onNone` arrow returning a number, empty string/array/object, null or undefined in
+ * contract/model/host, and direct or piped `Result.getOrThrow`/`Effect.runSync` calls in src outside tests), a comparison
+ * with `null` or `undefined`,
  * a test if/ternary guarded by Option/Result/Exit, an unwrapped `S.optionalKey` in contract/model/host, an Option turned
  * back into a missing value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not
  * `SchemaGetter`'s or `SchemaTransformation`'s. The law does not judge whether a place is "really" a default: a law
@@ -76,6 +78,11 @@ export interface DefaultsExemption {
  * lives in a file named here, and nowhere else.
  */
 export const exemptions: ReadonlyArray<DefaultsExemption> = [
+  {
+    file: "packages/catalog/model/src/Reading/Spreadsheet.rules.ts",
+    kinds: ["absence"],
+    why: "Cell.shown and Cell.formula stay keys left out because the table crosses the worker by postMessage, where an Option loses its prototype; shownOf and formulaOf read them as Options (Benjamin, 2026-11-25)"
+  },
   {
     file: "packages/catalog/model/src/Review/CellReading.rules.ts",
     kinds: ["normalise"],
@@ -234,7 +241,7 @@ export type DefaultsFinding = typeof DefaultsFinding.Type
 /** What to write instead, for each kind: the line an agent reads the moment it wrote the place. */
 const remedy: Readonly<Record<DefaultsKind, string>> = {
   fallback:
-    "a `??`, a `||` before a value, a getOrElse, a literal onNone arrow in contract/model/host, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
+    "a `??`, a `||` before a value, a getOrElse, a zero-argument synchronous onNone expression arrow returning a number, empty string/array/object, null or undefined in contract/model/host, a Result.getOrThrow or Effect.runSync call in src outside tests, or a default on a parameter or a destructured name supplies a value the type should already hold. Put the starting value on the schema (S.withConstructorDefault, S.withDecodingDefaultTypeKey), or decode the absence to an Option where the value enters and O.match it where it is drawn, both cases said (SF-5)",
   absence:
     "a comparison with null or undefined, or an unwrapped S.optionalKey in contract/model/host. Give the optional key an OptionFrom*, a decoding default, absentAsNone or emptyWhenLeftOut wrapper. Decode the value where it enters (S.OptionFromOptionalKey, S.OptionFromNullOr, S.OptionFromNullishOr), then O.match, O.map or O.isSome; if it tells two cases apart, the type is a tagged union (SF-4, SF-6)",
   unwrap:

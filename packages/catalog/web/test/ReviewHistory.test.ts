@@ -127,7 +127,7 @@ const visit = (id: ImportId, options: typeof visitStart) => {
         rows: A.map(["row-2", "row-3"], (rowId, index) => ReviewRow.make({ id: rowId, line: index + 2, cells: {} })),
         state: registry.get(reviewState(id)),
         action,
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       }).state

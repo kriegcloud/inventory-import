@@ -5,9 +5,10 @@
  * Each shape is an Effect Schema and its type is read from it. They come in two forms, and the difference is the one
  * thing not to break here:
  *
- * - What a caller hands in or is handed back once (a column, a row, a problem, a fix, the words, the import's result,
+ * - What a caller hands in or is handed back once (column metadata, a row, a problem, a fix, the words, the import's result,
  *   a draft) is a branded class, built with its own `make` (`ReviewRow.make({...})`; the parts inside may be plain
  *   objects). `make` checks the value and returns a copy.
+ *   A column adds its required drawing function beside its schema-backed metadata; functions stay outside the schema.
  * - What the rules work out again on every press (a row's view, its marks, the groups, the table's lines, the counts,
  *   the decisions and their history) is a plain struct schema, written as an object. It must stay one: `make` copies
  *   what it is given, so a view built with it would hold a copy of its row, and the grid, which redraws a row only
@@ -24,10 +25,10 @@
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { ColumnKey, ReviewDecision, RowKey } from "@inventory/review/ReviewDecision"
-import * as P from "effect/Predicate"
+import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as Tuple from "effect/Tuple"
-import type * as O from "effect/Option"
+import * as O from "effect/Option"
 import type * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
 import { $ReviewId } from "./internal/identity.ts"
@@ -57,20 +58,22 @@ export class ProblemKind extends S.Opaque<ProblemKind, { readonly brand: unique 
     label: S.String.pipe(S.annotateKey({ description: "The tag in the Problem column: three words or fewer" })),
     tone: ProblemTone.pipe(S.annotateKey({ description: "A decision (amber) or a blocker (red)" })),
     help: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           'One line under the kind\'s heading: what these rows need ("Each needs a cost before it can be imported.").'
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     fixable: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "`false` when nothing on this screen can settle a row of this kind (the item it names is not in the system " +
           "yet): such rows are counted apart from Needs you, under their own tab, with their reason and no answer to " +
           "press, and they never hold the import back. Left out, a kind can be settled here."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(true)),
+      S.withConstructorDefault(Effect.succeed(true))
     )
   }).pipe($I.annoteSchema("ProblemKind", { description: "One reason a row can need the person" }))
 ) {}
@@ -138,147 +141,168 @@ export const ColumnSize = LiteralKit(["fit", "fill"]).pipe(
 /** The decoded value of `ColumnSize`. */
 export type ColumnSize = typeof ColumnSize.Type
 
-/** How a column shows a value: the file's text in, the text to draw out. */
-const DisplayValue = S.declare<(value: string) => string>((u): u is (value: string) => string => P.isFunction(u), {
-  expected: "a function from the file's text to the text shown"
-})
-
 /** One column of the review: what it is called, how it is sized and drawn, and how it was found in the file. */
-export class ReviewColumn extends S.Opaque<ReviewColumn, { readonly brand: unique symbol }>()(
+class ColumnData extends S.Opaque<ColumnData, { readonly brand: unique symbol }>()(
   S.Struct({
     id: ColumnKey.pipe(S.annotateKey({ description: "The column's id: the key of its cell in every row" })),
     label: S.String.pipe(S.annotateKey({ description: "One or two words." })),
     width: S.Finite.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "The least width in pixels: a `fill` column never shrinks below it (160 when not given); a `fit` column is " +
           "at least this wide even when its values are shorter. The first column stays in view when the table " +
           "scrolls sideways."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     size: ColumnSize.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "`fit` (the default) or `fill`: see `ColumnSize`." })
+      S.annotateKey({ description: "`fit` (the default) or `fill`: see `ColumnSize`." }),
+      S.withDecodingDefaultTypeKey(Effect.succeed<ColumnSize>("fit")),
+      S.withConstructorDefault(Effect.succeed<ColumnSize>("fit"))
     ),
     priority: S.Finite.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "Which `fit` column gives way first when the room cannot hold them all: the lowest priority moves into the " +
           "row's detail (and, with `under`, under the record's name) before any value is cut. Higher stays longer; " +
           "ties go from the right. `core` counts as 1, anything else as 0, unless a number is given."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     unit: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description: 'A second, quieter header line under the label: the unit the values are in ("USD", "kg", "days").'
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     unitFrom: ColumnKey.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           'The column that holds each row\'s unit, for a quantity whose unit is the row\'s own ("120 EA", "4 KG"): ' +
           "the value is shown with it. Only what is drawn changes."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     byDefault: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           'What an empty cell of this column becomes when the row is imported ("0" for a quantity, "true" for ' +
           "Active): an empty cell shows it, quieter, marked as the default, so nobody reads an empty cell as a " +
           "missing value."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     align: S.Literal("right").pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "`right` for numbers; left out, the column is set left." })
+      S.annotateKey({ description: "`right` for numbers; left out, the column is set left." }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     core: S.Boolean.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "Kept in the table on a tablet. The first column always is." })
+      S.annotateKey({ description: "Kept in the table on a tablet. The first column always is." }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     hidden: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "Not shown until the person turns it on in the column menu. Its problems still show in the Status column."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     facet: S.Boolean.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "Offered as a filter by its values (a category, a supplier)." })
+      S.annotateKey({ description: "Offered as a filter by its values (a category, a supplier)." }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     search: S.Boolean.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "Searched along with the name (a SKU, a code)." })
+      S.annotateKey({ description: "Searched along with the name (a SKU, a code)." }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     context: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description: 'Part of the one line of context on a phone card ("SKU HB-M6-16 · On hand 100").'
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     under: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description: "On a tablet this column's value sits under the name instead of in its own column (a code, a SKU)."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     code: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "An identifier a person compares character by character: a SKU, a part number, a barcode, a lot or " +
           "serial, a document number. Set in the monospace face wherever it shows. Never for names, quantities or " +
           "money."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     match: ColumnMatch.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "How the column was found in the file, when the caller says" })
-    ),
-    display: DisplayValue.pipe(
-      S.optionalKey,
-      S.annotateKey({
-        description:
-          'How a value is shown, when it is not shown as the file has it: money as the rest of the app shows it ("1.2" ' +
-          'as "$1.20"). Only what is drawn changes; the value the person edits, the checks and the result keep the ' +
-          "file's text. Return the text unchanged when it cannot be read."
-      })
+      S.annotateKey({ description: "How the column was found in the file, when the caller says" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     )
   }).pipe($I.annoteSchema("ReviewColumn", { description: "One column of the review" }))
 ) {}
+
+/** A column's schema-backed metadata and its required drawing capability. */
+export type ReviewColumn = ColumnData & { readonly display: (value: string) => string }
+
+/** Builds column metadata once; functions are capabilities, outside the data schema. */
+export const ReviewColumn = {
+  make: (
+    input: Parameters<typeof ColumnData.make>[0] & { readonly display: (value: string) => string }
+  ): ReviewColumn => {
+    const { display, ...data } = input
+    return { ...ColumnData.make(data), display }
+  }
+}
 
 /** Shown when the person asks "Why?". `basis` names the rule or the model; 25 words at most with `detail`. */
 export class Why extends S.Opaque<Why, { readonly brand: unique symbol }>()(
   S.Struct({
     basis: S.String.pipe(S.annotateKey({ description: "The rule or the model behind the fix" })),
-    detail: S.String.pipe(S.optionalKey, S.annotateKey({ description: "A few more words, when the basis needs them" })),
+    detail: S.String.pipe(
+      S.annotateKey({ description: "A few more words, when the basis needs them" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    ),
     alternatives: S.Array(S.String).pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "The other values the person may pick instead of the fix's `to`" })
+      S.annotateKey({ description: "The other values the person may pick instead of the fix's `to`" }),
+      S.withDecodingDefaultTypeKey(Effect.succeed([])),
+      S.withConstructorDefault(Effect.succeed([]))
     ),
     labels: S.Array(S.String).pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "Words for the fix's `to` and then each of `alternatives`, in that order, when the values do not speak " +
           'for themselves ("2024-04-06 (month first)"): what the buttons that take them say.'
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed([])),
+      S.withConstructorDefault(Effect.succeed([]))
     ),
     targets: S.Array(ColumnKey).pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "The column each pick writes, for the fix's `to` and then each of `alternatives`, in that order, when a " +
           'pick is a value of another column ("No discontinued date" on a question asked on Active). Left out when ' +
           "every pick is a value of the fix's own column. A pick written to another column is a typed value: one " +
           "undo step, checked again by `recheck`."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed([])),
+      S.withConstructorDefault(Effect.succeed([]))
     )
   }).pipe(
     $I.annoteSchema("Why", {
@@ -320,12 +344,13 @@ export class Fix extends S.Opaque<Fix, { readonly brand: unique symbol }>()(
     column: ColumnKey.pipe(S.annotateKey({ description: "The column whose cell it changes" })),
     to: S.String.pipe(S.annotateKey({ description: "The value it would put there" })),
     by: FixSource.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           'Who prepared it, as the caller knows it. The screen says so ("Rule", a sparkle for a model); left out, it ' +
           "calls the change a suggestion and names nobody."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     confidence: S.Option(Confidence).pipe(
       S.annotateKey({
@@ -336,27 +361,30 @@ export class Fix extends S.Opaque<Fix, { readonly brand: unique symbol }>()(
     ),
     kind: S.String.pipe(S.annotateKey({ description: "The problem kind this change settles." })),
     group: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "Identical changes share a group, and one accept settles the whole group. Never mix reasons in a group."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     reason: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "What is wrong with the value this fix would change, in one sentence: the row's reason while the fix waits " +
           "for the person (a rule's lossless fix held back as a proposal has no `problem` of its own to carry one)."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     label: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "What a group's heading and button call the change when its rows end in different values: one reading of " +
           'a column ("a decimal point" for 1,5 → 1.5 and 2,25 → 2.25). Each row still shows its own old and new value.'
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     why: Why
   }).pipe(
@@ -373,16 +401,18 @@ export class Choice extends S.Opaque<Choice, { readonly brand: unique symbol }>(
     value: S.String.pipe(S.annotateKey({ description: "The value picking it writes" })),
     label: S.String.pipe(S.annotateKey({ description: 'The button\'s words ("40 L").' })),
     note: S.String.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: 'A few words after it ("as 6 of 7 lines say"): the reason for a suggestion.' })
+      S.annotateKey({ description: 'A few words after it ("as 6 of 7 lines say"): the reason for a suggestion.' }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     suggested: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           'The caller\'s suggestion, said in words on its button ("(suggested)"), with the reason in `note`. It is ' +
           "never picked for the person, and it looks like every other choice: no choice is the filled button."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     )
   }).pipe($I.annoteSchema("Choice", { description: "One value the person may pick on a row with no default" }))
 ) {}
@@ -392,52 +422,62 @@ export class Problem extends S.Opaque<Problem, { readonly brand: unique symbol }
   S.Struct({
     kind: S.String.pipe(S.annotateKey({ description: "The id of its problem kind" })),
     tone: ProblemTone.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "This problem's own tone, when it differs from its kind's: a `blocker` is a value that must be typed " +
           "before the row can be imported, so the row is counted under `words.cannot` and still offers its answers."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     reason: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           'The reason in one sentence, naming the column and the value ("Code is empty."): shown on the row whatever ' +
           "its kind, a fix or none, and in the file of rows not imported. Without it the kind's `help`, then its " +
           "label, stand in."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     column: ColumnKey.pipe(
-      S.optionalKey,
-      S.annotateKey({ description: "The cell the problem is in, when it is in one." })
+      S.annotateKey({ description: "The cell the problem is in, when it is in one." }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     ask: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description: 'What the edit button says when the only honest option is typing ("Type a cost").'
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
-    note: S.String.pipe(S.optionalKey, S.annotateKey({ description: 'A few words beside the value ("also row 31").' })),
-    fix: Fix.pipe(
-      S.optionalKey,
+    note: S.String.pipe(
+      S.annotateKey({ description: 'A few words beside the value ("also row 31").' }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    ),
+    fix: S.OptionFromOptionalKey(Fix).pipe(
+      S.withConstructorDefault(Effect.succeedNone),
       S.annotateKey({
         description: "What would settle it. Without one the person edits the value or leaves the row out."
       })
     ),
     rivals: S.Array(RowKey).pipe(
-      S.optionalKey,
       S.annotateKey({
         description: "Rows that cannot all be imported (copies). Keeping this row leaves those out."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     choices: S.Array(Choice).pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "A pick with no default: the values the person chooses between, as equal buttons, none proposed in the " +
           "cell. Picking one is the person's own value for `column`, so give a `column` and no `fix`."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     )
   }).pipe($I.annoteSchema("Problem", { description: "Why a row needs the person, and what would settle it" }))
 ) {}
@@ -454,44 +494,48 @@ export class ReviewRow extends S.Opaque<ReviewRow, { readonly brand: unique symb
       })
     ),
     label: S.String.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "How the region's sentences name this row when its line alone does not tell it from the others on that " +
           'line ("8 · Feb": "Leave row 8 · Feb out", "Keep row 8 · Feb"). Without it they say the line. The Row ' +
           "column keeps the line, so it still matches the file."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     cells: Cells.pipe(
       S.annotateKey({ description: "The file's text by column id, formatted the way it should read." })
     ),
     applied: S.Array(Fix).pipe(
-      S.optionalKey,
       S.annotateKey({
         description: "Lossless fixes the rules already made. Shown with a check; the person can undo a group of them."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed([])),
+      S.withConstructorDefault(Effect.succeed([]))
     ),
-    problem: Problem.pipe(
-      S.optionalKey,
+    problem: S.OptionFromOptionalKey(Problem).pipe(
+      S.withConstructorDefault(Effect.succeedNone),
       S.annotateKey({ description: "Why this row needs the person. A row without one is ready." })
     ),
     stored: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "The record is already in the system, so nothing is written for it and there is nothing to decide: it " +
           'shows under All with its tag (`words.stored`, "Already there"), counts apart from Needs you, Ready and ' +
           'Left out, and offers no answer, not even "Leave out". Give it no `problem`.'
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed(false)),
+      S.withConstructorDefault(Effect.succeed(false))
     ),
     blocked: S.Boolean.pipe(
-      S.optionalKey,
       S.annotateKey({
         description:
           "The caller's own word on where a row that needs the person is counted: `true` under `words.cannot` (it " +
           "cannot be imported as written, whatever its first problem), `false` under `words.needs`. Left out, the " +
           "problem's `tone` says."
-      })
+      }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     )
   }).pipe($I.annoteSchema("ReviewRow", { description: "One row of the file as the review shows it" }))
 ) {}
@@ -602,9 +646,8 @@ export const RowView = S.Struct({
   row: ReviewRow,
   status: RowStatus.pipe(S.annotateKey({ description: "Where the row stands now" })),
   cells: Cells.pipe(S.annotateKey({ description: "The values that would be imported, by column id" })),
-  problem: Problem.pipe(S.optionalKey, S.annotateKey({ description: "What is still open on the row" })),
+  problem: S.Option(Problem).pipe(S.annotateKey({ description: "What is still open on the row" })),
   blocked: S.Boolean.pipe(
-    S.optionalKey,
     S.annotateKey({
       description:
         "The row needs the person and cannot be imported as written: counted and listed under `words.cannot`, " +
@@ -614,8 +657,7 @@ export const RowView = S.Struct({
   marks: S.Record(ColumnKey, CellMark).pipe(
     S.annotateKey({ description: "How each changed cell differs from the file, by column id" })
   ),
-  decided: Decided.pipe(
-    S.optionalKey,
+  decided: S.Option(Decided).pipe(
     S.annotateKey({
       description: "Why a ready row is ready, when something happened to it: the rules fixed it, or the person decided."
     })
@@ -641,18 +683,17 @@ export const FixGroup = S.Struct({
   column: ColumnKey.pipe(S.annotateKey({ description: "The column its fixes change" })),
   to: S.String.pipe(S.annotateKey({ description: "The value its fixes put there" })),
   label: S.String.pipe(
-    S.optionalKey,
+    S.OptionFromOptionalKey,
     S.annotateKey({ description: "The fix's `label`, when its rows end in different values." })
   ),
   mixed: S.Boolean.pipe(
-    S.optionalKey,
     S.annotateKey({
       description:
         "The rows end in different values and the caller gave no `label` for the change: the heading and its " +
         'button then name no value at all ("Accept for the 2 ticked"), and each row shows its own old and new value.'
     })
   ),
-  by: MarkSource.pipe(S.annotateKey({ description: "Who prepared its fixes" })),
+  by: S.Option(FixSource).pipe(S.annotateKey({ description: "Who prepared its fixes" })),
   confidence: S.Option(Confidence).pipe(
     S.annotateKey({ description: "How sure the source is; none when it did not say" })
   ),
@@ -787,7 +828,11 @@ export class ActivityStep extends S.Opaque<ActivityStep, { readonly brand: uniqu
     id: S.String.pipe(S.annotateKey({ description: "The step's id" })),
     label: S.String.pipe(S.annotateKey({ description: "What was done, in the past tense" })),
     by: ActivitySource.pipe(S.annotateKey({ description: "Who did it" })),
-    detail: S.String.pipe(S.optionalKey, S.annotateKey({ description: "A line more, when there is one" }))
+    detail: S.String.pipe(
+      S.annotateKey({ description: "A line more, when there is one" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    )
   }).pipe($I.annoteSchema("ActivityStep", { description: "A step of the run, for the Activity drawer." }))
 ) {}
 
@@ -853,7 +898,11 @@ export class ImportChange extends S.Opaque<ImportChange, { readonly brand: uniqu
     ),
     decidedBy: ChangeDecider.pipe(S.annotateKey({ description: "Who put it in force" })),
     how: ChangeHow.pipe(S.annotateKey({ description: "How it came into force" })),
-    basis: S.String.pipe(S.optionalKey, S.annotateKey({ description: "The fix's `why.basis`" })),
+    basis: S.String.pipe(
+      S.annotateKey({ description: "The fix's `why.basis`" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    ),
     confidence: S.Option(Confidence).pipe(S.annotateKey({ description: "The fix's `confidence`" }))
   }).pipe(
     $I.annoteSchema("ImportChange", {
@@ -926,12 +975,12 @@ export type SavedDecisions = typeof SavedDecisions.Type
 export class DraftStep extends S.Opaque<DraftStep, { readonly brand: unique symbol }>()(
   S.Struct({
     label: S.String.pipe(S.annotateKey({ description: "What the step did, in the words its undo button says" })),
-    before: S.Array(S.Tuple([RowKey, S.NullOr(ReviewDecision)])).pipe(
+    before: S.Array(S.Tuple([RowKey, S.OptionFromNullOr(ReviewDecision)])).pipe(
       S.annotateKey({
         description: "The decisions these rows had before the step (for a redo step: before it was undone)."
       })
     ),
-    focus: S.NullOr(RowKey).pipe(
+    focus: S.OptionFromNullOr(RowKey).pipe(
       S.annotateKey({ description: "The row focus returns to when the step is undone or redone." })
     )
   }).pipe($I.annoteSchema("DraftStep", { description: "One step of the history as JSON-safe data" }))
@@ -943,10 +992,11 @@ export class ReviewDraft extends S.Opaque<ReviewDraft, { readonly brand: unique 
     decisions: SavedDecisions.pipe(S.annotateKey({ description: "Each row's decision, by row id" })),
     undo: S.Array(DraftStep).pipe(S.annotateKey({ description: "The steps an undo takes back, the latest last" })),
     redo: S.Array(DraftStep).pipe(
-      S.optionalKey,
       S.annotateKey({
         description: "Steps taken back and not yet redone. Absent in a draft from before redo existed."
-      })
+      }),
+      S.withDecodingDefaultTypeKey(Effect.succeed([])),
+      S.withConstructorDefault(Effect.succeed([]))
     )
   }).pipe(
     $I.annoteSchema("ReviewDraft", { description: "The decisions and the undo history behind them, as JSON-safe data" })
@@ -960,21 +1010,71 @@ export class ReviewDraft extends S.Opaque<ReviewDraft, { readonly brand: unique 
  */
 export class ReviewWords extends S.Opaque<ReviewWords, { readonly brand: unique symbol }>()(
   S.Struct({
-    needs: S.String.pipe(S.annotateKey({ description: "Rows that need the person" })),
-    cannot: S.String.pipe(S.annotateKey({ description: "Rows that cannot be imported as written" })),
-    ready: S.String.pipe(S.annotateKey({ description: "Rows that would be imported" })),
-    out: S.String.pipe(S.annotateKey({ description: "Rows the person left out" })),
-    all: S.String.pipe(S.annotateKey({ description: "Every row" })),
-    stored: S.String.pipe(S.annotateKey({ description: "Rows already in the system" })),
-    auto: S.String.pipe(S.annotateKey({ description: "A row the rules fixed" })),
-    accepted: S.String.pipe(S.annotateKey({ description: "A row whose proposal the person took" })),
-    kept: S.String.pipe(S.annotateKey({ description: "A row the person kept over its copies" })),
-    edited: S.String.pipe(S.annotateKey({ description: "A row whose value the person typed" })),
-    chosen: S.String.pipe(S.annotateKey({ description: "A row whose value the person picked" })),
-    nothingNew: S.String.pipe(
-      S.annotateKey({ description: "Ends a review whose every row is already there, in place of the import button" })
+    needs: S.String.pipe(
+      S.annotateKey({ description: "Rows that need the person" }),
+      S.withConstructorDefault(Effect.succeed("Needs a decision")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Needs a decision"))
     ),
-    nothingToImport: S.String.pipe(S.annotateKey({ description: "Ends a review in which nothing can be imported" }))
+    cannot: S.String.pipe(
+      S.annotateKey({ description: "Rows that cannot be imported as written" }),
+      S.withConstructorDefault(Effect.succeed("Cannot import")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Cannot import"))
+    ),
+    ready: S.String.pipe(
+      S.annotateKey({ description: "Rows that would be imported" }),
+      S.withConstructorDefault(Effect.succeed("Ready")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Ready"))
+    ),
+    out: S.String.pipe(
+      S.annotateKey({ description: "Rows the person left out" }),
+      S.withConstructorDefault(Effect.succeed("Left out")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Left out"))
+    ),
+    all: S.String.pipe(
+      S.annotateKey({ description: "Every row" }),
+      S.withConstructorDefault(Effect.succeed("All")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("All"))
+    ),
+    stored: S.String.pipe(
+      S.annotateKey({ description: "Rows already in the system" }),
+      S.withConstructorDefault(Effect.succeed("Already there")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Already there"))
+    ),
+    auto: S.String.pipe(
+      S.annotateKey({ description: "A row the rules fixed" }),
+      S.withConstructorDefault(Effect.succeed("Auto-fixed")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Auto-fixed"))
+    ),
+    accepted: S.String.pipe(
+      S.annotateKey({ description: "A row whose proposal the person took" }),
+      S.withConstructorDefault(Effect.succeed("Accepted")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Accepted"))
+    ),
+    kept: S.String.pipe(
+      S.annotateKey({ description: "A row the person kept over its copies" }),
+      S.withConstructorDefault(Effect.succeed("Kept")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Kept"))
+    ),
+    edited: S.String.pipe(
+      S.annotateKey({ description: "A row whose value the person typed" }),
+      S.withConstructorDefault(Effect.succeed("Edited")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Edited"))
+    ),
+    chosen: S.String.pipe(
+      S.annotateKey({ description: "A row whose value the person picked" }),
+      S.withConstructorDefault(Effect.succeed("Chosen")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Chosen"))
+    ),
+    nothingNew: S.String.pipe(
+      S.annotateKey({ description: "Ends a review whose every row is already there, in place of the import button" }),
+      S.withConstructorDefault(Effect.succeed("Nothing new: this file is already in")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Nothing new: this file is already in"))
+    ),
+    nothingToImport: S.String.pipe(
+      S.annotateKey({ description: "Ends a review in which nothing can be imported" }),
+      S.withConstructorDefault(Effect.succeed("Nothing here can be imported")),
+      S.withDecodingDefaultTypeKey(Effect.succeed("Nothing here can be imported"))
+    )
   }).pipe($I.annoteSchema("ReviewWords", { description: "Every status and tab word the region shows" }))
 ) {}
 
@@ -1012,7 +1112,7 @@ export type ReviewRegionProps = {
    */
   readonly recheck?: Atom.Atom<
     O.Option<
-      (input: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => Problem | undefined
+      (input: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => O.Option<Problem>
     >
   >
   readonly onImport: (result: ImportResult) => void
@@ -1083,7 +1183,7 @@ export type ReviewRegionProps = {
    * `undefined` for a row it does not fit. An atom (none while there is no such answer): the widths of the table's
    * answers are worked out from it.
    */
-  readonly rowAction?: Atom.Atom<O.Option<(row: ReviewRow) => RowAction | undefined>>
+  readonly rowAction?: Atom.Atom<O.Option<(row: ReviewRow) => O.Option<RowAction>>>
   /**
    * "Why flagged?": the caller's own account of the flagged rows on screen (what the view, the problem kind, the
    * search and the filters narrow it to), each row named with every reason it has. Shown in a side panel from the
@@ -1100,7 +1200,7 @@ export type ReviewRegionProps = {
     readonly row: ReviewRow
     readonly column: string
     readonly value: string
-  }) => CellEditor | undefined
+  }) => O.Option<CellEditor>
 }
 
 /** The caller's form for one cell (`cellEditor`): the button's words, the panel's title, and the form itself. */

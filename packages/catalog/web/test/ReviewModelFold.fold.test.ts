@@ -1,4 +1,5 @@
 import { identity } from "effect/Function"
+import { fixableBy } from "@inventory/review/ReviewDraft"
 // The review's model holds no "what a row's decision is now": a row's own instance holds only its own acts, and an act
 // on a group of rows is one instance of its own. What a row reads as is a fold, written here: the row's own decision,
 // then the patch of every group in force that names it and came after that decision, oldest first. A group's two
@@ -232,13 +233,13 @@ const patchesFor = (input: {
   }
   const accept = (view: RowView): void => {
     if (view.status !== "needs") return
-    O.map(O.fromUndefinedOr(view.problem?.fix), (fix) => {
-      const lift = A.some(
-        O.match(O.fromUndefinedOr(view.row.applied), { onNone: A.empty, onSome: identity }),
-        (applied) => applied.column === fix.column
-      )
-      set(view.row.id, Patch.cases.accept.make({ kind: "accept", column: fix.column, lift }))
-    })
+    O.map(
+      O.flatMap(view.problem, (problem) => problem.fix),
+      (fix) => {
+        const lift = A.some(view.row.applied, (applied) => applied.column === fix.column)
+        set(view.row.id, Patch.cases.accept.make({ kind: "accept", column: fix.column, lift }))
+      }
+    )
   }
   const each = (rows: ReadonlyArray<string>, f: (view: RowView) => void): void => {
     for (const row of rows) O.map(R.get(byId, row), f)
@@ -250,7 +251,7 @@ const patchesFor = (input: {
     accept: ({ rowIds }) => each(rowIds, accept),
     acceptGroup: ({ groupId, except }) =>
       O.map(
-        A.findFirst(waitingGroups({ views: input.views }), (group) => group.id === groupId),
+        A.findFirst(waitingGroups({ kind: O.none(), views: input.views }), (group) => group.id === groupId),
         (group) =>
           each(
             A.filter(group.rowIds, (row) => except?.includes(row) !== true),
@@ -259,30 +260,30 @@ const patchesFor = (input: {
       ),
     chooseGroup: ({ groupId, value, except }) =>
       O.map(
-        A.findFirst(waitingGroups({ views: input.views }), (group) => group.id === groupId),
+        A.findFirst(waitingGroups({ kind: O.none(), views: input.views }), (group) => group.id === groupId),
         (group) =>
           each(
             A.filter(group.rowIds, (row) => except?.includes(row) !== true),
             (view) => {
-              O.match(O.fromUndefinedOr(view.problem?.fix), {
-                onNone: () => set(view.row.id, Patch.cases.edit.make({ kind: "edit", column: group.column, value })),
-                onSome: (fix) => {
-                  if (value === fix.to) return accept(view)
-                  set(view.row.id, Patch.cases.edit.make({ kind: "edit", column: columnFor(fix, value), value }))
-                }
-              })
+              const fix = O.flatMap(view.problem, (problem) => problem.fix)
+              if (O.exists(fix, (fix) => value === fix.to)) return accept(view)
+              const column = O.match(fix, { onNone: () => group.column, onSome: (fix) => columnFor(fix, value) })
+              set(view.row.id, Patch.cases.edit.make({ kind: "edit", column, value }))
             }
           )
       ),
     keep: ({ rowId }) =>
       each([rowId], (view) => {
         if (view.status !== "needs") return
-        O.map(O.fromUndefinedOr(view.problem?.rivals), (rivals) => {
-          set(rowId, Patch.cases.keep.make({ kind: "keep" }))
-          for (const rival of rivals) {
-            if (R.has(byId, rival) && !decidedByPerson(decisionOf(rival))) set(rival, leaving)
+        O.map(
+          O.flatMap(view.problem, (problem) => problem.rivals),
+          (rivals) => {
+            set(rowId, Patch.cases.keep.make({ kind: "keep" }))
+            for (const rival of rivals) {
+              if (R.has(byId, rival) && !decidedByPerson(decisionOf(rival))) set(rival, leaving)
+            }
           }
-        })
+        )
       }),
     leaveOut: ({ rowIds }) =>
       each(rowIds, (view) => {
@@ -1162,7 +1163,7 @@ const liveReview = (input: {
   let presses = 0
   const expected: Array<O.Option<Readonly<Record<string, string>>>> = []
   const apart: Array<string> = []
-  const checking = O.fromUndefinedOr(input.recheck)
+  const checking = { recheck: input.recheck }
   const stateOf = (steps: Person["steps"]): ReviewState => ({ decisions, undo: steps.undo, redo: steps.redo })
   const personOf = (actor: Actor): Person => O.getOrElse(R.get(people, actor.memberId), () => nobody)
   const touchOf = (row: string): number => O.getOrElse(R.get(touch, row), () => 0)
@@ -1171,10 +1172,7 @@ const liveReview = (input: {
     const rows = input.rows(saved(stateOf(nobody.steps)))
     return {
       rows,
-      views: O.match(checking, {
-        onNone: () => viewRows({ rows, state: stateOf(nobody.steps) }),
-        onSome: (recheck) => viewRows({ rows, state: stateOf(nobody.steps), recheck })
-      })
+      views: viewRows({ fixable: fixableBy([]), rejects: false, rows, state: stateOf(nobody.steps), ...checking })
     }
   }
   /**
@@ -1265,9 +1263,13 @@ const liveReview = (input: {
     const step = `press-${presses}`
     presses += 1
     const actOn = (steps: Person["steps"], pressed: Action) =>
-      O.match(checking, {
-        onNone: () => act({ rows: shown.rows, state: stateOf(steps), action: pressed }),
-        onSome: (recheck) => act({ rows: shown.rows, state: stateOf(steps), action: pressed, recheck })
+      act({
+        fixable: fixableBy([]),
+        rejects: false,
+        rows: shown.rows,
+        state: stateOf(steps),
+        action: pressed,
+        ...checking
       })
     let pressed: Pressed = { kind: "new", sent: Sent.Nothing(), answer: true, undid: "taken", rows: [] }
     if (action.type === "undo") {
@@ -1455,13 +1457,8 @@ it("the fold: of two groups over a row the later is laid over the earlier, and i
 // saved decision names only fields, so made-up columns would be refused where the fold saves them.
 const [fieldProposed, fieldTyped, fieldApplied] = fields
 const why = Why.make({ basis: "the file's other rows" })
-const unitFix = (column: string, to: string, group: O.Option<string>) => {
-  const fields = { column, to, kind: "unit", confidence: O.none(), why }
-  return O.match(group, {
-    onNone: () => Fix.make(fields),
-    onSome: (group) => Fix.make({ ...fields, group })
-  })
-}
+const unitFix = (column: string, to: string, group?: string) =>
+  Fix.make({ column, to, kind: "unit", confidence: O.none(), group: O.fromNullishOr(group), why })
 const plainRow = (id: string, line: number) =>
   ReviewRow.make({ id, line, cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" } })
 const groupedRow = (id: string, line: number, to: string) =>
@@ -1469,7 +1466,9 @@ const groupedRow = (id: string, line: number, to: string) =>
     id,
     line,
     cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
-    problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, to, O.some("g")) })
+    problem: O.some(
+      Problem.make({ kind: "unit", column: O.some(fieldProposed), fix: O.some(unitFix(fieldProposed, to, "g")) })
+    )
   })
 
 it.effect("the fold equals `act` on a group only when the group's rows are split by exactly what each got", () =>
@@ -1477,9 +1476,15 @@ it.effect("the fold equals `act` on a group only when the group's rows are split
     // One press of "Set all to EA" over a group: row-1 proposed EA (accepted), row-2 proposed KG (EA typed instead).
     const rows = [groupedRow("row-1", 1, "EA"), groupedRow("row-2", 2, "KG")]
     const state: ReviewState = { decisions: HashMap.empty(), undo: [], redo: [] }
-    const action: Action = { type: "chooseGroup", groupId: "g", value: "EA" }
-    const unit = patchesFor({ views: viewRows({ rows, state }), decisions: state.decisions, action })
-    const acted = yield* regionTexts(saved(act({ rows, state, action }).state))
+    const action: Action = { type: "chooseGroup", groupId: "g", value: "EA", except: [] }
+    const unit = patchesFor({
+      views: viewRows({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state }),
+      decisions: state.decisions,
+      action
+    })
+    const acted = yield* regionTexts(
+      saved(act({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state, action }).state)
+    )
     const split = partsOf(unit)
     expect(split.length).toBe(2)
     const one: ReadonlyArray<Part> = A.map(A.take(split, 1), (part) => ({ ...part, rows: A.map(unit, (w) => w.row) }))
@@ -1502,13 +1507,17 @@ const messy = (table: StagedTable) => {
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
     if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
-    return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
+    return O.map(problem, toRegionProblem)
   }
   const rows = (decisions: Readonly<Record<string, ReviewDecision>>) => {
     const server = toServerDecisions(decisions)
     return toRegionRows(review({ ...input, decisions: server }), server)
   }
-  return { rows, recheck, first: firstDecisions({ table, choices: [], mode: ruleFixes, itemsOf: itemsOfRow }) }
+  return {
+    rows,
+    recheck: O.some(recheck),
+    first: firstDecisions({ table, choices: [], mode: ruleFixes, itemsOf: itemsOfRow })
+  }
 }
 
 /**
@@ -1521,26 +1530,33 @@ const BUSY_ROWS = 12
 const rowPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> =>
   A.flatMap(A.take(views, BUSY_ROWS), (view): ReadonlyArray<Action> => {
     const id = view.row.id
-    const column = view.problem?.column
+    const column = O.flatMap(view.problem, (problem) => problem.column)
     return [
       ...(view.status === "needs" || view.status === "ready" ? [{ type: "leaveOut" as const, rowIds: [id] }] : []),
       ...(view.status === "out" ? [{ type: "putBack" as const, rowId: id }] : []),
-      ...O.match(O.fromUndefinedOr(view.problem?.fix), {
-        onNone: A.empty,
-        onSome: () => (view.status === "needs" ? [{ type: "accept" as const, rowIds: [id] }] : [])
-      }),
-      ...O.match(O.fromUndefinedOr(view.problem?.rivals), {
-        onNone: A.empty,
-        onSome: () => [{ type: "keep" as const, rowId: id }]
-      }),
-      ...O.match(O.fromUndefinedOr(column), {
+      ...O.match(
+        O.flatMap(view.problem, (problem) => problem.fix),
+        {
+          onNone: A.empty,
+          onSome: () => (view.status === "needs" ? [{ type: "accept" as const, rowIds: [id] }] : [])
+        }
+      ),
+      ...O.match(
+        O.flatMap(view.problem, (problem) => problem.rivals),
+        { onNone: A.empty, onSome: () => [{ type: "keep" as const, rowId: id }] }
+      ),
+      ...O.match(column, {
         onNone: A.empty,
         onSome: (column) =>
           view.status === "needs"
             ? A.map(
                 A.append(
                   A.map(
-                    O.match(O.fromUndefinedOr(view.problem?.choices), { onNone: A.empty, onSome: identity }),
+                    view.problem.pipe(
+                      O.flatMap((problem) => problem.choices),
+                      O.toArray,
+                      A.flatten
+                    ),
                     (choice) => choice.value
                   ),
                   "ZZZ-9999"
@@ -1565,13 +1581,16 @@ const rowPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> =>
 const groupPresses = (views: ReadonlyArray<RowView>): ReadonlyArray<Action> => {
   const busy = A.take(views, BUSY_ROWS)
   const open = A.filter(busy, (view) => view.status === "needs" || view.status === "ready")
-  const fixable = A.filter(busy, (view) => view.status === "needs" && O.isSome(O.fromUndefinedOr(view.problem?.fix)))
+  const fixable = A.filter(
+    busy,
+    (view) => view.status === "needs" && O.isSome(O.flatMap(view.problem, (problem) => problem.fix))
+  )
   return [
     ...(open.length > 1 ? [{ type: "leaveOut" as const, rowIds: A.map(A.take(open, 3), (view) => view.row.id) }] : []),
     ...(fixable.length > 1
       ? [{ type: "accept" as const, rowIds: A.map(A.take(fixable, 3), (view) => view.row.id) }]
       : []),
-    ...A.flatMap(waitingGroups({ views }), (group): ReadonlyArray<Action> => [
+    ...A.flatMap(waitingGroups({ kind: O.none(), views }), (group): ReadonlyArray<Action> => [
       { type: "acceptGroup", groupId: group.id, except: [] },
       { type: "acceptGroup", groupId: group.id, except: A.take(group.rowIds, 1) },
       { type: "chooseGroup", groupId: group.id, value: group.to, except: [] },
@@ -2031,7 +2050,7 @@ const twoOn = Effect.fnUntraced(function* (
   touching: "named" | "changed"
 ) {
   const side = modelSide({ rows: rows.length, first: dana })
-  const live = liveReview({ side, rows: () => rows, recheck: undefined, touching })
+  const live = liveReview({ side, rows: () => rows, recheck: O.none(), touching })
   for (const [actor, action] of presses) yield* live.press(actor, action, how)
   const apart = yield* verdict(side, live.expected)
   // The instances read back from the model after the last press, once the story has run: not the test's own record.
@@ -2086,7 +2105,9 @@ it.effect(
           id: "row-14",
           line: 14,
           cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
-          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", O.some("g")) })
+          problem: O.some(
+            Problem.make({ kind: "unit", column: O.some(fieldProposed), fix: O.some(unitFix(fieldProposed, "X", "g")) })
+          )
         })
       ]
       const presses: ReadonlyArray<readonly [Actor, Action]> = [
@@ -2115,7 +2136,7 @@ it.effect("a row's undo from a screen that has not received an undo on the row i
   Effect.gen(function* () {
     const rows = [groupedRow("row-1", 1, "EA")]
     const side = modelSide({ rows: rows.length, first: dana })
-    const live = liveReview({ side, rows: () => rows, recheck: undefined, touching: walkStart.touching })
+    const live = liveReview({ side, rows: () => rows, recheck: O.none(), touching: walkStart.touching })
     yield* live.press(dana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "KG" }, right)
     yield* live.press(ana, { type: "edit", rowId: "row-1", column: fieldTyped, value: "LB" }, right)
     const anas = yield* live.press(ana, { type: "undo" }, right)
@@ -2141,7 +2162,7 @@ it.effect("a row's undo under a later group is refused naming the group, and tak
   Effect.gen(function* () {
     const rows = [groupedRow("row-1", 1, "EA"), groupedRow("row-2", 2, "EA")]
     const side = modelSide({ rows: rows.length, first: dana })
-    const live = liveReview({ side, rows: () => rows, recheck: undefined, touching: walkStart.touching })
+    const live = liveReview({ side, rows: () => rows, recheck: O.none(), touching: walkStart.touching })
     const changeOf = (sent: Sent): number =>
       Sent.$match(sent, { Nothing: () => 0, RowAct: ({ change }) => change, GroupAct: ({ change }) => change })
     // Dana types KG in row-1; Ana then sets the whole group to its proposal, row-1 included.
@@ -2186,13 +2207,15 @@ it.effect(
           id: "row-1",
           line: 1,
           cells: { [fieldProposed]: "x", [fieldTyped]: "x", [fieldApplied]: "x" },
-          applied: [unitFix(fieldApplied, "X", O.none())],
-          problem: Problem.make({ kind: "unit", column: fieldProposed, fix: unitFix(fieldProposed, "X", O.some("g")) })
+          applied: [unitFix(fieldApplied, "X")],
+          problem: O.some(
+            Problem.make({ kind: "unit", column: O.some(fieldProposed), fix: O.some(unitFix(fieldProposed, "X", "g")) })
+          )
         })
       ]
       const presses: ReadonlyArray<readonly [Actor, Action]> = [
         [dana, { type: "revert", rowId: "row-1", column: fieldApplied, how: "undo" }],
-        [ana, { type: "acceptGroup", groupId: "g" }],
+        [ana, { type: "acceptGroup", groupId: "g", except: [] }],
         // The applied field is undone already: the press leaves row-1 as it is.
         [dana, { type: "revert", rowId: "row-1", column: fieldApplied, how: "undo" }],
         // `act` puts back what Ana's step held: the applied field undone, nothing accepted.

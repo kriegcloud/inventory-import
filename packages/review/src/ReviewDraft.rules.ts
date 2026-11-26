@@ -43,11 +43,13 @@ import type {
   ReviewWords,
   RowView,
   SavedDecisions,
-  UndoStep
+  UndoStep,
+  Why,
+  Decided
 } from "@inventory/review/ReviewTypes"
 import * as A from "effect/Array"
 import * as S from "effect/Schema"
-import { defaultReviewWords } from "@inventory/review/ReviewWords"
+import * as R from "effect/Record"
 import { $ReviewId } from "./internal/identity.ts"
 
 const $I = $ReviewId.create("ReviewDraft")
@@ -63,7 +65,8 @@ const isColumnMatchUnmatched = ColumnMatch.guards.unmatched
  *
  * @example rowName({ id: "row-8.2", line: 8, label: "8 · Feb", cells: {} }) // "8 · Feb"
  */
-export const rowName = (row: Pick<ReviewRow, "line" | "label">): string => row.label ?? String(row.line)
+export const rowName = (row: Pick<ReviewRow, "line" | "label">): string =>
+  O.match(row.label, { onNone: () => String(row.line), onSome: (label) => label })
 
 /**
  * Two fixes that say the same thing. A rule's fix held back as a proposal is a checked copy of the row's own
@@ -97,7 +100,7 @@ export const emptyState: ReviewState = { decisions: HashMap.empty(), undo: [], r
 export function proposing(rows: ReadonlyArray<ReviewRow>): ReviewState {
   const decisions: Array<readonly [string, RowDecision]> = []
   for (const row of rows) {
-    if (row.applied !== undefined && row.applied.length > 0) {
+    if (row.applied.length > 0) {
       decisions.push([row.id, ReviewDecision.make({ reverted: row.applied.map((fix) => fix.column) })])
     }
   }
@@ -117,14 +120,14 @@ export const restored = (decisions: SavedDecisions): ReviewState => ({
 const toDraftStep = (step: UndoStep): DraftStep =>
   DraftStep.make({
     label: step.label,
-    before: [...step.before].map(([rowId, decision]) => [rowId, O.getOrNull(decision)] as const),
-    focus: O.getOrNull(step.focus)
+    before: [...step.before].map(([rowId, decision]) => [rowId, decision] as const),
+    focus: step.focus
   })
 
 const fromDraftStep = (step: DraftStep): UndoStep => ({
   label: step.label,
-  before: HashMap.fromIterable(step.before.map(([rowId, decision]) => [rowId, O.fromNullOr(decision)] as const)),
-  focus: O.fromNullOr(step.focus)
+  before: HashMap.fromIterable(step.before.map(([rowId, decision]) => [rowId, decision] as const)),
+  focus: step.focus
 })
 
 /**
@@ -145,10 +148,10 @@ export const toDraft = (state: ReviewState): ReviewDraft =>
 export const fromDraft = (draft: ReviewDraft): ReviewState => ({
   decisions: HashMap.fromIterable(Object.entries(draft.decisions)),
   undo: draft.undo.map(fromDraftStep),
-  redo: (draft.redo ?? []).map(fromDraftStep)
+  redo: draft.redo.map(fromDraftStep)
 })
 
-type Recheck = ((input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined) | undefined
+type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => O.Option<Problem>
 
 /** Whether a problem kind can be settled on this screen, from the caller's kinds (`ProblemKind.fixable`). */
 type Fixable = (kind: string) => boolean
@@ -156,8 +159,8 @@ type Fixable = (kind: string) => boolean
 const allFixable: Fixable = () => true
 
 /** The kinds nothing on this screen can settle, as a test on a kind's id. */
-export const fixableBy = (kinds: ReadonlyArray<ProblemKind> | undefined): Fixable => {
-  const not = (kinds ?? []).filter((kind) => kind.fixable === false).map((kind) => kind.id)
+export const fixableBy = (kinds: ReadonlyArray<ProblemKind>): Fixable => {
+  const not = kinds.filter((kind) => kind.fixable === false).map((kind) => kind.id)
   return not.length === 0 ? allFixable : (kind) => !not.includes(kind)
 }
 
@@ -171,18 +174,16 @@ const untouched = new WeakMap<ReviewRow, { fixable: Fixable; view: RowView }>()
 function viewUntouched(row: ReviewRow, fixable: Fixable): RowView {
   const known = untouched.get(row)
   if (known !== undefined && known.fixable === fixable) return known.view
-  const view = build(row, O.none(), () => false, undefined, fixable)
+  const view = build(row, O.none(), () => false, O.none(), fixable, false)
   untouched.set(row, { fixable, view })
   return view
 }
 
-const sourceOf = (fix: Fix): "rule" | "model" | "unknown" => fix.by ?? "unknown"
+const sourceOf = (fix: Fix): "rule" | "model" | "unknown" =>
+  O.match(fix.by, { onNone: () => "unknown", onSome: (by) => by })
 
 /** A problem with its proposal taken off: what is left once the person rejected it. */
-const withoutFix = (problem: Problem): Problem => {
-  const { fix: _fix, ...rest } = problem
-  return rest
-}
+const withoutFix = (problem: Problem): Problem => ({ ...problem, fix: O.none() })
 
 /** What a row with no decision has accepted, undone and typed: nothing, the same two objects for every such row. */
 const noColumns: ReadonlyArray<string> = []
@@ -191,33 +192,35 @@ const noEdits: Readonly<Record<string, string>> = {}
 function build(
   row: ReviewRow,
   decision: O.Option<RowDecision>,
-  settled: (rowId: string, column: string | undefined) => boolean,
-  recheck: Recheck,
+  settled: (rowId: string, column: O.Option<string>) => boolean,
+  recheck: O.Option<Recheck>,
   fixable: Fixable,
-  rejects = false
+  rejects: boolean
 ): RowView {
-  if (row.stored === true) return { row, status: "stored", cells: row.cells, marks: {} }
+  if (row.stored === true)
+    return { row, status: "stored", cells: row.cells, marks: {}, problem: O.none(), blocked: false, decided: O.none() }
   const cells: Record<string, string> = { ...row.cells }
   const marks: Record<string, CellMark> = {}
   const reverted = O.isSome(decision) ? decision.value.reverted : noColumns
   // Where a fix the person undid or rejected stays rejected (`rejects`), its problem is left without the proposal:
   // the file's value stands and the row waits for a typed value.
-  const gone = (fix: Fix | undefined): boolean => rejects && fix !== undefined && reverted.includes(fix.column)
-  const open: Array<Problem> =
-    row.problem === undefined ? [] : [gone(row.problem.fix) ? withoutFix(row.problem) : row.problem]
+  const gone = (fix: O.Option<Fix>): boolean => rejects && O.exists(fix, (fix) => reverted.includes(fix.column))
+  const open: Array<Problem> = A.map(O.toArray(row.problem), (problem) =>
+    gone(problem.fix) ? withoutFix(problem) : problem
+  )
   const accepted = O.isSome(decision) ? decision.value.accepted : noColumns
   const edits = O.isSome(decision) ? decision.value.edits : noEdits
   let auto = false
   let took = false
 
-  for (const fix of row.applied ?? []) {
+  for (const fix of row.applied) {
     if (reverted.includes(fix.column))
       open.push(
         Problem.make({
           kind: fix.kind,
-          column: fix.column,
-          ...(rejects ? {} : { fix }),
-          ...(fix.reason === undefined ? {} : { reason: fix.reason })
+          column: O.some(fix.column),
+          fix: rejects ? O.none() : O.some(fix),
+          reason: fix.reason
         })
       )
     else {
@@ -235,12 +238,12 @@ function build(
     }
   }
 
-  let problem: Problem | undefined
+  let problem: O.Option<Problem> = O.none()
   for (const candidate of open) {
     const column = candidate.column
-    if (column !== undefined && Object.hasOwn(edits, column)) continue
-    if (candidate.fix !== undefined && accepted.includes(candidate.fix.column)) {
-      const fix = candidate.fix
+    if (O.exists(column, (column) => Object.hasOwn(edits, column))) continue
+    if (O.isSome(candidate.fix) && accepted.includes(candidate.fix.value.column)) {
+      const fix = candidate.fix.value
       marks[fix.column] = {
         state: "applied" as const,
         from: row.cells[fix.column] ?? "",
@@ -253,16 +256,15 @@ function build(
       took = true
       continue
     }
-    if (candidate.rivals !== undefined) {
+    if (O.isSome(candidate.rivals)) {
       if (O.isSome(decision) && keptFlag(decision.value)) continue
-      if (candidate.rivals.every((rival) => settled(rival, column))) continue
+      if (candidate.rivals.value.every((rival) => settled(rival, column))) continue
     }
-    problem ??= candidate
+    if (O.isNone(problem)) problem = O.some(candidate)
   }
 
   let typed = false
-  for (const column of Object.keys(edits)) {
-    const value = edits[column] ?? ""
+  for (const [column, value] of R.toEntries(edits)) {
     marks[column] = {
       state: "applied" as const,
       from: row.cells[column] ?? "",
@@ -278,12 +280,13 @@ function build(
   // What the rules say then stands, a row they find nothing wrong with included: a pick written to another column
   // (an empty Discontinued on) settles a question asked on this one. Only a copy's problem is kept when they find
   // nothing, since whether it was kept is a decision they do not see.
-  if (typed && recheck !== undefined)
-    problem = recheck({ row, cells }) ?? (problem?.rivals === undefined ? undefined : problem)
-  if (problem !== undefined && gone(problem.fix)) problem = withoutFix(problem)
+  if (typed && O.isSome(recheck))
+    problem = O.orElse(recheck.value({ row, cells }), () => O.filter(problem, (problem) => O.isSome(problem.rivals)))
+  problem = O.map(problem, (problem) => (gone(problem.fix) ? withoutFix(problem) : problem))
 
-  if (problem?.fix !== undefined && !leftOutRow(decision)) {
-    const fix = problem.fix
+  const proposal = O.flatMap(problem, (problem) => problem.fix)
+  if (O.isSome(proposal) && !leftOutRow(decision)) {
+    const fix = proposal.value
     marks[fix.column] = {
       state: "proposed" as const,
       from: cells[fix.column] ?? "",
@@ -296,44 +299,50 @@ function build(
   // A problem nothing here can settle is counted apart from the ones the person can decide.
   const status = leftOutRow(decision)
     ? "out"
-    : problem === undefined
-      ? "ready"
-      : fixable(problem.kind)
-        ? "needs"
-        : "cannot"
-  if (problem !== undefined) {
-    // The caller's word first (it knows every problem of the row), else the tone of the one that shows.
-    const blocked = status === "needs" && (row.blocked ?? problem.tone === "blocker")
-    return blocked ? { row, status, cells, marks, problem, blocked } : { row, status, cells, marks, problem }
+    : O.match(problem, {
+        onNone: () => "ready" as const,
+        onSome: (problem) => (fixable(problem.kind) ? ("needs" as const) : ("cannot" as const))
+      })
+  if (O.isSome(problem)) {
+    const blocked =
+      status === "needs" &&
+      O.match(row.blocked, { onNone: () => O.contains(problem.value.tone, "blocker"), onSome: (blocked) => blocked })
+    return { row, status, cells, marks, problem, blocked, decided: O.none() }
   }
-  const decided = typed
-    ? "edited"
+  const decided: O.Option<Decided> = typed
+    ? O.some("edited")
     : O.isSome(decision) && keptFlag(decision.value)
-      ? "kept"
+      ? O.some("kept")
       : took
-        ? "accepted"
+        ? O.some("accepted")
         : auto
-          ? "auto"
-          : undefined
-  return decided === undefined || status !== "ready"
-    ? { row, status, cells, marks }
-    : { row, status, cells, marks, decided }
+          ? O.some("auto")
+          : O.none()
+  return {
+    row,
+    status,
+    cells,
+    marks,
+    problem: O.none(),
+    blocked: false,
+    decided: status === "ready" ? decided : O.none()
+  }
 }
 
 /** Every row as it stands now, in file order. Rows without a decision reuse one cached answer. */
 export function viewRows(input: {
   rows: ReadonlyArray<ReviewRow>
   state: ReviewState
-  recheck?: Recheck
+  recheck: O.Option<Recheck>
   /** The caller's kinds: a row whose problem is of a kind marked `fixable: false` is `cannot`, not `needs`. */
-  fixable?: Fixable
+  fixable: Fixable
   /**
    * A fix whose column is in `RowDecision.reverted` is rejected, not offered again: the file's value stands and the
    * row waits for the person. Without it (rule fixes held back as proposals) a reverted fix is a proposal to take.
    */
-  rejects?: boolean
+  rejects: boolean
 }): ReadonlyArray<RowView> {
-  const fixable = input.fixable ?? allFixable
+  const fixable = input.fixable
   const decisions = input.state.decisions
   const none = HashMap.isEmpty(decisions)
   // Read once into a record, then looked up per row: at 50,000 rows a HashMap lookup per row (twice per decision
@@ -346,15 +355,15 @@ export function viewRows(input: {
   const decisionOf = (rowId: string): O.Option<RowDecision> =>
     Object.hasOwn(byRow, rowId) ? byRow[rowId]! : noDecision
   // A copy is settled once it is left out, or once the person typed a new value into the cell they shared.
-  const settled = (rowId: string, column: string | undefined): boolean => {
+  const settled = (rowId: string, column: O.Option<string>): boolean => {
     const decision = decisionOf(rowId)
     if (O.isNone(decision)) return false
     if (isLeftOut(decision.value.place)) return true
-    return column !== undefined && Object.hasOwn(decision.value.edits, column)
+    return O.exists(column, (column) => Object.hasOwn(decision.value.edits, column))
   }
   return input.rows.map((row) => {
     const decision = none ? noDecision : decisionOf(row.id)
-    if (O.isNone(decision) && (row.problem?.rivals === undefined || none)) {
+    if (O.isNone(decision) && (!O.exists(row.problem, (problem) => O.isSome(problem.rivals)) || none)) {
       return viewUntouched(row, fixable)
     }
     return build(row, decision, settled, input.recheck, fixable, input.rejects === true)
@@ -385,10 +394,10 @@ export function count(views: ReadonlyArray<RowView>): Counts {
       blocked += 1
     } else {
       needs += 1
-      const kind = view.problem?.kind ?? ""
+      const kind = O.match(view.problem, { onNone: () => "", onSome: (problem) => problem.kind })
       MutableHashMap.set(kinds, kind, O.getOrElse(MutableHashMap.get(kinds, kind), () => 0) + 1)
     }
-    for (const fix of view.row.applied ?? []) {
+    for (const fix of view.row.applied) {
       const mark = view.marks[fix.column]
       if (mark !== undefined && isCellMarkApplied(mark) && mark.by !== "you" && !mark.accepted) applied += 1
     }
@@ -413,22 +422,24 @@ export const kindCount = (counts: Counts, kind: string): number => O.getOrElse(H
 export function visible(input: {
   views: ReadonlyArray<RowView>
   filter: FilterId
-  kind?: string | undefined
+  kind: O.Option<string>
 }): ReadonlyArray<RowView> {
   if (input.filter === "all") return input.views
-  if (input.filter === "auto") return input.views.filter((view) => view.decided === "auto")
+  if (input.filter === "auto") return input.views.filter((view) => O.contains(view.decided, "auto"))
   // A row that must have a value typed first is listed under "cannot", though it still takes answers.
   if (input.filter === "cannot") return input.views.filter((view) => view.status === "cannot" || view.blocked === true)
   return input.views.filter(
     (view) =>
       view.status === input.filter &&
       view.blocked !== true &&
-      (input.filter !== "needs" || input.kind === undefined || view.problem?.kind === input.kind)
+      (input.filter !== "needs" ||
+        O.isNone(input.kind) ||
+        O.exists(view.problem, (problem) => O.contains(input.kind, problem.kind)))
   )
 }
 
 /** A group being gathered: its fix, its rows and the file's spelling on each. */
-type Gathered = { fix: Fix; rowIds: Array<string>; froms: Array<string>; mixed?: boolean }
+type Gathered = { fix: Fix; rowIds: Array<string>; froms: Array<string>; mixed: boolean }
 
 /** Adds a row's fix to its group, noting when it ends in another value than the group's first. */
 const gather = (group: Gathered, rowId: string, from: string, fix: Fix): Gathered => {
@@ -439,8 +450,7 @@ const gather = (group: Gathered, rowId: string, from: string, fix: Fix): Gathere
 }
 
 /** One value named for rows that get different ones would be false: such a group says so, unless it has a label. */
-const mixedOf = (group: Gathered): { mixed?: boolean } =>
-  group.mixed === true && group.fix.label === undefined ? { mixed: true } : {}
+const mixedOf = (group: Gathered): { mixed: boolean } => ({ mixed: group.mixed && O.isNone(group.fix.label) })
 
 const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ from: string; count: number }> => {
   const tally = MutableHashMap.empty<string, number>()
@@ -454,20 +464,24 @@ const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ from: string;
  */
 export function waitingGroups(input: {
   views: ReadonlyArray<RowView>
-  kind?: string | undefined
+  kind: O.Option<string>
 }): ReadonlyArray<FixGroup> {
   const found = MutableHashMap.empty<string, Gathered>()
   for (const view of input.views) {
-    const fix = view.problem?.fix
+    const proposed = O.flatMap(view.problem, (problem) => problem.fix)
     // A row that cannot be imported as written is never part of a one-press group.
-    if (view.status !== "needs" || view.blocked === true || fix === undefined || fix.group === undefined) continue
-    if (input.kind !== undefined && view.problem?.kind !== input.kind) continue
-    const group = O.getOrElse(MutableHashMap.get(found, fix.group), (): Gathered => ({
+    if (view.status !== "needs" || view.blocked === true || O.isNone(proposed) || O.isNone(proposed.value.group))
+      continue
+    if (O.isSome(input.kind) && !O.exists(view.problem, (problem) => O.contains(input.kind, problem.kind))) continue
+    const fix = proposed.value
+    const groupId = proposed.value.group.value
+    const group = O.getOrElse(MutableHashMap.get(found, groupId), (): Gathered => ({
       fix,
       rowIds: [],
-      froms: []
+      froms: [],
+      mixed: false
     }))
-    MutableHashMap.set(found, fix.group, gather(group, view.row.id, view.row.cells[fix.column] ?? "", fix))
+    MutableHashMap.set(found, groupId, gather(group, view.row.id, view.row.cells[fix.column] ?? "", fix))
   }
   return [...found]
     .map(([id, group]) => ({
@@ -475,9 +489,9 @@ export function waitingGroups(input: {
       kind: group.fix.kind,
       column: group.fix.column,
       to: group.fix.to,
-      ...(group.fix.label === undefined ? {} : { label: group.fix.label }),
+      label: group.fix.label,
       ...mixedOf(group),
-      by: sourceOf(group.fix),
+      by: group.fix.by,
       confidence: group.fix.confidence,
       variants: variantsOf(group.froms),
       rowIds: group.rowIds,
@@ -490,11 +504,16 @@ export function waitingGroups(input: {
 export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixGroup> {
   const found = MutableHashMap.empty<string, Gathered>()
   for (const view of views) {
-    for (const fix of view.row.applied ?? []) {
+    for (const fix of view.row.applied) {
       const mark = view.marks[fix.column]
       if (mark === undefined || !isCellMarkApplied(mark) || mark.by === "you") continue
-      const id = fix.group ?? `${fix.column}:${fix.to}`
-      const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [] }))
+      const id = O.match(fix.group, { onNone: () => `${fix.column}:${fix.to}`, onSome: (group) => group })
+      const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({
+        fix,
+        rowIds: [],
+        froms: [],
+        mixed: false
+      }))
       MutableHashMap.set(found, id, gather(group, view.row.id, mark.from, fix))
     }
   }
@@ -503,9 +522,9 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
     kind: group.fix.kind,
     column: group.fix.column,
     to: group.fix.to,
-    ...(group.fix.label === undefined ? {} : { label: group.fix.label }),
+    label: group.fix.label,
     ...mixedOf(group),
-    by: sourceOf(group.fix),
+    by: group.fix.by,
     confidence: group.fix.confidence,
     variants: variantsOf(group.froms),
     rowIds: group.rowIds,
@@ -514,12 +533,9 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
 }
 
 /** "ea (6) · each (3)": the spellings in a group with their row counts. */
-export const variantsText = (group: FixGroup, display?: (value: string) => string): string =>
+export const variantsText = (group: FixGroup, display: (value: string) => string): string =>
   group.variants
-    .map(
-      (variant) =>
-        `${display === undefined || variant.from === "" ? spellingOf(variant.from) : display(variant.from)} (${variant.count})`
-    )
+    .map((variant) => `${variant.from === "" ? spellingOf(variant.from) : display(variant.from)} (${variant.count})`)
     .join(" · ")
 
 /**
@@ -558,7 +574,6 @@ export type ActionType = typeof ActionType.Type
 
 const rowIds = S.Array(S.String).pipe(S.annotateKey({ description: "The rows it is done to" }))
 const except = S.Array(S.String).pipe(
-  S.optionalKey,
   S.annotateKey({ description: "Rows of the group the person unticked: left as they are" })
 )
 
@@ -649,7 +664,7 @@ const decidedByPerson = (decision: O.Option<RowDecision>): boolean =>
 /** What one decision being taken has to hand: the rows as they stand, and the decisions it writes. */
 interface Deciding {
   readonly views: ReadonlyArray<RowView>
-  readonly viewOf: (rowId: string) => RowView | undefined
+  readonly viewOf: (rowId: string) => O.Option<RowView>
   readonly decisionOf: (rowId: string) => O.Option<RowDecision>
   readonly has: (rowId: string) => boolean
   readonly set: (rowId: string, decision: RowDecision) => void
@@ -662,9 +677,9 @@ type ActInput = {
   rows: ReadonlyArray<ReviewRow>
   state: ReviewState
   action: Action
-  recheck?: Recheck
-  fixable?: Fixable
-  rejects?: boolean
+  recheck: O.Option<Recheck>
+  fixable: Fixable
+  rejects: boolean
 }
 
 /**
@@ -677,8 +692,8 @@ const decide = (input: ActInput, focus: O.Option<string>, write: (deciding: Deci
     rows: input.rows,
     state,
     recheck: input.recheck,
-    ...(input.fixable === undefined ? {} : { fixable: input.fixable }),
-    ...(input.rejects === undefined ? {} : { rejects: input.rejects })
+    fixable: input.fixable,
+    rejects: input.rejects
   })
   const byId = MutableHashMap.fromIterable(views.map((view) => [view.row.id, view] as const))
   const decisionOf = (rowId: string): O.Option<RowDecision> => HashMap.get(state.decisions, rowId)
@@ -687,10 +702,11 @@ const decide = (input: ActInput, focus: O.Option<string>, write: (deciding: Deci
     MutableHashMap.set(next, rowId, decision)
   }
   const accept = (view: RowView): void => {
-    const fix = view.problem?.fix
-    if (view.status !== "needs" || fix === undefined) return
+    const proposed = O.flatMap(view.problem, (problem) => problem.fix)
+    if (view.status !== "needs" || O.isNone(proposed)) return
+    const fix = proposed.value
     const decision = O.getOrElse(decisionOf(view.row.id), () => undecided)
-    const wasApplied = (view.row.applied ?? []).some((applied) => applied.column === fix.column)
+    const wasApplied = view.row.applied.some((applied) => applied.column === fix.column)
     set(
       view.row.id,
       wasApplied
@@ -704,7 +720,7 @@ const decide = (input: ActInput, focus: O.Option<string>, write: (deciding: Deci
   }
   const label = write({
     views,
-    viewOf: (rowId) => O.getOrUndefined(MutableHashMap.get(byId, rowId)),
+    viewOf: (rowId) => MutableHashMap.get(byId, rowId),
     decisionOf,
     has: (rowId) => MutableHashMap.has(byId, rowId),
     set,
@@ -742,28 +758,33 @@ export function act(input: ActInput): Outcome {
     accept: ({ rowIds }) =>
       decide(input, O.none(), (d) => {
         for (const rowId of rowIds) {
-          const view = d.viewOf(rowId)
-          if (view !== undefined) d.accept(view)
+          O.map(d.viewOf(rowId), d.accept)
         }
         return `${plural(d.written(), "fix", "fixes")} accepted`
       }),
     acceptGroup: ({ groupId, except }) =>
       decide(input, O.none(), (d) => {
-        const group = waitingGroups({ views: d.views }).find((candidate) => candidate.id === groupId)
-        for (const rowId of group?.rowIds ?? []) {
-          if (except?.includes(rowId) === true) continue
-          const view = d.viewOf(rowId)
-          if (view !== undefined) d.accept(view)
+        const group = A.findFirst(
+          waitingGroups({ kind: O.none(), views: d.views }),
+          (candidate) => candidate.id === groupId
+        )
+        if (O.isNone(group)) return ""
+        for (const rowId of group.value.rowIds) {
+          if (except.includes(rowId)) continue
+          O.map(d.viewOf(rowId), d.accept)
         }
         return `${plural(d.written(), "fix", "fixes")} accepted`
       }),
     keep: ({ rowId }) =>
       decide(input, O.some(rowId), (d) => {
-        const view = d.viewOf(rowId)
-        if (view === undefined || view.status !== "needs" || view.problem?.rivals === undefined) return ""
+        const foundView = d.viewOf(rowId)
+        if (O.isNone(foundView) || foundView.value.status !== "needs") return ""
+        const view = foundView.value
+        const rivals = O.flatMap(view.problem, (problem) => problem.rivals)
+        if (O.isNone(rivals)) return ""
         d.set(rowId, ReviewDecision.make({ ...O.getOrElse(d.decisionOf(rowId), () => undecided), place: kept }))
         let left = 0
-        for (const rival of view.problem.rivals) {
+        for (const rival of rivals.value) {
           const decision = d.decisionOf(rival)
           if (!d.has(rival) || decidedByPerson(decision)) continue
           d.set(rival, leaveOut(decision))
@@ -773,17 +794,31 @@ export function act(input: ActInput): Outcome {
       }),
     chooseGroup: ({ groupId, value, except }) =>
       decide(input, O.none(), (d) => {
-        const group = waitingGroups({ views: d.views }).find((candidate) => candidate.id === groupId)
-        if (group === undefined) return ""
+        const foundGroup = A.findFirst(
+          waitingGroups({ kind: O.none(), views: d.views }),
+          (candidate) => candidate.id === groupId
+        )
+        if (O.isNone(foundGroup)) return ""
+        const group = foundGroup.value
         for (const rowId of group.rowIds) {
-          if (except?.includes(rowId) === true) continue
-          const view = d.viewOf(rowId)
-          if (view === undefined) continue
+          if (except.includes(rowId)) continue
+          const foundView = d.viewOf(rowId)
+          if (O.isNone(foundView)) continue
+          const view = foundView.value
           // Each row's own proposal: under a `label` the rows of one group end in different values.
-          if (value === view.problem?.fix?.to) d.accept(view)
+          if (
+            O.exists(
+              O.flatMap(view.problem, (problem) => problem.fix),
+              (fix) => value === fix.to
+            )
+          )
+            d.accept(view)
           else {
             const decision = O.getOrElse(d.decisionOf(rowId), () => undecided)
-            const column = view.problem?.fix === undefined ? group.column : columnFor(view.problem.fix, value)
+            const column = O.match(
+              O.flatMap(view.problem, (problem) => problem.fix),
+              { onNone: () => group.column, onSome: (fix) => columnFor(fix, value) }
+            )
             d.set(rowId, ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } }))
           }
         }
@@ -792,11 +827,12 @@ export function act(input: ActInput): Outcome {
     leaveOut: ({ rowIds }) =>
       decide(input, O.none(), (d) => {
         for (const rowId of rowIds) {
-          const view = d.viewOf(rowId)
+          const foundView = d.viewOf(rowId)
+          if (O.isNone(foundView)) continue
+          const view = foundView.value
           // A row already in the system, or one nothing here can fix, is not imported whatever the person does:
           // there is nothing to leave out.
-          if (view === undefined || view.status === "out" || view.status === "stored" || view.status === "cannot")
-            continue
+          if (view.status === "out" || view.status === "stored" || view.status === "cannot") continue
           d.set(rowId, leaveOut(d.decisionOf(rowId)))
         }
         return `${plural(d.written(), "row", "rows")} left out`
@@ -810,8 +846,8 @@ export function act(input: ActInput): Outcome {
       }),
     edit: ({ rowId, column, value }) =>
       decide(input, O.some(rowId), (d) => {
-        const view = d.viewOf(rowId)
-        if (view === undefined || view.status === "stored" || view.status === "cannot") return ""
+        const foundView = d.viewOf(rowId)
+        if (O.isNone(foundView) || foundView.value.status === "stored" || foundView.value.status === "cannot") return ""
         const decision = O.getOrElse(d.decisionOf(rowId), () => undecided)
         d.set(rowId, ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } }))
         return "Value changed"
@@ -819,9 +855,9 @@ export function act(input: ActInput): Outcome {
     revert: ({ rowId, column, how }) =>
       decide(input, O.some(rowId), (d) => {
         const view = d.viewOf(rowId)
-        const mark = view?.marks[column]
+        const mark = O.flatMap(view, (view) => R.get(view.marks, column))
         // Only a fix that is in force or waiting, and not a value the person typed themselves.
-        if (view === undefined || mark === undefined || mark.by === "you" || view.status === "stored") return ""
+        if (O.isNone(view) || O.isNone(mark) || mark.value.by === "you" || view.value.status === "stored") return ""
         d.set(
           rowId,
           reverting(
@@ -833,8 +869,9 @@ export function act(input: ActInput): Outcome {
       }),
     revertGroup: ({ groupId }) =>
       decide(input, O.none(), (d) => {
-        const group = appliedGroups(d.views).find((candidate) => candidate.id === groupId)
-        if (group === undefined) return ""
+        const foundGroup = A.findFirst(appliedGroups(d.views), (candidate) => candidate.id === groupId)
+        if (O.isNone(foundGroup)) return ""
+        const group = foundGroup.value
         for (const rowId of group.rowIds) {
           d.set(
             rowId,
@@ -876,18 +913,18 @@ export function primary(input: {
   counts: Counts
   noun: readonly [string, string]
   /** What the button says when nothing is ready and nothing waits for a decision, if that may be confirmed. */
-  closing?: string | undefined
-  words?: ReviewWords | undefined
+  closing: O.Option<string>
+  words: ReviewWords
 }): Primary {
-  const words = input.words ?? defaultReviewWords
-  const unmatched = input.columns.find((column) => isColumnMatchUnmatched(column.match))
+  const words = input.words
+  const unmatched = input.columns.find((column) => O.exists(column.match, isColumnMatchUnmatched))
   if (unmatched !== undefined) {
     return Primary.Blocked({ label: `Match ${unmatched.label} to import`, columnId: unmatched.id })
   }
   const { counts } = input
   if (counts.ready === 0) {
     // Reopened to look, with every remaining row left out: there is nothing to add, and the way out is to close.
-    if (input.closing !== undefined && counts.needs === 0) return Primary.Import({ label: input.closing })
+    if (O.isSome(input.closing) && counts.needs === 0) return Primary.Import({ label: input.closing.value })
     if (counts.needs + counts.blocked > 0) return Primary.Idle({ label: `No ${input.noun[1]} ready yet` })
     return Primary.Done({
       label: counts.total > 0 && counts.stored === counts.total ? words.nothingNew : words.nothingToImport
@@ -909,7 +946,7 @@ const tabTally = (counts: Counts, words: ReviewWords): string =>
     .join(", ")
 
 /** The status line beside the button: what will not be imported, or that everything will. */
-export function heldLine(counts: Counts, words: ReviewWords = defaultReviewWords): string {
+export function heldLine(counts: Counts, words: ReviewWords): string {
   if (counts.total === 0) return ""
   const held = counts.needs + counts.cannot + counts.out
   if (held === 0) return counts.stored === 0 ? `All ${counts.total} ${words.ready.toLowerCase()}` : ""
@@ -918,20 +955,25 @@ export function heldLine(counts: Counts, words: ReviewWords = defaultReviewWords
 }
 
 /** The sentence in the confirm step: what will not be written, and why. 25 words at most. */
-export function confirmLine(input: {
-  counts: Counts
-  noun: readonly [string, string]
-  words?: ReviewWords | undefined
-}): string {
+export function confirmLine(input: { counts: Counts; noun: readonly [string, string]; words: ReviewWords }): string {
   const { counts } = input
   const held = counts.needs + counts.cannot + counts.out + counts.stored
-  return `${plural(held, input.noun[0], input.noun[1])} won't be imported (${tabTally(counts, input.words ?? defaultReviewWords)}). Your file is not changed.`
+  return `${plural(held, input.noun[0], input.noun[1])} won't be imported (${tabTally(counts, input.words)}). Your file is not changed.`
 }
 
 /** What the import will carry, by how each row got ready: the lines of the confirm step. */
 export function importSummary(views: ReadonlyArray<RowView>): ReadonlyArray<{ label: string; count: number }> {
   const tally = { accepted: 0, kept: 0, edited: 0, auto: 0, plain: 0 }
-  for (const view of views) if (view.status === "ready") tally[view.decided ?? "plain"] += 1
+  for (const view of views)
+    if (view.status === "ready")
+      O.match(view.decided, {
+        onNone: () => {
+          tally.plain += 1
+        },
+        onSome: (decided) => {
+          tally[decided] += 1
+        }
+      })
   return [
     { label: "With a fix you accepted", count: tally.accepted },
     { label: "Kept over a row with the same key", count: tally.kept },
@@ -953,19 +995,24 @@ export const kindsOf = (kinds: ReadonlyArray<ProblemKind>): HashMap.HashMap<stri
 export const reasonOf = (input: {
   view: RowView
   kinds: HashMap.HashMap<string, ProblemKind>
-  words?: ReviewWords | undefined
+  words: ReviewWords
 }): string => {
   const { view } = input
-  const words = input.words ?? defaultReviewWords
+  const words = input.words
   if (view.status === "out") return words.out
   if (view.status === "stored") return words.stored
-  const problem = view.problem
-  if (problem === undefined) return ""
-  if (problem.reason !== undefined && problem.reason !== "") return problem.reason
-  // A fix carries the evidence for itself: the next best sentence when the caller gave no reason.
-  if (problem.fix !== undefined && problem.fix.why.basis !== "") return problem.fix.why.basis
-  const kind = O.getOrUndefined(HashMap.get(input.kinds, problem.kind))
-  return kind?.help ?? kind?.label ?? problem.kind
+  return O.match(view.problem, {
+    onNone: () => "",
+    onSome: (problem) => {
+      if (O.isSome(problem.reason) && problem.reason.value !== "") return problem.reason.value
+      // A fix carries the evidence for itself: the next best sentence when the caller gave no reason.
+      if (O.isSome(problem.fix) && problem.fix.value.why.basis !== "") return problem.fix.value.why.basis
+      return O.match(HashMap.get(input.kinds, problem.kind), {
+        onNone: () => problem.kind,
+        onSome: (kind) => O.match(kind.help, { onNone: () => kind.label, onSome: (help) => help })
+      })
+    }
+  })
 }
 
 const csvField = (text: string): string => (/[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text)
@@ -975,7 +1022,7 @@ export function heldCsv(input: {
   views: ReadonlyArray<RowView>
   columns: ReadonlyArray<ReviewColumn>
   problemKinds: ReadonlyArray<ProblemKind>
-  words?: ReviewWords | undefined
+  words: ReviewWords
 }): string {
   const kinds = kindsOf(input.problemKinds)
   const lines = [["Row", "Reason", ...input.columns.map((column) => column.label)]]
@@ -994,18 +1041,18 @@ export function heldCsv(input: {
 export function entries(input: {
   list: ReadonlyArray<RowView>
   groups: ReadonlyArray<FixGroup>
-  applied?: boolean
+  applied: boolean
 }): ReadonlyArray<Entry> {
   const rows = (views: ReadonlyArray<RowView>): ReadonlyArray<Entry> =>
     views.map((view) => ({ type: "row" as const, view }))
   if (input.groups.length === 0) return rows(input.list)
   const owner = MutableHashMap.empty<string, string>()
   for (const group of input.groups) for (const rowId of group.rowIds) MutableHashMap.set(owner, rowId, group.id)
-  const ownerOf = (view: RowView): string | undefined => O.getOrUndefined(MutableHashMap.get(owner, view.row.id))
+  const ownerOf = (view: RowView): O.Option<string> => MutableHashMap.get(owner, view.row.id)
   const out: Array<Entry> = []
   for (const group of input.groups) {
     out.push({ type: "group" as const, group, applied: input.applied === true })
-    out.push(...rows(input.list.filter((view) => ownerOf(view) === group.id)))
+    out.push(...rows(input.list.filter((view) => O.contains(ownerOf(view), group.id))))
   }
   out.push(...rows(input.list.filter((view) => !MutableHashMap.has(owner, view.row.id))))
   return out
@@ -1024,18 +1071,21 @@ export function sections(input: {
 }): ReadonlyArray<Entry> {
   const out: Array<Entry> = []
   for (const kind of input.problemKinds) {
-    const rows = input.list.filter((view) => view.problem?.kind === kind.id)
+    const rows = input.list.filter((view) => O.exists(view.problem, (problem) => problem.kind === kind.id))
     if (rows.length === 0) continue
     const groups = input.groups.filter((group) => group.kind === kind.id)
     const collapsed = input.collapsed(kind, groups.length > 0)
     const safe = rows
-      .filter(
-        (view) => view.problem?.fix !== undefined && A.containsWith(sameFix)(view.row.applied ?? [], view.problem.fix)
+      .filter((view) =>
+        O.exists(
+          O.flatMap(view.problem, (problem) => problem.fix),
+          (fix) => A.containsWith(sameFix)(view.row.applied, fix)
+        )
       )
       .map((view) => view.row.id)
     out.push({ type: "kind" as const, kind, rowIds: rows.map((view) => view.row.id), safe, collapsed })
     if (collapsed) continue
-    const lines = entries({ list: rows, groups })
+    const lines = entries({ applied: false, list: rows, groups })
     // The rows of no group come last. Straight after a group's rows they read as part of it ("1 row" over six),
     // so a line of their own says where the group ends.
     const grouped = MutableHashSet.fromIterable(groups.flatMap((group) => group.rowIds))
@@ -1054,7 +1104,7 @@ export function queue(input: {
   views: ReadonlyArray<RowView>
   split: Iterable<string>
   /** The rows that cannot be imported as written (`RowView.blocked`) instead of the decisions: each one by itself. */
-  blocked?: boolean
+  blocked: boolean
 }): ReadonlyArray<QueueEntry> {
   if (input.blocked === true) {
     return input.views
@@ -1062,7 +1112,7 @@ export function queue(input: {
       .map((view): QueueEntry => ({ type: "row" as const, view }))
   }
   const split = HashSet.fromIterable(input.split)
-  const groups = waitingGroups({ views: input.views }).filter((group) => !HashSet.has(split, group.id))
+  const groups = waitingGroups({ kind: O.none(), views: input.views }).filter((group) => !HashSet.has(split, group.id))
   const covered = MutableHashSet.fromIterable(groups.flatMap((group) => group.rowIds))
   return [
     ...groups.map((group): QueueEntry => ({ type: "group" as const, group, applied: false })),
@@ -1077,22 +1127,25 @@ export function queue(input: {
  * with words its description lacks). It is never a row's one-press answer: the row asks the person to type the
  * value, and the guess is offered beside the box with its evidence.
  */
-export const weakGuess = (fix: { by?: string | undefined; confidence: O.Option<string> }): boolean =>
-  fix.by === "model" && O.contains(fix.confidence, "low")
+export const weakGuess = (fix: { by: O.Option<string>; confidence: O.Option<string> }): boolean =>
+  O.contains(fix.by, "model") && O.contains(fix.confidence, "low")
 
 /** A `low` fix is a question for the person, not something to accept. Its choices are `to` and the alternatives. */
 export const choicesOf = (fix: {
   to: string
   confidence: O.Option<string>
-  why: { alternatives?: ReadonlyArray<string> }
-}): ReadonlyArray<string> | undefined =>
-  O.contains(fix.confidence, "low") ? [fix.to, ...(fix.why.alternatives ?? [])] : undefined
+  why: { alternatives: ReadonlyArray<string> }
+}): O.Option<ReadonlyArray<string>> =>
+  O.map(
+    O.filter(fix.confidence, (confidence) => confidence === "low"),
+    () => [fix.to, ...fix.why.alternatives]
+  )
 
 /** What the caller writes, and what it holds with a reason for each row. */
 export function result(input: {
   views: ReadonlyArray<RowView>
   problemKinds: ReadonlyArray<ProblemKind>
-  words?: ReviewWords | undefined
+  words: ReviewWords
 }): ImportResult {
   const kinds = kindsOf(input.problemKinds)
   const ready: Array<ReadyRow> = []
@@ -1111,7 +1164,7 @@ export function result(input: {
             source: mark.by === "you" ? "person" : mark.by,
             decidedBy: person || mark.accepted ? "person" : "rule",
             how: person ? "typed or chose a value" : mark.accepted ? "accepted a proposal" : "applied by a rule",
-            ...(O.isNone(mark.fix) ? {} : { basis: mark.fix.value.why.basis }),
+            basis: O.map(mark.fix, (fix) => fix.why.basis),
             confidence: O.flatMap(mark.fix, (fix) => fix.confidence)
           })
         )
@@ -1122,7 +1175,7 @@ export function result(input: {
           line: view.row.line,
           cells: view.cells,
           changes,
-          kept: view.decided === "kept"
+          kept: O.contains(view.decided, "kept")
         })
       )
     } else {
@@ -1143,26 +1196,33 @@ export function result(input: {
 /** The next undecided row after `afterId` in `list`, wrapping round; undefined when none is left. */
 export function nextProblem(input: {
   list: ReadonlyArray<RowView>
-  afterId?: string | undefined
-  back?: boolean
-}): string | undefined {
+  afterId: O.Option<string>
+  back: boolean
+}): O.Option<string> {
   const list = input.list
-  const start = input.afterId === undefined ? -1 : list.findIndex((view) => view.row.id === input.afterId)
+  const start = O.match(
+    A.findFirstIndex(list, (view) => O.contains(input.afterId, view.row.id)),
+    { onNone: () => -1, onSome: (index) => index }
+  )
   for (let step = 1; step <= list.length; step += 1) {
     const index = input.back === true ? start - step : start + step
     const view = list[((index % list.length) + list.length) % list.length]
-    if (view !== undefined && view.status === "needs" && view.row.id !== input.afterId) return view.row.id
+    if (view !== undefined && view.status === "needs" && !O.contains(input.afterId, view.row.id))
+      return O.some(view.row.id)
   }
-  return undefined
+  return O.none()
 }
 
 /** What a button that takes `value` says for it: the fix's own words for the value (`why.labels`), else the value. */
 export const valueWords = (
-  fix: { to: string; why: { alternatives?: ReadonlyArray<string>; labels?: ReadonlyArray<string> } },
+  fix: { to: string; why: { alternatives: ReadonlyArray<string>; labels: ReadonlyArray<string> } },
   value: string
 ): string => {
-  const at = [fix.to, ...(fix.why.alternatives ?? [])].indexOf(value)
-  return (at === -1 ? undefined : fix.why.labels?.[at]) ?? value
+  const at = A.findFirstIndex([fix.to, ...fix.why.alternatives], (candidate) => candidate === value)
+  return O.match(
+    O.flatMap(at, (at) => A.get(fix.why.labels, at)),
+    { onNone: () => value, onSome: (label) => label }
+  )
 }
 
 /**
@@ -1171,11 +1231,14 @@ export const valueWords = (
  * @example columnFor({ column: "isActive", to: "false", why: { alternatives: [""], targets: ["isActive", "discontinuedOn"] } }, "") // "discontinuedOn"
  */
 export const columnFor = (
-  fix: { column: string; to: string; why: { alternatives?: ReadonlyArray<string>; targets?: ReadonlyArray<string> } },
+  fix: { column: string; to: string; why: { alternatives: ReadonlyArray<string>; targets: ReadonlyArray<string> } },
   value: string
 ): string => {
-  const at = [fix.to, ...(fix.why.alternatives ?? [])].indexOf(value)
-  return (at === -1 ? undefined : fix.why.targets?.[at]) ?? fix.column
+  const at = A.findFirstIndex([fix.to, ...fix.why.alternatives], (candidate) => candidate === value)
+  return O.match(
+    O.flatMap(at, (at) => A.get(fix.why.targets, at)),
+    { onNone: () => fix.column, onSome: (column) => column }
+  )
 }
 
 /**
@@ -1185,19 +1248,29 @@ export const columnFor = (
  * @example shownWith({ id: "quantityOnHand", label: "On hand", unitFrom: "uom" }, "120", { uom: "EA" }) // "120 EA"
  */
 export const shownWith = (
-  column: { display?: ((value: string) => string) | undefined; unitFrom?: string | undefined },
+  column: { display: ReviewColumn["display"]; unitFrom: ReviewColumn["unitFrom"] },
   text: string,
   cells: Readonly<Record<string, string>>
 ): string => {
   if (text === "") return text
-  const shown = column.display === undefined ? text : column.display(text)
-  const unit = column.unitFrom === undefined ? "" : (cells[column.unitFrom] ?? "").trim()
-  return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
+  const shown = column.display(text)
+  return O.match(
+    O.flatMap(column.unitFrom, (id) => R.get(cells, id)),
+    {
+      onNone: () => shown,
+      onSome: (text) => {
+        const unit = text.trim()
+        return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
+      }
+    }
+  )
 }
 
 /** Words in a "Why?" answer, heading excluded. The region's budget is 25. */
-export const whyWords = (why: { basis: string; detail?: string }): number =>
-  `${why.basis} ${why.detail ?? ""}`.split(/\s+/).filter((word) => word !== "").length
+export const whyWords = (why: { basis: Why["basis"]; detail: Why["detail"] }): number => {
+  const count = (text: string) => A.length(A.filter(text.split(/\s+/), (word) => word !== ""))
+  return count(why.basis) + O.match(why.detail, { onNone: () => 0, onSome: count })
+}
 
 /** "1 row", "5 rows". */
 export const rowsWord = (n: number): string => `${n} ${n === 1 ? "row" : "rows"}`
@@ -1208,14 +1281,18 @@ export const rowsWord = (n: number): string => `${n} ${n === 1 ? "row" : "rows"}
 
 /** A choice's words on its button: the label, its note after a comma, and "(suggested)" when the caller suggests it. */
 export const choiceText = (choice: Choice): string =>
-  `${choice.label}${choice.note === undefined ? "" : `, ${choice.note}`}${choice.suggested === true ? " (suggested)" : ""}`
+  O.match(choice.note, {
+    onNone: () => `${choice.label}${choice.suggested ? " (suggested)" : ""}`,
+    onSome: (note) => `${choice.label}, ${note}${choice.suggested ? " (suggested)" : ""}`
+  })
 
 /** The choice the person picked on a row with `problem.choices`, while the row's value is one of them. */
-export const pickedChoice = (view: RowView): Choice | undefined => {
-  const column = view.row.problem?.column
-  const choices = view.row.problem?.choices
-  if (column === undefined || choices === undefined || view.marks[column]?.by !== "you") return undefined
-  return choices.find((choice) => choice.value === view.cells[column])
+export const pickedChoice = (view: RowView): O.Option<Choice> => {
+  const column = O.flatMap(view.row.problem, (problem) => problem.column)
+  const choices = O.flatMap(view.row.problem, (problem) => problem.choices)
+  if (O.isNone(column) || O.isNone(choices) || !O.exists(R.get(view.marks, column.value), (mark) => mark.by === "you"))
+    return O.none()
+  return A.findFirst(choices.value, (choice) => choice.value === view.cells[column.value])
 }
 
 /**
@@ -1223,7 +1300,7 @@ export const pickedChoice = (view: RowView): Choice | undefined => {
  * rows ticked under it or, where each row keeps its own answers (`rowAction`) and has no tick, for all of them.
  */
 export const groupUse = (input: { group: FixGroup; n: number; ticks: boolean }): string =>
-  `${input.group.mixed === true ? "Accept" : `Use ${input.group.label ?? valueWords(input.group, input.group.to)}`} ${input.ticks ? `for the ${input.n} ticked` : `for all ${input.n}`}`
+  `${input.group.mixed === true ? "Accept" : `Use ${O.match(input.group.label, { onNone: () => valueWords(input.group, input.group.to), onSome: (label) => label })}`} ${input.ticks ? `for the ${input.n} ticked` : `for all ${input.n}`}`
 
 /** One entry of "Other answers": typing a value, leaving the row out, or the caller's own answer. */
 export type OtherAnswer = Data.TaggedEnum<{
@@ -1244,19 +1321,19 @@ export const OtherAnswer = Data.taggedEnum<OtherAnswer>()
  */
 export function otherAnswers(input: {
   view: RowView
-  extra: RowAction | undefined
-}): ReadonlyArray<OtherAnswer> | undefined {
+  extra: O.Option<RowAction>
+}): O.Option<ReadonlyArray<OtherAnswer>> {
   const { view, extra } = input
-  const problem = view.status === "needs" ? view.problem : undefined
-  if (problem === undefined || extra === undefined) return undefined
-  const subject = problem.column
-  const proposed = subject === undefined ? undefined : view.marks[subject]
-  const typing = problem.choices === undefined && isCellMarkProposed(proposed)
-  return [
+  const problem = view.status === "needs" ? view.problem : O.none()
+  if (O.isNone(problem) || O.isNone(extra)) return O.none()
+  const subject = problem.value.column
+  const proposed = O.flatMap(subject, (column) => R.get(view.marks, column))
+  const typing = O.isNone(problem.value.choices) && O.exists(proposed, isCellMarkProposed)
+  return O.some([
     ...(typing ? [OtherAnswer.Type()] : []),
     OtherAnswer.LeaveOut({ label: `Leave row ${rowName(view.row)} out` }),
-    OtherAnswer.Extra({ label: extra.label })
-  ]
+    OtherAnswer.Extra({ label: extra.value.label })
+  ])
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1300,15 +1377,18 @@ export function workList(input: {
  * The kind "Next problem" goes to once `from` has no row left: the next kind down the list with rows waiting, then
  * from the top. Undefined when nothing is left anywhere.
  */
-export function nextKind(input: { list: ReadonlyArray<WorkItem>; from: string | undefined }): string | undefined {
-  const at = input.list.findIndex((item) => item.kind.id === input.from)
+export function nextKind(input: { list: ReadonlyArray<WorkItem>; from: O.Option<string> }): O.Option<string> {
+  const at = input.list.findIndex((item) => O.contains(input.from, item.kind.id))
   const order = [...input.list.slice(at + 1), ...input.list.slice(0, at + 1)]
-  return order.find((item) => item.left > 0)?.kind.id
+  return O.map(
+    A.findFirst(order, (item) => item.left > 0),
+    (item) => item.kind.id
+  )
 }
 
 /**
  * How many decisions are left: one per group of identical fixes, one per other row that needs the person. The same
  * number the phone counts its cards by, so "Decision 2 of 60" and "59 decisions left" agree.
  */
-export const decisionsLeft = (views: ReadonlyArray<RowView>, split: Iterable<string> = []): number =>
-  queue({ views, split }).length
+export const decisionsLeft = (views: ReadonlyArray<RowView>, split: Iterable<string>): number =>
+  queue({ blocked: false, views, split }).length

@@ -112,7 +112,7 @@ const world = (id: ImportId, network: { down: boolean }, reads: boolean) => {
           rows,
           state: registry.get(reviewState(id)),
           action: { type: "leaveOut" as const, rowIds: [rowId] },
-          recheck: undefined,
+          recheck: O.none(),
           fixable: () => false,
           rejects: false
         }).state

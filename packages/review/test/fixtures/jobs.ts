@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 /**
  * Made-up jobs for the same fabrication shop, for the gallery's "Records with a parent" state and its tests: each job
  * (the parent record) lists the material it needs, one line each. Development only: nothing in the app imports this.
@@ -6,7 +7,8 @@
  * whose rows end in different values), and a SKU that is not on the item list (type one, or leave the job out).
  */
 import * as O from "effect/Option"
-import { Choice, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import * as A from "effect/Array"
+import { Choice, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import type { RowDecision, SavedDecisions } from "@inventory/review/ReviewTypes"
 
 export const lineKinds: ReadonlyArray<ProblemKind> = [
@@ -14,28 +16,52 @@ export const lineKinds: ReadonlyArray<ProblemKind> = [
     id: "unit",
     label: "Unit to pick",
     tone: "decision",
-    help: "The file says “length”. Pick the unit the job counts it in."
+    help: O.some("The file says “length”. Pick the unit the job counts it in.")
   }),
   ProblemKind.make({
     id: "comma",
     label: "Decimal comma",
     tone: "decision",
-    help: "The quantity is written with a comma."
+    help: O.some("The quantity is written with a comma.")
   }),
   ProblemKind.make({
     id: "stock",
     label: "Not in stock",
     tone: "blocker",
-    help: "The SKU is not on your item list. Type one, or leave it out."
+    help: O.some("The SKU is not on your item list. Type one, or leave it out.")
   })
 ]
 
 export const lineColumns: ReadonlyArray<ReviewColumn> = [
-  ReviewColumn.make({ id: "material", label: "Material", size: "fill", width: 200, core: true }),
-  ReviewColumn.make({ id: "job", label: "Job", core: true, code: true, context: true, search: true }),
-  ReviewColumn.make({ id: "sku", label: "SKU", core: true, code: true, under: true, search: true, context: true }),
-  ReviewColumn.make({ id: "qty", label: "Qty", core: true, align: "right" }),
-  ReviewColumn.make({ id: "unit", label: "Unit", core: true })
+  ReviewColumn.make({
+    display: identity,
+    id: "material",
+    label: "Material",
+    size: "fill",
+    width: O.some(200),
+    core: true
+  }),
+  ReviewColumn.make({
+    display: identity,
+    id: "job",
+    label: "Job",
+    core: true,
+    code: true,
+    context: true,
+    search: true
+  }),
+  ReviewColumn.make({
+    display: identity,
+    id: "sku",
+    label: "SKU",
+    core: true,
+    code: true,
+    under: true,
+    search: true,
+    context: true
+  }),
+  ReviewColumn.make({ display: identity, id: "qty", label: "Qty", core: true, align: O.some("right") }),
+  ReviewColumn.make({ display: identity, id: "unit", label: "Unit", core: true })
 ]
 
 type Material = { name: string; sku: string; unit: "m" | "pcs" | "kg" | "L" }
@@ -155,7 +181,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         material: bar.name,
         sku: bar.sku,
         unit: "length",
-        problem: Problem.make({ kind: "unit", column: "unit", ask: "Pick a unit" })
+        problem: Problem.make({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
       }
     }
     if (kind === "comma") {
@@ -170,20 +196,22 @@ export function makeJobs(): ReadonlyArray<Job> {
         qty,
         problem: Problem.make({
           kind: "comma",
-          column: "qty",
-          fix: {
-            column: "qty",
-            to,
-            label: "a decimal point",
-            by: "rule",
-            confidence: O.some("high"),
-            kind: "comma",
-            group: "qty:comma",
-            why: {
-              basis: `"${qty}" is ${to} written with a decimal comma.`,
-              detail: "Every other quantity in the file uses a point."
-            }
-          }
+          column: O.some("qty"),
+          fix: O.some(
+            Fix.make({
+              column: "qty",
+              to,
+              label: O.some("a decimal point"),
+              by: O.some("rule"),
+              confidence: O.some("high"),
+              kind: "comma",
+              group: O.some("qty:comma"),
+              why: {
+                basis: `"${qty}" is ${to} written with a decimal comma.`,
+                detail: O.some("Every other quantity in the file uses a point.")
+              }
+            })
+          )
         })
       }
     }
@@ -195,7 +223,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         material: material.name,
         sku: material.sku,
         unit: material.unit,
-        problem: Problem.make({ kind: "stock", column: "sku", ask: "Type a SKU" })
+        problem: Problem.make({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
       }
     }
     job.lines = lines
@@ -204,7 +232,7 @@ export function makeJobs(): ReadonlyArray<Job> {
   for (const job of jobs) {
     job.lines = job.lines.map((entry) =>
       entry.problem?.kind === "unit"
-        ? { ...entry, problem: { ...entry.problem, choices: unitChoices(entry, all) } }
+        ? { ...entry, problem: { ...entry.problem, choices: O.some(unitChoices(entry, all)) } }
         : entry
     )
   }
@@ -221,7 +249,12 @@ const unitChoices = (target: Line, all: ReadonlyArray<Line>): ReadonlyArray<Choi
   const suggested = total > 0 && metres * 2 > total
   return [
     suggested
-      ? Choice.make({ value: "m", label: "m", suggested, note: `as ${metres} of ${total} lines with this SKU say` })
+      ? Choice.make({
+          value: "m",
+          label: "m",
+          suggested,
+          note: O.some(`as ${metres} of ${total} lines with this SKU say`)
+        })
       : Choice.make({ value: "m", label: "m" }),
     Choice.make({ value: "pcs", label: "pcs" })
   ]
@@ -240,25 +273,27 @@ export const questionRows = (jobs: ReadonlyArray<Job>, leftOut: ReadonlyArray<st
               id: `line-${entry.line}`,
               line: entry.line,
               cells: { material: entry.material, job: entry.job, sku: entry.sku, qty: entry.qty, unit: entry.unit },
-              problem: entry.problem
+              problem: O.some(entry.problem)
             })
           ]
     )
 
 /** The page's own check of a line after the person typed or picked a value: the same rule the server would run. */
-export function recheckLine(input: { cells: Readonly<Record<string, string>> }): Problem | undefined {
+export function recheckLine(input: { cells: Readonly<Record<string, string>> }): O.Option<Problem> {
   const { cells } = input
-  if (!knownSkus.includes(cells.sku ?? "")) return Problem.make({ kind: "stock", column: "sku", ask: "Type a SKU" })
-  if (!/^\d+(\.\d+)?$/.test(cells.qty ?? "")) return Problem.make({ kind: "comma", column: "qty" })
-  if (!["m", "pcs", "kg", "L"].includes(cells.unit ?? "")) return Problem.make({ kind: "unit", column: "unit" })
-  return undefined
+  if (!knownSkus.includes(cells.sku ?? ""))
+    return Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
+  if (!/^\d+(\.\d+)?$/.test(cells.qty ?? "")) return Problem.makeOption({ kind: "comma", column: O.some("qty") })
+  if (!["m", "pcs", "kg", "L"].includes(cells.unit ?? ""))
+    return Problem.makeOption({ kind: "unit", column: O.some("unit") })
+  return O.none()
 }
 
 /** Whether the person's decision settles a line's question, and how: the page counts from this, not the region. */
 const answerOf = (entry: Line, decision: RowDecision | undefined): "open" | "answered" | "out" => {
   if (entry.problem === undefined) return "answered"
   if (decision !== undefined && decision.place.kind === "leftOut") return "out"
-  const column = entry.problem.column ?? ""
+  const column = O.match(entry.problem.column, { onNone: () => "", onSome: (column) => column })
   const typed = decision?.edits?.[column]
   if (decision?.accepted?.includes(column) === true) return "answered"
   if (typed === undefined) return "open"
@@ -270,7 +305,7 @@ const answerOf = (entry: Line, decision: RowDecision | undefined): "open" | "ans
     unit: entry.unit,
     [column]: typed
   }
-  return recheckLine({ cells }) === undefined ? "answered" : "open"
+  return O.isNone(recheckLine({ cells })) ? "answered" : "open"
 }
 
 export type JobReview = {
@@ -312,12 +347,19 @@ export function reviewJobs(input: {
       const what = open.map(({ entry }) => {
         const problem = entry.problem
         if (problem?.kind === "unit") {
-          const hint = problem.choices?.find((choice) => choice.suggested === true)
-          const why = hint === undefined ? "" : ` (${hint.label}, ${hint.note ?? "suggested"})`
+          const hint = O.flatMap(
+            problem.choices,
+            A.findFirst((choice) => choice.suggested)
+          )
+          const why = O.match(hint, {
+            onNone: () => "",
+            onSome: (hint) =>
+              ` (${hint.label}, ${O.match(hint.note, { onNone: () => "suggested", onSome: (note) => note })})`
+          })
           return `line ${entry.line} says “length” for ${entry.material}: pick m or pcs${why}`
         }
         return problem?.kind === "comma"
-          ? `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as ${problem.fix?.to ?? ""}`
+          ? `line ${entry.line} has ${entry.qty} ${entry.unit} of ${entry.material}, a decimal comma the fix reads as ${O.match(problem.fix, { onNone: () => "", onSome: (fix) => fix.to })}`
           : `line ${entry.line} asks for ${entry.sku}, which is not on your item list: type the SKU or leave the job out`
       })
       const reason = `${what.join("; ")}.`

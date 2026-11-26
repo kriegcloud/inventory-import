@@ -1301,3 +1301,285 @@ Full validation results follow below. No browser was opened: **not seen on scree
 Needs the person: the eight listed API-edge candidates need an exemption decision; eleven unresolved source places
 remain work. No screen words or stored-data decisions are requested. Not seen on screen; the orchestrator still
 owns the real import acceptance.
+
+## Review source lane, complete row 9 dependency scope, 2026-11-26
+
+This pass owns all eighteen files under `packages/review/src`, starting from 474 counted places (166 fallback,
+259 absence, 29 unwrap, 20 normalise). Earlier internal-only inventory above is historical. No baseline,
+exemption, stored fixture or progress bytes are authorized to change.
+
+| Owned input / state | Verdict before edits | Meaning retained |
+| --- | --- | --- |
+| Review column size and boolean display/filter flags; kind fixable; choice suggested; row stored | Required decoded values with schema constructor and decode defaults | Size starts fit; flags start false; kinds remain fixable unless explicitly false. Width and priority depend on other fields and require separate modeling. |
+| Row applied fixes; why alternatives, labels and target columns | Required arrays with empty constructor/decode defaults | No applied fix or extra value starts empty; missing array entries still mean no indexed label/target. |
+| Problem rivals and choices | Option, or retained unresolved until their consumers migrate | An absent list differs from a present empty list: empty rivals are already settled, empty choices still suppress typing. Never replace either with an empty-array default. |
+| Row label, blocked override, problem; problem reason/tone/column/fix/ask/note; fix attribution/group/reason/label; column optional metadata | Option on decoded side, migration in dependency order | Preserve every distinct omitted/provided case, reference identity, and existing wording. No per-row constructor copy in view builders. |
+| Review words and region optional React props | Optional component props with destructuring presentation defaults; required callable helper inputs | Existing words and component defaults stay at their entry; callers explicitly state required helper arguments. |
+| Decisions, draft steps, stored review and progress | Decoded explicit values; legacy encoded flags/nulls/omitted keys preserved | Browser progress and undo/redo restore identically. Actual storage/IDB refusal and DOM nullability stay named edges. |
+| Derived grid/queue/nav state | Required initial state or Option until complete-case consumption | No early unwrap followed by repeated existence questions; final screen branches consume whole cases. |
+| Vendor optional property bags and nullable DOM methods | Actual edges retained by file/kind/example | Use Record.getSomes for optional outgoing library bags; no no-op capability defaults. |
+
+No browser is authorized for this pass; all resulting screen behavior is **not seen on screen**. Final inventory,
+forced callers and checks follow below when the edits are complete.
+
+### Review edit form entry verdict
+
+Before its final form edit: `EditText.text` is required raw browser input, and `EditText.submission` is an Option of
+`SubmittedText` (trimmed, nonempty). Decode once when the form opens and on each input event; retain raw text in the
+box, disable Save for None, and consume the complete Option on submit. This preserves the former trim-on-submit
+policy without changing any reviewed file cell or stored decision. This is an actual form entry schema, not a
+fallback-only decode. The two mark-space comparisons remain presentation comparisons and keep the original text.
+
+
+### Final review-source residual inventory
+
+The final source scan holds **153 sites: 69 fallback, 65 absence, two unwrap and 17 normalise**, down from 474.
+That clears 321 counted sites. These 153 are retained places, **not approved exemptions**, and row 9 is not a
+zero-baseline/schema-complete package. No baseline was written. All optional entry/decoded review schema fields
+are now Options or explicit required values; remaining owned items below are mostly sparse lookups, accumulator
+initialization, bounds/state relationships and presentation comparisons.
+
+`Platform` means an actual browser or vendor API boundary. `Presentation` means a final React capability/node or
+word/display choice, not an absent domain field. `Owned` is unresolved engineering work, not an exemption claim.
+The two retained unwraps are only localStorage availability and Virtualizer.getScrollElement's null convention.
+No synchronous escape was added. Internal state still uses some existing plain types; this pass does not claim
+that every such type has been rebuilt as a schema.
+
+| File under `packages/review/src/` | Fallback | Absence | Unwrap | Normalise | Total |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `ReviewRegion.atoms.ts` | 14 | 8 | 0 | 5 | 27 |
+| `ReviewDraft.rules.ts` | 18 | 6 | 0 | 7 | 31 |
+| `ReviewRegion.component.tsx` | 0 | 10 | 0 | 3 | 13 |
+| `SavedProgress.hook.ts` | 0 | 1 | 0 | 0 | 1 |
+| `internal/parts.tsx` | 2 | 8 | 0 | 1 | 11 |
+| `internal/keptStore.ts` | 0 | 3 | 1 | 0 | 4 |
+| `internal/WorkList.tsx` | 1 | 2 | 0 | 0 | 3 |
+| `internal/ReviewQueue.tsx` | 7 | 5 | 0 | 0 | 12 |
+| `internal/ReviewGrid.tsx` | 27 | 21 | 1 | 1 | 50 |
+| `internal/PhoneDrawer.tsx` | 0 | 1 | 0 | 0 | 1 |
+| **Total** | **69** | **65** | **2** | **17** | **153** |
+
+Classification totals are 29 platform sites, 36 presentation sites and 88 unresolved owned sites.
+
+Every retained occurrence is named below. Identical expressions in one file share a row; Count and Lines retain
+every occurrence, including repeated line numbers. Line numbers refer to the final formatted source. The call is
+shown in full for `getOrElse`/unwrap findings, where the scanner normally prints only the callee name.
+
+#### `packages/review/src/ReviewRegion.atoms.ts`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| fallback | 3 | 179, 265, 278 | `view.cells[column.id] ?? ""` | Owned | The generic review permits partial dynamic cell records. Empty text is still selected at a missing key; a total column/cell relationship is not modeled and no per-row fill/copy was added. |
+| normalise | 1 | 263 | `value.trim().toLowerCase` | Owned | Facet comparison/spelling keys still trim or fold case from raw cell text. Raw values are preserved; the comparison-key boundary remains unmodeled. |
+| normalise | 3 | 263, 274, 274 | `value.trim` | Owned | Facet comparison/spelling keys still trim or fold case from raw cell text. Raw values are preserved; the comparison-key boundary remains unmodeled. |
+| fallback | 1 | 268 | `O.getOrElse(MutableHashMap.get(found, key), () => ({ values: MutableHashSet.empty<string>(), n: 0, spellings: {} as Record<string, number> }))` | Owned | The mutable facet accumulator still creates values/count/spellings on its first key. Its initial-record boundary remains unresolved. |
+| fallback | 1 | 274 | `entry.spellings[value.trim()] ?? 0` | Owned | The mutable spelling counter still starts a missing spelling at zero; the accumulator initial state is not schema-backed. |
+| fallback | 1 | 285 | `Object.entries(entry.spellings).sort((a, b) => b[1] - a[1])[0]?.[0] ?? key` | Owned | Choosing the most frequent facet spelling still falls back to its existing comparison key when the sorted spelling list is empty. |
+| fallback | 1 | 291 | `facetPicked[column.id] ?? []` | Owned | The sparse selected-facet dictionary still interprets an unmentioned column as no selected values. |
+| fallback | 1 | 356 | `O.getOrElse(get.self<HashSet.HashSet<string>>(), () => HashSet.empty<string>())` | Owned | AtomContext.get.self is absent on first read; the existing seen-kind set, table-order snapshot or move counter initial value is still selected here. |
+| fallback | 1 | 410 | `view.cells[facet.column] ?? ""` | Owned | The generic review permits partial dynamic cell records. Empty text is still selected at a missing key; a total column/cell relationship is not modeled and no per-row fill/copy was added. |
+| absence | 1 | 452 | `node === null` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| absence | 1 | 590 | `target.closest("[role=dialog], [role=alertdialog], [role=menu]") !== null` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| fallback | 1 | 616 | `table.getAllLeafColumns()[0]?.table ?? table` | Platform | TanStack may have no leaf column; use the provided table when its leaf-table pointer is absent. |
+| fallback | 1 | 639 | `O.getOrElse(get.self<ReadonlyArray<RowView>>(), A.empty)` | Owned | AtomContext.get.self is absent on first read; the existing seen-kind set, table-order snapshot or move counter initial value is still selected here. |
+| absence | 1 | 673 | `first !== undefined` | Owned | A folded section may have no first row under the current generic array contract; the stop is omitted. Nonempty section membership is not encoded. |
+| fallback | 1 | 694 | `O.getOrElse(get.self<number>(), () => 0)` | Owned | AtomContext.get.self is absent on first read; the existing seen-kind set, table-order snapshot or move counter initial value is still selected here. |
+| fallback | 1 | 705 | `root?.querySelector<HTMLElement>("[data-import-button]") ?? null` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| absence | 1 | 706 | `button !== null` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| fallback | 1 | 724 | `(group === undefined ? undefined : root?.querySelector<HTMLElement>(&#96;[data-group-id="${CSS.escape(group)}"] [data-group-accept]&#96;)) ?? row?.querySelector<HTMLElement>("[data-first-action]")` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| absence | 1 | 724 | `group === undefined` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| absence | 1 | 728 | `target === null` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| absence | 1 | 728 | `target === undefined` | Platform | Actual DOM element/query/dataset availability at the keyboard/focus/attachment boundary. Existing fallback focus order is preserved. |
+| absence | 1 | 808 | `step !== undefined` | Owned | The bulk-action toast still checks the last undo entry before offering Undo. The outcome/history nonempty relationship is not encoded. |
+| normalise | 1 | 954 | `event.key.toLowerCase` | Platform | Browser KeyboardEvent.key spelling for the existing case-insensitive undo/redo shortcuts. |
+
+#### `packages/review/src/ReviewDraft.rules.ts`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| fallback | 1 | 90 | `O.getOrElse(decision, () => undecided)` | Owned | A sparse decision-map lookup still selects the existing empty ReviewDecision before the requested update. No per-row decision initialization/copy was added; this map-entry initialization remains counted. |
+| absence | 1 | 176 | `known !== undefined` | Platform | Native WeakMap.get can return undefined. Reuse the cached view only for the same fixable capability; row identity and cache behavior are preserved. |
+| fallback | 2 | 231, 249 | `row.cells[fix.column] ?? ""` | Owned | A dynamic cell key may be absent in this generic review API. The existing empty-text value is retained; a total column/cell contract would require a coordinated representation change. |
+| fallback | 1 | 270 | `row.cells[column] ?? ""` | Owned | A dynamic cell key may be absent in this generic review API. The existing empty-text value is retained; a total column/cell contract would require a coordinated representation change. |
+| fallback | 1 | 292 | `cells[fix.column] ?? ""` | Owned | A dynamic cell key may be absent in this generic review API. The existing empty-text value is retained; a total column/cell contract would require a coordinated representation change. |
+| fallback | 1 | 398 | `O.getOrElse(MutableHashMap.get(kinds, kind), () => 0)` | Owned | The sparse count/tally map still uses zero for an unmentioned key. Its total-count/read contract remains unresolved. |
+| absence | 1 | 402 | `mark !== undefined` | Owned | Presence of an entry in the sparse marks record still decides which applied fix is counted or grouped. This lookup remains a nullable owned-map access. |
+| fallback | 1 | 419 | `O.getOrElse(HashMap.get(counts.kinds, kind), () => 0)` | Owned | The sparse count/tally map still uses zero for an unmentioned key. Its total-count/read contract remains unresolved. |
+| fallback | 1 | 457 | `O.getOrElse(MutableHashMap.get(tally, from), () => 0)` | Owned | The sparse count/tally map still uses zero for an unmentioned key. Its total-count/read contract remains unresolved. |
+| fallback | 1 | 478 | `O.getOrElse(MutableHashMap.get(found, groupId), (): Gathered => ({ fix, rowIds: [], froms: [], mixed: false }))` | Owned | The mutable waiting/applied group accumulator still creates its first record for a key in the collector; initial group state is not schema-backed. |
+| fallback | 1 | 484 | `view.row.cells[fix.column] ?? ""` | Owned | A dynamic cell key may be absent in this generic review API. The existing empty-text value is retained; a total column/cell contract would require a coordinated representation change. |
+| absence | 1 | 509 | `mark === undefined` | Owned | Presence of an entry in the sparse marks record still decides which applied fix is counted or grouped. This lookup remains a nullable owned-map access. |
+| fallback | 1 | 511 | `O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [], mixed: false }))` | Owned | The mutable waiting/applied group accumulator still creates its first record for a key in the collector; initial group state is not schema-backed. |
+| normalise | 1 | 545 | `from.trim` | Presentation | Compares before/after spaces or quotes the original spelling; does not change a reviewed cell. This display comparison remains counted. |
+| absence | 1 | 642 | `step === undefined` | Owned | An empty undo/redo array is a legal state; the current last-entry bounds check returns the unchanged state. The stack lookup is not yet Option-valued. |
+| fallback | 1 | 708 | `O.getOrElse(decisionOf(view.row.id), () => undecided)` | Owned | A sparse decision-map lookup still selects the existing empty ReviewDecision before the requested update. No per-row decision initialization/copy was added; this map-entry initialization remains counted. |
+| fallback | 5 | 785, 817, 851, 864, 879 | `O.getOrElse(d.decisionOf(rowId), () => undecided)` | Owned | A sparse decision-map lookup still selects the existing empty ReviewDecision before the requested update. No per-row decision initialization/copy was added; this map-entry initialization remains counted. |
+| absence | 1 | 921 | `unmatched !== undefined` | Owned | The first unmatched-column lookup still returns a nullable native Array.find result before building the complete primary-button case. |
+| normalise | 1 | 952 | `words.ready.toLowerCase` | Presentation | Existing status, undo, column-label or sentence casing for words drawn on screen. No corresponding normalized presentation-word type was introduced. |
+| fallback | 1 | 1032 | `view.row.cells[column.id] ?? ""` | Owned | A dynamic cell key may be absent in this generic review API. The existing empty-text value is retained; a total column/cell contract would require a coordinated representation change. |
+| absence | 1 | 1210 | `view !== undefined` | Owned | Cyclic next-problem indexing still guards its array result. The nonempty/in-bounds relation is not carried by the array type. |
+| normalise | 1 | 1262 | `text.trim` | Presentation | The unit/display-number check still trims for drawing a numeric value with its unit. Stored and edited cell text is unchanged. |
+| normalise | 1 | 1263 | `shown.trim` | Presentation | The unit/display-number check still trims for drawing a numeric value with its unit. Stored and edited cell text is unchanged. |
+| normalise | 1 | 1345 | `label.toUpperCase` | Presentation | Existing status, undo, column-label or sentence casing for words drawn on screen. No corresponding normalized presentation-word type was introduced. |
+| normalise | 1 | 1345 | `label.toLowerCase` | Presentation | Existing status, undo, column-label or sentence casing for words drawn on screen. No corresponding normalized presentation-word type was introduced. |
+| normalise | 1 | 1355 | `label.trim` | Presentation | Existing status, undo, column-label or sentence casing for words drawn on screen. No corresponding normalized presentation-word type was introduced. |
+
+#### `packages/review/src/ReviewRegion.component.tsx`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| absence | 1 | 83 | `typeof navigator !== "undefined"` | Platform | Actual navigator availability during module initialization; selects the existing keyboard labels. |
+| absence | 1 | 374 | `select !== null` | Platform | Actual document.getElementById result before focus; absent matching control uses the caller matching capability. |
+| normalise | 1 | 399 | `(filter === "auto" ? words.auto : words[filter]).toLowerCase` | Presentation | Existing status, undo, column-label or sentence casing for words drawn on screen. No corresponding normalized presentation-word type was introduced. |
+| normalise | 2 | 462, 474 | `step.label.toLowerCase` | Presentation | Existing status, undo, column-label or sentence casing for words drawn on screen. No corresponding normalized presentation-word type was introduced. |
+| absence | 1 | 522 | `props.onShowMatching === undefined` | Presentation | Optional React capability/activity/note presence controls the actual control or container drawn. Kept absent rather than supplied a no-op or a default container. |
+| absence | 2 | 613, 624 | `props.explain === undefined` | Presentation | Optional React capability/activity/note presence controls the actual control or container drawn. Kept absent rather than supplied a no-op or a default container. |
+| absence | 2 | 643, 867 | `props.activity === undefined` | Presentation | Optional React capability/activity/note presence controls the actual control or container drawn. Kept absent rather than supplied a no-op or a default container. |
+| absence | 1 | 720 | `props.readOnlyNote !== undefined` | Presentation | Optional React capability/activity/note presence controls the actual control or container drawn. Kept absent rather than supplied a no-op or a default container. |
+| absence | 1 | 806 | `props.onRetry === undefined` | Presentation | Optional React capability/activity/note presence controls the actual control or container drawn. Kept absent rather than supplied a no-op or a default container. |
+| absence | 1 | 979 | `importButtonNode === null` | Presentation | A derived ReactNode may be null when Import is not offered; only existing buttons receive the footer wrapper. |
+
+#### `packages/review/src/SavedProgress.hook.ts`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| absence | 1 | 23 | `typeof indexedDB === "undefined"` | Platform | Actual absence of the IndexedDB global fails with FileNotKept; this is not an absent review field. |
+
+#### `packages/review/src/internal/parts.tsx`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| absence | 1 | 231 | `props.className === undefined` | Presentation | Optional React class/capability presence determines the wrapper or action actually drawn. No no-op capability or default action is supplied. |
+| absence | 1 | 271 | `face === undefined` | Owned | The column/CSS helper still returns an optional font class. The omitted class means the normal face; this derived nullable helper remains unresolved. |
+| normalise | 1 | 390 | `mark.from.trim` | Presentation | Compares before/after spaces or quotes the original spelling; does not change a reviewed cell. This display comparison remains counted. |
+| absence | 1 | 461 | `element === null` | Platform | Actual DOM ref is absent while an element is detached; measurement subscribes only to an attached element. |
+| fallback | 1 | 515 | `props.children ?? props.text` | Presentation | ReactNode null and undefined both choose text here. A destructuring default alone would preserve explicit null and change the content. |
+| fallback | 1 | 519 | `props.card ?? props.text` | Presentation | ReactNode null and undefined both choose text here. A destructuring default alone would preserve explicit null and change the content. |
+| absence | 1 | 622 | `props.onUndoFix !== undefined` | Presentation | Optional React class/capability presence determines the wrapper or action actually drawn. No no-op capability or default action is supplied. |
+| absence | 1 | 626 | `props.onPick !== undefined` | Presentation | Optional React class/capability presence determines the wrapper or action actually drawn. No no-op capability or default action is supplied. |
+| absence | 1 | 640 | `props.onAccept === undefined` | Presentation | Optional React class/capability presence determines the wrapper or action actually drawn. No no-op capability or default action is supplied. |
+| absence | 1 | 645 | `props.all === undefined` | Presentation | Optional React class/capability presence determines the wrapper or action actually drawn. No no-op capability or default action is supplied. |
+| absence | 1 | 652 | `props.onReject === undefined` | Presentation | Optional React class/capability presence determines the wrapper or action actually drawn. No no-op capability or default action is supplied. |
+
+#### `packages/review/src/internal/keptStore.ts`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| unwrap | 1 | 16 | `O.getOrUndefined(O.liftThrowable(() => window.localStorage)())` | Platform | Actual browser localStorage availability/refusal or Storage.getItem null contract. Keeps visit-only operation and bare-word compatibility. |
+| absence | 2 | 33, 37 | `storage === undefined` | Platform | Actual browser localStorage availability/refusal or Storage.getItem null contract. Keeps visit-only operation and bare-word compatibility. |
+| absence | 1 | 47 | `text === null` | Platform | Actual browser localStorage availability/refusal or Storage.getItem null contract. Keeps visit-only operation and bare-word compatibility. |
+
+#### `packages/review/src/internal/WorkList.tsx`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| fallback | 1 | 86 | `root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null` | Platform | Actual DOM viewport/ref/first-child availability while subscribing ResizeObserver and scroll handlers. |
+| absence | 1 | 99 | `element === null` | Platform | Actual DOM viewport/ref/first-child availability while subscribing ResizeObserver and scroll handlers. |
+| absence | 1 | 116 | `element.firstElementChild !== null` | Platform | Actual DOM viewport/ref/first-child availability while subscribing ResizeObserver and scroll handlers. |
+
+#### `packages/review/src/internal/ReviewQueue.tsx`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| absence | 1 | 98 | `shown === undefined` | Owned | The queue card identity still uses an empty key for no card. A distinct no-card state has not replaced that existing sentinel. |
+| absence | 1 | 129 | `first === undefined` | Owned | The generic column list can be empty. The name renderer still branches on its first-column lookup before using the row label. |
+| fallback | 1 | 129 | `view.cells[first.id] ?? ""` | Owned | A dynamic cell key may be absent; existing empty text is retained in context, editing and value drawing without copying/filling every row. |
+| fallback | 2 | 136, 142 | `view.cells[column.id] ?? ""` | Owned | A dynamic cell key may be absent; existing empty text is retained in context, editing and value drawing without copying/filling every row. |
+| fallback | 1 | 329 | `O.getOrElse(HashMap.get(labels, subject), () => subject)` | Owned | The column-label dictionary still uses the actual column id when no label entry is found; the column-id/label-map relation is not total. |
+| fallback | 3 | 382, 430, 472 | `view.cells[subject.value] ?? ""` | Owned | A dynamic cell key may be absent; existing empty text is retained in context, editing and value drawing without copying/filling every row. |
+| absence | 2 | 517, 559 | `main === null` | Presentation | The computed main ReactNode may be absent; the first-action marker then belongs to the existing secondary action. |
+| absence | 1 | 708 | `entry === undefined` | Owned | The clamped queue index can still select no entry from an empty decisions list; this queue/no-card case remains a bounds check. |
+
+#### `packages/review/src/internal/ReviewGrid.tsx`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| absence | 2 | 133, 888 | `first === undefined` | Owned | The column list may be empty; the row/name renderer keeps its complete no-first-column branch instead of inventing a column. |
+| fallback | 2 | 133, 914 | `view.cells[first.id] ?? ""` | Owned | A dynamic cell key may be absent. Empty text is still selected in measurement, comparison, context or editing; no per-row fill/copy was introduced. |
+| fallback | 8 | 175, 186, 309, 311, 618, 620, 624, 1141 | `view.cells[column.id] ?? ""` | Owned | A dynamic cell key may be absent. Empty text is still selected in measurement, comparison, context or editing; no per-row fill/copy was introduced. |
+| fallback | 2 | 175, 187 | `other.cells[column.id] ?? ""` | Owned | A dynamic cell key may be absent. Empty text is still selected in measurement, comparison, context or editing; no per-row fill/copy was introduced. |
+| absence | 1 | 191 | `props.onKeep === undefined` | Presentation | An optional React matching/keep capability omits its control when absent. No no-op action or invented selection is supplied. |
+| fallback | 1 | 268 | `top[index]?.length ?? 0` | Owned | The bounded longest-value sizing queue still protects unchecked indices with zero length. A type-safe bounded selection preserving linear work is not in place. |
+| fallback | 2 | 268, 269 | `top[at]?.length ?? 0` | Owned | The bounded longest-value sizing queue still protects unchecked indices with zero length. A type-safe bounded selection preserving linear work is not in place. |
+| absence | 2 | 318, 566 | `mark === undefined` | Owned | The sparse owned marks record still distinguishes an absent mark from an applied/proposed mark at this lookup. This is not a DOM/vendor exemption. |
+| normalise | 1 | 327 | `mark.from.trim` | Presentation | Compares before/after spaces or quotes the original spelling; does not change a reviewed cell. This display comparison remains counted. |
+| fallback | 1 | 374 | `input.columns.find((column) => column.id === subject)?.label ?? subject` | Owned | The action subject may name a column without metadata; the existing actual subject id is used as its label. That cross-record relationship is not modeled. |
+| fallback | 1 | 469 | `view.cells[subject.value] ?? ""` | Owned | A dynamic cell key may be absent. Empty text is still selected in measurement, comparison, context or editing; no per-row fill/copy was introduced. |
+| absence | 1 | 473 | `view.marks[subject.value] === undefined` | Owned | The sparse owned marks record still distinguishes an absent mark from an applied/proposed mark at this lookup. This is not a DOM/vendor exemption. |
+| absence | 1 | 618 | `view.marks[column.id] === undefined` | Owned | The sparse owned marks record still distinguishes an absent mark from an applied/proposed mark at this lookup. This is not a DOM/vendor exemption. |
+| fallback | 1 | 688 | `O.getOrElse(HashMap.get(props.labels, subject), () => subject)` | Owned | The column-label dictionary still uses the actual subject/column id when a label is absent; its key-to-label contract is not total. |
+| fallback | 2 | 690, 738 | `view.cells[subject] ?? ""` | Owned | A dynamic cell key may be absent. Empty text is still selected in measurement, comparison, context or editing; no per-row fill/copy was introduced. |
+| absence | 1 | 772 | `only !== undefined` | Owned | After the one-choice length test, the array type still permits an absent indexed choice. The one-choice tuple refinement is not encoded. |
+| absence | 1 | 914 | `view.marks[first.id] === undefined` | Owned | The sparse owned marks record still distinguishes an absent mark from an applied/proposed mark at this lookup. This is not a DOM/vendor exemption. |
+| absence | 2 | 920, 936 | `hiddenSubject === undefined` | Owned | The requested hidden subject may have no column metadata. Its nullable metadata lookup still decides whether a hidden-field presentation is drawn. |
+| absence | 2 | 996, 1074 | `main === null` | Presentation | The computed main ReactNode may be absent; the existing first-action marker is placed on another real control. |
+| fallback | 1 | 1011 | `O.getOrElse(HashMap.get(props.labels, present), () => present)` | Owned | The column-label dictionary still uses the actual subject/column id when a label is absent; its key-to-label contract is not total. |
+| fallback | 1 | 1225 | `O.getOrElse(HashMap.get(props.labels, group.column), () => group.column)` | Owned | The column-label dictionary still uses the actual subject/column id when a label is absent; its key-to-label contract is not total. |
+| fallback | 1 | 1595 | `measured[index] ?? O.match(column.width, { onNone: () => fillLeast, onSome: (width) => width })` | Owned | The measured-width array is not typed as total over the current columns. Missing measurement still uses supplied minimum width or the existing fill minimum. |
+| absence | 1 | 1603 | `head !== undefined` | Owned | The first shown-column lookup still guards the layout correction; a nonempty planner result is not represented in its type. |
+| absence | 1 | 1670 | `head === undefined` | Owned | An empty line list still uses its existing empty first-key marker for the virtual-list change signature; no separate empty signature case is modeled. |
+| absence | 1 | 1702 | `line === undefined` | Platform | The index is supplied by TanStack Virtualizer; check the current entries array before rendering or estimating that vendor-requested line. |
+| unwrap | 1 | 1732 | `O.getOrNull(registry.get(scroller))` | Platform | Final conversion of the scroller Option to the null contract required by TanStack Virtualizer.getScrollElement. |
+| fallback | 1 | 1778 | `O.getOrElse(get.self<Drawn>(), () => nothingDrawn)` | Owned | The virtual-list snapshot still selects nothingDrawn on its first atom read. That existing initial snapshot remains outside a schema constructor. |
+| fallback | 1 | 1901 | `items[0]?.start ?? 0` | Platform | TanStack Virtualizer may return no virtual items; its empty measurement range keeps zero padding. This vendor measurement edge remains counted. |
+| fallback | 1 | 1902 | `items[items.length - 1]?.end ?? 0` | Platform | TanStack Virtualizer may return no virtual items; its empty measurement range keeps zero padding. This vendor measurement edge remains counted. |
+| fallback | 1 | 1908 | `columns[0]?.id ?? ""` | Owned | The first-column measurement request still sends an empty id when columns are empty. This existing sizing sentinel is unresolved, not a platform edge. |
+| absence | 1 | 1933 | `sortable !== undefined` | Platform | TanStack Table.getColumn may return undefined, so its sort control is drawn only for a supplied column. |
+| absence | 2 | 1934, 1937 | `props.onMatch !== undefined` | Presentation | An optional React matching/keep capability omits its control when absent. No no-op action or invented selection is supplied. |
+| absence | 1 | 1945 | `sortable === undefined` | Platform | TanStack Table.getColumn may return undefined, so its sort control is drawn only for a supplied column. |
+| absence | 1 | 1997 | `entry === undefined` | Platform | The index is supplied by TanStack Virtualizer; check the current entries array before rendering or estimating that vendor-requested line. |
+
+#### `packages/review/src/internal/PhoneDrawer.tsx`
+
+| Kind | Count | Lines | Expression | Class | Reason retained |
+| --- | ---: | --- | --- | --- | --- |
+| absence | 1 | 36 | `props.footer === undefined` | Presentation | Optional React footer controls whether a footer container exists. Explicit null and omission keep their previous distinct container behavior. |
+
+
+### Review-source handback and proof limits
+
+The dependency migration reaches the source consumers: decoded metadata, decision flags, saved progress, words,
+atom inputs, navigation, callback capabilities and final screen cases use their canonical required/Option forms.
+Rows retain their existing objects and sparse cells; there is no per-row schema copy. The unresolved owned
+lookups above are retained explicitly rather than hidden behind another spelling of a default.
+
+Storage review: `ReviewDecision.schema.ts:249` still writes sparse encoded flags; the codec at line 273 restores
+the canonical representation. `SavedProgress.schema.ts:129` and line 136 convert stored steps without changing
+nulls, sparse flag keys or the legacy browser format; lines 144 and 154 preserve the existing saved-review shape.
+The legacy fixture is unchanged, and its exact-byte round-trip test passes. Recheck's absent result still preserves
+an existing rival problem; a present-empty rival list keeps its previous vacuous-settlement behavior. Present-empty
+choices still suppress the typing control. These distinctions remain Options through the consuming cases.
+
+The edit form at `internal/parts.tsx:665` checks trimmed, nonempty submission at the actual input boundary.
+Its state keeps the raw displayed text and a separate checked submission. Opening and changing the input update
+both; Save remains disabled for empty/whitespace input and submits trimmed text. Six direct schema probes checked
+empty, spaces, tabs, padded numeric/text and nonbreaking-space inputs. This is local proof, not screen inspection.
+No product words were changed, and no new product rule was chosen.
+
+Forced caller changes are limited to the two review gallery pages and catalog's ImportReview controller,
+ReviewDraft atoms, ReviewStep and UploadStep. They state the required arguments, supply Option capabilities and
+consume Option results. Six catalog test files, six review test files and the two review fixtures reflect those
+canonical internal shapes/signatures. The review strict ceiling decreases from 249 to 225. No ceiling was raised;
+no defaults baseline, exemption, protected fixture, lockfile, PLAN, vendor or UI component/hook file was changed.
+
+Validation on the final code: `bun run check --env-mode=loose` passed all 105 tasks (72 cached, 2m 6.528s), using
+isolated temporary cache paths. That includes the catalog's 401 fast tests and review's 115 tests. The dedicated
+catalog fold run also passed all 17 properties in 149.11s. Earlier runs caught stale Option-shape expectations and
+ledger/gate issues; those were corrected before the final green run without changing a baseline or exemption.
+The final source scan counts the 153 sites above. Focused defaults, formatting and docs checks are recorded in the
+handback after this appendix. No commit or push was made.
+
+Nothing was inspected in a browser or on screen. The green checks establish local behavior and integration,
+including saved-progress and review-model properties; they do not establish the orchestrator's visual acceptance
+or a real user's complete import journey. Row 9 remains an incomplete zero-baseline migration because the 153
+named sites remain, including 88 owned cases. The actual platform sites are candidates for a human exemption
+judgment, not exemptions granted by this pass.
+
+Needs the person: the existing defaults and exemption judgments in this goal packet, plus the orchestrator's
+on-screen acceptance. No additional approval was requested and no new product rule was chosen.
+
+
+Final focused receipts: formatting passes all 34 changed code/config files; defaults law passes all 33 changed
+TypeScript files (186 fallback, 145 absence, 17 unwrap, 27 normalise across source plus forced callers/tests).
+The separate review-source-only inventory remains 153. `docs:check` passes all three documentation roots with
+existing status-vocabulary warnings, and `git diff --check` passes. The baseline was not lowered.

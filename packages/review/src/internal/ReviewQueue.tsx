@@ -1,9 +1,12 @@
+import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import { OtherAnswer } from "@inventory/review/ReviewDraft"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as A from "effect/Array"
 import { useAtom, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
@@ -169,8 +172,8 @@ type CardProps = {
   groupActions: GroupActions
   onSplit: (groupId: string) => void
   excluded: HashSet.HashSet<string>
-  rowAction: RowActionFor | undefined
-  cellEditor: ReviewRegionProps["cellEditor"]
+  rowAction: O.Option<RowActionFor>
+  cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
 }
 
 /** The one decision on screen: a group of identical fixes, or a row. Everything needed to decide is on the card. */
@@ -201,7 +204,7 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
   return (
     <Item variant="outline" className="w-full min-w-0">
       <ItemHeader>
-        <ReasonTag kind={O.getOrUndefined(HashMap.get(props.kinds, group.kind))} fallback={group.kind} />
+        <ReasonTag kind={HashMap.get(props.kinds, group.kind)} tone={O.none()} fallback={group.kind} />
         <span className="text-muted-foreground">{rowsWord(n)}</span>
       </ItemHeader>
       <ItemContent className="min-w-0">
@@ -216,26 +219,34 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
       </ItemContent>
       <ItemFooter className="min-w-0">
         <div className="flex w-full min-w-0 flex-col gap-2">
-          {choices !== undefined ? (
-            <ButtonGroup aria-label={`Choose for ${n === 1 ? "the row" : `all ${n} rows`}`} className="w-full">
-              {choices.map((choice, at) => (
-                <Button
-                  key={choice}
-                  variant="outline"
-                  size="touch"
-                  className="flex-1"
-                  {...(at === 0 ? first : {})}
-                  onClick={() => groupActions.choose(group.id, choice)}
-                >
-                  {valueWords(group, choice)} for {n}
-                </Button>
-              ))}
-            </ButtonGroup>
-          ) : (
-            <Button size="touch" {...first} onClick={() => groupActions.accept(group.id)}>
-              {group.mixed === true ? `Accept for ${n}` : `Use ${group.label ?? group.to} for ${n}`}
-            </Button>
-          )}
+          {O.match(choices, {
+            onNone: () => (
+              <Button size="touch" {...first} onClick={() => groupActions.accept(group.id)}>
+                {group.mixed === true
+                  ? `Accept for ${n}`
+                  : O.match(group.label, {
+                      onNone: () => `Use ${group.to} for ${n}`,
+                      onSome: (label) => `Use ${label} for ${n}`
+                    })}
+              </Button>
+            ),
+            onSome: (present) => (
+              <ButtonGroup aria-label={`Choose for ${n === 1 ? "the row" : `all ${n} rows`}`} className="w-full">
+                {present.map((choice, at) => (
+                  <Button
+                    key={choice}
+                    variant="outline"
+                    size="touch"
+                    className="flex-1"
+                    {...(at === 0 ? first : {})}
+                    onClick={() => groupActions.choose(group.id, choice)}
+                  >
+                    {valueWords(group, choice)} for {n}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            )
+          })}
           <div className="flex flex-col gap-2">
             <Button variant="outline" size="touch" onClick={() => props.onSplit(group.id)}>
               Review {n} one by one
@@ -250,35 +261,45 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
             </Button>
           </div>
           <ul className="flex min-w-0 flex-col border-t pt-1">
-            {group.rowIds.map((rowId) => {
-              const view = actions.peek(rowId)
-              if (view === undefined) return null
-              const name = nameOf(view, props.columns[0])
-              return (
-                <li key={rowId} className="min-w-0 text-sm">
-                  {/* The whole line is the tick box's label: a 20px box alone is too small to tap. */}
-                  <Label className="min-h-11 min-w-0 overflow-hidden">
-                    <Checkbox
-                      checked={!HashSet.has(props.excluded, rowId)}
-                      aria-label={`In this fix: ${name}`}
-                      className="size-5"
-                      onCheckedChange={() => groupActions.toggle(rowId)}
-                    />
-                    <span className="min-w-0 flex-1 leading-5">
-                      <span className="block truncate font-medium">{name}</span>
-                      <span className="block truncate font-normal text-muted-foreground">
-                        {contextOf(view, props.columns, group.column)}
-                      </span>
-                    </span>
-                    <span className="flex-none font-normal text-muted-foreground">
-                      <ColumnText column={columnOf(group.column)}>{view.row.cells[group.column]}</ColumnText> →{" "}
-                      {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
-                      {choices === undefined ? (view.problem?.fix?.to ?? group.to) : "?"}
-                    </span>
-                  </Label>
-                </li>
-              )
-            })}
+            {group.rowIds.map((rowId) =>
+              O.match(actions.peek(rowId), {
+                onNone: () => null,
+                onSome: (view) => {
+                  const name = nameOf(view, props.columns[0])
+                  return (
+                    <li key={rowId} className="min-w-0 text-sm">
+                      {/* The whole line is the tick box's label: a 20px box alone is too small to tap. */}
+                      <Label className="min-h-11 min-w-0 overflow-hidden">
+                        <Checkbox
+                          checked={!HashSet.has(props.excluded, rowId)}
+                          aria-label={`In this fix: ${name}`}
+                          className="size-5"
+                          onCheckedChange={() => groupActions.toggle(rowId)}
+                        />
+                        <span className="min-w-0 flex-1 leading-5">
+                          <span className="block truncate font-medium">{name}</span>
+                          <span className="block truncate font-normal text-muted-foreground">
+                            {contextOf(view, props.columns, group.column)}
+                          </span>
+                        </span>
+                        <span className="flex-none font-normal text-muted-foreground">
+                          <ColumnText column={columnOf(group.column)}>{view.row.cells[group.column]}</ColumnText> →{" "}
+                          {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
+                          {O.match(choices, {
+                            onNone: () =>
+                              O.match(
+                                O.flatMap(view.problem, (problem) => problem.fix),
+                                { onNone: () => group.to, onSome: (fix) => fix.to }
+                              ),
+                            onSome: () => "?"
+                          })}
+                        </span>
+                      </Label>
+                    </li>
+                  )
+                }
+              })
+            )}
           </ul>
         </div>
       </ItemFooter>
@@ -292,35 +313,47 @@ function RowCard(props: CardProps & { view: RowView }) {
   const nameColumn = props.columns[0]
   const name = nameOf(view, nameColumn)
   const problem = view.problem
-  const subject = problem?.column
-  const mark = subject === undefined ? undefined : view.marks[subject]
-  const fix = mark !== undefined && isCellMarkProposed(mark) ? mark.fix : undefined
-  const choices = fix === undefined ? undefined : choicesOf(fix)
-  const rival = problem?.rivals?.[0] === undefined ? undefined : actions.peek(problem.rivals[0])
-  const label = subject === undefined ? "" : O.getOrElse(HashMap.get(labels, subject), () => subject)
-  const extra = problem === undefined ? undefined : props.rowAction?.(view.row)
+  const subject = O.flatMap(problem, (problem) => problem.column)
+  const mark = O.flatMap(subject, (column) => R.get(view.marks, column))
+  const fix = O.map(O.filter(mark, isCellMarkProposed), (mark) => mark.fix)
+  const choices = O.flatMap(fix, choicesOf)
+  const rival = O.flatMap(
+    O.flatMap(
+      O.flatMap(problem, (problem) => problem.rivals),
+      A.head
+    ),
+    actions.peek
+  )
+  const label = O.match(subject, {
+    onNone: () => "",
+    onSome: (subject) => O.getOrElse(HashMap.get(labels, subject), () => subject)
+  })
+  const extra = O.match(problem, {
+    onNone: () => O.none(),
+    onSome: () => O.flatMap(props.rowAction, (action) => action(view.row))
+  })
   const others = otherAnswers({ view, extra })
-  const picks = problem?.choices
+  const picks = O.flatMap(problem, (problem) => problem.choices)
 
   let main: ReactNode = null
-  if (picks !== undefined && subject !== undefined) {
+  if (O.isSome(picks) && O.isSome(subject)) {
     // A pick with no default: every choice is the same outline button; a suggestion says so in words.
-    main = picks.map((pick, at) => (
+    main = picks.value.map((pick, at) => (
       <Button
         key={pick.value}
         variant="outline"
         size="touch"
         className="h-auto min-h-11"
         {...(at === 0 ? first : {})}
-        onClick={() => actions.edit(view.row.id, subject, pick.value)}
+        onClick={() => actions.edit(view.row.id, subject.value, pick.value)}
       >
         <span className="py-2.5 whitespace-normal">{choiceText(pick)}</span>
       </Button>
     ))
-  } else if (fix !== undefined && choices !== undefined && !weakGuess(fix)) {
+  } else if (O.isSome(fix) && O.isSome(choices) && !weakGuess(fix.value)) {
     main = (
       <ButtonGroup aria-label={`${label} for ${name}`} className="w-full">
-        {choices.map((choice, at) => (
+        {choices.value.map((choice, at) => (
           <Button
             key={choice}
             variant="outline"
@@ -328,70 +361,86 @@ function RowCard(props: CardProps & { view: RowView }) {
             className="flex-1"
             {...(at === 0 ? first : {})}
             onClick={() =>
-              choice === fix.to
+              choice === fix.value.to
                 ? actions.accept(view.row.id)
-                : actions.edit(view.row.id, columnFor(fix, choice), choice)
+                : actions.edit(view.row.id, columnFor(fix.value, choice), choice)
             }
           >
-            Use {valueWords(fix, choice)}
+            Use {valueWords(fix.value, choice)}
           </Button>
         ))}
       </ButtonGroup>
     )
-  } else if (fix !== undefined && !weakGuess(fix)) {
+  } else if (O.isSome(fix) && !weakGuess(fix.value)) {
     main = (
       <Button size="touch" {...first} onClick={() => actions.accept(view.row.id)}>
-        Use {valueWords(fix, fix.to)}
+        Use {valueWords(fix.value, fix.value.to)}
       </Button>
     )
-  } else if (subject !== undefined) {
-    const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
+  } else if (O.isSome(subject)) {
+    const own = O.flatMap(props.cellEditor, (editor) =>
+      editor({ row: view.row, column: subject.value, value: view.cells[subject.value] ?? "" })
+    )
     main = (
       <Overlay
-        title={own?.title ?? `${label} for ${name}`}
+        title={O.match(own, { onNone: () => `${label} for ${name}`, onSome: (own) => own.title })}
         about={`Type the ${label} so ${name} can be imported`}
         trigger={
           <Button size="touch" {...first}>
-            {own?.label ?? problem?.ask ?? askFor(label)}
+            {O.match(own, {
+              onNone: () =>
+                O.match(
+                  O.flatMap(problem, (problem) => problem.ask),
+                  { onNone: () => askFor(label), onSome: (ask) => ask }
+                ),
+              onSome: (own) => own.label
+            })}
           </Button>
         }
       >
         {(close) =>
-          own !== undefined ? (
-            own.render((next) => {
-              close()
-              actions.edit(view.row.id, subject, next)
-            })
-          ) : (
-            <span className="flex flex-col gap-3">
-              {/* A weak guess is offered beside the box with its evidence, never as the row's own answer. */}
-              {fix === undefined ? null : (
-                <span className="flex flex-col gap-1.5">
-                  <span className="text-sm text-muted-foreground">{fix.why.basis}</span>
-                  <Button
-                    variant="outline"
-                    size="touch"
-                    className="h-auto min-h-11"
-                    onClick={() => {
-                      close()
-                      actions.accept(view.row.id)
-                    }}
-                  >
-                    <span className="py-2.5 whitespace-normal">Use {valueWords(fix, fix.to)} (suggested)</span>
-                  </Button>
-                </span>
-              )}
-              <EditForm
-                label={label}
-                size="touch"
-                value={view.cells[subject] ?? ""}
-                onSave={(next) => {
-                  close()
-                  actions.edit(view.row.id, subject, next)
-                }}
-              />
-            </span>
-          )
+          O.match(own, {
+            onNone: () => (
+              <span className="flex flex-col gap-3">
+                {/* A weak guess is offered beside the box with its evidence, never as the row's own answer. */}
+                {O.match(fix, {
+                  onNone: () => null,
+                  onSome: (present) => (
+                    <span className="flex flex-col gap-1.5">
+                      <span className="text-sm text-muted-foreground">{present.why.basis}</span>
+                      <Button
+                        variant="outline"
+                        size="touch"
+                        className="h-auto min-h-11"
+                        onClick={() => {
+                          close()
+                          actions.accept(view.row.id)
+                        }}
+                      >
+                        <span className="py-2.5 whitespace-normal">
+                          Use {valueWords(present, present.to)} (suggested)
+                        </span>
+                      </Button>
+                    </span>
+                  )
+                })}
+                <EditForm
+                  label={label}
+                  size="touch"
+                  value={view.cells[subject.value] ?? ""}
+                  onSave={(next) => {
+                    close()
+                    actions.edit(view.row.id, subject.value, next)
+                  }}
+                />
+              </span>
+            ),
+            onSome: (present) =>
+              present.render((next) => {
+                close()
+                actions.edit(view.row.id, subject.value, next)
+              })
+          })
         }
       </Overlay>
     )
@@ -401,52 +450,67 @@ function RowCard(props: CardProps & { view: RowView }) {
     <Item variant="outline" className="w-full min-w-0">
       <ItemHeader>
         <ReasonTag
-          kind={problem === undefined ? undefined : O.getOrUndefined(HashMap.get(props.kinds, problem.kind))}
-          tone={problem?.tone}
-          fallback={problem?.kind ?? ""}
+          kind={O.flatMap(problem, (problem) => HashMap.get(props.kinds, problem.kind))}
+          tone={O.flatMap(problem, (problem) => problem.tone)}
+          fallback={O.match(problem, { onNone: () => "", onSome: (problem) => problem.kind })}
         />
         <span className="text-muted-foreground">row {rowName(view.row)}</span>
       </ItemHeader>
       <ItemContent className="min-w-0">
         <ItemTitle>{name}</ItemTitle>
-        <ItemDescription>{contextOf(view, props.columns, subject)}</ItemDescription>
-        {subject === undefined || subject === nameColumn?.id ? null : (
+        <ItemDescription>
+          {O.match(subject, {
+            onNone: () => contextOf(view, props.columns, undefined),
+            onSome: (subject) => contextOf(view, props.columns, subject)
+          })}
+        </ItemDescription>
+        {O.isNone(subject) || O.contains(subject, nameColumn?.id) ? null : (
           <p className="flex flex-wrap items-center gap-x-2 text-sm">
             <span className="text-muted-foreground">{label}</span>
-            <ColumnText column={columnOf(subject)}>
+            <ColumnText column={columnOf(subject.value)}>
               <CellValue
-                value={view.cells[subject] ?? ""}
-                display={columnOf(subject)?.display}
+                value={view.cells[subject.value] ?? ""}
+                display={columnOf(subject.value)?.display}
                 mark={mark}
                 empty={<span className="text-destructive">Empty</span>}
               />
             </ColumnText>
-            {rival === undefined ? null : (
-              <span className="text-muted-foreground">
-                also row {rowName(rival.row)}, {nameOf(rival, nameColumn)}
-              </span>
-            )}
+            {O.match(rival, {
+              onNone: () => null,
+              onSome: (present) => (
+                <span className="text-muted-foreground">
+                  also row {rowName(present.row)}, {nameOf(present, nameColumn)}
+                </span>
+              )
+            })}
           </p>
         )}
         {/* Why the row needs the person, with a fix or none; then who proposes the fix and on what evidence. */}
-        <p className="text-sm">{reasonOf({ view, kinds: props.kinds })}</p>
-        {fix === undefined ? null : (
-          <WhySheet title={`Why ${valueWords(fix, fix.to)}?`} about={`Why it is proposed for ${name}`}>
-            <p>
-              <Reason fix={fix} />
-            </p>
-          </WhySheet>
-        )}
+        <p className="text-sm">{reasonOf({ words: defaultReviewWords, view, kinds: props.kinds })}</p>
+        {O.match(fix, {
+          onNone: () => null,
+          onSome: (present) => (
+            <WhySheet title={`Why ${valueWords(present, present.to)}?`} about={`Why it is proposed for ${name}`}>
+              <p>
+                <Reason fix={present} />
+              </p>
+            </WhySheet>
+          )
+        })}
       </ItemContent>
       <ItemFooter className="min-w-0">
         <div className="flex w-full min-w-0 flex-col gap-2">
           {main}
-          {fix === undefined || actions.reject === undefined ? null : (
-            <Button variant="outline" size="touch" onClick={() => actions.reject?.(view.row.id, fix.column)}>
+          {O.isNone(fix) || O.isNone(actions.reject) ? null : (
+            <Button
+              variant="outline"
+              size="touch"
+              onClick={() => O.map(actions.reject, (reject) => reject(view.row.id, fix.value.column))}
+            >
               Reject this proposal
             </Button>
           )}
-          {others === undefined || extra === undefined ? (
+          {O.isNone(others) || O.isNone(extra) ? (
             <Button
               variant="outline"
               size="touch"
@@ -457,33 +521,36 @@ function RowCard(props: CardProps & { view: RowView }) {
             </Button>
           ) : (
             // The caller's own answer for the row: each answer in full words, as on a desk.
-            others.map((answer) =>
+            others.value.map((answer) =>
               OtherAnswer.$match(answer, {
                 Type: () =>
-                  subject === undefined ? null : (
-                    <Overlay
-                      key="type"
-                      title={`${label} for ${name}`}
-                      about={`Type the ${label} for ${name}`}
-                      trigger={
-                        <Button variant="outline" size="touch">
-                          {askFor(label)}
-                        </Button>
-                      }
-                    >
-                      {(close) => (
-                        <EditForm
-                          label={label}
-                          size="touch"
-                          value=""
-                          onSave={(next) => {
-                            close()
-                            actions.edit(view.row.id, subject, next)
-                          }}
-                        />
-                      )}
-                    </Overlay>
-                  ),
+                  O.match(subject, {
+                    onNone: () => null,
+                    onSome: (present) => (
+                      <Overlay
+                        key="type"
+                        title={`${label} for ${name}`}
+                        about={`Type the ${label} for ${name}`}
+                        trigger={
+                          <Button variant="outline" size="touch">
+                            {askFor(label)}
+                          </Button>
+                        }
+                      >
+                        {(close) => (
+                          <EditForm
+                            label={label}
+                            size="touch"
+                            value=""
+                            onSave={(next) => {
+                              close()
+                              actions.edit(view.row.id, present, next)
+                            }}
+                          />
+                        )}
+                      </Overlay>
+                    )
+                  }),
                 LeaveOut: ({ label: words }) => (
                   <Button
                     key="leave-out"
@@ -496,7 +563,7 @@ function RowCard(props: CardProps & { view: RowView }) {
                   </Button>
                 ),
                 Extra: ({ label: words }) => (
-                  <Button key="extra" variant="outline" size="touch" onClick={extra.onSelect}>
+                  <Button key="extra" variant="outline" size="touch" onClick={extra.value.onSelect}>
                     {words}
                   </Button>
                 )
@@ -521,7 +588,7 @@ type QueueProps = {
   loading: boolean
   caption: string
   empty: ReactNode
-  cellEditor: ReviewRegionProps["cellEditor"]
+  cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
 }
 
 /**
@@ -554,7 +621,7 @@ function QueueBody(props: QueueProps & { region: Region }) {
   const words = useAtomValue(region.words)
   const readOnly = useAtomValue(region.input.readOnly)
   const ownAnswer = useAtomValue(region.input.rowAction)
-  const rowAction = O.getOrUndefined(ownAnswer)
+  const rowAction = ownAnswer
   const actions = useAtomValue(region.rejects) ? table.actions : table.plainActions
   const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
@@ -598,9 +665,9 @@ function QueueBody(props: QueueProps & { region: Region }) {
                 </ItemContent>
                 {view.status === "needs" || view.status === "cannot" ? (
                   <ReasonTag
-                    kind={O.getOrUndefined(HashMap.get(kinds, view.problem?.kind ?? ""))}
-                    tone={view.problem?.tone}
-                    fallback={view.problem?.kind ?? ""}
+                    kind={O.flatMap(view.problem, (problem) => HashMap.get(kinds, problem.kind))}
+                    tone={O.flatMap(view.problem, (problem) => problem.tone)}
+                    fallback={O.match(view.problem, { onNone: () => "", onSome: (problem) => problem.kind })}
                   />
                 ) : (
                   <DecisionTag view={view} words={words} />

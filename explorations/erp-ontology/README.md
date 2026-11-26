@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Benjamin accepts report 18, the design of the party slice's terms revised to decisions 154 to 167, as one decision (129), names the accepting decision's number (its question 1) and answers its questions 2 to 5; then steps 9 to 12 of goals/party-slice add the terms.
+next: Benjamin accepts report 18, the design of the party slice's terms revised to decisions 154 to 167, as one decision (129), names the accepting decision's number (its question 1) and answers its questions 2 to 10; then steps 9 to 12 of goals/party-slice add the terms.
 goals: [erp-vocabulary, party-slice]
 ---
 
@@ -53,7 +53,7 @@ organization scope remains enough for the thread (115). Gate 10 is not built (de
 | [15 What the foundational audit of the thread found](research/15-audit-findings.md) | The auditor's two runs, what its adversary landed, why the audit is advisory (decision 107) and five design points still to rule on. |
 | [16 Sutton's API schema against the packet's Sutton rows](research/16-sutton-schema-check.md) | What the schema confirms and overturns in report 11's 28 Sutton rows, the records Sutton has that the packet lacks, and three questions (decisions 125 to 127). |
 | [17 A plan for modelling Sutton whole](research/17-sutton-whole-model-plan.md) | Sutton's 200 record types placed against the packet, eight slices with what each waits on and which pointers run forward, 45 findings where schema and design disagree, 24 new questions, and what a review disputed. The readers' output is `assets/sutton/readings.json`. |
-| [18 The party slice's terms](research/18-party-slice-terms.md) | Slice 1's terms for one accepting decision, revised to decisions 154 to 167: 10 new classes, 53 properties (27 object, 26 datatype), 7 schemes and 24 concepts with `Member`'s new wording and `Party`'s exception entry, each property's evidence and step, the gist parents, disjoint pairs and gist properties read from the pinned file, Sutton's slice-1 fields as placed, the questions each term serves, the choices it makes and five open questions for Benjamin. Nothing is built from it. |
+| [18 The party slice's terms](research/18-party-slice-terms.md) | Slice 1's terms for one accepting decision, revised to decisions 154 to 167: 10 new classes, 53 properties (27 object, 26 datatype), 7 schemes and 24 concepts with `Member`'s new wording and `Party`'s exception entry, each property's evidence and step, the gist parents, disjoint pairs and gist properties read from the pinned file, Sutton's slice-1 fields as placed, the questions each term serves, the choices it makes and ten open questions for Benjamin. Nothing is built from it. |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).

@@ -8,5 +8,17 @@
     "export": "AuditTrail",
     "as": "collection",
     "of": "packages/kernel/src/Activity.schema.ts#Activity.json"
-  }
+  },
+  { "file": "packages/kernel/src/AgentRun.schema.ts", "export": "AgentRun", "as": "record" },
+  {
+    "file": "packages/access/contract/src/Session/SessionState.read.ts",
+    "export": "OrganizationChoice",
+    "as": "record"
+  },
+  {
+    "file": "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts",
+    "export": "ModelCallPurpose",
+    "as": "scheme"
+  },
+  { "file": "packages/access/contract/src/Session/SessionState.read.ts", "export": "Membership", "as": "noTerm" }
 ]

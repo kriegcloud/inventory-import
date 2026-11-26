@@ -1,0 +1,2587 @@
+{
+ "party": {
+  "types": [
+   {
+    "suttonType": "Address",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "PostalAddress",
+    "packetReport": "06 (and 08 for a tenant's address)",
+    "note": "On a Company or Contact it is 06's PostalAddress (addressLineOne/Two to addressLines, city to locality, state to region, zip to postalCode, country to countryCode, which is free text here, not ISO); on the tenant Organization it is also the site report 16 finding D reads as 08's Site/Warehouse, and UserProfile.assignedLocations points at it; type and the four is*Default flags only partly fit defaultFor (AddressType values differ); customerPaymentTerm and vendorPaymentTerm are tenant trading terms with no packet term (decision 3 puts terms on the organization, report 07/09 own them); title is a name."
+   },
+   {
+    "suttonType": "Approval",
+    "verdict": "new-term-needed",
+    "packetTerm": "OrderApproval",
+    "packetReport": "09",
+    "note": "An approval of one Order or PurchaseOrder with status, rejectionReason, statusUpdatedAt and statusUpdatedBy; nothing in reports 04 to 13 proposes it (report 16 section 3 lists order approvals as missing); it keeps only its latest state, and statusUpdatedBy is required even for auto_approved, so whom it names then is not who decided (not checked against data)."
+   },
+   {
+    "suttonType": "Company",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SourceRecord",
+    "packetReport": "04 (record), 06 (Organization, Person, isCustomer, isVendor)",
+    "note": "The tenant's record of a trading party (decision 34), whose recordOf is an Organization when kind is company and a Person when kind is individual (pending decision 125); type gives isCustomer/isVendor, status gives accountStatus, addresses give hasPostalAddress, primaryContact has no packet term (a ContactAssignment with no stated purpose), and notes, logo, website, files and customFields have none."
+   },
+   {
+    "suttonType": "Contact",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SourceRecord",
+    "packetReport": "04, 06",
+    "note": "The tenant's record of a Person (recordOf Person); email and phone are two ContactPoints; company is one optional link that would be a ContactAssignment except that Sutton states no purpose and no point for it (pending decision 126); type is not a ContactPurposeScheme value; owners (tenant members who own the contact) needs a new property such as contactOwner, range Member; addresses on a contact are PostalAddresses of the person."
+   },
+   {
+    "suttonType": "CurrentUser",
+    "verdict": "computed-view",
+    "packetTerm": "SignInAccount",
+    "packetReport": "06",
+    "note": "The signed-in User as the session sees it, with its organizations listed and canManageRoles derived from the built-in admin role; impersonatedBy and isDigitAdmin are Sutton support mechanics; like SessionState it gets no term of its own (anti-pattern 14)."
+   },
+   {
+    "suttonType": "CurrentUserOrganization",
+    "verdict": "computed-view",
+    "packetTerm": "Member",
+    "packetReport": "06",
+    "note": "One user's view of one membership and its tenant (name, status, memberStatus), like the access contract's OrganizationChoice, which report 06 marks as a view; clerkOrganizationId is the sign-in provider's key, a source id, not a term."
+   },
+   {
+    "suttonType": "Organization",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Tenant",
+    "packetReport": "06",
+    "note": "Sutton's workspace for one customer, which denotes the Tenant's body only through a SourceRecord (accountType sandbox, trial and internal show one body can have several workspaces, see conflicts); addresses are its sites (08), defaultCurrency and defaultUom are 07's, members gives Member, and accountType, billingStatus, features, moduleSettings, prefixes, msl alert settings, sidebar layouts, whitelabel and portalCount are settings or Sutton's own billing, not domain terms."
+   },
+   {
+    "suttonType": "OrganizationMember",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Member",
+    "packetReport": "06",
+    "note": "The membership: user is its SignInAccount, profile holds its status, role and person facts, isOrgCreator has no term, settings is UI state; most records name it as createdBy, which fits recordedActor and 09's performedBy."
+   },
+   {
+    "suttonType": "Permission",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Permission",
+    "packetReport": "06",
+    "note": "One action keyed by a DigitPermission notation with a description, so its individuals are concepts of a scheme as decision 41 made roles; report 13 lists Permission as not proposed, and decision 124 now brings it in."
+   },
+   {
+    "suttonType": "PermissionGroupDetails",
+    "verdict": "new-term-needed",
+    "packetTerm": "PermissionGroup",
+    "packetReport": "06",
+    "note": "The unit an admin grants to a role: a key, a category, the permissions it contains, the groups it requires, an org feature it depends on and agentGrantable; report 06's requiresPermission (from the public 'flags when one depends on another') holds between these groups in the schema, not between Permissions."
+   },
+   {
+    "suttonType": "RoleDetails",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Role",
+    "packetReport": "06",
+    "note": "A built-in role (name is a MemberRole) or a tenant's custom role (name null, isCustom true, only id and displayName), granting permissionGroups and permissions (permits); memberCount and permissionCount are computed; a custom role has no notation, so Role's stated identity criterion (scheme and notation) does not apply to it."
+   },
+   {
+    "suttonType": "User",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SignInAccount",
+    "packetReport": "06",
+    "note": "The sign-in identity across organizations (report 13 lists SignInAccount as later and not proposed); User carries no email, which sits on CurrentUser and per membership on UserProfile, so accountEmail has no source here; isDigitAdmin flags Sutton's own staff and is not domain."
+   },
+   {
+    "suttonType": "UserProfile",
+    "verdict": "part-of-another-record",
+    "packetTerm": "Member",
+    "packetReport": "06",
+    "note": "The membership's per-organization profile: status gives membershipStatus, role gives a Grant, assignedLocations and includesUnassignedLocations give the grant's location scope (pending 42 and 116), startDate/endDate may be employment dates rather than joinedAt/removedAt (not checked), firstName/lastName/fullName/middleName/jobTitle/image/about and the personal email and phones describe the Person through ContactPoints, and heardAboutUs and firstLogin are not domain; whether UserProfile.id equals OrganizationMember.id was not checked."
+   }
+  ],
+  "enums": [
+   {
+    "enum": "AddressType",
+    "verdict": "values-differ",
+    "packetScheme": "ContactPurposeScheme (06's defaultFor on PostalAddress)",
+    "note": "billing and shipping match; ship_from, manufacturing and other are new; receiving and ordering have no Sutton value; Sutton allows several types on one address plus a default flag for each but other (pending decision 126)."
+   },
+   {
+    "enum": "ApprovalStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ApprovalStatusScheme (proposed)",
+    "note": "pending_approval, approved, auto_approved, rejected; Order and PurchaseOrder also carry approvalStatus directly, a second copy of the same fact; not to be folded into decision 82's OrderLifecycleScheme without a ruling."
+   },
+   {
+    "enum": "CompanyKind",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none: a class choice, not a classification",
+    "note": "It is domain-relevant but chooses which class recordOf points at (Organization or Person) under decision 125 (a), so it projects as no scheme; fixed at creation, per its description."
+   },
+   {
+    "enum": "CompanyStatus",
+    "verdict": "scheme-exists",
+    "packetScheme": "AccountStatusScheme",
+    "note": "active and archived match report 10 section 4.29 exactly; the value sits on the tenant's record (see the accountStatus conflict)."
+   },
+   {
+    "enum": "CompanyType",
+    "verdict": "scheme-exists",
+    "packetScheme": "none as a scheme: the flags isCustomer and isVendor, labels in report 10 section 4.8 (decisions 3, 47)",
+    "note": "customer and vendor equal the two flags; a list on Company, so both may hold; confirms decision 89 (a); no PartyRole scheme is made."
+   },
+   {
+    "enum": "ContactType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ContactTypeScheme (proposed)",
+    "note": "customer, marketing, sales, vendor is not ContactPurposeScheme (billing, shipping, receiving, ordering): it reads as the tenant's classification of the contact, one value per contact; customer and vendor overlap the company's flags."
+   },
+   {
+    "enum": "MemberStatus",
+    "verdict": "values-differ",
+    "packetScheme": "MembershipStatusScheme",
+    "note": "active and suspended match; pending is the scheme's invited (its altLabel is Pending); revoked may be a withdrawn invitation rather than removed (not checked); the scheme is not proposed in report 13 and would be with Sutton data."
+   },
+   {
+    "enum": "OrganizationStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none",
+    "note": "Sutton's own service state for a workspace (deleted ones read as deactivated); at most evidence that the Tenant role ended (decision 38's anti-rigidity), not a scheme."
+   },
+   {
+    "enum": "OrganizationAccountType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none",
+    "note": "Sutton's commercial class of a workspace (customer, internal, sandbox, trial, unassigned); it matters only for which workspaces an import reads (see the Tenant conflict)."
+   },
+   {
+    "enum": "OrganizationBillingStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none",
+    "note": "Sutton's billing of its customer, not the tenant's business."
+   },
+   {
+    "enum": "MslAlertFrequency",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none",
+    "note": "A notification setting for minimum stock alerts."
+   },
+   {
+    "enum": "DigitPermission",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "PermissionScheme (proposed; concepts are Permission individuals, as decision 41 made roles)",
+    "note": "About 250 actions, each documented as in one PermissionGroup, always granted, or for portal sessions only; the portal-only ones bear on PortalAccess and decision 44."
+   },
+   {
+    "enum": "PermissionCategory",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "PermissionAreaScheme (proposed)",
+    "note": "The app areas report 06's Permission definition names ('one area of the app'); could equally be a display grouping, low priority."
+   },
+   {
+    "enum": "PermissionGroup",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "PermissionGroupScheme (proposed)",
+    "note": "The keys of PermissionGroupDetails, with the requires-dependencies in each value's description."
+   },
+   {
+    "enum": "MemberRole",
+    "verdict": "values-differ",
+    "packetScheme": "MemberRoleScheme",
+    "note": "FULL_ACCESS_USER, MANAGER, SHOP_FLOOR_OPERATOR against viewer, editor, admin: different roles of a different app, not ranked as hasRole ranks them; which one is 'the built-in admin role' that CurrentUser.canManageRoles names is not stated."
+   }
+  ],
+  "questions": [
+   {
+    "question": "What is a Sutton Company whose kind is individual?",
+    "options": [
+     "(a) A Person with the tenant's SourceRecord; recordOf points at a Person or an Organization by kind",
+     "(b) An Organization all the same, as decision 3 wrote",
+     "(c) Left out of the party slice"
+    ],
+    "recommended": "(a)",
+    "why": "The enum's own description calls it a person modelled as a company; decision 34 already makes Person the human, and (b) types a retail customer an organization.",
+    "existingDecision": "125"
+   },
+   {
+    "question": "Where does billing or shipping purpose sit for Sutton records, and what is Contact.type?",
+    "options": [
+     "(a) Purpose on the address (Address.type and defaults, AddressType concepts added for ship_from and manufacturing); Contact.type a new ContactTypeScheme on the contact's SourceRecord; no ContactAssignment made up",
+     "(b) A ContactAssignment derived for each contact of the company at each address, Contact.type as its purpose",
+     "(c) Contact.type's customer and vendor read as flags on the person's record, sales and marketing a scheme"
+    ],
+    "recommended": "(a)",
+    "why": "Sutton states purpose only on addresses and never a purpose at a point for a person; (b) invents pairs nobody recorded, and Contact.type's values (sales, marketing) are not exchanges a ContactAssignment serves.",
+    "existingDecision": "126"
+   },
+   {
+    "question": "Is a Sutton Organization the Tenant, or a record of the tenant's body?",
+    "options": [
+     "(a) A SourceRecord whose recordOf is the tenant's Organization; inTenant stays the repository's tenant; a sandbox or trial workspace is another record of the same body, never a second Tenant",
+     "(b) A new Workspace term between records and Tenant, with records inWorkspace and the workspace of a Tenant",
+     "(c) Each Sutton Organization is its own Tenant, as the repository's OrganizationId is"
+    ],
+    "recommended": "(a)",
+    "why": "Decision 103 makes an organization the legal entity, and Sutton keeps sandbox, trial and internal workspaces of one company; (c) breaks 103, and (b) changes the range of the thread's inTenant, a breaking change under decision 24.",
+    "existingDecision": ""
+   },
+   {
+    "question": "Is an invited (pending) or revoked Sutton member a Member?",
+    "options": [
+     "(a) Yes: a Member from the invitation, its stage a MembershipStatusScheme concept, the Member definition widened from 'lets the person act' to include the invited stage",
+     "(b) No: only active and suspended are Members; a pending invitation is not imported as a membership",
+     "(c) All four are Members and the definition stays as it is"
+    ],
+    "recommended": "(a)",
+    "why": "Sutton gives a pending member an id, a role and locations, and RoleDetails.memberCount counts invited members; (b) drops grants Sutton states; (c) leaves the accepted definition false of invitees. Changing a thread definition is recorded as breaking (decision 24).",
+    "existingDecision": ""
+   },
+   {
+    "question": "How are Sutton's roles written, built-in and custom?",
+    "options": [
+     "(a) Role individuals of their own, concepts of a new Sutton role scheme, aligned to MemberRoleScheme by SSSOM only; a custom role identified by its tenant and its Sutton id",
+     "(b) Concepts added to MemberRoleScheme beside viewer, editor and admin",
+     "(c) Mapped onto viewer, editor or admin at import"
+    ],
+    "recommended": "(a)",
+    "why": "They are another app's roles and not ranked; (b) mixes two apps' roles in one closed scheme, and (c) loses what a Sutton role permits. A custom role has no notation, so Role's identity criterion (decision 41) needs a second form either way.",
+    "existingDecision": ""
+   },
+   {
+    "question": "Which Sutton level is the packet's Permission?",
+    "options": [
+     "(a) Both: Permission is one DigitPermission action, a new PermissionGroup is what a role grants, with requiresPermission moved to the groups",
+     "(b) Permission is the group; single actions are not modelled",
+     "(c) Permission is the single action; groups are only a SKOS grouping"
+    ],
+    "recommended": "(a)",
+    "why": "RoleDetails lists both permissionGroups and permissions, Sutton's dependencies are between groups, and every field's access rule names a single action, which a question such as 'may member M read company details' needs.",
+    "existingDecision": ""
+   }
+  ],
+  "conflicts": [
+   {
+    "packetPlace": "DECISIONS.md decision 3, 'What it gives up': \"a person cannot be an Account\"; decision 34: \"the Sutton Account is the organization\"",
+    "schemaFact": "Company.kind is company or individual, and individual is \"a person modelled as a company — a sole trader or a retail customer\", fixed at creation",
+    "consequence": "The Organization ↔ Sutton Account mapping holds only for kind company; open decision 125 resolves it, and decision 3's sentence would be struck."
+   },
+   {
+    "packetPlace": "DECISIONS.md decisions 39 and 43: \"a contact purpose sits on the assignment, not on the address or contact point alone\"",
+    "schemaFact": "Purpose is on Address.type (billing, shipping, ship_from, manufacturing, other) with is*Default flags; Contact has one optional company and a type of customer, marketing, sales or vendor, never a purpose at a point",
+    "consequence": "No ContactAssignment can be read from Sutton without making up pairs; open decision 126 keeps 39 and 43 for other sources only."
+   },
+   {
+    "packetPlace": "Terms.vocab.ts Organization identity (decision 103): \"the same organization being the same legal entity\"; Tenant: \"An organization for which this application keeps a workspace\", told apart in the repository by OrganizationId (decision 38)",
+    "schemaFact": "Sutton's Organization is a workspace with accountType customer, internal, sandbox, trial or unassigned, so one company can have several",
+    "consequence": "A Sutton Organization cannot be minted as a Tenant per row: two workspaces of one legal entity would be two tenants, or their records would merge under one inTenant. It has to be read as a SourceRecord of the body (question 3)."
+   },
+   {
+    "packetPlace": "Terms.vocab.ts Role identity: \"the concept's scheme and notation (decision 41)\"; definition \"A named level of access ... such as viewer, editor or admin\"",
+    "schemaFact": "A custom RoleDetails has name null (no MemberRole notation), only an id, an editable displayName and the permission groups it grants; built-in roles MANAGER and SHOP_FLOOR_OPERATOR are functions, not ranked levels",
+    "consequence": "A custom role has no notation for the stated criterion to use, and 'level' fits Sutton's roles poorly. The criterion needs a tenant-and-id form for custom roles (question 5)."
+   },
+   {
+    "packetPlace": "Terms.vocab.ts Grant definition: \"An assignment of one role to one member at one scope\"; identity \"the member it is granted to and the record field it is read from\"",
+    "schemaFact": "UserProfile has one role and a list assignedLocations (null for all), plus includesUnassignedLocations for records with no location",
+    "consequence": "One Sutton field gives one role over several locations and over 'no location', which no GrantScopeKindScheme concept covers. Either a grant per location is lifted from one field, which breaks the identity criterion, or a grant has many scopes, which breaks the definition (open 42 and 116)."
+   },
+   {
+    "packetPlace": "Terms.vocab.ts Member definition: \"lets the person act in the tenant's workspace from the day it is made until it is removed\"",
+    "schemaFact": "OrganizationMember and UserProfile exist for pending and revoked members (MemberStatus), and RoleDetails.memberCount counts \"invited and suspended members as well as active ones\"",
+    "consequence": "A pending invitee is a Sutton member who cannot yet act, so the definition is false of it (question 4)."
+   },
+   {
+    "packetPlace": "Report 06 properties table: accountStatus, domain Organization",
+    "schemaFact": "CompanyStatus is on Company, the tenant's record of the party; report 10 section 4.29 already says \"one per account's SourceRecord ... not the shared organization\"",
+    "consequence": "Report 06's domain contradicts decision 34 and report 10. The domain should be SourceRecord, as decision 34 put the flags there."
+   },
+   {
+    "packetPlace": "Report 06 properties table: hasPostalAddress, domain Party",
+    "schemaFact": "Sutton addresses on a Company carry tenant-specific customerPaymentTerm, vendorPaymentTerm and default flags",
+    "consequence": "These are the tenant's assertions, which decision 34 puts on the tenant's SourceRecord, not on the shared body. Hanging the address on the Party mixes one tenant's terms into another's view."
+   }
+  ],
+  "notes": "Build this family first after the thin thread, as slice 1: every other family names OrganizationMember (createdBy, owners), Company (orders), and Address (sites). Prerequisites, in order: 04's SourceRecord with recordOf, sourceSystem, sourceType and sourceId; answers to 125, 126 and the workspace question; decision 12 (the Party category, for hasPostalAddress and hasContactPoint); 35 (closed flags); and 37 (which context owns party records). Then Organization and Person records, PostalAddress and ContactPoint, and the identity terms. The access half (Permission, PermissionGroup, Sutton roles, location grants) needs 08's Location and Site, because assignedLocations points at tenant addresses, plus 42 and 116. Approval waits for 09's orders and its own ruling. Not checked: the inputs and mutations, any record data, whether UserProfile.id equals OrganizationMember.id, what revoked means, which built-in role is the admin, and whether startDate is the membership's start."
+ },
+ "catalog": {
+  "types": [
+   {
+    "suttonType": "Bom",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "BomRevision",
+    "packetReport": "07",
+    "note": "Each row is one version (id changes on every update, `versionId` is the stable lineage), so a row is a `BomRevision` and `versionId` identifies the enduring `Bom`; `isDefault` is the item's `primaryBom` (an item can hold several lineages, decision 66 (a)); no effective date and no output quantity (lines are per one unit of the parent); `totalCost` is a computed view; a job's own editable BOM is also a `Bom` row (not checked further)."
+   },
+   {
+    "suttonType": "BomItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "BomLine",
+    "packetReport": "07",
+    "note": "`item` is `componentItem`, `quantity` is `quantityPer` for one unit of the parent, its unit not stated (presumably the component's stock unit, not checked); `instructions` needs a property; `supplyType` is set only when read through a job, so it belongs to 09's job line, not to `BomLine`; no scrap ratio, optional flag or sequence."
+   },
+   {
+    "suttonType": "Cost",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "MoneyAmount",
+    "packetReport": "07",
+    "note": "A money amount with a currency; `costAmount` is a Float, so the lift must read the JSON digits rather than the parsed float (decision 59); the field that holds it (`standardCost`, `purchasePrice`, `unitPrice`) decides whether it fills a `CostObservation.costAmount` or an offer's `unitPrice`."
+   },
+   {
+    "suttonType": "CostSum",
+    "verdict": "computed-view",
+    "packetTerm": "MoneyAmount",
+    "packetReport": "07",
+    "note": "A sum per currency (`Item.amountSold`), a total read from transactions, not a stored fact."
+   },
+   {
+    "suttonType": "CurrencyDetails",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Currency",
+    "packetReport": "07",
+    "note": "`code` fills `currencyCode` (ISO 4217 assumed, not checked); `name` and `symbol` are labels; it has its own `id`, but the individual is the ISO entry, matched by code."
+   },
+   {
+    "suttonType": "DecimalCost",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "MoneyAmount",
+    "packetReport": "07",
+    "note": "The same as `Cost` with the amount as a String, which can be read from its digits; used for averages and expected values."
+   },
+   {
+    "suttonType": "Equipment",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Machine",
+    "packetReport": "08",
+    "note": "08's `Machine` (under `gist:Equipment`) fits, but its definition requires a recorded running state that Sutton's equipment does not have; `serialNumber` is an identifier of kind `serialNumber`; `workCenter`, `manufacturer`, `modelNumber`, `purchaseDate`, `warrantyExpirationDate` and `status` need properties; `createdBy` is bookkeeping."
+   },
+   {
+    "suttonType": "Item",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "ItemSpecification",
+    "packetReport": "07",
+    "note": "`trackingMethod` chooses the subkind and the tracking concept (decision 65); `itemTypes` is `itemRole`; `defaultStockUom`, `defaultPurchasingUom` and `defaultSalesUom` are `baseUnit`, `purchaseUnit` and `salesUnit`; `fulfillmentItem` is `fulfilledBy`; `sku` and `gtin` are `ItemIdentifier`s; `standardCost` is a `CostObservation` of basis standard; `parent`, `variants`, `shelfLifeDays`, `grossWeightPerUom`, `defaultSalesPrice`, `defaultPackagingType` and `minimumStockLevel` have no property yet; every quantity, value and price history field is a computed view, and the label settings are not domain facts."
+   },
+   {
+    "suttonType": "ItemCustomer",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomerItem",
+    "packetReport": "07",
+    "note": "A relator under `gist:Offer`: the tenant offers an item to one customer, optionally at one customer address, with the customer's own SKU (an `ItemIdentifier` issued by the customer, which needs a new `IdentifierKindScheme` concept, customer part number), a minimum order quantity and a unit price; Sutton finds it by item, customer and address."
+   },
+   {
+    "suttonType": "ItemImage",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "07",
+    "note": "A picture file attached to the item (url, storage key, default flag); at most a depiction link, not a class."
+   },
+   {
+    "suttonType": "ItemRouting",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "RoutingRevision",
+    "packetReport": "07",
+    "note": "A new row is made when a routing is replaced, and the item's active one is the most recent, so a row is a revision; Sutton has no lineage id and one routing per item, so the enduring `Routing` has no Sutton record (the item stands in); the totals and counts are computed views."
+   },
+   {
+    "suttonType": "ItemRoutingOperation",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "OperationDefinition",
+    "packetReport": "07",
+    "note": "One step of a routing: `position` is `sequence`, `itemSetupSeconds` is `setupTime`, `itemOperatingSeconds` is `runTime` (whether it is per unit is not stated), `instructions` needs a property; it names a reusable `Operation` and has no work center of its own, which the packet's definition requires."
+   },
+   {
+    "suttonType": "ItemVendor",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "VendorItem",
+    "packetReport": "07",
+    "note": "`vendor` is `offeredBy`, `purchasePrice` `unitPrice`, `leadTime` `leadTime` (unit not stated), `preferredVendor` `isPreferred`, `vendorItemSku` an `ItemIdentifier` of kind `vendorSku`; `vendorAddress`, `minimumOrderQuantity`, `defaultQuantity` and the vendor's purchase unit with its conversion rate (and an inverted flag) need properties or a vendor-scoped `ItemUnitConversion`; Sutton finds it by item, vendor and vendor address."
+   },
+   {
+    "suttonType": "ItemVendorGtin",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "ItemIdentifier",
+    "packetReport": "07",
+    "note": "A GTIN (kind `gtin`) that the vendor item carries, so its subject is the `VendorItem`, not the item; GS1 assigns the issuer, not the vendor."
+   },
+   {
+    "suttonType": "Measurement",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "QuantityValue",
+    "packetReport": "07",
+    "note": "A value and its unit; `value` is a Float, so the lift follows decision 50."
+   },
+   {
+    "suttonType": "Operation",
+    "verdict": "new-term-needed",
+    "packetTerm": "StandardOperation",
+    "packetReport": "07",
+    "note": "A task template for a kind of production work the tenant performs, such as cutting or painting, with default setup and run seconds, a default work center, default operators, equipment and tool options, internal or external, and for external work the service item bought; routing steps reuse it, so it is not the packet's `OperationDefinition`."
+   },
+   {
+    "suttonType": "OperationConfiguration",
+    "verdict": "part-of-another-record",
+    "packetTerm": "StandardOperation",
+    "packetReport": "07",
+    "note": "One resource option of an operation: a work center (a `WarehouseLocation`), optional equipment and an optional tool, one of them the default; whether a job or work order names a chosen configuration was not checked."
+   },
+   {
+    "suttonType": "OperationEquipment",
+    "verdict": "part-of-another-record",
+    "packetTerm": "StandardOperation",
+    "packetReport": "07",
+    "note": "A join row: equipment that can perform the operation, with the tools it uses there."
+   },
+   {
+    "suttonType": "OperationsOutput",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "09",
+    "note": "A total quantity per operation name and day, a report over 09's operation executions, not a record."
+   },
+   {
+    "suttonType": "PriceList",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "PriceList",
+    "packetReport": "07",
+    "note": "`status`, and the list-level rule (`conversionType`, `value`, `valueType`) that derives an item's price from its default sales price, need properties; it has no period and no tax-inclusive flag, both of which the packet's design has."
+   },
+   {
+    "suttonType": "PriceListCustomer",
+    "verdict": "part-of-another-record",
+    "packetTerm": "assignedPriceList",
+    "packetReport": "07",
+    "note": "A join row from a company to a price list; a customer may be on several lists and an order stores the chosen one; the company may be of kind `individual` (decision 125)."
+   },
+   {
+    "suttonType": "PriceListItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "PriceListEntry",
+    "packetReport": "07",
+    "note": "`overridePrice` is `unitPrice` when set; `effectivePrice` is a computed view (override, else the list's rule on the default sales price); there is no minimum quantity."
+   },
+   {
+    "suttonType": "Tool",
+    "verdict": "new-term-needed",
+    "packetTerm": "Tool",
+    "packetReport": "08",
+    "note": "Physical tooling (a mold, die or fixture) used on equipment and jobs, under `gist:Equipment` beside `Machine` and disjoint from it; `owner` is a company (customer-owned tooling) and needs an ownership property; `toolNumber` and `toolCustomerNumber` are identifiers; `partsMade` is a computed counter; `condition` is a tenant option list."
+   },
+   {
+    "suttonType": "ToolImage",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "08",
+    "note": "A picture file attached to a tool, the same as `ItemImage`."
+   },
+   {
+    "suttonType": "ToolItem",
+    "verdict": "part-of-another-record",
+    "packetTerm": "Tool",
+    "packetReport": "08",
+    "note": "A join row naming an item the tool makes: a property from `Tool` to `ItemSpecification`."
+   },
+   {
+    "suttonType": "ToolSetupConfiguration",
+    "verdict": "new-term-needed",
+    "packetTerm": "ToolSetup",
+    "packetReport": "07",
+    "note": "A specification of one way to set up a tool: a name, a setup time in minutes, notes, and the items it makes with the units of each per cycle; `showOnSalesOrders` is a setting."
+   },
+   {
+    "suttonType": "ToolSetupConfigurationItem",
+    "verdict": "part-of-another-record",
+    "packetTerm": "ToolSetup",
+    "packetReport": "07",
+    "note": "A line of a tool setup: one item and the whole number of units of it each cycle makes."
+   },
+   {
+    "suttonType": "UoM",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "UnitOfMeasure",
+    "packetReport": "07",
+    "note": "A tenant's own unit record (id, name, symbol, type), so a person maps each to a concept of `UnitOfMeasureCodeScheme` (decision 61); `type` is `hasDimension`; a code is never the identity."
+   },
+   {
+    "suttonType": "VariantTemplate",
+    "verdict": "part-of-another-record",
+    "packetTerm": "ItemSpecification",
+    "packetReport": "07",
+    "note": "A value on a parent item: one option axis and its allowed values; variants are items whose `parent` is that item, so it needs `variantOf` and an option-value property, and report 07 section 8 left variants out."
+   }
+  ],
+  "enums": [
+   {
+    "enum": "BomItemSupplyType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ComponentSupplyScheme (proposed)",
+    "note": "`SELF_SUPPLIED`, `VENDOR_SUPPLIED`: who supplies a component on a job (probably an outsourced one), set only on a job's BOM, so it belongs to 09's job line."
+   },
+   {
+    "enum": "EquipmentStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "EquipmentStatusScheme (proposed)",
+    "note": "active, inactive, maintenance, retired. Report 10 section 4.26 already says maintenance and retired are equipment statuses and not machine states, so this is not `MachineStateScheme`."
+   },
+   {
+    "enum": "ItemType",
+    "verdict": "scheme-exists",
+    "packetScheme": "ItemRoleScheme",
+    "note": "buy, make, sell, the same three notations, several on one item, as 4.1 says."
+   },
+   {
+    "enum": "PurchasePriceSource",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Worked out from whether a preferred `VendorItem` exists; it names the rule that picks one price, which is not a fact about the item."
+   },
+   {
+    "enum": "ItemStatus",
+    "verdict": "scheme-exists",
+    "packetScheme": "ItemLifecycleScheme",
+    "note": "active, archived and draft are all concepts of 4.4. Sutton has no inactive or discontinued, so no mapping to the repository's discontinued is implied."
+   },
+   {
+    "enum": "TrackingMethod",
+    "verdict": "values-differ",
+    "packetScheme": "TrackingMethodScheme",
+    "note": "standard maps to `untracked` and serialized to `label` (decision 73). service and alias are item kinds (`ServiceItemSpecification`, `AliasItemSpecification`, decision 65), not tracking methods, so one Sutton field fills a subkind and a concept."
+   },
+   {
+    "enum": "OperationStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "",
+    "note": "active and archived: the same words as `AccountStatusScheme`, which is defined for accounts only. Whether one shared in-use or archived scheme serves operations, tools and price lists was not decided."
+   },
+   {
+    "enum": "OperationType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "",
+    "note": "internal or external. An external operation names a service item that is bought, so this is outsourced work. It could also be a boolean."
+   },
+   {
+    "enum": "PriceListConversionType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "PriceRuleScheme (proposed)",
+    "note": "markup, discount and set_to: how a list derives an item's price from its default sales price when the entry has no override."
+   },
+   {
+    "enum": "PriceListStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "",
+    "note": "active or inactive: whether the list can be assigned to customers and orders. It has the same shared-status question as `OperationStatus`."
+   },
+   {
+    "enum": "PriceListValueType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "It says whether the list's `value` is a percentage or a money amount. That is the datatype of the adjustment: type it as a ratio or as a `MoneyAmount`, not a concept."
+   },
+   {
+    "enum": "ToolStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "",
+    "note": "active or archived. It has the same shared-status question as `OperationStatus`."
+   },
+   {
+    "enum": "UoMType",
+    "verdict": "values-differ",
+    "packetScheme": "MeasurementDimensionScheme",
+    "note": "count, mass, length and volume match. Sutton adds area, molar and time, which need three concepts."
+   }
+  ],
+  "questions": [
+   {
+    "question": "What does one Sutton `Bom` row denote, given that every update makes a new row and `versionId` stays the same?",
+    "options": [
+     "(a) A `BomRevision`; `versionId` mints the enduring `Bom`; `isDefault` is the item's `primaryBom`; a job's own BOM is a revision bound by 09's `usesBomRevision`",
+     "(b) A `Bom`; only the latest version is imported and versions are left out",
+     "(c) A `Bom` per row, linked to the earlier row by `supersedes`"
+    ],
+    "recommended": "(a)",
+    "why": "Sutton says that `id` names one version and `versionId` the lineage, which is the packet's own split. Under (b) a job bound to an older version points at nothing. It fits decision 66 (a), alternates as second bills.",
+    "existingDecision": ""
+   },
+   {
+    "question": "How is Sutton's single `TrackingMethod` field split between the item kind and the tracking concept?",
+    "options": [
+     "(a) standard: inventory item, `untracked`; serialized: inventory item, `label`; service: `ServiceItemSpecification` with no tracking; alias: `AliasItemSpecification`",
+     "(b) Make item kind a scheme, and take all four values as concepts of it plus tracking"
+    ],
+    "recommended": "(a)",
+    "why": "The kinds differ in structure: an alias has a fulfilment item and a service has no stock. That is decision 65 (a) and 73 (a), applied to the schema's real enum.",
+    "existingDecision": "65"
+   },
+   {
+    "question": "Is a work center a place? Sutton's is a `WarehouseLocation` of type `workCenter` that holds stock and is where equipment sits.",
+    "options": [
+     "(a) Keep `WorkCenter` a `gist:Collection` and mint a `Location` plus a `WorkCenter` `sitedAt` it from the one Sutton row",
+     "(b) `WorkCenter` becomes a subkind of `Location` (67 (c))",
+     "(c) The Sutton row is a plain `Location`, and `WorkCenter` waits for a source that groups capacity"
+    ],
+    "recommended": "(b)",
+    "why": "Every source in hand makes a work center a place that holds stock. (a) makes two individuals from one record, and the case where a work center is not one place has no source. This goes against 67's current recommendation.",
+    "existingDecision": "67"
+   },
+   {
+    "question": "Is Sutton's reusable `Operation` a term of its own beside the routing step that uses it?",
+    "options": [
+     "(a) Yes: a new `StandardOperation` task template; `ItemRoutingOperation` is `OperationDefinition` and points at it",
+     "(b) No: fold the operation's defaults into each `OperationDefinition`"
+    ],
+    "recommended": "(a)",
+    "why": "One operation is shared by many items' routings and carries its own work center, equipment, tools, type and service item. Under (b) a change to it has no single home, which breaks decision 2.",
+    "existingDecision": ""
+   },
+   {
+    "question": "What do a tenant's terms with one company hang on: a price list assignment, a customer item, a vendor item?",
+    "options": [
+     "(a) The tenant's `SourceRecord` of that company, so `assignedPriceList` and the offers' counterparty range over it and a company of kind `individual` works too",
+     "(b) The shared `Organization`, as decision 3 wrote it"
+    ],
+    "recommended": "(a)",
+    "why": "Decision 34's reason (one tenant's vendor is another's customer) applies to prices just as it does to flags. Sutton's `PriceListCustomer.customer` can be a person (decision 125), which an `Organization` domain refuses.",
+    "existingDecision": ""
+   },
+   {
+    "question": "How are a tenant's own option lists written: Sutton item category, tags, packaging type, tool condition (`DynamicFieldOption`)?",
+    "options": [
+     "(a) Tenant data: each option is a `gist:Category` individual in that tenant's graph, mapped by a person to a concept of ours where one exists",
+     "(b) A concept scheme minted per tenant and per list",
+     "(c) Tags and conditions only as text"
+    ],
+    "recommended": "(a)",
+    "why": "Report 10 section 4.3 leaves another tenant's list as 'its own scheme or a `gist:Category`'. (b) turns customer data into vocabulary, and the vocabulary module holds only ratified terms (decision 32).",
+    "existingDecision": ""
+   }
+  ],
+  "conflicts": [
+   {
+    "packetPlace": "07 section 3, `BomRevision`: \"lists, for one bill of materials from a stated date, the component lines needed to make a stated output quantity\"; `defaultRevision`: \"the version used when an order names none\"",
+    "schemaFact": "A `Bom` version has no date. The latest version is current and `boms` always returns it. `BomItem.quantity` is \"for one unit of the parent item\". `isDefault` marks the item's default bill, not a default version.",
+    "consequence": "`effectiveFrom` and `outputQuantity` stay empty for Sutton, or `outputQuantity` is fixed at one unit. `defaultRevision` has no Sutton source: the latest revision is the one in force."
+   },
+   {
+    "packetPlace": "07 section 3, `WorkCenter`: \"a grouping of equipment, people and capacity ... which need not be one machine or one place\" (decision 67 open, recommending not a `Location`)",
+    "schemaFact": "`Equipment.workCenter` and `OperationConfiguration.warehouseLocation` are a `WarehouseLocation!`, and `WarehouseLocationType.workCenter` is a location that stock can sit in.",
+    "consequence": "Sutton's work center is a place. Under 67 (a) one row makes two individuals. See question 3."
+   },
+   {
+    "packetPlace": "Decision 3: \"terms, price lists and portal access sit on the organization, not on the relationship\"; 07's `assignedPriceList` domain `Organization` (06)",
+    "schemaFact": "`PriceListCustomer.customer` is a `Company`, which may be of kind `individual`, \"a person modelled as a company\"",
+    "consequence": "An `Organization` domain cannot hold a retail customer's price list. Decision 34's reason also puts the assignment on the tenant's record. See question 5, and 125."
+   },
+   {
+    "packetPlace": "10 section 4.5: \"Sutton public: an item is Standard or Serialized\"; 4.2 treats item kind and tracking as separate fields",
+    "schemaFact": "`TrackingMethod` is `alias`, `serialized`, `service`, `standard`, one field",
+    "consequence": "Section 4.5's source line is wrong for the API. The mapping needs a split rule (question 2, decision 65)."
+   },
+   {
+    "packetPlace": "07 section 3, `OperationDefinition`: \"one planned step of a routing revision: the work center it needs and the setup and run time\"",
+    "schemaFact": "`ItemRoutingOperation` has times, a position and instructions but no work center. The work center is on the reusable `Operation` (`defaultWarehouseLocation`, `operationConfigurations`).",
+    "consequence": "A Sutton step reaches its work center only through the operation it names. The definition or the mapping must change (question 4)."
+   },
+   {
+    "packetPlace": "07 section 3, `ItemUnitConversion`: \"how many of one unit make one of another unit for one item, from a stated date\"; identity \"not the item and its two units, since a factor changes over time\"",
+    "schemaFact": "Conversions have no date. One sits on the vendor item (`unitConversionRate`, `unitConversionRateInverted`, `vendorPurchaseUoM`). One sits on the item (`numberOfUnitsPerDefaultPackageType` for `defaultPackagingType`).",
+    "consequence": "`conversionFor` ranges over `ItemSpecification` only, so a vendor-scoped factor has no subject. `effectiveFrom` has no Sutton source."
+   },
+   {
+    "packetPlace": "07 section 3, `PriceList`: \"for a period\"; `PriceListEntry`: \"the price of one item per unit, from a minimum quantity\"",
+    "schemaFact": "`PriceList` has no dates. `PriceListItem` has no minimum quantity. Without `overridePrice` an entry's price is derived from the item's default sales price by the list's markup, discount or set_to rule.",
+    "consequence": "`minimumQuantity` and the period stay empty for Sutton. A derived price is a computed view, not a stated `unitPrice`, and the list-level rule needs properties."
+   },
+   {
+    "packetPlace": "08, `Machine`: \"a piece of equipment that performs production operations and whose running state a detector or an operator records over time\"",
+    "schemaFact": "`Equipment` has a status (active, inactive, maintenance, retired), a serial number and a warranty, but no running state. Machine telemetry is will-not in 04.",
+    "consequence": "Sutton equipment fits `Machine` only if its definition drops the running-state clause, or a broader equipment term is added."
+   },
+   {
+    "packetPlace": "07 section 3, `VendorItem` identity: \"not the pair of vendor and item, since one vendor may sell one item in two pack sizes\"",
+    "schemaFact": "`itemVendor(itemAndVendorIds)` returns one `ItemVendor` per item, vendor and optional vendor address",
+    "consequence": "Identity by source id still holds. The stated reason does not hold for Sutton, and the vendor address is part of what tells two Sutton vendor items apart."
+   }
+  ],
+  "notes": "Build after the party slice: `VendorItem`, `CustomerItem`, `PriceList` and `Tool.owner` point at companies, so 125 and question 5 come first. Inside the family, start with the values: `UnitOfMeasure` and its dimensions (61, plus area, molar and time), `Currency` (62) and `MoneyAmount` (59; Sutton gives Floats). Then `ItemSpecification` with its kinds (65, 92), roles, lifecycle, tracking (73) and identifiers. Then the offers. Next the places: 08's `Location` and the work center (67). Then `Machine` and `Tool`, `StandardOperation`, the routing and the BOM. The job's BOM, `supplyType` and operation output wait for 09. Not checked: inputs and mutations, `Job`, `WorkOrder` and `WarehouseLocation` (only grepped), whether any record names a chosen `OperationConfiguration`, the units of `leadTime`, `itemOperatingSeconds` and `BomItem.quantity`, and the ISO status of `CurrencyDetails.code`."
+ },
+ "stock": {
+  "types": [
+   {
+    "suttonType": "Inventory",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "InventoryLabel",
+    "packetReport": "08",
+    "note": "A record of a labelled portion (decision 71 (a), open), but only when `storageType` is `single`: a `nested` one with `isMixed` and no `item` cannot meet InventoryLabel's \"of one item specification\" and reads as `LogisticUnit`. Several fields have other homes: `lotNumber` is text (127), `inventoryId`/`scanCodeSerialNumber` go to `TrackingCode` (`labelCode`), `quantityInStock`/`quantityAvailable`/`quantityReserved` go to `StockPosition` measures, `costPerUom`/`standardCost`/`valueInStock` to 07's `CostObservation`, `receivingStatus` mixes lifecycle and disposition, and `expirationDate` has no label-side property."
+   },
+   {
+    "suttonType": "WarehouseLocation",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Location",
+    "packetReport": "08",
+    "note": "`type: bin` is `Bin`. But the record has no parent location, only a nullable `address`, so `hasParentLocation` must point at whatever the organization `Address` becomes. `workCenter`, `transit` and `unassigned` have no subkind, and a work center that holds stock clashes with decision 67 (a). `numberOfInventoryCodes`, `numberOfUniqueItems`, `stockItems` and `totalValueInStock` are computed. `locationCode` is the code, scoped to its parent."
+   },
+   {
+    "suttonType": "InventoryAdjustment",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "InventoryAdjustment",
+    "packetReport": "08",
+    "note": "The same thing, but Sutton's record is a header: one `adjustmentReason` (a tenant `DynamicFieldOption`, not `AdjustmentReasonScheme`), one `address`, a `status` that can be `draft`, and many `lineItems`. The packet's single signed amount and `forLabel` therefore move to the lines. `documentNumber` and `inventoryAdjustmentNumber` are identifiers. There is no `settlesCount`: Sutton has no count record."
+   },
+   {
+    "suttonType": "InventoryAdjustmentLineItem",
+    "verdict": "part-of-another-record",
+    "packetTerm": "EventLine (09), a line of InventoryAdjustment",
+    "packetReport": "09",
+    "note": "One signed `quantityChange` on one label (`inventory`), carried as 09's `EventLine` with `forLabel` and a signed `hasQuantity`. Its `inventoryLedger` is the matching ledger entry (null on a draft, not checked)."
+   },
+   {
+    "suttonType": "InventoryLedger",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "EventLine",
+    "packetReport": "09",
+    "note": "Each entry is one signed quantity change on one label, caused by the record its `source` names (adjustment, `Job`, `Order`, `PurchaseOrder`, `TransferOrder`, `WarehouseLocation`, `WorkOrder`). That makes it an `EventLine` of that event, but this rests on a question below. `quantityTotal` is a book `StockPosition` of the label `asOf` `createdAt`; `runningTotalPerItem` is computed; `type: costAdjustment` entries carry no quantity and belong to 07's `CostObservation`; `startingBalance` has no packet event."
+   },
+   {
+    "suttonType": "ReservedItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "InventoryReservation",
+    "packetReport": "08",
+    "note": "`reservesFor` reaches `orderItem` (a `SalesOrderLine`) or the (`job`, `bomItem`) pair (a `ManufacturingOrderLine`), and `quantity` is `hasQuantity`. The scope is always one label (`forLabel`), narrower than the packet allows. There is no `reservedUntil`, and nothing records release or consumption, so `drawsOnReservation` has no source."
+   },
+   {
+    "suttonType": "LotTraceability",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "08",
+    "note": "The result of `Query.lotTraceability(lotNumber)`: labels found by the lot text, through manufacturing and split lineage up to 3 levels, plus PO receipts, returns and picks. It is the genealogy answer of 08's lot question and decision 85, read by text, as 127 (a) has it. It is not a record."
+   },
+   {
+    "suttonType": "AddressQuantityInStock",
+    "verdict": "computed-view",
+    "packetTerm": "StockPosition",
+    "packetReport": "08",
+    "note": "Returned by `Item.quantityInStockByOrganizationAddress`: the `onHand` measure of a `reported` position for one item at one organization address, the `id` most likely the address's (not checked)."
+   },
+   {
+    "suttonType": "StockItem",
+    "verdict": "computed-view",
+    "packetTerm": "StockPosition",
+    "packetReport": "08",
+    "note": "`WarehouseLocation.stockItems` returns the top-N items with their `quantityInStock` at that location: `onHand` measures of `reported` positions, cut to a limit, so never a full statement."
+   },
+   {
+    "suttonType": "ConvertedInventory",
+    "verdict": "part-of-another-record",
+    "packetTerm": "TransformationEvent (09)",
+    "packetReport": "09",
+    "note": "A pair of a label and a `convertedQuantity` on `Inventory.convertedInventory`: most likely the quantity of this label a conversion job (`Job.type` `CONVERSION` or `QUEUE_CONVERSION`) turned into another label, so an input-output line of 09's `TransformationEvent`. Which way it points was not checked."
+   },
+   {
+    "suttonType": "CreatedThrough",
+    "verdict": "part-of-another-record",
+    "packetTerm": "InventoryLabel",
+    "packetReport": "08",
+    "note": "The label's provenance: the `job`, `purchaseOrder` or `orderReturn` it was created through, or `manual`. That is 09's `Receipt` or `TransformationEvent` output, or a creation by hand. The packet has `originatedIn` for a lot only, so a label-side property (for example `labelledIn`, range `gist:Event`) is needed."
+   }
+  ],
+  "enums": [
+   {
+    "enum": "CostingMethod",
+    "verdict": "scheme-exists",
+    "packetScheme": "CostBasisScheme",
+    "note": "`ACTUAL` maps to `actual` and `STANDARD` to `standard` (the notation case differs). It sits on `Inventory`, the label, while the packet's `costBasis` sits on 07's `CostObservation`, so the lift takes it onto the label's cost observation."
+   },
+   {
+    "enum": "ReceivingItemStatus",
+    "verdict": "values-differ",
+    "packetScheme": "LabelLifecycleScheme (active, depleted) with QualityDispositionScheme (onHold)",
+    "note": "One field with four values, held one at a time. `active` and `depleted` map to `LabelLifecycleScheme`. `quarantined` is `QualityDispositionScheme-onHold`, which 10 4.20 reads as active plus a disposition, a re-modelling (report 16 L). `reserved` has no concept anywhere: the packet makes a reservation a relator and designs no reservation status (10 4.30). It is on `Inventory.receivingStatus` despite the name."
+   },
+   {
+    "enum": "StorageType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "none; the two values select a class (InventoryLabel for `single`, LogisticUnit for `nested`)",
+    "note": "The packet has no scheme for it. In the packet's style it should not become one: as decision 65 (a) does for item kinds, the value says which class the record points at. A scheme is needed only if every `Inventory` stays an `InventoryLabel`. What `nested` means exactly was read from the field names only."
+   },
+   {
+    "enum": "InventoryAdjustmentStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "none; OrderLifecycleScheme covers orders only",
+    "note": "`draft` and `completed` are phases of the adjustment document. The packet's `InventoryAdjustment` is an event, so a draft is one that has not happened. A scheme is needed only if draft adjustments are lifted (see conflicts)."
+   },
+   {
+    "enum": "LedgerMovementType",
+    "verdict": "values-differ",
+    "packetScheme": "BusinessStepScheme",
+    "note": "Same idea (the kind of stock event), different values: `purchaseOrderReceipt` and `orderReturnReceipt` go to receiving, `picked` to picking, `stockTransferIn`/`stockTransferOut` to 08's `StockMovement`, `inventoryAdjustment` to `InventoryAdjustment`, `manufacturingOutput` to 09's `TransformationEvent`. `reversePurchaseOrderReceipt`, `unpicked`, `startingBalance` and `costAdjustment` (cost only, so a `CostObservation`) have no concept. Most values map to the event class, not a concept."
+   },
+   {
+    "enum": "WarehouseLocationStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "none for locations; AccountStatusScheme has the same two values for an account",
+    "note": "`active` and `archived` say whether the tenant still uses the location record. A `LocationStatusScheme`, or `AccountStatusScheme` widened to a record status, would carry it. The separate `deleted` flag is not part of it."
+   },
+   {
+    "enum": "WarehouseLocationType",
+    "verdict": "values-differ",
+    "packetScheme": "decision 69's location levels (Site, Warehouse, Bin as subkinds under 69 (a); a level scheme under 69 (b))",
+    "note": "`bin` is `Bin`. `workCenter` is a stock-holding place, against 67 (a). `transit` is a system location for stock on the move, which the packet holds as the `inTransit` measure, not a place. `unassigned` means \"no bin at this address\", not a place of its own. Under 69 (a) these map to classes or to nothing, never to concepts."
+   }
+  ],
+  "questions": [
+   {
+    "question": "What does a Sutton `Inventory` record denote, given that one can hold others (`nestedInventory`, `storageType: nested`) and hold several items (`isMixed`, `item` optional)?",
+    "options": [
+     "(a) `single` points at InventoryLabel and `nested` at LogisticUnit, the term chosen by `storageType` as decision 125 (a) chooses by `kind`",
+     "(b) Every Inventory is an InventoryLabel, and nesting is a containment link between labels",
+     "(c) A nested Inventory is a Container"
+    ],
+    "recommended": "(a)",
+    "why": "InventoryLabel is \"of one item specification\", which a mixed nested record breaks. LogisticUnit (\"contents may change while it stays the same unit\") is what 08 already aligns to Sutton's container. (c) mixes up the vessel and the load, which 08 keeps disjoint.",
+    "existingDecision": ""
+   },
+   {
+    "question": "What is the tenant's organization `Address` in stock terms, given that `WarehouseLocation` sits directly under one with no parent location?",
+    "options": [
+     "(a) A Site, with Sutton's bins directly under it and Bin's definition widened to \"within a warehouse or, where the source has no warehouse level, a site\"",
+     "(b) A Warehouse, as report 16 D has it, with no Site minted for Sutton data",
+     "(c) Both: each address mints one Site and one Warehouse, the bins under the warehouse"
+    ],
+    "recommended": "(a)",
+    "why": "08 defines a site by its one address, which is exactly Sutton's address, and report 16 J already calls addresses sites for grants (decision 42). (b) contradicts J and leaves `operatedBy` with no subject. (c) states a level nobody recorded.",
+    "existingDecision": ""
+   },
+   {
+    "question": "Is a work center a place that holds stock? In Sutton it is a `WarehouseLocation` of type `workCenter`, and `Equipment.workCenter` and `WorkOrder` point at that record.",
+    "options": [
+     "(a) Keep 67 (a): the Sutton record is a plain Location, and a 07 WorkCenter is minted `sitedAt` it",
+     "(b) A work center is a subkind of Location (67 (c))",
+     "(c) The record is a WorkCenter only, and its stock is read at its site"
+    ],
+    "recommended": "(a)",
+    "why": "It keeps 07's grouping of equipment and capacity apart from the place stock sits, which Sutton's ledger and `stockItems` need. Sutton has no separate work-center record, so one record lifts two individuals.",
+    "existingDecision": "67"
+   },
+   {
+    "question": "What does a Sutton `InventoryLedger` entry denote?",
+    "options": [
+     "(a) An 09 EventLine of the event its `source` names: `type` picks the event class, `quantityTotal` is lifted as a book StockPosition of the label as of `createdAt`, and `costAdjustment` entries become CostObservations",
+     "(b) A new information term (for example `StockLedgerEntry` under `gist:Content`) that records a change and points at the event",
+     "(c) Not lifted: the ledger is a projection of the events, which come from their own records"
+    ],
+    "recommended": "(a)",
+    "why": "A move by hand (`moveBulkInventory`), a split and a starting balance leave no record except the ledger entry. Under (c) those events are lost, and (b) puts a second home beside 09's event lines.",
+    "existingDecision": ""
+   },
+   {
+    "question": "How are Sutton's system locations `transit` and `unassigned` read?",
+    "options": [
+     "(a) `transit` is no Location: stock there is lifted as the `inTransit` measure for its transfer order's destination, never as `onHand`. `unassigned` is no Location: its stock is at the address's site",
+     "(b) Both are plain Locations, and their stock is on hand there",
+     "(c) `transit` a plain Location, `unassigned` read as the site"
+    ],
+    "recommended": "(a)",
+    "why": "08 keeps T out of H at both ends so that a transfer is never counted twice or not at all. A transit place counted as on hand brings that double count back. `unassigned` means only \"no bin\".",
+    "existingDecision": ""
+   },
+   {
+    "question": "Where does expiry live for Sutton data, which states `expirationDate` per label while decision 127 (a) mints no lot?",
+    "options": [
+     "(a) `expiresOn` loses its MaterialLot domain (none declared, shared) and a label record fills it",
+     "(b) A new label-side property beside the lot's `expiresOn`",
+     "(c) Mint MaterialLot individuals after all (127 (b)) and put the expiry on them"
+    ],
+    "recommended": "(a)",
+    "why": "Two labels with one lot number may carry two dates in Sutton, and one property with a broad domain follows anti-pattern 10. (c) makes lots out of text, which 127 (a) avoids.",
+    "existingDecision": "127"
+   }
+  ],
+  "conflicts": [
+   {
+    "packetPlace": "08, Places: `Bin` \"A location within a warehouse that is the smallest slot...\"; `hasParentLocation` \"The location that immediately contains this one\"",
+    "schemaFact": "`WarehouseLocation` has no parent-location field, only `address: Address` (nullable). Report 16 D maps the address to Warehouse, while 16 J calls the same addresses sites.",
+    "consequence": "A Sutton bin is either not \"within a warehouse\" or its address must be a Warehouse with no Site above it. Report 16 contradicts itself on which one; the second question settles it."
+   },
+   {
+    "packetPlace": "08, Places: \"this document keeps only `sitedAt` ... and the answer that a work center is not a place\" (pending decision 67 (a))",
+    "schemaFact": "`WarehouseLocationType.workCenter` is a stock-holding location (ledger `warehouseLocation`, `stockItems`); `Equipment.workCenter: WarehouseLocation!`; a work order always has one `WarehouseLocation`.",
+    "consequence": "Sutton's work center is a place. Under 67 (a) one Sutton record must lift two individuals (a Location and a WorkCenter)."
+   },
+   {
+    "packetPlace": "08, properties: `expiresOn` \"The last day a lot may be used\", domain `MaterialLot`; decision 127 (a) recommended: no lot is minted for Sutton",
+    "schemaFact": "`Inventory.expirationDate` is stated per label.",
+    "consequence": "Under 127 (a), Sutton's expiry has no property to land in."
+   },
+   {
+    "packetPlace": "08, terms: `InventoryLabel` \"A portion of the stock of one item specification, of at most one lot\"",
+    "schemaFact": "`Inventory.item` is optional, `isMixed: Boolean`, `nestedInventory`, `storageType: nested`.",
+    "consequence": "A nested mixed Inventory is not an InventoryLabel by the packet's definition. The record needs a term chosen per row (the first question)."
+   },
+   {
+    "packetPlace": "08, terms: `InventoryAdjustment` \"An event that changes a book quantity at a scope by a signed amount, for a stated reason\"; identity \"Tenant and source id\"",
+    "schemaFact": "`InventoryAdjustment` has `status: draft | completed`, one `adjustmentReason` and many `lineItems`, each with its own `inventory` and `quantityChange`.",
+    "consequence": "A draft is the same record but no event has happened, and the one signed amount is per line. The amount and label move to 09 EventLines, and a draft either points at no term or needs a lifecycle scheme."
+   },
+   {
+    "packetPlace": "08, terms: `LabelSplit` identity \"Tenant and source id\"; section 3: \"`splitFromLabel` is not a stored property here: it is the path `^inv:splitResult/inv:splitSource`\"",
+    "schemaFact": "Sutton stores `Inventory.splitFromInventory` directly. `splitSerializedInventory` returns only the new and original labels, and no split record with its own id exists.",
+    "consequence": "A LabelSplit lifted from Sutton has no source id. Its identity must come from the new label (one split per new label) and its time from that label's `createdAt`."
+   },
+   {
+    "packetPlace": "08 section 2: \"'Quarantined' as a Sutton label status ... is read as 'a quality hold in force covers this label'\"; 10 4.30: \"A count kind and a reservation status are not designed\"",
+    "schemaFact": "`ReceivingItemStatus` is one field, one value at a time: `active | depleted | quarantined | reserved`.",
+    "consequence": "Sutton states both quarantine and reservation as label phases. `quarantined` replaces `active`, so the packet's reading is a re-modelling (16 L). `reserved` has no concept: it lifts as nothing beside the `ReservedItem` rows, or needs one."
+   },
+   {
+    "packetPlace": "08 section 5: available \"May be negative (overcommitted)\"; \"Sutton's formula is not public\"; 10 4.21 `committed` \"reservations included\" (from the public article)",
+    "schemaFact": "`Item.quantityAvailable` is \"`quantityInStock` less `quantityQuarantined` and `quantityReserved`, never below 0\"; `quantityCommitted` is a separate field that the formula does not use.",
+    "consequence": "Sutton's rule is A = max(0, H − Q − R), which is none of decision 75's options (c) or (d). Under 75 (a) it is kept as a `reported` measure under that rule's name. The O = R reading of Sutton's Committed is not supported by the schema."
+   }
+  ],
+  "notes": "Build after the party slice, since locations need the tenant's organization `Address`, and after 07's `ItemSpecification`, `QuantityValue`, `UnitOfMeasure` and `CostObservation`. Decisions 68, 69, 71, 74, 76 and 127 come first, plus the address and nesting questions here. Order within the family: (1) `Location`, `Site` or `Warehouse`, and `Bin` from `Address` and `WarehouseLocation`; (2) `InventoryLabel`, `LogisticUnit` and `TrackingCode` from `Inventory`; (3) `reported` `StockPosition` and `InventoryMeasure` from the quantity fields and the two views; (4) `InventoryReservation`, which needs 09's sales and manufacturing order lines; (5) the ledger and adjustments, which need 09's `Receipt`, `TransferOrder`, `TransformationEvent` and `EventLine`; (6) lot traceability, last, under decision 85. Not checked: no record was read; only four inputs and a few mutation names were read; the direction of `ConvertedInventory`, the exact meaning of `storageType`, and whether a move writes one ledger entry or two are inferred, not seen."
+ },
+ "commit": {
+  "types": [
+   {
+    "suttonType": "Quote",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Quote",
+    "packetReport": "09",
+    "note": "Same thing (11's row can move from the title-only 0.6). But `customer: Company` is optional, while 09 defines a quote as made \"to one customer\". `expiryDate` (a String) is 07's `effectiveUntil`, `order` is `acceptsQuote` read backwards, and `quoteStatus` needs a scheme the packet put off as \"later\". I did not check what `isStandardQuote` or `paymentStatus` on a quote mean."
+   },
+   {
+    "suttonType": "QuoteItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "QuoteLine",
+    "packetReport": "09",
+    "note": "A line of a quote. `cost` is the offered unit price (`agreedUnitPrice`), not a cost, and `deliverBy` maps to `dueOn` (a DateTimeISO, optional). `item` is nullable, so a Sutton quote line can name no item, against `CommitmentLine`'s \"one quantity of one item\"."
+   },
+   {
+    "suttonType": "Order",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SalesOrder",
+    "packetReport": "09",
+    "note": "The API's name for the sales order (finding G). `customer: Company!` maps to `counterparty`, which waits on decision 125. `orderStatus` mixes phase and progress beside separate `fulfillmentStatus`, `paymentStatus`, `invoiceStatus`, `pickingStatus`, `packingStatus` and `returnStatus` (decision 82). Order-level `shippingFees`, `tax`, `discount` and `paymentAdjustments` have no packet property. `approvals` point at a party-family record. `convertedPurchaseOrders` is `raisedFor` at order level, not line level."
+   },
+   {
+    "suttonType": "OrderItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SalesOrderLine",
+    "packetReport": "09",
+    "note": "Fields map as follows: `cost` to `agreedUnitPrice`, `deliverBy` to `dueOn`, `item` (nullable) to `promisedItem`, `reservedItems` to 08's `InventoryReservation`. `totalShipped/Picked/Invoiced/ReturnedQuantity`, `quantityAvailableToInvoice/Return` and `itemAvailability` are computed views that 09 already wants (`LineFulfilment`). `fulfillmentLocationAddress` (the site it ships from) and `customerSku` (07's customer item) have no 09 property."
+   },
+   {
+    "suttonType": "PurchaseOrder",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "PurchaseOrder",
+    "packetReport": "09",
+    "note": "Same thing. `vendor: Company` is optional, though 09's definition makes it an agreement with a vendor. `billTo*`/`shipTo*` can be a `Company`, the tenant `Organization` or an `OrganizationMember` (a drop-ship), which the packet has no properties for. `sourceOrder`, `job` and `jobLinkType` are `raisedFor` at order level. `status`, `receivingStatus`, `billStatus` and `matchStatus` are four separate status fields. `freight`, `tax`, `discount` and `paymentAdjustments` are order-level amounts."
+   },
+   {
+    "suttonType": "PurchaseOrderItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "PurchaseOrderLine",
+    "packetReport": "09",
+    "note": "A line of a purchase order. `cost` maps to `agreedUnitPrice`, `itemVendor` to 07's `VendorItem`, `unitConversionRate` (vendor unit to stock unit) to 07's `ItemUnitConversion`, and `job`/`workOrder` to `raisedFor` (line level). `inventories` are the labels its receipts made, which are event lines (exec family). `accepted`, `rejected`, `totalBilledQuantity`, `quantityAvailableToBill` and `purchasePriceVariance` are computed, and `standardCost` is 07's cost observation."
+   },
+   {
+    "suttonType": "TransferOrder",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "TransferOrder",
+    "packetReport": "09",
+    "note": "Confirmed site to site: `fromAddress`/`toAddress` are tenant `Address` records (finding D), mapping to `sourceLocation`/`destinationLocation`. The dates are on the order (`transferDate`, `shipByDate`, `receiveByDate`), not on its lines. `pickedItems`/`receivedItems` are the exec family's event lines. `scanMode` is an app setting."
+   },
+   {
+    "suttonType": "TransferOrderLineItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "TransferOrderLine",
+    "packetReport": "09",
+    "note": "Only `item` and `quantity`: no lot, no label and no date. That fits 09's \"item, lot or label\", since lot and label are optional, but not `CommitmentLine`'s \"by one date\"."
+   },
+   {
+    "suttonType": "Invoice",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Invoice",
+    "packetReport": "09",
+    "note": "`order: Order!` maps to `invoicesOrder`. `Shipment.invoices` (one per order on a multi-order shipment) is the source for `invoicesShipment`. `externalInvoice`/`lastSync` map to `AccountingSyncRecord`, but Sutton keeps only the last attempt, not every one. 09's definition says it is \"sent to an outside accounting system\", which Sutton contradicts (see conflicts)."
+   },
+   {
+    "suttonType": "InvoiceLineItemNode",
+    "verdict": "new-term-needed",
+    "packetTerm": "InvoiceLine",
+    "packetReport": "09",
+    "note": "A part of an invoice billing one quantity of one item at one amount against one sales order line (`orderItem`). It keeps its own `item` so it survives the order line's deletion. It has no `id` field in the API, so its identity would be the invoice and its order line (or position); question 2 asks whether it is a term at all."
+   },
+   {
+    "suttonType": "Bill",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SupplierBill",
+    "packetReport": "09",
+    "note": "One `purchaseOrder` maps to `billsOrder`, and there are several bills per PO (`suffix`). `documentNumber` falls back to the PO number when no vendor invoice number was entered, so it is the tenant's record of an amount owed, not always the vendor's document (see conflicts). `status`, `lastSync` and `platformUrl` belong to `AccountingSyncRecord`. `matchStatus` and `exceptionReasons` are roll-ups of the match lines. `overrideReason` is a person's stated reason for overriding exceptions."
+   },
+   {
+    "suttonType": "BillLineItemNode",
+    "verdict": "new-term-needed",
+    "packetTerm": "SupplierBillLine",
+    "packetReport": "09",
+    "note": "A part of a bill billing one quantity at one unit amount (the vendor's cost when entered, else the PO cost) against one `purchaseOrderItem`. It has an `id`. It feeds `totalBilledQuantity` and the billing status, so it counts a quantity against a commitment line much as `LineAllocation` does (question 2)."
+   },
+   {
+    "suttonType": "BillMatchLine",
+    "verdict": "new-term-needed",
+    "packetTerm": "ThreeWayMatchResult",
+    "packetReport": "09",
+    "note": "A snapshot per bill line of PO quantity and cost, received quantity, previously billed quantity, billed quantity and cost, the exceptions and an outcome that a person can set to `manuallyVerified`. It is a stored determination, like `QualityResult`, and cannot be recomputed. The PO-level and bill-level `matchStatus` fields are views over it (question 3). No field says who verified it."
+   },
+   {
+    "suttonType": "OrderReturn",
+    "verdict": "new-term-needed",
+    "packetTerm": "ReturnAuthorization",
+    "packetReport": "09",
+    "note": "A customer return against one sales order (`order`, `customer`), with expected lines before anything arrives, a status of `open`/`finished`, and receipts (`createdThrough` `rma`). That is promise then performance, so it is a seventh commitment kind under `gist:Commitment`, not an event (question 1). Report 16 section 3 lists it as missing from the packet."
+   },
+   {
+    "suttonType": "OrderReturnLineItem",
+    "verdict": "new-term-needed",
+    "packetTerm": "ReturnLine",
+    "packetReport": "09",
+    "note": "A subkind of `CommitmentLine`: `expectedQuantity` coming back for one sales order line (`orderItem`; its id differs from the order line's). `acceptedQuantity`/`rejectedQuantity` are sums of its receipt items, which makes them views."
+   },
+   {
+    "suttonType": "OrderReturnReceiptItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "EventLine",
+    "packetReport": "09",
+    "note": "One quantity received into one `Inventory` (a label) at one `WarehouseLocation`, with its own `receivedAt` and `receivedBy`. No return-receipt header record exists, so the `Receipt` it would be observed by has no Sutton record. `type: reject` maps to a `ReceivingRejection`, and `disposition` restock/scrap needs a scheme. 09's `Receipt` definition does not cover goods coming from a customer."
+   },
+   {
+    "suttonType": "PaymentAdjustment",
+    "verdict": "part-of-another-record",
+    "packetTerm": "SalesOrder / PurchaseOrder / Quote (an order-level MoneyAmount with a tenant-defined kind)",
+    "packetReport": "09",
+    "note": "A `cost` plus a tenant's picked option (`paymentAdjustmentField: DynamicFieldOption`) on an order, a quote or a PO. `Order.currency`'s description lists it among the order's costs, so it reads as a charge or credit, not as a recorded payment. I did not check its sign or its meaning in the demo (question 4)."
+   }
+  ],
+  "enums": [
+   {
+    "enum": "BillMatchExceptionReason",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "BillMatchExceptionScheme (proposed)",
+    "note": "costMismatch, quantityExceedsOrdered, quantityExceedsReceived: why a bill line fails the match. They are recorded exceptions that a person can override, not refusals."
+   },
+   {
+    "enum": "ThreeWayMatchStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ThreeWayMatchOutcomeScheme (proposed)",
+    "note": "verified, manuallyVerified, exception, unknown are outcomes of a match. `notBilled` appears only on a PO roll-up and repeats `BillStatus`, so it is not a match outcome."
+   },
+   {
+    "enum": "FulfillmentStatus",
+    "verdict": "scheme-exists",
+    "packetScheme": "FulfilmentProgressScheme",
+    "note": "unfulfilled, partially_fulfilled and fulfilled map one to one to none, partial and full. Sutton stores it on both `Order` and `OrderItem`. 09 says a line's state is a view, so on the line it is a source word to check against the view."
+   },
+   {
+    "enum": "InvoiceStatus",
+    "verdict": "values-differ",
+    "packetScheme": "InvoicingProgressScheme",
+    "note": "notInvoiced, partiallyInvoiced and invoiced map to notInvoiced, partlyInvoiced and fullyInvoiced. `invoicePending` and `manuallyInvoiced` (marked invoiced by hand with no invoice record, which is a basis, not a degree of progress) have no concept."
+   },
+   {
+    "enum": "OrderStatus",
+    "verdict": "values-differ",
+    "packetScheme": "OrderLifecycleScheme (plus FulfilmentProgressScheme, PaymentProgressScheme)",
+    "note": "draft, cancelled and closed map to phases. `requested` (a portal request, I assume; not checked) has no phase. unfulfilled, partially_fulfilled and fulfilled are fulfilment progress that `fulfillmentStatus` repeats. `refunded` is payment and `returned` is return progress. One field maps to several schemes, which is the premise of decision 82."
+   },
+   {
+    "enum": "PackingStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "PackingProgressScheme (proposed; decision 82's 'whether three is enough')",
+    "note": "not_started, partially_packed and fully_packed: warehouse progress on an order, probably derived from pack containers (not checked)."
+   },
+   {
+    "enum": "PaymentStatus",
+    "verdict": "values-differ",
+    "packetScheme": "PaymentProgressScheme",
+    "note": "not_paid, partially_paid and paid_in_full match the scheme. payment_pending, overdue (a date comparison, which reads like a view), disputed, refunded and cancelled are new. The scheme is open, as report 10 expected. It also appears on `Quote`, where report 10 says the scheme does not apply."
+   },
+   {
+    "enum": "PickingStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "PickingProgressScheme (proposed; decision 82)",
+    "note": "not_started, partially_picked, fully_picked: progress on an order, which also appears on `OrderItem`."
+   },
+   {
+    "enum": "OrderReturnState",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ReturnProgressScheme (proposed; decision 82)",
+    "note": "unreturned, partially_returned, returned. Sutton calls it \"Derived\", worked out from returned against shipped quantities, so it may be better as a view than a stored concept."
+   },
+   {
+    "enum": "ItemAvailability",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none: a view over 08's available measure",
+    "note": "fully_available, partially_available, unavailable on `OrderItem`: stock read against the line's demand at the moment of asking. Under 09's rule that a computed state is a view, it gets no scheme."
+   },
+   {
+    "enum": "OrderReturnStatus",
+    "verdict": "values-differ",
+    "packetScheme": "OrderLifecycleScheme",
+    "note": "Only if a return is a commitment kind (question 1): open corresponds to released or inProgress, finished to complete. It has no draft and no cancelled."
+   },
+   {
+    "enum": "OrderReturnDisposition",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ReturnDispositionScheme (proposed)",
+    "note": "restock and scrap say what is done with returned goods. That is not 10's `QualityDispositionScheme` (unrestricted, onHold, rejected), though scrap may align to an EPCIS disposition (11's job)."
+   },
+   {
+    "enum": "OrderReturnReceiptType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none: carried by event class (Receipt line vs ReceivingRejection)",
+    "note": "accept and reject are domain facts, but 09 tells a refusal apart as its own event, `ReceivingRejection`, not as a concept. So the enum maps to a choice of class, and no scheme is needed."
+   },
+   {
+    "enum": "BillStatus",
+    "verdict": "values-differ",
+    "packetScheme": "InvoicingProgressScheme",
+    "note": "notBilled, partiallyBilled, billed, billPending and manuallyBilled repeat `InvoiceStatus` exactly, on the purchase side. The same progress shape applies to POs, although report 10's 4.17 table says invoicing does not apply to a PurchaseOrder. Pending and manual are new, as for invoices."
+   },
+   {
+    "enum": "JobLinkType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "none yet (or two sub-properties of raisedFor)",
+    "note": "material (the PO buys a component for the job) or service (the PO buys the job's work, probably outsourced; finding G). It could be two sub-properties of `raisedFor` instead of a scheme, which touches decision 89 on contract manufacturers."
+   },
+   {
+    "enum": "ReceivingStatus",
+    "verdict": "values-differ",
+    "packetScheme": "FulfilmentProgressScheme",
+    "note": "awaiting_shipment, receiving_in_progress and received map to none, partial and full (report 10 already has \"Awaiting shipment\" as an altLabel). `shipped` (vendor has sent, in transit) has no concept."
+   },
+   {
+    "enum": "PurchaseOrderStatus",
+    "verdict": "values-differ",
+    "packetScheme": "OrderLifecycleScheme",
+    "note": "draft, cancelled and closed (complete) map to phases. `open` and `sent` both read as released, which is ambiguous. `archived` is a filing state, not a phase."
+   },
+   {
+    "enum": "QuoteStatus",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "QuoteLifecycleScheme (09's first proposal; 10 says a quote's phases are 'later')",
+    "note": "draft, sent, open, revisionsNeeded, expired, closedWon, closedLost: the phases of an offer, with an accepted or lost outcome. They do not fit the order phases."
+   },
+   {
+    "enum": "TransferOrderScanMode",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "none",
+    "note": "manual, autoPick, autoReceive are how the app performs picking and receiving when the record is created: a setting, not a fact about the transfer."
+   },
+   {
+    "enum": "TransferOrderStatus",
+    "verdict": "values-differ",
+    "packetScheme": "OrderLifecycleScheme",
+    "note": "draft, open (released), inProgress and completed (complete) map to phases. It has no cancelled. `completed` is defined as every line being fully received, so the phase is worked out from receipts."
+   }
+  ],
+  "questions": [
+   {
+    "question": "What is a Sutton order return (`OrderReturn` with its lines and receipt items)?",
+    "options": [
+     "(a) A seventh commitment kind, `ReturnAuthorization` under `gist:Commitment`, whose lines are `ReturnLine` under `CommitmentLine` and whose receipt items are `EventLine`s of a `Receipt`, with `Receipt`'s definition widened to goods coming from a customer",
+     "(b) Events only: the receipt items are receipts and refusals, and no return record is a term",
+     "(c) A subkind of `SalesOrder`"
+    ],
+    "recommended": "(a)",
+    "why": "Sutton keeps expected quantities per sales order line before anything arrives, with an open or finished status, which is promise then performance as 09 splits them. Under (b) a return with nothing received yet does not exist. (c) is a false is-a, since a return is not a sale. It changes the disjoint set of commitment kinds (six to seven), the `Receipt` definition and two new schemes (return disposition, return progress)."
+   },
+   {
+    "question": "Are invoice and bill lines terms of their own?",
+    "options": [
+     "(a) Yes: `InvoiceLine` and `SupplierBillLine` under `gist:Content`, each part of its document, billing one commitment line (a new `billsLine`) with a quantity and a unit amount",
+     "(b) No: they are values inside `Invoice` and `SupplierBill`, and billed quantity per order line is a view over the documents"
+    ],
+    "recommended": "(a)",
+    "why": "Invoicing and billing progress, `quantityAvailableToBill/Invoice` and the three-way match are all counted per order line from these lines. An invoice line outlives its sales order line (`orderItem` is nullable, `item` is kept). `InvoiceLineItemNode` has no `id` in the API, so under (a) its identity is the invoice and its order line, which is a record rule to state."
+   },
+   {
+    "question": "Is a three-way match a stored result or only a view?",
+    "options": [
+     "(a) A stored `ThreeWayMatchResult` (content) per bill line, with a `BillMatchExceptionScheme` and a `ThreeWayMatchOutcomeScheme`; the bill-level and PO-level `matchStatus` are views over it",
+     "(b) All a view, computed from the PO line, its receipts and the bill line",
+     "(c) Left out with the accounting boundary"
+    ],
+    "recommended": "(a)",
+    "why": "Sutton's `BillMatchLine` is a snapshot taken at billing, and a person can set it to `manuallyVerified` while the exceptions stay. A view would lose both once receipts or the PO change. The match also decides whether a bill can be paid when the tenant turns matching on."
+   },
+   {
+    "question": "How are an order's own money amounts (shipping fees, freight, tax, discount, `PaymentAdjustment`) modelled?",
+    "options": [
+     "(a) One part record, say `OrderCharge`, with a `MoneyAmount` and a charge kind (shipping, freight, tax, discount, or a tenant's adjustment option), so the lines and charges add up to the order total",
+     "(b) One `MoneyAmount` property per Sutton field on each commitment, with `PaymentAdjustment` a part of its own",
+     "(c) Totals only: store `totalOrderAmount` and drop the parts"
+    ],
+    "recommended": "(a)",
+    "why": "`Order.currency` lists \"lines, shipping, tax, discount, payment adjustments\" as the order's costs, so a payment adjustment reads as a charge, not a payment received, though its meaning was not checked against a record. One shape lets a total be checked against its parts (CLAUDE.md: show the totals). (b) gives about ten properties that differ between quote, order and PO for one idea."
+   },
+   {
+    "question": "How are Sutton's order statuses split across schemes?",
+    "options": [
+     "(a) Decision 82 (a) as recommended: one `OrderLifecycleScheme` for phase, plus a progress scheme per dimension Sutton keeps (fulfilment, payment, invoicing and billing, receiving under fulfilment, picking, packing, returns); `QuoteLifecycleScheme` now; and each source status word kept beside its mapped concept",
+     "(b) Decision 82 (b): one scheme per order kind, each mirroring Sutton's enum",
+     "(c) Decision 82 (a) with only the three progress schemes, and picking, packing and returns left as views"
+    ],
+    "existingDecision": "82",
+    "recommended": "(a)",
+    "why": "`OrderStatus` carries phase (draft, closed, cancelled), fulfilment (three values), payment (refunded) and returns (returned) in one field, beside six separate progress fields. Only separate schemes can say \"open, half shipped, not paid\". Quotes have seven statuses now, so they can no longer wait for \"later\"."
+   },
+   {
+    "question": "What may `raisedFor` point at, given that Sutton links a purchase order to a whole sales order or job?",
+    "options": [
+     "(a) Widen its range to `gist:Intention`: an order or a line",
+     "(b) Keep the line only, and leave Sutton's order-level links (`PurchaseOrder.sourceOrder`, `PurchaseOrder.job`, `Order.convertedPurchaseOrders`) unmapped",
+     "(c) Keep the line, and copy an order-level link to every line of the order"
+    ],
+    "recommended": "(a)",
+    "why": "Sutton records both levels (`PurchaseOrderItem.job` and `workOrder` at line level, `sourceOrder` and `job` at order level). (c) states pairs nobody recorded, as decision 126's reasoning rejects for contacts, and (b) loses the link from a sales order to the purchase orders made from it."
+   }
+  ],
+  "conflicts": [
+   {
+    "packetPlace": "09, Accounting boundary, `Invoice` definition: \"Content that asks a customer to pay ... sent to an outside accounting system\"",
+    "schemaFact": "`hasAccountingIntegration`: \"Without one, invoices and bills are created without being pushed anywhere\"; `Bill.status` is \"Null for bills created without an accounting integration\"",
+    "consequence": "An invoice or a bill exists with no accounting system. Drop \"sent to an outside accounting system\" from the definition, and leave sending to `AccountingSyncRecord`."
+   },
+   {
+    "packetPlace": "09, `SupplierBill` definition: \"Content in which a vendor asks the organization to pay\"",
+    "schemaFact": "`Bill.documentNumber`: \"The vendor invoice number if one was provided when billing; otherwise the Digit-generated PO document number\"",
+    "consequence": "A Sutton bill can be made with no vendor document. It is the organization's record of what it owes a vendor under a PO, so the definition and 11's row should say so."
+   },
+   {
+    "packetPlace": "Decision 84's Why (open): \"Sutton's public three-way matching refuses billing beyond receipt\"; 09's Alchemy table gives `QuantityBeyondReceived` as the invoice's rejection",
+    "schemaFact": "`quantityExceedsReceived` is a `BillMatchExceptionReason` recorded on the bill line and overridable (`Bill.overrideReason`); `allowInvoiceBillOverQuantity` is a tenant setting; `enableThreeWayMatching` says bills must match \"before they can be paid\", not before they are created",
+    "consequence": "Billing beyond receipt is recorded with an exception, not refused. The rejection example is wrong, and 84's reasoning needs this source."
+   },
+   {
+    "packetPlace": "09 property `matchesReceipt`: \"Relates a vendor bill to a receipt it was matched against\" (`SupplierBill` to `Receipt`)",
+    "schemaFact": "`BillMatchLine` compares against `receivedQuantity` on the `purchaseOrderItem`; no field links a `Bill` or a bill line to a `ReceivingTicket`",
+    "consequence": "Sutton matches per PO line against a received total, not against a receipt, so `matchesReceipt` has no Sutton source. The match becomes the new match result's quantities."
+   },
+   {
+    "packetPlace": "09 property `raisedFor`: range `CommitmentLine` (\"Relates a commitment to a line of another commitment it was raised to supply\")",
+    "schemaFact": "`PurchaseOrder.sourceOrder: Order`, `PurchaseOrder.job: Job`, `Order.convertedPurchaseOrders` link whole orders",
+    "consequence": "An order-level link has no target under the current range (question 6)."
+   },
+   {
+    "packetPlace": "09 `Quote` definition \"to one customer\"; `PurchaseOrder` definition \"commits to pay a vendor\"; decision 81 (open) recommends a draft is an instance of its class",
+    "schemaFact": "`Quote.customer: Company` and `PurchaseOrder.vendor: Company` are both nullable",
+    "consequence": "A quote or PO with no counterparty (presumably a draft) fails the definitions. Either the definitions allow it before the phase that binds, or SHACL requires the counterparty only past draft."
+   },
+   {
+    "packetPlace": "09 `Receipt` definition: goods arrive \"from a vendor, a carrier or another of its sites\"",
+    "schemaFact": "`OrderReturnReceiptItem` records goods received from a customer; `CreatedThroughType` includes `rma`",
+    "consequence": "A customer return's arrival is not a `Receipt` as defined. Widen the definition or add an event (question 1)."
+   },
+   {
+    "packetPlace": "Report 10, 4.17 applicability table: PurchaseOrder has InvoicingProgressScheme \"no\" and PaymentProgressScheme \"no\"; Quote has both \"no\"",
+    "schemaFact": "`PurchaseOrder.billStatus: BillStatus` (the same five values as `InvoiceStatus`); `Quote.paymentStatus: PaymentStatus`",
+    "consequence": "Billing progress applies to POs, and payment status to quotes. The table needs rows for both, or a reason for leaving them out."
+   },
+   {
+    "packetPlace": "09 Lifecycle schemes: \"A line's state (open, partly met, met) is not a scheme ... worked out by a View\", against report 10's `FulfilmentProgressScheme` \"applies: one per order or line\"",
+    "schemaFact": "`OrderItem.fulfillmentStatus`, `pickingStatus` and `packingStatus` are stored per line",
+    "consequence": "The packet contradicts itself, and Sutton stores the line state. Settle it as a view on the line, with Sutton's value kept as a source word checked against it."
+   },
+   {
+    "packetPlace": "09 `CommitmentLine` definition: \"one quantity of one item by one date\"",
+    "schemaFact": "`TransferOrderLineItem` has no date (dates are on `TransferOrder`); `OrderItem.deliverBy` and `QuoteItem.deliverBy` are nullable; `OrderItem.item` and `QuoteItem.item` are nullable",
+    "consequence": "A line can have no date and no item. The definition should make the date optional (or inherited from the order), and say what a line with no item is."
+   }
+  ],
+  "notes": "Build after the party slice and alongside stock and exec. `counterparty` needs `Organization`/`Person` and decision 125 (a customer may be `kind: individual`). Lines need 07's `ItemSpecification` and `MoneyAmount`, with currency per order (Sutton's `CurrencyDetails`, so decision 88's USD-only rule does not hold for Sutton data). `TransferOrder` needs 08's `Site`/`Location`. `LineAllocation` and returns need the exec family's `Receipt`, `Shipment` and `EventLine`. Decisions first: 80, 81, 82, 83, 84 and 37 (the owning context). Then: the four commitments and their lines, then allocation, then the invoice and bill documents with their lines and the match, then returns. Not checked: the inputs and mutations (which fields can change); the meaning of `isStandardQuote`, `gap`, `requested` and the sign of `PaymentAdjustment`; whether picking and packing statuses are derived. No demo record was read."
+ },
+ "exec": {
+  "types": [
+   {
+    "suttonType": "ItemToPick",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "ManufacturingOrderLine",
+    "packetReport": "09",
+    "note": "One planned component of a job (`plannedComponentOf`), with `jobs` and `purchaseOrders` as 09's `raisedFor`. `totalPickedQuantity`, `reservedQuantity`, `totalAvailableQty` and the costs are views. `subItemsToPick` nests sub-assemblies and no create mutation names it (grep), so it may be 07's `BomExpansionNode` (an expansion of the job's BOM) rather than a stored line. Not checked."
+   },
+   {
+    "suttonType": "Job",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "ManufacturingOrder",
+    "packetReport": "09",
+    "note": "Report 16 G. `parent`/`children` are `subOrderOf`, `salesOrderItem` is `raisedFor`, `bom` is `usesBomRevision`, `workOrders` is the reverse of `workOrderOf`. The output is on the job itself (`item`, `targetQuantity`), not on a line. `lotNumber` and `serialNumber` are text (decision 127). `type` needs a scheme, and `OUTSOURCED` touches decision 89."
+   },
+   {
+    "suttonType": "JobBatchLog",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "EventLine",
+    "packetReport": "09",
+    "note": "An output quantity posted into one label (`inventory`, ledger `manufacturingOutput`): a `produces` line. The type has no `job` field (it is reached from `Inventory.jobBatchLogs`), and Sutton records no transformation event joining it to inputs (question 4)."
+   },
+   {
+    "suttonType": "JobWaste",
+    "verdict": "part-of-another-record",
+    "packetTerm": "ManufacturingOrder",
+    "packetReport": "09",
+    "note": "It has no id: a scrap quantity and unit on one job, so it is a 07 `QuantityValue` on the order. The packet has no property for waste or scrap yet."
+   },
+   {
+    "suttonType": "MultiOrderShipmentGroup",
+    "verdict": "part-of-another-record",
+    "packetTerm": "Shipment",
+    "packetReport": "09",
+    "note": "A list of orders shipped together. The packet already lets one shipment serve several orders through `LineAllocation`, so this is a grouping record with nothing of its own. Whether one group can hold several shipments was not checked."
+   },
+   {
+    "suttonType": "PackContainer",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "LogisticUnit",
+    "packetReport": "08",
+    "note": "Report 16 F: a packed unit on a shipment, a sales order or a transfer order. `parent` nests units, and the dimensions and weights are its measurements. Its `container` kind (`asIs`, `package`, `pallet`) needs a scheme. It is not 08's `Container`, the vessel."
+   },
+   {
+    "suttonType": "PackedItem",
+    "verdict": "part-of-another-record",
+    "packetTerm": "AggregationEvent",
+    "packetReport": "09",
+    "note": "One line of a packing (`packs`): a quantity of a picked item put into a `PackContainer` (`packedInto`). Sutton keeps no packing event apart from its lines, each with its own `createdAt`."
+   },
+   {
+    "suttonType": "PickedItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Pick",
+    "packetReport": "09",
+    "note": "One pick of one label for one sales-order line. One record holds the `Pick`, its `EventLine` and the `LineAllocation` to the `OrderItem`. `shipment` and `packedQuantity` tie it to the shipment. It names no destination location, which bears on decision 79."
+   },
+   {
+    "suttonType": "PickedJobItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Pick",
+    "packetReport": "09",
+    "note": "Material picked to a job (a production need). `processedQuantity` is most likely what the job consumed, the `consumes` side (question 4); that reading is not stated in the schema. `PickedJobItemType.NON_INVENTORY` picks have no label."
+   },
+   {
+    "suttonType": "PickedTransferItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "StockMovement",
+    "packetReport": "08",
+    "note": "The dispatch of a transfer (`underTransferOrder`, line `transferOrderLineItem`). `TransferOrder.pickedItems` describes these as \"picked from the source location but not yet received\", i.e. in transit. This is 08's one movement, not a 09 `Pick` (question 6)."
+   },
+   {
+    "suttonType": "QualityCheck",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "QualityInspection",
+    "packetReport": "09",
+    "note": "Only ever on a `Job`. The result is folded into the same record (`status`, `notes`, `files`: 09's `QualityResult`). `checkpointType` is a tenant option, not a scheme, and `updateQualityCheck` edits the check in place with no revision."
+   },
+   {
+    "suttonType": "QualityCheckFile",
+    "verdict": "part-of-another-record",
+    "packetTerm": "QualityResult",
+    "packetReport": "09",
+    "note": "A join row from a check to a file: the result's evidence."
+   },
+   {
+    "suttonType": "ReceivedTransferItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "StockMovement",
+    "packetReport": "08",
+    "note": "The arrival end of a transfer pick (`pickedItem`): `receivedAt` is 08's `arrivedAt`, and the source and destination bins are `sourceLocation`/`destinationLocation`. 09's `Receipt` definition (\"or another of its sites\") claims it too (question 6)."
+   },
+   {
+    "suttonType": "ReceivingTicket",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Receipt",
+    "packetReport": "09",
+    "note": "Report 16 H: a `narrowMatch`, always one `PurchaseOrder`. It is a receiving session from `createdAt` to `completedAt` with several receivers (`receiveProfiles`), so the event's interval rather than an instant. `inventories` are its event lines. `shippingCarrierField` is an option, not an organization (conflict 1)."
+   },
+   {
+    "suttonType": "ReceivingTicketLineItem",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "LineAllocation",
+    "packetReport": "09",
+    "note": "What one ticket received against one `PurchaseOrderItem`, summed. Its `quantity` minus `accepted` is rejected: 09's `ReceivingRejection` has no Sutton record of its own (`Inventory.rejectedItems`; reasons come from the tenant's `rejectionReasons` list, where each one is stored not checked). `expectedQuantity` and `status` are views."
+   },
+   {
+    "suttonType": "Shipment",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "Shipment",
+    "packetReport": "09",
+    "note": "The record exists before the goods leave and can be cancelled (conflict 2, question 1). `shippedOn` is the event time and `invoices` is the reverse of `invoicesShipment`. The bill-of-lading fields are document fields. `preparedBy` is free text naming people, not ids. It has no transfer-order link (transfers leave through `PickedTransferItem`)."
+   },
+   {
+    "suttonType": "WorkOrder",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "WorkOrder",
+    "packetReport": "09",
+    "note": "`itemRoutingOperation` is `followsOperation`, and `warehouseLocation` is its work center (07's `atWorkCenter`). `job` is optional (conflict 3), and `purchaseOrderItem` marks an outsourced operation. `status` is typed `String!`, while the input enum `WorkOrderStatus` adds `PAUSED`. No work-order lines exist, so `WorkOrderLine` has no Sutton source."
+   },
+   {
+    "suttonType": "WorkOrderBatch",
+    "verdict": "new-term-needed",
+    "packetTerm": "OperationOutputReport",
+    "packetReport": "09",
+    "note": "An event in which one person reports a quantity completed at one work order. It creates no stock (that is `JobBatchLog`) and can be edited and deleted. `WorkOrder.completedQuantity` is likely its sum (not checked). The packet's `WorkOrderLine` (\"one output to report\") is the plan, not this report."
+   },
+   {
+    "suttonType": "WorkOrderLog",
+    "verdict": "part-of-another-record",
+    "packetTerm": "OperationExecution",
+    "packetReport": "09",
+    "note": "One `START_WORK` or `STOP_WORK` instant by one person on one work order: the `startedAt` or `endedAt` of an operation run."
+   },
+   {
+    "suttonType": "WorkOrderLogInterval",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "OperationExecution",
+    "packetReport": "09",
+    "note": "One person's start-to-stop on one work order (`executesWorkOrder`, `performedBy` the profile). `end` is absent while it is running, as `endedAt` allows. Whether a run is per person or per work order is question 3."
+   }
+  ],
+  "enums": [
+   {
+    "enum": "JobPackingType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "A setting of the job for how its output is labelled (none, standard, or nested labels with `piecesPerContainer`). What it causes is recorded as `Inventory` nesting and 09's `AggregationEvent`."
+   },
+   {
+    "enum": "JobPriority",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "OrderPriorityScheme (proposed)",
+    "note": "`NORMAL`, `RUSH`. The packet has no priority scheme. Report 10 section 5 left the seeds' shop-floor codes for later."
+   },
+   {
+    "enum": "JobStatus",
+    "verdict": "values-differ",
+    "packetScheme": "OrderLifecycleScheme",
+    "note": "`NOT_STARTED`, `IN_PROGRESS` and `COMPLETED` map to `planned` (altLabel \"Not started\"), `inProgress` and `complete`. There is no draft, released or cancelled. The scheme is open decision 82."
+   },
+   {
+    "enum": "JobType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ManufacturingOrderKindScheme (proposed)",
+    "note": "`PRODUCTION`, `CONVERSION`, `QUEUE_CONVERSION`, `SORTING`, `OUTSOURCED`. Recommend a scheme rather than subclasses: one record keeps its identity and the type is a choice made on it. `OUTSOURCED` bears on decision 89 (report 16 G). The meaning of `QUEUE_CONVERSION` was not checked."
+   },
+   {
+    "enum": "Container",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "LogisticUnitKindScheme (proposed)",
+    "note": "`asIs`, `package`, `pallet`: the kind of a `PackContainer` (08 `LogisticUnit`). `asIs` means shipped without packaging. Report 10 has no such scheme."
+   },
+   {
+    "enum": "QualityCheckStatus",
+    "verdict": "scheme-exists",
+    "packetScheme": "QualityOutcomeScheme",
+    "note": "`pass` and `fail` match 10's `pass` and `fail` exactly. The scheme is open, as 10 says."
+   },
+   {
+    "enum": "ReceivingTicketStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "`inProgress` or `completed` only says whether the receipt event has ended (`completedAt`, 09's `endedAt`). It becomes a scheme only if Benjamin reads the ticket as a record rather than the event."
+   },
+   {
+    "enum": "ReceivingTicketItemStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "`pending` and `accepted` are a line's progress, which 09 says is a View, not a scheme (\"A line's state ... is the sum of the line's allocations\"). `rejected` is a 09 `ReceivingRejection` event."
+   },
+   {
+    "enum": "BillOfLadingFreightCountedBy",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "FreightCountedByScheme (proposed)",
+    "note": "`driverPallet`, `driverPieces`, `shipper`: who counted the freight, a liability fact printed on the bill of lading. Needed only if decision 124's open \"all\" includes the bill of lading."
+   },
+   {
+    "enum": "BillOfLadingTrailerLoadedBy",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "TrailerLoadedByScheme (proposed)",
+    "note": "`driver`, `shipper`: who loaded the trailer. Same condition as the freight-count scheme."
+   },
+   {
+    "enum": "FobType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "FobPointScheme (proposed)",
+    "note": "`consignee`, `shipper`: where title and risk pass. The packet has no freight-terms scheme. `freightChargeTerms` beside it is a tenant option."
+   },
+   {
+    "enum": "ShipmentType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "ShipmentMethodScheme (proposed)",
+    "note": "`carrier`, `drop_off`, `pick_up`: how goods leave. `pick_up` means the customer collects, so `carriedBy` may be absent."
+   },
+   {
+    "enum": "ShippingStatus",
+    "verdict": "values-differ",
+    "packetScheme": "OrderLifecycleScheme",
+    "note": "The `awaiting_*` values are roughly `released` (each repeats the `ShipmentType`), `shipped` is `complete`, `cancelled` is `cancelled`. 09's `Shipment` is an event with no lifecycle, so this scheme exists only if question 1 gives the record its own term."
+   },
+   {
+    "enum": "WorkOrderLogEvent",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "`START_WORK` and `STOP_WORK` are the start and end of an operation run, which are 09's `startedAt` and `endedAt`, not concepts."
+   }
+  ],
+  "questions": [
+   {
+    "question": "Is a Sutton `Shipment` the event of goods leaving, or a planned shipment whose `shipped` status marks that event?",
+    "options": [
+     "(a) Keep 09's `Shipment` as the event; mint it from a Sutton record only once `shippingStatus` is `shipped` (event time `shippedOn`); awaiting and cancelled records stay records with no event",
+     "(b) A new commitment term for the planned shipment (the Sutton record through every status), and 09's `Shipment` as the event it leads to",
+     "(c) Widen 09's `Shipment` to cover planned and cancelled shipments"
+    ],
+    "recommended": "(a)",
+    "why": "It needs no new term and keeps 09's split between promise and performance. Under (c) a cancelled shipment would be an event that never happened. (b) is right only if a competency question asks about shipments not yet gone.",
+    "existingDecision": ""
+   },
+   {
+    "question": "What does `carriedBy` point at when Sutton's carrier is a picked option (`shippingCarrierField`), never a `Company`?",
+    "options": [
+     "(a) Each carrier option is the tenant's `SourceRecord` of an `Organization` (source type the option list, its option id the key); `carriedBy` points at that organization",
+     "(b) The option is a concept of a tenant carrier list, and `carriedBy` is not filled from Sutton",
+     "(c) Leave the carrier unmapped until a carrier flag exists (decision 89)"
+    ],
+    "recommended": "(a)",
+    "why": "Decision 34 already reads an imported row as the tenant's record of a real body; an option list entry is such a record. It avoids identity from a name, since two options become one carrier only through an `IdentityDecision`.",
+    "existingDecision": "89"
+   },
+   {
+    "question": "What is one operation run (`OperationExecution`) in Sutton?",
+    "options": [
+     "(a) One `WorkOrderLogInterval`: one person from start to stop on one work order; the `WorkOrderLog` rows give `startedAt` and `endedAt`",
+     "(b) One per work order, its intervals parts of it",
+     "(c) One per `WorkOrderLog`"
+    ],
+    "recommended": "(a)",
+    "why": "The interval is Sutton's own record, with an id, a person and an open end. Under (b) a work order paused and resumed by three people becomes one run with no single performer, which `performedBy` cannot state.",
+    "existingDecision": ""
+   },
+   {
+    "question": "What is a transformation when Sutton records consumption (`PickedJobItem.processedQuantity`) and output (`JobBatchLog`) separately?",
+    "options": [
+     "(a) One `TransformationEvent` per job: what it consumed from its picks' processed quantities, what it produced from its batch logs; genealogy within a job read as decision 85 (a)",
+     "(b) One `TransformationEvent` per `JobBatchLog`, with no consumed lines",
+     "(c) No `TransformationEvent` from Sutton; genealogy by job only"
+    ],
+    "recommended": "(a)",
+    "why": "The job is the only Sutton record that joins inputs to outputs, and decision 85 (a) already reads that as possible contribution. (b) produces events with no inputs, so a recall cannot trace back.",
+    "existingDecision": "85"
+   },
+   {
+    "question": "Is a pick a kind of stock movement, now that Sutton's pick sets stock aside (ledger `picked`, \"Stock allocated to an order, job, or work order\") and names no destination?",
+    "options": [
+     "(a) Yes, as decision 79 (a): `Pick` under 08's `StockMovement`",
+     "(b) No: `Pick` is its own event beside `StockMovement`, undone by an unpick (ledger `unpicked`)"
+    ],
+    "recommended": "(b)",
+    "why": "`PickedItem` and `PickedJobItem` carry no destination location, so under (a) a pick fails `StockMovement`'s definition (\"taken from one of the organization's locations and put at another\"). The recommendation recorded on 79 was made before this schema was read.",
+    "existingDecision": "79"
+   },
+   {
+    "question": "Is a transfer's arrival (`ReceivedTransferItem`) the end of one 08 `StockMovement`, or a 09 `Receipt`?",
+    "options": [
+     "(a) One `StockMovement` per transfer pick (`underTransferOrder`, `arrivedAt` from `receivedAt`); 09's `Receipt` and `Shipment` drop \"another of its sites\" from their definitions",
+     "(b) A transfer is a `Pick` followed by a `Receipt`, as 09's definitions allow"
+    ],
+    "recommended": "(a)",
+    "why": "08 already says \"one dispatch and its arrival are one movement\", and Sutton links each arrival to its pick (`ReceivedTransferItem.pickedItem`). Under (b) the in-transit quantity is counted from two events that do not know each other.",
+    "existingDecision": ""
+   }
+  ],
+  "conflicts": [
+   {
+    "packetPlace": "Report 09, Properties, `carriedBy`: range `Organization` (06), source \"decisions 3 and 34: the carrier is the organization\"",
+    "schemaFact": "`Shipment.shippingCarrierField` and `ReceivingTicket.shippingCarrierField` are `DynamicFieldOption`, a tenant's picked option. No carrier is a `Company` (report 16 B).",
+    "consequence": "`carriedBy` cannot be filled from Sutton unless an `Organization` is minted from an option, which is identity from a name unless question 2 (a) is taken."
+   },
+   {
+    "packetPlace": "Report 09, Execution events, `Shipment`: \"A transaction in which goods leave a site of the organization and pass out of its custody\" (tag event)",
+    "schemaFact": "`ShippingStatus` is `awaiting_carrier`, `awaiting_drop_off`, `awaiting_pickup`, `cancelled` or `shipped`. The record exists before anything leaves and can be cancelled.",
+    "consequence": "A Sutton shipment in any status other than `shipped` is not an instance of `Shipment` as defined. A 1:1 alignment row is wrong until question 1 is answered."
+   },
+   {
+    "packetPlace": "Report 09, Commitments, `WorkOrder`: \"A commitment, part of one manufacturing order\"; property `workOrderOf` from `WorkOrder` to `ManufacturingOrder`",
+    "schemaFact": "`WorkOrder.job: Job` is optional, and a work order can carry a `purchaseOrderItem`. `Job.hasFullAccess` speaks of reaching a job \"only through one of its work orders\".",
+    "consequence": "A work order with no job fails the definition and any record rule requiring `workOrderOf`. Either the definition drops \"part of one manufacturing order\" or such work orders get no term."
+   },
+   {
+    "packetPlace": "Report 09, Commitments, `ManufacturingOrderLine`: \"names one material to consume or one output to produce\"; property `plannedOutputOf`",
+    "schemaFact": "A `Job` has one output on its header (`item`, `targetQuantity`). Its only lines are components (`itemsToPick`).",
+    "consequence": "`plannedOutputOf` has no Sutton line to read. An output line would have to be made up from the header, so the mapping should point the output at the order itself."
+   },
+   {
+    "packetPlace": "Report 09, Execution events, `QualityResult`: \"kept by revision when edited\"; identity \"the check it is of and the result's revision\"",
+    "schemaFact": "`QualityCheck` holds its own result (`status`, `notes`, `files`), has no revision field, and `updateQualityCheck` edits it in place.",
+    "consequence": "A `QualityResult` from Sutton has no revision to be identified by. Only the latest result can be stated, as with `RowOutcome` under open decision 53."
+   }
+  ],
+  "notes": "Build after the commitments family (commit: `Order`, `OrderItem`, `PurchaseOrder`, `PurchaseOrderItem`, `TransferOrder` and their lines) and the stock family (`Inventory`, `WarehouseLocation`, the ledger). Every exec record points at their lines (`LineAllocation`, `EventLine`), labels and bins. It also needs catalog's `Bom`, `ItemRoutingOperation`, `Equipment` and `Tool` (`usesBomRevision`, `followsOperation`, `atWorkCenter`). First needed: decision 80 (gist parents of `ManufacturingOrder`/`WorkOrder`), 82 (`JobStatus`/`ShippingStatus` mapping), 79 (pick), 85 (genealogy), 89 (carrier), and the gist names `gist:Task`/`gist:PhysicalEvent` admitted under decision 13. Within the family: `Job` and `WorkOrder` first, then picks and receiving, then shipment and packing, then the operation runs and quality. Not checked: inputs and mutations beyond the few named, whether `ItemToPick` is stored, field descriptions beyond the family file, and no record or screen was read."
+ },
+ "layout": {
+  "types": [
+   {
+    "suttonType": "AddressCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "One value of a tenant-defined field on an Address (the packet's PostalAddress, or Site/Warehouse for an organization address per report 16 D); one term for all 19 value types, 19 bindings (05 section 6), pending question 3."
+   },
+   {
+    "suttonType": "BillOfLadingBillTo",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Show/hide switches of the bill-of-lading layout's bill-to block."
+   },
+   {
+    "suttonType": "BillOfLadingConsignee",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches of the consignee block of a printed bill of lading."
+   },
+   {
+    "suttonType": "BillOfLadingDocumentsConfiguration",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "The tenant's bill-of-lading layout and its boilerplate terms text (masterBillOfLadingTerms, certification); a rendering of a Shipment, not a record of one."
+   },
+   {
+    "suttonType": "BillOfLadingOption",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "One field slot (key, formName, visible, grouped) in a document layout."
+   },
+   {
+    "suttonType": "BillOfLadingPdf",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "A URL to a rendered PDF: transport."
+   },
+   {
+    "suttonType": "BillOfLadingSection",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "A section of layout options."
+   },
+   {
+    "suttonType": "BillOfLadingShipper",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches of the shipper block."
+   },
+   {
+    "suttonType": "BomDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "The manufacturing orders and price breaks that reference a BOM, returned when a delete is refused: a query result over Bom (07) references."
+   },
+   {
+    "suttonType": "BulkItemMutationError",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Per-row error code and message of a bulk mutation response (noTerm error, if ever mirrored)."
+   },
+   {
+    "suttonType": "CompanyCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a Company, which is the tenant's SourceRecord of an Organization or (pending 125) a Person."
+   },
+   {
+    "suttonType": "ContactCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a Contact (Person, ContactAssignment in 06)."
+   },
+   {
+    "suttonType": "CreateItemsResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk create response row (index, item or error): transport."
+   },
+   {
+    "suttonType": "CustomDocumentConfigurationDetails",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "A designer layout (Fabric.js JSON, page size, active/archived) for one printed document type; Sutton itself calls layoutJson untrusted and not a contract."
+   },
+   {
+    "suttonType": "CustomField",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldDefinition",
+    "packetReport": "10",
+    "note": "A tenant-defined field on one kind of record (context, name, type, options); no packet report owns tenant-defined attributes, 10 is the nearest home; pending question 3."
+   },
+   {
+    "suttonType": "CustomFieldOption",
+    "verdict": "new-term-needed",
+    "packetTerm": "TenantCode",
+    "packetReport": "10",
+    "note": "One allowed value of a select custom field, soft-deleted by `deleted`; the same kind of thing as a DynamicFieldOption, in a list owned by its CustomField (question 2)."
+   },
+   {
+    "suttonType": "CustomFieldValueOption",
+    "verdict": "part-of-another-record",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "The option a value picked, copied into the value (id, value, deleted): a reference to a TenantCode, not a record of its own."
+   },
+   {
+    "suttonType": "CustomLabelAddressConfig",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Address block switches of a printed label layout."
+   },
+   {
+    "suttonType": "CustomLabelConfigurationDetails",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "The printed tag layout (size, alignment, logo, fields); a separate record from the stock Inventory, which supports decision 71 (a)/(b) against (c) 'the printed tag'."
+   },
+   {
+    "suttonType": "CustomLabelConfigurations",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "An item's default label layout per purpose (item, manualInventory, production, receiving)."
+   },
+   {
+    "suttonType": "CustomLabelOption",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "One field slot on a label layout with barcode/QR switches and up to five GS1-128 application identifiers; the AIs touch IdentifierKindScheme (gtin, sscc, lotCode) only as encoding, not as terms."
+   },
+   {
+    "suttonType": "DeleteItemsResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk delete response row: transport."
+   },
+   {
+    "suttonType": "DeleteJobsResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk delete response row: transport."
+   },
+   {
+    "suttonType": "DeleteQuotesResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk delete response row: transport."
+   },
+   {
+    "suttonType": "DeleteSalesOrdersResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk delete response row: transport."
+   },
+   {
+    "suttonType": "DeleteSerializedInventoriesResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk delete response row: transport."
+   },
+   {
+    "suttonType": "DynamicField",
+    "verdict": "new-term-needed",
+    "packetTerm": "TenantCodeList",
+    "packetReport": "10",
+    "note": "A tenant's own named list of codes for one field (21 of them under OrganizationDynamicFields); report 10 section 4.3 already says 'another tenant's category list is its own scheme', but no term or shape exists for it (question 2)."
+   },
+   {
+    "suttonType": "DynamicFieldOption",
+    "verdict": "new-term-needed",
+    "packetTerm": "TenantCode",
+    "packetReport": "10",
+    "note": "One entry of a tenant code list, identified by its id (value is renameable text, `deleted` a soft retirement), pointed at by Item.category, tags, InventoryAdjustment.adjustmentReason, carriers, payment terms and more; maps to ItemCategoryScheme, AdjustmentReasonScheme or ReceivingRejectReasonScheme concepts only through a person's mapping."
+   },
+   {
+    "suttonType": "ExternalBill",
+    "verdict": "part-of-another-record",
+    "packetTerm": "SupplierBill",
+    "packetReport": "09",
+    "note": "A slim reference to a Bill (id, url, suffix, isLocal) listed where a purchase order cannot be removed; isLocal ('created without an accounting integration') shows a bill can exist unsent."
+   },
+   {
+    "suttonType": "ExternalInvoice",
+    "verdict": "part-of-another-record",
+    "packetTerm": "AccountingSyncRecord",
+    "packetReport": "09",
+    "note": "The invoice's copy on a connected platform (connection, platformUrl, free-text status, lastSync): its id and URL are AccountingSyncRecord's externalDocumentId; Sutton keeps one per invoice, not one per attempt."
+   },
+   {
+    "suttonType": "ExternalOrder",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SourceRecord",
+    "packetReport": "04",
+    "note": "A commerce platform's record of a sales order (connection, orderNumber), linked to the Order by recordOf; whether id or orderNumber is the platform's source id was not checked."
+   },
+   {
+    "suttonType": "File",
+    "verdict": "new-term-needed",
+    "packetTerm": "Attachment",
+    "packetReport": "09",
+    "note": "A file attached to a company, inventory, shipment or quality check (FileCategory includes itemPhoto, logo, qualityCheck and OCR source documents for orders); formatted content beside StagedFile, which is only an import's file; pending question 1."
+   },
+   {
+    "suttonType": "FileAttachment",
+    "verdict": "new-term-needed",
+    "packetTerm": "Attachment",
+    "packetReport": "09",
+    "note": "The same thing as File with non-null key, status and url, used on orders, purchase orders, quotes, receiving tickets and the organization: one term, two bindings."
+   },
+   {
+    "suttonType": "FileUploadLink",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "A presigned upload URL and its form fields: transport."
+   },
+   {
+    "suttonType": "FileUploadLinkField",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "One multipart form field of an upload link: transport."
+   },
+   {
+    "suttonType": "InventoryAdjustmentCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on an InventoryAdjustment (08)."
+   },
+   {
+    "suttonType": "InventoryCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on an Inventory record (InventoryLabel, 08)."
+   },
+   {
+    "suttonType": "InventoryDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Manufacturing and sales orders referencing a label, returned when a delete is refused."
+   },
+   {
+    "suttonType": "InventoryLinkedRecord",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "An id-and-name reference inside a deletion-blocker list: helper."
+   },
+   {
+    "suttonType": "ItemCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on an Item (ItemSpecification, 07)."
+   },
+   {
+    "suttonType": "ItemDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Every record kind that blocks deleting an item (BOMs, aliases, inventories, orders); its `labels` field carries the description of `inventories`, so whether Sutton's 'label' there means stock or printed labels was not checked."
+   },
+   {
+    "suttonType": "ItemLinkedRecord",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "An id-and-name reference: helper."
+   },
+   {
+    "suttonType": "JobCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a Job (ManufacturingOrder, 09)."
+   },
+   {
+    "suttonType": "JobDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Blocking inventories and the locations whose standard stock would go negative; the no-negative rule for standard items is a record rule worth recording for 08, not a term."
+   },
+   {
+    "suttonType": "JobTravelerPdf",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "URL of a rendered job traveler: transport."
+   },
+   {
+    "suttonType": "LabelDetails",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Show-name/address/logo switches of a label layout."
+   },
+   {
+    "suttonType": "ObjectSyncStatus",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "AccountingSyncRecord",
+    "packetReport": "09",
+    "note": "One sync attempt's status (free String), timestamp and error, but only the last one per Bill or ExternalInvoice and with no direction field, so 09's identity (document, direction, attempt time) cannot be filled from it (conflict 4)."
+   },
+   {
+    "suttonType": "OperationIDOnly",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Id-only mutation response: transport."
+   },
+   {
+    "suttonType": "OrderCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on an Order (SalesOrder, 09)."
+   },
+   {
+    "suttonType": "OrderDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Invoices, picks, packs and shipments that block deleting an order."
+   },
+   {
+    "suttonType": "OrderIDOnly",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Id-only mutation response: transport."
+   },
+   {
+    "suttonType": "OrganizationAccountsSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "06",
+    "note": "Tenant switches for the customer portal and webhooks; enableCustomerPortal gates 06's PortalAccess but is itself a setting."
+   },
+   {
+    "suttonType": "OrganizationCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on the tenant organization itself (Tenant, 06)."
+   },
+   {
+    "suttonType": "OrganizationDocumentNumberPrefix",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "The prefix a tenant puts on document numbers per DocumentType: presentation of tenant-issued numbers; IdentifierKindScheme has no document-number kind, and a prefix would not add one."
+   },
+   {
+    "suttonType": "OrganizationDynamicFieldOptionIdOnly",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Delete response of an option: transport."
+   },
+   {
+    "suttonType": "OrganizationDynamicFields",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "10",
+    "note": "The bag serving the tenant's 21 lists; itemCategories maps to ItemCategoryScheme, inventoryAdjustmentReasons to AdjustmentReasonScheme, rejectionReasons to ReceivingRejectReasonScheme, itemTags and jobTags to gist:Tag via taggedWith, packagingTypes to PackagingType; paymentTerms, shippingTerms, freightCharges, freightChargeTerms, shippingClasses, paymentAdjustments, jobCategories, qualityCheckTypes, toolConditions, scanCodeCategories, inventorySourceType, equipment, shippingCarriers and scacCodes have no packet scheme; what `warehouseLocations` lists was not checked."
+   },
+   {
+    "suttonType": "OrganizationFeature",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Plan entitlements (FeatureKey with config limits)."
+   },
+   {
+    "suttonType": "OrganizationLocationSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "08",
+    "note": "enableBinTracking: whether Bin applies in this tenant, overridable per item (report 16 section 2); a tenant rule, not a term."
+   },
+   {
+    "suttonType": "OrganizationMemberCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on an OrganizationMember (Member, 06)."
+   },
+   {
+    "suttonType": "OrganizationMemberSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "A member's UI preferences (language, theme, sidebar)."
+   },
+   {
+    "suttonType": "OrganizationModuleSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Container of the seven module settings."
+   },
+   {
+    "suttonType": "OrganizationProductionSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "08",
+    "note": "Tenant rules on backflush, auto-reservation and lot numbering (automaticLotNumbers, preventManualLotNumbers), the last bearing on open decision 127."
+   },
+   {
+    "suttonType": "OrganizationPurchaseOrderSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "09",
+    "note": "PO approval policy with a minimum amount (a Float) and notification emails: a tenant policy behind the Approval record (party family)."
+   },
+   {
+    "suttonType": "OrganizationReceivingSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "08",
+    "note": "preventOverReceiving (bears on open decision 84), enableReturnQuarantine (returned serialized stock lands quarantined, consistent with report 16 L) and allowManualSerialOverride, whose description confirms serial numbers are unique in the organization, as 08's TrackingCode identity says."
+   },
+   {
+    "suttonType": "OrganizationSalesOrderSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "09",
+    "note": "SO approval policy, default terms text and enableProjects (orders carry a project, which no packet term holds)."
+   },
+   {
+    "suttonType": "OrganizationShippingSettings",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "09",
+    "note": "preventOverPicking: a tenant rule on Pick."
+   },
+   {
+    "suttonType": "PackagingTypeDynamicFieldOption",
+    "verdict": "new-term-needed",
+    "packetTerm": "PackagingType",
+    "packetReport": "08",
+    "note": "A tenant's kind of packaging with a tare weight in a unit, the default on an Item and the packaging of an Inventory; neither 07's PackagingUnit (a count unit for a pack level) nor 08's Container (the physical object), so a specification term, gist:Specification pending."
+   },
+   {
+    "suttonType": "PackingSlipBillTo",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Packing slip layout switches."
+   },
+   {
+    "suttonType": "PackingSlipDocumentsConfiguration",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Packing slip layout and footer text."
+   },
+   {
+    "suttonType": "PackingSlipOption",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout field slot."
+   },
+   {
+    "suttonType": "PackingSlipOrganization",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches of the organization block."
+   },
+   {
+    "suttonType": "PackingSlipPdf",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Rendered PDF URL: transport."
+   },
+   {
+    "suttonType": "PackingSlipSection",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout section."
+   },
+   {
+    "suttonType": "PackingSlipShipFrom",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches."
+   },
+   {
+    "suttonType": "PackingSlipShipTo",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches."
+   },
+   {
+    "suttonType": "PurchaseOrderCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a PurchaseOrder (09)."
+   },
+   {
+    "suttonType": "PurchaseOrderDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bills, inventories, jobs and sales orders that block removing a purchase order."
+   },
+   {
+    "suttonType": "PurchaseOrderPdf",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Rendered PDF URL: transport."
+   },
+   {
+    "suttonType": "QuoteCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a Quote (09)."
+   },
+   {
+    "suttonType": "QuotePdf",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Rendered PDF URL: transport."
+   },
+   {
+    "suttonType": "ReceivingTicketCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a ReceivingTicket (narrower than Receipt, report 16 H)."
+   },
+   {
+    "suttonType": "ReceivingTicketDeletionBlockingLinkedRecords",
+    "verdict": "computed-view",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Inventories received on a ticket, which block deleting it."
+   },
+   {
+    "suttonType": "ReceivingTicketDocumentsConfiguration",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Receiving ticket print layout."
+   },
+   {
+    "suttonType": "ReceivingTicketOption",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout field slot."
+   },
+   {
+    "suttonType": "ReceivingTicketOrganization",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches."
+   },
+   {
+    "suttonType": "ReceivingTicketReceivingLocationInfo",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches."
+   },
+   {
+    "suttonType": "ReceivingTicketSection",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout section."
+   },
+   {
+    "suttonType": "ReceivingTicketSupplierInfo",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Layout switches."
+   },
+   {
+    "suttonType": "RemovePurchaseOrdersResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk remove response row: transport."
+   },
+   {
+    "suttonType": "RutterAccountingProperties",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "09",
+    "note": "Accounting connection settings; allowInvoiceBillOverQuantity and allowInvoiceUnfulfilledOrders bear on open decision 84, enableThreeWayMatching on SupplierBill's definition (conflict 3)."
+   },
+   {
+    "suttonType": "RutterCommerceLocation",
+    "verdict": "term-exists-in-packet",
+    "packetTerm": "SourceRecord",
+    "packetReport": "04",
+    "note": "A commerce platform's own location (name, platformId): another system's record of a site, which the mapping links to an organization Address."
+   },
+   {
+    "suttonType": "RutterCommerceLocationMapping",
+    "verdict": "part-of-another-record",
+    "packetTerm": "SourceRecord",
+    "packetReport": "04",
+    "note": "Its address is the recordOf of the platform location's SourceRecord (Site or Warehouse, report 16 D); its two push flags are connection settings with no term."
+   },
+   {
+    "suttonType": "RutterCommerceProperties",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Commerce connection settings (which orders sync, from when, fulfilment direction, the member synced fulfilments are attributed to)."
+   },
+   {
+    "suttonType": "SalesOrderPdf",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Rendered PDF URL: transport."
+   },
+   {
+    "suttonType": "SharedSidebarNavLayout",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Admin-shared navigation preset: UI."
+   },
+   {
+    "suttonType": "ShipmentCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a Shipment (09)."
+   },
+   {
+    "suttonType": "SidebarNavSection",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Navigation section: UI."
+   },
+   {
+    "suttonType": "SignupHeardAboutUsOption",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Sign-up marketing survey option."
+   },
+   {
+    "suttonType": "Skill",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Instructions for Sutton's Studio app builder, with owner, visibility and versions: outside the ERP domain, unless question 1 says otherwise."
+   },
+   {
+    "suttonType": "SkillFile",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "A file of a skill version."
+   },
+   {
+    "suttonType": "SkillVersion",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "An immutable saved version of a skill."
+   },
+   {
+    "suttonType": "ToolCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a Tool, which itself has no packet term yet (report 16 section 3)."
+   },
+   {
+    "suttonType": "ToolSetupConfigurationCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a ToolSetupConfiguration, which has no packet term yet."
+   },
+   {
+    "suttonType": "TransferOrderCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a TransferOrder (09)."
+   },
+   {
+    "suttonType": "UnionDynamicFieldOption",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "The create-response shape covering a plain option and a packaging-type option: helper."
+   },
+   {
+    "suttonType": "UpdateItemsResultItem",
+    "verdict": "not-a-domain-thing",
+    "packetTerm": "",
+    "packetReport": "",
+    "note": "Bulk update response row: transport."
+   },
+   {
+    "suttonType": "WarehouseLocationCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a WarehouseLocation (Bin or Location, report 16 D)."
+   },
+   {
+    "suttonType": "WorkOrderCustomFieldValue",
+    "verdict": "new-term-needed",
+    "packetTerm": "CustomFieldValue",
+    "packetReport": "10",
+    "note": "Value of a tenant field on a WorkOrder (09)."
+   },
+   {
+    "suttonType": "PackagingTypeDynamicField",
+    "verdict": "part-of-another-record",
+    "packetTerm": "TenantCodeList",
+    "packetReport": "10",
+    "note": "The tenant's packaging-type list: a DynamicField whose options are PackagingType entries carrying a tare weight."
+   }
+  ],
+  "enums": [
+   {
+    "enum": "CustomFieldType",
+    "verdict": "new-scheme-needed",
+    "packetScheme": "CustomFieldKindScheme (proposed)",
+    "note": "date | datetime | identifier | multiSelect | number | singleSelect | text: needed only if question 3 answers (a), because a definition must say select-one, select-many and generated identifier, which a value's datatype cannot; under (b) or (c) it is not a domain thing."
+   },
+   {
+    "enum": "CustomDocumentConfigurationStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "active | archived of a print layout."
+   },
+   {
+    "enum": "CustomDocumentConfigurationType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Which printed document a layout is for (bill_of_lading, packing_slip, job_traveler and the rest)."
+   },
+   {
+    "enum": "CustomFieldContext",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Its 20 values are kinds of record, i.e. classes (Item, Job, Order...), so under report 10 rule 1 they are a map to class keys, never a scheme; `deal` has no packet term and no Deal type in the schema, so only 19 value types exist."
+   },
+   {
+    "enum": "GenerateIdentifierStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "complete | pending of a background job that fills generated-identifier custom fields."
+   },
+   {
+    "enum": "CustomLabelAlignment",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Label layout."
+   },
+   {
+    "enum": "CustomLabelSpacing",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Label layout."
+   },
+   {
+    "enum": "LogoType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Label layout; the enum has no values in the schema (checked in schema.sdl.txt)."
+   },
+   {
+    "enum": "CustomLabelConfigurationStatus",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "active | archived of a label layout."
+   },
+   {
+    "enum": "CustomLabelConfigurationType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Which label a layout prints (container, customer, item, manual_inventory, production, receiving)."
+   },
+   {
+    "enum": "CustomLabelCustomFieldContext",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "address | inventory | item | order: record kinds whose custom fields a label may print; class keys, a subset of CustomFieldContext."
+   },
+   {
+    "enum": "DocumentType",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Record kinds that get a numbered prefix (INVENTORY to InventoryLabel, JOB to ManufacturingOrder, RECEIVING to Receipt, SALES_ORDER to SalesOrder...): a class-key map, never a scheme; ORDER_RETURN has no packet term."
+   },
+   {
+    "enum": "FeatureKey",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "Plan entitlements; CUSTOM_ROLES and CUSTOMER_PORTAL only gate terms 06 already has (Role, PortalAccess)."
+   },
+   {
+    "enum": "Language",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "A member's UI language."
+   },
+   {
+    "enum": "ViewMode",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "UI theme."
+   },
+   {
+    "enum": "RutterFulfillmentDirection",
+    "verdict": "values-differ",
+    "packetScheme": "AccountingSyncDirectionScheme",
+    "note": "fromPlatform | toPlatform has the same two directions as toAccounting | fromAccounting, but for fulfilments with a commerce platform, and it is a connection setting rather than the direction of one sync record; the scheme's definition names accounting only."
+   },
+   {
+    "enum": "SkillSource",
+    "verdict": "not-a-domain-thing",
+    "packetScheme": "",
+    "note": "ORGANIZATION | SUTTON | USER: who owns an app-builder skill."
+   }
+  ],
+  "questions": [
+   {
+    "question": "Decision 124 left open whether modelling Sutton 'all' includes document layouts, settings and integrations. For this family of 109 types, which do get terms?",
+    "options": [
+     "(a) Business content only: tenant code lists, custom fields, attachments and integration links (external orders, platform locations, sync status) get terms; layouts, PDFs, navigation, skills, features, sign-up options and bulk responses get none; settings that change a record rule are read as the tenant's rules, not terms",
+     "(b) Every type, layouts and settings included",
+     "(c) Only tenant code lists and custom fields; attachments and integrations wait"
+    ],
+    "recommended": "(a)",
+    "why": "About 60 of the 109 types are print layouts, PDFs, UI and API responses that describe no business thing; a term for a sidebar section or a label's alignment would answer no competency question. Under (b) decision 21's closed noTerm reasons (transport, request, screen, error, bookkeeping, deferred) have none for a tenant setting or a print layout, so the list would need widening. Under (a) roughly 30 types map to 6 new terms (TenantCodeList, TenantCode, CustomFieldDefinition, CustomFieldValue, PackagingType, Attachment) plus existing SourceRecord, AccountingSyncRecord and SupplierBill.",
+    "existingDecision": ""
+   },
+   {
+    "question": "How are a Sutton tenant's own option lists (21 DynamicFields, plus custom-field select options) represented?",
+    "options": [
+     "(a) Each list is the tenant's own code list kept as data, each option keyed by tenant and Sutton's option id with its text as label; a person maps an option to a concept of our scheme where one exists (ItemCategoryScheme, AdjustmentReasonScheme, ReceivingRejectReasonScheme), never automatically",
+     "(b) Each option becomes a new concept of our scheme",
+     "(c) Only the option's text is kept on the record that picked it; the list itself is not modelled"
+    ],
+    "recommended": "(a)",
+    "why": "Report 10 section 4.3 already says another tenant's category list is 'its own scheme ..., not new concepts here'. Decision 10's concept IRI (scheme key, hyphen, notation) would collide across tenants under (b). Sutton options are renamed and soft-deleted (`deleted`), so their identity is the id, and under (c) a rename would split one category in two. Example: Item.category points at one DynamicFieldOption of itemCategories.",
+    "existingDecision": ""
+   },
+   {
+    "question": "How are Sutton's custom fields (CustomField and 19 value types) modelled?",
+    "options": [
+     "(a) A tenant's field definition and each value are content records (CustomFieldDefinition, CustomFieldValue) pointing at the record described, typed by the field's kind, with select values pointing at a TenantCode; a person may map a definition to one of our properties, and then its values lift to that property",
+     "(b) Each tenant field is minted as a property in the tenant's data namespace",
+     "(c) Not modelled: the values stay on the tenant's source record only"
+    ],
+    "recommended": "(a)",
+    "why": "Under (a) nothing a tenant recorded is lost, and a field that turns out to mean one of ours (for example an expiry date) can still reach it. (b) puts tenant-made properties beside the hand-written vocabulary, against decision 2's one module owning every term fact. (c) drops data the person moving off Sutton expects to bring along. One term covers the 19 value types (report 05 section 6).",
+    "existingDecision": ""
+   },
+   {
+    "question": "Sutton's carrier is an option from the tenant's shippingCarriers list (SCAC codes are a second list), never a Company. What does 09's carriedBy point at for Sutton data?",
+    "options": [
+     "(a) A person maps each carrier option to an Organization once (a SourceRecord with recordOf), and carriedBy keeps its Organization range; until the option is mapped, no carrier triple is written and the option's text is kept",
+     "(b) carriedBy's range is widened to accept a tenant code",
+     "(c) No carriedBy for Sutton data"
+    ],
+    "recommended": "(a)",
+    "why": "Option (b) would let a list entry stand where 09 and decisions 3 and 34 put a party. Option (c) loses the carrier on every Sutton shipment, receiving ticket and purchase order. Under (a) each tenant maps a carrier once, not once per shipment. This is related to open decision 89, which asks about carrier flags, not this range. Under (a), scacCode becomes an identifier of that organization, which needs a new IdentifierKindScheme concept, scac.",
+    "existingDecision": ""
+   },
+   {
+    "question": "Sutton makes over-receiving, over-picking, over-invoicing and over-billing tenant or connection settings. Is decision 84 one rule for everyone?",
+    "options": [
+     "(a) The tenant's setting decides: the setting is kept with the tenant's source record and the app's check reads it; the ontology states no over-delivery rule",
+     "(b) One product rule for every tenant, as 84 (a) recommends",
+     "(c) The settings become ontology terms (a tenant policy class)"
+    ],
+    "recommended": "(a)",
+    "why": "OrganizationReceivingSettings.preventOverReceiving, OrganizationShippingSettings.preventOverPicking and RutterAccountingProperties.allowInvoiceBillOverQuantity show the answer differs per tenant in the source. (b) would refuse or allow rows that the tenant's own Sutton setting decided otherwise. (c) makes configuration into vocabulary.",
+    "existingDecision": "84"
+   },
+   {
+    "question": "Sutton keeps only the last sync attempt per invoice or bill (ObjectSyncStatus), with no direction and a free-text status. What identifies an AccountingSyncRecord made from Sutton?",
+    "options": [
+     "(a) Keep 09's identity: the last attempt is imported as one attempt at its timestamp, the direction is set to accounting only where Sutton created the document there (allowCreateInvoice, allowCreateBill), and the status word is kept as stated for a person to map to AccountingSyncStateScheme",
+     "(b) Change the identity to the document and the connection, with each import overwriting the attempt",
+     "(c) Make no sync record from Sutton"
+    ],
+    "recommended": "(a)",
+    "why": "(a) keeps 09's identity (document, direction and attempt time) and the history that later attempts add. (b) loses every earlier attempt by design. (c) drops the outside id and URL a person needs to find the copy on the platform. The states are open decision 86, which this does not settle.",
+    "existingDecision": ""
+   }
+  ],
+  "conflicts": [
+   {
+    "packetPlace": "Report 09 property table, `carriedBy`: \"Relates a receipt or a shipment to the organization that carried the goods\", range `Organization`, citing decisions 3 and 34: \"the carrier is the organization\"",
+    "schemaFact": "The carrier on Shipment, Order, PurchaseOrder, ReceivingTicket and Invoice is `shippingCarrierField: DynamicFieldOption`, an entry of the tenant's `OrganizationDynamicFields.shippingCarriers` list; `scacCodes` is a separate list; Company.type is only customer or vendor",
+    "consequence": "No Sutton carrier can fill carriedBy without minting an Organization from a list entry; a person's mapping step or a change to the range is needed (question 4)."
+   },
+   {
+    "packetPlace": "Report 09 term table, `Invoice`: \"Content that asks a customer to pay ... sent to an outside accounting system\"",
+    "schemaFact": "`Invoice.externalInvoice: ExternalInvoice` is nullable and `RutterAccountingProperties.allowCreateInvoice` is a setting: an invoice exists in Sutton with no outside copy (report 16 section 2: sent 'when one is connected')",
+    "consequence": "Being sent is not part of what an invoice is; the definition should say 'which may be sent', or every local Sutton invoice falls outside the class."
+   },
+   {
+    "packetPlace": "Report 09 term table, `SupplierBill`: \"Content in which a vendor asks the organization to pay ... under a purchase order, matched against what was received\"",
+    "schemaFact": "`RutterAccountingProperties.enableThreeWayMatching` is a per-connection setting, and `ExternalBill.isLocal` marks bills created with no accounting integration",
+    "consequence": "Matching is a tenant's option, not a defining trait; a bill from a tenant with matching off would contradict the definition."
+   },
+   {
+    "packetPlace": "Report 09 term table, `AccountingSyncRecord`: \"records one attempt ... with the outside id, the outcome and any error\", identity \"the document, the direction and the attempt's time\"",
+    "schemaFact": "`ObjectSyncStatus` (id, status: String, timestamp, errorMessage) has no direction, and Sutton holds one `lastSync` per Bill or ExternalInvoice, not each attempt",
+    "consequence": "The identity's direction cannot be read from Sutton and earlier attempts are not in the source; the identity must accept a stated or fixed direction (question 6)."
+   },
+   {
+    "packetPlace": "Report 16 section 3: \"custom fields on twenty kinds of record\"",
+    "schemaFact": "`CustomFieldContext` has 20 values, but only 19 `*CustomFieldValue` types exist; `deal` has none, and no `Deal` type appears in the schema",
+    "consequence": "Nineteen host records carry custom fields as far as the schema shows; `deal` cannot be mapped until Sutton's deal record is found."
+   }
+  ],
+  "notes": "Build this family last of the six, except two pieces that others need first. TenantCodeList and TenantCode (question 2) must come before catalog (Item.category, tags, defaultPackagingType), stock (adjustmentReason, packagingType, scanCodeCategory) and exec (carriers, rejection reasons, checkpointType), since those records point at options. SourceRecord (04, slice 1) must come before ExternalOrder and RutterCommerceLocation. Custom fields wait until each host record has its term; Tool and ToolSetupConfiguration have none yet. AccountingSyncRecord follows commit's Invoice and SupplierBill. Layout, PDF, UI, skill and response types need no terms if question 1 is (a). Not checked: inputs and mutations; what the `warehouseLocations`, `inventorySourceType`, `scanCodeCategories` and `equipment` lists hold; whether ExternalOrder.id or orderNumber is the platform's id; the meaning of `labels` in ItemDeletionBlockingLinkedRecords; Sutton's screens and data."
+ }
+}

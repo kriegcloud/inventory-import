@@ -1,0 +1,16 @@
+# CQ-P09, its party half: Does any party record belong to no tenant, or to two?
+# A constraint: each row is a violation, a source record with its count of distinct tenants when that count is not
+# one. Zero rows mean no violation only beside a fixture that holds a record this query reads (report 04 section 4).
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?record (COUNT(DISTINCT ?tenant) AS ?tenants)
+WHERE {
+  ?record rdf:type/rdfs:subClassOf* inv:SourceRecord .
+  OPTIONAL { ?record inv:inTenant ?tenant }
+}
+GROUP BY ?record
+HAVING (COUNT(DISTINCT ?tenant) != 1)
+ORDER BY ?record

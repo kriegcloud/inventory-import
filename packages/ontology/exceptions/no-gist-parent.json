@@ -3,5 +3,10 @@
     "class": "Role",
     "reason": "Its individuals are the concepts of MemberRoleScheme; gist:Permission fits once permits exists.",
     "ratification": { "decision": 97 }
+  },
+  {
+    "class": "Party",
+    "reason": "gist 14.1.0 has no party class; Party gathers Person and Organization, which keep their gist parents, and supplies no identity.",
+    "ratification": { "decision": 176 }
   }
 ]

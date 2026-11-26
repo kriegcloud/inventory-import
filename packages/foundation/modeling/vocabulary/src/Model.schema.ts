@@ -47,6 +47,17 @@ export const GistName = S.String.check(S.isPattern(/^[A-Z][A-Za-z0-9]{0,63}$/)).
 export type GistName = typeof GistName.Type
 
 /**
+ * The local name of a gist property under the gist namespace, lowerCamelCase as gist writes it.
+ *
+ * @example "isCategorizedBy"
+ */
+export const GistPropertyName = S.String.check(S.isPattern(/^[a-z][A-Za-z0-9]{0,63}$/)).pipe(
+  $I.annoteSchema("GistPropertyName", { description: "The local name of a gist property" })
+)
+/** Runtime type of {@link GistPropertyName}. */
+export type GistPropertyName = typeof GistPropertyName.Type
+
+/**
  * The local name of a concept scheme IRI: class-shaped, ending in `Scheme`, so it never reads as a class.
  *
  * @example "LoanStatusScheme"
@@ -83,6 +94,18 @@ export const Notation = S.String.check(S.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]{0
 /** Runtime type of {@link Notation}. */
 export type Notation = typeof Notation.Type
 
+/**
+ * The key a term has in its own table: a class, property or scheme key, or a concept's notation. Which table it must
+ * be a key of is a rule of the vocabulary (C15), so a key of the wrong table still decodes.
+ *
+ * @example "EA"
+ */
+export const TermKey = S.String.check(S.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/)).pipe(
+  $I.annoteSchema("TermKey", { description: "The key a term has in its own table, or a concept's notation" })
+)
+/** Runtime type of {@link TermKey}. */
+export type TermKey = typeof TermKey.Type
+
 /** A name for people, in English, written by hand and never derived from a key (`skos:prefLabel`, `skos:altLabel`). */
 export const Label = S.Trimmed.check(S.isMinLength(1), S.isMaxLength(80)).pipe(
   $I.annoteSchema("Label", { description: "A name for people, in English" })
@@ -101,12 +124,21 @@ export const Definition = S.Trimmed.check(S.isMinLength(12), S.isMaxLength(400))
 export type Definition = typeof Definition.Type
 
 /**
- * The ontological category a class's instances fall under. Only the four values every option of the open decision on
- * the tag's values contains; the others wait for that decision.
+ * The ontological category a class's instances fall under: the nine values of decision 18, on classes only. A
+ * `category` gathers classes of different kinds and supplies no identity criterion (decision 12); which criterion
+ * each other tag carries is gate 4's rule C7.
  */
-export const KindTag = LiteralKit(["kind", "role", "relator", "information"]).pipe(
-  $I.annoteSchema("KindTag", { description: "The ontological category a class's instances fall under" })
-)
+export const KindTag = LiteralKit([
+  "kind",
+  "subkind",
+  "role",
+  "phase",
+  "relator",
+  "event",
+  "information",
+  "category",
+  "value"
+]).pipe($I.annoteSchema("KindTag", { description: "The ontological category a class's instances fall under" }))
 /** Runtime type of {@link KindTag}. */
 export type KindTag = typeof KindTag.Type
 
@@ -135,6 +167,52 @@ export class Ratification extends S.Opaque<Ratification, { readonly brand: uniqu
     )
   }).pipe($I.annoteSchema("Ratification", { description: "The decision in which the term was accepted" }))
 ) {}
+
+// ---------------------------------------------------------------------------------------------------------------
+// A term's retirement (decision 33)
+// ---------------------------------------------------------------------------------------------------------------
+
+const DeprecationKind = LiteralKit(["replaced", "withdrawn"])
+
+const since = S.SemVerFromString.pipe(
+  S.annotateKey({ description: "The vocabulary version from which the term is retired, never later than the module's" })
+)
+
+/**
+ * A term retired in favour of another of its own table: the successor named at that retirement, kept when the
+ * successor later retires itself (report 05's V14), so an earlier replacement never fails for a later one.
+ */
+export class ReplacedTerm extends S.Opaque<ReplacedTerm, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("replaced"),
+    replacedBy: TermKey.pipe(
+      S.annotateKey({
+        description: "The immediate successor at retirement, a key of the same table (dcterms:isReplacedBy)"
+      })
+    ),
+    since
+  }).pipe($I.annoteSchema("ReplacedTerm", { description: "A term retired in favour of a named successor" }))
+) {}
+
+/** A term retired with nothing in its place, and why: a retirement with no successor always says its reason. */
+export class WithdrawnTerm extends S.Opaque<WithdrawnTerm, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("withdrawn"),
+    reason: Definition.pipe(S.annotateKey({ description: "Why the term is retired with no successor" })),
+    since
+  }).pipe($I.annoteSchema("WithdrawnTerm", { description: "A term retired with no successor, and why" }))
+) {}
+
+/**
+ * A term's retirement (decision 33): replaced by a successor, or withdrawn with a reason. A retired term keeps its
+ * label and definition and stays in the module for good, since a stored IRI or notation may still name it.
+ */
+export const Deprecation = DeprecationKind.mapMembers(() => Tuple.make(ReplacedTerm, WithdrawnTerm)).pipe(
+  S.toTaggedUnion("kind"),
+  $I.annoteSchema("Deprecation", { description: "A term's retirement: its successor, or why it has none" })
+)
+/** Runtime type of {@link Deprecation}. */
+export type Deprecation = typeof Deprecation.Type
 
 // ---------------------------------------------------------------------------------------------------------------
 // A class's parent and identity
@@ -179,12 +257,24 @@ export type ParentLink = typeof ParentLink.Type
 
 const IdentityKind = LiteralKit(["stated", "inherited"])
 
-/** What makes two instances of the class the same one, written out. */
+/**
+ * What makes two instances of the class the same one, written out, and the properties of the vocabulary it rests on.
+ * The sentence is for people; `restsOn` is what rule C16 reads (report 05's V18, decision 146), so a criterion on a name
+ * or an email is refused by what it states, not by a word match on its sentence. An empty `restsOn` states no basis the
+ * vocabulary has, as a criterion on a body no record holds does.
+ */
 export class StatedIdentity extends S.Opaque<StatedIdentity, { readonly brand: unique symbol }>()(
   S.Struct({
     kind: S.tag("stated"),
-    criterion: Definition.pipe(S.annotateKey({ description: "What makes two instances the same one" }))
-  }).pipe($I.annoteSchema("StatedIdentity", { description: "An identity criterion written out" }))
+    criterion: Definition.pipe(S.annotateKey({ description: "What makes two instances the same one" })),
+    restsOn: S.Array(PropertyKey.annotateKey({ description: "A property of the vocabulary the criterion reads" })).pipe(
+      S.annotateKey({
+        description: "The properties of the vocabulary the criterion reads (rule C16); empty, it reads none of them"
+      }),
+      S.withConstructorDefault(Effect.succeed([])),
+      S.withDecodingDefaultTypeKey(Effect.succeed([]))
+    )
+  }).pipe($I.annoteSchema("StatedIdentity", { description: "An identity criterion written out, with its basis" }))
 ) {}
 
 /** The class takes its identity criterion from its parent, which must then be a class of the same vocabulary. */
@@ -233,6 +323,17 @@ export const RangeTarget = RangeKind.mapMembers(() => Tuple.make(ClassRange, Sch
 export type RangeTarget = typeof RangeTarget.Type
 
 /**
+ * The gist property a property sits under (`rdfs:subPropertyOf`, decision 16): one on the vocabulary's gist list, whose
+ * domain and range the property's own fall under (rule C9).
+ */
+export class GistPropertyParent extends S.Opaque<GistPropertyParent, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("gist"),
+    name: GistPropertyName.pipe(S.annotateKey({ description: "A gist property the vocabulary's gist list holds" }))
+  }).pipe($I.annoteSchema("GistPropertyParent", { description: "The gist property a property sits under" }))
+) {}
+
+/**
  * Where a property's use is shown when no record fills it: `fixture`, a test graph only. Absent, a record must name
  * the property.
  */
@@ -241,6 +342,18 @@ export const Evidence = LiteralKit(["fixture"]).pipe(
 )
 /** Runtime type of {@link Evidence}. */
 export type Evidence = typeof Evidence.Type
+
+/**
+ * What kind of label a property's values are, when they are one that is given to a thing rather than one that tells
+ * it apart: a `name` people call it by, or an `email` address it is reached at. Two parties may share a name and one
+ * party may change its address, so no identity criterion may rest on such a property (rule C16, report 05's V18,
+ * decision 146). The property carries the fact, so the rule names no term of any vocabulary.
+ */
+export const Designation = LiteralKit(["name", "email"]).pipe(
+  $I.annoteSchema("Designation", { description: "A label no identity criterion may rest on: a name or an email" })
+)
+/** Runtime type of {@link Designation}. */
+export type Designation = typeof Designation.Type
 
 // ---------------------------------------------------------------------------------------------------------------
 // The terms
@@ -256,7 +369,12 @@ const termFields = {
   definition: Definition.pipe(
     S.annotateKey({ description: "What it means: genus, then difference (skos:definition)" })
   ),
-  ratification: Ratification.pipe(S.annotateKey({ description: "The decision that accepted it" }))
+  ratification: Ratification.pipe(S.annotateKey({ description: "The decision that accepted it" })),
+  deprecation: Deprecation.pipe(
+    S.annotateKey({ description: "Its retirement, when it is retired (decision 33); absent while it is live" }),
+    S.OptionFromOptionalKey,
+    S.withConstructorDefault(Effect.succeedNone)
+  )
 } as const
 
 const propertyFields = {
@@ -266,20 +384,55 @@ const propertyFields = {
     S.OptionFromOptionalKey,
     S.withConstructorDefault(Effect.succeedNone)
   ),
+  subPropertyOf: GistPropertyParent.pipe(
+    S.annotateKey({ description: "The gist property it sits under (decision 16); absent, it sits under none" }),
+    S.OptionFromOptionalKey,
+    S.withConstructorDefault(Effect.succeedNone)
+  ),
   evidence: Evidence.pipe(
     S.annotateKey({ description: "Where it is shown in use when no record fills it" }),
+    S.OptionFromOptionalKey,
+    S.withConstructorDefault(Effect.succeedNone)
+  ),
+  designation: Designation.pipe(
+    S.annotateKey({
+      description:
+        "What kind of label its values are, a name or an email, which no criterion may rest on; absent, neither"
+    }),
     S.OptionFromOptionalKey,
     S.withConstructorDefault(Effect.succeedNone)
   )
 } as const
 
-/** One OWL class: its one parent, its kind tag and its identity criterion. */
+/**
+ * One OWL class: its one identity-bearing parent, the local categories it also falls under (decision 12), its kind
+ * tag and its identity criterion. A category supplies no criterion, so a class tagged `category` states none and every
+ * other class states or inherits one (rule C7). A class whose records store no id (decision 135) says so with
+ * `storesId`: a record of it names it on its own annotations alone, and the lift mints no node of it, since an IRI made
+ * from another record's id would say something nobody decided.
+ */
 export class ClassTerm extends S.Opaque<ClassTerm, { readonly brand: unique symbol }>()(
   S.Struct({
     ...termFields,
     tag: KindTag.pipe(S.annotateKey({ description: "The category its instances fall under" })),
-    parent: ParentLink.pipe(S.annotateKey({ description: "Its one parent, or why it has none" })),
-    identity: IdentityCriterion.pipe(S.annotateKey({ description: "What makes two instances the same one" }))
+    storesId: S.Boolean.pipe(
+      S.annotateKey({
+        description: "Whether its records store an id its IRIs are made from; absent, they do (decision 135)"
+      }),
+      S.withConstructorDefault(Effect.succeed(true)),
+      S.withDecodingDefaultTypeKey(Effect.succeed(true))
+    ),
+    parent: ParentLink.pipe(S.annotateKey({ description: "Its one identity-bearing parent, or why it has none" })),
+    categoryParents: S.Array(ClassKey.annotateKey({ description: "A local class tagged category" })).pipe(
+      S.annotateKey({ description: "The local categories it also falls under, beside its one parent (decision 12)" }),
+      S.withConstructorDefault(Effect.succeed([])),
+      S.withDecodingDefaultTypeKey(Effect.succeed([]))
+    ),
+    identity: IdentityCriterion.pipe(
+      S.annotateKey({ description: "What makes two instances the same one; absent on a category" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    )
   }).pipe($I.annoteSchema("ClassTerm", { description: "One OWL class of the vocabulary" }))
 ) {}
 
@@ -364,9 +517,58 @@ export class GistClass extends S.Opaque<GistClass, { readonly brand: unique symb
   }).pipe($I.annoteSchema("GistClass", { description: "One admitted gist class, as a name and a link" }))
 ) {}
 
+const GistPropertyKind = LiteralKit(["object", "datatype"])
+
+const gistDomain = GistName.pipe(
+  S.annotateKey({ description: "The gist class gist declares as its domain, held for rule C9 and never projected" }),
+  S.OptionFromOptionalKey,
+  S.withConstructorDefault(Effect.succeedNone)
+)
+
 /**
- * The gist names a vocabulary admits: the parents its classes name and their named ancestors, and the disjoint pairs
- * gist states between them, as names and links only. No label, definition, property, domain or range of gist's.
+ * One gist relation the vocabulary's properties may sit under. Its domain and range are what gist declares, read from
+ * the pinned release and held only so rule C9 can compare a sub-property with them; decision 16 never copies them into
+ * the generated files.
+ */
+export class GistObjectProperty extends S.Opaque<GistObjectProperty, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("object"),
+    domain: gistDomain,
+    range: GistName.pipe(
+      S.annotateKey({ description: "The gist class gist declares as its range, held for rule C9 and never projected" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    )
+  }).pipe($I.annoteSchema("GistObjectProperty", { description: "A gist relation a property may sit under" }))
+) {}
+
+/** One gist attribute the vocabulary's properties may sit under, with the domain and the datatype gist declares. */
+export class GistDatatypeProperty extends S.Opaque<GistDatatypeProperty, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("datatype"),
+    domain: gistDomain,
+    range: XsdDatatype.pipe(
+      S.annotateKey({ description: "The datatype gist declares as its range, held for rule C9 and never projected" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
+    )
+  }).pipe($I.annoteSchema("GistDatatypeProperty", { description: "A gist attribute a property may sit under" }))
+) {}
+
+/** One gist property the vocabulary admits: a relation or an attribute, with the domain and range gist declares. */
+export const GistProperty = GistPropertyKind.mapMembers(() =>
+  Tuple.make(GistObjectProperty, GistDatatypeProperty)
+).pipe(
+  S.toTaggedUnion("kind"),
+  $I.annoteSchema("GistProperty", { description: "One admitted gist property, with gist's domain and range" })
+)
+/** Runtime type of {@link GistProperty}. */
+export type GistProperty = typeof GistProperty.Type
+
+/**
+ * The gist names a vocabulary admits: the parents its classes name and their named ancestors, the disjoint pairs gist
+ * states between them, as names and links only, and the gist properties its properties sit under. No label or
+ * definition of gist's; a gist property's domain and range are held for rule C9 and never projected (decision 16).
  */
 export class GistProjection extends S.Opaque<GistProjection, { readonly brand: unique symbol }>()(
   S.Struct({
@@ -386,7 +588,17 @@ export class GistProjection extends S.Opaque<GistProjection, { readonly brand: u
         GistName.annotateKey({ description: "One class of the pair" }),
         GistName.annotateKey({ description: "The other class of the pair" })
       ]).annotateKey({ description: "Two gist classes gist states share no instance" })
-    ).pipe(S.annotateKey({ description: "The disjoint pairs gist states between admitted classes, and no others" }))
+    ).pipe(S.annotateKey({ description: "The disjoint pairs gist states between admitted classes, and no others" })),
+    properties: S.Record(
+      GistPropertyName.annotateKey({ description: "A gist property's local name" }),
+      GistProperty
+    ).pipe(
+      S.annotateKey({
+        description: "The admitted gist properties, by local name; none unless a property sits under one"
+      }),
+      S.withConstructorDefault(Effect.succeed({})),
+      S.withDecodingDefaultTypeKey(Effect.succeed({}))
+    )
   }).pipe($I.annoteSchema("GistProjection", { description: "The gist names a vocabulary admits" }))
 ) {}
 

@@ -24,7 +24,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | built ("Step 8" below) |
 | 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
 | 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | built ("Step 10" below) |
-| 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | todo |
+| 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | built but the ten runs, which wait on a push ("Step 11" below) |
 
 Steps 1 to 8 and 10 wait on nothing of Benjamin's. Every estimate is capped by the other job: steps 2 and 3 reach their
 figures together, not apart.
@@ -119,6 +119,24 @@ Past two workers nothing is gained: the draft file, about 50 s in one worker, is
 job still gives one worker, and the file is not split. Both wait on the job timed on CI over several runs at one
 and at two workers, as the standard asks before a job is given more; if two holds, splitting the file by group is
 what lets a third or fourth worker help.
+
+## Step 11, the build's type-check and the CLI's tests at scale
+
+`tsc -b` stays in the app's build: `check` does not cover it. The build's `tsc` is effect-tsgo 7.0.2, the pinned
+compiler; `check` runs `tsrs` 7.1.0-beta with `--fast`, which its own help says "may differ from pinned TypeScript
+behavior", and nothing else runs the pinned one (`typecheck:tsc` is in no task). It took 2.7 s on the workstation
+against 0.6 s for `tsrs -b --fast`, so keeping it costs seconds.
+
+The CLI's two tests at scale moved to `test/Steps.slow.test.ts`, in its slow project, which turbo now replays (step
+8): names given the one before from a hundred to ten thousand, and the five heaviest shapes at about a million
+characters. The shapes and `within` moved unchanged to `test/support/shapes.ts`, apart from five helpers made dual,
+as an exported helper with two arguments must be. 143 tests in `Steps.test.ts` and 4 in the slow file, against 147
+before; the fast file took 12.1 s alone where it took 24.3 s. `Release.test.ts` stays: its time is spread over
+tests of real git repositories, none of them at scale (the slowest 1.9 s).
+
+`docs/standards/engineering.md` ("The check on CI") and CLAUDE.md say what each job carries, the live test, the
+replayed slow tests and the run counts (steps 3, 8 and 10). Not done: the ten runs after, beside the baseline, which
+need the branch pushed.
 
 ## Step 5, the experiment
 

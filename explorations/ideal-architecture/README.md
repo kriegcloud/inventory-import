@@ -5,7 +5,7 @@ description: What inventory-import becomes as a model-first Turborepo of deep pa
 status: active
 stage: shape
 next: step 8, `@beep/xlsx`; goals ui-packages and contexts are built
-goals: [workspace-and-strictness, beep-csv, kernel-drivers, ui-packages, contexts]
+goals: [workspace-and-strictness, beep-csv, kernel-drivers, ui-packages, contexts, ci-speed]
 ---
 
 # Ideal architecture
@@ -89,6 +89,10 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-26: [goals/ci-speed](../../goals/ci-speed/SPEC.md) written from an audit of `turbo.json`, the workflows, the
+  tests and the checks ([AUDIT](../../goals/ci-speed/AUDIT.md)): a run is about 11 minutes, replays nothing in its
+  check job and carries everything on two slots. Nothing built; its decisions answered the same day in three
+  rounds, the cache on beep-effect's Worker with the workstation writing ([PLAN](../../goals/ci-speed/PLAN.md)).
 - 2026-11-19: [goals/infra](../../goals/infra/SPEC.md) built as far as this machine allows: the seeds out of the
   migration, closed sign-up, `@beep/infra` with the stage plan and the two stacks, `deploy.yml`. Nothing deployed;
   the next step is Benjamin's login and `alchemy state bootstrap` ([PLAN](../../goals/infra/PLAN.md)).

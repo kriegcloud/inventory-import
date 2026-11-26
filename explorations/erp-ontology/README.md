@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Benjamin accepts report 18, the final design of the party slice's terms revised to decisions 154 to 175, as one decision (129) under the number its one open question asks (recommended a new heading, 176); then steps 9 to 12 of goals/party-slice add the terms.
+next: Build steps 9 to 12 of goals/party-slice: the party slice's terms, accepted as decision 176 (report 18), enter the vocabulary module.
 goals: [erp-vocabulary, party-slice]
 ---
 
@@ -117,3 +117,5 @@ first class list, a decision log and a product model read from public sources).
   questions 2 to 10, each as recommended. The report is final to them: `membershipIn` reworded, `Party` stores no id,
   the flags only on a trading account's record, `memberContactPoint` under `gist:hasAddress`, and no count of terms
   moved. One question remains, the accepting decision's number (recommended: 176).
+- 2026-11-26: I accepted report 18 as decision 176. Decisions 154 to 175 answered its questions; no term is in the
+  module yet (steps 9 to 12 of `goals/party-slice`).

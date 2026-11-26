@@ -8,7 +8,7 @@ description: Open questions on the ERP ontology in the order they block work, an
 
 ## Open
 
-Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 175 answer the questions report 18 and step 7 raised. They are under Answered. They are what is left
+Forty-seven questions are open: 42, 47 to 86, 88, 90 to 92, 116 and 127 (the audit added 116 on 2026-11-23; report 16 added 125 to 127 on 2026-11-26, and 127 is the last row). Nineteen left this table on 2026-11-26, when I took the party slice's and the alignment file's: 12, 17 to 19, 27 to 31, 33, 35 to 37, 44, 45, 87, 89, 125 and 126. The goal party-slice entered 129 to 152 the same day, its rows O1 to O19 and five readings its first steps made, and I answered all of them and 153, which the gist file raised; 154 to 175 answer the questions report 18 and step 7 raised. Decision 176 accepts report 18 as the text of the party slice's terms. They are under Answered. They are what is left
 of eighty-five: eighty from reports 04 to 12 and the brief, merged where two reports asked one thing and numbered from
 8 in the order they block work, four a sceptic's review of the whole design added on 2026-11-22 (88 to 91), and
 decision 92, which a later review of the packet took out of 12 (the item kinds' parent) and which sits after 66 with
@@ -1339,3 +1339,11 @@ I chose that contact points are written by hand in this slice and the rule is as
 - Rationale: decision 159 gives a contact point an id from its record and field while decision 155 has the lift state nothing for a path that ends in an attribute; no step of this goal lifts one.
 - What changes: nothing is built. The question is put when Sutton records are first lifted, on a real record.
 - Reverse: a second exception to decision 155 that mints the node from record and field.
+
+### 176. The party slice's terms accepted (2026-11-26)
+
+I accepted report 18 (`research/18-party-slice-terms.md`, as committed at `8363bfb1`) as the text of the party slice's terms; the agent recommended a new heading for it, and I chose the same.
+
+- Rationale: decision 129 has one report and one accepting decision; a number of its own names the text accepted and not the method chosen before it was written.
+- What changes: each new term's label, definition, tag, parents, identity criterion, basis and gist names are the report's, and each names 176: 10 classes, 27 object and 26 datatype properties, 7 schemes with 24 concepts. `Member` and `membershipIn`, whose text changed, name 176, as does `Party`'s entry in the no-gist-parent exceptions. `Person`, `Organization` and `grantScope` keep 111; their new links are `Party` as category parent of `Person` and `Organization`, `storesId: false` on `Person`, and `grantScope` under `gist:isCategorizedBy`. The choices the report lists in its section 11 are accepted with it. Terms enter the module in steps 9 to 12 of `goals/party-slice`.
+- Reverse: a term is changed or retired by a decision of its own (decisions 24 and 33).

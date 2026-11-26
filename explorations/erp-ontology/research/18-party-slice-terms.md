@@ -837,6 +837,8 @@ The accepting decision covers each. Each is reversible by changing the entry bef
 
 ## 13. Question for Benjamin
 
+Answered on 2026-11-26: Benjamin accepted this report as decision 176, option (a). The question is kept as it was put.
+
 Every other point a term rests on is answered (section 14). One question is left, and it is the act of acceptance
 itself.
 

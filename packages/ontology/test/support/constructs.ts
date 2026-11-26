@@ -1,6 +1,8 @@
 // An in-memory copy of the kernel's vocabulary literal that holds each construct step 1 of the party slice added to
 // the metamodel, written so gate 4 finds it coherent: a category, `Party`, over `Person` and `Organization` (decision
-// 12); a retired class, property, scheme and concept, replaced or withdrawn (decision 33); a relation and an attribute
+// 12); a retired class, relation, attribute, scheme and concept, replaced or withdrawn, each holding an axiom its
+// retirement drops: a category parent, a domain, a class range, a gist parent, a class assertion (decision 33); a
+// relation and an attribute
 // under a gist property (decision 16); and an attribute stated as a boolean. Gates 3 and 4 and the projector are tried
 // on it, and on copies of it with one mistake planted, while the kernel's module and the committed exception list stay
 // as they are (PLAN, step 2).
@@ -46,6 +48,7 @@ export const constructsVocabulary = {
       definition: "An organization for which the application kept a workspace, before the tenant replaced it.",
       tag: "role",
       parent: { kind: "local", key: "Organization" },
+      categoryParents: ["Party"],
       identity: { kind: "inherited" },
       deprecation: { kind: "replaced", replacedBy: "Tenant", since },
       ratification: { decision: 33 }
@@ -53,7 +56,17 @@ export const constructsVocabulary = {
   },
   objectProperties: {
     ...vocabulary.objectProperties,
-    grantScope: { ...vocabulary.objectProperties.grantScope, subPropertyOf: { kind: "gist", name: "isCategorizedBy" } }
+    grantScope: { ...vocabulary.objectProperties.grantScope, subPropertyOf: { kind: "gist", name: "isCategorizedBy" } },
+    // A retired relation with every axiom a retirement drops: a domain, a class range and a gist parent.
+    workspaceMembership: {
+      prefLabel: "workspace membership",
+      definition: "Linked a membership to the workspace it let its person act in, before the tenant replaced it.",
+      domain: "Member",
+      range: { kind: "class", key: "Tenant" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
+      deprecation: { kind: "replaced", replacedBy: "membershipIn", since },
+      ratification: { decision: 33 }
+    }
   },
   datatypeProperties: {
     ...vocabulary.datatypeProperties,
@@ -64,6 +77,15 @@ export const constructsVocabulary = {
     recordedAt: {
       ...vocabulary.datatypeProperties.recordedAt,
       subPropertyOf: { kind: "gist", name: "plantedAttribute" }
+    },
+    // A retired attribute with a domain, a datatype range and a gist parent, each dropped by its retirement.
+    loggedAt: {
+      ...vocabulary.datatypeProperties.recordedAt,
+      prefLabel: "logged at",
+      definition: "The instant at which an audit entry was logged, before recorded at replaced it.",
+      subPropertyOf: { kind: "gist", name: "plantedAttribute" },
+      deprecation: { kind: "replaced", replacedBy: "recordedAt", since },
+      ratification: { decision: 33 }
     },
     onHold: {
       prefLabel: "on hold",
@@ -76,6 +98,20 @@ export const constructsVocabulary = {
   },
   schemes: {
     ...vocabulary.schemes,
+    MemberRoleScheme: {
+      ...vocabulary.schemes.MemberRoleScheme,
+      concepts: {
+        ...vocabulary.schemes.MemberRoleScheme.concepts,
+        // A retired concept that is also an individual of a class, whose class assertion its retirement drops.
+        owner: {
+          prefLabel: "Owner",
+          definition: "A member role whose holder could do everything an admin can, before admin replaced it.",
+          alsoInstanceOf: "Role",
+          deprecation: { kind: "replaced", replacedBy: "admin", since },
+          ratification: { decision: 33 }
+        }
+      }
+    },
     GrantScopeKindScheme: {
       ...vocabulary.schemes.GrantScopeKindScheme,
       concepts: {

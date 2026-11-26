@@ -46,6 +46,7 @@ import { graphProjection, owlProjection, skosProjection, triplesOf, type Project
 import { threadContext } from "../src/Thread.ts"
 import { parseTurtle, readTurtle } from "../src/Turtle.ts"
 import { writeTurtle } from "../src/Write.ts"
+import { vocabulary as kernelVocabulary } from "@inventory/kernel/Terms"
 import { constructsVocabulary } from "./support/constructs.ts"
 
 const committed: Readonly<Record<FileKind, string>> = { owl: committedOwl, skos: committedSkos, graph: committedGraph }
@@ -454,7 +455,7 @@ describe("the projector, for the party slice's constructs", () => {
     })
   )
 
-  it.effect("states a retired class's three, keeps its words and drops its parent", () =>
+  it.effect("states a retired class's three, keeps its words and drops its parent and its category parent", () =>
     Effect.gen(function* () {
       const context = yield* constructsContext
       const { namespace } = context.vocabulary
@@ -482,6 +483,51 @@ describe("the projector, for the party slice's constructs", () => {
         `${at("skos", "definition")} "${constructsVocabulary.datatypeProperties.action.definition}"@en`,
         `${at("skos", "historyNote")} "Deprecated in 0.1.0. ${reason}"@en`,
         `${at("skos", "prefLabel")} "action"@en`
+      ])
+    })
+  )
+
+  it.effect("drops a retired relation's domain, class range and gist link, and a retired attribute's too", () =>
+    Effect.gen(function* () {
+      const context = yield* constructsContext
+      const { namespace } = context.vocabulary
+      const owl = triplesOf(owlProjection(context, source))
+      const relation = constructsVocabulary.objectProperties.workspaceMembership
+      const attribute = constructsVocabulary.datatypeProperties.loggedAt
+      expect(statedOf(owl, `${namespace}workspaceMembership`)).toStrictEqual([
+        `${at("dcterms", "isReplacedBy")} <${namespace}membershipIn>`,
+        `${at("rdf", "type")} ${at("owl", "ObjectProperty")}`,
+        `${at("owl", "deprecated")} "true"^^${at("xsd", "boolean")}`,
+        `${at("skos", "definition")} "${relation.definition}"@en`,
+        `${at("skos", "historyNote")} "Deprecated in 0.1.0."@en`,
+        `${at("skos", "prefLabel")} "${relation.prefLabel}"@en`
+      ])
+      expect(statedOf(owl, `${namespace}loggedAt`)).toStrictEqual([
+        `${at("dcterms", "isReplacedBy")} <${namespace}recordedAt>`,
+        `${at("rdf", "type")} ${at("owl", "DatatypeProperty")}`,
+        `${at("owl", "deprecated")} "true"^^${at("xsd", "boolean")}`,
+        `${at("skos", "definition")} "${attribute.definition}"@en`,
+        `${at("skos", "historyNote")} "Deprecated in 0.1.0."@en`,
+        `${at("skos", "prefLabel")} "${attribute.prefLabel}"@en`
+      ])
+    })
+  )
+
+  it.effect("drops a retired concept's class assertion and keeps a live one's (decision 33)", () =>
+    Effect.gen(function* () {
+      const context = yield* constructsContext
+      const { namespace } = context.vocabulary
+      const owl = triplesOf(owlProjection(context, source))
+      expect(statedOf(owl, `${namespace}MemberRoleScheme-owner`)).toStrictEqual([
+        `${at("dcterms", "isReplacedBy")} <${namespace}MemberRoleScheme-admin>`,
+        `${at("rdf", "type")} ${at("owl", "NamedIndividual")}`,
+        `${at("owl", "deprecated")} "true"^^${at("xsd", "boolean")}`,
+        `${at("skos", "historyNote")} "Deprecated in 0.1.0."@en`
+      ])
+      // The near miss: its live successor is still typed by the class it is an instance of.
+      expect(statedOf(owl, `${namespace}MemberRoleScheme-admin`)).toStrictEqual([
+        `${at("rdf", "type")} ${at("owl", "NamedIndividual")}`,
+        `${at("rdf", "type")} <${namespace}Role>`
       ])
     })
   )
@@ -547,6 +593,35 @@ describe("the projector, for the party slice's constructs", () => {
         `${RdfVocab.dcterms.iri}isReplacedBy`
       ])
       expect(declared(triplesOf(owlProjection(thread, source)))).toStrictEqual([])
+      // A vocabulary whose only retired term is a scheme: the OWL file writes no scheme, so it declares neither, and
+      // the SKOS file alone states the retirement.
+      const schemeOnly = yield* S.decodeEffect(
+        Vocabulary,
+        strict
+      )({
+        ...kernelVocabulary,
+        schemes: {
+          ...kernelVocabulary.schemes,
+          AccessLevelScheme: {
+            ...constructsVocabulary.schemes.AccessLevelScheme,
+            concepts: {
+              full: {
+                prefLabel: constructsVocabulary.schemes.AccessLevelScheme.concepts.full.prefLabel,
+                definition: constructsVocabulary.schemes.AccessLevelScheme.concepts.full.definition,
+                ratification: { decision: 33 }
+              }
+            }
+          }
+        }
+      })
+      const retiredScheme = { ...thread, vocabulary: schemeOnly }
+      expect(declared(triplesOf(owlProjection(retiredScheme, source)))).toStrictEqual([])
+      expect(
+        A.filter(
+          statedOf(triplesOf(skosProjection(retiredScheme, source)), `${schemeOnly.namespace}AccessLevelScheme`),
+          Str.startsWith(at("owl", "deprecated"))
+        )
+      ).toStrictEqual([`${at("owl", "deprecated")} "true"^^${at("xsd", "boolean")}`])
     })
   )
 
@@ -668,6 +743,34 @@ describe("the projector, for the party slice's constructs", () => {
           `a value of ${member} is no xsd:dateTime: "2026-11-01"`,
           `a value of ${member} is no xsd:dateTime: "2026-11-01T9:00:00Z"`
         ])
+        // XML Schema 1.1 part 2, section 3.3.7.2: a day past its month's end, and 29 February outside a leap year.
+        const pastEnd = A.make(
+          "2026-02-30T00:00:00Z",
+          "2026-04-31T00:00:00Z",
+          "2026-02-29T00:00:00Z",
+          "1900-02-29T00:00:00Z"
+        )
+        const refused = yield* Effect.forEach(pastEnd, (value) => refusal("recordedAt", value, "dateTime"), {
+          concurrency: 1
+        })
+        expect(refused).toStrictEqual(A.map(pastEnd, (value) => `a value of ${member} is no xsd:dateTime: "${value}"`))
+        // The near miss: the last day of each, and 29 February of a leap year, a year of 400 among them.
+        const lastDays = A.make(
+          "2026-04-30T00:00:00Z",
+          "2026-12-31T23:59:59Z",
+          "2024-02-29T00:00:00Z",
+          "2000-02-29T00:00:00Z"
+        )
+        const written = yield* writeTurtle(
+          graphProjection(
+            context,
+            "a planted graph",
+            A.map(lastDays, (value) =>
+              literal(member, `${vocabulary.namespace}recordedAt`, value, `${RdfVocab.xsd.iri}dateTime`)
+            )
+          )
+        )
+        expect(A.filter(lastDays, (value) => !Str.includes(`"${value}"^^xsd:dateTime`)(written))).toStrictEqual([])
       })
   )
 })
@@ -733,16 +836,25 @@ describe("gate 3, for the party slice's constructs", () => {
       })
   )
 
-  it.effect("planted: a listed gist property's domain or range is refused (decision 16)", () =>
+  it.effect("planted: a listed gist property's domain, range or own gist parent is refused (decision 16)", () =>
     Effect.gen(function* () {
       const { vocabulary: copy } = yield* constructsContext
       const attribute = `${copy.gist.namespace}plantedAttribute`
       const ranged = `<${attribute}> ${at("rdfs", "range")} ${at("xsd", "dateTime")} .\n`
       const domained = `<${attribute}> ${at("rdfs", "domain")} <${copy.gist.namespace}Content> .\n`
+      // Decision 16 copies a gist property's own gist parent, but the metamodel has no field for one yet, so the
+      // projector writes none and the gate refuses one until the step that builds the field (PLAN, step 2).
+      const parented = `<${attribute}> ${at("rdfs", "subPropertyOf")} <${copy.gist.namespace}atDateTime> .\n`
       const range = yield* refusedIn("owl", ranged, copy)
       const domain = yield* refusedIn("owl", domained, copy)
-      // Each is refused twice: the gist name is no class on the list, and a gist subject carries no domain or range.
-      expect([range, domain]).toStrictEqual([
+      const parent = yield* refusedIn("owl", parented, copy)
+      // Each is refused twice: the gist name is no class on the list, and a gist subject carries no domain, range or
+      // property parent.
+      expect([range, domain, parent]).toStrictEqual([
+        [
+          ["namespace", attribute],
+          ["namespace", attribute]
+        ],
         [
           ["namespace", attribute],
           ["namespace", attribute]

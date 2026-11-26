@@ -54,6 +54,7 @@ Step 13 is the first that needs Java.
 | The domain and range of `gist:isCategorizedBy` and `gist:name`, which C9 compares (decision 16). The pinned file was read on 2026-11-22 for names, parents and disjoint pairs (`gist-categories.md`, report 11) and for the version IRI (decision 122), and is not kept in the repository; no domain or range was copied (report 11's property table gives parents only, and report 10 did not look up `isCategorizedBy`'s range). A fresh read is the download step 6 asks for. If the file gives a range a concept does not fall under, such as `gist:Category`, decision 16 refuses the link decision 17 keeps; that conflict goes to Benjamin as a question of its own, and step 9's link waits on it | 6, 8 | |
 | Whether gist 14.1.0 states the disjoint pairs between the gist classes the new terms bring, beyond those report 11 lists. Gate 9 reads only the generated OWL file and the fixtures, so it cannot see a pair the projection leaves out | 6, 8 | |
 | Whether `UserProfile.id` equals `OrganizationMember.id` beyond one empty trial workspace (report 17 section 8) | not met: this goal reads no Sutton data (Choices made) | |
+| A gist property's own gist parent, which decision 16 copies: the metamodel has no field for one, the projector writes none and gate 3 refuses one (Step 2, choices). Whether Benjamin accepts the deferral | 6; the field with the first term that needs one, in no slice-1 step | |
 
 ## Current blocker
 
@@ -161,22 +162,37 @@ Choices the SPEC left open, each the agent's:
 - **Where a retirement is written.** A class and a property in the OWL file; a scheme and a concept in the SKOS file,
   keeping its notation, scheme and top-concept link (report 12 section 3); and every retired concept again on its OWL
   individual, since the OWL file makes every concept an individual, not only those with `alsoInstanceOf`.
-- **The two annotation properties are declared only when used.** `skos:historyNote` when any term is retired,
-  `dcterms:isReplacedBy` when one is replaced, so the kernel's files, which retire nothing, keep every byte.
-  `owl:deprecated` is OWL's own and is not declared.
+- **A retired concept loses its class assertion.** It stays an `owl:NamedIndividual`, but its `rdf:type` to the class
+  of `alsoInstanceOf` is not written: report 05 section 8 lists parent, disjointness, domain and range, and decision 33
+  and SPEC's acceptance say every logical axiom, which in OWL 2 a class assertion is. Keeping it is the other reading;
+  it would change one line of the projector and the copy's test.
+- **The two annotation properties are declared only when used.** `skos:historyNote` when the OWL file states a
+  retirement, of a class, a property or a concept; `dcterms:isReplacedBy` when one of those is replaced. The OWL file
+  writes no scheme, so a retired scheme declares neither there. The kernel's files, which retire nothing, keep every
+  byte. `owl:deprecated` is OWL's own and is not declared.
 - **A gist property's declaration sits among the properties of its kind** (report 12 section 3.1, rule 5), and states
   its type and nothing else: no words of gist's, no domain or range (decision 16).
+- **A gist property's own gist parent is not copied yet.** Decision 16's first clause copies "each taken gist
+  property's named `rdfs:subPropertyOf`"; step 1 gave a gist property no parent field, since no slice-1 term needs one
+  (report 11's `gist:isRecordedAt` under `gist:atDateTime` comes with the commitment slice). So the projector writes
+  none and gate 3 refuses one, as two findings, like a domain or a range (a planted test in `Generated.test.ts`); the
+  step that brings a term needing one builds the field and moves the link onto gate 3's list. This defers part of an
+  answered decision, so step 6 puts it to Benjamin with "Choices made" (What the design left unchecked).
 - **The writer writes a boolean as Turtle's bare `true` or `false`** and refuses any other text, XSD's `1` and `0`
   included, so a value has one spelling; it refuses a date-time outside the `xsd:dateTime` lexical space, a day alone
-  among them (decision 16's day strings). Both refusals are the writer's, beside its NFC check: the graph's literal
+  among them (decision 16's day strings), and a day past its month's end, 29 February outside a leap year included
+  (XML Schema 1.1 part 2, section 3.3.7.2). Both refusals are the writer's, beside its NFC check: the graph's literal
   schema stays generic over datatypes.
 - **Gate 3's rule for a gist property**: a gist subject typed `owl:ObjectProperty` or `owl:DatatypeProperty` passes only
   when the gist list holds that name with that kind; any other statement about it falls to the class rule and is
   refused, so a gist property's domain or range is two findings (no class on the list, and nothing a gist subject
   carries).
 - **The in-memory copy** (`test/support/constructs.ts`) is the kernel's literal with `Party` (decision 12), a retired
-  `Workspace`, a withdrawn `action`, a retired concept and scheme, `grantScope` under `isCategorizedBy` and a boolean
-  `onHold`, and a copy of the exception list with `Party`'s entry. Its gist list is planted: `isCategorizedBy` states no
+  `Workspace` under `Organization` and `Party`, a withdrawn `action`, a retired relation `workspaceMembership` (a
+  domain, a class range, under `isCategorizedBy`) and a retired attribute `loggedAt` (under `plantedAttribute`), a
+  retired concept and scheme, a retired `MemberRoleScheme-owner` that is also a `Role`, `grantScope` under
+  `isCategorizedBy` and a boolean `onHold`, and a copy of the exception list with `Party`'s entry. Each retired term
+  holds an axiom its retirement drops, and a test states each one's whole projection. Its gist list is planted: `isCategorizedBy` states no
   domain or range, and `plantedAttribute` is no gist name. None of it is an accepted term.
 
 ## Closing note

@@ -6,8 +6,10 @@
  * Do not break: the projector states only what the vocabulary holds. A class is a name, its labels, its definition,
  * its one parent and its category parents (decision 12); a property its domain, where it ranges over a class or a
  * datatype its range, and the gist property it sits under (decision 16); a gist class a name, a link and the pairs
- * gist states; a gist property its declaration alone, never gist's domain or range (decision 16). A retired term keeps
- * its words, gains `owl:deprecated true`, its successor and the version, and loses every logical axiom (decision 33).
+ * gist states; a gist property its declaration alone, never gist's domain or range (decision 16). Decision 16 also
+ * copies a gist property's own gist parent, which no slice-1 term needs and the metamodel has no field for yet, so none
+ * is written (PLAN, step 2). A retired term keeps its words, gains `owl:deprecated true`, its successor and the
+ * version, and loses every logical axiom, a retired concept's class assertion included (decision 33).
  * No kind tag, identity criterion, scope or ratification is written (decision 19). Nothing here writes an inverse, a
  * characteristic, a key, a restriction or a sameness: the vocabulary has no field for one, and gate 3 refuses each in
  * a file. A property that ranges over a scheme gets no `rdfs:range` (section 2.2), and a concept that is also an
@@ -152,16 +154,18 @@ const liveOrRetired = (
 ): ReadonlyArray<Triple> =>
   O.match(deprecation, { onNone: axioms, onSome: (retired) => retirementOf(subject, retired, successor) })
 
-/** Every retirement the vocabulary states, of a class, a property, a scheme or a concept. */
-const deprecationsOf = (vocabulary: Vocabulary): ReadonlyArray<Deprecation> =>
+/**
+ * Every retirement the OWL file states: of a class, a property or a concept. A scheme's is not among them: the OWL
+ * file writes no scheme, and only the SKOS file says a scheme is retired.
+ */
+const owlDeprecationsOf = (vocabulary: Vocabulary): ReadonlyArray<Deprecation> =>
   A.getSomes([
     ...A.map(R.values(vocabulary.classes), (entry) => entry.deprecation),
     ...A.map(R.values(vocabulary.objectProperties), (entry) => entry.deprecation),
     ...A.map(R.values(vocabulary.datatypeProperties), (entry) => entry.deprecation),
-    ...A.flatMap(R.values(vocabulary.schemes), (scheme) => [
-      scheme.deprecation,
-      ...A.map(R.values(scheme.concepts), (concept) => concept.deprecation)
-    ])
+    ...A.flatMap(R.values(vocabulary.schemes), (scheme) =>
+      A.map(R.values(scheme.concepts), (concept) => concept.deprecation)
+    )
   ])
 
 /**
@@ -232,9 +236,10 @@ const owlProjectionOf = (context: ProjectContext, source: string): Projection =>
   const gist = (name: string): Iri => `${vocabulary.gist.namespace}${name}`
   const document = ontologyIri(vocabulary)
   const type = term("rdf", "type")
-  const retirements = deprecationsOf(vocabulary)
+  const retirements = owlDeprecationsOf(vocabulary)
   // The two annotation properties of a retirement are declared only by a file that states one, so a vocabulary with
-  // no retired term writes the file it wrote before decision 33 was built. `owl:deprecated` is OWL's own.
+  // no retired term, or whose only retired term is a scheme, writes the file it wrote before decision 33 was built.
+  // `owl:deprecated` is OWL's own.
   const annotations = A.map(
     [
       term("skos", "prefLabel"),
@@ -317,17 +322,26 @@ const owlProjectionOf = (context: ProjectContext, source: string): Projection =>
       ])
     ])
   ]
-  // A retired concept is still an individual a stored code names: it keeps its types and states its retirement here
-  // as in the SKOS file (report 12 section 3).
+  // A retired concept is still an individual a stored code names: it stays a named individual and states its
+  // retirement here as in the SKOS file (report 12 section 3). Its typing by the class it is also an instance of is a
+  // class assertion, a logical axiom of OWL 2, so it goes with the others (decision 33).
   const individuals = A.flatMap(R.toEntries(vocabulary.schemes), ([scheme, entry]) =>
-    A.flatMap(R.toEntries(entry.concepts), ([notation, concept]) => [
-      link(conceptIri(vocabulary, scheme, notation), type, term("owl", "NamedIndividual")),
-      ...O.match(concept.alsoInstanceOf, {
-        onNone: () => [],
-        onSome: (key) => [link(conceptIri(vocabulary, scheme, notation), type, inv(key))]
-      }),
-      ...retiredOnly(vocabulary, scheme, notation, concept.deprecation)
-    ])
+    A.flatMap(R.toEntries(entry.concepts), ([notation, concept]) => {
+      const subject = conceptIri(vocabulary, scheme, notation)
+      return [
+        link(subject, type, term("owl", "NamedIndividual")),
+        ...liveOrRetired(
+          subject,
+          concept.deprecation,
+          (successor) => conceptIri(vocabulary, scheme, successor),
+          () =>
+            O.match(concept.alsoInstanceOf, {
+              onNone: () => [],
+              onSome: (key) => [link(subject, type, inv(key))]
+            })
+        )
+      ]
+    })
   )
   return {
     header: headerOf(vocabulary, source),
@@ -349,7 +363,7 @@ const owlProjectionOf = (context: ProjectContext, source: string): Projection =>
  * The OWL file (section 8): the document, the annotation properties it uses (four, and the two of a retirement when it
  * states one), the gist classes with their links and pairs, the vocabulary's classes and properties with each gist
  * property among those of its kind, and every concept as a named individual, typed by its class where it is also an
- * instance of one.
+ * instance of one and is live.
  *
  * @example owlProjection(context, "packages/kernel/src/Terms.vocab.ts") // seven sections
  */

@@ -8,8 +8,10 @@
  * The lists hold no sameness, no key, no inverse, no characteristic and no restriction: those are the constructs by
  * which a reasoner could conclude that two tenants are one organization (the fifth forbidden conclusion), and each is
  * a finding the moment a file states it. A gist subject is a class or a property the vocabulary's gist list holds, and
- * carries only its declaration and, for a class, its parent and pairs: never gist's words, domain or range (decisions
- * 14 and 16). The gate works on parsed statements, never on text.
+ * carries only its declaration and, for a class, its parent and pairs: never gist's words (decision 14), domain or
+ * range (decision 16). A gist property's own gist parent, which decision 16 copies, is refused too: the metamodel has
+ * no field for one and no slice-1 term needs one (PLAN, step 2), so the projector writes none, and this rule changes
+ * with the step that builds the field. The gate works on parsed statements, never on text.
  *
  * @packageDocumentation
  */

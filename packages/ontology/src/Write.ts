@@ -9,7 +9,7 @@
  * predicate one a line, in the order of their N-Triples form, which is used to sort and never written; no blank node, no `@base`, and no date, host, path outside the repository or
  * commit anywhere. A boolean is written `true` or `false`, Turtle's own form (report 12 section 3.1, rule 8), and a
  * date-time with its datatype. A predicate the projection's order lacks, words that are not NFC, a boolean that is not
- * `true` or `false` and a date-time that is no `xsd:dateTime` are refused: nothing is written around them.
+ * `true` or `false` and a date-time that is no `xsd:dateTime`, a day past its month's end included, are refused: nothing is written around them.
  *
  * @packageDocumentation
  */
@@ -68,18 +68,50 @@ const isNfc = (value: string): boolean => Str.normalize("NFC")(value) === value
 const booleans: ReadonlyArray<string> = ["true", "false"]
 
 /**
- * The lexical space of `xsd:dateTime` (XML Schema 1.1 part 2, section 3.3.7): a year of four digits or more, the month,
- * the day, the time to the second with an optional fraction, or 24:00:00, and an optional zone. A day alone is none.
+ * The shape of the lexical space of `xsd:dateTime` (XML Schema 1.1 part 2, section 3.3.7): a year of four digits or
+ * more, the month, a day from 01 to 31, the time to the second with an optional fraction, or 24:00:00, and an optional
+ * zone. A day alone is none. The day's fit to its month is {@link dayFits}'s, not this pattern's.
  */
 const dateTimeForm =
   /^-?(?:[1-9][0-9]{3,}|0[0-9]{3})-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]+)?|24:00:00(?:\.0+)?)(?:Z|[+-](?:(?:0[0-9]|1[0-3]):[0-5][0-9]|14:00))?$/
+
+/** The year's digits, the month and the day of a text {@link dateTimeForm} accepts. */
+const datePart = /^-?([0-9]{4,})-([0-9]{2})-([0-9]{2})T/
+
+/** The days of each month of a common year, January first. */
+const monthLengths: ReadonlyArray<number> = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+/**
+ * Whether a year, given as its digits without a sign, is a leap year: a multiple of 4 that is not a multiple of 100,
+ * or a multiple of 400. Its last four digits decide it, since 10000 is a multiple of 400, so a year of any length is
+ * read exactly; the sign changes no multiple.
+ */
+const isLeapYear = (digits: string): boolean => {
+  const year = Number(Str.takeRight(digits, 4))
+  return year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0)
+}
+
+/**
+ * XML Schema 1.1 part 2, section 3.3.7.2, "Day-of-month Values": the day is not past the end of its month, 29
+ * February in a leap year only. So `2026-02-30T00:00:00Z` and `2026-02-29T00:00:00Z` are outside the lexical space,
+ * and `2024-02-29T00:00:00Z` is in it.
+ */
+const dayFits = (value: string): boolean =>
+  O.exists(
+    O.flatMap(Str.match(datePart)(value), (parts) => O.all([A.get(parts, 1), A.get(parts, 2), A.get(parts, 3)])),
+    ([year, month, day]) =>
+      O.exists(
+        A.get(monthLengths, Number(month) - 1),
+        (length) => Number(day) <= length || (month === "02" && Number(day) === 29 && isLeapYear(year))
+      )
+  )
 
 /** Why a literal's text is not one its datatype writes, or none when it is. */
 const misread = (datatype: Iri, value: string): O.Option<string> => {
   if (datatype === term("xsd", "boolean") && !A.contains(booleans, value)) {
     return O.some(`is no boolean the files write: "${value}" is neither true nor false`)
   }
-  if (datatype === term("xsd", "dateTime") && !dateTimeForm.test(value)) {
+  if (datatype === term("xsd", "dateTime") && !(dateTimeForm.test(value) && dayFits(value))) {
     return O.some(`is no xsd:dateTime: "${value}"`)
   }
   return O.none()

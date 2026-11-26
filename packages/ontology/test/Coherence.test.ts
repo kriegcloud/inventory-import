@@ -181,7 +181,7 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
-  it.effect("reports exactly C9 on grantScope when the gist property it sits under leaves the gist list", () =>
+  it.effect("reports exactly C9 on the two relations under a gist property that leaves the gist list", () =>
     Effect.gen(function* () {
       const planted = {
         ...constructsVocabulary,
@@ -191,7 +191,11 @@ describe("gate 4, vocabulary coherence", () => {
         }
       }
       const found = yield* findingsOfCopy(planted)
-      expect(found).toEqual([["C9", "objectProperty", "grantScope"]])
+      // The retired relation is held to its gist parent too: C9 reads every property, live or retired.
+      expect(found).toEqual([
+        ["C9", "objectProperty", "grantScope"],
+        ["C9", "objectProperty", "workspaceMembership"]
+      ])
     })
   )
 })

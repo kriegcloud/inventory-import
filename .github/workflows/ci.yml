@@ -152,7 +152,8 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
 
-  # The slow tests (workerd, a real D1 database, sign-in), and the data grid typed on in a real browser.
+  # The slow tests (workerd, a real D1 database, sign-in), which turbo replays until what they read changes; the one
+  # test that calls a real service (`test:live`), which it never replays; and the data grid typed on in a real browser.
   slow:
     name: Slow tests and the data grid
     runs-on: ubuntu-latest
@@ -169,8 +170,8 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      - name: The slow tests
-        run: bunx turbo run test:slow --summarize --continue --concurrency=2
+      - name: The slow tests and the live one
+        run: bunx turbo run test:slow test:live --summarize --continue --concurrency=2
         env:
           VITEST_MAX_WORKERS: 1
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has

@@ -8,7 +8,8 @@ import { browser, signInApp, signInStart } from "./support/app.ts"
 
 // The breach check against the real Have I Been Pwned service, through the Worker's own composition with
 // PWNED_PASSWORD_CHECK on (network needed; `bun run check:full`). Only the first five characters of each password's
-// SHA-1 hash leave this machine, exactly as in production.
+// SHA-1 hash leave this machine, exactly as in production. A live test, not a slow one: the service's answer is in no
+// file, so turbo runs it every time (`test:live`) while the slow tests beside it are replayed.
 
 layer(signInApp({ ...signInStart, settings: { PWNED_PASSWORD_CHECK: "true" } }), { timeout: "60 seconds" })(
   "the breach check against the real service",

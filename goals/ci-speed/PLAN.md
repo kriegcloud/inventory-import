@@ -21,7 +21,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 5 | Bring the vendored kit into the hash of prove, verify, mutants and mutants:sample; then take `@beep/repo-cli` out of the root's devDependencies, and bring the CLI's source to the tasks that run it through its own `transit`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | done ("Step 5, the experiment" below) |
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | built; CI's run waits on a push ("Step 6" below) |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
-| 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | todo |
+| 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | built ("Step 8" below) |
 | 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
 | 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | todo |
 | 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | todo |
@@ -140,6 +140,24 @@ the file into every task, and `version-sync` holds its major to `engines.node`. 
 same file, so inside this repository `node` is 22.23.4 where it was 24.22.1: that is the point of the pin, and it is
 the one thing here that changes what his machine runs. Not checked at run time: a machine with no version manager
 runs whatever Node it has under the pin's hash.
+
+## Step 8, the slow tests replayed and the live one run
+
+The breach check against the real service is `apps/inventory/test/server/Pwned.live.test.ts`, in a third Vitest
+project of the app, `live` (`*.live.test.ts`), run by the package task `test:live`, which is never cached.
+`test:slow` now has the fast tests' inputs and is replayed; the CLI's two slow files share the definition and are
+replayed with it. `check:full`, `bun run test` and CI's `slow` job run both. Run on 2026-11-26:
+
+| Trial | Result |
+| --- | --- |
+| `turbo run test:slow test:live`, twice | First: 4 tasks run, 73 s. Second: both `test:slow` replayed, `test:live` run again, 2.8 s |
+| A line added to `packages/catalog/model/src/Item/ItemSearch.rules.ts` | the app's `test:slow` hash changes |
+| To `apps/inventory/src/server/App.ts` | the app's changes; the CLI's does not |
+| To `packages/tooling/tool/cli/src/bin.ts` | the CLI's changes; the app's does not |
+| To `packages/ontology/src/Constructs.rules.ts`, which the app does not import | neither changes |
+
+Nothing in the app's slow tests reads a file outside its own folder or a package it imports (its migrations, seeds
+and `wrangler.jsonc` are in the folder), so the default inputs hold what they read. Not yet seen: a run of CI.
 
 ## Choices made along the way
 

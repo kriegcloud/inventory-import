@@ -11,7 +11,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import { CrossSiteRequest } from "./AccessError.errors.ts"
 import { $KernelId } from "./internal/identity.ts"
@@ -19,6 +19,24 @@ import { $KernelId } from "./internal/identity.ts"
 const $I = $KernelId.create("SameOrigin")
 
 const readingMethods = ["GET", "HEAD", "OPTIONS"]
+const Method = S.String.pipe(
+  S.decodeTo(S.String, SchemaTransformation.toUpperCase()),
+  $I.annoteSchema("Method", { description: "The request method compared without case" })
+)
+const Origin = S.String.pipe(
+  S.decodeTo(S.String, SchemaTransformation.toLowerCase()),
+  $I.annoteSchema("Origin", { description: "An origin compared without case, as before" })
+)
+const ComparedSource = S.Struct({
+  method: Method,
+  fetchSite: S.Option(S.String),
+  origin: S.Option(Origin),
+  own: S.Array(Origin)
+}).pipe(
+  $I.annoteSchema("ComparedSource", {
+    description: "Only the request fields used for the same-origin decision, canonicalized for comparison"
+  })
+)
 
 /**
  * What the cross-site rule reads from one request.
@@ -65,15 +83,16 @@ export class RequestSource extends S.Opaque<RequestSource, { readonly brand: uni
    * to say, when `Origin` is one of the app's own. A request with neither header is not from a browser page (a
    * script, a test, curl): it has no visitor's browser to borrow, so the rule does not apply to it.
    */
-  static readonly allows = (source: Pick<RequestSource, "method" | "fetchSite" | "origin" | "own">): boolean => {
-    const method = Str.toUpperCase(source.method)
-    if (A.some(readingMethods, (reading) => reading === method)) return true
-    if (O.isSome(source.fetchSite)) return source.fetchSite.value === "same-origin" || source.fetchSite.value === "none"
-    return O.match(source.origin, {
-      onNone: () => true,
-      onSome: (origin) => A.some(source.own, (own) => Str.toLowerCase(own) === Str.toLowerCase(origin))
+  static readonly allows = (source: Pick<RequestSource, "method" | "fetchSite" | "origin" | "own">): boolean =>
+    // A source that somehow fails to decode is refused: O.exists returns false for None.
+    O.exists(S.decodeOption(ComparedSource)(source), (compared) => {
+      if (A.contains(readingMethods, compared.method)) return true
+      return O.match(compared.fetchSite, {
+        onSome: (site) => site === "same-origin" || site === "none",
+        onNone: () =>
+          O.match(compared.origin, { onNone: () => true, onSome: (origin) => A.contains(compared.own, origin) })
+      })
     })
-  }
 }
 
 /**

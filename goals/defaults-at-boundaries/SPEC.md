@@ -92,14 +92,15 @@ the value moves.
 | `model/src/Confirm/Confirm.rules.ts` | who decided a row nobody is recorded for, and a stored name too long or empty to show | the confirming person's name | 0 on a fresh import: every decision of the sample's review records its author | none in the sample |
 | `model/src/Review/Review.rules.ts` `recheckRow` | a field the screen's row sends no value for, as the person types | `""`, an empty cell (`emptyText`) | not an import path: the screen sends every field of a row | none in the sample |
 | `model/src/Review/CellReading.rules.ts` `readDimensions` | the unit of a dimensions cell that names none | `cm` | 0: every dimensions cell of the sample names its unit (108 cm, 19 in) | `{"length":31.2,"width":41.4,"height":2}` reads as cm |
+| `drivers/openrouter/src/internal/plan.ts` | provider input/output token totals missing, undefined or NULL | `0` each, on the provider response schema | 0 (model calls are optional assistance, not stored import rows) | a scripted reply with no usage reports 0 tokens |
+| `drivers/openrouter/src/internal/plan.ts` | provider response with no valid model name | the requested model, matched where the answer is built | 0 (no stored import row changes) | scripted reply without response metadata attributes the answer to `scripted/primary` |
+| `drivers/better-auth/src/BetterAuth.schema.ts` | library options with absent, undefined or NULL `basePath` | `/api/auth` | 0 (sign-in routing, not an import row) | the default sign-in endpoint `/api/auth/sign-in/email` |
 
 The new-kind pilot follow-up also retained these values on schemas (2026-11-25):
 
 | File | Field | Value | Rows of the messy sample | Example |
 | --- | --- | --- | --- | --- |
 | `model/src/Import/ImportStore.store.ts` | `StoredDecisions.saves` when no draft is found | `0` | 0 on a fresh import; the draft exists | a lookup of an import that no longer exists has no saves |
-| `model/src/Catalog.memory.ts` | `UpdateOrder.millis` when an item has no recorded update | `0` | none (test twin sort key) | an item without `updatedAt` compares at epoch zero; no timestamp is stored |
-| `model/src/Reading/Spreadsheet.rules.ts` | `ReadingPlace.text` without a sheet name | `"the file"` | 0 row fields; reader notes only, no cell or outcome changes | a reader note names "the file" instead of a sheet |
 
 The two plain optional keys `Cell.shown` and `Cell.formula` remain exemption candidates, not approved exemptions:
 `{ type: "number", text: "123", shown: "00123" }` crosses the reader's worker by `postMessage`, and an Option there

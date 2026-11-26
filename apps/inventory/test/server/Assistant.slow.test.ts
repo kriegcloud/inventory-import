@@ -14,6 +14,7 @@ import { Api } from "../../src/api/v1/Api.ts"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { ModelPolicy } from "@beep/openrouter/OpenRouterConfig"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
@@ -71,7 +72,11 @@ const answering = (reply: unknown) =>
   Layer.unwrap(
     Effect.gen(function* () {
       const text = yield* toJson(reply)
-      return OpenRouterTest.scripted([{ text }], { model: ModelId.make("scripted/model") }).layer
+      return OpenRouterTest.scripted([{ text, modelId: O.none() }], {
+        model: ModelId.make("scripted/model"),
+        fallbackModels: [],
+        policy: ModelPolicy.default
+      }).layer
     })
   )
 

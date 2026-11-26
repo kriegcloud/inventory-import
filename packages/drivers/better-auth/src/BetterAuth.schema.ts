@@ -4,9 +4,11 @@
  * @packageDocumentation
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import type { BetterAuthSettings } from "./BetterAuth.config.ts"
@@ -87,7 +89,7 @@ export class AuthSession extends S.Opaque<AuthSession, { readonly brand: unique 
  *
  * @category schemas
  */
-export const AuthSessionAnswer = S.NullOr(
+export const AuthSessionAnswer = S.OptionFromNullOr(
   S.Struct({
     session: S.Struct({
       userId: AuthUserId,
@@ -187,3 +189,24 @@ export const resolveAuthSecret = (
   }
   return Result.succeed(EphemeralSecret.make({ kind: "ephemeral" }))
 }
+
+/** The library's resolved options read by this driver.
+ * @category schemas
+ */
+export const AuthDriverOptions = S.Struct({
+  basePath: S.NullishOr(S.String).pipe(
+    S.annotateKey({ description: "The path under which Better Auth serves its endpoints" }),
+    S.decodeTo(S.String, {
+      decode: SchemaGetter.transformOptional<string, string | null | undefined>(O.flatMap(O.fromNullishOr)).pipe(
+        SchemaGetter.compose(SchemaGetter.withDefault(Effect.succeed("/api/auth")))
+      ),
+      encode: SchemaGetter.passthrough()
+    }),
+    S.withDecodingDefaultType(Effect.succeed("/api/auth"))
+  )
+}).pipe($I.annoteSchema("AuthDriverOptions", { description: "Better Auth options read by the driver" }))
+
+/** The decoded driver options.
+ * @category models
+ */
+export type AuthDriverOptions = typeof AuthDriverOptions.Type

@@ -20,7 +20,7 @@ import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import type * as HttpClient from "effect/http/HttpClient"
-import { ModelPolicy, type OpenRouterSettings } from "./OpenRouter.config.ts"
+import type { ModelPolicy, OpenRouterSettings } from "./OpenRouter.config.ts"
 import { ModelUnavailable } from "./OpenRouter.errors.ts"
 import { ModelAccess, modelAccessOf, type ModelPrompt, type ModelStatus, modelStatusOf } from "./OpenRouter.schema.ts"
 import { $OpenrouterId } from "./internal/identity.ts"
@@ -60,7 +60,7 @@ export class OpenRouter extends Context.Service<
    */
   static readonly layer = (
     settings: OpenRouterSettings,
-    policy: ModelPolicy = ModelPolicy.default
+    policy: ModelPolicy
   ): Layer.Layer<OpenRouter, never, HttpClient.HttpClient> =>
     Layer.effect(
       OpenRouter,
@@ -105,6 +105,6 @@ export class OpenRouter extends Context.Service<
     )
 
   /** `layer` over the platform's `fetch`: what a Worker uses. */
-  static readonly layerFetch = (settings: OpenRouterSettings, policy: ModelPolicy = ModelPolicy.default) =>
+  static readonly layerFetch = (settings: OpenRouterSettings, policy: ModelPolicy) =>
     OpenRouter.layer(settings, policy).pipe(Layer.provide(FetchHttpClient.layer))
 }

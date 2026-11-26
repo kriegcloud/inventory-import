@@ -1,3 +1,4 @@
+import { assertDefined } from "@effect/vitest/utils"
 // The model path's rules, with no key and no spend: an answer is decoded and says who gave it; a transient failure is
 // tried again within the policy and a bad answer never is; each attempt and the whole call are bounded in time; AI
 // off makes no request; and what OpenRouter is sent, and how its statuses map, through its real client.
@@ -22,7 +23,7 @@ const Greeting = S.Struct({ greeting: S.String })
 const model = ModelId.make("scripted/primary")
 const prompt = ModelPrompt.make({ name: "greeting", prompt: "Say hello." })
 const fast = ModelPolicy.make({ backoff: Duration.zero })
-const hello: ScriptedReply = { text: '{"greeting":"Hello"}' }
+const hello: ScriptedReply = { text: '{"greeting":"Hello"}', modelId: O.none() }
 const busy = () => AiError.make({ module: "test", method: "generateText", reason: AiError.RateLimitError.make({}) })
 const refused = () =>
   AiError.make({
@@ -36,7 +37,7 @@ const failure = greet.pipe(Effect.flip)
 
 describe("a scripted model", () => {
   {
-    const run = OpenRouterTest.scripted([hello], { model })
+    const run = OpenRouterTest.scripted([hello], { model, fallbackModels: [], policy: ModelPolicy.default })
     const calls = run.calls
     layer(run.layer)("an answer", (it) => {
       it.effect("is decoded and names the model that gave it", () =>
@@ -44,6 +45,8 @@ describe("a scripted model", () => {
           const answer = yield* greet
           expect(answer.value).toEqual({ greeting: "Hello" })
           expect(answer.answered.model).toBe("scripted/primary")
+          expect(answer.answered.usage.inputTokens).toBe(0)
+          expect(answer.answered.usage.outputTokens).toBe(0)
           expect(answer.answered.fallback).toBe(false)
           expect(calls()).toBe(1)
         })
@@ -52,9 +55,10 @@ describe("a scripted model", () => {
   }
 
   {
-    const run = OpenRouterTest.scripted([{ text: '{"greeting":"Hi"}', modelId: "scripted/backup-2026" }], {
+    const run = OpenRouterTest.scripted([{ text: '{"greeting":"Hi"}', modelId: O.some("scripted/backup-2026") }], {
       model,
-      fallbackModels: [ModelId.make("scripted/backup")]
+      fallbackModels: [ModelId.make("scripted/backup")],
+      policy: ModelPolicy.default
     })
     layer(run.layer)("a fallback", (it) => {
       it.effect("is said to be one", () =>
@@ -67,7 +71,7 @@ describe("a scripted model", () => {
   }
 
   {
-    const run = OpenRouterTest.scripted([busy(), hello], { model, policy: fast })
+    const run = OpenRouterTest.scripted([busy(), hello], { model, fallbackModels: [], policy: fast })
     const calls = run.calls
     layer(run.layer)("busy, then an answer", (it) => {
       it.effect("answers on the second attempt", () =>
@@ -81,7 +85,7 @@ describe("a scripted model", () => {
   }
 
   {
-    const run = OpenRouterTest.scripted([busy(), busy(), busy(), busy()], { model, policy: fast })
+    const run = OpenRouterTest.scripted([busy(), busy(), busy(), busy()], { model, fallbackModels: [], policy: fast })
     const calls = run.calls
     layer(run.layer)("busy every time", (it) => {
       it.effect("gives up after the policy's retries, as busy", () =>
@@ -96,7 +100,11 @@ describe("a scripted model", () => {
   }
 
   {
-    const run = OpenRouterTest.scripted([{ text: '{"wrong":1}' }, hello], { model, policy: fast })
+    const run = OpenRouterTest.scripted([{ text: '{"wrong":1}', modelId: O.none() }, hello], {
+      model,
+      fallbackModels: [],
+      policy: fast
+    })
     const calls = run.calls
     layer(run.layer)("an answer that does not fit", (it) => {
       it.effect("is asked for once, and never again", () =>
@@ -110,7 +118,7 @@ describe("a scripted model", () => {
   }
 
   {
-    const run = OpenRouterTest.scripted([refused(), hello], { model, policy: fast })
+    const run = OpenRouterTest.scripted([refused(), hello], { model, fallbackModels: [], policy: fast })
     const calls = run.calls
     layer(run.layer)("a refused key", (it) => {
       it.effect("is not tried again", () =>
@@ -124,7 +132,11 @@ describe("a scripted model", () => {
   }
 
   {
-    const run = OpenRouterTest.scripted([{ hang: true }, hello], { model })
+    const run = OpenRouterTest.scripted([{ hang: true }, hello], {
+      model,
+      fallbackModels: [],
+      policy: ModelPolicy.default
+    })
     const calls = run.calls
     layer(run.layer)("a model that never answers", (it) => {
       it.effect("is cut off by the attempt's timeout and not tried again", () =>
@@ -142,6 +154,7 @@ describe("a scripted model", () => {
   {
     const run = OpenRouterTest.scripted([{ hang: true }], {
       model,
+      fallbackModels: [],
       policy: ModelPolicy.make({ attemptTimeout: Duration.minutes(5) })
     })
     layer(run.layer)("a call longer than the deadline", (it) => {
@@ -164,21 +177,25 @@ const counted = () => {
 }
 
 describe("AI off", () => {
-  layer(OpenRouterTest.overHttp(OpenRouterSettings.make({ model }), counted))("with no key", (it) => {
-    it.effect("says noKey, and makes no request", () =>
-      Effect.gen(function* () {
-        const openRouter = yield* OpenRouter
-        const error = yield* failure
-        expect(openRouter.status).toMatchObject({ kind: "off", why: "noKey" })
-        expect(error.trouble).toBe("noKey")
-        expect(MutableRef.get(sent)).toBe(0)
-      })
-    )
-  })
+  layer(OpenRouterTest.overHttp(OpenRouterSettings.make({ model }), counted, ModelPolicy.default))(
+    "with no key",
+    (it) => {
+      it.effect("says noKey, and makes no request", () =>
+        Effect.gen(function* () {
+          const openRouter = yield* OpenRouter
+          const error = yield* failure
+          expect(openRouter.status).toMatchObject({ kind: "off", why: "noKey" })
+          expect(error.trouble).toBe("noKey")
+          expect(MutableRef.get(sent)).toBe(0)
+        })
+      )
+    }
+  )
   layer(
     OpenRouterTest.overHttp(
       OpenRouterSettings.make({ model, enabled: false, apiKey: O.some(Redacted.make("test-key")) }),
-      counted
+      counted,
+      ModelPolicy.default
     )
   )("turned off with a key", (it) => {
     it.effect("says noKey, and makes no request", () =>
@@ -207,13 +224,17 @@ describe("over OpenRouter's real client", () => {
   const bodies = MutableRef.make<ReadonlyArray<string>>([])
 
   layer(
-    OpenRouterTest.overHttp(settings, (request) => {
-      if (request.body instanceof HttpBody.Uint8Array) {
-        const text = new TextDecoder().decode(request.body.body)
-        MutableRef.update(bodies, (all) => [...all, text])
-      }
-      return new Response(answer, json)
-    })
+    OpenRouterTest.overHttp(
+      settings,
+      (request) => {
+        if (request.body instanceof HttpBody.Uint8Array) {
+          const text = new TextDecoder().decode(request.body.body)
+          MutableRef.update(bodies, (all) => [...all, text])
+        }
+        return new Response(answer, json)
+      },
+      ModelPolicy.default
+    )
   )("an answer", (it) => {
     it.effect("is asked with the fallback list and the length cap, and reports tokens and cost", () =>
       Effect.gen(function* () {
@@ -226,7 +247,8 @@ describe("over OpenRouter's real client", () => {
         expect(got.answered.usage.inputTokens).toBe(12)
         expect(got.answered.usage.costMicroUsd).toEqual(O.some(42))
         const [first] = MutableRef.get(bodies)
-        const body = yield* S.decodeEffect(S.fromJsonString(S.Unknown))(first ?? "")
+        assertDefined(first)
+        const body = yield* S.decodeEffect(S.fromJsonString(S.Unknown))(first)
         expect(body).toMatchObject({
           model: "anthropic/claude-haiku-5.5",
           models: ["anthropic/claude-haiku-5.5", "google/gemini-3.8-flash"],

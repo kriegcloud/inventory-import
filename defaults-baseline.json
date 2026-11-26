@@ -23,18 +23,10 @@
     "unwrapped S.optionalKey in contract/model/host"
   ],
   "files": {
-    "apps/inventory/src/api/v1/Document.ts": [0, 3, 0, 0],
-    "apps/inventory/src/server/SameOrigin.ts": [2, 0, 0, 0],
-    "apps/inventory/src/web/Workspace.tsx": [1, 1, 0, 0],
     "apps/inventory/src/web/components/app/AppShell.tsx": [0, 1, 0, 0],
-    "apps/inventory/src/web/components/app/AppSidebar.tsx": [0, 0, 0, 1],
     "apps/inventory/src/web/lib/settings.ts": [1, 0, 0, 0],
     "apps/inventory/src/web/pages/ReviewGallery.tsx": [4, 0, 0, 1],
     "apps/inventory/src/web/pages/gallery/JobsReview.tsx": [0, 1, 0, 0],
-    "apps/inventory/src/web/preload.ts": [0, 2, 0, 0],
-    "apps/inventory/test/server/ImportsTwin.test.ts": [0, 0, 0, 1],
-    "apps/inventory/test/server/MatchAtomic.slow.test.ts": [0, 0, 0, 1],
-    "apps/inventory/test/server/StaleAccepts.slow.test.ts": [0, 0, 0, 1],
     "apps/inventory/test/web/support/page.ts": [1, 0, 0, 0],
     "packages/catalog/web/src/ImportPage.screen.tsx": [0, 1, 0, 0],
     "packages/catalog/web/src/ItemsPage.screen.tsx": [1, 0, 0, 0],

@@ -1,8 +1,8 @@
 # CQ-P06: Who are the members of this organization and which role does each hold?
 # The role is read through the grant and in no other way. "This organization" is a value of ?tenant. The name is the
-# person's (decision 133); the email is the sign-in account's (decision 134), and a member with no account is listed
-# with none. A membership that names a source's workspace is a Sutton member's, not this app's, and is left out
-# (decision 154).
+# person's (decision 133), and a member whose person states no name is listed with none (decision 177); the email is
+# the sign-in account's (decision 134), and a member with no account is listed with none. A membership that names a
+# source's workspace is a Sutton member's, not this app's, and is left out (decision 154).
 # Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
 PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -14,8 +14,7 @@ WHERE {
           inv:membershipIn ?tenant ;
           inv:membershipOf ?person .
   FILTER NOT EXISTS { ?member inv:membershipWorkspace ?workspace }
-  ?person rdf:type/rdfs:subClassOf* inv:Person ;
-          inv:name ?name .
+  ?person rdf:type/rdfs:subClassOf* inv:Person .
   OPTIONAL {
     ?member inv:memberAccount ?account .
     ?account rdf:type/rdfs:subClassOf* inv:SignInAccount ;
@@ -25,5 +24,6 @@ WHERE {
          inv:grantedTo ?member ;
          inv:grantScope inv:GrantScopeKindScheme-organization ;
          inv:grantsRole ?role .
+  OPTIONAL { ?person inv:name ?name }
 }
 ORDER BY ?tenant ?member

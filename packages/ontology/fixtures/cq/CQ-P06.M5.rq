@@ -1,7 +1,7 @@
 # Must-fail case M5, a mutant of CQ-P06 and never the question: it reaches the grant through the person, not the
 # member, so it forgets the tenant and reports a role held in one organization as held in the other. It reads the name
-# and the email, and leaves out a membership that names a workspace, as the question does, so it differs from it
-# by that join alone.
+# and the email, each optional, and leaves out a membership that names a workspace, as the question does, so it
+# differs from it by that join alone.
 # Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
 PREFIX inv: <https://example.org/inventory-import/ontology/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -13,8 +13,7 @@ WHERE {
           inv:membershipIn ?tenant ;
           inv:membershipOf ?person .
   FILTER NOT EXISTS { ?member inv:membershipWorkspace ?workspace }
-  ?person rdf:type/rdfs:subClassOf* inv:Person ;
-          inv:name ?name .
+  ?person rdf:type/rdfs:subClassOf* inv:Person .
   OPTIONAL {
     ?member inv:memberAccount ?account .
     ?account rdf:type/rdfs:subClassOf* inv:SignInAccount ;
@@ -25,5 +24,6 @@ WHERE {
          inv:grantedTo ?other ;
          inv:grantScope inv:GrantScopeKindScheme-organization ;
          inv:grantsRole ?role .
+  OPTIONAL { ?person inv:name ?name }
 }
 ORDER BY ?tenant ?member

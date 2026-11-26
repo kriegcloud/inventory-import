@@ -177,39 +177,71 @@ describe("gate 8, the questions", () => {
     })
   )
 
-  // Decisions 133 and 134: the name is read on the person, required; the email on the member's sign-in account,
-  // optional, since the People page lists a member with no account.
-  it.effect("CQ-P06 lists a member with no account with no email, and no member whose person has no name", () =>
-    Effect.gen(function* () {
-      const graph = yield* threadGraph()
-      const n = yield* names
-      const noAccount = dropped(graph, n.raviSecond, n.inv("memberAccount"))
-      expect(noAccount).toHaveLength(graph.length - 1)
-      const unaccounted = yield* asked(noAccount, membersAndRoles, membersVariables)
-      expect(unaccounted).toStrictEqual([
-        raviRow(n.person, n.works, n.raviWorks, n.admin, raviEmail),
-        raviRow(n.person, n.second, n.raviSecond, n.viewer, "")
-      ])
-      // Planted: the account untyped, so the email is read from nothing the vocabulary calls an account.
-      const untypedAccount = A.filter(graph, (triple) => !(triple.subject === n.account && triple.predicate === type))
-      expect(untypedAccount).toHaveLength(graph.length - 1)
-      const unsigned = yield* asked(untypedAccount, membersAndRoles, membersVariables)
-      expect(unsigned).toStrictEqual([
-        raviRow(n.person, n.works, n.raviWorks, n.admin, ""),
-        raviRow(n.person, n.second, n.raviSecond, n.viewer, "")
-      ])
-      // Planted: the person's name left out. The tenants' lifted names do not stand in for it.
-      const nameless = dropped(graph, n.person, n.inv("name"))
-      expect(nameless).toHaveLength(graph.length - 1)
-      expect(A.some(nameless, withPredicate(n.inv("name")))).toBe(true)
-      const unnamed = yield* asked(nameless, membersAndRoles, membersVariables)
-      expect(unnamed).toStrictEqual([])
-      // Planted: the person's type left out. A node with a name that the vocabulary calls no person gives no row.
-      const untypedPerson = A.filter(graph, (triple) => !(triple.subject === n.person && triple.predicate === type))
-      expect(untypedPerson).toHaveLength(graph.length - 1)
-      const unpersoned = yield* asked(untypedPerson, membersAndRoles, membersVariables)
-      expect(unpersoned).toStrictEqual([])
-    })
+  // Decisions 133, 134 and 177: the name is read on the person and the email on the member's sign-in account, each
+  // optional, since the People page lists a member with no account and a missing name should not lose a member.
+  it.effect(
+    "CQ-P06 lists a member with no account with no email, and a member whose person has no name with no name",
+    () =>
+      Effect.gen(function* () {
+        const graph = yield* threadGraph()
+        const n = yield* names
+        const noAccount = dropped(graph, n.raviSecond, n.inv("memberAccount"))
+        expect(noAccount).toHaveLength(graph.length - 1)
+        const unaccounted = yield* asked(noAccount, membersAndRoles, membersVariables)
+        expect(unaccounted).toStrictEqual([
+          raviRow(n.person, n.works, n.raviWorks, n.admin, raviEmail),
+          raviRow(n.person, n.second, n.raviSecond, n.viewer, "")
+        ])
+        // Planted: the account untyped, so the email is read from nothing the vocabulary calls an account.
+        const untypedAccount = A.filter(graph, (triple) => !(triple.subject === n.account && triple.predicate === type))
+        expect(untypedAccount).toHaveLength(graph.length - 1)
+        const unsigned = yield* asked(untypedAccount, membersAndRoles, membersVariables)
+        expect(unsigned).toStrictEqual([
+          raviRow(n.person, n.works, n.raviWorks, n.admin, ""),
+          raviRow(n.person, n.second, n.raviSecond, n.viewer, "")
+        ])
+        // Planted: the person's name left out. Both members stay listed, each with no name (decision 177); the tenants'
+        // lifted names do not stand in for it.
+        const nameless = dropped(graph, n.person, n.inv("name"))
+        expect(nameless).toHaveLength(graph.length - 1)
+        expect(A.some(nameless, withPredicate(n.inv("name")))).toBe(true)
+        const unnamed = yield* asked(nameless, membersAndRoles, membersVariables)
+        expect(unnamed).toStrictEqual([
+          [n.works, n.person, "", n.raviWorks, raviEmail, n.admin],
+          [n.second, n.person, "", n.raviSecond, raviEmail, n.viewer]
+        ])
+        // The rejected reading, the name required as step 11 built it: the same graph loses both members. The near miss,
+        // the committed graph with its name, gives the same rows either way.
+        const required = Str.replace("OPTIONAL { ?person inv:name ?name }", "?person inv:name ?name .")(membersAndRoles)
+        expect(required).not.toBe(membersAndRoles)
+        const lost = yield* asked(nameless, required, membersVariables)
+        expect(lost).toStrictEqual([])
+        const expected = yield* expectedMembers
+        const named = yield* asked(graph, required, membersVariables)
+        expect(named).toStrictEqual(expected)
+        // M5 reads the name as the question does, so the nameless graph keeps its four rows, each with no name.
+        const mutant = yield* asked(nameless, mutantThroughPerson, membersVariables)
+        expect(A.sort(A.map(mutant, A.join(" ")), byCodePoint)).toStrictEqual(
+          A.sort(
+            A.map(
+              [
+                [n.works, n.person, "", n.raviWorks, raviEmail, n.admin],
+                [n.works, n.person, "", n.raviWorks, raviEmail, n.viewer],
+                [n.second, n.person, "", n.raviSecond, raviEmail, n.admin],
+                [n.second, n.person, "", n.raviSecond, raviEmail, n.viewer]
+              ],
+              A.join(" ")
+            ),
+            byCodePoint
+          )
+        )
+        // The person's type left out: decision 177 makes the name optional and says nothing of the type step, which stays
+        // required, so a node with a name that the vocabulary calls no person gives no row.
+        const untypedPerson = A.filter(graph, (triple) => !(triple.subject === n.person && triple.predicate === type))
+        expect(untypedPerson).toHaveLength(graph.length - 1)
+        const unpersoned = yield* asked(untypedPerson, membersAndRoles, membersVariables)
+        expect(unpersoned).toStrictEqual([])
+      })
   )
 
   it.effect("CQ-P11: each member's role with the scope it is held at", () =>
@@ -1612,13 +1644,36 @@ describe("gate 8, CQ-P04: the pairs of a tenant's records decided to be one part
       })
   )
 
-  it.effect("must-fail: test_AcmeC and test_AcmeD, two records with no decision, give no pair", () =>
+  // Decision 179: C and D share only a name, "Acme Industrial", which no other record states; sharing it makes them no
+  // pair. Only a decision of the tenant's does.
+  it.effect("must-fail: test_AcmeC and test_AcmeD, two records that share only a name, give no pair", () =>
     Effect.gen(function* () {
       const n = yield* partyNames
       const graph = yield* fixtureGraph(identity.fixture)
       const undecided = [n.record("test_AcmeC"), n.record("test_AcmeD")]
+      const named = A.filter(graph, withPredicate(n.inv("name")))
+      expect(
+        A.map(named, (triple) => [triple.subject, ...objectsOf(graph, triple.subject, n.inv("name"))])
+      ).toStrictEqual(A.map(undecided, (record) => [record, "Acme Industrial"]))
       const rows = yield* asked(graph, identity.query, identityVariables)
       expect(A.filter(rows, ([, a, b]) => A.contains(undecided, a) || A.contains(undecided, b))).toStrictEqual([])
+      // Planted: a question that reads a shared name as one party pairs C and D, and only them: the fixture holds the
+      // case, and the committed question does not read it so.
+      const byName = `PREFIX inv: <${n.inv("")}>
+SELECT ?a ?b WHERE {
+  ?a inv:name ?name .
+  ?b inv:name ?name .
+  FILTER (STR(?a) < STR(?b))
+}`
+      const paired = yield* asked(graph, byName, ["a", "b"])
+      expect(paired).toStrictEqual([undecided])
+      // Near miss: the names taken away, the same question pairs nothing, and CQ-P04's answer is the same.
+      const unnamed = A.filter(graph, (triple) => !withPredicate(n.inv("name"))(triple))
+      expect(unnamed).toHaveLength(graph.length - 2)
+      const nothing = yield* asked(unnamed, byName, ["a", "b"])
+      expect(nothing).toStrictEqual([])
+      const unnamedRows = yield* asked(unnamed, identity.query, identityVariables)
+      expect(unnamedRows).toStrictEqual(rows)
       // Planted: given a sameParty decision of the tenant's about them, they are a pair; the decision is the answer.
       const decided = yield* decisionTriples({
         name: "test_DecisionCD",
@@ -1869,10 +1924,15 @@ describe("gate 8, CQ-P04: the pairs of a tenant's records decided to be one part
 })
 
 describe("gate 8, CQ-P05: no identity is stated by the construct CQ-P05 asks for", () => {
-  it.effect("on CQ-P04's fixture the ASK answers false: two records with no decision are two records", () =>
+  // Decision 179: test_AcmeC and test_AcmeD share the name "Acme Industrial", and the ASK stays false: a shared name
+  // states no identity.
+  it.effect("on CQ-P04's fixture the ASK answers false: two records that share only a name are two records", () =>
     Effect.gen(function* () {
+      const n = yield* partyNames
       const graph = yield* fixtureGraph(identity.fixture)
       const owl = yield* ontologyGraph
+      expect(objectsOf(graph, n.record("test_AcmeC"), n.inv("name"))).toStrictEqual(["Acme Industrial"])
+      expect(objectsOf(graph, n.record("test_AcmeD"), n.inv("name"))).toStrictEqual(["Acme Industrial"])
       const answer = yield* askWhether([...graph, ...owl], sameness.query)
       expect(answer).toBe(false)
     })
@@ -1971,6 +2031,12 @@ describe("gate 8, the guards on the fixture's two parts", () => {
         expect(linesOf(overreach([...written, tenantName, renamed], lifted))).toStrictEqual(
           linesOf([tenantName, renamed])
         )
+        // Decision 179: the shared name CQ-P04's fixture states on test_AcmeC and test_AcmeD is on subjects the lift
+        // states nothing of, so it passes as the person's does.
+        const identityGraph = yield* fixtureGraph(identity.fixture)
+        const sharedNames = A.filter(identityGraph, withPredicate(name))
+        expect(sharedNames).toHaveLength(2)
+        expect(linesOf(overreach(sharedNames, lifted))).toStrictEqual([])
       })
   )
 

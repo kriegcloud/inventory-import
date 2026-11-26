@@ -283,5 +283,6 @@ thread's terms, gates, records and acceptance); 115 and 120 (what the audit kept
 44, 45, 126 and P2 (portals, agents, purpose, the stage); 6, 25, 26, 112 to 114, 117, 118 and 121 (the checks, the
 reasoner, the RDF engines, the bans, the answer lock); 123, 124 and 128 (Sutton's names and its whole). Decisions 28
 to 31 are the alignment file's, with 32's ratified rows; 28 also fixes gate 9's closure as "the OWL file and each
-fixture only". Forty-seven are open and this goal waits on none of them; it waits on the nineteen rows above, which
-no decision answers.
+fixture only". Forty-seven are open and this goal waits on none of them. The nineteen rows above are answered by
+decisions 129 to 147; 148 to 175 answer the readings and questions the first steps and report 18 raised, 176 accepts
+report 18, and 177 to 179 answer what steps 9 to 12 set aside.

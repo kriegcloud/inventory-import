@@ -1,10 +1,11 @@
 # The fixture of CQ-P04 and CQ-P05 (report 04 section 4, report 18 section 10). test_ExampleWorks holds six source
 # records, test_AcmeA to test_AcmeF, records and not organizations. At 09:00 UTC on 2026-11-01 test_Dana decides that
-# A and B record the same party, citing the evidence "same tax id". C and D have no decision. At 10:00 test_Decision2
-# joins E and F, and at 11:00 test_Decision3 reverses it. In test_SecondOrg, test_Kim decides at noon that its own two
-# records are one party and at 13:00 that they are two. Every record states its source keys and every piece of
-# evidence its tenant. No owl:sameAs is stated here: CQ-P05's fixture holds the one a must-fail case adds. Nothing here
-# is a record of this app, and every name starts `test_`.
+# A and B record the same party, citing the evidence "same tax id". C and D have no decision and share only a name,
+# "Acme Industrial" (decision 179), which makes them no pair. At 10:00 test_Decision2 joins E and F, and at 11:00
+# test_Decision3 reverses it. In test_SecondOrg, test_Kim decides at noon that its own two records are one party and at
+# 13:00 that they are two. Every record states its source keys and every piece of evidence its tenant. No owl:sameAs is
+# stated here: CQ-P05's fixture holds the one a must-fail case adds. Nothing here is a record of this app, and every
+# node's name starts `test_`.
 @base <https://example.org/inventory-import/> .
 @prefix inv: <https://example.org/inventory-import/ontology/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -33,13 +34,15 @@
   inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
   inv:sourceSystem "test_Ledger" ;
   inv:sourceType "Company" ;
-  inv:sourceId "A0003" .
+  inv:sourceId "A0003" ;
+  inv:name "Acme Industrial" .
 
 <fixture/SourceRecord/test_AcmeD> a inv:SourceRecord ;
   inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
   inv:sourceSystem "test_Ledger" ;
   inv:sourceType "Company" ;
-  inv:sourceId "A0004" .
+  inv:sourceId "A0004" ;
+  inv:name "Acme Industrial" .
 
 <fixture/SourceRecord/test_AcmeE> a inv:SourceRecord ;
   inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;

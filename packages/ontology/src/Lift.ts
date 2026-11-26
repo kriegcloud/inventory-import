@@ -14,7 +14,9 @@
  * A path that ends in an attribute states nothing, an absent value included, and the record still lifts (decision
  * 155): no record identifies the person, the account or the run such a path passes through. The one exception is a
  * path whose node step is a relation another field of the same record fills (decision 161): its node is that field's
- * object, untyped here, and the literal is written on it, so `Member.organizationName` names the tenant.
+ * object, untyped here, and the literal is written on it, so `Member.organizationName` names the tenant. Where two
+ * fields fill that relation, or the reused step fixes a concept, the field states nothing and the record still lifts
+ * (decision 178): one ambiguous field does not stop what the rest of the record says.
  *
  * @packageDocumentation
  */
@@ -227,8 +229,8 @@ type Siblings = {
 /**
  * What a path that ends in an attribute states (decisions 155 and 161): the literal on the node another field's
  * relation names, when the path's one node step is that relation, forward; nothing otherwise, whatever the node's class
- * stores. A reused step that fixes a concept is refused, since it would state on another record's node what no field
- * states, and so is a relation two fields name, whose node is then undecided.
+ * stores. A reused step that fixes a concept states nothing, since it would state on another record's node what no
+ * field states, and so does a relation two fields name, whose node is then undecided (decision 178).
  */
 const attributePath = Effect.fnUntraced(function* (
   context: LiftContext,
@@ -259,14 +261,10 @@ const attributePath = Effect.fnUntraced(function* (
   if (O.isNone(filler)) {
     return []
   }
-  if (filling.length > 1) {
-    return yield* refused(at, `${filling.length} fields fill ${linking}, so the path's node is undecided`)
-  }
-  if (step.value.fixed.length > 0) {
-    return yield* refused(
-      at,
-      `the node ${linking} names is another field's, and a fixed concept on it is stated by no field`
-    )
+  // Decision 178: two fields filling the relation leave the node undecided, and a fixed concept on another field's
+  // node is stated by no field; either way this field states nothing, and the rest of the record lifts.
+  if (filling.length > 1 || step.value.fixed.length > 0) {
+    return []
   }
   const relation = yield* propertyNamed(context, O.some(filler.value.name), linking)
   const node = yield* objectOf(context, organization, relation, filler.value, siblings.valueOf(filler.value))
@@ -328,9 +326,9 @@ const pathTriples = Effect.fnUntraced(function* (
  *
  * It fails with `LiftRefused` when the record names no class or one that stores no id, when not exactly one field is
  * its id, when its tenant is not named by exactly one field or given beside it (and not both), when a field is
- * unmarked, when a mark cannot be followed, when a path's node or a link's object is of a class that stores no id, when
- * a path ending in an attribute reuses a node two fields fill or fixes a concept on it, or when a literal's value is not
- * one its datatype writes.
+ * unmarked, when a mark cannot be followed, when a path's node or a link's object is of a class that stores no id, or
+ * when a literal's value is not one its datatype writes. A path ending in an attribute that reuses a node two fields
+ * fill, or fixes a concept on it, states nothing and is not refused (decision 178).
  *
  * @example lift(context, Member, member) // seven triples: the member, its tenant, the grant its role is, the tenant's name
  */

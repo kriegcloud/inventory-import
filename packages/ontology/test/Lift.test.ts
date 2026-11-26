@@ -13,8 +13,9 @@
 //
 // A path that ends in an attribute (party slice, step 11; decisions 155 and 161): it states nothing, and the record still
 // lifts, unless its node step is a relation another field fills, whose object then carries the literal, untyped. Each
-// branch is planted on a struct beside the kernel's records: the reuse with a fixed concept, two fields filling the
-// relation, a reverse step, and a node step no field fills, each with the near miss that differs from it by one step.
+// branch is planted on a struct beside the kernel's records: the reuse with a fixed concept and two fields filling the
+// relation, each stating nothing for that field while the rest of the record lifts (decision 178), a reverse step, and a
+// node step no field fills, each with the near miss that differs from it by one step.
 //
 // A class that stores no id (party slice, step 7; decision 135): on copies of the kernel's terms with one class's
 // records storing no id, the lift makes no node of it as a record, as a path's node or as a link's object, and the
@@ -601,29 +602,48 @@ describe("a path that ends in an attribute (decisions 155 and 161)", () => {
     })
   )
 
-  it.effect("refuses the path when two fields fill its relation, naming the path's field", () =>
+  // Decision 178: two fields filling the relation leave the path's node undecided, so the path's field states nothing
+  // and the record still lifts its other fields. The near miss, one field filling it, writes the name.
+  it.effect("planted: two fields fill the relation, so the path states nothing and the rest of the entry lifts", () =>
     Effect.gen(function* () {
-      const refusal = yield* Effect.flip(
-        liftEntry(
-          {
-            actorId: actorLink,
-            reviewerId: actorLink,
-            actorName: actorNamed(
-              aboutPath([{ property: "inv:recordedActor", node: "inv:Member" }, { property: "inv:name" }])
-            )
-          },
-          { actorId: "test_RaviWorks", reviewerId: "test_RaviSecond", actorName: "Ravi Example" }
-        )
+      const { inv, data } = yield* names
+      const { entry, head } = yield* entryNames
+      const named = actorNamed(
+        aboutPath([{ property: "inv:recordedActor", node: "inv:Member" }, { property: "inv:name" }])
       )
-      expect(refusal.field).toStrictEqual(O.some("actorName"))
-      expect(refusal.reason).toBe("2 fields fill inv:recordedActor, so the path's node is undecided")
+      const actor = data("test_ExampleWorks", "Member", "test_RaviWorks")
+      const reviewer = data("test_ExampleWorks", "Member", "test_RaviSecond")
+      const triples = yield* liftEntry(
+        { actorId: actorLink, reviewerId: actorLink, actorName: named },
+        { actorId: "test_RaviWorks", reviewerId: "test_RaviSecond", actorName: "Ravi Example" }
+      )
+      expect(linesOf(triples)).toStrictEqual(
+        linesOf([...head, link(entry, inv("recordedActor"), actor), link(entry, inv("recordedActor"), reviewer)])
+      )
+      const nearMiss = yield* liftEntry(
+        { actorId: actorLink, actorName: named },
+        { actorId: "test_RaviWorks", actorName: "Ravi Example" }
+      )
+      expect(linesOf(nearMiss)).toStrictEqual(
+        linesOf([
+          ...head,
+          link(entry, inv("recordedActor"), actor),
+          literal(actor, inv("name"), "Ravi Example", xsd("string"))
+        ])
+      )
     })
   )
 
-  it.effect("refuses a reused node step that fixes a concept, which no field states on the other record", () =>
-    Effect.gen(function* () {
-      const refusal = yield* Effect.flip(
-        liftEntry(
+  // Decision 178: a reused node step that fixes a concept would state on the other record's node what no field
+  // states, so the path's field states nothing and the record still lifts. The near miss, no fixed concept, writes it.
+  it.effect(
+    "planted: a reused node step fixes a concept, so the path states nothing and the rest of the entry lifts",
+    () =>
+      Effect.gen(function* () {
+        const { inv, data } = yield* names
+        const { entry, head } = yield* entryNames
+        const actor = data("test_ExampleWorks", "Member", "test_RaviWorks")
+        const triples = yield* liftEntry(
           {
             actorId: actorLink,
             actorName: actorNamed(
@@ -639,12 +659,25 @@ describe("a path that ends in an attribute (decisions 155 and 161)", () => {
           },
           { actorId: "test_RaviWorks", actorName: "Ravi Example" }
         )
-      )
-      expect(refusal.field).toStrictEqual(O.some("actorName"))
-      expect(refusal.reason).toBe(
-        "the node inv:recordedActor names is another field's, and a fixed concept on it is stated by no field"
-      )
-    })
+        expect(linesOf(triples)).toStrictEqual(linesOf([...head, link(entry, inv("recordedActor"), actor)]))
+        expect(A.some(triples, (triple) => triple.predicate === inv("membershipStatus"))).toBe(false)
+        const nearMiss = yield* liftEntry(
+          {
+            actorId: actorLink,
+            actorName: actorNamed(
+              aboutPath([{ property: "inv:recordedActor", node: "inv:Member", fixed: [] }, { property: "inv:name" }])
+            )
+          },
+          { actorId: "test_RaviWorks", actorName: "Ravi Example" }
+        )
+        expect(linesOf(nearMiss)).toStrictEqual(
+          linesOf([
+            ...head,
+            link(entry, inv("recordedActor"), actor),
+            literal(actor, inv("name"), "Ravi Example", xsd("string"))
+          ])
+        )
+      })
   )
 })
 

@@ -52,7 +52,7 @@
   "packages/catalog/web/test/ReviewHistory.test.ts": 2,
   "packages/catalog/web/test/ReviewModelFold.fold.test.ts": 5,
   "packages/catalog/web/test/SessionAsked.test.ts": 5,
-  "packages/catalog/web/test/TabRows.test.ts": 5,
+  "packages/catalog/web/test/TabRows.test.ts": 4,
   "packages/catalog/web/test/UploadOwner.test.ts": 7,
   "packages/catalog/web/test/reviewParity.test.ts": 8,
   "packages/catalog/web/test/support/draftWorld.ts": 35,

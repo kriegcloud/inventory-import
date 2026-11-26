@@ -34,7 +34,7 @@
   "packages/catalog/web/test/ImportPage.test.ts": 2,
   "packages/catalog/web/test/RemoveImport.test.ts": 1,
   "packages/catalog/web/test/RemoveImportAddress.test.ts": 1,
-  "packages/catalog/web/test/TabRows.test.ts": 16,
+  "packages/catalog/web/test/TabRows.test.ts": 15,
   "packages/catalog/web/test/UploadOwner.test.ts": 1,
   "packages/catalog/web/test/readInPieces.test.ts": 1,
   "packages/catalog/web/test/support/catalog.ts": 1,

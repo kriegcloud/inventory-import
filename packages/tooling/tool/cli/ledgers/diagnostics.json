@@ -1,8 +1,4 @@
 {
-  "packages/catalog/web/test/DraftPicks.test.ts": 1,
-  "packages/catalog/web/test/ItemEditor.test.ts": 1,
-  "packages/catalog/web/test/KeptRows.test.ts": 1,
-  "packages/catalog/web/test/TakenBackWords.test.ts": 1,
   "packages/catalog/web/test/csvDifferential.test.ts": 1,
   "packages/catalog/web/test/readSpreadsheet.test.ts": 1,
   "packages/catalog/web/test/reviewHonesty.test.ts": 1,

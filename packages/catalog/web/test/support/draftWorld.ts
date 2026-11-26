@@ -945,7 +945,7 @@ const runIn = (world: World, command: Command): void => {
             world.confirmed = {}
             world.region = O.none()
             for (const row of R.keys(world.unanswered)) forget(world, row)
-            const madeAt = A.get(world.history, confirm.revision + 1)
+            const madeAt = O.fromUndefinedOr(world.history[confirm.revision + 1])
             assertTrue(O.isSome(madeAt), "a completed confirm has its written revision in history")
             const made = madeAt.value
             if (!O.exists(world.view, (view) => view.revision > made.revision)) world.view = O.some(made)
@@ -1225,7 +1225,7 @@ const runIn = (world: World, command: Command): void => {
       if (!world.draft.onScreen) return
       // The closed tab decided the row on a state the server was in, over what it held then.
       const madeOn = Math.max(1, world.server.revision - 1)
-      const previous = A.get(world.history, madeOn)
+      const previous = O.fromUndefinedOr(world.history[madeOn])
       assertTrue(O.isSome(previous), "the take-up revision is already in server history")
       const then = previous.value
       const base = R.get(then.decisions, row)

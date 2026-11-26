@@ -69,8 +69,9 @@ const world = (overrides: Partial<typeof worldStart>) => {
     })
   })
   const api = makeApiAtoms(Server)
-  const itemShown = shown(api.query((server) => server.read, { keep: "unwatched" }))
+  const itemShown = shown(api.query((server) => server.read, { keep: "unwatched", reactivityKeys: O.none() }))
   const edit = optimisticWrite({
+    settled: O.none(),
     send: (input: Edit) => api.send((server) => server.edit(input)),
     changes: [optimisticChange(itemShown, (now: Item, input: Edit) => ({ ...now, ...input }))],
     failed: () => "The item was not saved.",

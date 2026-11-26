@@ -350,7 +350,7 @@ describe("an import not found while it is open", () => {
       yield* until("the review drawn", t.onScreen, 1_000)
       const { reads } = t.server
       t.server.notFoundIn = "org_prairie"
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* answering(t, 5)
       expect([t.drew, t.session.times(), t.server.reads - reads]).toEqual([["skeleton", "review", "gone"], 0, 1])
     })
@@ -364,12 +364,12 @@ describe("an import not found while it is open", () => {
       yield* passes(1_100)
       const { reads } = t.server
       t.server.notFoundIn = "org_northline"
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* answering(t, 6)
       expect([t.drew, t.session.times(), t.server.reads - reads]).toEqual([["skeleton", "review", "gone"], 1, 1])
       expect(t.registry.get(t.session.asked)).toBe(false)
       // Asked once more, and still not found: what was read before is not drawn meanwhile.
-      importView(id).askAgain(t.registry)
+      importView(id).askAgain(t.registry, O.none())
       yield* answering(t, 3)
       expect(t.drew).toEqual(["skeleton", "review", "gone"])
     })

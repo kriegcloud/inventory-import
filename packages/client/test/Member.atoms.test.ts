@@ -49,7 +49,7 @@ const world = () => {
     )
   })
   const api = makeApiAtoms(RowServer)
-  const rows = api.query((server) => server.rows, { keep: "unwatched", reactivityKeys: ["rows"] })
+  const rows = api.query((server) => server.rows, { keep: "unwatched", reactivityKeys: O.some(["rows"]) })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer), provideMember(signedIn)] })
   registry.mount(rows)
   const seen = () => registry.get(rows).pipe(AsyncResult.value, assertedValue)

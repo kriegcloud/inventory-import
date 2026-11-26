@@ -172,7 +172,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     void matchOne({ id: view.id, field: pick.field, column: O.some(pick.column) }).then((exit) => {
       happened(DraftEvent.MatchEnded())
       done?.()
-      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), {})
+      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash), { lead: O.none() })
     })
   }
   // Asks for suggestions where the rules have none. Nothing it returns changes a row: each waits for the person.
@@ -181,7 +181,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const suggest = () =>
     void suggestNow(view.id).then((exit) => {
       if (Exit.isSuccess(exit)) setLocal((now) => ({ ...now, suggested: O.some(exit.value) }))
-      else toastError(exit.cause.pipe(Cause.squash), { lead: "No suggestions were made." })
+      else toastError(exit.cause.pipe(Cause.squash), { lead: O.some("No suggestions were made.") })
     })
   const suggested = O.getOrUndefined(local.suggested)
 

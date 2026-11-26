@@ -211,7 +211,7 @@ export const heldReadMembers = (): ReadonlyArray<string> => A.flatMap(heldByQuer
 /** How a read behaves beyond its request. */
 export interface QueryOptions {
   /** What it shows, so a write that names one of these keys reads it again. */
-  readonly reactivityKeys?: Reactivity.KeysInput
+  readonly reactivityKeys: O.Option<Reactivity.KeysInput>
   /**
    * "page": the answer never changes once given (a staged file's rows), so it is kept for the page's life and not
    * asked again on a return. Otherwise kept for `keepUnwatched` and asked again behind it on every return.
@@ -243,7 +243,7 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
    * the answer wanted: nothing is asked. An earlier one, or any one when no `since` is given, is left to land, and
    * the read is asked once more when it does.
    */
-  readonly askAgain: (registry: AtomRegistry.AtomRegistry, since?: DateTime.Utc) => void
+  readonly askAgain: (registry: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>) => void
 }
 
 /**
@@ -294,7 +294,7 @@ export interface ApiAtoms<Id, Client> {
    */
   readonly write: <Input>() => <A, E>(
     use: (client: Client, input: Input) => Effect.Effect<A, E>,
-    options: { readonly reactivityKeys?: Reactivity.KeysInput }
+    options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
   ) => Atom.AtomResultFn<Input, A, E>
   /**
    * One program against the API with the write retries, to run on `apiRuntime`: for a write built of several steps
@@ -447,7 +447,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         beside,
         out,
         held,
-        read: options.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
+        read: O.match(options.reactivityKeys, { onNone: () => fresh, onSome: (keys) => fresh.pipe(followKeys(keys)) })
       }
     }
     const forMember = (member: string): PerMember<A, E> =>
@@ -548,12 +548,12 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
             () => (nodes.has(per.held) ? AsyncResult.value(registry.get(per.held)) : O.none())
           )
         }),
-      askAgain: (registry: AtomRegistry.AtomRegistry, since?: DateTime.Utc) => {
+      askAgain: (registry: AtomRegistry.AtomRegistry, since: O.Option<DateTime.Utc>) => {
         O.map(MutableHashMap.get(reads, registry.get(memberKey)), (per) =>
           O.match(registry.get(per.out), {
             onNone: () => registry.refresh(per.read),
             onSome: (request) => {
-              if (since !== undefined && DateTime.isGreaterThan(request.at, since)) return
+              if (O.exists(since, (since) => DateTime.isGreaterThan(request.at, since))) return
               if (registry.getNodes().has(per.beside)) {
                 registry.update(per.beside, (now) => ({ ...now, newer: now.newer + 1 }))
               }
@@ -570,13 +570,16 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     <Input>() =>
     <A, E>(
       use: (client: Client, input: Input) => Effect.Effect<A, E>,
-      options: { readonly reactivityKeys?: Reactivity.KeysInput }
+      options: { readonly reactivityKeys: O.Option<Reactivity.KeysInput> }
     ): Atom.AtomResultFn<Input, A, E> =>
       apiRuntime.fn<Input>()(
         (input) => {
           const keys = options.reactivityKeys
           const sent = send((c) => use(c, input))
-          return keys === undefined ? sent : Effect.tap(sent, () => Effect.sync(() => invalidate(keys)))
+          return O.match(keys, {
+            onNone: () => sent,
+            onSome: (keys) => Effect.tap(sent, () => Effect.sync(() => invalidate(keys)))
+          })
         },
         { concurrent: true }
       )

@@ -105,7 +105,7 @@ const switchSaid = Atom.fn(
     const switching = toast.loading(`Switching to ${target.name}`)
     const exit = yield* Effect.exit(get.setResult(switchOrganization, target.id))
     toast.dismiss(switching)
-    if (Exit.isFailure(exit)) toastError(Cause.squash(exit.cause), { lead: `Still in ${target.from}.` })
+    if (Exit.isFailure(exit)) toastError(Cause.squash(exit.cause), { lead: O.some(`Still in ${target.from}.`) })
   })
 )
 
@@ -126,7 +126,7 @@ const signInSaid = Atom.fn(
       Effect.catch((refused) =>
         Effect.sync(() => {
           toast.dismiss(switching)
-          toastError(refused.cause, { lead: `Still signed in as ${target.from}.` })
+          toastError(refused.cause, { lead: O.some(`Still signed in as ${target.from}.`) })
         })
       )
     )
@@ -136,7 +136,9 @@ const signInSaid = Atom.fn(
 /** Signing out; a refusal is said, and the person stays signed in. */
 const signOutSaid = Atom.fn(() =>
   Effect.tryPromise({ try: () => signOut(), catch: (cause) => AccountNotChanged.make({ cause }) }).pipe(
-    Effect.catch((refused) => Effect.sync(() => toastError(refused.cause, { lead: "You are still signed in." })))
+    Effect.catch((refused) =>
+      Effect.sync(() => toastError(refused.cause, { lead: O.some("You are still signed in.") }))
+    )
   )
 )
 

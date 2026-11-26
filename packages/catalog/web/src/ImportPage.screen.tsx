@@ -61,14 +61,14 @@ export const readAgainWhenBack = perKey((id: ImportId) =>
       askedAgainWhenBack({
         mayPass: isTransient,
         read: importViewShown(id),
-        askAgain: (registry) => importView(id).askAgain(registry)
+        askAgain: (registry) => importView(id).askAgain(registry, O.none())
       })
     )
     get.mount(
       askedAgainWhenBack({
         mayPass: isTransient,
         read: importTable(id),
-        askAgain: (registry) => importTable(id).askAgain(registry)
+        askAgain: (registry) => importTable(id).askAgain(registry, O.none())
       })
     )
   })
@@ -76,8 +76,8 @@ export const readAgainWhenBack = perKey((id: ImportId) =>
 
 /** The person asked for an import to be read again: its view and its rows, whichever could not be. */
 const readAgain = Atom.fnSync((id: ImportId, get) => {
-  if (AsyncResult.isFailure(get.registry.get(importView(id)))) importView(id).askAgain(get.registry)
-  if (AsyncResult.isFailure(get.registry.get(importTable(id)))) importTable(id).askAgain(get.registry)
+  if (AsyncResult.isFailure(get.registry.get(importView(id)))) importView(id).askAgain(get.registry, O.none())
+  if (AsyncResult.isFailure(get.registry.get(importTable(id)))) importTable(id).askAgain(get.registry, O.none())
 })
 
 /** The server says there is no such import where the person is: removed, or another organization's. */

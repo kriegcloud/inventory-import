@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // What a screen builds from a read's data must not be built again when the read is asked again and answers the same.
 // The read itself changes twice per refresh (waiting, then answered); its answer, kept the same object while it is
 // equal, does not. The Items table's columns were built from the read, so every refresh drew every cell again, and an
@@ -29,7 +30,10 @@ describe("what is built from a read's answer", () => {
           return { categories: [...categories] }
         })
       })
-      const read = makeApiAtoms(Server).query((server) => server.facets, { keep: "unwatched" })
+      const read = makeApiAtoms(Server).query((server) => server.facets, {
+        keep: "unwatched",
+        reactivityKeys: O.none()
+      })
       const answer = answerOf(read)
       let fromAnswer = 0
       let fromRead = 0

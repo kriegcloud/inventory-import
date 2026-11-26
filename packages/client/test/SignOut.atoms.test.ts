@@ -43,7 +43,7 @@ const world = () => {
   const layer = Layer.succeed(RowServer, {
     rows: Effect.sleep("20 millis").pipe(Effect.andThen(Effect.sync(() => `rows of ${session}`)))
   })
-  const rows = makeApiAtoms(RowServer).query((server) => server.rows, { keep: "unwatched" })
+  const rows = makeApiAtoms(RowServer).query((server) => server.rows, { keep: "unwatched", reactivityKeys: O.none() })
   const registry = AtomRegistry.make({
     initialValues: [provideApi(layer), provideMember(signedIn)],
     defaultIdleTTL: 50

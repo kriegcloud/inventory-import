@@ -40,8 +40,8 @@ const world = (overrides: Partial<typeof worldStart>) => {
     )
   })
   const api = makeApiAtoms(RowServer)
-  const rows = api.query((server) => server.rows, { keep: "unwatched" })
-  const forever = api.query((server) => server.rows, { keep: "page" })
+  const rows = api.query((server) => server.rows, { keep: "unwatched", reactivityKeys: O.none() })
+  const forever = api.query((server) => server.rows, { keep: "page", reactivityKeys: O.none() })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: idle })
   const seen = (atom: typeof rows) => registry.get(atom).pipe(AsyncResult.value, assertedValue)
   return { registry, layer, rows, forever, seen, reads: () => reads, starts: () => starts }
@@ -221,7 +221,7 @@ describe("what a read shows besides the answer a screen gave", () => {
     Effect.gen(function* () {
       let asked = 0
       const api = makeApiAtoms(GoneServer)
-      const rows = api.query((server) => server.rows, { keep: "unwatched" })
+      const rows = api.query((server) => server.rows, { keep: "unwatched", reactivityKeys: O.none() })
       const layer = Layer.succeed(GoneServer, {
         rows: Effect.suspend(() => (++asked === 1 ? Effect.succeed("server's rows 1") : Effect.fail(Gone.make({}))))
       })
@@ -268,7 +268,7 @@ describe("what a read shows besides the answer a screen gave", () => {
       t.registry.subscribe(t.rows, (now) => {
         if (asked || now.waiting) return
         asked = true
-        t.rows.askAgain(t.registry)
+        t.rows.askAgain(t.registry, O.none())
       })
       yield* Effect.sleep("80 millis")
       // That request left after the save's answer was given: it is the once more, and nothing ends it.
@@ -305,7 +305,7 @@ describe("asking again for an answer no older than a write", () => {
       const t = world({ takes: "30 millis" })
       t.registry.mount(t.rows)
       yield* Effect.sleep("60 millis")
-      t.rows.askAgain(t.registry, DateTime.nowUnsafe())
+      t.rows.askAgain(t.registry, O.some(DateTime.nowUnsafe()))
       yield* Effect.sleep("5 millis")
       expect(t.starts()).toBe(2)
       yield* Effect.sleep("60 millis")
@@ -322,7 +322,7 @@ describe("asking again for an answer no older than a write", () => {
       yield* Effect.sleep("3 millis")
       t.registry.refresh(t.rows)
       yield* Effect.sleep("3 millis")
-      t.rows.askAgain(t.registry, sent)
+      t.rows.askAgain(t.registry, O.some(sent))
       yield* Effect.sleep("90 millis")
       expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 2", 2])
     })
@@ -338,8 +338,8 @@ describe("asking again for an answer no older than a write", () => {
       yield* Effect.sleep("3 millis")
       const sent = DateTime.nowUnsafe()
       yield* Effect.sleep("3 millis")
-      t.rows.askAgain(t.registry, sent)
-      t.rows.askAgain(t.registry, sent)
+      t.rows.askAgain(t.registry, O.some(sent))
+      t.rows.askAgain(t.registry, O.some(sent))
       yield* Effect.sleep("10 millis")
       // Not ended and not started again: the one request is still out.
       expect([t.starts(), t.reads()]).toEqual([2, 1])

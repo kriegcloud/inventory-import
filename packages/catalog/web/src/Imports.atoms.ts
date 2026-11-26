@@ -31,7 +31,7 @@ import { catalogKeys } from "./Catalog.keys.ts"
 export const importView = perKey((id: ImportId) =>
   catalogApi.query((api) => api.imports.get({ params: { id } }), {
     keep: "unwatched",
-    reactivityKeys: catalogKeys.import(id)
+    reactivityKeys: O.some(catalogKeys.import(id))
   })
 )
 
@@ -62,7 +62,7 @@ export const followRemoval = perKey((id: ImportId) =>
 
 /** One staged file's rows. They never change once staged: asked for once and kept for the page. */
 export const importTable = perKey((id: ImportId) =>
-  catalogApi.query((api) => api.imports.table({ params: { id } }), { keep: "page" })
+  catalogApi.query((api) => api.imports.table({ params: { id } }), { keep: "page", reactivityKeys: O.none() })
 )
 
 /**
@@ -122,7 +122,7 @@ export const openWorkbook = perKey((_importId: string) =>
  * remove each. The server sends the newest few in full and counts the rest (`older`). Shown through removals.
  */
 export const openImports = shown(
-  catalogApi.query((api) => api.imports.open(), { keep: "unwatched", reactivityKeys: catalogKeys.openImports })
+  catalogApi.query((api) => api.imports.open(), { keep: "unwatched", reactivityKeys: O.some(catalogKeys.openImports) })
 )
 
 /**
@@ -131,7 +131,7 @@ export const openImports = shown(
  */
 export const pastImports = catalogApi.query((api) => api.imports.past(), {
   keep: "unwatched",
-  reactivityKeys: catalogKeys.pastImports
+  reactivityKeys: O.some(catalogKeys.pastImports)
 })
 
 /** Goes to the first screen when the address names this import, and stays where it is otherwise. */
@@ -175,7 +175,7 @@ export const removeImport = Atom.family((id: ImportId) =>
       registry.set(openWorkbook(id), O.none())
     },
     readAgainAfterRefusal: true,
-    settled: catalogKeys.activity
+    settled: O.some(catalogKeys.activity)
   })
 )
 

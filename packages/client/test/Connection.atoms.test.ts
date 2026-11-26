@@ -53,10 +53,10 @@ const world = (clock: O.Option<Clock.Clock>) => {
   }).pipe(
     Layer.merge(O.match(clock, { onNone: () => Layer.empty, onSome: (clock) => Layer.succeed(Clock.Clock, clock) }))
   )
-  const rows = makeApiAtoms(RowServer).query((api) => api.rows, { keep: "unwatched" })
+  const rows = makeApiAtoms(RowServer).query((api) => api.rows, { keep: "unwatched", reactivityKeys: O.none() })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
   const stop = registry.mount(
-    askedAgainWhenBack({ mayPass: isTransient, read: rows, askAgain: (at) => rows.askAgain(at) })
+    askedAgainWhenBack({ mayPass: isTransient, read: rows, askAgain: (at) => rows.askAgain(at, O.none()) })
   )
   const read = () => registry.get(rows)
   const down = Effect.fail(HttpApiError.InternalServerErrorProblem.make({}))
@@ -69,7 +69,7 @@ describe("a read that could not be made", () => {
       const t = world(O.none())
       yield* settle
       t.server.answer = t.down
-      t.rows.askAgain(t.registry)
+      t.rows.askAgain(t.registry, O.none())
       yield* settle
       expect(AsyncResult.isFailure(t.read())).toBe(true)
       const before = t.server.times
@@ -94,7 +94,7 @@ describe("a read that could not be made", () => {
       const t = world(O.none())
       yield* settle
       t.server.answer = t.down
-      t.rows.askAgain(t.registry)
+      t.rows.askAgain(t.registry, O.none())
       yield* settle
       t.server.answer = Effect.succeed("fresh rows")
       const context = yield* Effect.context<never>()
@@ -142,7 +142,7 @@ describe("a read that could not be made", () => {
       const t = world(O.none())
       yield* settle
       t.server.answer = Effect.fail(Forbidden.make({ reason: "Your role is viewer.", required: "editor" }))
-      t.rows.askAgain(t.registry)
+      t.rows.askAgain(t.registry, O.none())
       yield* settle
       const refused = t.server.times
       serverAnswered(200)
@@ -150,7 +150,7 @@ describe("a read that could not be made", () => {
       yield* settle
       expect(t.server.times).toBe(refused)
       t.server.answer = t.down
-      t.rows.askAgain(t.registry)
+      t.rows.askAgain(t.registry, O.none())
       yield* settle
       const failed = t.server.times
       serverAnswered(503)
@@ -175,7 +175,7 @@ describe("a read that could not be made, on a quiet page", () => {
       const tick = (by: Duration.Input) => TestClock.adjust(by)
       yield* tick("1 second")
       t.server.answer = t.down
-      t.rows.askAgain(t.registry)
+      t.rows.askAgain(t.registry, O.none())
       yield* tick("1 second")
       expect(AsyncResult.isFailure(t.read())).toBe(true)
       const failed = t.server.times

@@ -660,7 +660,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         expect(R.has(browser.kept, keyOf(id, "mem_dana", "org_prairie"))).toBe(true)
         // Another tab switched the session's organization: this one's read of the import answers not found there.
         server.removed = true
-        importView(id).askAgain(t.registry)
+        importView(id).askAgain(t.registry, O.none())
         yield* settle
         // Everything stays, the row and its place on the screen; only who is signed in is asked.
         expect([
@@ -1006,7 +1006,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
         expect([leaving(), says(t)]).toEqual([true, []])
         const asked = t.asked.times
         server.removed = true
-        importView(id).askAgain(t.registry)
+        importView(id).askAgain(t.registry, O.none())
         yield* settle
         expect([
           leaving(),

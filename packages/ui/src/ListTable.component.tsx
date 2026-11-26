@@ -91,9 +91,9 @@ const optionsOf = <Row,>(rows: ReadonlyArray<Row>, value: (row: Row) => string |
     const text = String(value(row))
     counts[text] = (Object.hasOwn(counts, text) ? (counts[text] ?? 0) : 0) + 1
   }
-  return Object.keys(counts)
-    .sort((a, b) => a.localeCompare(b))
-    .map((text) => ({ label: text === "" ? "Not set" : text, value: text, count: counts[text] ?? 0 }))
+  return Object.entries(counts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([text, count]) => ({ label: text === "" ? "Not set" : text, value: text, count }))
 }
 
 type ListInput<Row extends RowData> = {
@@ -240,7 +240,7 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
   const rows = useAtomValue(props.rows)
   const config = useAtomValue(list.config)
   const tableColumns = useAtomValue(list.tableColumns) as unknown as Array<ColumnDef<DataTableFeatures, Row, unknown>>
-  const first = columns[0]?.id
+  const pinnedStart = A.map(A.take(columns, 1), (column) => column.id)
   const ends = columns.filter((column) => column.end === true).map((column) => column.id)
   const { table } = useDataTable({
     mode: "client",
@@ -250,7 +250,7 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
     getRowId: props.rowKey,
     globalFilterFn: everyWord as FilterFn<DataTableFeatures, Row>,
     enableRowSelection: false,
-    initialState: { columnPinning: { start: first === undefined ? [] : [first], end: ends } }
+    initialState: { columnPinning: { start: pinnedStart, end: ends } }
   })
 
   const searched = typeof table.state.globalFilter === "string" ? table.state.globalFilter : ""
@@ -293,7 +293,7 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
     const blanks = Object.fromEntries(columns.map((column) => [column.id, column.blank]))
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        {toolbar === null ? null : <div className="px-3 pb-2">{toolbar}</div>}
+        {rows.length === 0 ? null : <div className="px-3 pb-2">{toolbar}</div>}
         <DataTableCards
           table={table}
           label={props.caption}

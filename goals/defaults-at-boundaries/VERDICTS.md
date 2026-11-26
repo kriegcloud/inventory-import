@@ -1692,3 +1692,142 @@ bookkeeping edits are provided, unapplied, in `/tmp/defaults-review-ledger-decre
 Needs the person: authorize the three ledger decreases outside this lane, or have the orchestrator apply them;
 the 20 named remaining sites and the uncounted no-column fallback still need follow-up, not an exemption inferred
 by this lane.
+
+## Row 10 leftovers: client and owned UI, 2026-11-26
+
+Written before implementation in the `defaults-ui-client-2` lane. The starting scanner inventory is 73 places:
+19 in five client source files and 54 in ten owned UI source files. No exemption is granted by this section.
+
+| Field or boundary | Verdict before implementation | Reason and intended treatment |
+| --- | --- | --- |
+| Query/write reactivity keys; optimistic settled keys | Required Option capability | Our own configuration must state Some(keys) or None. Keep the exact existing subscription/invalidation branches; forced callers supply the choice. |
+| Query answer | Retain unresolved | The answer atom's nullable public result requires a consuming-shape migration. Do not rename the unwrap. |
+| Query comparison time and toast lead | Required Option | Our helpers require explicit absence or a value; forced callers preserve their existing choices. The draft already holds an Option time, so its caller passes it directly. |
+| Connection globals; navigator and lock callbacks | Browser edge | These are actual absent globals/platform capabilities and Web Locks' nullable callback argument. Retain and name each check. |
+| Error sentences and path capitalization | Retain unresolved | Existing unknown-kind wording, camel-case splitting and capitalization need an actual schema/consumer design; no fallback-only decode or renamed normalization. |
+| Error logging and JSON codec | Retain unresolved | Synchronous Effect execution cannot be erased by another throwing escape or by changing when logging happens or what a failed codec throws. These are not nullable browser edges. |
+| Agent run step input/output/tag | Retain unresolved | Owned run-step data, not the AgentRun component's own optional props. Do not relabel it as a React edge. |
+| List columns, facet counting and search text | Retain unresolved except total entry enumeration and first-column selection | Owned configuration and synchronous normalization remain. Enumerating count entries can eliminate an impossible missing count; take at most one column for pinning rather than selecting a potentially missing first id. |
+| List toolbar | Required rendering case | Select the wrapper from the existing empty-row case, without asking whether the derived ReactNode is null. |
+| PageHeader and ProposedValue optional props | React edge | Preserve omitted versus explicit null markup and each optional state/source case. No body default is introduced. |
+| Proposal attribution helpers | Retain unresolved | Owned helper inputs and the medium confidence fallback are not component props. Keep unchanged rather than moving an undecided fallback into a fallback-only codec. |
+| Route path/query | Nonempty path and query constructor cases | A string split always has a path. Read it from a nonempty split; match an absent/present first query segment into its complete URLSearchParams constructor, preserving repeated question marks. |
+| Skeleton component props | React and vendor edges | Retain each actual optional prop check. Grid column width and label are owned data and remain unresolved, rather than being passed through a schema just to default them. |
+| Search keyboard ownership | Browser DOM edge | closest returns null at this line. Keep the actual edge. |
+| Search trimming and keyboard case | Retain unresolved | Moving a synchronous text cleanup needs a canonical decoded text carried through debounce/comparison/submission. Do not hide it behind a string helper. |
+| Canvas context and font cache | Option initialization state plus browser edge | Cache initialization separately from a failed getContext; convert its null once on entry, then use Options. Preserve lazy font reads and the existing measured-width cache. |
+| CSS font words | Retain unresolved | CSS returns an empty string, not a nullable API value. Existing sans-serif/monospace policies stay visible and are not classified as null edges. |
+
+The final single remaining-site table and verification receipts follow this section after implementation.
+
+### Final remaining-site table
+
+The scanner now reports **60 sites: client 14, UI 46**, down from 73. The table additionally retains the canvas
+`O.fromNullishOr` entry as **one browser edge**, as required by this lane: this reader does not count that token.
+Thus the hand inventory has **61 places: 20 actual browser/React/vendor edges and 41 unresolved owned places**.
+The latter are explicitly not exemptions and not claimed cleared. No baseline or exemption was changed.
+
+| File | Kind | Count | Lines | Example | Which edge, or why unresolved |
+| --- | --- | ---: | --- | --- | --- |
+| `packages/client/src/Api.atoms.ts` | fallback | 1 | 59 | `Effect.runSync(Reactivity.make)` | **Unresolved owned.** Tab-wide synchronous Reactivity construction; no unsafe constructor exists in the installed source. |
+| `packages/client/src/Api.atoms.ts` | unwrap | 1 | 260 | `O.getOrUndefined` | **Unresolved owned.** Public answer atom still converts to undefined before its screen consumers; requires consuming-shape migration. |
+| `packages/client/src/Connection.atoms.ts` | absence | 2 | 21, 53 | `typeof window === "undefined"` | **Browser edge.** The window global itself may be absent during server rendering/tests. |
+| `packages/client/src/SayError.controller.ts` | fallback | 1 | 36 | `(Object.hasOwn(troubles, kind) ? troubles[kind] : troubles["down"]) ?? "The model is not answering right now. Try again later."` | **Unresolved owned.** Installed trouble dictionary may lack the requested/down sentence; the existing literal sentence remains unchanged. |
+| `packages/client/src/SayError.controller.ts` | normalise | 2 | 66, 84 | `last.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase` | **Unresolved owned.** Existing request-path camel-case/letter presentation needs a canonical text schema carried through its synchronous consumers. |
+| `packages/client/src/SayError.controller.ts` | absence | 1 | 95 | `error === null` | **Unresolved owned.** The unknown error input may be null; this is an owned logging guard, not a browser null-returning API. |
+| `packages/client/src/SayError.controller.ts` | fallback | 2 | 95, 98 | `Effect.runSync(Effect.logError("[failure]", error))` | **Unresolved owned.** Synchronous error logging remains; changing to asynchronous logging changes timing. |
+| `packages/client/src/Tab.atoms.ts` | absence | 3 | 45, 45, 61 | `typeof navigator === "undefined"` | **Browser edge.** Actual missing navigator/global Web Locks capability or the nullable ifAvailable lock callback argument. |
+| `packages/client/src/Tab.atoms.ts` | absence | 1 | 57 | `locks === undefined` | **Unresolved owned.** The result of our own browserLocks helper is still nullable here; only the original navigator read is a browser edge. |
+| `packages/ui/src/AgentRun.component.tsx` | absence | 5 | 41, 41, 55, 79, 85 | `step.input !== undefined` | **Unresolved owned.** RunStep input/output/tag are optional owned data fields, not optional props directly owned by AgentRun. |
+| `packages/ui/src/Json.codec.ts` | absence | 1 | 10 | `value === undefined` | **Unresolved owned.** Synchronous schema codec execution and the arbitrary-input undefined guard remain; preserving failure behavior needs an Effect/Option consumer migration. |
+| `packages/ui/src/Json.codec.ts` | fallback | 2 | 10, 14 | `Effect.runSync(S.encodeEffect(codec)(value))` | **Unresolved owned.** Synchronous schema codec execution and the arbitrary-input undefined guard remain; preserving failure behavior needs an Effect/Option consumer migration. |
+| `packages/ui/src/ListTable.component.tsx` | normalise | 2 | 68, 75 | `(typeof filterValue === "string" ? filterValue : "") .toLowerCase` | **Unresolved owned.** Case-insensitive search text is still normalized synchronously inside the filter, not at a schema boundary. |
+| `packages/ui/src/ListTable.component.tsx` | fallback | 5 | 92, 115, 151, 152, 171 | `counts[text] ?? 0` | **Unresolved owned.** Owned column width/cell/hover choices and facet accumulation remain; no fallback-only schema or literal alias was introduced. |
+| `packages/ui/src/ListTable.component.tsx` | absence | 4 | 124, 124, 152, 154 | `column.value !== undefined` | **Unresolved owned.** Owned ListColumn value capability remains nullable through table construction. |
+| `packages/ui/src/PageHeader.component.tsx` | absence | 2 | 24, 30 | `props.line === undefined` | **React prop edge.** The component directly reads its optional line/actions props; explicit null and omission keep distinct wrapper markup. |
+| `packages/ui/src/ProposalSource.words.ts` | absence | 2 | 42, 68 | `source === undefined` | **Unresolved owned.** Own helper source/confidence input and the medium-confidence policy remain unchanged; these are not React component props. |
+| `packages/ui/src/ProposalSource.words.ts` | fallback | 1 | 79 | `fix.confidence ?? "medium"` | **Unresolved owned.** Own helper source/confidence input and the medium-confidence policy remain unchanged; these are not React component props. |
+| `packages/ui/src/ProposedValue.component.tsx` | absence | 4 | 74, 86, 110, 110 | `props.source === undefined` | **React prop edge.** The component directly reads its optional source/state props to choose complete markup cases. |
+| `packages/ui/src/Skeletons.component.tsx` | absence | 6 | 44, 166, 167, 168, 170, 199 | `props.title === undefined` | **React prop edge.** Direct title/line/action/views optional props choose markup or outgoing optional component props. |
+| `packages/ui/src/Skeletons.component.tsx` | absence | 1 | 96 | `props.rows === undefined` | **React/vendor prop edge.** TableSkeleton's optional rows prop is omitted from the vendored DataTableFrameSkeleton when absent. |
+| `packages/ui/src/Skeletons.component.tsx` | fallback | 2 | 114, 127 | `column.width ?? 240` | **Unresolved owned.** SkeletonColumn width/label are owned nested data, not the skeleton component's own optional props. |
+| `packages/ui/src/TableSearch.component.tsx` | normalise | 6 | 115, 125, 140, 140, 151, 151 | `after.value.text.trim` | **Unresolved owned.** Five search trim sites and one KeyboardEvent key case normalization remain; the browser supplies a string, not a null/undefined value. |
+| `packages/ui/src/TableSearch.component.tsx` | absence | 1 | 127 | `event.target.closest("[role=dialog]") !== null` | **Browser edge.** Element.closest returns null at this exact read; a dialog retains keyboard ownership. |
+| `packages/ui/src/TextWidth.measure.ts` | fallback | 2 | 31, 32 | `style.getPropertyValue("--font-sans") \|\| "sans-serif"` | **Unresolved owned.** CSS returns an empty string; sans-serif/monospace are existing owned font policies, not nullable API edges. |
+| `packages/ui/src/TextWidth.measure.ts` | absence at entry (not counted by this scanner) | 1 | 19 | `O.fromNullishOr(document.createElement("canvas").getContext("2d"))` | **Browser edge.** One conversion of the nullable canvas API result; cached initialization and all consumers keep Options. |
+
+### Changed files and forced callers
+
+The required canonical configuration fields are `QueryOptions.reactivityKeys`, write `reactivityKeys`,
+`OptimisticWrite.settled`, `Query.askAgain` comparison time, and `toastError` lead. None carries a new default:
+callers explicitly pass Some of the old supplied value or None for the old omission. The None query branch returns
+exactly the former atom, and the None write branch returns exactly the former Effect. No no-op subscriber or empty
+invalidation was substituted. Draft's comparison time is already an Option and now passes through directly.
+
+List pinning takes at most one existing column; facet entries enumerate each held count with its key; the mobile
+toolbar wrapper uses the already-known empty-row case. Route reads a guaranteed nonempty split and matches both
+complete URLSearchParams construction cases. Canvas initialization retains a failed null read for the page's life,
+reads fonts only after a usable context, and keeps the original width-cache keys and missing-context estimate.
+The UI strict ceiling decreases from 40 to 39 because the native string split retired. No schema sent across a
+browser/worker boundary or stored-byte codec was changed.
+
+Owned code/configuration and its required test adaptations:
+
+- `packages/client/src/Api.atoms.ts`
+- `packages/client/src/Optimistic.atoms.ts`
+- `packages/client/src/SayError.controller.ts`
+- `packages/client/test/Answer.atoms.test.ts`
+- `packages/client/test/Connection.atoms.test.ts`
+- `packages/client/test/Freshness.atoms.test.ts`
+- `packages/client/test/Member.atoms.test.ts`
+- `packages/client/test/Optimistic.atoms.test.ts`
+- `packages/client/test/Paging.atoms.test.ts`
+- `packages/client/test/Seed.atoms.test.ts`
+- `packages/client/test/SignOut.atoms.test.ts`
+- `packages/client/test/SignedIn.atoms.test.ts`
+- `packages/ui/src/ListTable.component.tsx`
+- `packages/ui/src/Route.atoms.ts`
+- `packages/ui/src/TextWidth.measure.ts`
+- `packages/ui/strict-ceiling.json`
+
+Every following out-of-package edit is a forced caller of one of the required signatures above; no independent
+behavior was changed in another lane. Review source was not edited.
+
+- `apps/inventory/src/web/components/app/AppSidebar.tsx`
+- `apps/inventory/test/web/session.test.ts`
+- `packages/access/web/src/AuditEvents.screen.tsx`
+- `packages/access/web/src/People.screen.tsx`
+- `packages/catalog/web/src/ImportDecisions.screen.tsx`
+- `packages/catalog/web/src/ImportPage.screen.tsx`
+- `packages/catalog/web/src/Imports.atoms.ts`
+- `packages/catalog/web/src/ItemEditor.screen.tsx`
+- `packages/catalog/web/src/ItemsPage.screen.tsx`
+- `packages/catalog/web/src/MatchStep.screen.tsx`
+- `packages/catalog/web/src/ResultStep.screen.tsx`
+- `packages/catalog/web/src/ReviewDraft.atoms.ts`
+- `packages/catalog/web/src/ReviewStep.screen.tsx`
+- `packages/catalog/web/test/ImportPage.test.ts`
+- `packages/catalog/web/test/KeptRows.test.ts`
+- `packages/catalog/web/test/SessionAsked.test.ts`
+- `packages/catalog/web/test/TabRows.test.ts`
+
+This section is the only documentation change. PLAN, SPEC, defaults-baseline.json, exemptions, the Verify lock,
+bun.lock, stored data and vendored files remain unchanged. No commit or push was made.
+
+### Validation and limits
+
+- `bun run check` passed **105/105 tasks**, 75 cached, in **2m24.712s**, with temporary Bun, XDG, Wrangler and Turbo cache paths. This includes client 58 tests, catalog web 401 tests, app 70 tests, review 115 tests, catalog model 274 fast tests and five proof tests. No web test needed a second try. Log: `/tmp/defaults-ui-client-2-check.log`.
+- The focused defaults law passed all 32 changed TypeScript files. The separate source inventory reconciles every finding in the 15 baseline-named client/UI source files to the table above. The canvas entry is intentionally named beyond this reader's syntactic count; no exemption was added to hide it.
+- `bun run format -- <changed files>` passed on all 33 changed code/config files; this formatter excludes Markdown. `bun run docs:check` passed all documentation roots with the existing status-vocabulary warnings. `git diff --check` passed.
+- Direct probes of the actual final Route atom matched the previous splitter in **509 cases**, including empty paths, absent/empty queries, duplicate parameters and repeated question marks. Two isolated canvas probes verified available-context lazy initialization, cache identity/flags/font defaults, and unavailable-context one-time null read, original width estimates and no font access. These are local mocked-platform probes, not browser observations. No new permanent tests were added for these small refactors.
+- Effect 4.1.5 APIs were read in `node_modules/effect/src`: Option construction/match/map/exists, Array get/headNonEmpty/take/map, String.split, MutableHashMap get/set and Effect sync/tap. Reactivity.make was inspected and retains its named synchronous escape because it has no unsafe constructor in this version.
+- Byte comparisons against HEAD confirm defaults-baseline.json, the Verify lock, PLAN and bun.lock are unchanged. Vendored UI components/hooks, exemptions, review source and stored data were not edited. No `.dev.vars` was read; UPDATE_VERIFY_LOCK was not set; no commit or push was made.
+
+Earlier checks caught formatting, sandbox cache permissions, two new duplicated non-readonly font fields, the required decreasing UI ceiling and forced app callers. These were corrected before the final green check. The original FontFamilies fields now have one shared type declaration; no unrelated law ledger was edited.
+
+Not checked: `check:full`, a real browser/on-screen import of the messy sample through Confirm, hosted behavior,
+production deployment or a dedicated performance benchmark. No screen words, stored representation or product
+rule changed. The 41 unresolved owned sites are retained work, not approved edges or a claim that row 10 reached
+zero. The 20 real edge sites are named candidates; this pass grants no exemptions.
+
+Needs the person: the existing defaults/exemption judgments for the named retained sites; no additional product decision was chosen in this lane.

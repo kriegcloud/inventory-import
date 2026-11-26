@@ -4,7 +4,8 @@
 // parameter or a destructured name given a default: in a `.tsx` file that is where a component's optional prop takes
 // its default, Benjamin's decision of 2026-11-23, and the reader cannot tell a component from another function),
 // a comparison with `null` or `undefined`, a test if/ternary guarded by Option/Result/Exit, and in contract/model/host
-// a literal onNone arrow or an optionalKey not consumed by an absence/default wrapper; an Option turned back into a missing
+// an onNone arrow returning a number, empty string/array/object, null or undefined, or an unwrapped optionalKey;
+// Result.getOrThrow and Effect.runSync calls (direct or piped) in src outside tests; an Option turned back into a missing
 // value (`getOrUndefined`, `getOrNull`), and a trim or a change of case that is not a schema's own
 // (`SchemaGetter.trim()`, `SchemaTransformation.toLowerCase()`). A pattern over the text would also take the words
 // out of a comment or a string, so the tree is read; the read is one parse and one walk, so a whole repository takes
@@ -95,12 +96,13 @@ export const whatIsCounted: ReadonlyArray<string> = [
   ...unwraps,
   ...cleanUps,
   "Option/Result/Exit guard in a test if or ternary",
-  "onNone literal arrow in contract/model/host",
+  "onNone number/empty string/empty array/empty object/null/undefined arrow in contract/model/host",
+  "Result.getOrThrow/O.getOrThrow/Effect.runSync calls in src, outside tests",
   "unwrapped S.optionalKey in contract/model/host"
 ]
 
 // These additions deliberately stay syntactic: a branch in a test may skip its assertions; only a literal
-// onNone is an invented value. A schema wrapper must consume this optionalKey, never a neighbouring field.
+// onNone data literal is an invented value. A schema wrapper must consume this optionalKey, never a neighbouring field.
 const memberName = (node: Node): O.Option<string> =>
   node.type === "MemberExpression" && node["computed"] !== true
     ? O.flatMap(child(node, "property"), (property) => text(property, "name"))
@@ -176,7 +178,7 @@ const optionalIsWrapped = (node: Node, ancestors: ReadonlyArray<Node>): boolean 
 const literalFallback = (node: Node): boolean => {
   const value = bare(node)
   return (
-    (value.type === "Literal" && value["regex"] === undefined) ||
+    (value.type === "Literal" && (P.isNumber(value["value"]) || value["value"] === "" || value["value"] === null)) ||
     named(value, "undefined") ||
     (value.type === "ArrayExpression" && A.isArray(value["elements"]) && A.isArrayEmpty(value["elements"])) ||
     (value.type === "ObjectExpression" && A.isArray(value["properties"]) && A.isArrayEmpty(value["properties"])) ||
@@ -212,8 +214,39 @@ const kindOf = (
   screen: boolean,
   test: boolean,
   business: boolean,
+  src: boolean,
   ancestors: ReadonlyArray<Node>
 ): O.Option<DefaultsKind> => {
+  if (src && !test && node.type === "CallExpression") {
+    const callee = O.map(child(node, "callee"), bare)
+    if (
+      O.exists(
+        callee,
+        (one) =>
+          memberOf(one, "Result", "getOrThrow") ||
+          memberOf(one, "O", "getOrThrow") ||
+          memberOf(one, "Effect", "runSync")
+      )
+    )
+      return O.some("fallback")
+  }
+  if (
+    src &&
+    !test &&
+    (memberOf(node, "Result", "getOrThrow") || memberOf(node, "O", "getOrThrow") || memberOf(node, "Effect", "runSync"))
+  ) {
+    const parent = A.last(ancestors)
+    if (
+      O.exists(
+        parent,
+        (one) =>
+          one.type === "CallExpression" &&
+          (named(called(one), "pipe") || O.exists(memberName(called(one)), (name) => name === "pipe")) &&
+          A.some(argumentsOf(one), (argument, index) => argument === node && (!named(called(one), "pipe") || index > 0))
+      )
+    )
+      return O.some("fallback")
+  }
   if (test && testGuard(node, ancestors)) return O.some("absence")
   if (
     business &&
@@ -286,6 +319,7 @@ export const readDefaults = (input: { readonly file: string; readonly source: st
   const lineOf = linesOf(input.source)
   const screen = Str.endsWith(".tsx")(input.file)
   const test = /(?:^|\/)(?:test|tests)\//.test(input.file) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(input.file)
+  const src = /(?:^|\/)src\//.test(input.file)
   const business = /^packages\/[^/]+\/(?:contract|model|host)\//.test(input.file)
   const found: Array<DefaultsPlace> = []
   // The walk keeps its own list, so no file nests it past the stack.
@@ -296,7 +330,7 @@ export const readDefaults = (input: { readonly file: string; readonly source: st
     const entry = pending.pop()
     if (entry === undefined) continue
     const { node, ancestors } = entry
-    const kind = kindOf(node, screen, test, business, ancestors)
+    const kind = kindOf(node, screen, test, business, src, ancestors)
     if (O.isSome(kind)) {
       found.push({ kind: kind.value, line: lineOf(node.start), code: Str.slice(node.start, node.end)(input.source) })
     }

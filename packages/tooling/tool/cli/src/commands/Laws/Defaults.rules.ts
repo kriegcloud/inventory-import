@@ -79,6 +79,21 @@ export interface DefaultsExemption {
  */
 export const exemptions: ReadonlyArray<DefaultsExemption> = [
   {
+    file: "packages/ui/src/Json.codec.ts",
+    kinds: ["fallback"],
+    why: "stringify is the synchronous edge a component's draw needs; its Effect.runSync encodes a value the codec cannot refuse (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/client/src/Api.atoms.ts",
+    kinds: ["fallback"],
+    why: "The one Reactivity is made at module level, where atoms are made; its Effect.runSync runs an Effect that cannot fail (Benjamin, 2026-11-26)"
+  },
+  {
+    file: "packages/foundation/modeling/xlsx/src/Xlsx.codec.ts",
+    kinds: ["fallback"],
+    why: "The workbook writer is the synchronous edge a download needs; its Effect.runSync is the codec's own run (Benjamin, 2026-11-26)"
+  },
+  {
     file: "packages/review/src/internal/atomContext.adapter.ts",
     kinds: ["fallback"],
     why: "AtomContext.get.self has no prior value on its first read; each owner supplies the exact original initial value (Benjamin, 2026-11-26)"

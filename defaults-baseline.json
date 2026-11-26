@@ -23,9 +23,6 @@
     "unwrapped S.optionalKey in contract/model/host"
   ],
   "files": {
-    "packages/client/src/Api.atoms.ts": [1, 0, 0, 0],
-    "packages/foundation/modeling/xlsx/src/Xlsx.codec.ts": [1, 0, 0, 0],
-    "packages/review/src/ReviewDraft.rules.ts": [1, 0, 0, 0],
-    "packages/ui/src/Json.codec.ts": [1, 0, 0, 0]
+    "packages/review/src/ReviewDraft.rules.ts": [1, 0, 0, 0]
   }
 }

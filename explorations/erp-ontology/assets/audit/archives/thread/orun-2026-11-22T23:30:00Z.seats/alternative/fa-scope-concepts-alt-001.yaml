@@ -1,0 +1,23 @@
+{
+  "id": "fa:scope-concepts-alt:001",
+  "hypothesis_ref": "dh:scope-concepts:001",
+  "identity_card_ref": "ic:scope-concepts-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Scope-kind concept (information object) — what is shipped",
+      "still_viable": true
+    },
+    {
+      "label": "Scope particular (organization/site/field individual) as grant relatum — what the definition describes",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "A grant at site scope must name which site; a kind concept cannot, so the shipped property denotes the type of the scope, not the scope.",
+  "verdict": "analyzed"
+}

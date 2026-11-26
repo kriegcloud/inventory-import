@@ -1,0 +1,80 @@
+{
+  "id": "so:sha256:c94fc69a82421478564d8bad567599e059b61ec1d0009fdcf8619b839690c5c9",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/kernel/src/Activity.schema.ts"
+  },
+  "source_span": {
+    "start_line": 21,
+    "end_line": 46,
+    "content_sha256": "1b0099e346d86b3eb389de0662ff0809bd7f67b160f89ea446a97c8bf4864284"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Activity",
+    "lexical_name": "Activity",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_field",
+      "object": "action"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "actorId"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "actorName"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "agent"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "createdAt"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "detail"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "id"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "organizationId"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "Activity"
+    },
+    {
+      "predicate": "references_type",
+      "object": "ActivityId"
+    },
+    {
+      "predicate": "references_type",
+      "object": "DisplayName"
+    },
+    {
+      "predicate": "references_type",
+      "object": "MemberId"
+    },
+    {
+      "predicate": "references_type",
+      "object": "OrganizationId"
+    }
+  ],
+  "source_excerpt": "export class Activity extends Model.Class<Activity>(\"Activity\")(\n  {\n    id: Model.UuidV4Insert(ActivityId),\n    organizationId: OrganizationId,\n    actorId: MemberId,\n    actorName: DisplayName.pipe(\n      S.annotateKey({ description: \"Who did it: the member's name as it was then, for the screen. Not an id\" })\n    ),\n    action: S.String.check(S.isMinLength(1), S.isMaxLength(120)).pipe(\n      S.annotateKey({ description: \"What was done, in a few words a person reads\", examples: [\"Imported items\"] })\n    ),\n    detail: S.String.check(S.isMaxLength(4000)).pipe(\n      S.annotateKey({\n        description: \"What it was done to and what came of it, in a sentence; may be empty\",\n        examples: [\"Created 11 items from items.csv\"]\n      })\n    ),\n    agent: Model.FieldOption(\n      DisplayName.pipe(\n        S.annotateKey({ description: \"The agent that did this for the actor. None: the person did it themselves.\" })\n      )\n    ),\n    createdAt: Model.DateTimeInsert\n  },\n  { description: \"One line of the audit trail: who did what, in words a person can read\" }\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

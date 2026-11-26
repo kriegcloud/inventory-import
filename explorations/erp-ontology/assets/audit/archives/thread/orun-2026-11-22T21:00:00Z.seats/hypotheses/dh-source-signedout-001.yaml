@@ -1,0 +1,25 @@
+id: dh:source-signedout:001
+observation_refs:
+- so:sha256:9943dcbebffa29e5fd4cdfd39bb9a2e77e1163659ab979d6480d01a5b2198006
+cq_warrants: []
+proposed_referent:
+  label: signed-out response representation
+  description: One tagged signed-out response value. It describes a session context,
+    not nonexistence of a person or account.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Session-specific unauthenticated state
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

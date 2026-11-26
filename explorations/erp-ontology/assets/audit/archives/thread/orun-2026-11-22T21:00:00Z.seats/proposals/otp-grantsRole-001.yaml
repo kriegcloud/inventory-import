@@ -1,0 +1,79 @@
+id: otp:grantsRole:001
+hypothesis_ref: dh:grant-role-content:001
+identity_card_ref: ic:grant-role-content:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: grants role
+  local_name: grantsRole
+  proposed_iri: https://example.org/inventory-import/ontology/grantsRole
+  owl_entity_kind: object_property
+  in_scheme: ''
+definition:
+  text: 'A relation linking an access assignment to the access-level meaning it assigns. Proposed domain:
+    Grant; proposed range: Role.'
+  source:
+  - CQ-P06
+  - po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0
+  - po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+  - po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: none
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: none
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotations
+  say the grant gives a member a named level of access and is an authorized scoped assignment. The proposed
+  content is access conferred by an assignment, rather than just a string-valued link.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:grant-role-content:001): Resolve grant lifecycle, access-level identity and whether
+  level replacement ends an assignment or changes its state; distinguish a normative permission from an
+  encoded claim.'
+- 'Identity criterion from ic:grant-role-content:001: Provisionally the same grant-to-level relation concerns
+  the same assignment and policy-qualified access level; time/version is required if the assigned level
+  can change. This is a relation extension, not a new individual or identity-supplying sortal. Its holding
+  is temporally qualified; participant identity is inherited from the referenced analyses.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Constitutive mediation/content aspect
+  of an access-assignment relator. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Resolve grant lifecycle, access-level identity and
+  whether level replacement ends an assignment or changes its state; distinguish a normative permission
+  from an encoded claim.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Grant-borne normative mode determined
+  by an access specification. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Resolve grant lifecycle, access-level identity and
+  whether level replacement ends an assignment or changes its state; distinguish a normative permission
+  from an encoded claim.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Information-bearing role-value assertion
+  about an assignment. Choose the proposed shape or this rival explicitly; the current proposal does not
+  decide between them. Evidence required: Resolve grant lifecycle, access-level identity and whether level
+  replacement ends an assignment or changes its state; distinguish a normative permission from an encoded
+  claim.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Encoded role value in a grant record
+  (implementation_artifact_only). This alternative is not accepted, rejected or silently merged with the
+  proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

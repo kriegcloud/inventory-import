@@ -1,0 +1,28 @@
+id: dh:source-person-unrepresented:001
+observation_refs:
+- so:sha256:4b60f32391b77bde317af08f56ad864ab9b49b0b02fc96f079515a0c117f635f
+cq_warrants: []
+proposed_referent:
+  label: people-page member projection
+  description: One displayed member response with memberId, role, optional account
+    email and joining time. The excerpt explicitly describes a member on the People
+    page; it does not establish identity with the account-independent human of the
+    prose.
+representation_status: unresolved
+alternatives:
+- label: Human or membership represented on the page
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

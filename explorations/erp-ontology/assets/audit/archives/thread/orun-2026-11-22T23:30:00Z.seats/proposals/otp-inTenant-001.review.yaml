@@ -1,0 +1,36 @@
+target: "otp:inTenant:001"
+target_sha256: "17bc8fe8d32c217f8815d749d09ebc1fe94e43b1a064d335b5e36771506b759c"
+chain_sha256: "084f7a35e60ddd64866d88e70016b6b32e251a6b6c1298bea236370cd4883e59"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed for this object property, so superclass rigidity, identity, unity, and dependence checks have no edge to apply to."
+revision_requests:
+  - "Replace the null discriminator. po:fdb5b79b2faf (every customer-data query filters on organizationId, and child references include it) and po:745d38853519 (holder, not owner of the described body) are both true of an organizationId column with that comment and those queries. Cite a fact that column lacks."
+  - "Keep CQ-P09 as the warrant only if the replacement discriminator actually rejects the column. The question does require some record-to-holder link; it does not by itself reject implementation-only."
+attacks:
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Customer row R has organizationId T. Every query that reads R filters on T, and a child row references R by (T, id), which is po:fdb5b79b2faf. The column comment is po:745d38853519: T is the workspace that holds R, not the owner of the body R describes. A pure data-transfer twin that copies T and does not filter would miss po:fdb5b79b2faf, but the implementation-only twin that already is the schema — the column plus the filter rule — makes both quoted facts true. The discriminator does not reject that twin."
+    outcome: landed
+  - surface: warrant
+    rule: listing-cq-warrant
+    counterexample: "CQ-P09 asks whether any record belongs to no organization, to two, or points at a record of another organization, and it says a missing tenant link is a violation only for records the lift wrote whole. That constraint is not answerable from an unscoped record class. inTenant is the proposed record-to-holder link, not a word the question merely lists. The warrant survives. The failure is the discriminator."
+    outcome: survived
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "R stays in workspace T across two snapshots, then a successor keeps organizationId T. The proposal claims no containment individual: sameness is the triple (record, holder, snapshot), and a changed snapshot is a different assertion rather than a persisting relator. It does not use organizationId as identity of the tenant body or of the body R describes. That is what the card says. The attack does not falsify the no-individual claim."
+    outcome: survived
+rival_models_still_viable:
+  - "Contextual record-containment predicate with no separately identified relator"
+  - "Reified placement episode if migration, custody or succession history becomes decision-bearing"
+evidence:
+  - "po:sha256:fdb5b79b2fafe375c4e785c1c568682819f47cb24bcc548c43c74e27061fba78"
+  - "po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3"
+  - "CQ-P09"

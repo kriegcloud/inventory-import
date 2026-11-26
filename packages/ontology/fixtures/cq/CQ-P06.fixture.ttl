@@ -1,0 +1,8 @@
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<fixture/Person/test_Ravi> a inv:Person .
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+<data/test_ExampleWorks/Member/test_RaviWorks> inv:membershipOf <fixture/Person/test_Ravi> .
+<data/test_SecondOrg/Member/test_RaviSecond> inv:membershipOf <fixture/Person/test_Ravi> .

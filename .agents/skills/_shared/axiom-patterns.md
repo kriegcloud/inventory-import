@@ -1,0 +1,435 @@
+> In this repository read `project-profile.md` first; where it and this file disagree, it wins.
+
+# Axiom Patterns
+
+16 core OWL 2 axiom patterns with when-to-use guidance, ROBOT template
+syntax, and Manchester Syntax examples. Reference for the conceptualizer
+and architect skills.
+
+> Here: no ROBOT template writes a term. Each pattern becomes an entry in the vocabulary module, proposed as a TypeScript sketch in a research report; read the Manchester form to understand it. Inverse properties (`owl:inverseOf`) and `owl:sameAs` are not used here.
+
+## 1. Simple SubClassOf (Primitive Class)
+
+**When**: Asserting that one class is a subtype of another.
+
+**Manchester Syntax**:
+```
+Class: Piano
+  SubClassOf: KeyboardInstrument
+```
+
+**ROBOT Template**:
+```tsv
+ID	LABEL	SC %
+ID	A rdfs:label	SC %
+EX:0001	piano	EX:0010
+```
+
+**Notes**: The foundation of taxonomy. Every class should have at least one
+named superclass (no orphans except owl:Thing).
+
+---
+
+## 2. Existential Restriction (SomeValuesFrom)
+
+**When**: "Every X has at least one Y" — expressing necessary conditions.
+
+**Pattern**: `X SubClassOf R some Y`
+
+**Manchester Syntax**:
+```
+Class: Guitar
+  SubClassOf: hasComponent some String
+```
+
+**ROBOT Template**:
+```tsv
+ID	LABEL	SC %	REL
+ID	A rdfs:label	SC %	SC 'hasComponent' some %
+EX:0002	guitar	EX:0010	EX:0030
+```
+
+A class-expression column starts with `C`, `SC`, `EC` or `DC` (`C` takes
+its axiom type from a `CLASS_TYPE` column, default subclass). ROBOT parses
+properties in a class expression only by label, so `'hasComponent'` must be
+the `rdfs:label` of a property in the `--input` ontology.
+
+**Notes**: The most common restriction pattern. Use for necessary conditions
+that define what members of the class must have.
+
+---
+
+## 3. Universal Restriction (AllValuesFrom / Closure Axiom)
+
+**When**: "The only Y that X can have are Z" — constraining the range of a
+relation for a specific class.
+
+**Pattern**: `X SubClassOf R only Y`
+
+**Manchester Syntax**:
+```
+Class: VegetarianPizza
+  SubClassOf: hasTopping only VegetableTopping
+```
+
+**Notes**: Often combined with an existential restriction to form a
+**closure axiom**: "has at least one, and only these." Without a
+corresponding `some`, the universal restriction alone is satisfied by
+having no values at all (vacuous truth).
+
+**Worked closure example**:
+```
+Class: VegetarianPizza
+  SubClassOf: hasTopping some VegetableTopping
+  SubClassOf: hasTopping only VegetableTopping
+```
+
+---
+
+## 4. Equivalent Class (Defined Class)
+
+**When**: Providing necessary AND sufficient conditions — enabling automatic
+classification by the reasoner.
+
+**Pattern**: `X EquivalentTo Y and R some Z`
+
+**Manchester Syntax**:
+```
+Class: StringInstrument
+  EquivalentTo: MusicalInstrument and hasComponent some String
+```
+
+**ROBOT Template**:
+```tsv
+ID	LABEL	EC %
+ID	A rdfs:label	EC %
+EX:0020	string instrument	EX:0010 and ('hasComponent' some EX:0030)
+```
+
+**Notes**: Defined classes are the heart of reasoning. Any individual (or
+class) that satisfies the conditions will be automatically classified.
+Use sparingly — not every class needs to be defined.
+
+**Design decision: `SubClassOf` vs `EquivalentClass`**
+- Use `SubClassOf` when you are asserting only necessary conditions.
+- Use `EquivalentClass` when you are confident the condition set is both
+  necessary and sufficient.
+- Default to `SubClassOf` if domain consensus is incomplete; premature
+  equivalence often causes misclassification cascades.
+
+---
+
+## 5. Disjoint Classes
+
+> Here: disjointness is a term fact in the vocabulary module, proposed to Benjamin; never between role flags such as customer and vendor (decision 3).
+
+**When**: Two sibling classes under the same parent share no instances.
+
+**Pattern**: `DisjointClasses: A, B, C`
+
+**Manchester Syntax**:
+```
+DisjointClasses: WindInstrument, StringInstrument, PercussionInstrument
+```
+
+**ROBOT Template**:
+```tsv
+ID	LABEL	SC %	DISJOINT_WITH
+ID	A rdfs:label	SC %	DC %
+EX:0020	string instrument	EX:0010	EX:0021
+EX:0021	wind instrument	EX:0010	EX:0020
+```
+
+**Notes**: Disjointness is critical for reasoning — without it, the
+reasoner cannot detect classification errors. Sibling kinds (rigid classes)
+under the same parent SHOULD be declared disjoint unless there is a
+specific reason not to. Never apply this default to roles or phases: they
+are anti-rigid, and one individual can hold several at once (an
+organization that is both customer and supplier), so disjointness between
+them, or between a role and a kind, makes such individuals inconsistent.
+For >2 classes, use `DisjointClasses` (pairwise disjointness) or
+`DisjointUnion`.
+
+---
+
+## 6. Covering Axiom (Disjoint Union / Exhaustive Partition)
+
+> Here: a proposal for Benjamin only; it takes the reasoner out of OWL 2 EL.
+
+**When**: A parent class is fully partitioned into its children — "X is
+exactly A, B, or C, and nothing else."
+
+**Pattern**: `X DisjointUnionOf A, B, C`
+
+**Manchester Syntax**:
+```
+Class: InstrumentFamily
+  DisjointUnionOf: StringFamily, WindFamily, PercussionFamily, KeyboardFamily
+```
+
+**Notes**: Combines SubClassOf + DisjointClasses + Covering in one axiom.
+Use when the enumeration is exhaustive and stable. Be cautious — adding
+a new sibling later requires updating the union.
+
+---
+
+## 7. Qualified Cardinality Restriction
+
+> Here: a field's cardinality lives in the record schema and is projected to SHACL (research/02); an OWL cardinality axiom is a proposal for Benjamin.
+
+**When**: "X has exactly/at least/at most N values of type Y for relation R."
+
+**Pattern**: `X SubClassOf R exactly N Y`
+
+**Manchester Syntax**:
+```
+Class: StringQuartet
+  SubClassOf: hasMember exactly 4 Musician
+```
+
+**ROBOT Template** (requires `EC %` or `SC %` with full expression):
+```tsv
+ID	LABEL	SC %
+ID	A rdfs:label	SC %
+EX:0050	string quartet	'hasMember' exactly 4 EX:0060
+```
+
+**Notes**: Requires OWL 2 DL. Unqualified cardinality (`R exactly 3`) is
+simpler but less expressive. ELK does not support cardinality and ignores
+the axiom — use HermiT (`robot reason --reasoner hermit`) or a DL reasoner
+outside ROBOT such as Openllet, which has its own CLI.
+
+---
+
+## 8. Value Partition Pattern
+
+> Here: a code list (ItemRole) is a SKOS scheme in the vocabulary module, not a value partition.
+
+**When**: Modeling quality values as a controlled vocabulary (e.g., sizes,
+grades, severity levels).
+
+**Pattern**: Quality class with exhaustive partition of value classes.
+
+**Manchester Syntax**:
+```
+Class: PitchRange
+  DisjointUnionOf: HighPitch, MediumPitch, LowPitch
+
+Class: HighPitch
+  SubClassOf: PitchRange
+
+Class: Cello
+  SubClassOf: hasPitchRange some LowPitch
+```
+
+**Notes**: Preferred over data properties with string values when the
+values take part in reasoning. Each value is a class, not an individual.
+For a code list that needs no reasoning (statuses, units chosen from a
+list), a SKOS concept scheme or SHACL `sh:in` is enough
+(`foundational-analysis.md`, Enum-is-taxonomy).
+
+---
+
+## 9. N-ary Relation Pattern
+
+> Here: the connector class goes under a projected gist class (`gist:Event`, or `gist:Agreement` for a relationship that holds commitments), not BFO `Process`.
+
+**When**: A relation involves more than two participants (e.g., "Person X
+prescribed Drug Y for Condition Z at Time T").
+
+**Pattern**: Reify the relation as a class.
+
+**Manchester Syntax**:
+```
+Class: MusicalPerformance
+  SubClassOf: Process
+  SubClassOf: hasPerformer some Musician
+  SubClassOf: hasPiece some MusicalWork
+  SubClassOf: hasVenue some Site
+  SubClassOf: hasDate some xsd:date
+```
+
+**Notes**: OWL only supports binary relations. For n-ary, create a
+"connector" class representing the event/situation. The connector class
+holds all the participants via binary relations.
+
+---
+
+## 10. Self-Restriction Pattern
+
+**When**: "Every X is related to itself via R" (reflexive for a specific class).
+
+**Pattern**: `X SubClassOf R Self`
+
+**Manchester Syntax**:
+```
+Class: NarcissisticEntity
+  SubClassOf: admires Self
+```
+
+**Notes**: Rarely needed. More common is to declare the property reflexive
+globally:
+```
+ObjectProperty: partOf
+  Characteristics: Reflexive
+```
+
+---
+
+## 11. HasKey Axiom
+
+> Here: not used for the identity of records: a party's identity is report 01's "tenant and a source id" (`project-profile.md`: open as criterion or key, for Benjamin). HasKey entails `owl:sameAs`; put any proposed key to Benjamin as a question.
+
+**When**: Stating that individuals of a class that share values for the key
+properties are the same individual.
+
+**Pattern**: `HasKey(C, P1, P2, ...)`
+
+**Manchester Syntax**:
+```
+Class: Person
+  HasKey: hasSSN
+```
+
+**Notes**: OWL 2 feature. HasKey applies only to named individuals, and it
+does not enforce anything: a reasoner infers `owl:sameAs` between named
+individuals of C that share values for all key properties. It is therefore
+an identity claim with the consequences of #14, not a database primary key:
+it never rejects a duplicate and never requires a key to be present. For
+uniqueness or presence, use SHACL (`sh:minCount`, a SPARQL constraint over
+the key) or a database constraint. Add a key only after the identity
+criterion for C has been established and accepted.
+
+---
+
+## 12. Property Chain (SubPropertyChain)
+
+> Here: not a term fact here: lot genealogy and similar paths are a query or a View (research/02); propose a chain only as a question.
+
+**When**: Inferring a relation from a sequence of relations — "if A R1 B
+and B R2 C, then A R3 C."
+
+**Pattern**: `R3 SubPropertyChainOf R1 o R2`
+
+**Manchester Syntax**:
+```
+ObjectProperty: hasGrandparent
+  SubPropertyChain: hasParent o hasParent
+```
+
+**Notes**: Powerful for transitive-like inference paths. OWL 2 allows
+chains of arbitrary length, but the property hierarchy must be regular. A
+chain that implies R may take only one of these forms:
+
+- `R o R` (R is then transitive)
+- `R o S1 o ... o Sn` (R first)
+- `S1 o ... o Sn o R` (R last)
+- `S1 o ... o Sn`
+
+In the last three forms no Si may be R, nor a property whose own chain or
+subproperty axioms lead back to R (the Si must sit below R in a strict
+order, OWL 2 Structural Specification §11.2).
+
+A property implied by a chain, a transitive property, and any property with
+such a subproperty is non-simple. A
+non-simple property cannot be used in cardinality restrictions, `Self`
+restrictions, or in functional, inverse-functional, irreflexive,
+asymmetric or disjoint-property axioms. ELK supports simple chains.
+
+---
+
+## 13. Negation (Negative Property Assertion)
+
+**When**: You must explicitly state that a specific relation does not hold
+between two named individuals.
+
+**Pattern**: `NegativeObjectPropertyAssertion( R a b )`
+
+**Manchester Syntax**:
+```
+Individual: Alice
+  Facts: not hasParent Bob
+```
+
+**Notes**: Assertion-level construct. Use sparingly; in OWA, absence of a
+triple is not equivalent to negation.
+
+---
+
+## 14. Identity Links (`owl:sameAs` / `owl:differentFrom`)
+
+> Here: not used. No `owl:sameAs` (`project-profile.md`): two records that may be one party are settled by a recorded identity decision.
+
+**When**: Asserting strict identity (or non-identity) between individuals.
+
+**Pattern**:
+- `a owl:sameAs b`
+- `a owl:differentFrom b`
+
+**Manchester Syntax**:
+```
+Individual: ex:PatientRecord123
+  SameAs: ex:NationalRegistryPerson987
+```
+
+**Notes**: `owl:sameAs` is very strong and transitive. One incorrect link can
+merge large identity clusters and propagate unintended inferences. Assert it
+only when an accepted identity criterion says the two are one individual;
+records that look alike are not evidence of identity. For "these records
+describe related things", use a weaker link (`skos:closeMatch`,
+`skos:exactMatch`, an SSSOM mapping) instead.
+
+---
+
+## 15. Enumeration (`owl:oneOf`)
+
+**When**: Representing a genuinely closed, finite set of named individuals.
+
+**Pattern**: `Class: C EquivalentTo {a, b, c}`
+
+**Manchester Syntax**:
+```
+Class: TrafficLightState
+  EquivalentTo: {RedState, YellowState, GreenState}
+```
+
+**Notes**: Use only for stable closed sets. If the set changes frequently,
+prefer a normal class hierarchy or controlled vocabulary approach.
+
+---
+
+## 16. Complement (`owl:complementOf`)
+
+**When**: Defining a class as the complement of another class.
+
+**Pattern**: `A EquivalentTo not B`
+
+**Manchester Syntax**:
+```
+Class: NonSmoker
+  EquivalentTo: not Smoker
+```
+
+**Notes**: Use cautiously. Complement-heavy modeling can indicate missing
+positive class definitions or insufficient partition design.
+
+---
+
+## Pattern Selection Guide
+
+> Here: rows 11 and 14 do not apply; a reverse direction is a SPARQL `^p` path, never an inverse property.
+
+| CQ Pattern | Axiom Pattern | # |
+|-----------|--------------|---|
+| "Every X has a Y" | Existential restriction | 2 |
+| "X can only have Y" | Universal restriction / closure | 3 |
+| "X is defined as Y with Z" | Equivalent class | 4 |
+| "X and Y never overlap" | Disjoint classes | 5 |
+| "X is exactly A, B, or C" | Covering axiom | 6 |
+| "X has exactly N of Y" | Qualified cardinality | 7 |
+| "X has high/medium/low Z" | Value partition | 8 |
+| "X did Y to Z at time T" | N-ary relation | 9 |
+| "Individuals of X that share P are the same individual" | HasKey (entails sameAs; not a uniqueness check) | 11 |
+| "if R1 then R2" (chained) | Property chain | 12 |
+| "These two identifiers are the same individual" (per an accepted identity criterion) | Identity links | 14 |
+| "Class is exactly this finite set" | Enumeration | 15 |

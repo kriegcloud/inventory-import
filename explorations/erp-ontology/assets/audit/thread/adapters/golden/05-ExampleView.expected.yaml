@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:6b5ff431a37308efc067d8342b3868902a2be13f09b4319f05eae2cfb5b8304c",
+  "schema_version": 1,
+  "repository": {
+    "commit": "1111111111111111111111111111111111111111",
+    "path": "golden/input/schemas.ts"
+  },
+  "source_span": {
+    "start_line": 14,
+    "end_line": 17,
+    "content_sha256": "440e56afe775d7cdbe6eb33b1bfed4f52041568803faf39ac800e1494e6cdb9b"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "ExampleView",
+    "lexical_name": "ExampleView",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class ExampleView extends S.Class<ExampleView>(\"ExampleView\")({\n  memberId: MemberId,\n  name: DisplayName,\n}) {}\n",
+  "epistemic_status": "parser_derived"
+}

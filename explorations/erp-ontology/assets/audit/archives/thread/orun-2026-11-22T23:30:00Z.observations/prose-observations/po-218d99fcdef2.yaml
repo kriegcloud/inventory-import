@@ -1,0 +1,6 @@
+id: "po:sha256:218d99fcdef200927a39668d5aef017716150daa8a3ee3767ad8c0d5a784e374"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 175, end_line: 175}
+quote: "Links a grant to the kind of scope it applies to. (new wording; decision 96)"
+epistemic_status: quoted_prose

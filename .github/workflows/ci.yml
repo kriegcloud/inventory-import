@@ -170,3 +170,62 @@ jobs:
         with:
           path: .turbo/cache
           key: ${{ steps.filed.outputs.key }}
+
+  # Gate 9 of the ERP vocabulary, apart from the jobs above (explorations/erp-ontology/DECISIONS.md, decision 114): a
+  # reasoner reads the generated ontology with the thread's data and with each refused case, so a change that lets a
+  # person be a tenant, or an audit entry be who it is about, fails its pull request. `check:ci` does not run it: it
+  # needs Java and a jar no install brings. The pin of both is one file, packages/ontology/robot.lock.json, and every
+  # value below is read from it. What is cached is the jar, never a result: the script starts on every run, and the
+  # `reason` task is never replayed by turbo (packages/ontology/turbo.json).
+  reason:
+    name: The reasoner on the vocabulary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      # The script keeps the jar under $XDG_CACHE_HOME/inventory-import/robot/<release>/, so the folder is named here
+      # once, for the script and for the cache alike.
+      - name: Read the pin
+        id: pin
+        run: |
+          echo "XDG_CACHE_HOME=$RUNNER_TEMP/cache" >> "$GITHUB_ENV"
+          node -e '
+            const pin = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+            for (const key of ["release", "sha256", "javaMajor"]) {
+              if (!/^[A-Za-z0-9.]+$/.test(String(pin[key]))) throw new Error("robot.lock.json has no plain " + key)
+            }
+            console.log("java=" + pin.javaMajor)
+            console.log("sha256=" + pin.sha256)
+            console.log("folder=" + process.argv[2] + "/cache/inventory-import/robot/" + pin.release)
+          ' packages/ontology/robot.lock.json "$RUNNER_TEMP" >> "$GITHUB_OUTPUT"
+      # The script takes the Java at JAVA_HOME first, and refuses one whose major version is not the pin's.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ steps.pin.outputs.java }}
+      # Keyed by the jar's sha256 alone: another jar is another key. With none kept, the script fetches the pinned
+      # address itself.
+      - name: Bring back the jar
+        id: jar
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.pin.outputs.folder }}
+          key: robot-jar-${{ steps.pin.outputs.sha256 }}
+      # The script hashes the jar on every run, fetched or brought back, and refuses one that is not the pin's; then
+      # the two runs that must be consistent and the three that must not. One task: nothing else of the check runs.
+      - name: Gate 9, the reasoner
+        run: bunx turbo run reason --filter=@inventory/ontology
+      # Only after the gate passed, so only a jar the script hashed to the pin is ever kept.
+      - name: Keep the jar for later runs
+        if: steps.jar.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.pin.outputs.folder }}
+          key: robot-jar-${{ steps.pin.outputs.sha256 }}

@@ -1,0 +1,25 @@
+id: dh:addpersonproblemkind-representation:001
+observation_refs:
+- so:sha256:5028d5a3834babd774993ddc3fe7bd704d418b7ed95767bfa9ddcffb27ea7a50
+- so:sha256:61d4d5420477cc5ec2042753c8bbbb95cf2f7ca38bf50416e6a72d850979f5ca
+cq_warrants: []
+proposed_referent:
+  label: AddPersonProblemKind codes
+  description: 'Candidate real/domain referents: none established for the code set. noAccount and alreadyMember
+    discriminate form feedback branches. Representation instances are code values; their occurrence does
+    not establish an actual absent account or duplicate membership.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: Kinds of unsuccessful membership additions
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

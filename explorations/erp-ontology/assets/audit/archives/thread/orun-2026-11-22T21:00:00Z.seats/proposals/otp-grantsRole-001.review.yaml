@@ -1,0 +1,40 @@
+target: "otp:grantsRole:001"
+target_sha256: "59c6486c968839c6f2f289ebebf6e5e7dc56cbc968ca55661faeae045b6e762e"
+chain_sha256: "da2dd1d52c83eb3292767bbf97a9ae77704231287501e2112ec1b8c2fa48a6ad"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "Role identity is unresolved across policy versions. Do not define grantsRole sameness as 'the same policy-qualified access level' until that level has a criterion. Otherwise editor-v1 and editor-v2 on one grant are one link and two."
+  - "CQ-P06 needs some member-to-role association, not this grant-mediated property. Drop the decision warrant or show the listing failing when grantsRole is absent and a role sits on the membership."
+  - "Replace the null discriminator. po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0 is what a role string field's comment says."
+attacks:
+  - surface: identity
+    rule: "identity-conflict"
+    counterexample: "One grant links to editor. Policy v2 changes what editor permits and the same grant still points at the same role node. The criterion says the relation concerns the same policy-qualified access level, and that a version is required if the level can change. Role's own criterion does not decide whether v1 and v2 are one level. The link therefore identifies two policy-qualified levels as one grantsRole pair."
+    outcome: landed
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks which role each member holds. The SPARQL reaches the role only by inv:grantsRole because it routes through Grant. A role property on Member answers the sample answer. The property is a word in the drafted query, not a condition of the question."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a role string on a grant row, commented with po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0 ('Links a grant to the role it gives') and po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8. The discriminator says the content is access conferred rather than a string-valued link. The observations are those sentences, which the string field still carries."
+    outcome: landed
+rival_models_still_viable:
+  - "Constitutive mediation of an access-assignment relator."
+  - "Grant-borne normative mode determined by an access specification."
+  - "Information-bearing role-value assertion about an assignment."
+  - "Encoded role value in a grant record (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0"
+  - "po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a"
+  - "po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8"

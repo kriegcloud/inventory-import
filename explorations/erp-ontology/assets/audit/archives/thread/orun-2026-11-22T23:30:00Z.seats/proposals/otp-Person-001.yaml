@@ -1,0 +1,85 @@
+id: otp:Person:001
+hypothesis_ref: dh:human-person:001
+identity_card_ref: ic:human-person:001
+foundational_status: analyzed
+term:
+  preferred_label: Person
+  local_name: Person
+  proposed_iri: https://example.org/inventory-import/ontology/Person
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A human being, living or dead, whom a tenant deals with as a workspace participant or as a contact
+    at another organization.
+  source:
+  - po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62
+  - po:sha256:409cfb4d8ae1c4cf7180ff65594c3914c5b37da84b47ac137190b65e159c21ef
+  - po:sha256:54da2f53fbca640bc6194127d5133624bf87036f456e144813d9a91362920579
+  - po:sha256:6978a469f8c2d0ff495c6dad024e4ea8420d2032a4f4f22db396decff519d8bb
+  - po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c
+foundational:
+  ufo_category: kind
+  gufo_alignment: gufo:Kind
+ontoclean:
+  rigidity: rigid
+  identity: supplies
+  dependence: none
+parents:
+- parent: gist:Person
+  justification: This relevant human is a human living or dead as gist:Person denotes. The joined human identity
+    card supplies identity independently of records, including the stipulated post-death continuity; the projected
+    ancestry reaches gist:PhysicalIdentifiableItem.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Person
+    compatibility: The projection describes gist:Person as a human being living or dead, compatible with the
+      supplied post-death human identity. The local term selects humans relevant to tenants, so the broader
+      gist class is reused as a parent, not as the local IRI.
+operational_warrant:
+  competency_questions: []
+  semantic_support_for:
+  - otp:Member:001
+alternatives_rejected:
+- 'Foundational analysis rejects: Account or membership information object as the human itself; contradicted
+  by the explicit duplicate-record decision.'
+- 'Foundational analysis rejects: Tenant-contact role of a human, useful as a separate participation predicate
+  but not the referent of this identity commitment.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The prose explicitly distinguishes the human bearer from representations and organization-specific memberships.
+  This supports the intended domain denotation, without proving the fixture actually resolves a human.'
+open_issues:
+- 'Steward identity commitment: the same human individual for life and after death. Duplicate records, copies,
+  account edits, account merging, two memberships, removal or re-adding membership neither multiply nor fuse
+  humans. No name, email or account/member id supplies human identity. Human-resolution implementation is not
+  established.'
+- 'Strongest counterexample carried forward: One human has two Member records, later one is removed and both
+  account details change. Neither operation creates another human; death also does not end Person identity
+  under the supplied decision. A living-organism-only interpretation would conflict with this post-death stipulation.'
+- 'Identity-card alternatives carried forward: Tenant-contact role is separate from the human bearer; no automatic
+  equivalence to the People-page Person type.'
+- 'Existential dependencies carried forward: No particular tenant, account, membership, name or email is necessary
+  to the human continuing to be that individual (po:409cfb4d8ae1 and po:79e6720f1b1d). Being dealt with by
+  a tenant selects relevant humans; it does not define a new kind.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:human-person:001: “The quoted identity decision says two records of the same human
+  denote one Person, an account or member id never identifies that person, and the same human persists after
+  death. Those record-independent identity commitments would be false if the intended referent were only the
+  records.” The claim must fail for a pure data-transfer twin: record-independent human continuity cannot be
+  constituted by copying or changing records.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=true; ontoclean.supplies_identity=true;
+  ontoclean.carries_identity=true. Closed proposal identity value=supplies. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): An account or tenant-specific membership
+  record; representation_status=information_artifact; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

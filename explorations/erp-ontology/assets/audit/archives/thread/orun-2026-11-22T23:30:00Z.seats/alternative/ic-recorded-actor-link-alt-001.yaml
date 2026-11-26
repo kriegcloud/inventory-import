@@ -1,0 +1,40 @@
+{
+  "id": "ic:recorded-actor-link-alt:001",
+  "hypothesis_ref": "dh:recorded-actor-link:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "Not an individual: an aboutness link individuated by (entry, member named).",
+    "reidentification_key": [
+      "Activity.actorId (MemberId)"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "rigid",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "relational"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "agent participation in a change (rejected by decision 106 for this predicate)",
+      "reference to the human (Person qua member) rather than to the membership"
+    ],
+    "existential_dependencies": [
+      "AuditEntry",
+      "Member"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Range category: the entry 'names who made the change' but the range is Member — a membership (relator). A relationship does not make changes; a person (or agent) does. The predicate is either about the membership (then 'who' is answered only indirectly via the Membership→Person mediation) or about the person-qua-member, which is a role, not a relator."
+    }
+  ],
+  "status": "proposed"
+}

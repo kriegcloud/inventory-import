@@ -1,0 +1,6 @@
+id: "po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 137, end_line: 137}
+quote: "An assignment of one role to one member at one scope (the whole tenant, one site or one field), made by a member allowed to make it."
+epistemic_status: quoted_prose

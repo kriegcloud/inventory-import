@@ -1,0 +1,19 @@
+{
+  "id": "fa:membership-representation-alt:001",
+  "hypothesis_ref": "dh:membership-representation:001",
+  "identity_card_ref": "ic:membership-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Session summary view (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Name collision with the Membership relator; the view is account-keyed ('an organization the account belongs to').",
+  "verdict": "analyzed"
+}

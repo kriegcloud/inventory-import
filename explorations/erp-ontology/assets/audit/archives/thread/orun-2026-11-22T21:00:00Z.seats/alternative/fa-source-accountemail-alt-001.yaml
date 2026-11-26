@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-accountemail-alt:001"
+hypothesis_ref: "dh:source-accountemail:001"
+identity_card_ref: "ic:source-accountemail-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Email address as an identifier (information object) of an Account; Account itself is a missing referent in this hypothesis set"
+    still_viable: true
+strongest_counterexample: "Person.email is null 'for a member with no account': the email identifies an account, never a human, so treating AccountEmail as person identity would be identifier-is-identity."
+verdict: analyzed
+needed_evidence: "Whether Account is to be admitted as a referent (it is presupposed by AccountEmail, TestAccount, Membership 'the account belongs to', AddPerson 'signed up with this email') and whether one account maps to at most one human."

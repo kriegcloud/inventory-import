@@ -1,0 +1,19 @@
+id: fa:membership:001
+hypothesis_ref: dh:membership:001
+identity_card_ref: ic:membership:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Temporally qualified participation relation without a separately reified relator.
+  still_viable: true
+- label: Participation situation holding over human and tenant.
+  still_viable: true
+strongest_counterexample: Remove and later recreate participation for the same human and tenant. Tuple
+  equality merges potentially different episodes; equating membership with human also merges simultaneous
+  memberships in two tenants.
+verdict: explicitly_deferred
+needed_evidence: Specify remove/recreate, suspension/reinstatement and participant replacement rules,
+  with examples separating correction of a record from termination of participation.

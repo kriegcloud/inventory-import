@@ -1,0 +1,87 @@
+id: otp:Grant:001
+hypothesis_ref: dh:grant:001
+identity_card_ref: ic:grant:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Grant
+  local_name: Grant
+  proposed_iri: https://example.org/inventory-import/ontology/Grant
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A continuing scoped assignment of one access role to one member, constituted by an authorized
+    member assigning that access; this proposal provisionally selects the continuing-assignment reading.
+  source:
+  - CQ-P06
+  - po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+  - po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd
+  - po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0
+  - po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: unresolved
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: unresolved
+  dependence: relational
+parents:
+- parent: gist:Assignment
+  justification: Provisional is-a placement supported by the supplied gist projection and thin-thread
+    section 2; unresolved identity and category choices remain explicit below.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Assignment
+    compatibility: Broader parent candidate from the supplied gist 14.1.0 projection; the local definition
+      narrows its meaning. This is not an exact-reuse or equivalence claim.
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotation
+  characterizes an assignment made by a member allowed to make it, giving another member a role over a
+  specified extent. Authorized assignment and participant-scoped access provide the intended referent
+  beyond a configuration tuple.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:grant:001): Determine whether assignment means act, continuing normative relation
+  or configuration; supply lifecycle examples for revocation, regrant, role edits and assigner departure.'
+- 'Identity criterion from ic:grant:001: Unresolved: a continuing access assignment would be reidentified
+  by continuity of its authorized conferral episode and recipient/scope, rather than tuple equality. An
+  assigning act instead has occurrence identity. The quotation does not settle whether role changes revise
+  one assignment or replace it.'
+- 'Design disagreement: <member IRI>/role and the member-plus-field rule are projection keys, not established
+  assignment-episode identity. A continued assignment, assigning act and configuration artifact have different
+  lifecycle criteria.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Relator: continuing normative access
+  assignment mediating recipient and organizational authority under a scope. Choose the proposed shape
+  or this rival explicitly; the current proposal does not decide between them. Evidence required: Determine
+  whether assignment means act, continuing normative relation or configuration; supply lifecycle examples
+  for revocation, regrant, role edits and assigner departure.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Event: authorized act of assigning
+  access. Choose the proposed shape or this rival explicitly; the current proposal does not decide between
+  them. Evidence required: Determine whether assignment means act, continuing normative relation or configuration;
+  supply lifecycle examples for revocation, regrant, role edits and assigner departure.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Information object: configuration or
+  prescription specifying access without establishing conferred permission. Choose the proposed shape
+  or this rival explicitly; the current proposal does not decide between them. Evidence required: Determine
+  whether assignment means act, continuing normative relation or configuration; supply lifecycle examples
+  for revocation, regrant, role edits and assigner departure.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Grant configuration record (information_artifact).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

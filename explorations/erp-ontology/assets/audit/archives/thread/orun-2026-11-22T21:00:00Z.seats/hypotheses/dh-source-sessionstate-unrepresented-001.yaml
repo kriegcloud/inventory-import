@@ -1,0 +1,27 @@
+id: dh:source-sessionstate-unrepresented:001
+observation_refs:
+- so:sha256:21db00c53f8d21c54d4ecc301275c63ee5510095aa137c3922560116bd221107
+- so:sha256:52c916fb7854298d2a4bb9f3ce68e0c438a62dc0b4bab015811c3f9984dc690b
+cq_warrants: []
+proposed_referent:
+  label: session response union representation
+  description: One response value in a tagged union, or its static type; do not merge
+    a response snapshot with an enduring person, account or organization.
+representation_status: unresolved
+alternatives:
+- label: Information snapshot of sign-in and acting context
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

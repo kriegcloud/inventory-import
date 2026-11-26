@@ -1,0 +1,32 @@
+id: dh:organization-body:001
+observation_refs:
+- po:sha256:020743f3cadf0467e6f94f024b74d06b24fc542c5381f072586777707b229f1a
+- po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f
+- po:sha256:a9f7e334db4f34fc0728f5c7109c7a1280d0cc01ba2037a45aeb86b7224f197c
+- po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c
+cq_warrants:
+- CQ-P06
+- CQ-P09
+proposed_referent:
+  label: Organized body
+  description: 'Candidate referent: an organized body formed for a purpose. Grouped chains describe companies,
+    counterparties and the tenant body, while distinguishing imported source records. An instance follows
+    legal-entity continuity; an unregistered body is distinguished by its founding. A successor is another
+    body even if it inherits the workspace.'
+representation_status: domain_referent
+alternatives:
+- label: A tenant workspace or imported organization record
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The organizational bearer has a supplied identity criterion independent of a software workspace.
+    No source Organization declaration is required or invented.
+  discriminator: The identity decision explicitly makes a successor company a new organization despite
+    retention of the same workspace, and identifies unregistered bodies by their founding. Workspace or
+    record continuity therefore cannot constitute the intended organization identity.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

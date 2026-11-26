@@ -1,0 +1,6 @@
+id: "po:sha256:cf426b237ec8182ac1c1c7893b2e21fcdbe11f6c682e625af8517f5042bc694c"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 273, end_line: 276}
+quote: "I chose both as one thing: viewer, editor and admin are concepts of `MemberRoleScheme`, and each is, under the same IRI, an individual of `Role`. Such an individual has one identity criterion, the concept's: its scheme and its notation. A tenant's custom role is another individual. The thin thread ships `Role` without `permits`, so `Permission` waits for the party slice. The agent recommended the same."
+epistemic_status: quoted_prose

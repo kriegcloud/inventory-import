@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:14deb02703c6540851ac3908190975fc2687a82bcf666adb158dcd85ccfd57cd",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 60,
+    "end_line": 64,
+    "content_sha256": "4dcb254385d46c43a5e0cdcb14cdb9209da3482d70eaa0e58a920716691e5434"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "ChangeRole",
+    "lexical_name": "ChangeRole",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class ChangeRole extends S.Opaque<ChangeRole, { readonly brand: unique symbol }>()(\n  S.Struct({\n    role: Role.pipe(S.annotateKey({ messageMissingKey: \"Choose a role: viewer, editor or admin.\" }))\n  }).pipe($I.annoteSchema(\"ChangeRole\", { description: \"Give a member this role\" }))\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

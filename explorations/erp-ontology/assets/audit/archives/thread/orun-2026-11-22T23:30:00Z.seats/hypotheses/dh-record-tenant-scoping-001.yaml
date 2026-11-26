@@ -1,0 +1,32 @@
+id: dh:record-tenant-scoping:001
+observation_refs:
+- po:sha256:745d38853519cd7a3baad1da77048e88622196cede3eb8f163fb0ce5825109c3
+- po:sha256:fdb5b79b2fafe375c4e785c1c568682819f47cb24bcc548c43c74e27061fba78
+cq_warrants:
+- CQ-P09
+- CQ-P10
+proposed_referent:
+  label: Record containment in a tenant workspace
+  description: 'Candidate referent: the contextual assignment of a customer-data record to the workspace
+    that holds it. An instance is the record and containing tenant pair in a data snapshot; it is distinct
+    from ownership of the body described. The whole-record closure assumption in CQ-P09 is needed before
+    treating missing links as violations.'
+representation_status: domain_referent
+alternatives:
+- label: An organizationId column without workspace containment semantics
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The supplied isolation behavior and explicit holder-versus-described-owner distinction support
+    the containment relationship. This remains a quoted behavior claim; no query or tenancy test was run
+    here.
+  discriminator: The prose says every customer-data query filters by organizationId and child references
+    include that tenant component, while the workspace definition distinguishes the holding tenant from
+    the described body owner. These are asserted isolation and contextual containment semantics beyond
+    the bare presence of a column.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

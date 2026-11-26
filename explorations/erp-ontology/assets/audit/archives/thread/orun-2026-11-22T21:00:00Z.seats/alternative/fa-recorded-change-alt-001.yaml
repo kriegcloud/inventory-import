@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:recorded-change-alt:001"
+hypothesis_ref: "dh:recorded-change:001"
+identity_card_ref: "ic:recorded-change-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+  - label: "Data-change event bounded by the writing batch (this seat)"
+    still_viable: true
+  - label: "Atomic per-row mutation events aggregated by one record"
+    still_viable: true
+  - label: "Business-world event that the data change reflects"
+    still_viable: false
+strongest_counterexample: "One CSV import: is it one change with 11 parts or 11 changes? The record count (1) and the item count (11) disagree, and the definition does not say which individuates the change."
+verdict: analyzed
+needed_evidence: "Transaction/batch semantics: whether one audit entry is written per transaction and whether a transaction is the unit of change."

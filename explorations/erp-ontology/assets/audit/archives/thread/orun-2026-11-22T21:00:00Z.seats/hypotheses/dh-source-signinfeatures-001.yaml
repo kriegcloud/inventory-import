@@ -1,0 +1,26 @@
+id: dh:source-signinfeatures:001
+observation_refs:
+- so:sha256:eb8860120c3e342eb7a324ab966df659c284476dd0fd679f4478a8bfd10d3324
+cq_warrants: []
+proposed_referent:
+  label: browser sign-in configuration projection
+  description: One browser-facing configuration value of test offers, password-check
+    setting and sign-up setting. Defaults and settings do not prove checks executed
+    or policies enforced.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Sign-in policy or feature specification
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:audit-writing-instant-alt:001"
+hypothesis_ref: "dh:audit-writing-instant:001"
+identity_card_ref: "ic:audit-writing-instant-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: false
+rival_models:
+  - label: "Temporal location of the writing event, modelled as a datatype property (this seat)"
+    still_viable: true
+  - label: "A reified time:Instant individual"
+    still_viable: true
+  - label: "The time of the recorded change itself"
+    still_viable: true
+strongest_counterexample: "Same-batch writing: change and entry commit in one transaction, so a single transaction timestamp serves both; no observation could distinguish 'instant of writing' from 'instant of change'."
+verdict: analyzed
+needed_evidence: "Whether createdAt is set by the same transaction as the change, and whether any change carries its own timestamp distinct from the entry's; until then 'writing instant' and 'change instant' are observationally equivalent."

@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:f25ec1a0d819cd8dd06f0e389a5435aaeed206f8efa0863088e5535a94dd3e99",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/People/People.command.ts"
+  },
+  "source_span": {
+    "start_line": 39,
+    "end_line": 39,
+    "content_sha256": "85226650c7da5d7eb5cafceedf7934d2f0fdeeeb3e1484494cab716e9e0fb3e8"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "EmailToFind",
+    "lexical_name": "EmailToFind",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "TypeQuery"
+    }
+  ],
+  "source_excerpt": "export type EmailToFind = typeof EmailToFind.Type\n",
+  "epistemic_status": "parser_derived"
+}

@@ -1,0 +1,43 @@
+target: "otp:grantScope:001"
+target_sha256: "e52f458acba3d3ef39cc184b8d43e94dfcf9e533baabb21ad9ed6888daf6cb8c"
+chain_sha256: "ae71c4e75a414541a4f47c4f0cf101c972128ccf2b225ea89949c8ef77695a36"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "Do not identify 'the whole tenant' (po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a) with 'a whole organization' (po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96). A grant over the workspace and a grant over the organized body are different extents."
+  - "CQ-P06 does not ask for scope. Stop citing it as a decision warrant, or add semantic_support_for only if a real decision term needs the kind of extent."
+  - "Replace the null discriminator. The extent sentences are true of a scope-code column."
+attacks:
+  - surface: identity
+    rule: "identity-conflict"
+    counterexample: "Grant W covers the whole tenant workspace of ExampleWorks. Grant B covers the whole organization ExampleWorks, including a supplier site the workspace does not hold. po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a says 'the whole tenant, one site or one field'. po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96 says 'a whole organization, one location, or one field'. The proposal links both to the organization scope kind. The criterion then says they are the same extent kind. They are not the same extent: records outside the workspace are in the organization and not in the tenant."
+    outcome: landed
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "A scope value is edited from organization to a later location concept. The criterion says sameness needs a vocabulary version and that whether a scope change replaces the grant is open. One grant id therefore identifies the two scope associations and the version clause separates them."
+    outcome: landed
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks who holds which role. Scope is not in the natural-language question, the decision sentence, or the sample answer. The SPARQL hard-codes a scope concept. Naming grantScope in required_properties does not make the listing unanswerable without it."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: a scope code column commented with po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049, po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96, and po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a. The discriminator says those sentences are limits on access rather than spellings. The sentences remain true as comments, which is all the observations contain."
+    outcome: landed
+rival_models_still_viable:
+  - "Applicability situation joining assignment, tenant, scope kind, target, and interval."
+  - "Information assertion that a grant has a particular scope code."
+  - "Scope code stored on a grant (information_artifact)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049"
+  - "po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96"
+  - "po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a"

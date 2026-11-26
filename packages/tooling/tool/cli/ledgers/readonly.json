@@ -69,7 +69,6 @@
   "packages/review/src/ReviewDraft.rules.ts": 103,
   "packages/review/src/ReviewRegion.atoms.ts": 27,
   "packages/review/src/ReviewRegion.component.tsx": 15,
-  "packages/review/src/ReviewRegion.types.ts": 39,
   "packages/review/src/internal/PhoneDrawer.tsx": 8,
   "packages/review/src/internal/ReviewGrid.tsx": 71,
   "packages/review/src/internal/ReviewQueue.tsx": 31,

@@ -1,0 +1,19 @@
+{
+  "id": "fa:signinfeatures-representation-alt:001",
+  "hypothesis_ref": "dh:signinfeatures-representation:001",
+  "identity_card_ref": "ic:signinfeatures-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Page configuration data (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "None for the business domain.",
+  "verdict": "analyzed"
+}

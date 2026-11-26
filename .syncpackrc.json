@@ -60,6 +60,7 @@
         "@dnd-kit/sortable",
         "@dnd-kit/utilities",
         "@effect/atom-react",
+        "@effect/platform-bun",
         "@effect/platform-node",
         "@effect/sql-d1",
         "@effect/tsgo",

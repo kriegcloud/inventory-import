@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:membership-context-alt:001"
+hypothesis_ref: "dh:membership-context:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No individual of its own: the membership relator's mediation of its tenant, identified by (membership, tenant); exactly one tenant per membership."
+  reidentification_key:
+    - "Member.organizationId"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+    - "mediation object property membershipIn (no class)"
+    - "role on the tenant side: Organization in the tenant role (already covered by dh:tenant-organization)"
+  existential_dependencies:
+    - "the membership"
+    - "the tenant organization"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+    - "ends with the membership"
+counterexamples:
+  - description: "If a membership could move between tenants the link would need its own temporal identity; the prose fixes one tenant for the membership's life, so the link adds no individual."
+status: proposed

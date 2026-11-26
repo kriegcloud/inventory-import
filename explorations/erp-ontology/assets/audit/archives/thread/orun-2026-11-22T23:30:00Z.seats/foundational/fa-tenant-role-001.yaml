@@ -1,0 +1,19 @@
+id: fa:tenant-role:001
+hypothesis_ref: dh:tenant-role:001
+identity_card_ref: ic:tenant-role:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Workspace partition as a separately identifiable information/system object
+  still_viable: true
+- label: Rigid subkind of Organization
+  still_viable: false
+strongest_counterexample: A successor keeps the same OrganizationId and workspace, but is a new organization.
+  Treating Tenant identity as the partition key would falsely identify distinct role bearers.
+verdict: explicitly_deferred
+needed_evidence: Resolve the Organization identity continuity questions, then supply a dated workspace-to-body
+  succession example showing which body bears Tenant before and after takeover; this is needed for bearer
+  identity, not for the anti-rigid role classification.

@@ -1,0 +1,27 @@
+id: dh:source-ready-unrepresented:001
+observation_refs:
+- so:sha256:e4cfcc1912f9e9d70993a064ac3447dab24bd480eeb6896138180e607ccf26ba
+cq_warrants: []
+proposed_referent:
+  label: ready session response
+  description: One ready-state response value carrying an actor and available organizations.
+    This does not establish a new kind of member or guarantee that a subsequent action
+    is permitted.
+representation_status: unresolved
+alternatives:
+- label: Session-specific acting-member context
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

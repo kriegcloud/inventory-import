@@ -1,0 +1,43 @@
+target: "otp:AuditEntry:001"
+target_sha256: "9337b415d1f3f2c3ac091ec6add275b8ae2e4e3efdc4074b85f8e5e76d9978b2"
+chain_sha256: "992078ab1e54350a7598c988e7ad0aea3759a28a1650a024ffaaa6639e5dc1b1"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed, so anti-rigid-superclass, conflicting inherited identity, unity, and dependence cannot be compared across a parent. gist:Content is recorded only as a non-asserted mapping. The missing identity-supplying ancestor is charged on the identity surface."
+revision_requests:
+  - "Replace the null discriminator. so:c94fc69a8242 together with po:8e6b8e4428f5 and po:160303617dee already describe an Activity row written when data changes, which cannot prove the actor. That row is the implementation artifact. Cite a fact that row lacks."
+  - "Do not propose AuditEntry as a rigid sortal until some ancestor, itself included, supplies identity. po:a2954515f056's tenant-plus-id handle does not supply it; amendment, copy, deletion, and id reuse are still open. Withhold the class or drop rigidity and unity until that criterion exists."
+attacks:
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "A data change inserts one Activity row (so:c94fc69a8242) with organizationId, id, actorId, action, and createdAt. po:8e6b8e4428f5 says data changes record such a row, and po:160303617dee says the row is about a change and cannot prove who acted. Both sentences are true of that table row and false of neither a schema construct nor a pure event. Same-batch writing (po:89e5463325c4) is the insert lifecycle of the row, not a fact the row lacks. The discriminator does not reject implementation-only."
+    outcome: landed
+  - surface: identity
+    rule: sortal-no-identity-ancestor
+    counterexample: "Entry E1 is stored under tenant T and id I. The action and named member are replaced in place; later the row is deleted and a new row reuses I. po:a2954515f056 only states the handle Activity.organizationId plus Activity.id. No parent is proposed, the card supplies_identity is unresolved, and carries_identity true has no supplier that decides whether E1 continued or was replaced. A rigid unity class with no identity-supplying ancestor, itself included, is the blocked sortal. The handle is evidence of a row, not the criterion, which the card already says."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "Two entries can describe one change, and a false member name remains an entry. The proposal does not equate tenant-plus-id with informational sameness. The technical-key attack is already conceded; the landed defect is proposing the rigid sortal anyway."
+    outcome: survived
+  - surface: warrant
+    rule: listing-cq-warrant
+    counterexample: "CQ-P10 asks, for each audit entry, what it says, which member it names, and when it was written. Without an audit-entry individual those three claims have nothing to be claims of. required_classes listing AuditEntry is not the warrant; the natural-language question is. recordedAt being unproposed leaves the question incomplete, but it does not make the entry itself unnecessary."
+    outcome: survived
+rival_models_still_viable:
+  - "Persistent audit record allowing amendments while retaining identity"
+  - "Immutable audit-entry version or writing occurrence content"
+evidence:
+  - "so:sha256:c94fc69a82421478564d8bad567599e059b61ec1d0009fdcf8619b839690c5c9"
+  - "po:sha256:8e6b8e4428f59f50f4bfcc6b8100db1692104086505630db8c9dca418239430b"
+  - "po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053"
+  - "po:sha256:89e5463325c44a76a128c4dff85caed068911d4e9354c960107bc822d66f0304"
+  - "po:sha256:a2954515f0563e447882b597c9c9efb2f780016b31552fa2b41b3b21a3989ea1"
+  - "CQ-P10"

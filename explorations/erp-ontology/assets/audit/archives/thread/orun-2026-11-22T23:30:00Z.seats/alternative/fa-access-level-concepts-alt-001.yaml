@@ -1,0 +1,27 @@
+{
+  "id": "fa:access-level-concepts-alt:001",
+  "hypothesis_ref": "dh:access-level-concepts:001",
+  "identity_card_ref": "ic:access-level-concepts-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Controlled concepts (information objects) punned as Role individuals (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Role types (high-order/powertype reading)",
+      "still_viable": true
+    },
+    {
+      "label": "Bare branch literals (null)",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "Tenant-specific custom roles break scheme+notation identity unless the scheme itself gets a tenant-scoped identity — which the scheme note denies.",
+  "verdict": "analyzed"
+}

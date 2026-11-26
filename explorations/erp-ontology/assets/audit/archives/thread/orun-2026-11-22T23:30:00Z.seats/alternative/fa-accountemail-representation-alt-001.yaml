@@ -1,0 +1,23 @@
+{
+  "id": "fa:accountemail-representation-alt:001",
+  "hypothesis_ref": "dh:accountemail-representation:001",
+  "identity_card_ref": "ic:accountemail-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Datatype / value space (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Account sign-in attribute (needs an Account term)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "If an Account term is ever admitted, AccountEmail becomes the range of its sign-in property, not a class.",
+  "verdict": "analyzed"
+}

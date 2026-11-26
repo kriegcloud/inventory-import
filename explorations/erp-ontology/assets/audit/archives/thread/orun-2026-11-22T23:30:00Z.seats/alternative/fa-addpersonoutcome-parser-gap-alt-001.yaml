@@ -1,0 +1,24 @@
+{
+  "id": "fa:addpersonoutcome-parser-gap-alt:001",
+  "hypothesis_ref": "dh:addpersonoutcome-parser-gap:001",
+  "identity_card_ref": "ic:addpersonoutcome-parser-gap-alt:001",
+  "tests": {
+    "spec_vs_execution": "unresolved",
+    "world_vs_information": "unresolved",
+    "role_vs_bearer": "unresolved",
+    "context_reification_needed": "unresolved"
+  },
+  "rival_models": [
+    {
+      "label": "Collapse onto dh:addpersonoutcome-representation:001 (my preferred reading: a coverage gap is an observation fact, not a referent)",
+      "still_viable": true
+    },
+    {
+      "label": "Independent partial encoding of a domain concept",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The gap hides the S.Result(Person, AddPersonProblem) composition; whether that content changes the category of 'AddPersonOutcome' cannot be decided from this chain.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "Adapter coverage of CallExpression, TypeQuery for Effect Schema pipe/annotate/check calls so that the S.Result(Person, AddPersonProblem) composition become parser-derived observed facts; then re-run denotation for 'AddPersonOutcome' and test whether it adds anything beyond dh:addpersonoutcome-representation:001."
+}

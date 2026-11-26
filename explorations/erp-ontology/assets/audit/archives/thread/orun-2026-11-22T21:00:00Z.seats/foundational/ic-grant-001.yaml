@@ -1,0 +1,37 @@
+id: ic:grant:001
+hypothesis_ref: dh:grant:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: a continuing access assignment would be reidentified by continuity
+    of its authorized conferral episode and recipient/scope, rather than tuple equality. An assigning
+    act instead has occurrence identity. The quotation does not settle whether role changes revise one
+    assignment or replace it.'
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: unresolved
+  supplies_identity: unresolved
+  unity: unresolved
+  dependence: relational
+ufo_analysis:
+  candidate_category: unresolved
+  alternatives:
+  - 'Relator: continuing normative access assignment mediating recipient and organizational authority
+    under a scope.'
+  - 'Event: authorized act of assigning access.'
+  - 'Information object: configuration or prescription specifying access without establishing conferred
+    permission.'
+  existential_dependencies:
+  - Continuing conferral depends on recipient membership, tenant and applicable access context. The authorized
+    assigning member is a historical constituting participant; their continued existence need not sustain
+    the grant. A role definition is not an acting person.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states:
+  - Revocation/expiry are possible termination conditions for a continuing grant, but not specified. Completion
+    would terminate an assigning act.
+counterexamples:
+- description: An authorized member assigns access then leaves while access remains. The assigning event
+    is over although the grant continues; two identical later conferrals may also be distinct episodes.
+status: proposed

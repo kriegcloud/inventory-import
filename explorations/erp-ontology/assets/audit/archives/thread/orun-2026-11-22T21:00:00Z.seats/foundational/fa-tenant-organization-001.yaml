@@ -1,0 +1,19 @@
+id: fa:tenant-organization:001
+hypothesis_ref: dh:tenant-organization:001
+identity_card_ref: ic:tenant-organization:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: false
+rival_models:
+- label: Workspace-service relator mediating organization and application; distinct from its tenant bearer.
+  still_viable: true
+- label: Information record of tenancy, distinct from served organization.
+  still_viable: true
+strongest_counterexample: An organization closes its workspace and continues trading. A kind classification
+  of tenant would require it to cease being that organization; a workspace identity would also split one
+  organization with two workspaces.
+verdict: analyzed
+needed_evidence: Resolve organization identity and organization-to-workspace cardinality before using
+  workspace identifiers to reidentify tenant bearers.

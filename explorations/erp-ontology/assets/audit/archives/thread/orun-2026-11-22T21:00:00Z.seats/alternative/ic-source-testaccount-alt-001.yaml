@@ -1,0 +1,26 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:source-testaccount-alt:001"
+hypothesis_ref: "dh:source-testaccount:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No domain identity: the construct is a source declaration (schema, type alias, helper or response shape). Its own identity is its declaration at a source span and commit; value occurrences are individuated by their response/request context."
+  reidentification_key:
+    - "source symbol + span at commit 7f7c2b3f"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U): delimits no domain whole"
+  dependence: none
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+    - "synthetic account in a local development environment"
+  existential_dependencies: []
+temporality:
+  exists_during_interval: false
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "A test account accidentally seeded into a deployed database: by definition 'never in a deployed database', yet it would be a real account there."
+status: proposed

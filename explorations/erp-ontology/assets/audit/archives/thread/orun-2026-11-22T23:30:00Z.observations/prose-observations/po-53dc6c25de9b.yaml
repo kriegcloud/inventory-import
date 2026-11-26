@@ -1,0 +1,6 @@
+id: "po:sha256:53dc6c25de9b99130d5c7b2b8dae181251cb671d41edcc57d4a250ac3eb405d0"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 204, end_line: 204}
+quote: "A member role whose holder may read the organization's records and write none."
+epistemic_status: quoted_prose

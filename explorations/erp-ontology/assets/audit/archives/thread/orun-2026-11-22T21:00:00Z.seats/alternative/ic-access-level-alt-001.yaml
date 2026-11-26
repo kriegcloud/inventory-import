@@ -1,0 +1,31 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:access-level-alt:001"
+hypothesis_ref: "dh:access-level:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "Proposed (unratified): two access levels are the same iff they occupy the same position in the same ranked access-level vocabulary version and confer the same deontic content (read; read+write; read+write+manage people). Names (viewer/editor/admin) are labels, not the criterion. Unresolved for Benjamin: is a level defined by its rank alone, or by an explicit permission set that could change while the name stays?"
+  reidentification_key:
+    - "Role literal 'viewer' | 'editor' | 'admin' (packages/kernel/src/Role.schema.ts)"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U): a level is a value in an ordinal structure, not a whole with parts"
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: quality
+  alternatives:
+    - "role (each level as an anti-rigid role universal, e.g. Admin, played by a member through a grant): rejected as primary because the same member holds different levels at different scopes, which would multiply role universals per scope"
+    - "mode (a bundle of deontic powers inhering in the grant)"
+    - "information_object (entry of the access-level vocabulary)"
+  existential_dependencies:
+    - "the grant (relator) it characterizes: the level is the value of the grant's access-quality"
+    - "the access-level vocabulary that fixes the ordering"
+temporality:
+  exists_during_interval: false
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "The source encodes the level on the member/person projection (Member.role, Person.role) and ChangeRole addresses a member, not a grant, so the implementation may attach a level to a membership rather than to a grant; the quality would then inhere in a different bearer."
+  - description: "If 'admin' later gains or loses a permission while keeping its rank, rank-identity and permission-set identity diverge."
+status: proposed

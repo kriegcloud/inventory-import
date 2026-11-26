@@ -1,0 +1,18 @@
+id: fa:scope-concepts:001
+hypothesis_ref: dh:scope-concepts:001
+identity_card_ref: ic:scope-concepts:001
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Concrete tenant-specific extent or collection of accessible records
+  still_viable: false
+- label: Versioned extent specification under a future scheme-version policy
+  still_viable: true
+strongest_counterexample: Two grants share organization scope concept but apply to distinct tenants. Treating
+  the concept as the actual extent would collapse their target sets. Mention of site or field scope does
+  not prove shipped concept instances.
+verdict: analyzed
+needed_evidence: ''

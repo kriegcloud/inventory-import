@@ -1,0 +1,29 @@
+id: dh:grant-recipient:001
+observation_refs:
+- po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd
+- po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Member receiving an assignment
+  description: The recipient relationship of one grant assignment to the member holding
+    it. An instance follows the assignment episode and its recipient membership, not
+    a person across all organizations.
+representation_status: domain_referent
+alternatives:
+- label: Grant recipient foreign key
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The linked grant is explicitly an authorized assignment of a role
+    to a member at a scope; holding the grant denotes being the recipient of that
+    scoped access assignment beyond a storage pointer.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

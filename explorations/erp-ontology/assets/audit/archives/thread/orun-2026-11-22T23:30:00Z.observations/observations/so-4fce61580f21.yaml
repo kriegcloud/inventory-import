@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:4fce61580f21c547a2ad57ef2cf3d2af5e6af419c3f31209d3ebb3d68550560f",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 204,
+    "end_line": 213,
+    "content_sha256": "f9d00ad8a0a28ecb63ee16efafddb67837a199b087186cdf567141f52964736b"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Ready",
+    "lexical_name": "Ready",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class Ready extends S.Opaque<Ready, { readonly brand: unique symbol }>()(\n  S.Struct({\n    status: S.tag(\"ready\"),\n    email,\n    // Who this session acts as: the same member `me` answers. No key annotation: it would unwrap the class.\n    actor: Member,\n    organizations,\n    features: SignInFeatures\n  }).pipe($I.annoteSchema(\"Ready\", { description: \"A member is signed in and ready to act.\" }))\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

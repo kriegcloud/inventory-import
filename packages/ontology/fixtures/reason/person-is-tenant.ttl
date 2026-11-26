@@ -1,0 +1,5 @@
+# Ban 1, refused: the fixture's person is also typed a tenant. Hand-written; only gate 9 reads it.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<fixture/Person/test_Ravi> a inv:Tenant .

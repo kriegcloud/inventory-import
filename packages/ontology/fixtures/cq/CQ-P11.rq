@@ -1,0 +1,12 @@
+# CQ-P11: At which scope does each member hold which role? (decision 102)
+# It has no answer without a grant: a role written on the member cannot state a scope.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+
+SELECT ?member ?role ?scope
+WHERE {
+  ?grant a inv:Grant ;
+         inv:grantedTo ?member ;
+         inv:grantsRole ?role ;
+         inv:grantScope ?scope .
+}
+ORDER BY ?member ?scope

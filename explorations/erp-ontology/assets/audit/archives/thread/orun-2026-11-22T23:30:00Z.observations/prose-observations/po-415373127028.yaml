@@ -1,0 +1,6 @@
+id: "po:sha256:4153731270284017dd2f93816b22863dd78e69e1cc7b10fd3e13c940002dba8a"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 205, end_line: 205}
+quote: "A member role whose holder may read and write the organization's records but not manage its people."
+epistemic_status: quoted_prose

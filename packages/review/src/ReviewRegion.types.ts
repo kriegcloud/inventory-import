@@ -983,15 +983,15 @@ export type Total = { readonly label: string; readonly value: string }
 
 export type ReviewRegionProps = {
   /** The page's `h1`: the job and the file ("Review items.csv"). */
-  title: string
+  readonly title: string
   /** What a row is called, singular and plural. */
-  noun: readonly [string, string]
+  readonly noun: readonly [string, string]
   /**
    * The columns and the rows, as atoms: the region and everything it works out from them (the counts, the list on
    * screen, the facets, the widths) follow them, and a caller whose rows change hands over no new props.
    */
-  columns: Atom.Atom<ReadonlyArray<ReviewColumn>>
-  rows: Atom.Atom<ReadonlyArray<ReviewRow>>
+  readonly columns: Atom.Atom<ReadonlyArray<ReviewColumn>>
+  readonly rows: Atom.Atom<ReadonlyArray<ReviewRow>>
   /**
    * The person's decisions with their undo history: the caller's atom. The region writes it with every action and
    * every undo, and whoever keeps the decisions (a server draft, the browser) reads it there: `saved(state)` is the
@@ -1000,80 +1000,82 @@ export type ReviewRegionProps = {
    * `proposing(rows)` where the rules' fixes are proposals, or with `emptyState`. A new atom, with a new `key` on the
    * region, starts the review again.
    */
-  decisions: Atom.Writable<ReviewState>
+  readonly decisions: Atom.Writable<ReviewState>
   /** The kinds of problem the rows can have, in the order the work list shows them, as an atom the region follows. */
-  problemKinds: Atom.Atom<ReadonlyArray<ProblemKind>>
+  readonly problemKinds: Atom.Atom<ReadonlyArray<ProblemKind>>
   /** Past-tense facts about the run, a few words each ("178 rows read"). Columns and fixes are added for you. */
-  summary: ReadonlyArray<string>
-  activity?: Activity
+  readonly summary: ReadonlyArray<string>
+  readonly activity?: Activity
   /**
    * The caller's own check, run on a row after the person typed a value, as an atom (none while there is no rule).
    * Without it an edit to the problem's cell settles the problem.
    */
-  recheck?: Atom.Atom<
-    O.Option<(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined>
+  readonly recheck?: Atom.Atom<
+    O.Option<
+      (input: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => Problem | undefined
+    >
   >
-  onImport: (result: ImportResult) => void
+  readonly onImport: (result: ImportResult) => void
   /** The person picked a file column for a field. Re-run the review and pass new `columns` and `rows`. */
-  onMatchColumn?: (columnId: string, source: string) => void
+  readonly onMatchColumn?: (columnId: string, source: string) => void
   /**
    * Opens the caller's own screen that says which file column fills each field (and takes a new match). With it the
    * toolbar has a button there, amber while a field has no column.
    */
-  onShowMatching?: () => void
-  state?: "ready" | "loading" | "error"
+  readonly onShowMatching?: () => void
+  readonly state?: "ready" | "loading" | "error"
   /** One sentence for the error state, and what to try. */
-  error?: string
-  onRetry?: () => void
+  readonly error?: string
+  readonly onRetry?: () => void
   /**
    * True while the person may look but not decide, as an atom: the region's widths, its keys and its buttons follow
    * it. `readOnlyNote` says who can decide, in the caller's words.
    */
-  readOnly?: Atom.Atom<boolean>
-  readOnlyNote?: string
+  readonly readOnly?: Atom.Atom<boolean>
+  readonly readOnlyNote?: string
   /**
    * The one action when the file has no rows, or when nothing in it can be imported (every row already there, left
    * out or not fixable here): it then stands where the import button was, after the words that say so ("Choose another
    * file").
    */
-  emptyAction?: ReactNode
+  readonly emptyAction?: ReactNode
   /**
    * The caller's own quiet actions beside the grey line under the title ("Suggest fixes"): outline buttons and a
    * line of what they did. Never the filled button.
    */
-  summaryAction?: ReactNode
+  readonly summaryAction?: ReactNode
   /**
    * What happens to the rules' own lossless fixes (`row.applied`). "propose" (the default) asks first: they are
    * proposals the person takes in one click, counted under Needs you until then. "apply" puts them in force on
    * arrival, shown with a tick and an Undo per group. An atom, as everything the region works from is.
    */
-  ruleFixes?: Atom.Atom<"propose" | "apply">
+  readonly ruleFixes?: Atom.Atom<"propose" | "apply">
   /** One sentence for the confirm step: what the import does to what is already there ("Each row becomes a new item."). */
-  importNote?: string
+  readonly importNote?: string
   /**
    * The button's words when no row is ready and none needs a decision, for a caller that can confirm with nothing
    * to add (an import reopened after it created its items). Without it the button says nothing is ready.
    */
-  closingLabel?: string
+  readonly closingLabel?: string
   /** True while the caller is writing the import. */
-  importing?: boolean
+  readonly importing?: boolean
   /**
    * Inside a page that has its own heading, counts and import button (records with a parent: the page's table of
    * orders, the region for the questions on their lines). The title is an `h2`, and the footer keeps Undo but shows
    * neither the region's own tally nor its import button, so `onImport` is never called: the page's counts decide.
    */
-  embedded?: boolean
+  readonly embedded?: boolean
   /**
    * The caller's words for the tabs and the statuses, when the task has its own ("Waiting on you" for Needs you,
    * "Will be created" for Ready). Each word is set once here and used on every tab, tag, count and file that says it;
    * what is not given keeps its default (`defaultReviewWords`). An atom the region follows.
    */
-  words?: Atom.Atom<Partial<typeof ReviewWords.Encoded>>
+  readonly words?: Atom.Atom<Partial<typeof ReviewWords.Encoded>>
   /**
    * The sums that matter, worked out by the caller from the rows it will import, each with its unit or currency
    * ("Purchase $12,480.20"). Shown in the table's footer beside the counts. Never add different units in one.
    */
-  totals?: ReadonlyArray<Total>
+  readonly totals?: ReadonlyArray<Total>
   /**
    * One more answer on a row that needs the person, for rows that belong to a parent record ("Leave job J-2044
    * out"). With it each such row keeps its own answers, under a group heading too: its fix or its choices, then
@@ -1081,29 +1083,33 @@ export type ReviewRegionProps = {
    * `undefined` for a row it does not fit. An atom (none while there is no such answer): the widths of the table's
    * answers are worked out from it.
    */
-  rowAction?: Atom.Atom<O.Option<(row: ReviewRow) => RowAction | undefined>>
+  readonly rowAction?: Atom.Atom<O.Option<(row: ReviewRow) => RowAction | undefined>>
   /**
    * "Why flagged?": the caller's own account of the flagged rows on screen (what the view, the problem kind, the
    * search and the filters narrow it to), each row named with every reason it has. Shown in a side panel from the
    * toolbar. Left out, there is no such button.
    */
-  explain?: (rows: ReadonlyArray<ReviewRow>) => ReactNode
+  readonly explain?: (rows: ReadonlyArray<ReviewRow>) => ReactNode
   /**
    * The caller's own form for a value the person has to give, where one box of text would not do (a cell that holds
    * several values). It stands where the region's one field would, behind the same button, and what it saves is the
    * cell's text: one undo step, checked again by `recheck`, as a typed value is. `undefined` for a cell it does not
    * fit. Read when a row is drawn, and kept nowhere.
    */
-  cellEditor?: (input: { row: ReviewRow; column: string; value: string }) => CellEditor | undefined
+  readonly cellEditor?: (input: {
+    readonly row: ReviewRow
+    readonly column: string
+    readonly value: string
+  }) => CellEditor | undefined
 }
 
 /** The caller's form for one cell (`cellEditor`): the button's words, the panel's title, and the form itself. */
 export type CellEditor = {
-  label: string
-  title: string
+  readonly label: string
+  readonly title: string
   /** `save` takes the cell's new text ("" for none) and closes the panel. */
-  render: (save: (value: string) => void) => ReactNode
+  readonly render: (save: (value: string) => void) => ReactNode
 }
 
 /** The caller's own answer on one row (`rowAction`): its words in full, and what it does. */
-export type RowAction = { label: string; onSelect: () => void }
+export type RowAction = { readonly label: string; readonly onSelect: () => void }

@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:dcd84cbd44297d85d7e8beb69d3911a8dbff4661c2e055cda30d19c449e7c01e",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/People/Person.read.ts"
+  },
+  "source_span": {
+    "start_line": 21,
+    "end_line": 38,
+    "content_sha256": "6da25ec96f9d4b11077c6f2a86758dd75f505f69537c8fe2d12a32881d3c72c5"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Person",
+    "lexical_name": "Person",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class Person extends S.Opaque<Person, { readonly brand: unique symbol }>()(\n  S.Struct({\n    memberId: MemberId.pipe(\n      S.annotateKey({\n        description: \"The member's id: what the address of a change of role or a removal names\",\n        examples: [MemberId.make(\"mem_marcus\")]\n      })\n    ),\n    name: DisplayName.pipe(\n      S.annotateKey({ description: \"The name people read. Not unique, so it never tells two people apart\" })\n    ),\n    email: AccountEmail.pipe(\n      nullAsNone({ description: \"The email of the person's account; null for a member with no account\" })\n    ),\n    role: Role,\n    joinedAt: Instant.pipe(nullAsNone({ description: \"When they became a member; null when that is not known\" }))\n  }).pipe($I.annoteSchema(\"Person\", { description: \"One member of the organization as the People page shows them\" }))\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

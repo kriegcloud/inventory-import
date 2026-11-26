@@ -1,0 +1,6 @@
+id: "po:sha256:409cfb4d8ae1c4cf7180ff65594c3914c5b37da84b47ac137190b65e159c21ef"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 535, end_line: 537}
+quote: "I chose the human being: one human is one Person for life and after death. Two records of the same human denote one Person, and merging them is a matter of data quality, not of two people. An account or a member id never identifies a person. The agent recommended the same."
+epistemic_status: quoted_prose

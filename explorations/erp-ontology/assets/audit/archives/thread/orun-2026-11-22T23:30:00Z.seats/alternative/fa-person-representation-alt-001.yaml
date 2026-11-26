@@ -1,0 +1,23 @@
+{
+  "id": "fa:person-representation-alt:001",
+  "hypothesis_ref": "dh:person-representation:001",
+  "identity_card_ref": "ic:person-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Membership projection mislabelled 'Person' (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Person-qua-member role instance",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The same human in two tenants appears as two 'Person' values with different memberIds — so this 'Person' is per-membership, not the human kind.",
+  "verdict": "analyzed"
+}

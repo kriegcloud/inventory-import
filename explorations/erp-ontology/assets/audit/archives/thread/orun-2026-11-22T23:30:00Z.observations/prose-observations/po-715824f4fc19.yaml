@@ -1,0 +1,6 @@
+id: "po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 524, end_line: 526}
+quote: "The identity question the project profile kept for me. I chose the legal entity: the same organization is the same legal entity. A successor company is a new Organization even when it keeps the workspace, and the Tenant role then passes to the new one. A body with no registration is told apart by its founding. The agent recommended the same."
+epistemic_status: quoted_prose

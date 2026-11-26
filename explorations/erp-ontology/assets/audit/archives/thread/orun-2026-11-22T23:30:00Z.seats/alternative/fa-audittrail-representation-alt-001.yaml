@@ -1,0 +1,23 @@
+{
+  "id": "fa:audittrail-representation-alt:001",
+  "hypothesis_ref": "dh:audittrail-representation:001",
+  "identity_card_ref": "ic:audittrail-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Bounded response window (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Tenant audit log as a collective",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The description says 'the organization's audit trail' but the schema caps it at 500, newest first — a snapshot window, not the trail (snapshot-is-continuant).",
+  "verdict": "analyzed"
+}

@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-testaccount-alt:001"
+hypothesis_ref: "dh:source-testaccount:001"
+identity_card_ref: "ic:source-testaccount-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: true
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Instance of an (unhypothesized) Account referent, scoped to a development environment context"
+    still_viable: true
+strongest_counterexample: "Test accounts really sign in and hold memberships in the dev database; they are real accounts in a different environment context, so 'implementation artifact only' holds for the class but the instances are Account instances under environment context."
+verdict: analyzed
+needed_evidence: "Whether Account is admitted and whether environment (dev vs deployed) is a context the ontology must index."

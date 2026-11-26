@@ -1,0 +1,27 @@
+id: dh:membership-human-link:001
+observation_refs:
+- po:sha256:84869274c0b0aa4e0b7806eec23063acf78b38f3d188f4fb97a8b574945469bc
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Membership-to-human link candidate
+  description: 'Candidate referent under evaluation: human participation in membership independently of
+    an account. An instance of the proposed link is a membership and human pair. No matching or human-resolution
+    procedure is supplied; this relation label is not evidence that any account has been resolved to a
+    human.'
+representation_status: unresolved
+alternatives:
+- label: The human participant in the membership relationship
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: Account independence is an intended meaning of the proposed link, not evidence of resolved
+    human participation for an observed membership. The link construct alone does not defeat the implementation-only
+    null.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

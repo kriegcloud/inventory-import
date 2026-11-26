@@ -1,0 +1,29 @@
+id: dh:addpersonoutcome-parser-gap:001
+observation_refs:
+- so:sha256:2a94f58e6c6e5d4c9afba2601fc6fc264715b4b9847b532a97de97a34179f6e3
+- so:sha256:ac377b1e6d8115ad314d92c67593da01baf3d99b88b7ca95da3fc107f3d3e0da
+cq_warrants: []
+proposed_referent:
+  label: AddPersonOutcome constructs not represented by the adapter
+  description: 'Candidate real/domain referents: none established by these observation chains. The adapter
+    marks CallExpression, TypeQuery as unrepresentable. These chains are grouped by the observed symbol
+    only, not asserted to instantiate a domain kind. An observed declaration occurrence is individuated
+    by its supplied observation; neither its repeated excerpt nor its spelling establishes a domain instance.
+    More complete syntactic observations and semantic evidence are needed before these chains can support
+    a referent.'
+representation_status: unresolved
+alternatives:
+- label: A partially observed encoding of a domain concept or information object
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The closed observation vocabulary did not represent these constructs. Reusing the excerpt
+    to silently upgrade the unsupported chain would bypass that limit; the implementation-only null is
+    not rejected.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

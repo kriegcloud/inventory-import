@@ -1,0 +1,30 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:audit-action-description-alt:001"
+hypothesis_ref: "dh:audit-action-description:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No independent identity: the description is individuated by the audit entry that bears it (one entry, one action text). Identical wording in two entries gives two descriptions."
+  reidentification_key:
+    - "Activity.action (1..120 chars)"
+    - "Activity.id via the bearing entry"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U): a textual part of the entry, not a whole of its own"
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+    - "no class at all: a datatype property (action text) of the audit record"
+    - "quality of the recorded change event (its humanly-described type)"
+  existential_dependencies:
+    - "the audit record that contains it"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "Activity also has a 'detail' field ('what it was done to and what came of it'); the action text alone ('Imported items') underdetermines the change, so treating action as THE description of the change is partial."
+  - description: "If audit entries are mutable, the text can change while the entry persists, breaking the intrinsic-part reading."
+status: proposed

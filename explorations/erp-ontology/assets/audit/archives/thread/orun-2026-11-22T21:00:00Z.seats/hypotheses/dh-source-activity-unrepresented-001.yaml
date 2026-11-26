@@ -1,0 +1,27 @@
+id: dh:source-activity-unrepresented:001
+observation_refs:
+- so:sha256:c9b824c607aeb918ddb8d57f74229f013dd3591f17c72c29620909ac61a7cfa3
+cq_warrants: []
+proposed_referent:
+  label: audit-entry source model
+  description: One source model declaration, distinct from an information-bearing
+    record instance or the change it describes. The class construction alone establishes
+    neither occurrence.
+representation_status: unresolved
+alternatives:
+- label: Information-bearing audit record
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

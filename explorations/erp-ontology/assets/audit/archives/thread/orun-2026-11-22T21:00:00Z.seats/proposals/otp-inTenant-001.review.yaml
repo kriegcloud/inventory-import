@@ -1,0 +1,38 @@
+target: "otp:inTenant:001"
+target_sha256: "edb5ad7d10877c8ae1b7c461a274f1674277fa27dd61e3aeeb7f5b21ef4f5fe9"
+chain_sha256: "b01b4fadf8453f218b4f7e0659ea009eb255534b2e1ffc8b09fb58d28b224b1b"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "CQ-P09 asks whether a record belongs to no organization, to two, or points at a record of another organization. inTenant is defined as workspace custody, not belonging and not a cross-record pointer (po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321). Do not cite CQ-P09 as the decision this property answers."
+  - "State record identity under copy and move. A copy from tenant A into tenant B is one record in two workspaces or two records, and the criterion currently allows both."
+  - "Replace the null discriminator. Activity.organizationId in so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9 is already the column, and the cited prose can comment it. The hypothesis does not cite that source observation; the prose observations alone are still true of the column."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "A record held for tenant A is copied into tenant B's workspace. The criterion says one association is one record, one served tenant, and one holding interval, and the needed evidence says copy and move identity is unspecified. If the copy is the same record, one record has two inTenant links and the criterion still calls each link a different association while CQ-P09 needs to see one record belonging twice. If the copy is a new record, the criterion separates them and the cross-organization pointer CQ-P09 asks about is not represented at all."
+    outcome: landed
+  - surface: warrant
+    rule: "cq-mismatch"
+    counterexample: "CQ-P09 asks whether any record belongs to no organization, to two, or points at a record of another organization. po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321 defines the link as the tenant whose workspace holds the record, not the owner of the body described. A record held in tenant A that points at a record of organization B satisfies the CQ's violation and has a single inTenant value, A. The property does not answer the question it is cited to warrant."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: an organizationId column on each stored row, commented with po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321 and po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001. The discriminator says the quotations distinguish workspace tenant from ownership. Those quotations stay true as comments. It also says actual isolation is unverified, so no observed isolation fact is false of the column."
+    outcome: landed
+rival_models_still_viable:
+  - "Reified data-custody relator, if it has its own rights and lifecycle."
+  - "Situation in which a workspace holds a record for a tenant."
+  - "Tenant column or partition pointer (implementation_artifact_only)."
+evidence:
+  - "CQ-P09"
+  - "po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321"
+  - "po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001"

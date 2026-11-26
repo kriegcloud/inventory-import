@@ -1,0 +1,30 @@
+id: dh:grant-scope-content:001
+observation_refs:
+- po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+- po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96
+- po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Extent kind of an access assignment
+  description: 'The applicability of an assignment to an extent kind: whole organization,
+    location or field. An instance is an assignment and its selected extent kind;
+    this does not identify a particular location or field.'
+representation_status: domain_referent
+alternatives:
+- label: Scope code stored on a grant
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotations say an access grant covers an extent and explicitly
+    distinguish a whole organization, a location and a field. These are intended limits
+    on applicability of access, not merely alternative code spellings.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

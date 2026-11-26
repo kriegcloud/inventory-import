@@ -1,0 +1,78 @@
+id: otp:Person:001
+hypothesis_ref: dh:human-person:001
+identity_card_ref: ic:human-person:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Person
+  local_name: Person
+  proposed_iri: https://example.org/inventory-import/ontology/Person
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A human being, independently of any sign-in account, contact record or workspace membership; tenant
+    dealings select the humans relevant to this vocabulary.
+  source:
+  - CQ-P06
+  - po:sha256:8746f14a1bc5f08392dc18e902915c61f9f21e9403967eed57cc9c873aa67dc7
+  - po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: kind
+  gufo_alignment: gufo:Kind
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: none
+parents:
+- parent: gist:Person
+  justification: Provisional is-a placement supported by the supplied gist projection and thin-thread
+    section 2; unresolved identity and category choices remain explicit below.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Person
+    compatibility: Broader parent candidate from the supplied gist 14.1.0 projection; the local definition
+      narrows its meaning. This is not an exact-reuse or equivalence claim.
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotations
+  explicitly identify a human being and say membership points to its human holder independently of any
+  account. Account-independent human identity would have no referent under the implementation-only reading.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:human-person:001): Steward must distinguish the human kind from the tenant-related
+  selection and specify organism/legal identity and duplicate-resolution criteria.'
+- 'Identity criterion from ic:human-person:001: Proposed provider: the human individual, reidentified
+  by continuity of that human independently of accounts, contacts and memberships. Unresolved: the quotations
+  do not settle organism versus legal-person continuity, death, or duplicate-person resolution; account
+  identifiers and names cannot supply this criterion.'
+- 'Design qualification: tenant involvement is contextual selection in this proposal, not essential human
+  nature. Human continuity and duplicate resolution remain open; names and account keys never supply identity.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Subkind of a broader organism kind,
+  inheriting its identity criterion. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Steward must distinguish the human kind from the tenant-related
+  selection and specify organism/legal identity and duplicate-resolution criteria.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Human in a tenant-contact role: anti-rigid
+  and relationally dependent if tenant involvement is made definitional. Choose the proposed shape or
+  this rival explicitly; the current proposal does not decide between them. Evidence required: Steward
+  must distinguish the human kind from the tenant-related selection and specify organism/legal identity
+  and duplicate-resolution criteria.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Account or contact record (information_artifact).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

@@ -1,0 +1,32 @@
+id: ic:membership-holder:001
+hypothesis_ref: dh:membership-holder:001
+identity:
+  supplies_identity: false
+  identity_criterion: The same holding relation-instance description concerns the same membership episode
+    and the same human over the applicable interval; account replacement is immaterial. This is a relation
+    extension, not a new individual or identity-supplying sortal. Its holding is temporally qualified;
+    participant identity is inherited from the referenced analyses.
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: false
+  supplies_identity: false
+  unity: non_unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+  - Human membership-holder role, anti-rigid, inheriting human identity; a distinct bearer-oriented model.
+  - Mediation aspect of the membership relator without a separate relation object.
+  existential_dependencies:
+  - Holding presupposes the membership episode and human participant; the human persists independently
+    of being holder.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+- description: A human changes login accounts without a membership change; a member-row/account join would
+    incorrectly replace the holder. One human holding two memberships also does not imply one holding
+    relation.
+status: proposed

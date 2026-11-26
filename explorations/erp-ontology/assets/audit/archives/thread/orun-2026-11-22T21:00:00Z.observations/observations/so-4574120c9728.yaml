@@ -1,0 +1,68 @@
+{
+  "id": "so:sha256:4574120c97289b69119fcb9a4cf3a6d660bd2efd898e1e500b14ff3210540e39",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/kernel/src/Member.schema.ts"
+  },
+  "source_span": {
+    "start_line": 28,
+    "end_line": 47,
+    "content_sha256": "fe5502987de53b67f1e0ba2563f47f0d49ce85879df3d80bbfa0340fd6d8cb9f"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "Member",
+    "lexical_name": "Member",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "declares_field",
+      "object": "id"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "name"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "organizationId"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "organizationName"
+    },
+    {
+      "predicate": "declares_field",
+      "object": "role"
+    },
+    {
+      "predicate": "exports_symbol",
+      "object": "Member"
+    },
+    {
+      "predicate": "references_type",
+      "object": "DisplayName"
+    },
+    {
+      "predicate": "references_type",
+      "object": "MemberId"
+    },
+    {
+      "predicate": "references_type",
+      "object": "OrganizationId"
+    },
+    {
+      "predicate": "references_type",
+      "object": "Role"
+    }
+  ],
+  "source_excerpt": "export class Member extends S.Opaque<Member, { readonly brand: unique symbol }>()(\n  S.Struct({\n    id: MemberId.pipe(S.annotateKey({ description: \"Who this is: people are told apart by this id\" })),\n    name: DisplayName.pipe(\n      S.annotateKey({\n        description: \"The name people read. Not unique and can change, so it never decides a permission.\"\n      })\n    ),\n    role: Role.pipe(S.annotateKey({ description: \"What this member may do in this organization\" })),\n    organizationId: OrganizationId.pipe(S.annotateKey({ description: \"The organization the member acts in\" })),\n    organizationName: DisplayName.pipe(S.annotateKey({ description: \"The organization's name, for the screen.\" }))\n  }).pipe(\n    $I.annoteSchema(\"Member\", {\n      description: \"A person acting inside one organization: who they are, their role, and their tenant.\"\n    })\n  )\n) {\n  /** True when the member's role is at least `minimum` (`hasRole` on their role). */\n  static readonly allows = (member: Pick<Member, \"role\">, minimum: Role): boolean => hasRole(member.role, minimum)\n}\n",
+  "epistemic_status": "parser_derived"
+}

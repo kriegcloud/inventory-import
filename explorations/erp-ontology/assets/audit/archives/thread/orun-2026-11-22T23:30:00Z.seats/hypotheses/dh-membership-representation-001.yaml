@@ -1,0 +1,25 @@
+id: dh:membership-representation:001
+observation_refs:
+- so:sha256:0e85c3094e55c1f397ab7b0af90f9cc6517375c69069f4025bc545017f2c92f7
+cq_warrants: []
+proposed_referent:
+  label: Membership sign-in summary
+  description: 'Candidate real/domain referents: none established for this summary as a distinct membership
+    relationship. These chains show organizationName and role in account-oriented display data. A summary
+    occurrence is individuated by its containing account response and list position; a name does not establish
+    which tenant or human relationship it summarizes.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: The person-to-tenant membership relationship summarized by the view
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

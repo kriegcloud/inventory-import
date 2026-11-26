@@ -1,0 +1,6 @@
+id: "po:sha256:8e6b8e4428f59f50f4bfcc6b8100db1692104086505630db8c9dca418239430b"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "CLAUDE.md"}
+source_span: {start_line: 603, end_line: 603}
+quote: "Anything that changes data records an `Activity` row saying who did what."
+epistemic_status: quoted_prose

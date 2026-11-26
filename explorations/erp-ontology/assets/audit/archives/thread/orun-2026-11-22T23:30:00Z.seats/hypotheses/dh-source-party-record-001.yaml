@@ -1,0 +1,27 @@
+id: dh:source-party-record:001
+observation_refs:
+- po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c
+cq_warrants: []
+proposed_referent:
+  label: Imported party source-record candidate
+  description: 'Candidate referent under evaluation: information imported, matched and reviewed by a tenant
+    about a party. Instances are proposed to be individuated by tenant, source system, source type and
+    exact source id. This is distinct from the described human or body; a possible-match decision does
+    not prove identity of its referents.'
+representation_status: unresolved
+alternatives:
+- label: A representation of the real party with no separate admitted record kind
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The prose supplies a plausible information-record candidate and an identity tuple, but the
+    supplied competency questions do not require import matching or source-record identity. No admission
+    warrant in this bounded thread establishes a domain-ontology referent; the null stands pending a relevant
+    decision question.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

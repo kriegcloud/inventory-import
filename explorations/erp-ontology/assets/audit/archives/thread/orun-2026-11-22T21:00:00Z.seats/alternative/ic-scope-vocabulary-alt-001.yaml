@@ -1,0 +1,29 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:scope-vocabulary-alt:001"
+hypothesis_ref: "dh:scope-vocabulary:001"
+identity:
+  supplies_identity: true
+  identity_criterion: "Proposed (unratified): same vocabulary iff same governing artifact and version with the same set of extent kinds (organization, location, field). Unresolved for Benjamin: is it versioned independently, and does 'field' mean a data field or a physical field?"
+  reidentification_key:
+    - "prose definition 14-thin-thread.md:191; decision 96"
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: "unity (+U)"
+  dependence: none
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+    - "implementation scope enumeration only (none observed in the parsed source at this commit)"
+  existential_dependencies:
+    - "its entries (extent kinds)"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states:
+    - "superseded by a later version"
+counterexamples:
+  - description: "No source observation in this input declares a scope enumeration at all (unlike Role); the vocabulary is prose-only here, so the implementation-only alternative has no implementation to point to."
+  - description: "'Field' sits beside 'site' and 'location' in the grant prose, which reads as a physical place, but field-level data permissions are equally common in ERP access control; the vocabulary's meaning is underdetermined."
+status: proposed

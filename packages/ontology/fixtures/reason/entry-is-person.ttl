@@ -1,0 +1,5 @@
+# Ban 2, refused: one node is an audit entry and a person. Hand-written; only gate 9 reads it.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<fixture/AuditEntry/test_Entry> a inv:AuditEntry , inv:Person .

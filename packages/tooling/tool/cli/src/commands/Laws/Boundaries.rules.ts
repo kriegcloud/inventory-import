@@ -164,15 +164,22 @@ const contextMay = (a: Kind, b: Kind): boolean => {
  * Nothing depends on `infra` either: it declares what is deployed, so nothing that is deployed may import it, the
  * app included. An `infra` package itself may use the foundation and nothing else.
  *
+ * Nothing depends on `ontology` either, the app included (decision 9; report 14 section 7.2): it projects the
+ * vocabulary into generated files and holds the ontology's gates, so it is run, never imported. The rule has no
+ * notion of a test, so a test outside the package may not import it either. An `ontology` package may use the
+ * foundation, the kernel (where the vocabulary and the records it reads live) and a context's contract package.
+ *
  * @category rules
  */
 export const allowed =
   (a: Kind) =>
   (b: Kind): boolean => {
     if (b.family === "tooling" || b.family === "infra") return false
+    if (b.family === "ontology") return false
     if (a.family === "app") return true
     if (b.family === "app") return false
     if (b.family === "foundation") return true
+    if (a.family === "ontology") return b.family === "kernel" || (b.family === "context" && b.layer === "contract")
     if (a.family === "drivers") return b.family === "drivers"
     if (a.family === "ui-system") return b.family === "ui-system"
     if (a.family === "web-kit") return b.family === "kernel"

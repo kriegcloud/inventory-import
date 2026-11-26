@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:e0a523695707511ed69bb30747dd9eb0f0ff6c70dfd15103846bfc04fd1d5137",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/kernel/src/Role.schema.ts"
+  },
+  "source_span": {
+    "start_line": 52,
+    "end_line": 55,
+    "content_sha256": "afdd23352ee8ec64e05b0695f3001a18d2311d6177d14a64a7a75ffc39525400"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "hasRole",
+    "lexical_name": "hasRole",
+    "syntactic_kind": "const"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export const hasRole: {\n  (minimum: Role): (role: Role) => boolean\n  (role: Role, minimum: Role): boolean\n} = dual(2, (role: Role, minimum: Role): boolean => rank(role) >= rank(minimum))\n",
+  "epistemic_status": "parser_derived"
+}

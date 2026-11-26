@@ -1,0 +1,24 @@
+{
+  "id": "fa:member-parser-gap-alt:001",
+  "hypothesis_ref": "dh:member-parser-gap:001",
+  "identity_card_ref": "ic:member-parser-gap-alt:001",
+  "tests": {
+    "spec_vs_execution": "unresolved",
+    "world_vs_information": "unresolved",
+    "role_vs_bearer": "unresolved",
+    "context_reification_needed": "unresolved"
+  },
+  "rival_models": [
+    {
+      "label": "Collapse onto dh:workspace-membership:001 (my preferred reading: a coverage gap is an observation fact, not a referent)",
+      "still_viable": true
+    },
+    {
+      "label": "Independent partial encoding of a domain concept",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The gap hides the field annotations, including Member.id 'people are told apart by this id' — decisive for the Person/Membership identity conflict; whether that content changes the category of 'Member' cannot be decided from this chain.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "Adapter coverage of CallExpression, PropertyDeclaration for Effect Schema pipe/annotate/check calls so that the field annotations, including Member.id 'people are told apart by this id' — decisive for the Person/Membership identity conflict become parser-derived observed facts; then re-run denotation for 'Member' and test whether it adds anything beyond dh:workspace-membership:001."
+}

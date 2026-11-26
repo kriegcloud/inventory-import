@@ -1,0 +1,37 @@
+target: "otp:membershipOf:001"
+target_sha256: "78552d0bafbb046be6cf43deac78f322479981f0da8afa29a2fec3b2fbbe9eab"
+chain_sha256: "f21e97e4677713b689d543544a1188b4aed74288e3341f80066be83d172b21d4"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed for this object property, so superclass rigidity, identity, unity, and dependence checks have no edge to apply to."
+revision_requests:
+  - "CQ-P06's one-human-two-members sample can keep membershipOf as support for Member. The joined discriminator cannot: po:0fd580baa7d4 and po:8b535e25c8a2 are already true as the meaning of member rows plus a person link stored beside them. Cite a fact that arrangement lacks."
+attacks:
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Two Member rows, test_RaviWorks and test_RaviSecond, share a person foreign key and each lasts only until removal (po:8b535e25c8a2). po:0fd580baa7d4 is the decision to add that link because the rows alone did not say they were one human. A member table plus a person-id column makes the human/membership split and the authorization interval true without a domain relator. The discriminator, which only contrasts a display or session record, stays true of this twin."
+    outcome: landed
+  - surface: warrant
+    rule: support-not-necessary
+    counterexample: "CQ-P06's decision is whether a person may be offered an action in one organization and nowhere else. The sample is one person with two memberships. membershipOf is how Member points at that human, and po:0fd580baa7d4 says the member rows do not say it by themselves. The property is necessary for the decision term Member. The warrant survives; the discriminator does not."
+    outcome: survived
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "Re-adding the same human in the same tenant under a reused MemberId fits two establishments or one suspended relation. The proposal does not mint a property individual and does not treat MemberId or the person-tenant pair as the criterion. No false identity claim is added for the property."
+    outcome: survived
+rival_models_still_viable:
+  - "Membership relator with creation/removal episodes"
+  - "Anti-rigid member role of the human, with the continuing human supplying identity"
+  - "Retained membership information object documenting an ended relation"
+evidence:
+  - "CQ-P06"
+  - "po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62"
+  - "po:sha256:8b535e25c8a2cc2dfb8d33ef90801cd51458c927d540c9ccbe11aff2918848c2"
+  - "po:sha256:d81d11ca9403b6a9a6da6fa8a4e8a0c34133b27337ee19288a802b1deef5f863"

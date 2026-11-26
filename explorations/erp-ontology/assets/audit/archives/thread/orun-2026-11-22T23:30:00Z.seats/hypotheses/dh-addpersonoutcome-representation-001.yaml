@@ -1,0 +1,25 @@
+id: dh:addpersonoutcome-representation:001
+observation_refs:
+- so:sha256:a91ae9c8738321116885abb03de9ca32068efa0db4441a1a3d90b6c987db72ea
+- so:sha256:fb3d28b83f221031761b02097f789d8ef480393b2a3905e1ca2c79a93d57168d
+cq_warrants: []
+proposed_referent:
+  label: AddPersonOutcome result encoding
+  description: 'Candidate real/domain referents: none established for this wrapper. Successful Person
+    data and AddPersonProblem data are alternatives in a result representation. Each result value belongs
+    to an operation response; no distinct domain outcome identity is given.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A report of a membership addition attempt
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

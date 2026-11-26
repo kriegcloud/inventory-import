@@ -1,0 +1,40 @@
+id: dh:role-assignment:001
+observation_refs:
+- po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8
+- po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5
+- po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9
+- po:sha256:a189eb95f95d457aa06a751fa0eeeb541f07eecb66ad261d9ac709c5bd4b03ca
+- po:sha256:773104c28ed467a30f132e112bcb7ae328f88cde089c66e73c56e487d48b30f8
+- po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45
+- po:sha256:11d1b53834c38359f84295b255a9249cef0d3f03d3a302aab2b61de3b75c1871
+- po:sha256:5c45964a11cc82365db545213f1efa9e3c4ba4a5204bc0d1676d50f935806267
+- po:sha256:218d99fcdef200927a39668d5aef017716150daa8a3ee3767ad8c0d5a784e374
+cq_warrants:
+- CQ-P06
+- CQ-P11
+proposed_referent:
+  label: Scoped assignment of a role to a member
+  description: 'Candidate referent: one role assigned to one member at one extent by an authorized member.
+    The grouped chains connect recipient, access level and scope; current member.role is interpreted as
+    one assignment at organization scope. An instance in the thin thread is individuated by the member
+    and the role field, not an invented stored grant id. This present projection cannot distinguish successive
+    assignment episodes; historical assignment identity is unresolved.'
+representation_status: domain_referent
+alternatives:
+- label: A derived node manufactured solely to express member.role and a constant scope
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The scope-sensitive access decision supplies a referent beyond the derived node syntax. The
+    member-and-field construction is only the supplied thin-thread individuation convention, not evidence
+    of separate grant occurrences or a stored lifecycle.
+  discriminator: The prose describes an authorized assignment that jointly determines which member holds
+    which role at which extent, and explicitly distinguishes organization-wide from narrower access for
+    the action-offering decision. That contextual access assignment is the intended relationship even
+    though no grant row exists.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

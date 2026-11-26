@@ -1,0 +1,36 @@
+id: ic:audit-entry:001
+hypothesis_ref: dh:audit-entry:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: candidate sameness is continuity of a particular created audit record,
+    independently of sameness of the described change, wording or actor. Tenant plus entry id is the supplied
+    record handle (po:a2954515f056), but copies, amendments, deletion/recreation and id reuse are not
+    governed.'
+  reidentification_key:
+  - Activity.organizationId
+  - Activity.id
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: unresolved
+  unity: unity
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+  - Immutable record-version information object; event interpretation is excluded by po:160303617dee.
+  existential_dependencies:
+  - Requires informational realization; no specific physical carrier is established as essential. Tenant
+    placement is the recorded context. The asserted actual change and actor are objects of claims, not
+    existential prerequisites for a claim-bearing record being present or intelligible (po:160303617dee).
+    The same-batch writing statement is supplied prose, not executed transactional proof.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states:
+  - Deletion may remove a stored realization; logical record persistence under archive/copy is unspecified.
+counterexamples:
+- description: A record falsely naming a member remains an audit entry; two entries may describe the same
+    change. Conversely, replacing action and actor under the same tenant/id leaves the technical key unchanged
+    while potentially replacing the record claim.
+status: proposed

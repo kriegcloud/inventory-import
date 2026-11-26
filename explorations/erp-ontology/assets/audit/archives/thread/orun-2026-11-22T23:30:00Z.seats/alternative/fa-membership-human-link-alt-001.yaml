@@ -1,0 +1,23 @@
+{
+  "id": "fa:membership-human-link-alt:001",
+  "hypothesis_ref": "dh:membership-human-link:001",
+  "identity_card_ref": "ic:membership-human-link-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "merged",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "World mediation (Membership → Person), rigid for the relator",
+      "still_viable": true
+    },
+    {
+      "label": "Recorded resolution assertion (Member record → Person record), revisable",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "A data-quality merge rewrites the link while the world relation is unchanged; the same predicate cannot be both rigid (mediation) and revisable (resolution).",
+  "verdict": "analyzed"
+}

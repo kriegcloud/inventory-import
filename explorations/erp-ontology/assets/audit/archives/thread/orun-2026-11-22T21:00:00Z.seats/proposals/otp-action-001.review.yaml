@@ -1,0 +1,42 @@
+target: "otp:action:001"
+target_sha256: "ad0578b61db5e0793d377fd69eecfb6f92e88ca10d11ec52791a8b7a80c778e7"
+chain_sha256: "27d1250b5eefe5c724d7945d67e6ddd42cc0ce6802e8de369f35cb7026dc22b7"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "The identity criterion individuates a description token by entry version, but the term is a data property with range xsd:string. Either reify the token or adopt string identity and drop the token criterion."
+  - "Drop 'Parent Activity.id plus action field' as a reidentification key until a version policy exists. Two entries worded 'Imported items' are one string and two tokens under the current text."
+  - "Replace the null discriminator. so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9 already is a string field described as words a person reads."
+attacks:
+  - surface: identity
+    rule: "identity-conflict"
+    counterexample: "Entry A and entry B are both worded 'Imported items', the example in so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9. The criterion says equal wording is not token identity. The data property's range is xsd:string, whose identity is the wording. The proposal therefore identifies the two descriptions and separates them."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "reidentification_key is 'Parent Activity.id plus action field and entry version', and the version policy is absent. Edit the wording on the same Activity.id without a new version: the key identifies the old wording with the new one. Reissue Activity.id for a second serialization of the same token: the key separates one token into two."
+    outcome: landed
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "Tried: CQ-P10 merely mentions action. The question asks what was done, and the sample answer's action field is 'Imported items'. That conjunct is unanswerable without the wording the property carries."
+    outcome: survived
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: the action field on Activity in so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9, annotated 'What was done, in a few words a person reads', plus po:sha256:4f84af70495b7304f5a3e7b576f8ad387255992240c31f7818b983dd431aa438. The discriminator says those texts describe words a person reads. They do, and they remain true if action is only a string column."
+    outcome: landed
+rival_models_still_viable:
+  - "Repeatable linguistic or propositional content shared across entries."
+  - "Information-bearing component of an entry without a separate token individual."
+  - "The action occurrence described (domain_referent)."
+evidence:
+  - "CQ-P10"
+  - "po:sha256:4f84af70495b7304f5a3e7b576f8ad387255992240c31f7818b983dd431aa438"
+  - "so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9"

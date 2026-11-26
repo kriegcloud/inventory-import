@@ -1,0 +1,25 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:source-addpersonoutcome-unrepresented-alt:001"
+hypothesis_ref: "dh:source-addpersonoutcome-unrepresented:001"
+identity:
+  supplies_identity: unresolved
+  identity_criterion: "unresolved: the adapter marked this construct unrepresentable, so no parser-derived facts exist for it. The excerpt text alone is not admitted as a source fact."
+  reidentification_key: []
+ontoclean:
+  rigidity: unresolved
+  carries_identity: unresolved
+  supplies_identity: unresolved
+  unity: unresolved
+  dependence: unresolved
+ufo_analysis:
+  candidate_category: unresolved
+  alternatives:
+    - "same ruling as the represented observation of the same symbol (dh:source-addpersonoutcome:001), which this seat analyzed independently"
+  existential_dependencies: []
+temporality:
+  exists_during_interval: unresolved
+  may_change_state_without_losing_identity: unresolved
+  terminal_states: []
+counterexamples:
+  - description: "If this observation covers a different declaration form (const vs type alias) of the same symbol, it may add nothing beyond the represented sibling; if it is the only observation of the symbol's full declaration (e.g. a class with brand/annotations the adapter could not parse), it may carry facts the sibling lacks."
+status: proposed

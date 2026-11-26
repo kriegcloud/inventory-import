@@ -1,0 +1,33 @@
+id: dh:grant:001
+observation_refs:
+- po:sha256:bdf8ad74d87fbd47c5a9d0bf4597dc23d4336fd11c2345134a302ee78440965a
+- po:sha256:92c9f8e574302fba49371237bfe913c0c42fa79a782cda78796abe665859fdcd
+- po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0
+- po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Scoped assignment of access
+  description: An assignment of one access role to one member at one scope, made by
+    an authorized member. An instance is provisionally a particular assignment episode
+    with recipient, role, scope and assigning act; two identical tuples need not be
+    the same episode.
+representation_status: domain_referent
+alternatives:
+- label: Grant configuration record
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotation characterizes an assignment made by a member allowed
+    to make it, giving another member a role over a specified extent. Authorized assignment
+    and participant-scoped access provide the intended referent beyond a configuration
+    tuple.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

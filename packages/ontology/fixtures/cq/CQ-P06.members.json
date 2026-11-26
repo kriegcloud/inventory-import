@@ -1,0 +1,16 @@
+[
+  {
+    "id": "test_RaviWorks",
+    "name": "Ravi Example",
+    "role": "admin",
+    "organizationId": "test_ExampleWorks",
+    "organizationName": "Example Works (test)"
+  },
+  {
+    "id": "test_RaviSecond",
+    "name": "Ravi Example",
+    "role": "viewer",
+    "organizationId": "test_SecondOrg",
+    "organizationName": "Second Org (test)"
+  }
+]

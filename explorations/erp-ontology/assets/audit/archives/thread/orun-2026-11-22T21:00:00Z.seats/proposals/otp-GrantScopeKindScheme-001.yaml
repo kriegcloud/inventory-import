@@ -1,0 +1,75 @@
+id: otp:GrantScopeKindScheme:001
+hypothesis_ref: dh:scope-vocabulary:001
+identity_card_ref: ic:scope-vocabulary:001
+foundational_status: analyzed
+term:
+  preferred_label: Grant scope kind
+  local_name: GrantScopeKindScheme
+  proposed_iri: https://example.org/inventory-import/ontology/GrantScopeKindScheme
+  owl_entity_kind: skos_concept_scheme
+  in_scheme: ''
+definition:
+  text: A controlled vocabulary distinguishing kinds of extent covered by access assignments, including
+    organization-wide, location and field extents. The thin-thread proposal lists only GrantScopeKindScheme-organization
+    (the whole organization) as a skos_concept. The scheme is open to later proposals; no location or
+    field concept is proposed in this pass.
+  source:
+  - CQ-P06
+  - po:sha256:f733eea136043dd89463b8cef706ce5faf868ed1cc118d8cd7a15b48ed800b96
+  - po:sha256:c51a9399a8f75a10b00a15e2924b6969e19da32381459f6e3c57912e18ab6049
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: information_object
+  gufo_alignment: ''
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: unresolved
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotation
+  explicitly describes a controlled vocabulary of the extents an access grant covers, distinguishing organization,
+  location and field applicability. That stated classification content is about access extents, rather
+  than merely a declaration shape; no implemented vocabulary is proven.'
+open_issues:
+- 'Needed evidence (fa:scope-vocabulary:001): Specify content/edition identity and version rules; provide
+  target-selection evidence before using this vocabulary to infer which site or field a grant covers.'
+- 'Identity criterion from ic:scope-vocabulary:001: Provisional: one vocabulary-version content distinguishing
+  organization-wide, location and field extent kinds; copies can realize the same distinctions. A location
+  instance is not an entry. Unresolved: semantic-equivalence and edition identity rules are absent.'
+- 'Design qualification: organization, location and field appear in the meaning, but only GrantScopeKindScheme-organization
+  is listed for this thin thread. Target-selection evidence is absent. The card’s vocabulary-version identity
+  is unresolved despite section 2.3’s lack of a criterion.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Issued scope-vocabulary edition with
+  provenance-sensitive identity. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Specify content/edition identity and version rules;
+  provide target-selection evidence before using this vocabulary to infer which site or field a grant
+  covers.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Implementation enumeration only, absent
+  independently maintained vocabulary instances. Choose the proposed shape or this rival explicitly; the
+  current proposal does not decide between them. Evidence required: Specify content/edition identity and
+  version rules; provide target-selection evidence before using this vocabulary to infer which site or
+  field a grant covers.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Implementation scope enumeration only
+  (implementation_artifact_only). This alternative is not accepted, rejected or silently merged with the
+  proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

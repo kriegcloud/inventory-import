@@ -1,0 +1,92 @@
+id: otp:Organization:001
+hypothesis_ref: dh:organization-body:001
+identity_card_ref: ic:organization-body:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Organization
+  local_name: Organization
+  proposed_iri: https://example.org/inventory-import/ontology/Organization
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: An organized body of people or other organizations formed for a purpose, including a counterparty or
+    the body for which the application keeps a workspace.
+  source:
+  - po:sha256:020743f3cadf0467e6f94f024b74d06b24fc542c5381f072586777707b229f1a
+  - po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f
+  - po:sha256:a9f7e334db4f34fc0728f5c7109c7a1280d0cc01ba2037a45aeb86b7224f197c
+  - po:sha256:79e6720f1b1d259c433ff6c9e8afcbe2329c7cf79b4aa5670ede11ad83ae418c
+foundational:
+  ufo_category: unresolved
+  gufo_alignment: ''
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: unresolved
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Organization
+    compatibility: The candidate is an organized body formed for a purpose, fitting gist:Organization; legal
+      continuity and kind status remain unresolved, so this is a candidate broad alignment, not an asserted
+      parent or exact reuse.
+operational_warrant:
+  competency_questions: []
+  semantic_support_for:
+  - otp:Member:001
+  - otp:inTenant:001
+alternatives_rejected:
+- 'Foundational analysis rejects: Workspace partition or imported SourceRecord as the body itself.'
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The organizational bearer has a supplied identity criterion independent of a software workspace. No source
+  Organization declaration is required or invented.'
+open_issues:
+- 'FLAGGED FOR STEWARD — foundational_status explicitly_deferred; this proposal does not settle the foundational
+  question. Needed evidence: A steward-approved continuity rule with merger, dissolution, reorganization and
+  unregistered-body examples must distinguish continuation from successor formation and say whether member/purpose
+  replacement preserves identity. Also identify the essential institutional dependencies. Kind is a candidate,
+  not a settled identity-supplying sortal.'
+- 'Steward identity commitment, as reported by the hypothesis and identity card: continuity of the organized
+  legal body; a successor is a different body even when it retains the workspace; an unregistered body is distinguished
+  by founding. Names, records and OrganizationId never supply body identity. Reorganization, merger, dissolution
+  and replacement of founders or purpose remain unresolved. Kind is a candidate only: the unsettled card does
+  not license an identity-supplying kind commitment.'
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Organizational collective with membership-based unity; Institutional organized body with
+  legally constituted continuity and varying members. This synthesis makes no selection by omission. The selected
+  model may require a revised proposal or a separate future candidate; no such additional term is admitted
+  in this 18-key scope.'
+- 'Strongest counterexample carried forward: An unregistered body replaces every founder and changes its purpose,
+  or a company reorganizes without a legally new entity. Founding and the phrase same legal entity alone do
+  not decide all such cases; retaining the workspace never establishes identity.'
+- 'Identity-card alternatives carried forward: collective; Institutional body interpretation remains viable;
+  member aggregation alone is not established.'
+- 'Existential dependencies carried forward: Formation for a purpose and organization of people or other bodies
+  are constitutive features (po:a9f7e334db4f). No particular workspace or tenant relation is necessary. Whether
+  any particular constituent, purpose, registration or institutional recognition is essential is unresolved;
+  founding is an origin condition, not dependence on a currently existing founder.'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:organization-body:001: “The identity decision explicitly makes a successor company
+  a new organization despite retention of the same workspace, and identifies unregistered bodies by their founding.
+  Workspace or record continuity therefore cannot constitute the intended organization identity.” The claim
+  must fail for a pure data-transfer twin: a successor is a different body despite the same workspace; pure
+  workspace-key continuity cannot satisfy that lifecycle.'
+- 'Parent withheld: gist:Organization is a plausible organized-body parent, but no settled identity supplier
+  in this branch is established. Do not assert the candidate kind while either provider is unresolved.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=unresolved; ontoclean.supplies_identity=unresolved;
+  ontoclean.carries_identity=true. Closed proposal identity value=unresolved. No unresolved provider is promoted
+  to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): A tenant workspace or imported organization
+  record; representation_status=information_artifact; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

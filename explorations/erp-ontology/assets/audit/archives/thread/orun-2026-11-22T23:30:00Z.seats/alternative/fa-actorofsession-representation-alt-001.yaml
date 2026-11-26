@@ -1,0 +1,19 @@
+{
+  "id": "fa:actorofsession-representation-alt:001",
+  "hypothesis_ref": "dh:actorofsession-representation:001",
+  "identity_card_ref": "ic:actorofsession-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "separated",
+    "world_vs_information": "not_applicable",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Function / derived projection (my ruling)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "None: a pure selector over the session union.",
+  "verdict": "analyzed"
+}

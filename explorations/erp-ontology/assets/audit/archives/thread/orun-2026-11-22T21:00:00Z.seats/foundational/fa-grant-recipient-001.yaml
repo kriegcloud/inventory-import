@@ -1,0 +1,18 @@
+id: fa:grant-recipient:001
+hypothesis_ref: dh:grant-recipient:001
+identity_card_ref: ic:grant-recipient:001
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+- label: Grant-holder role borne by the member/human, anti-rigid while access is held.
+  still_viable: true
+- label: Recipient participation in an assigning event, if grant denotes an act.
+  still_viable: true
+strongest_counterexample: One human has two tenant memberships and receives a grant in only one. Modeling
+  the recipient as the human without membership context transfers access to the other tenant.
+verdict: explicitly_deferred
+needed_evidence: Resolve grant act-versus-continuing-assignment identity and whether recipient replacement
+  is correction or a new grant; preserve recipient membership context.

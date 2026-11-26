@@ -1,0 +1,47 @@
+target: "otp:MemberRoleScheme:001"
+target_sha256: "3db999defbb1a4ae1db59c49fd9c2fab81fbce6542f034854ddb93de4e8db2c1"
+chain_sha256: "423fb43fd369c65cc0642d4d860b7c8b56b5f078a80c80be6e15d8e1b0e90326"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. The term is a property or a concept scheme with no proposed is-a edge, so there is no subsumption to compare for rigidity, identity, dependence, or unity."
+revision_requests:
+  - "Either give the scheme a supplied identity criterion that decides paraphrase and republication, or state that it supplies none. The card is unresolved while section 2.3, as recorded on the proposal, says the scheme has no criterion of its own."
+  - "This is not a decision term for CQ-P06. Put Role in semantic_support_for, or drop the CQ citation. The question asks which role each member holds, not which concept scheme contains the labels."
+  - "Replace the null discriminator. The Role enum so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563 plus po:sha256:f37962927f2b535604cb61961ace9335b1c86887f87b34c62bfde0dd0d1866e9 is the implementation twin, and the discriminator already says separate maintenance is not established."
+attacks:
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Scheme S1 ranks viewer, editor, admin by the words 'reads', 'writes', 'manages people'. Scheme S2 uses the paraphrases 'may read records', 'may write records', 'may add, change, and remove people' in the same order. 'One vocabulary-version content' can identify them as the same meanings or separate them as different formulations. The criterion says equivalent reformulations are not governed, so S1 and S2 are one scheme and two."
+    outcome: landed
+  - surface: identity
+    rule: "identity-conflict"
+    counterexample: "The proposal records that section 2.3 gives the scheme no identity criterion of its own, while the card individuates vocabulary-version content. A republished copy of the same three concepts is the same scheme under the design note and a different edition under provenance-sensitive identity. The two statements identify and separate that copy."
+    outcome: landed
+  - surface: warrant
+    rule: "listing-cq-warrant"
+    counterexample: "CQ-P06 asks who the members are and which role each holds. required_schemes names MemberRoleScheme because the sketch uses it. The sample answer's role values are the labels admin and viewer. The listing is answered by those labels without a concept-scheme individual."
+    outcome: landed
+  - surface: warrant
+    rule: "support-term-unnamed"
+    counterexample: "If the scheme exists only to fix the meaning of Role, it is a semantic-support term and semantic_support_for is empty. It does not name Role, and it does not name any other decision term. A support chain that names nothing warrants nothing."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563, the viewer/editor/admin enum, whose description ranks read, write, and managing people, together with the sentence po:sha256:f37962927f2b535604cb61961ace9335b1c86887f87b34c62bfde0dd0d1866e9. The discriminator says the prose proposes organized access meanings beyond literals, and then admits separate maintenance is not established. The enum makes the cited fact true."
+    outcome: landed
+rival_models_still_viable:
+  - "Issued vocabulary edition whose provenance individuates otherwise equal content."
+  - "Implementation enumeration only."
+  - "Implementation enumeration without an independently maintained vocabulary (implementation_artifact_only)."
+evidence:
+  - "CQ-P06"
+  - "po:sha256:f37962927f2b535604cb61961ace9335b1c86887f87b34c62bfde0dd0d1866e9"
+  - "po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8"
+  - "so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563"

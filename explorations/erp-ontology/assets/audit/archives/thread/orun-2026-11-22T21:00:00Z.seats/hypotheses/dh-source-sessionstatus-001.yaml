@@ -1,0 +1,26 @@
+id: dh:source-sessionstatus:001
+observation_refs:
+- so:sha256:319a2addc69c457189cf4429d9f89e762ac3a8f93f09bb0b6e8adf14123a1cde
+- so:sha256:82246491958754434a36c4f49b48cdd1b3a31e1fcc07271d5ad7bb4978c44e37
+cq_warrants: []
+proposed_referent:
+  label: session status representation
+  description: One literal status code or its compile-time alias. Individuate encoded
+    values by response context, not enduring kinds of people.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Contextual authentication state
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

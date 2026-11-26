@@ -1,0 +1,29 @@
+id: dh:membership-holder:001
+observation_refs:
+- po:sha256:2329ec6004e6daa0305cf3584aab6c5ff614a7fddad119180e3b958827e5fb5c
+- po:sha256:e2f038bb00ccc4ebab80ef1dc9d445758de2d5f5d53e4f6865ce6e18f4db735c
+cq_warrants:
+- CQ-P06
+proposed_referent:
+  label: Human holding a membership
+  description: The holding relationship from a membership episode to its human participant.
+    An instance is that membership and human pair during that episode; it does not
+    identify a login account.
+representation_status: domain_referent
+alternatives:
+- label: Foreign-key representation of the holder
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The holder is expressly the human independently of any account, and
+    the membership enables that human to act in the tenant. Thus the proposed relationship
+    connects an access episode and its human participant, not just identifiers.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

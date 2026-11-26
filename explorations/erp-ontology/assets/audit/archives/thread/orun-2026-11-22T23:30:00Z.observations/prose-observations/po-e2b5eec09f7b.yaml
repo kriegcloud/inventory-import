@@ -1,0 +1,6 @@
+id: "po:sha256:e2b5eec09f7b75d471242308ed66f9815f1217127ff0c27b2c6af0238da41321"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "CLAUDE.md"}
+source_span: {start_line: 604, end_line: 605}
+quote: "People are told apart by id (`actor.id`), never by name. A name is not unique and its owner can change it, so a rule such as \"nobody approves their own count\" compares ids."
+epistemic_status: quoted_prose

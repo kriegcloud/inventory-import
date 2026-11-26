@@ -1,0 +1,6 @@
+id: "po:sha256:cf88db38b0c877168ea7fc86a91d7ee12704ce01e2b9fe3321b841240c924551"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 207, end_line: 207}
+quote: "A grant scope kind in which the grant covers every record of one organization."
+epistemic_status: quoted_prose

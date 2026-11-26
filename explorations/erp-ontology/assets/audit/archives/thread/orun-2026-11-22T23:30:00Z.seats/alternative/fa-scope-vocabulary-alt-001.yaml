@@ -1,0 +1,28 @@
+{
+  "id": "fa:scope-vocabulary-alt:001",
+  "hypothesis_ref": "dh:scope-vocabulary:001",
+  "identity_card_ref": "ic:scope-vocabulary-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "ConceptScheme information object (semantic-support term)",
+      "still_viable": true
+    },
+    {
+      "label": "Collective of concepts",
+      "still_viable": true
+    },
+    {
+      "label": "Scaffolding only (null)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Adding the 'location' concept: same scheme (information object) or a new one (collective)?",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "Scheme identity ruling and a decision on whether adding a concept revises or replaces the scheme."
+}

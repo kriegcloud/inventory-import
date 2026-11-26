@@ -1,0 +1,32 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:audit-attribution-alt:001"
+hypothesis_ref: "dh:audit-attribution:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "Individuated by its bearing audit entry. The attributed content is n-ary: principal member (actorId), optional delegate agent (agent), and the principal's display name as it was at writing time (actorName)."
+  reidentification_key:
+    - "Activity.actorId (MemberId)"
+    - "Activity.agent (optional DisplayName)"
+    - "Activity.actorName (snapshot, explicitly not an id)"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U)"
+  dependence: intrinsic
+ufo_analysis:
+  candidate_category: information_object
+  alternatives:
+    - "relator in the world: an agency/delegation relationship between principal member, delegate agent and the change event"
+    - "no class: object property recordedActor on the audit record"
+  existential_dependencies:
+    - "the audit record"
+    - "the recorded change it is about (as subject matter, not existentially)"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "When an agent acted for the member, 'the member who made the change' is ambiguous between performer and responsible principal; a binary record-to-member attribution loses the delegation the prose explicitly mentions ('the agent that acted for them if any')."
+  - description: "actorId is a MemberId (membership-scoped); after the membership is removed, the attribution points at a membership that no longer exists while the human persists."
+status: proposed

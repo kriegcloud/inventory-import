@@ -1,0 +1,19 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:human-person-alt:001"
+hypothesis_ref: "dh:human-person:001"
+identity_card_ref: "ic:human-person-alt:001"
+tests:
+  spec_vs_execution: not_applicable
+  world_vs_information: separated
+  role_vs_bearer: separated
+  context_reification_needed: true
+rival_models:
+  - label: "Human as a rigid kind; member/contact as roles of the human relative to a tenant (this seat)"
+    still_viable: true
+  - label: "Tenant-relative 'person dealt with' as the class (role_mixin)"
+    still_viable: true
+  - label: "Per-tenant person record only (information object), no cross-tenant human"
+    still_viable: true
+strongest_counterexample: "One human is a member of tenant A and a supplier contact known to tenant B. Under a kind model that is one Person; under per-tenant records it is two. Nothing observed shows which the system maintains."
+verdict: analyzed
+needed_evidence: "Whether any identifier or merge rule links the same human across tenants or across membership episodes; how a member with no account is created and re-identified."

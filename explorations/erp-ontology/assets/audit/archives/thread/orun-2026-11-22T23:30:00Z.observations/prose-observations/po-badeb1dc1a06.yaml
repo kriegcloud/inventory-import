@@ -1,0 +1,6 @@
+id: "po:sha256:badeb1dc1a0680ab75832b2858d545aed1b7e203be21606c8b64935bfbac9227"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 193, end_line: 195}
+quote: "A scheme has no kind tag, no gist parent and no identity criterion of its own. Its key ends in `Scheme` (decision 10). The rank of the roles is the rule of `hasRole` in `packages/kernel/src/Role.schema.ts`; it is not written as `skos:broader`."
+epistemic_status: quoted_prose

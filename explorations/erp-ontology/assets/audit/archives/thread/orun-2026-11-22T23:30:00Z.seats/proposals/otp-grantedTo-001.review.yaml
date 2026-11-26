@@ -1,0 +1,39 @@
+target: "otp:grantedTo:001"
+target_sha256: "470ac878821989d3ba56b11b8ef02fe1b9373d5823ac9a9caffdd9e45b88e885"
+chain_sha256: "9ac677a3fa0c6ace58beb8ea8fd07ff2b128ee78e662d2285a2bbdcc7b7e3cb7"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed for this object property, so superclass rigidity, identity, unity, and dependence checks have no edge to apply to."
+revision_requests:
+  - "Do not warrant grantedTo solely as semantic support for otp:Grant:001 while Grant is not a decision term. CQ-P11 is answered by naming the member who holds the role at a scope; it does not require a reified grant to be the subject of grantedTo."
+  - "The shared role-assignment discriminator is true of member.role with no grant row (po:4ddf67948771, po:5c45964a11cc). Replace it with a fact that a member row's role field lacks, or drop the claim that the null is rejected."
+attacks:
+  - surface: warrant
+    rule: supports-non-decision-term
+    counterexample: "grantedTo's only warrant is semantic_support_for otp:Grant:001. CQ-P11 asks which member holds which role at which scope. Member M with role admin at the constant extent organization answers that without a Grant individual (po:c4054ec5a4fd, po:4ddf67948771). Support for a class the question does not require is not support for a decision term. po:5c45964a11cc (\"links a grant to the member who holds it\") presupposes the grant node; it does not show the natural-language question needs that node. There is no self-reference and no CQ id in semantic_support_for; the failure is the target."
+    outcome: landed
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "The joined hypothesis discriminator is the authorized member-role-extent assignment with no grant row. M.role already is that assignment under po:559ba5ec7c7d and po:4ddf67948771. The recipient is M. A derived <M>/role node plus an edge back to M adds no fact the member row lacked. The discriminator stays true of the implementation-only twin."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "Viewer, then admin, then viewer on M share <M>/role. The proposal says no property individual is minted and that this address does not decide one assignment versus three. It does not assert the key as identity. The defect is the warrant and the discriminator, not a hidden property identity."
+    outcome: survived
+rival_models_still_viable:
+  - "Continuing authorization relator whose level may change"
+  - "Distinct grant episodes each created by an assignment act"
+  - "Current contextual role assertion without separately persisting grant individual"
+evidence:
+  - "CQ-P11"
+  - "po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5"
+  - "po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9"
+  - "po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8"
+  - "po:sha256:5c45964a11cc82365db545213f1efa9e3c4ba4a5204bc0d1676d50f935806267"

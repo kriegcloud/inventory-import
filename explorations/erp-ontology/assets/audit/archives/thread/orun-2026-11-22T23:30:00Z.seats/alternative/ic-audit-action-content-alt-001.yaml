@@ -1,0 +1,37 @@
+{
+  "id": "ic:audit-action-content-alt:001",
+  "hypothesis_ref": "dh:audit-action-content:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No identity of its own: a value inhering in one entry.",
+    "reidentification_key": []
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "intrinsic"
+  },
+  "ufo_analysis": {
+    "candidate_category": "quality",
+    "alternatives": [
+      "information content entity with its own individuals (wording occurrences) — the reading I reject as unnecessary reification",
+      "event type/action category (requires a controlled action vocabulary, not observed)"
+    ],
+    "existential_dependencies": [
+      "AuditEntry (bearer)"
+    ]
+  },
+  "temporality": {
+    "exists_during_interval": true,
+    "may_change_state_without_losing_identity": false,
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Two entries both saying 'Imported items': nothing in any observation refers to, reuses, translates or counts the wording as a thing apart from its entry. Individuating 'wording occurrences' adds individuals no CQ can tell apart from the entry's action value."
+    }
+  ],
+  "status": "proposed"
+}

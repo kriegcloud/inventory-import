@@ -1,0 +1,25 @@
+id: dh:sessionstate-representation:001
+observation_refs:
+- so:sha256:6a4f5d6bfd4e6d87bfaa06929285933faaafdbe9ff7d5f3e70a116145ecb70b0
+- so:sha256:b33d40e617809c66528845544fc58859c82fef5ba9f94f9a5a243ff3f17f7e0c
+cq_warrants: []
+proposed_referent:
+  label: SessionState tagged representation
+  description: 'Candidate real/domain referents: none established for the tagged union itself. It groups
+    alternative session snapshots and sign-in offers. An instance is a state value in a session response;
+    no durable session identity or account-to-person identification is supplied.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A snapshot describing authentication and workspace context
+  representation_status: information_artifact
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

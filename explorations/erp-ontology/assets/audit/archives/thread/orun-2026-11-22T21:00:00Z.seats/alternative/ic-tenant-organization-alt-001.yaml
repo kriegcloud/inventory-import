@@ -1,0 +1,32 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:tenant-organization-alt:001"
+hypothesis_ref: "dh:tenant-organization:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "Inherits identity from Organization; the tenant role holds while the application keeps a workspace for it. Unresolved for Benjamin: can one organization hold several workspaces (then tenant is per workspace, not per organization)?"
+  reidentification_key:
+    - "OrganizationId"
+ontoclean:
+  rigidity: anti_rigid
+  carries_identity: true
+  supplies_identity: false
+  unity: "unity (+U) inherited from the organization"
+  dependence: relational
+ufo_analysis:
+  candidate_category: role
+  alternatives:
+    - "the workspace itself (an artifact/information object) as the tenant"
+    - "a subscription/service relator between operator and organization, with tenant as the organization's role in it"
+  existential_dependencies:
+    - "the organization"
+    - "the workspace kept by the application (unhypothesized referent)"
+    - "the application/operator keeping it"
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states:
+    - "workspace closed (organization continues to exist)"
+counterexamples:
+  - description: "If one organization has two workspaces, 'the tenant' as role of the organization cannot tell them apart; the record-isolation boundary is the workspace."
+  - description: "The definition defines a tenant through 'records scoped to it and hidden from every other organization', which is a policy (normative isolation), not a fact; isolation is not verified."
+status: proposed

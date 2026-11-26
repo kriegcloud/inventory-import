@@ -1,0 +1,16 @@
+# Must-fail case M5, a mutant of CQ-P06 and never the question: it reaches the grant through the person, not the
+# member, so it forgets the tenant and reports a role held in one organization as held in the other.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+
+SELECT ?tenant ?person ?member ?role
+WHERE {
+  ?member a inv:Member ;
+          inv:membershipIn ?tenant ;
+          inv:membershipOf ?person .
+  ?other inv:membershipOf ?person .
+  ?grant a inv:Grant ;
+         inv:grantedTo ?other ;
+         inv:grantScope inv:GrantScopeKindScheme-organization ;
+         inv:grantsRole ?role .
+}
+ORDER BY ?tenant ?member

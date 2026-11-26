@@ -1,0 +1,23 @@
+{
+  "id": "fa:ready-representation-alt:001",
+  "hypothesis_ref": "dh:ready-representation:001",
+  "identity_card_ref": "ic:ready-representation-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Session-union branch (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Session phase",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "The 'acts as' relation (session → Member) is the only potentially domain-relevant content, and only for actor attribution.",
+  "verdict": "analyzed"
+}

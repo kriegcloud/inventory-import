@@ -1,0 +1,42 @@
+target: "otp:Tenant:001"
+target_sha256: "f2ee3f4979b96263f019512509dec676c252f8a108a233eb82a089f597baf26b"
+chain_sha256: "2333526fc8d60775b7665500f1392671266a53635c3f39a96524a0bb4e0c584e"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed, so the anti-rigid role is not placed under a rigid or anti-rigid parent in this proposal. po:2c332e9298fc says Tenant was chosen under Organization, but that edge is withheld, and a withheld edge is not reviewed as if it had been asserted. gist:Organization is a non-asserted mapping. The bearer-identity defect is charged on the identity surface."
+revision_requests:
+  - "Do not set identity carries while the organizational bearer supplies no settled criterion. po:715824f4fc19 decides a successor company and founding, not a reorganization that keeps the legal shell. Either assert no Tenant identity value until Organization supplies one and the parent edge is actually proposed, or stop claiming the bearer criterion is carried."
+  - "The null discriminator can stand: an unchanged OrganizationId does not pass the Tenant role to a successor. Do not weaken it into a warrant for carries."
+attacks:
+  - surface: identity
+    rule: carries-unsupplied-identity
+    counterexample: "Acme reorganizes, keeps OrganizationId W and the workspace, and is not described as a successor company. po:715824f4fc19 says a successor company is a new body even when it keeps the workspace, and an unregistered body is told apart by founding. It does not say whether this Acme is the same legal body. po:7b635e2155ff says Tenant inherits Organization's identity and is told apart in the repository by OrganizationId. The proposal sets identity carries, not unresolved, so sameness of the Tenant is supposed to be the body's sameness. There is no settled body criterion to carry, and parents does not even include Organization. W would identify the pre- and post-reorganization hosts; the card correctly refuses that key, and refusing the key does not install a bearer criterion. A role with relational dependence on the workspace-hosting relation is declared (po:e93ff65f63c8); that part is not the defect."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "A successor company keeps OrganizationId W. po:715824f4fc19 says the Tenant role passes to the new body. The proposal does not use W as the identity criterion. The technical key is evidence of the partition, which is the attack that survives. The landed defect is carries without a supplier, not a hidden key-as-identity claim."
+    outcome: survived
+  - surface: warrant
+    rule: support-not-necessary
+    counterexample: "Tenant is semantic support for Member and inTenant. CQ-P06's members are members of one workspace, and CQ-P09's record constraint is which workspace holds the record. membershipIn and inTenant need a holder class. Organization does not answer them inside these proposals, because those properties' object is Tenant, and CQ-P09's required classes name Tenant rather than the organized-body kind. One holder class is necessary. The warrant survives. It does not make the carried identity true."
+    outcome: survived
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "Successor NewAcme keeps partition key W. If Tenant denoted W alone, the role would not pass, contradicting po:715824f4fc19. The key-only twin makes the fact false. A two-column record that updates a bearer foreign key while leaving W fixed is a stored bearer change, which is the domain role, not the named null (the partition key alone). The discriminator rejects that null. The attack does not land."
+    outcome: survived
+rival_models_still_viable:
+  - "Workspace partition as a separately identifiable information/system object"
+evidence:
+  - "po:sha256:715824f4fc19e675ee0cbeefdfed3c5784d1f3684285fd3b693899e63cfdb12f"
+  - "po:sha256:7b635e2155ffb47af78fa15060c100ae1b805f024646ccf60c805e91a1103b8f"
+  - "po:sha256:e93ff65f63c8e0b6104d61b4f751695b64819a77bc122f66d8701c03ffbaa02d"
+  - "po:sha256:2c332e9298fcc6c7c51b57fa34c20af8a9e6d8906f610b7584ce170c17dd3733"
+  - "CQ-P06"
+  - "CQ-P09"

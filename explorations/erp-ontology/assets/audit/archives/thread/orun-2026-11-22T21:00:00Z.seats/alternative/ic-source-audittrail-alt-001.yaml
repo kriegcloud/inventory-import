@@ -1,0 +1,26 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "ic:source-audittrail-alt:001"
+hypothesis_ref: "dh:source-audittrail:001"
+identity:
+  supplies_identity: false
+  identity_criterion: "No domain identity: the construct is a source declaration (schema, type alias, helper or response shape). Its own identity is its declaration at a source span and commit; value occurrences are individuated by their response/request context."
+  reidentification_key:
+    - "source symbol + span at commit 7f7c2b3f"
+ontoclean:
+  rigidity: rigid
+  carries_identity: false
+  supplies_identity: false
+  unity: "non_unity (-U): delimits no domain whole"
+  dependence: none
+ufo_analysis:
+  candidate_category: none
+  alternatives:
+    - "the collection of a tenant's audit records (a collective/information object), of which the response is a bounded, ordered view"
+  existential_dependencies: []
+temporality:
+  exists_during_interval: false
+  may_change_state_without_losing_identity: false
+  terminal_states: []
+counterexamples:
+  - description: "A tenant with more entries than the maximum length: the response omits the oldest; the trail and the response diverge."
+status: proposed

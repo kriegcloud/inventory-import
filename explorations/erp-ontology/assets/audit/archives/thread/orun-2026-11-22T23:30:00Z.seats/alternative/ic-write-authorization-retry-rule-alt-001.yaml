@@ -1,0 +1,37 @@
+{
+  "id": "ic:write-authorization-retry-rule-alt:001",
+  "hypothesis_ref": "dh:write-authorization-retry-rule:001",
+  "identity": {
+    "supplies_identity": false,
+    "identity_criterion": "No individuals required; if reified, a specification is identified by its version, not by request keys.",
+    "reidentification_key": [
+      "requestId / operation-target keys (idempotency keys of attempts, not of the rule)"
+    ]
+  },
+  "ontoclean": {
+    "rigidity": "unresolved",
+    "carries_identity": false,
+    "supplies_identity": false,
+    "unity": "non_unity",
+    "dependence": "none"
+  },
+  "ufo_analysis": {
+    "candidate_category": "none",
+    "alternatives": [
+      "information_object: an access-and-idempotency policy specification (spec side)",
+      "event: guarded write attempts (execution side)"
+    ],
+    "existential_dependencies": []
+  },
+  "temporality": {
+    "exists_during_interval": "unresolved",
+    "may_change_state_without_losing_identity": "unresolved",
+    "terminal_states": []
+  },
+  "counterexamples": [
+    {
+      "description": "Spec/execution: the quote mixes a repeatable rule (requireRole, SameOrigin) with per-attempt keys (newRequestId per press). A request key individuates an attempt-group, never the rule; any model that reifies 'the protocol' must split these."
+    }
+  ],
+  "status": "proposed"
+}

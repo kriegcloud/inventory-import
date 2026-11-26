@@ -1,0 +1,40 @@
+target: "otp:grantScope:001"
+target_sha256: "9b7ae07da92d481071d330b2afdae34c1e7030fa72d7f31c1c3f39aebbceb53f"
+chain_sha256: "b0da9fd1d9d59786a59008b1f1e7eafafd1a812e4211da21ca119996182e3e0f"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed for this object property, so superclass rigidity, identity, unity, and dependence checks have no edge to apply to."
+revision_requests:
+  - "Do not warrant grantScope only as support for otp:Grant:001. CQ-P11 asks for the extent, and the proposal mints neither a scope individual nor GrantScopeKindScheme, so the property has no admitted object that could answer the question."
+  - "Replace the shared discriminator. member.role read as one organization-scoped grant (po:c4054ec5a4fd, po:19ca3041dabc) already states the extent without this property."
+attacks:
+  - surface: warrant
+    rule: supports-non-decision-term
+    counterexample: "The only warrant is semantic_support_for otp:Grant:001. CQ-P11's sample answer is scope GrantScopeKindScheme-organization. po:19ca3041dabc says that one concept ships, but this proposal's own terms mint no scope individual and no scheme, and it declares no OWL range. Member M with role admin, read as organization scope by po:c4054ec5a4fd, answers \"at which scope\" with no Grant and no grantScope edge. Support for an unrequired class, pointing at an unadmitted object, does not make grantScope necessary for a decision term. po:218d99fcdef2 only glosses the edge the SPARQL already assumed."
+    outcome: landed
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "No grant row exists (po:4ddf67948771). Today's member.role is defined to be one grant at organization scope (po:c4054ec5a4fd), and po:19ca3041dabc ships that one extent. A member row plus the constant organization makes the discriminator's \"which member, which role, which extent\" true. grantScope is not a fact that constant lacks."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "Scope is a constant on the lifted member-role node, not a separately identified individual. The proposal says the joined card mints no property individual and leaves assignment identity unresolved. The technical address <member IRI>/role is not asserted as this property's identity."
+    outcome: survived
+rival_models_still_viable:
+  - "Continuing authorization relator whose level may change"
+  - "Distinct grant episodes each created by an assignment act"
+  - "Current contextual role assertion without separately persisting grant individual"
+evidence:
+  - "CQ-P11"
+  - "po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5"
+  - "po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9"
+  - "po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45"
+  - "po:sha256:218d99fcdef200927a39668d5aef017716150daa8a3ee3767ad8c0d5a784e374"
+  - "po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8"

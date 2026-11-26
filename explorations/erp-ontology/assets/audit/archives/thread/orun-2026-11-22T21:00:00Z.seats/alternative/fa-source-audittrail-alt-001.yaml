@@ -1,0 +1,17 @@
+# Alternative-model seat (blinded): independent ruling from observations + hypotheses only.
+id: "fa:source-audittrail-alt:001"
+hypothesis_ref: "dh:source-audittrail:001"
+identity_card_ref: "ic:source-audittrail-alt:001"
+tests:
+  spec_vs_execution: separated
+  world_vs_information: separated
+  role_vs_bearer: not_applicable
+  context_reification_needed: true
+rival_models:
+  - label: "Implementation artifact only; null stands (this seat, independent)"
+    still_viable: true
+  - label: "Audit trail as the complete collection of a tenant's audit records, with the response as a bounded snapshot view"
+    still_viable: true
+strongest_counterexample: "The response has a maximum length; reading 'not in the response' as 'never happened' is negative inference without declared closure."
+verdict: analyzed
+needed_evidence: "A completeness contract (pagination/closure) for the audit-trail read before absence from it is decision-bearing."

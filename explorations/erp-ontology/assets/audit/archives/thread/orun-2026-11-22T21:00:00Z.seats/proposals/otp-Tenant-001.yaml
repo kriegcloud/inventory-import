@@ -1,0 +1,75 @@
+id: otp:Tenant:001
+hypothesis_ref: dh:tenant-organization:001
+identity_card_ref: ic:tenant-organization:001
+foundational_status: analyzed
+term:
+  preferred_label: Tenant
+  local_name: Tenant
+  proposed_iri: https://example.org/inventory-import/ontology/Tenant
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: An organization in the role of being served by an application workspace whose records are intended
+    to be scoped to that organization and hidden from other organizations.
+  source:
+  - CQ-P06
+  - CQ-P09
+  - po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: role
+  gufo_alignment: gufo:Role
+ontoclean:
+  rigidity: anti_rigid
+  identity: carries
+  dependence: relational
+parents:
+- parent: inv:Organization
+  justification: Provisional is-a placement supported by the supplied gist projection and thin-thread
+    section 2; unresolved identity and category choices remain explicit below.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  - CQ-P09
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The quotation
+  identifies the tenant as an organization for which a workspace is kept and whose records are hidden
+  from other organizations. Its asserted bearer is the served organization, not merely the partition implementation;
+  actual isolation is unverified.'
+open_issues:
+- 'Needed evidence (fa:tenant-organization:001): Resolve organization identity and organization-to-workspace
+  cardinality before using workspace identifiers to reidentify tenant bearers.'
+- 'Identity criterion from ic:tenant-organization:001: Inherited from the served organization, not supplied
+  by tenancy. Two tenants-as-organizations are the same bearer iff they are the same organization under
+  its eventual identity criterion; separate workspace-service episodes do not create organizations. The
+  organization identity criterion remains unresolved in ic:organization:001.'
+- OrganizationId is a technical reidentification pointer, not bearer identity. Workspace closure ends
+  the tenant role, not necessarily the organization; workspace multiplicity remains open.
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Workspace-service relator mediating
+  organization and application; distinct from its tenant bearer. Choose the proposed shape or this rival
+  explicitly; the current proposal does not decide between them. Evidence required: Resolve organization
+  identity and organization-to-workspace cardinality before using workspace identifiers to reidentify
+  tenant bearers.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Information record of tenancy, distinct
+  from served organization. Choose the proposed shape or this rival explicitly; the current proposal does
+  not decide between them. Evidence required: Resolve organization identity and organization-to-workspace
+  cardinality before using workspace identifiers to reidentify tenant bearers.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Workspace or data partition (implementation_artifact_only).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

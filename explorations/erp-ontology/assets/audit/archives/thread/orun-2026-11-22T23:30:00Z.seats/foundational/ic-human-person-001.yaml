@@ -1,0 +1,33 @@
+id: ic:human-person:001
+hypothesis_ref: dh:human-person:001
+identity:
+  supplies_identity: true
+  identity_criterion: Same human individual throughout the life and post-death continuity explicitly stipulated
+    in po:409cfb4d8ae1; duplicate or merged representations do not multiply or fuse humans. This is the
+    supplied domain identity commitment, not an account-resolution algorithm or a general claim about
+    biological death.
+  reidentification_key: []
+ontoclean:
+  rigidity: rigid
+  carries_identity: true
+  supplies_identity: true
+  unity: unity
+  dependence: none
+ufo_analysis:
+  candidate_category: kind
+  alternatives:
+  - Tenant-contact role is separate from the human bearer; no automatic equivalence to the People-page
+    Person type.
+  existential_dependencies:
+  - No particular tenant, account, membership, name or email is necessary to the human continuing to be
+    that individual (po:409cfb4d8ae1 and po:79e6720f1b1d). Being dealt with by a tenant selects relevant
+    humans; it does not define a new kind.
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: true
+  terminal_states: []
+counterexamples:
+- description: One human has two Member records, later one is removed and both account details change.
+    Neither operation creates another human; death also does not end Person identity under the supplied
+    decision. A living-organism-only interpretation would conflict with this post-death stipulation.
+status: proposed

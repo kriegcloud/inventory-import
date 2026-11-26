@@ -1,0 +1,46 @@
+target: "otp:Role:001"
+target_sha256: "b97db48b3df40925d03e4fc2b06bb2c51445ea50409408b7ab5bff8d623855a3"
+chain_sha256: "051f5f5339db439a1d31f75226ab6a8362591837a7f80971cd8e992c7e5033ef"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: no_surface
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons:
+  taxonomy: "parents is empty. No is-a edge is proposed. skos:Concept is recorded as an alignment vocabulary and explicitly not an asserted parent, so no superclass rigidity, identity, unity, or dependence is compared. Role supplies identity itself, so the missing-ancestor rule is not the defect."
+revision_requests:
+  - "Drop semantic_support_for otp:Member:001 and otp:Grant:001, or name a decision question that a role notation does not answer. CQ-P06 and CQ-P11 ask which role is held, and both put \"what a role permits\" out of scope. The permission sentences are not why those questions need a class."
+  - "Do not set supplies_identity true on scheme-plus-notation while a changed entitlement under the same notation is an open rival. Either close versioning, or stop claiming the criterion supplies identity."
+  - "Replace the discriminator. so:9f27182cb6fa is already the literal union viewer, editor, admin with those permission sentences in the schema description. A code-only transfer that strips the descriptions is a weaker twin than the implementation that exists."
+attacks:
+  - surface: warrant
+    rule: support-not-necessary
+    counterexample: "Role is offered only as semantic support for Member and Grant. CQ-P06 asks which role each member holds; a member.role literal admin answers it. CQ-P11 asks at which scope that role is held; the role value is still a notation. Both questions list \"What a role permits\" as out of scope, so the normative differences in po:53dc6c25de9b, po:415373127028, and po:471a16ce6f74 are not what the decision terms need. po:17438ea944b4 calls Role a named level such as viewer, editor, or admin, which a literal already is. Neither support target becomes unanswerable without the class. Not a self-reference and not a CQ id used as a support target."
+    outcome: landed
+  - surface: identity
+    rule: identity-criterion-collapses-versions
+    counterexample: "po:cf426b237ec8 and po:318a83669135 individuate one Role by scheme and notation. po:471a16ce6f74's admin may add, change, and remove people. A later admin in the same scheme, same notation, whose text no longer includes removal, is a different entitlement specification and the same scheme-and-notation individual. The version-specific rival is still viable, but supplies_identity is true. The criterion wrongly identifies those two. It correctly does not identify two humans who hold admin, and it correctly separates the same notation in two schemes; those cases are not the failure. MemberRoleScheme is the reidentification key, and this proposal admits no scheme individual, so the criterion's scheme relatum is not available to do the separating work either."
+    outcome: landed
+  - surface: identity
+    rule: identifier-is-identity
+    counterexample: "The criterion is scheme and notation, not a member id and not the spelling of a display label. Copying a representation and assigning the concept to another human are correctly refused as identity-makers. The technical member key is not the criterion. The landed defect is the version collapse, not key-as-identity."
+    outcome: survived
+  - surface: null_discriminator
+    rule: discriminator-true-of-dto
+    counterexample: "so:9f27182cb6fa is LiteralKit viewer, editor, admin, described as a viewer reads, an editor also writes, an admin also manages people. po:53dc6c25de9b, po:415373127028, and po:471a16ce6f74 state the same three entitlements. The discriminator says these are not three opaque spellings. They are not opaque in the implementation: the union carries the sentences. A transfer of the bare tokens without the sentences would make the fact false, but that is not the artifact the observations record. The real literal union keeps the discriminator true."
+    outcome: landed
+rival_models_still_viable:
+  - "Version-specific entitlement specification with finer identity than scheme and notation if future content-version policy requires it"
+evidence:
+  - "CQ-P06"
+  - "CQ-P11"
+  - "po:sha256:17438ea944b4c4d7360830228707f119a5ed9bdd1620fdaaff4443e1dce4d3b9"
+  - "po:sha256:53dc6c25de9b99130d5c7b2b8dae181251cb671d41edcc57d4a250ac3eb405d0"
+  - "po:sha256:4153731270284017dd2f93816b22863dd78e69e1cc7b10fd3e13c940002dba8a"
+  - "po:sha256:471a16ce6f740e347c1f3f38e5480a050530104d4e167e047ef69c00c1899d7e"
+  - "po:sha256:cf426b237ec8182ac1c1c7893b2e21fcdbe11f6c682e625af8517f5042bc694c"
+  - "po:sha256:318a836691358a33ece5bb9c397a38aadfcbe103cd494d570dced6654bd594d2"
+  - "so:sha256:9f27182cb6fa04b772602a4c652c17a0c00aac9798a67870470f4c01853e8b4b"

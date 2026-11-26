@@ -1,0 +1,53 @@
+target: "otp:AuditEntry:001"
+target_sha256: "3e2a2b9daeb8cb393daf6f961d182f3b43c87af5dd7a2a42951a265af6e5c125"
+chain_sha256: "b54951940562dd681a7f3796eec2587bdecc2c3c1c181bc5a2b88e0dd38f56f5"
+seat: ontoclean-adversary
+verdict: FAIL
+needed_evidence: ""
+surfaces:
+  taxonomy: attacked
+  identity: attacked
+  warrant: attacked
+  null_discriminator: attacked
+no_surface_reasons: {}
+revision_requests:
+  - "Drop gist:Content until token identity, repeatable content, and the writing event are not all still viable. A writing occurrence is not Content, and two tokens of one wording are not one Content individual."
+  - "Remove Activity.id from reidentification_key or demote it to evidence. Two copies of one assertion with two Activity.id values are two records only under a copy policy the card says is missing."
+  - "CQ-P10 asks who did each recorded act. The act is a change occurrence the proposal says is not the entry, and that occurrence remains a viable rival. Warrant AuditEntry with a CQ about the record, or semantic_support_for the change term, not as if the entry were the act."
+  - "The discriminator's facts are po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671 and the Activity class so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9, which is the DTO. Replace the discriminator."
+attacks:
+  - surface: taxonomy
+    rule: "no-valid-subsumption"
+    counterexample: "One import emits two stored copies of the assertion 'Imported items', same actor and wording. Content identity makes them one gist:Content individual. The token reading makes them two AuditEntry individuals, so they are not both individuals of one Content individual. The writing-event rival is still viable, and the writing occurrence is not an individual of gist:Content at all."
+    outcome: landed
+  - surface: taxonomy
+    rule: "sortal-without-identity-supplier"
+    counterexample: "AuditEntry carries identity and supplies none. gist:Content is not shown supplying a criterion. The two copies above have no ancestor that says whether they are one individual or two."
+    outcome: landed
+  - surface: identity
+    rule: "identifier-is-identity"
+    counterexample: "reidentification_key lists Activity.id and organizationId. Copy the same assertion into a second row: two Activity.id values. The key separates them into two records. Rewrite one row in place after a correction: one Activity.id identifies the false assertion with the corrected one. The card says the key is technical only and the copy policy is missing, but the key is still the only reidentification procedure published."
+    outcome: landed
+  - surface: identity
+    rule: "identity-criterion-underspecified"
+    counterexample: "Two content-identical audit lines describe one import. Token identity separates them. Repeatable-content identity identifies them. The criterion states both and says the copy policy is absent, so the lines are one AuditEntry and two."
+    outcome: landed
+  - surface: warrant
+    rule: "cq-mismatch"
+    counterexample: "CQ-P10 asks who did each recorded act, what was done, and when, and its decision is whether a change can be attributed to the member who made it. The proposal defines AuditEntry as a record distinct from the change and allows a false attribution. The change occurrence remains a viable rival and is not this class. The listing of acts is answerable about the occurrence; required_classes mentions AuditEntry, but the CQ does not require the record to be the act."
+    outcome: landed
+  - surface: null_discriminator
+    rule: "discriminator-true-of-dto"
+    counterexample: "Pure-DTO twin: so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9, the Activity class, with fields action, actorId, actorName, and createdAt, plus the design sentence po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671. The discriminator says this prose names who made the change and what was done. That is true of the class comment and the field list. Batch co-writing is explicitly not execution-tested."
+    outcome: landed
+rival_models_still_viable:
+  - "Provenance-sensitive information record token."
+  - "Repeatable propositional content shared by several record tokens."
+  - "Writing event, separated from its record output."
+  - "The change occurrence recorded (domain_referent)."
+evidence:
+  - "CQ-P09"
+  - "CQ-P10"
+  - "po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671"
+  - "po:sha256:b638b95df94a10990df79b6cb627319a6cae7b29d4362ab928fe404fb5f708a6"
+  - "so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9"

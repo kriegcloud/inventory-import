@@ -1,0 +1,26 @@
+id: dh:source-signupoffer:001
+observation_refs:
+- so:sha256:307f5b8f0c9c84eb53136163354673d3cf1b6d1974cf665b5736fb97db5c879a
+- so:sha256:4d9187ffd59135a4f8c6849c0549d46cafeb5c22f28f445d55ee9f09cd72947e
+cq_warrants: []
+proposed_referent:
+  label: sign-up offer setting representation
+  description: One coded offer setting among open, invited and closed, or its compile-time
+    alias. A setting value is not evidence of actual admission policy enforcement.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Account-admission policy specification
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

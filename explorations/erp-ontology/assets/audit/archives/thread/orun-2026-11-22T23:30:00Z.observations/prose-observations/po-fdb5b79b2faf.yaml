@@ -1,0 +1,6 @@
+id: "po:sha256:fdb5b79b2fafe375c4e785c1c568682819f47cb24bcc548c43c74e27061fba78"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "CLAUDE.md"}
+source_span: {start_line: 595, end_line: 597}
+quote: "Every table that holds customer data has `organizationId`, every query filters on it, its indexes start with it, and a child row references its parent by `(organizationId, id)`; `Tenancy.slow.test.ts` reads the schema and checks every table that has `organizationId`."
+epistemic_status: quoted_prose

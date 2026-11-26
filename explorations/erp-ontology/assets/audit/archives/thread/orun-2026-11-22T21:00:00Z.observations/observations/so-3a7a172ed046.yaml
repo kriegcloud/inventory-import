@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:3a7a172ed0466ab2780a70eb63d5d8b77c275dc7d182b16a40a6cd335ab3fc27",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 142,
+    "end_line": 149,
+    "content_sha256": "e4f856acc569190308dfbdf6a63114bc7ed954d9e18d239e81cc5d653ac5f733"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "OrganizationChoice",
+    "lexical_name": "OrganizationChoice",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class OrganizationChoice extends S.Opaque<OrganizationChoice, { readonly brand: unique symbol }>()(\n  S.Struct({\n    id: OrganizationId,\n    name: DisplayName.pipe(\n      S.annotateKey({ description: \"The organization's name, for the switch\", examples: [\"Example Works (test)\"] })\n    )\n  }).pipe($I.annoteSchema(\"OrganizationChoice\", { description: \"One of the person's organizations.\" }))\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

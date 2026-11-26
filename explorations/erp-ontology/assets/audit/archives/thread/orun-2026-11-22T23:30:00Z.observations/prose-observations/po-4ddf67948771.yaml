@@ -1,0 +1,6 @@
+id: "po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 140, end_line: 144}
+quote: "**`Grant`'s one criterion.** Report 06 gave `Grant` two (an id of its own, and a derivation from the role field). No grant row and no grant id exist: decision 40 reads `member.role` as one grant, and decision 10 names a lifted node by its parent's IRI and the field path. So the thread states the second only. The node's IRI is the criterion written down: `<member IRI>/role` (section 4). When a grant becomes a stored row with an id of its own, the criterion changes to that id; that is a change after which an answer that held no longer holds, so decision 24 records it as breaking."
+epistemic_status: quoted_prose

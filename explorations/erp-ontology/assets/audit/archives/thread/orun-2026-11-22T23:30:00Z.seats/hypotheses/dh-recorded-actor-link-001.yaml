@@ -1,0 +1,30 @@
+id: dh:recorded-actor-link:001
+observation_refs:
+- po:sha256:c8e8fdebd997dbac3d3e155859f2f36e0a483bd39803752034c82e0dc7ad5bfe
+- po:sha256:160303617dee28888265ac6196a833e3ddc685768ebe26cff852dca23f151053
+- po:sha256:65f2858be391b40afd0cec16b80fc2b84d1222994b01c4dbf2464faacb14149b
+cq_warrants:
+- CQ-P10
+proposed_referent:
+  label: Member named by an audit entry
+  description: 'Candidate referent: a recorded attribution, relating an audit entry to the member it names.
+    Each attribution instance is individuated by entry plus member reference, not by the actual maker
+    of a change. These chains express what the record claims and explicitly leave the occurrence and real
+    actor unproved.'
+representation_status: information_artifact
+alternatives:
+- label: An actual agent-to-change participation relation
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The attribution has informational content distinct from the truth of actual agency. This
+    is the member-reference content of an entry, not a new executed action or guaranteed true causal relation.
+  discriminator: The audit decision explicitly states that the entry cannot prove who made the change
+    and rewords the question to ask which member it names. A recorded attribution can therefore be understood
+    and read without establishing the corresponding actual action participation.
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

@@ -1,0 +1,6 @@
+id: "po:sha256:0fd580baa7d431365366c196ceb8853393febe1bf7ceefe577234f11771d4c62"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/DECISIONS.md"}
+source_span: {start_line: 402, end_line: 404}
+quote: "A question the carried-through reports raised: with no `Person` term, the thread's fixture was two `Member` records and nothing said they were one human. I chose to bring `Person` into the thread, under `gist:Person`, with one link from `Member` to the person and no name or email paths (decision 93 stands). The agent recommended the same."
+epistemic_status: quoted_prose

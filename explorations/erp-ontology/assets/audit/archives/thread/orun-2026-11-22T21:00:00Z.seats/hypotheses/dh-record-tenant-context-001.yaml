@@ -1,0 +1,30 @@
+id: dh:record-tenant-context:001
+observation_refs:
+- po:sha256:0e1b03b92039ee2935b64bc6bf4b3a46c92e3efe023588f795e7df375ce69321
+- po:sha256:71c42ca07087ad9878d00bb4dc73483ebff0b122a49a737c60c142b43f37b001
+cq_warrants:
+- CQ-P09
+proposed_referent:
+  label: Workspace-scoping assignment of a record
+  description: The contextual association of a record with the tenant whose workspace
+    holds it. An instance is the record and its holding workspace tenant at a given
+    context; the organization described by a record can differ.
+representation_status: domain_referent
+alternatives:
+- label: Tenant column or partition pointer
+  representation_status: implementation_artifact_only
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: true
+  rationale: The quoted meaning supplies a candidate with participants or communicative
+    content beyond the source declaration. This supports intended denotation only;
+    it does not verify any live instance or implemented guarantee.
+  discriminator: The quotations distinguish the workspace tenant holding a record
+    from ownership of the body described, and specify records scoped and hidden across
+    organizations. The proposed context concerns whose workspace data is being handled,
+    beyond a syntactic reference; actual isolation is unverified.
+epistemic_status: proposed
+confidence:
+  value: 0.75
+  use_for_acceptance: false

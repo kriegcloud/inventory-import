@@ -1,0 +1,27 @@
+id: dh:source-accountemail:001
+observation_refs:
+- so:sha256:382c3166a9d777ddc098f0a8a5b6c82443c9676637f1a411f5bff7d7e921d80a
+- so:sha256:5a929ddf3ccaf9725041771ca00d54a1a4c0181819974eedd5e05aa18f90b772
+cq_warrants: []
+proposed_referent:
+  label: account-email validation representation
+  description: One validation schema or its derived static type; a validated string
+    occurrence is distinct from a mailbox, account or human, whose identity is not
+    established.
+representation_status: implementation_artifact_only
+alternatives:
+- label: Account login identifier
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observation establishes a representation or helper and its described
+    use. This is compatible with a pure implementation artifact; no observed instance,
+    account-independent participant criterion, or independently specified domain relationship
+    establishes a distinct referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.85
+  use_for_acceptance: false

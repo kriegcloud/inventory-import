@@ -1,0 +1,28 @@
+id: dh:source-audittrail-unrepresented:001
+observation_refs:
+- so:sha256:b1091af312e4b3a598d4d5e027749d3d4dc470483f6b82ee9cfae261a41c7a95
+- so:sha256:b9961ca022875a53924dc661cd759e8a048e2f90838e0fc1a731275507fe363f
+cq_warrants: []
+proposed_referent:
+  label: audit-trail response collection
+  description: One bounded array response described as newest-first. An instance is
+    a response snapshot; the maximum length does not establish a complete historical
+    audit collection.
+representation_status: unresolved
+alternatives:
+- label: Collection of audit records
+  representation_status: unresolved
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: 'The adapter marks the construct unrepresentable. No semantic conclusion
+    follows from that syntactic failure; the excerpt suggests an interpretation but
+    cannot establish a domain candidate under this limited observation. Needed evidence:
+    a representable observation and an explicit account of the construct''s referent
+    and instance identity.'
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.5
+  use_for_acceptance: false

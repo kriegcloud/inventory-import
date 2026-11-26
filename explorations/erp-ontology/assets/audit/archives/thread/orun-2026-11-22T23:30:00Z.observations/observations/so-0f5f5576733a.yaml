@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:0f5f5576733a239aa7779cc985f9623a8a776310dcd4c7b78bb1c8aa557b8aaf",
+  "schema_version": 1,
+  "repository": {
+    "commit": "a645f59a479c9f0cc3aea284bb775b2d2a434d19",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 104,
+    "end_line": 104,
+    "content_sha256": "d45055eaa779c35060f1fa48ccc8e1e286fdef8f7ca6b0648fcf2d0de72cf709"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SignUpOffer",
+    "lexical_name": "SignUpOffer",
+    "syntactic_kind": "type_alias"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "TypeQuery"
+    }
+  ],
+  "source_excerpt": "export type SignUpOffer = typeof SignUpOffer.Type\n",
+  "epistemic_status": "parser_derived"
+}

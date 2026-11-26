@@ -1,0 +1,93 @@
+id: otp:AuditEntry:001
+hypothesis_ref: dh:audit-record:001
+identity_card_ref: ic:audit-record:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Audit entry
+  local_name: AuditEntry
+  proposed_iri: https://example.org/inventory-import/ontology/AuditEntry
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: An information record asserting a change to tenant data and describing who made it and what was
+    done, with an optional agent attribution; same-batch writing is an intended requirement rather than
+    verified execution. The record is distinct from its writing event and the change it describes.
+  source:
+  - CQ-P09
+  - CQ-P10
+  - po:sha256:0b58130ca5df2221a6f0ccb85bc5ff80d50e066ad54843c9b1df993da0173671
+  - so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9
+  - po:sha256:b638b95df94a10990df79b6cb627319a6cae7b29d4362ab928fe404fb5f708a6
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: information_object
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: unresolved
+  dependence: unresolved
+parents:
+- parent: gist:Content
+  justification: Provisional is-a placement supported by the supplied gist projection and thin-thread
+    section 2; unresolved identity and category choices remain explicit below.
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Content
+    compatibility: Broader parent candidate from the supplied gist 14.1.0 projection; the local definition
+      narrows its meaning. This is not an exact-reuse or equivalence claim.
+operational_warrant:
+  competency_questions:
+  - CQ-P09
+  - CQ-P10
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The prose
+  identifies a record written in the same batch as a tenant-data change and naming who made it and what
+  was done; the source excerpt describes a human-readable audit line. This is explicitly an attribution-bearing
+  record about a separate change, rather than merely a model declaration. Batch behavior is specified,
+  not execution-tested.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:audit-record:001): Choose record token versus content identity; provide correction,
+  copying and reserialization rules and separate the writing event from the artifact it produces. Batch
+  co-writing is stated, not tested.'
+- 'Identity criterion from ic:audit-record:001: Unresolved: a record is not a record-writing occurrence,
+  contrary to the hypothesis sentence calling an instance an occurrence. Proposed record-token identity
+  follows one provenance-bearing audit assertion, with serializations as realizations; two separately
+  authored assertions can describe one change. Content-identical copies may or may not be the same record
+  under the missing copy/provenance policy.'
+- 'Design disagreement: tenant plus Activity.id is a technical record key, not a settled copy/version
+  identity criterion. Activity is the design’s alternative label. The hypothesis occurrence clause is
+  separated from the information artifact here.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Provenance-sensitive information record
+  token. Choose the proposed shape or this rival explicitly; the current proposal does not decide between
+  them. Evidence required: Choose record token versus content identity; provide correction, copying and
+  reserialization rules and separate the writing event from the artifact it produces. Batch co-writing
+  is stated, not tested.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Repeatable propositional content shared
+  by several record tokens. Choose the proposed shape or this rival explicitly; the current proposal does
+  not decide between them. Evidence required: Choose record token versus content identity; provide correction,
+  copying and reserialization rules and separate the writing event from the artifact it produces. Batch
+  co-writing is stated, not tested.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Writing event: viable only for the
+  hypothesis occurrence clause, and must be separated from its record output. Choose the proposed shape
+  or this rival explicitly; the current proposal does not decide between them. Evidence required: Choose
+  record token versus content identity; provide correction, copying and reserialization rules and separate
+  the writing event from the artifact it produces. Batch co-writing is stated, not tested.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: The change occurrence recorded (domain_referent).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

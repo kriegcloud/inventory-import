@@ -1,0 +1,6 @@
+id: "po:sha256:de408e7eb4c4400b6371a6c0953e638fee6eac266149fcc5e73488616fa0ea1e"
+schema_version: 1
+repository: {commit: "a645f59a479c9f0cc3aea284bb775b2d2a434d19", path: "explorations/erp-ontology/research/14-thin-thread.md"}
+source_span: {start_line: 190, end_line: 190}
+quote: "A controlled vocabulary of the access levels a member holds in an organization, ranked by what each may do."
+epistemic_status: quoted_prose

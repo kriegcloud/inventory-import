@@ -1,0 +1,24 @@
+{
+  "id": "fa:audit-writing-time-alt:001",
+  "hypothesis_ref": "dh:audit-writing-time:001",
+  "identity_card_ref": "ic:audit-writing-time-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "merged",
+    "role_vs_bearer": "not_applicable",
+    "context_reification_needed": false
+  },
+  "rival_models": [
+    {
+      "label": "Temporal quality/data property of the entry (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Pointer to an actual instant individual",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "Observationally equivalent on current evidence: no observation shows how createdAt is produced or whether recordedAt maps to it.",
+  "verdict": "explicitly_deferred",
+  "needed_evidence": "The createdAt generation contract (DB default at commit vs application clock) and the mapping from recordedAt to the Activity field."
+}

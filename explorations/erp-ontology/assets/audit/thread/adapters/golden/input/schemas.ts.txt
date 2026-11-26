@@ -1,0 +1,17 @@
+// Parser fixture only: these imports are parsed, never evaluated.
+// fixture.json pins a fixed fake commit, independent of the real repository HEAD.
+import * as S from "effect/Schema";
+import * as Model from "effect/schema/Model";
+import { MemberId, DisplayName } from "./types";
+
+export class ExampleRow extends Model.Class<ExampleRow>("ExampleRow")({
+  id: MemberId,
+  name: DisplayName.pipe(S.annotateKey({ description: "Visible name" })),
+}) {}
+
+export const ExampleStatus = S.Literals(["ready", "signed-out"]);
+
+export class ExampleView extends S.Class<ExampleView>("ExampleView")({
+  memberId: MemberId,
+  name: DisplayName,
+}) {}

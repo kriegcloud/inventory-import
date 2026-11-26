@@ -1,0 +1,74 @@
+id: otp:action:001
+hypothesis_ref: dh:audit-action-description:001
+identity_card_ref: ic:audit-action-description:001
+foundational_status: analyzed
+term:
+  preferred_label: action
+  local_name: action
+  proposed_iri: https://example.org/inventory-import/ontology/action
+  owl_entity_kind: data_property
+  in_scheme: ''
+definition:
+  text: 'A data property relating an audit entry to the short human-readable wording describing its asserted
+    change. Proposed domain: AuditEntry; proposed range: xsd:string. Equal wording does not identify a
+    change occurrence.'
+  source:
+  - CQ-P10
+  - po:sha256:4f84af70495b7304f5a3e7b576f8ad387255992240c31f7818b983dd431aa438
+  - so:sha256:7cb3432045189b6713a9cc8eb9ca1f9dca366a96634f7d51c4ac7083a8dd98b9
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: information_object
+  gufo_alignment: ''
+ontoclean:
+  rigidity: rigid
+  identity: carries
+  dependence: intrinsic
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P10
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: Both
+  supplied texts describe words a person reads about what was done, and the excerpt gives an import description
+  as an example. The candidate is explicitly human-directed descriptive content about a change, separate
+  from the action itself.'
+open_issues:
+- 'Needed evidence (fa:audit-action-description:001): Clarify token versus content identity and whether
+  an edited description creates a new entry version. It describes a claimed past action, not an executable
+  plan or proof of its performance.'
+- 'Identity criterion from ic:audit-action-description:001: Provisional: the description token/aspect
+  carried by one audit-entry version, individuated by parent-entry identity, descriptive function and
+  version provenance. Equal wording in two entries is not token identity or event identity. Repeatable
+  semantic content has a different equivalence criterion.'
+- 'Design qualification: the property projects description content to a string rather than reifying an
+  entry-specific description token. Token/content distinctions are preserved as steward choices below.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Repeatable linguistic/propositional
+  content shared across entries. Choose the proposed shape or this rival explicitly; the current proposal
+  does not decide between them. Evidence required: Clarify token versus content identity and whether an
+  edited description creates a new entry version. It describes a claimed past action, not an executable
+  plan or proof of its performance.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Information-bearing component of an
+  entry without a separate token individual. Choose the proposed shape or this rival explicitly; the current
+  proposal does not decide between them. Evidence required: Clarify token versus content identity and
+  whether an edited description creates a new entry version. It describes a claimed past action, not an
+  executable plan or proof of its performance.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: The action occurrence described (domain_referent).
+  This alternative is not accepted, rejected or silently merged with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

@@ -1,0 +1,37 @@
+id: ic:role-assignment:001
+hypothesis_ref: dh:role-assignment:001
+identity:
+  supplies_identity: unresolved
+  identity_criterion: 'Unresolved: candidate sameness is one continuing scoped authorization assignment
+    to one membership, grounded in an authorized establishment. The stipulated member-plus-role-field
+    convention identifies the lifted current projection only; it cannot decide whether viewer to admin
+    to viewer is one changed assignment or three episodes.'
+  reidentification_key:
+  - <member IRI>/role
+  - Member identity plus field path role
+ontoclean:
+  rigidity: rigid
+  carries_identity: unresolved
+  supplies_identity: unresolved
+  unity: unity
+  dependence: relational
+ufo_analysis:
+  candidate_category: relator
+  alternatives:
+  - situation
+  - Unreified contextual member-role-scope relation
+  existential_dependencies:
+  - Active assignment jointly depends on recipient membership, access-level concept and applicable tenant/scope
+    context (po:559ba5ec7c7d, po:c4054ec5a4fd). Authorized assigner is an establishment condition; no
+    evidence requires its continued existence. No grant row, grant id or historical lifecycle is established
+    (po:4ddf67948771).
+temporality:
+  exists_during_interval: true
+  may_change_state_without_losing_identity: unresolved
+  terminal_states:
+  - Revocation or membership removal may end the assignment; lifecycle not supplied.
+counterexamples:
+- description: At successive times member.role is viewer, admin, viewer; the same lifted IRI names every
+    snapshot. That invariant node address cannot establish one continuing grant, and duplicate assignments
+    with identical endpoints could still be distinct episodes.
+status: proposed

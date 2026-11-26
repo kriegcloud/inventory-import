@@ -1,0 +1,27 @@
+{
+  "id": "fa:record-tenant-scoping-alt:001",
+  "hypothesis_ref": "dh:record-tenant-scoping:001",
+  "identity_card_ref": "ic:record-tenant-scoping-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Object property record→workspace (my ruling)",
+      "still_viable": true
+    },
+    {
+      "label": "Object property record→Tenant (as stated)",
+      "still_viable": true
+    },
+    {
+      "label": "Column only (null)",
+      "still_viable": false
+    }
+  ],
+  "strongest_counterexample": "Succession leaves containment unchanged but changes the Tenant bearer.",
+  "verdict": "analyzed"
+}

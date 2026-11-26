@@ -1,0 +1,98 @@
+id: otp:Grant:001
+hypothesis_ref: dh:role-assignment:001
+identity_card_ref: ic:role-assignment:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Grant
+  local_name: Grant
+  proposed_iri: https://example.org/inventory-import/ontology/Grant
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: A scoped authorization assignment of one access-level concept to one membership, established by a member
+    authorized to assign it; the thin-thread projection represents the current assignment read from that membership’s
+    role field.
+  source:
+  - po:sha256:559ba5ec7c7d084a74dffa3c71144e51d02266f46ceff7871000a19cadd987e8
+  - po:sha256:c4054ec5a4fd067b9fae125101bd832d2f2ffec2feed3658a0e70d393683a0a5
+  - po:sha256:4ddf67948771d14d953697011e76a75da51732cf8d7e101a260289111ce67ae9
+  - po:sha256:a189eb95f95d457aa06a751fa0eeeb541f07eecb66ad261d9ac709c5bd4b03ca
+  - po:sha256:773104c28ed467a30f132e112bcb7ae328f88cde089c66e73c56e487d48b30f8
+  - po:sha256:19ca3041dabc43e97bfb8091f72f2de1cb1bd255f32b7f9445df8331f46ddd45
+  - po:sha256:11d1b53834c38359f84295b255a9249cef0d3f03d3a302aab2b61de3b75c1871
+  - po:sha256:5c45964a11cc82365db545213f1efa9e3c4ba4a5204bc0d1676d50f935806267
+  - po:sha256:218d99fcdef200927a39668d5aef017716150daa8a3ee3767ad8c0d5a784e374
+  - CQ-P11
+foundational:
+  ufo_category: relator
+  gufo_alignment: gufo:Relator
+ontoclean:
+  rigidity: rigid
+  identity: unresolved
+  dependence: relational
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings:
+  - iri: https://w3id.org/semanticarts/ns/ontology/gist/Assignment
+    compatibility: The scoped assignment model is a relation made by assigning an access level, compatible
+      in shape with gist:Assignment. Unresolved assignment individuation prevents asserting this parent now.
+operational_warrant:
+  competency_questions:
+  - CQ-P11
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-only null rejected on the supplied discriminator, not merely on the existence of a field:
+  The scope-sensitive access decision supplies a referent beyond the derived node syntax. The member-and-field
+  construction is only the supplied thin-thread individuation convention, not evidence of separate grant occurrences
+  or a stored lifecycle.'
+open_issues:
+- 'FLAGGED FOR STEWARD — foundational_status explicitly_deferred; this proposal does not settle the foundational
+  question. Needed evidence: Provide authorized assignment/revocation history with effective intervals and
+  a steward decision on whether changing role or scope preserves assignment identity. Include repeated equal
+  assignments and later return to the prior value; distinguish relation, establishing act and lifted representation.'
+- 'Steward thin-thread identity convention: the recipient member and source record field role, represented
+  as <member IRI>/role. There is no grant row or grant id. This is the one projection criterion, not a second
+  domain identity criterion. Changes viewer→admin→viewer, scope edits, repeated equal assignments, revocation/re-adding
+  and copied member records do not yet decide whether the same authorization assignment continues; domain identity
+  remains unresolved.'
+- 'STEWARD CHOICE REQUIRED — this is one provisional term shape, not a merged or chosen rival model. Choose
+  explicitly among: Continuing authorization relator whose level may change; Distinct grant episodes each created
+  by an assignment act; Current contextual role assertion without separately persisting grant individual. This
+  synthesis makes no selection by omission. The selected model may require a revised proposal or a separate
+  future candidate; no such additional term is admitted in this 18-key scope.'
+- 'Strongest counterexample carried forward: At successive times member.role is viewer, admin, viewer; the
+  same lifted IRI names every snapshot. That invariant node address cannot establish one continuing grant,
+  and duplicate assignments with identical endpoints could still be distinct episodes.'
+- 'Identity-card alternatives carried forward: situation; Unreified contextual member-role-scope relation'
+- 'Existential dependencies carried forward: Active assignment jointly depends on recipient membership, access-level
+  concept and applicable tenant/scope context (po:559ba5ec7c7d, po:c4054ec5a4fd). Authorized assigner is an
+  establishment condition; no evidence requires its continued existence. No grant row, grant id or historical
+  lifecycle is established (po:4ddf67948771).'
+- 'Reuse search scope: the supplied gist 14.1.0 projection and thin-thread design only; no separate reuse dispositions
+  or external search results were supplied. No exact local-term replacement was established within this bounded
+  search.'
+- 'Evidence boundary: the hypothesis discriminator is a supplied prose/design assertion, not a live test. Quoted
+  discriminator from dh:role-assignment:001: “The prose describes an authorized assignment that jointly determines
+  which member holds which role at which extent, and explicitly distinguishes organization-wide from narrower
+  access for the action-offering decision. That contextual access assignment is the intended relationship even
+  though no grant row exists.” The claim must fail for a pure data-transfer twin: an authorized, scope-sensitive
+  assignment controls where actions may be offered or refused; a node address alone cannot establish that assignment.'
+- Parent withheld pending identity and rival-model resolution. The proposed thin-thread parent is a candidate
+  only; no ancestor identity supplier has been established for this unresolved branch.
+- 'Warrant necessity: CQ-P11 requires connecting recipient, assigned access level and applicable extent. CQ-P06
+  alone could put a role directly on a membership and is not used to warrant Grant. The viable unreified contextual
+  relation remains an explicit steward choice.'
+- 'Joined IdentityCard provider fields: identity.supplies_identity=unresolved; ontoclean.supplies_identity=unresolved;
+  ontoclean.carries_identity=unresolved. Closed proposal identity value=unresolved. No unresolved provider
+  is promoted to true.'
+- 'Hypothesis alternative preserved (not automatically rejected): A derived node manufactured solely to express
+  member.role and a constant scope; representation_status=implementation_artifact_only; plausibility=viable.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

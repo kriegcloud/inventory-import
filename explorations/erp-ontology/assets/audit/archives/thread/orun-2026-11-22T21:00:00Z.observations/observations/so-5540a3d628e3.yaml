@@ -1,0 +1,32 @@
+{
+  "id": "so:sha256:5540a3d628e3d5b6652895d00c91f2a6db3621fc2c566fcdcc9e0477d959a4ed",
+  "schema_version": 1,
+  "repository": {
+    "commit": "7f7c2b3f23842437520ff77d89e79c7985e237d9",
+    "path": "packages/access/contract/src/Session/SessionState.read.ts"
+  },
+  "source_span": {
+    "start_line": 112,
+    "end_line": 135,
+    "content_sha256": "67d3c3e3a86fea04219d5138cb5250af7de59e05eb15ea359de62509b38fbb42"
+  },
+  "extractor": {
+    "id": "adapter-typescript",
+    "version": "1.0.0",
+    "parser": "typescript@7.0.2",
+    "script": "explorations/erp-ontology/assets/audit/thread/adapters/adapter-typescript.ts.txt"
+  },
+  "symbol": {
+    "qualified_name": "SignInFeatures",
+    "lexical_name": "SignInFeatures",
+    "syntactic_kind": "class"
+  },
+  "observed_facts": [
+    {
+      "predicate": "unrepresentable_construct",
+      "object": "CallExpression"
+    }
+  ],
+  "source_excerpt": "export class SignInFeatures extends S.Opaque<SignInFeatures, { readonly brand: unique symbol }>()(\n  S.Struct({\n    testAccounts: TestAccountsOffer.pipe(\n      nullAsNone({\n        description: \"TEST_ACCOUNTS: the accounts to offer and their password, or null when it is off.\"\n      })\n    ),\n    pwnedPasswordCheck: S.Boolean.pipe(\n      S.annotateKey({ description: \"PWNED_PASSWORD_CHECK: a new password is checked against known data breaches.\" })\n    ),\n    signUp: SignUpOffer.pipe(\n      S.annotateKey({\n        description:\n          \"SIGN_UP: whether the page offers making an account: open to anyone, to invited emails only, or closed.\"\n      }),\n      S.withConstructorDefault(Effect.succeed(\"closed\" as const)),\n      S.withDecodingDefaultTypeKey(Effect.succeed(\"closed\" as const))\n    )\n  }).pipe(\n    $I.annoteSchema(\"SignInFeatures\", {\n      description: \"Sign-in features the settings turned on or off, as the browser needs to know them.\"\n    })\n  )\n) {}\n",
+  "epistemic_status": "parser_derived"
+}

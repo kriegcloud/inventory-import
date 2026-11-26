@@ -1,0 +1,23 @@
+{
+  "id": "fa:membership-tenant-link-alt:001",
+  "hypothesis_ref": "dh:membership-tenant-link:001",
+  "identity_card_ref": "ic:membership-tenant-link-alt:001",
+  "tests": {
+    "spec_vs_execution": "not_applicable",
+    "world_vs_information": "separated",
+    "role_vs_bearer": "separated",
+    "context_reification_needed": true
+  },
+  "rival_models": [
+    {
+      "label": "Mediation to the workspace/tenancy (my preferred reading)",
+      "still_viable": true
+    },
+    {
+      "label": "Mediation to the Tenant role (as stated in the source)",
+      "still_viable": true
+    }
+  ],
+  "strongest_counterexample": "A successor organization inherits the workspace: the stated range (Tenant ⊑ Organization) forces memberships to change relatum silently.",
+  "verdict": "analyzed"
+}

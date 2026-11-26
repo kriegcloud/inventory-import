@@ -1,0 +1,86 @@
+id: otp:Role:001
+hypothesis_ref: dh:access-level:001
+identity_card_ref: ic:access-level:001
+foundational_status: explicitly_deferred
+term:
+  preferred_label: Role
+  local_name: Role
+  proposed_iri: https://example.org/inventory-import/ontology/Role
+  owl_entity_kind: class
+  in_scheme: ''
+definition:
+  text: An access-level meaning reusable across grants, distinguishing what a member may do, such as reading,
+    writing or managing people; this proposal selects the vocabulary-content reading provisionally.
+  source:
+  - CQ-P06
+  - po:sha256:ca99fb5e7e41f80e1e880e5034e0006aef69acd768de37966f0d9ade49f715c8
+  - po:sha256:11c53a64a26e647d69e50832c31cf1fced53e010f6b14d87dc6dc9c8b1867fa0
+  - so:sha256:4f7c7c864d772a2f736f7b40c07f6e23f253203896ed44c657a96062c829e563
+  - in/14-thin-thread.md section 2
+foundational:
+  ufo_category: unresolved
+  gufo_alignment: ''
+ontoclean:
+  rigidity: unresolved
+  identity: unresolved
+  dependence: unresolved
+parents: []
+revision_log: []
+reuse:
+  searched: true
+  exact_reuse_found: false
+  mappings: []
+operational_warrant:
+  competency_questions:
+  - CQ-P06
+  semantic_support_for: []
+alternatives_rejected:
+- 'Implementation-artifact-only null hypothesis rejected for intended denotation, not execution: The prose
+  specifies access that a grant gives a member, and the source excerpt differentiates reading, writing
+  and managing people. These are intended differences in what participants may do, beyond differences
+  between enum strings; enforcement is not demonstrated.'
+open_issues:
+- 'FLAGGED FOR STEWARD: foundational analysis is explicitly_deferred; the proposed shape is provisional
+  and does not settle the open category or identity question.'
+- 'Needed evidence (fa:access-level:001): Choose reusable level meaning versus instantiated entitlement;
+  provide policy version and semantic-change rules. The reading/writing/manage-people descriptions establish
+  intended differences, not enforcement or role-bearer identity.'
+- 'Identity criterion from ic:access-level:001: Unresolved: same level could mean identical permission
+  meaning under one policy/vocabulary version, or the same historically maintained level despite revised
+  permissions. Labels viewer/editor/admin and extensionally identical permission sets alone do not settle
+  cross-policy identity.'
+- 'Design choice requires steward ruling: retain the Role class as a class of reusable access-level meanings,
+  versus model only SKOS concepts or choose the entitlement/mode or scale-quality readings. Section 2.4
+  proposes additional Role individual typing of the same role concepts; this is an explicit proposed exception
+  requiring a category and identity ruling, not an inference from enum membership. No gist parent is defensible
+  yet; section 2.1 decision 97 provides a proposed exception, not acceptance by this synthesis.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Information object: policy meaning
+  or vocabulary-entry content reusable across assignments. Choose the proposed shape or this rival explicitly;
+  the current proposal does not decide between them. Evidence required: Choose reusable level meaning
+  versus instantiated entitlement; provide policy version and semantic-change rules. The reading/writing/manage-people
+  descriptions establish intended differences, not enforcement or role-bearer identity.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Mode: recipient-borne normative entitlement
+  conferred by a grant. Choose the proposed shape or this rival explicitly; the current proposal does
+  not decide between them. Evidence required: Choose reusable level meaning versus instantiated entitlement;
+  provide policy version and semantic-change rules. The reading/writing/manage-people descriptions establish
+  intended differences, not enforcement or role-bearer identity.'
+- 'STEWARD CHOICE REQUIRED — viable rival, not merged or rejected: Quality: position on an explicitly
+  defined access scale, if a value-space interpretation is supplied. Choose the proposed shape or this
+  rival explicitly; the current proposal does not decide between them. Evidence required: Choose reusable
+  level meaning versus instantiated entitlement; provide policy version and semantic-change rules. The
+  reading/writing/manage-people descriptions establish intended differences, not enforcement or role-bearer
+  identity.'
+- 'STEWARD CHOICE REQUIRED — hypothesis alternative remains viable: Controlled-vocabulary entry representing
+  an access level (information_artifact). This alternative is not accepted, rejected or silently merged
+  with the proposed referent.'
+- 'Reuse scope: compared with in/gist-categories.md and the steward design only. No separate reuse dispositions
+  were supplied. This is a bounded supplied-material search, not an external vocabulary search or proof
+  of absence.'
+- 'First synthesis pass: no adversarial dispositions or revision requests were supplied; all reviews and
+  acceptance remain pending.'
+revision_requests: []
+review:
+  foundational_agent: pending
+  adversarial_agent: pending
+  steward: pending
+status: proposed

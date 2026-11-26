@@ -1,0 +1,24 @@
+id: dh:personnotfound-representation:001
+observation_refs:
+- so:sha256:6086b535648a5990e39d04f21959857cdede42def27f4718d250884bfa8fbdc4
+cq_warrants: []
+proposed_referent:
+  label: PersonNotFound rejection representation
+  description: 'Candidate real/domain referents: none established. The error describes a member address
+    that does not resolve in this organization; it does not establish that a human does not exist. Instances
+    are operation-specific rejection responses.'
+representation_status: implementation_artifact_only
+alternatives:
+- label: A scoped member lookup failure
+  representation_status: domain_referent
+  plausibility: viable
+null_hypothesis:
+  label: implementation artifact only
+  rejected: false
+  rationale: The observations establish a representation but supply no fact requiring an independent domain
+    referent for this construct. The null stands.
+  discriminator: ''
+epistemic_status: proposed
+confidence:
+  value: 0.7
+  use_for_acceptance: false

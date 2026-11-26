@@ -20,7 +20,9 @@
     "./Actor": "./src/Actor.context.ts",
     "./Agent": "./src/Agent.context.ts",
     "./Identity": "./src/Identity.middleware.ts",
-    "./SameOrigin": "./src/SameOrigin.middleware.ts"
+    "./SameOrigin": "./src/SameOrigin.middleware.ts",
+    "./Terms": "./src/Terms.vocab.ts",
+    "./TermsPointer": "./src/Terms.pointer.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
@@ -30,6 +32,7 @@
   "dependencies": {
     "@beep/identity": "workspace:*",
     "@beep/schema": "workspace:*",
+    "@beep/vocabulary": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

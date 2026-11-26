@@ -59,6 +59,27 @@ describe("Vocabulary", () => {
       const publishedAt = R.get(vocabulary.datatypeProperties, "publishedAt")
       expect(O.flatMap(publishedAt, (term) => term.domain)).toEqual(O.some("Book"))
       expect(O.flatMap(publishedAt, (term) => term.evidence)).toEqual(O.none())
+      expect(O.flatMap(publishedAt, (term) => term.subPropertyOf)).toEqual(O.none())
+      expect(O.map(decodedBook, (term) => term.categoryParents)).toEqual(O.some([]))
+      expect(O.flatMap(decodedBook, (term) => term.deprecation)).toEqual(O.none())
+      expect(O.map(decodedBook, (term) => O.isSome(term.identity))).toEqual(O.some(true))
+      expect(vocabulary.gist.properties).toEqual({})
+    })
+  )
+
+  it.effect("decodes an attribute written as xsd:boolean, the datatype the party slice's flags need", () =>
+    Effect.gen(function* () {
+      const flag = {
+        prefLabel: "is lent",
+        definition: "Whether a book may leave the library on a loan.",
+        domain: "Book",
+        datatype: "xsd:boolean",
+        ratification: { decision: 3 }
+      } as const
+      const vocabulary = yield* decodeStrict({ ...twoTerms, datatypeProperties: { isLent: flag } })
+      expect(O.map(R.get(vocabulary.datatypeProperties, "isLent"), (term) => term.datatype)).toEqual(
+        O.some("xsd:boolean")
+      )
     })
   )
 
@@ -114,11 +135,17 @@ describe("the types a vocabulary module leans on", () => {
   )
 
   it("keeps the merged registry's literal terms, rdf:type included", () => {
-    const written: ReadonlyArray<RdfCurie> = ["rdf:type", "owl:disjointWith", "owl:versionIRI", "xsd:dateTime"]
+    const written: ReadonlyArray<RdfCurie> = [
+      "rdf:type",
+      "owl:disjointWith",
+      "owl:versionIRI",
+      "xsd:dateTime",
+      "xsd:boolean"
+    ]
     const leaf: XsdTerm = "string"
     // @ts-expect-error a datatype the registry lacks is not a CURIE of it
     const missing: Curie<typeof RdfVocab> = "xsd:integer"
-    expect(written).toHaveLength(4)
+    expect(written).toHaveLength(5)
     expect(RdfVocab.xsd.terms).toContain(leaf)
     expect(RdfVocab.owl.terms).toContain("disjointWith")
     expect(RdfVocab.rdf.terms).toContain("type")

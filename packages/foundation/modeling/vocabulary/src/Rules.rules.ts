@@ -8,8 +8,10 @@
  * never reads what the decision says.
  *
  * Rules the decoded value already holds are not repeated: a scheme key ends in `Scheme`, a notation is unique in its
- * scheme, a label and a definition are not empty (C2), a datatype is in the registry, a tag is one of the four, and a
- * version is a semantic version. C9 (a sub-property link) is not built: the metamodel has no field for one.
+ * scheme, a label and a definition are not empty (C2), a datatype is in the registry, a tag is one of decision 18's
+ * nine, a version is a semantic version, a retirement with no successor states its reason, and a retired term keeps
+ * its label and definition. C14 (a category's place) and C15 (a retirement, report 05's V14) are named after report 14
+ * section 6.4's thirteen.
  *
  * @packageDocumentation
  */
@@ -20,16 +22,20 @@ import * as Num from "effect/Number"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as SemVer from "effect/SemVer"
 import * as Str from "effect/String"
 import { $VocabularyId } from "./internal/identity.ts"
 import {
   ClassKey,
   Definition,
+  Deprecation,
+  GistProperty,
   IdentityCriterion,
   ParentLink,
   Ratification,
   RangeTarget,
   type ClassTerm,
+  type KindTag,
   type Vocabulary
 } from "./Model.schema.ts"
 
@@ -60,10 +66,26 @@ export const ExceptionList = S.Array(
 /** Runtime type of {@link ExceptionList}. */
 export type ExceptionList = typeof ExceptionList.Type
 
-/** The rules gate 4 runs, by their names in report 14 section 6.4. C2 and C9 are not here (the file's header says why). */
-export const RuleId = LiteralKit(["C1", "C3", "C4", "C5", "C6", "C7", "C8", "C10", "C11", "C12", "C13"]).pipe(
-  $I.annoteSchema("RuleId", { description: "A coherence rule of gate 4" })
-)
+/**
+ * The rules gate 4 runs, by their names in report 14 section 6.4, and C14 and C15 after them. C2 is not here (the
+ * file's header says why).
+ */
+export const RuleId = LiteralKit([
+  "C1",
+  "C3",
+  "C4",
+  "C5",
+  "C6",
+  "C7",
+  "C8",
+  "C9",
+  "C10",
+  "C11",
+  "C12",
+  "C13",
+  "C14",
+  "C15"
+]).pipe($I.annoteSchema("RuleId", { description: "A coherence rule of gate 4" }))
 /** Runtime type of {@link RuleId}. */
 export type RuleId = typeof RuleId.Type
 
@@ -143,6 +165,36 @@ const localParentKey = (term: ClassTerm): O.Option<string> =>
 const noParentReason = (term: ClassTerm): O.Option<string> =>
   ParentLink.guards.none(term.parent) ? O.some(term.parent.reason) : O.none()
 
+/**
+ * Every key reached from `from` by following `next` once or more. Each key is visited once, so the walk ends on a
+ * cycle; `from` is among the result only when a chain comes back to it.
+ */
+const reached = (from: string, next: (key: string) => ReadonlyArray<string>): HashSet.HashSet<string> => {
+  const walk = (frontier: ReadonlyArray<string>, seen: HashSet.HashSet<string>): HashSet.HashSet<string> => {
+    const fresh = A.dedupe(A.filter(A.flatMap(frontier, next), (key) => !HashSet.has(seen, key)))
+    return A.isReadonlyArrayNonEmpty(fresh) ? walk(fresh, HashSet.union(seen, HashSet.fromIterable(fresh))) : seen
+  }
+  return walk([from], HashSet.empty())
+}
+
+/** A class's parents in the vocabulary: its local identity-bearing parent, then its category parents (decision 12). */
+const classParents =
+  (vocabulary: Vocabulary) =>
+  (key: string): ReadonlyArray<string> =>
+    O.match(R.get(vocabulary.classes, key), {
+      onNone: () => [],
+      onSome: (term) => [...A.fromOption(localParentKey(term)), ...term.categoryParents]
+    })
+
+/** The gist classes a class falls under: the gist parent of the class or of any class above it, and their ancestors. */
+const gistAncestors = (vocabulary: Vocabulary, key: string): HashSet.HashSet<string> => {
+  const lineage = [key, ...A.fromIterable(reached(key, classParents(vocabulary)))]
+  const named = A.flatMap(lineage, (cls) => A.fromOption(O.flatMap(R.get(vocabulary.classes, cls), gistParentName)))
+  const gistParent = (name: string): ReadonlyArray<string> =>
+    A.fromOption(O.flatMap(R.get(vocabulary.gist.classes, name), (gist) => gist.parent))
+  return HashSet.fromIterable(A.flatMap(named, (name) => [name, ...A.fromIterable(reached(name, gistParent))]))
+}
+
 const tables = (vocabulary: Vocabulary): ReadonlyArray<readonly [TermKind, ReadonlyArray<string>]> => [
   ["class", R.keys(vocabulary.classes)],
   ["objectProperty", R.keys(vocabulary.objectProperties)],
@@ -162,18 +214,14 @@ const c1 = (vocabulary: Vocabulary): ReadonlyArray<Finding> => {
   )
 }
 
-/** True when following local parents from `start` comes back to it. */
-const onCycle = (vocabulary: Vocabulary, start: string): boolean => {
-  const step = (key: string, left: number): boolean => {
-    const next = O.flatMap(R.get(vocabulary.classes, key), localParentKey)
-    if (O.isNone(next)) return false
-    if (next.value === start) return true
-    return left > 0 && step(next.value, left - 1)
-  }
-  return step(start, R.size(vocabulary.classes))
-}
+/** True when following local and category parents from `start` comes back to it. */
+const onCycle = (vocabulary: Vocabulary, start: string): boolean =>
+  HashSet.has(reached(start, classParents(vocabulary)), start)
 
-/** C3: a gist parent is on the gist list, a local parent is a class of the vocabulary, and no class is its own ancestor. */
+/**
+ * C3: a gist parent is on the gist list, a local parent and each category parent are classes of the vocabulary, and
+ * no class is its own ancestor through either kind of parent (decision 12).
+ */
 const c3 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
   A.flatMap(R.toEntries(vocabulary.classes), ([key, term]) => [
     ...O.match(gistParentName(term), {
@@ -190,6 +238,11 @@ const c3 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
           ? []
           : [finding("C3", "class", key, `Its parent ${parent} is not a class of the vocabulary.`)]
     }),
+    ...A.flatMap(term.categoryParents, (category) =>
+      R.has(vocabulary.classes, category)
+        ? []
+        : [finding("C3", "class", key, `Its category parent ${category} is not a class of the vocabulary.`)]
+    ),
     ...(onCycle(vocabulary, key) ? [finding("C3", "class", key, "Its chain of parents comes back to it.")] : [])
   ])
 
@@ -286,13 +339,61 @@ const c6 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
       : [])
   ])
 
-/** C7: an inherited identity criterion needs a local parent to inherit it from. */
+const IdentityShape = LiteralKit(["stated", "inherited", "absent"])
+type IdentityShape = typeof IdentityShape.Type
+
+/**
+ * The identity criterion each tag carries (report 05's V17, as far as the metamodel holds it): a rigid sort states
+ * its own, a subkind, phase or role inherits its bearer's, and a category supplies none (decision 12).
+ */
+const identityByTag: { readonly [Tag in KindTag]: IdentityShape } = {
+  kind: "stated",
+  subkind: "inherited",
+  role: "inherited",
+  phase: "inherited",
+  relator: "stated",
+  event: "stated",
+  information: "stated",
+  category: "absent",
+  value: "stated"
+}
+
+const identityShape = (term: ClassTerm): IdentityShape =>
+  O.match(term.identity, {
+    onNone: (): IdentityShape => "absent",
+    onSome: (identity) =>
+      IdentityCriterion.match(identity, {
+        stated: (): IdentityShape => "stated",
+        inherited: (): IdentityShape => "inherited"
+      })
+  })
+
+/**
+ * C7: a class's identity criterion agrees with its tag, and an inherited one has a local parent to inherit it from.
+ * One finding a class: a criterion of the wrong shape is reported before a missing parent. A role with no local
+ * parent is C11's alone: it has no bearer whose criterion it could inherit, and V17's `notApplicable` is not built.
+ */
 const c7 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
-  A.flatMap(R.toEntries(vocabulary.classes), ([key, term]) =>
-    IdentityCriterion.guards.inherited(term.identity) && O.isNone(localParentKey(term))
+  A.flatMap(R.toEntries(vocabulary.classes), ([key, term]) => {
+    const expected = identityByTag[term.tag]
+    const actual = identityShape(term)
+    if (term.tag === "role" && O.isNone(localParentKey(term))) {
+      return []
+    }
+    if (expected !== actual) {
+      return [
+        finding(
+          "C7",
+          "class",
+          key,
+          `It is tagged ${term.tag}, so its identity criterion is ${expected}, not ${actual}.`
+        )
+      ]
+    }
+    return actual === "inherited" && O.isNone(localParentKey(term))
       ? [finding("C7", "class", key, "It inherits its identity criterion but has no parent in the vocabulary.")]
       : []
-  )
+  })
 
 const domainFindings = (
   vocabulary: Vocabulary,
@@ -328,6 +429,98 @@ const c8 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
       domainFindings(vocabulary, "datatypeProperty", key, term.domain)
     )
   )
+
+/** True when the class `key` falls under the gist class `gist` names, or when `gist` names none. */
+const domainFits = (vocabulary: Vocabulary, key: O.Option<string>, gist: O.Option<string>): boolean =>
+  O.match(gist, {
+    onNone: () => true,
+    onSome: (name) => O.exists(key, (cls) => HashSet.has(gistAncestors(vocabulary, cls), name))
+  })
+
+const domainCheck = (
+  vocabulary: Vocabulary,
+  kind: TermKind,
+  key: string,
+  domain: O.Option<string>,
+  gist: GistProperty
+): ReadonlyArray<Finding> =>
+  domainFits(vocabulary, domain, gist.domain)
+    ? []
+    : [finding("C9", kind, key, "Its domain does not fall under the domain of the gist property it sits under.")]
+
+/**
+ * C9 (decision 16): a property's gist parent is a gist property of its own kind on the gist list, and the property's
+ * domain and range fall under that gist property's. A domain falls under a gist class its class reaches through its
+ * parents, category parents included; a scheme range falls under no gist class, since concepts are typed by SKOS only
+ * (decision 17); a datatype falls under the same datatype only. A gist property that declares no domain or range
+ * accepts any.
+ */
+const c9 = (vocabulary: Vocabulary): ReadonlyArray<Finding> => {
+  const parentOf = (name: string): O.Option<GistProperty> => R.get(vocabulary.gist.properties, name)
+  const missing = (kind: TermKind, key: string, name: string): Finding =>
+    finding("C9", kind, key, `Its gist parent ${name} is not on the gist list.`)
+  return [
+    ...A.flatMap(R.toEntries(vocabulary.objectProperties), ([key, term]) =>
+      O.match(term.subPropertyOf, {
+        onNone: () => [],
+        onSome: ({ name }) =>
+          O.match(parentOf(name), {
+            onNone: () => [missing("objectProperty", key, name)],
+            onSome: (gist) =>
+              GistProperty.match(gist, {
+                datatype: () => [
+                  finding("C9", "objectProperty", key, `It is a relation and its gist parent ${name} an attribute.`)
+                ],
+                object: (relation) => [
+                  ...domainCheck(vocabulary, "objectProperty", key, term.domain, relation),
+                  ...(RangeTarget.match(term.range, {
+                    class: (range) => domainFits(vocabulary, O.some(range.key), relation.range),
+                    scheme: () => O.isNone(relation.range)
+                  })
+                    ? []
+                    : [
+                        finding(
+                          "C9",
+                          "objectProperty",
+                          key,
+                          `Its range does not fall under the range of its gist parent ${name}.`
+                        )
+                      ])
+                ]
+              })
+          })
+      })
+    ),
+    ...A.flatMap(R.toEntries(vocabulary.datatypeProperties), ([key, term]) =>
+      O.match(term.subPropertyOf, {
+        onNone: () => [],
+        onSome: ({ name }) =>
+          O.match(parentOf(name), {
+            onNone: () => [missing("datatypeProperty", key, name)],
+            onSome: (gist) =>
+              GistProperty.match(gist, {
+                object: () => [
+                  finding("C9", "datatypeProperty", key, `It is an attribute and its gist parent ${name} a relation.`)
+                ],
+                datatype: (attribute) => [
+                  ...domainCheck(vocabulary, "datatypeProperty", key, term.domain, attribute),
+                  ...(O.match(attribute.range, { onNone: () => true, onSome: (datatype) => datatype === term.datatype })
+                    ? []
+                    : [
+                        finding(
+                          "C9",
+                          "datatypeProperty",
+                          key,
+                          `Its datatype is not the datatype of its gist parent ${name}.`
+                        )
+                      ])
+                ]
+              })
+          })
+      })
+    )
+  ]
+}
 
 /** C10: a scheme has at least one concept, and a concept's `alsoInstanceOf` names a class of the vocabulary. */
 const c10 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
@@ -412,6 +605,130 @@ const c13 = (vocabulary: Vocabulary): ReadonlyArray<Finding> => {
   ]
 }
 
+const isCategory = (vocabulary: Vocabulary, key: string): boolean =>
+  O.exists(R.get(vocabulary.classes, key), (term) => term.tag === "category")
+
+/**
+ * C14 (decision 12): a category parent is a class tagged category, named once; and a category is never a class's one
+ * identity-bearing parent, since it supplies no identity criterion to inherit. A category parent that is no class at
+ * all is C3's.
+ */
+const c14 = (vocabulary: Vocabulary): ReadonlyArray<Finding> =>
+  A.flatMap(R.toEntries(vocabulary.classes), ([key, term]) => [
+    ...A.flatMap(term.categoryParents, (category, index) => [
+      ...(R.has(vocabulary.classes, category) && !isCategory(vocabulary, category)
+        ? [finding("C14", "class", key, `Its category parent ${category} is not tagged category.`)]
+        : []),
+      ...(A.contains(A.take(term.categoryParents, index), category)
+        ? [finding("C14", "class", key, `It names the category parent ${category} twice.`)]
+        : [])
+    ]),
+    ...O.match(localParentKey(term), {
+      onNone: () => [],
+      onSome: (parent) =>
+        isCategory(vocabulary, parent)
+          ? [finding("C14", "class", key, `Its one parent ${parent} is a category, which supplies no identity.`)]
+          : []
+    })
+  ])
+
+type Retirable = { readonly deprecation: O.Option<Deprecation> }
+
+const successorOf =
+  <T extends Retirable>(table: Readonly<Record<string, T>>) =>
+  (key: string): ReadonlyArray<string> =>
+    A.fromOption(
+      O.flatMap(
+        O.flatMap(R.get(table, key), (term) => term.deprecation),
+        (retired) => (Deprecation.guards.replaced(retired) ? O.some(retired.replacedBy) : O.none())
+      )
+    )
+
+/** The retirement findings of one table: a successor of the same table, no cycle of successors, a version not ahead. */
+const retirements = <T extends Retirable>(
+  vocabulary: Vocabulary,
+  kind: TermKind,
+  table: Readonly<Record<string, T>>,
+  keyOf: (key: string) => string
+): ReadonlyArray<Finding> =>
+  A.flatMap(R.toEntries(table), ([key, term]) =>
+    O.match(term.deprecation, {
+      onNone: () => [],
+      onSome: (retired) => [
+        ...(SemVer.isGreaterThan(retired.since, vocabulary.version)
+          ? [
+              finding(
+                "C15",
+                kind,
+                keyOf(key),
+                `It is retired from ${SemVer.format(retired.since)}, after the vocabulary's ${SemVer.format(vocabulary.version)}.`
+              )
+            ]
+          : []),
+        ...Deprecation.match(retired, {
+          withdrawn: () => [],
+          replaced: ({ replacedBy }) =>
+            !R.has(table, replacedBy)
+              ? [finding("C15", kind, keyOf(key), `Its successor ${replacedBy} is not a term of the same table.`)]
+              : HashSet.has(reached(key, successorOf(table)), key)
+                ? [finding("C15", kind, keyOf(key), "Its chain of successors comes back to it.")]
+                : []
+        })
+      ]
+    })
+  )
+
+const isRetired = <T extends Retirable>(table: Readonly<Record<string, T>>, key: string): boolean =>
+  O.exists(R.get(table, key), (term) => O.isSome(term.deprecation))
+
+/** One finding when a live term's link names a retired term of the table: decision 33 drops the retired term's axioms. */
+const liveLink = <T extends Retirable>(
+  kind: TermKind,
+  key: string,
+  link: string,
+  table: Readonly<Record<string, T>>,
+  target: string
+): ReadonlyArray<Finding> =>
+  isRetired(table, target)
+    ? [finding("C15", kind, key, `Its ${link} ${target} is retired; retarget the link or retire the term.`)]
+    : []
+
+/**
+ * C15 (decision 33, report 05's V14): a retired term's successor is a term of its own table (a concept's, a notation of
+ * its scheme), the successors form no cycle, and its retirement is not dated after the vocabulary's version. A
+ * successor may itself retire later: the earlier edge stays the fact of that retirement. A live class's parent and
+ * category parents, and a live property's domain and range, name no retired term.
+ */
+const c15 = (vocabulary: Vocabulary): ReadonlyArray<Finding> => {
+  const { classes, datatypeProperties, objectProperties, schemes } = vocabulary
+  const live = <T extends Retirable>(table: Readonly<Record<string, T>>): ReadonlyArray<readonly [string, T]> =>
+    A.filter(R.toEntries(table), ([, term]) => O.isNone(term.deprecation))
+  const same = (key: string): string => key
+  return [
+    ...retirements(vocabulary, "class", classes, same),
+    ...retirements(vocabulary, "objectProperty", objectProperties, same),
+    ...retirements(vocabulary, "datatypeProperty", datatypeProperties, same),
+    ...retirements(vocabulary, "scheme", schemes, same),
+    ...A.flatMap(R.toEntries(schemes), ([schemeKey, scheme]) =>
+      retirements(vocabulary, "concept", scheme.concepts, (notation) => `${schemeKey}-${notation}`)
+    ),
+    ...A.flatMap(live(classes), ([key, term]) => [
+      ...A.flatMap(A.fromOption(localParentKey(term)), (parent) => liveLink("class", key, "parent", classes, parent)),
+      ...A.flatMap(term.categoryParents, (category) => liveLink("class", key, "category parent", classes, category))
+    ]),
+    ...A.flatMap(live(objectProperties), ([key, term]) => [
+      ...A.flatMap(A.fromOption(term.domain), (domain) => liveLink("objectProperty", key, "domain", classes, domain)),
+      ...RangeTarget.match(term.range, {
+        class: (range) => liveLink("objectProperty", key, "range", classes, range.key),
+        scheme: (range) => liveLink("objectProperty", key, "range", schemes, range.key)
+      })
+    ]),
+    ...A.flatMap(live(datatypeProperties), ([key, term]) =>
+      A.flatMap(A.fromOption(term.domain), (domain) => liveLink("datatypeProperty", key, "domain", classes, domain))
+    )
+  ]
+}
+
 /**
  * Gate 4: every broken coherence rule of a decoded vocabulary, in rule order, then in the order the terms are written.
  * An empty result means the vocabulary is coherent. The caller decodes the vocabulary and the exception list first,
@@ -429,9 +746,12 @@ export const coherenceFindings = (input: CoherenceInput): ReadonlyArray<Finding>
     ...c6(vocabulary),
     ...c7(vocabulary),
     ...c8(vocabulary),
+    ...c9(vocabulary),
     ...c10(vocabulary),
     ...c11(vocabulary),
     ...c12(vocabulary, exceptions, decisions),
-    ...c13(vocabulary)
+    ...c13(vocabulary),
+    ...c14(vocabulary),
+    ...c15(vocabulary)
   ]
 }

@@ -11,14 +11,14 @@ import { CoreVocab, type Curie, mergeVocab } from "@beep/identity/Vocab"
 /**
  * The registry the writer takes every predicate and type from: `CoreVocab`, plus `owl:disjointWith` and
  * `owl:versionIRI`, which `CoreVocab` lacks, and an `xsd` prefix holding only the datatypes a vocabulary states.
- * A datatype is added here by the slice that first writes it; `owl:AllDisjointClasses` is not added, because a
- * projection states disjointness as pairs.
+ * A datatype is added here by the slice that first writes it (`boolean` by the party slice, for its flags);
+ * `owl:AllDisjointClasses` is not added, because a projection states disjointness as pairs.
  *
- * @example RdfVocab.xsd.terms // ["string", "dateTime"]
+ * @example RdfVocab.xsd.terms // ["string", "dateTime", "boolean"]
  */
 export const RdfVocab = mergeVocab(CoreVocab, {
   owl: { iri: CoreVocab.owl.iri, terms: [...CoreVocab.owl.terms, "disjointWith", "versionIRI"] },
-  xsd: { iri: "http://www.w3.org/2001/XMLSchema#", terms: ["string", "dateTime"] }
+  xsd: { iri: "http://www.w3.org/2001/XMLSchema#", terms: ["string", "dateTime", "boolean"] }
 } as const)
 
 /** Runtime type of {@link RdfVocab}. */

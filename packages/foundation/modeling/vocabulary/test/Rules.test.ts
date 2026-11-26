@@ -1,10 +1,13 @@
 // Gate 4's rules on a small vocabulary of an example library, not this repository's: the valid one gives no finding,
 // and each copy changed to break one rule gives that rule's findings and no other. The decision log is text handed
-// in, so C12's planted number 999 changes no committed file.
+// in, so C12's planted number 999 changes no committed file. The party slice's constructs (a category, a retirement,
+// a gist property) are planted on copies too, each beside a near miss that passes; the gist properties C9 compares
+// with are written on planted gist lists only, never read from gist's file.
 import { describe, expect, it } from "@effect/vitest"
 import { Vocabulary } from "@beep/vocabulary/Model"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as HashSet from "effect/HashSet"
 import * as Num from "effect/Number"
 import * as S from "effect/Schema"
@@ -453,6 +456,376 @@ describe("what the decode holds before any rule runs", () => {
     Effect.gen(function* () {
       const refusal = yield* Effect.flip(decodeExceptions([{ ...exceptions[0], class: "ex:Genre" }]))
       expect(refusal.message).toContain("class")
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// Categories (decision 12): C3's walk, C7's absent criterion and C14
+// ---------------------------------------------------------------------------------------------------------------
+
+const lenderReason = "A category over libraries and members who lend; it supplies no identity of its own."
+
+/** A category over the kinds that lend, with no identity criterion and no gist parent. */
+const lender = {
+  prefLabel: "Lender",
+  definition: "Anything that lends books, whether a library or one of its members.",
+  tag: "category",
+  parent: { kind: "none", reason: lenderReason },
+  ratification: accepted
+} as const
+
+const withLender = {
+  ...valid,
+  classes: { ...valid.classes, Lender: lender, Library: { ...library, categoryParents: ["Lender"] } }
+} as const satisfies typeof Vocabulary.Encoded
+
+const lenderExceptions = [...exceptions, { class: "Lender", reason: lenderReason, ratification: { decision: 2 } }]
+
+/** The findings of a copy of the library with the category, its exception entry beside the library's own. */
+const findingsWithLender = (classes: object) =>
+  findingsWith({ ...withLender, classes: { ...withLender.classes, ...classes } }, lenderExceptions)
+
+describe("a category and its category parents", () => {
+  it.effect("near miss: a category with no criterion, under which a class with its own gist parent falls, passes", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({})
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("near miss: a subkind that inherits its local parent's criterion passes", () =>
+    Effect.gen(function* () {
+      const paperback = {
+        ...book,
+        prefLabel: "Paperback",
+        tag: "subkind",
+        parent: { kind: "local", key: "Book" },
+        identity: { kind: "inherited" }
+      }
+      const found = yield* findingsOf(withClasses({ Paperback: paperback }))
+      expect(found).toEqual([])
+    })
+  )
+
+  it.effect("C3: a category parent that is not a class of the vocabulary", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({ Library: { ...library, categoryParents: ["Borrower"] } })
+      expect(found).toEqual([["C3", "class", "Library"]])
+    })
+  )
+
+  it.effect("C3: a category that is its own category parent, a cycle only the category link closes", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({ Lender: { ...lender, categoryParents: ["Lender"] } })
+      expect(found).toEqual([["C3", "class", "Lender"]])
+    })
+  )
+
+  it.effect("C7: a category that states an identity criterion", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({ Lender: { ...lender, identity: library.identity } })
+      expect(found).toEqual([["C7", "class", "Lender"]])
+    })
+  )
+
+  it.effect("C7: a kind with no identity criterion", () =>
+    Effect.gen(function* () {
+      const noCriterion = {
+        prefLabel: book.prefLabel,
+        definition: book.definition,
+        tag: book.tag,
+        parent: book.parent,
+        ratification: accepted
+      }
+      const found = yield* findingsOf(withClasses({ Book: noCriterion }))
+      expect(found).toEqual([["C7", "class", "Book"]])
+    })
+  )
+
+  it.effect("C7: a subkind that inherits its criterion but has a gist parent, not a local one", () =>
+    Effect.gen(function* () {
+      const paperback = { ...book, prefLabel: "Paperback", tag: "subkind", identity: { kind: "inherited" } }
+      const found = yield* findingsOf(withClasses({ Paperback: paperback }))
+      expect(found).toEqual([["C7", "class", "Paperback"]])
+    })
+  )
+
+  it.effect("C7: a role under a local parent that states its own criterion instead of inheriting it", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(withClasses({ Branch: { ...branch, identity: library.identity } }))
+      expect(found).toEqual([["C7", "class", "Branch"]])
+    })
+  )
+
+  it.effect("C14: a category parent that is not tagged category", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({ Library: { ...library, categoryParents: ["Book"] } })
+      expect(found).toEqual([["C14", "class", "Library"]])
+    })
+  )
+
+  it.effect("C14: a category parent named twice", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({ Library: { ...library, categoryParents: ["Lender", "Lender"] } })
+      expect(found).toEqual([["C14", "class", "Library"]])
+    })
+  )
+
+  it.effect("C14: a category as a class's one identity-bearing parent", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsWithLender({ Branch: { ...branch, parent: { kind: "local", key: "Lender" } } })
+      expect(found).toEqual([["C14", "class", "Branch"]])
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// Retirement (decision 33, report 05's V14): C15
+// ---------------------------------------------------------------------------------------------------------------
+
+const replaced = (by: string, since: string) => ({ kind: "replaced", replacedBy: by, since }) as const
+const withdrawn = { kind: "withdrawn", reason: "No longer kept in any branch's catalogue.", since: "0.1.0" } as const
+
+/** A copy of the library whose loan status scheme holds the given concepts beside its own. */
+const withStatuses = (concepts: object): unknown => ({
+  ...valid,
+  schemes: {
+    ...valid.schemes,
+    LoanStatusScheme: { ...loanStatusScheme, concepts: { ...loanStatusScheme.concepts, ...concepts } }
+  }
+})
+
+describe("a retired term", () => {
+  it.effect(
+    "near miss: an earlier replacement stands when its successor retires in turn, and a withdrawn successor",
+    () =>
+      Effect.gen(function* () {
+        const found = yield* findingsOf(
+          withStatuses({
+            lent: { ...concept("lent"), deprecation: replaced("out", "0.1.0") },
+            out: { ...concept("out"), deprecation: replaced("on-loan", "0.1.0") },
+            kept: { ...concept("kept"), deprecation: replaced("lost", "0.1.0") },
+            lost: { ...concept("lost"), deprecation: withdrawn }
+          })
+        )
+        expect(found).toEqual([])
+      })
+  )
+
+  it.effect("a retired class's own parent is not checked, its axioms being dropped; a live range naming it is", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(withClasses({ Branch: { ...branch, deprecation: replaced("Library", "0.1.0") } }))
+      expect(found).toEqual([["C15", "objectProperty", "heldAt"]])
+    })
+  )
+
+  it.effect("C15: a successor that is not a term of the same table", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(
+        withStatuses({ lent: { ...concept("lent"), deprecation: replaced("missing", "0.1.0") } })
+      )
+      expect(found).toEqual([["C15", "concept", "LoanStatusScheme-lent"]])
+      const crossed = yield* findingsOf(withClasses({ Genre: { ...genre, deprecation: replaced("loanOf", "0.1.0") } }))
+      expect(crossed).toEqual([["C15", "class", "Genre"]])
+    })
+  )
+
+  it.effect("C15: two concepts that replace each other", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(
+        withStatuses({
+          lent: { ...concept("lent"), deprecation: replaced("out", "0.1.0") },
+          out: { ...concept("out"), deprecation: replaced("lent", "0.1.0") }
+        })
+      )
+      expect(found).toEqual([
+        ["C15", "concept", "LoanStatusScheme-lent"],
+        ["C15", "concept", "LoanStatusScheme-out"]
+      ])
+    })
+  )
+
+  it.effect("C15: a retirement dated after the vocabulary's version", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(
+        withStatuses({ lent: { ...concept("lent"), deprecation: replaced("on-loan", "0.2.0") } })
+      )
+      expect(found).toEqual([["C15", "concept", "LoanStatusScheme-lent"]])
+    })
+  )
+
+  it.effect("C15: live properties whose domain or range is a retired class or scheme", () =>
+    Effect.gen(function* () {
+      const copy = {
+        ...valid,
+        classes: { ...valid.classes, Book: { ...book, deprecation: withdrawn } },
+        schemes: { ...valid.schemes, LoanStatusScheme: { ...loanStatusScheme, deprecation: withdrawn } }
+      }
+      const found = yield* findingsOf(copy)
+      expect(found).toEqual([
+        ["C15", "objectProperty", "loanOf"],
+        ["C15", "objectProperty", "loanStatus"],
+        ["C15", "datatypeProperty", "publishedAt"]
+      ])
+    })
+  )
+
+  it.effect("C15: a live class whose parent or category parent is retired", () =>
+    Effect.gen(function* () {
+      const parent = yield* findingsOf(withClasses({ Library: { ...library, deprecation: withdrawn } }))
+      expect(parent).toEqual([["C15", "class", "Branch"]])
+      const category = yield* findingsWithLender({ Lender: { ...lender, deprecation: withdrawn } })
+      expect(category).toEqual([["C15", "class", "Library"]])
+    })
+  )
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// A property under a gist property (decision 16): C9, on planted gist lists
+// ---------------------------------------------------------------------------------------------------------------
+
+/** A planted gist list: two gist classes over the library's, and gist properties with the domains and ranges C9 reads. */
+const gistWithProperties = {
+  ...gist,
+  classes: { ...gist.classes, TemporalRelation: { parent: "Thing" }, Thing: {} },
+  properties: {
+    isCategorizedBy: { kind: "object" },
+    categorizedAs: { kind: "object", range: "Content" },
+    occursIn: { kind: "object", domain: "Thing", range: "Content" },
+    servedBy: { kind: "object", domain: "Organization" },
+    startDateTime: { kind: "datatype", range: "xsd:dateTime" },
+    name: { kind: "datatype", range: "xsd:string" }
+  }
+} as const
+
+/** A copy of the library on the planted gist list, one object property and one datatype property changed. */
+const onGistList = (objectProperties: object, datatypeProperties: object): unknown => ({
+  ...valid,
+  gist: gistWithProperties,
+  objectProperties: { ...valid.objectProperties, ...objectProperties },
+  datatypeProperties: { ...valid.datatypeProperties, ...datatypeProperties }
+})
+
+const gistParent = (name: string) => ({ subPropertyOf: { kind: "gist", name } }) as const
+
+describe("a property under a gist property", () => {
+  it.effect(
+    "near miss: domains and ranges that fall under the gist property's, through gist ancestors and local parents",
+    () =>
+      Effect.gen(function* () {
+        const found = yield* findingsOf(
+          onGistList(
+            {
+              loanOf: { ...loanOf, ...gistParent("occursIn") },
+              loanStatus: { ...loanStatus, ...gistParent("isCategorizedBy") },
+              heldAt: {
+                ...heldAt,
+                domain: "Branch",
+                range: { kind: "class", key: "Branch" },
+                ...gistParent("servedBy")
+              }
+            },
+            { publishedAt: { ...publishedAt, ...gistParent("startDateTime") } }
+          )
+        )
+        expect(found).toEqual([])
+      })
+  )
+
+  it.effect("C9: a gist parent that is not on the gist list", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(
+        onGistList(
+          { loanOf: { ...loanOf, ...gistParent("hasPart") } },
+          { publishedAt: { ...publishedAt, ...gistParent("startedAt") } }
+        )
+      )
+      expect(found).toEqual([
+        ["C9", "objectProperty", "loanOf"],
+        ["C9", "datatypeProperty", "publishedAt"]
+      ])
+    })
+  )
+
+  it.effect("C9: a relation under a gist attribute, and an attribute under a gist relation", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(
+        onGistList(
+          { loanOf: { ...loanOf, ...gistParent("name") } },
+          { publishedAt: { ...publishedAt, ...gistParent("occursIn") } }
+        )
+      )
+      expect(found).toEqual([
+        ["C9", "objectProperty", "loanOf"],
+        ["C9", "datatypeProperty", "publishedAt"]
+      ])
+    })
+  )
+
+  it.effect("C9: a domain that does not fall under the gist property's, and one left undeclared", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(
+        onGistList(
+          {
+            loanOf: { ...loanOf, domain: "Book", ...gistParent("occursIn") },
+            heldAt: { ...heldAt, ...gistParent("servedBy") }
+          },
+          {}
+        )
+      )
+      expect(found).toEqual([
+        ["C9", "objectProperty", "loanOf"],
+        ["C9", "objectProperty", "heldAt"]
+      ])
+    })
+  )
+
+  it.effect(
+    "C9: a class range outside the gist range, and a scheme range under a gist property with a class range",
+    () =>
+      Effect.gen(function* () {
+        const found = yield* findingsOf(
+          onGistList(
+            {
+              loanOf: { ...loanOf, range: { kind: "class", key: "Library" }, ...gistParent("occursIn") },
+              loanStatus: { ...loanStatus, ...gistParent("categorizedAs") }
+            },
+            {}
+          )
+        )
+        expect(found).toEqual([
+          ["C9", "objectProperty", "loanOf"],
+          ["C9", "objectProperty", "loanStatus"]
+        ])
+      })
+  )
+
+  it.effect("C9: a datatype that is not the gist property's", () =>
+    Effect.gen(function* () {
+      const found = yield* findingsOf(onGistList({}, { publishedAt: { ...publishedAt, ...gistParent("name") } }))
+      expect(found).toEqual([["C9", "datatypeProperty", "publishedAt"]])
+    })
+  )
+})
+
+describe("what the decode holds for the party slice's constructs", () => {
+  it.effect("decodes each of decision 18's nine tags and refuses a tenth", () =>
+    Effect.gen(function* () {
+      for (const tag of ["kind", "subkind", "role", "phase", "relator", "event", "information", "category", "value"]) {
+        const decoded = yield* Effect.exit(decodeVocabulary(withClasses({ Book: { ...book, tag } })))
+        expect(Exit.isSuccess(decoded)).toBe(true)
+      }
+      const refusal = yield* Effect.flip(decodeVocabulary(withClasses({ Book: { ...book, tag: "mixin" } })))
+      expect(refusal.message).toContain("tag")
+    })
+  )
+
+  it.effect("refuses a withdrawn term with no reason", () =>
+    Effect.gen(function* () {
+      const noReason = { kind: "withdrawn", since: withdrawn.since }
+      const refusal = yield* Effect.flip(decodeVocabulary(withClasses({ Genre: { ...genre, deprecation: noReason } })))
+      expect(refusal.message).toContain("reason")
     })
   )
 })

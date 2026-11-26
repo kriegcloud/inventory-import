@@ -15,10 +15,10 @@ pull request is merged, not when it is opened.
 | 1 | The five rulings, and this packet | 17 | done: merged 2026-11-26 |
 | 2 | The draft machine's failing property | 19 | done: merged 2026-11-26. The machine was wrong in both orderings, not the property (below) |
 | 3 | A test of the facet filter on a table with rows | 18 | done: merged 2026-11-26 |
-| 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | doing: open, `bun run check` 107 of 107, seen on screen (below) |
+| 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | done: merged 2026-11-26 |
 | 6, 7 | Outside the review package: 48 places to 36 | 20 | done: merged 2026-11-26 |
-| 7b | What is left, 104 places in 30 files, by Benjamin's four rulings of 2026-11-26 (below) | `feat/defaults-last` | doing: a Codex lane |
-| 8 | Close: both goals' closing notes and `status: done`; the merged worktrees and branches removed | | todo |
+| 7b | What was left, 104 places in 30 files, by Benjamin's rulings of 2026-11-26 (below): the baseline names no file | 22 | doing: open, `bun run check` 107 of 107, seen on screen (below) |
+| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | | todo: after 22 is merged |
 
 ## The failing property (step 2)
 
@@ -36,6 +36,11 @@ exactly, though a match may leave only part of it. Both seeds are replayed in th
 - Another library handing back nothing (the table, the virtual list, an atom's first read of itself, a portal
   target, the Web Locks default): each behind a small adapter file of ours, and only those files exempted. About 17
   places in 5 files.
+- The three public APIs that run `Effect.runSync` (`stringify`, the one Reactivity, the workbook writer): their three
+  files on the exemptions list. 3 places.
+- `TotalCells.text` returns an Option, and the screen decides at its last step. 1 place.
+- The four starting values the lane kept (`CountStart`, `FacetStart`, and in test support `TabIdentity` and
+  `WriterStart`): ratified as they were.
 - A lane may lower a strict ceiling: the earlier lanes put seven good moves back because they were told not to.
 
 ## Seen on screen
@@ -58,11 +63,31 @@ Dana Whitfield.
 - Not seen on screen: "Not recorded" and a suggestion with no confidence. A fresh import records an author and a
   confidence for every decision, so neither can be reached without a row edited by hand.
 
+2026-11-26, on the branch of pull request 22 (the adapters and the Option reader), a fresh database, port 5174,
+signed in as Dana Whitfield. No error in the browser's console.
+
+- Pressed "Use items_messy.csv". It read "Stopped before it was saved" again, as on the first look; pressed
+  Continue. The steps sat in the top bar beside the breadcrumb. Review read: "200 rows read · 20 values fixed for
+  you", Needs a decision 24, Cannot import 21, Ready 155, All 200.
+- Pressed "All 200": row 2 read "Fiberglass Crate, XRR-0266, Ready", row 4 "Oak Cutting Oil, YDR-8742, SKU clash
+  row 10". Pressed the Category filter: Component 1, components 38, Finished Good 2, finished-goods 29, Misc 2,
+  packaging 34, raw-materials 44, supplies 50, which add to 200. Picked "Misc 2": two rows, 40 Steel Planter and
+  116 Rubber Sheet 4x8.
+- Pressed "Import 155, skip 45", then "Import 155 items". Result read: Not imported 45, Imported 155, Already there
+  0, All 200. The Items page read "155 items", 20 rows, "Page 1 of 8".
+- Activity read Decisions 20, Events 2, Imports 1. People read "3 people", and its Role filter Admin 1, Editor 1,
+  Viewer 1.
+- Not seen on screen: a column a row does not hold, the case the reader's None is for. No file reaches it.
+
 ## Blocker
 
 None.
 
 ## Choices made along the way
+
+- 2026-11-26. "Use items_messy.csv" on a dev server just started read "Stopped before it was saved" on both looks,
+  and Continue went on. Not diagnosed: it may be the dev server's first build of the reader, or a defect in the
+  sample's first press. Somebody should press it on a production build before this is called nothing.
 
 - 2026-11-26. The stored change's `confidence` and a left-out row's `name` became optional on the wire, so absence
   is carried as absence. Stored columns are unchanged.
